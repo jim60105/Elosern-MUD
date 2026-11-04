@@ -75,10 +75,10 @@ class FreeformResolverGateTests(EvenniaTestCase):
         self.actor.traits.mp.current = 500
         self.field = Battlefield(
             {
-                "party": frozenset({"freeform caster"}),
-                "foes": frozenset({"freeform target"}),
+                'party': frozenset({"fixture:freeform caster"}),
+                'foes': frozenset({"fixture:freeform target"}),
             },
-            {"freeform caster": self.actor, "freeform target": self.target},
+            {"fixture:freeform caster": self.actor, "fixture:freeform target": self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 
@@ -181,10 +181,10 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
         self.actor.traits.mp.current = 500
         self.field = Battlefield(
             {
-                "party": frozenset({"freeform caster"}),
-                "foes": frozenset({"scale contract target"}),
+                'party': frozenset({"fixture:freeform caster"}),
+                'foes': frozenset({"fixture:scale contract target"}),
             },
-            {"freeform caster": self.actor, "scale contract target": self.target},
+            {"fixture:freeform caster": self.actor, "fixture:scale contract target": self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 

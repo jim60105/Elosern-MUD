@@ -36,6 +36,7 @@ from typing import Any, Mapping
 from evennia.utils.ansi import strip_ansi
 
 from world.rules.event_log import EventEntry, EventLog, render_entry_text
+from world.rules.combat_identity import stable_actor_id
 
 
 # The closed beat-kind set (design D5). A kind joins this set only through a
@@ -66,7 +67,8 @@ class RoundRecord:
         logs: The round's OWN event logs, in resolution order. A terminal
             settlement's defeat-aftermath logs are not part of the round and
             must not be passed here.
-        identities: Roster key → dbref for every participant of the round.
+        identities: Stable individual identity → dbref for every participant
+            of the round. The roster key is that same identity.
         hp_before: dbref → stored HP before the round.
         hp_after: dbref → stored HP at the committed end of the round, read
             before any terminal settlement.
@@ -110,12 +112,14 @@ class CombatBeatsView:
 def capture_round_hp(battlefield: Any) -> tuple[dict[str, int], dict[int, int]]:
     """Read the roster's identities and stored HP at one round boundary.
 
-    Returns ``(identities, hp)`` where ``identities`` maps every roster key to
-    its dbref and ``hp`` maps every dbref to its stored current HP. Both terms
-    come from :func:`world.rules.action.stored_gauge_pair`, the same read-only
-    true-HP source the combat panel's participant rows use (it clamps negative
-    stored HP to zero, which is the projection's own floor for a lethal
-    overkill).
+    Returns ``(identities, hp)`` where ``identities`` maps every roster key
+    (the participant's stable identity) to its dbref and ``hp`` maps every
+    dbref to its stored current HP. Both terms come from
+    :func:`world.rules.action.stored_gauge_pair`, the same read-only true-HP
+    source the combat panel's participant rows use (it clamps negative stored
+    HP to zero, which is the projection's own floor for a lethal overkill).
+    The identity is recomputed from the entity, so a roster that disagrees
+    with its own participant fails closed instead of mislabeling a beat.
     """
     # Function-local import (the ``combat_view`` precedent): the action package
     # reaches the Evennia dice contrib, which is not importable while the
@@ -125,6 +129,8 @@ def capture_round_hp(battlefield: Any) -> tuple[dict[str, int], dict[int, int]]:
     identities: dict[str, int] = {}
     hp: dict[int, int] = {}
     for key, entity in battlefield.roster.items():
+        if stable_actor_id(entity) != key:
+            raise CombatBeatsError("identity_mismatch")
         dbref = int(entity.pk)
         identities[str(key)] = dbref
         hp[dbref] = stored_gauge_pair(entity, "hp")[0]
@@ -149,17 +155,17 @@ def _identity_of(identities: Mapping[str, int], key: str | None) -> str | None:
 def _knockout_floors(record: RoundRecord) -> dict[int, int]:
     """The per-dbref projection floor: 1 for a knocked-out target, else 0.
 
-    The crossing entry carries both the roster key in ``target`` and the dbref
-    in ``data["target_id"]``; this reads the same ``target`` field every other
-    identity read in the module uses, so the floor and the beat identities can
-    never disagree about which participant an entry names.
+    The crossing entry carries its stable target identity; this reads the same
+    identity field every other identity read in the module uses, so the floor
+    and the beat identities can never disagree about which participant an
+    entry names.
     """
     floors = {dbref: 0 for dbref in record.identities.values()}
     for event_log in record.logs:
         for entry in event_log.entries:
             if entry.kind != "target_knocked_out":
                 continue
-            dbref = record.identities.get(entry.target)
+            dbref = record.identities.get(entry.target_id)
             if dbref is not None:
                 floors[dbref] = 1
     return floors
@@ -176,14 +182,14 @@ def _beat(seq: int, action: int, entry: EventEntry, record: RoundRecord,
           projected: dict[int, int], floors: dict[int, int]) -> CombatBeat:
     """Build one beat, projecting HP for a ``damage`` entry."""
     kind = entry.kind if entry.kind in _MAPPED_KINDS else "other"
-    actor = _identity_of(record.identities, entry.actor)
-    target = _identity_of(record.identities, entry.target)
+    actor = _identity_of(record.identities, entry.actor_id)
+    target = _identity_of(record.identities, entry.target_id)
     amount: int | None = None
     hp_after: int | None = None
     if kind == "damage":
-        if entry.target is None or entry.target not in record.identities:
+        if entry.target_id is None or entry.target_id not in record.identities:
             raise CombatBeatsError("unknown_damage_target")
-        dbref = record.identities[entry.target]
+        dbref = record.identities[entry.target_id]
         if dbref not in projected:
             raise CombatBeatsError("hp_mismatch")
         amount = _damage_amount(entry)
@@ -229,7 +235,7 @@ def build_combat_beats(record: RoundRecord) -> CombatBeatsView:
                 raise CombatBeatsError("too_many_beats")
             beat = _beat(len(beats), action, entry, record, projected, floors)
             if beat.kind == "damage":
-                damaged.add(record.identities[entry.target])
+                damaged.add(record.identities[entry.target_id])
             beats.append(beat)
     for dbref in damaged:
         recorded = record.hp_after.get(dbref)

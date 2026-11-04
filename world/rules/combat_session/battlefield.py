@@ -17,6 +17,7 @@ from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
 from world.rules.fatigue import sleep_blocks_actions
 from world.rules.party import bound_owner_of, is_companion
 from world.rules.combat_session.records import CombatSessionRecord
+from world.rules.combat_identity import stable_actor_id
 
 
 def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefield:
@@ -34,34 +35,33 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
     def resolve(dbref):
         return ObjectDB.objects.filter(id=dbref).first()
 
-    entities = {}
-    key_by_pk = {}
-    for dbref in player_ids:
+    # Participants are admitted by persistent identity, sorted numerically:
+    # two same-label individuals are distinct participants, while the same
+    # entity supplied twice (or one dbref claimed by both teams) is rejected
+    # before a battlefield exists. The record's own tuple order still governs
+    # the ``aN``/``eN`` presentation tokens.
+    ordered_ids = [*player_ids, *record.enemy_ids]
+    if len(ordered_ids) != len(set(ordered_ids)):
+        raise CombatSessionError(
+            SessionReason.DUPLICATE_PARTICIPANT,
+            "a participant dbref is supplied more than once",
+        )
+    entities: dict[str, Any] = {}
+    key_by_pk: dict[int, str] = {}
+    for dbref in sorted(set(ordered_ids)):
         entity = resolve(dbref)
         if entity is None:
             raise CombatSessionError(
-                SessionReason.MISSING_PARTICIPANT, f"player dbref {dbref} missing"
+                SessionReason.MISSING_PARTICIPANT, f"participant dbref {dbref} missing"
             )
-        if str(entity.key) in entities:
+        identity = stable_actor_id(entity)
+        if identity in entities:
             raise CombatSessionError(
                 SessionReason.DUPLICATE_PARTICIPANT,
-                f"participant key {entity.key!r} is not unique",
+                f"participant identity {identity!r} is not unique",
             )
-        entities[entity.key] = entity
-        key_by_pk[dbref] = entity.key
-    for dbref in record.enemy_ids:
-        entity = resolve(dbref)
-        if entity is None:
-            raise CombatSessionError(
-                SessionReason.MISSING_PARTICIPANT, f"enemy dbref {dbref} missing"
-            )
-        if str(entity.key) in entities:
-            raise CombatSessionError(
-                SessionReason.DUPLICATE_PARTICIPANT,
-                f"participant key {entity.key!r} is not unique",
-            )
-        entities[entity.key] = entity
-        key_by_pk[dbref] = entity.key
+        entities[identity] = entity
+        key_by_pk[dbref] = identity
 
     player_entity = resolve(player_id)
     if player_entity is None or _stored_trait_value(player_entity.traits.hp) <= 0:
@@ -126,12 +126,12 @@ def is_actor_eligible_to_act(
     actor_pk = getattr(actor, "pk", None)
     if actor_pk is None or actor_pk not in record.player_ids:
         return False
-    actor_key = str(getattr(actor, "key", ""))
-    if actor_key not in battlefield.roster:
+    actor_id = stable_actor_id(actor)
+    if actor_id not in battlefield.roster:
         return False
-    if actor_pk in record.fled_ids or actor_key in battlefield.fled:
+    if actor_pk in record.fled_ids or actor_id in battlefield.fled:
         return False
-    if actor_pk in record.knocked_out_ids or actor_key in battlefield.knocked_out:
+    if actor_pk in record.knocked_out_ids or actor_id in battlefield.knocked_out:
         return False
     if _stored_trait_value(getattr(actor.traits, "hp", None)) <= 0:
         return False

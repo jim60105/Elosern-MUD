@@ -87,10 +87,10 @@ class SyntheticDamageCastTests(EvenniaTestCase):
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                "party": frozenset({"synth cleave actor"}),
-                "foes": frozenset({"synth cleave target"}),
+                'party': frozenset({"fixture:synth cleave actor"}),
+                'foes': frozenset({"fixture:synth cleave target"}),
             },
-            {"synth cleave actor": self.actor, "synth cleave target": self.target},
+            {"fixture:synth cleave actor": self.actor, "fixture:synth cleave target": self.target},
         )
         self.request = ActionRequest(
             self.actor,
@@ -144,10 +144,10 @@ class SelfBuffCastTests(EvenniaTestCase):
         self.other.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                "party": frozenset({"synth veil actor"}),
-                "foes": frozenset({"synth veil other"}),
+                'party': frozenset({"fixture:synth veil actor"}),
+                'foes': frozenset({"fixture:synth veil other"}),
             },
-            {"synth veil actor": self.actor, "synth veil other": self.other},
+            {"fixture:synth veil actor": self.actor, "fixture:synth veil other": self.other},
         )
         self.context = BattlefieldActionContext(battlefield)
 

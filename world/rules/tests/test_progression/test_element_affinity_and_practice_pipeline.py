@@ -80,6 +80,7 @@ from ._support import (
     _monster,
     _scoped_setup,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 class ElementAffinityProgressionTests(EvenniaTestCase):
@@ -182,11 +183,11 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
     def _field(self, monsters, **event_context):
         field = Battlefield(
             {
-                "party": frozenset({"pipeline caster"}),
-                "foes": frozenset(monster.key for monster in monsters),
+                'party': frozenset({"fixture:pipeline caster"}),
+                'foes': frozenset(stable_actor_id(monster) for monster in monsters),
             },
             {"pipeline caster": self.actor}
-            | {monster.key: monster for monster in monsters},
+            | {stable_actor_id(monster): monster for monster in monsters},
         )
         return BattlefieldActionContext(field, event_context=dict(event_context))
 
@@ -635,8 +636,8 @@ class ElementalLearningEligibilityTests(EvenniaTestCase):
         entities = {str(entity.key): entity for entity in (*party, *foes)}
         return Battlefield(
             {
-                "party": frozenset(str(entity.key) for entity in party),
-                "foes": frozenset(str(entity.key) for entity in foes),
+                'party': frozenset(stable_actor_id(entity) for entity in party),
+                'foes': frozenset(stable_actor_id(entity) for entity in foes),
             },
             entities,
         )

@@ -30,8 +30,8 @@ class MonsterBehaviourDeterminismTests(unittest.TestCase):
     @covers_requirement("monster-action-policy::no-llm-or-generative-layer-involvement-anywhere-in-monster-decision-making")
     def test_unchanged_state_produces_identical_requests_without_roll(self):
         owned = list(_scope_extra()["skills"])
-        monster = FakeMonster("monster", threat_tier="low", owned=owned)
-        enemy = FakeEntity("enemy", hp=50)
+        monster = FakeMonster("monster", combat_identity='monster', threat_tier="low", owned=owned)
+        enemy = FakeEntity("enemy", combat_identity='enemy', hp=50)
         battlefield = _field(monster, [enemy])
         with patch(
             "world.rules.monster_behaviour.dice.roll_d100"
@@ -44,8 +44,8 @@ class MonsterBehaviourDeterminismTests(unittest.TestCase):
         self.assertEqual(first.targets, second.targets)
 
     def test_fixed_seed_replays_a_real_tie_break_roll(self):
-        monster = FakeMonster("monster")
-        enemies = [FakeEntity("first"), FakeEntity("second")]
+        monster = FakeMonster("monster", combat_identity='monster')
+        enemies = [FakeEntity("first", combat_identity='first'), FakeEntity("second", combat_identity='second')]
         with patch(
             "world.rules.monster_behaviour.dice.roll_d100",
             wraps=dice.roll_d100,

@@ -54,6 +54,7 @@ from ._support import (
     _SKILL_MAP,
     _make_synth_skill,
 )
+from world.rules.combat_identity import stable_actor_id
 
 
 class DamageStateFeedbackBehaviorTests(EvenniaTest):
@@ -194,10 +195,10 @@ class DamageStateFeedbackBehaviorTests(EvenniaTest):
         self._grant_skill(self.actor, sage_spell.key, SkillKind.ACTIVE)
         battlefield = Battlefield(
             {
-                "party": frozenset({self.actor.key}),
-                "foes": frozenset({self.target.key}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset({stable_actor_id(self.target)}),
             },
-            {self.actor.key: self.actor, self.target.key: self.target},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         field_ctx = BattlefieldActionContext(battlefield)
         req = ActionRequest(self.actor, sage_spell.key, [self.target], field_ctx)

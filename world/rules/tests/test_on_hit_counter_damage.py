@@ -52,6 +52,7 @@ from world.skills.registry import (
     TargetSpec,
 )
 
+from world.rules.combat_identity import stable_actor_id
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
 _lore_mod = importlib.import_module("world.lore.elements")
@@ -144,10 +145,10 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
 
     def _make_battlefield(self, actor: Any, *foes: Any) -> Battlefield:
         all_entities = (actor, *foes)
-        roster = {ent.key: ent for ent in all_entities}
-        party_keys = frozenset({actor.key})
-        foe_keys = frozenset(ent.key for ent in foes)
-        return Battlefield({"party": party_keys, "foes": foe_keys}, roster)
+        roster = {stable_actor_id(ent): ent for ent in all_entities}
+        party_keys = frozenset({stable_actor_id(actor)})
+        foe_keys = frozenset(stable_actor_id(ent) for ent in foes)
+        return Battlefield({'party': party_keys, 'foes': foe_keys}, roster)
 
     # -------------------------------------------------------------------------
     # Requirement 1: A qualifying physical strike dispatches one source-attributed on-hit event
@@ -655,10 +656,12 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                 res = resolve_combat_action(req)
 
             self.assertEqual(res.outcome, "success")
-            expected_instance_key = f"{ignite_buff.key}:{self.target.key}"
+            expected_instance_key = (
+                f"{ignite_buff.key}:{stable_actor_id(self.target)}"
+            )
             self.assertIn(expected_instance_key, self.actor.buffs.all)
             instance = self.actor.buffs.all[expected_instance_key]
-            self.assertEqual(instance.source_key, self.target.key)
+            self.assertEqual(instance.source_key, stable_actor_id(self.target))
 
             # 2. Immune attacker -> holds nothing
             immune_actor = create_object(PlayerCharacter, key="synth_immune_actor")
@@ -812,7 +815,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                     "damage:earth:physical",
                     {
                         "battlefield": bf,
-                        "nonlethal_keys": frozenset({str(self.actor.key)}),
+                        "nonlethal_keys": frozenset({stable_actor_id(self.actor)}),
                     },
                     1.0,
                 )
@@ -822,7 +825,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             # Attacker was protected: floored at 1 HP
             self.assertEqual(int(self.actor.traits.hp.current), 1)
             # Battlefield marked attacker as knocked_out
-            self.assertIn(str(self.actor.key), bf.knocked_out)
+            self.assertIn(stable_actor_id(self.actor), bf.knocked_out)
 
             # 2. Session-flag nonlethal (empty nonlethal_keys): floors at 1 HP without battlefield mark
             self.actor.traits.hp.current = 20
@@ -843,7 +846,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
                     eff.apply()
 
             self.assertEqual(int(self.actor.traits.hp.current), 1)
-            self.assertNotIn(str(self.actor.key), bf2.knocked_out)
+            self.assertNotIn(stable_actor_id(self.actor), bf2.knocked_out)
 
     @covers_requirement(
         "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"

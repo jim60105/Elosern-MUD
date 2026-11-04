@@ -80,6 +80,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
     synth_innate_overlay,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SCOPE = "normal:61:0"
 ROUND = 61
@@ -358,11 +359,11 @@ def _suppress_innate_skills(test) -> None:
 
 def _field(actor, allies, enemies) -> Battlefield:
     """A two-team battlefield over real participants."""
-    roster = {str(entity.key): entity for entity in (actor, *allies, *enemies)}
+    roster = {stable_actor_id(entity): entity for entity in (actor, *allies, *enemies)}
     return Battlefield(
         {
-            "party": frozenset(str(entity.key) for entity in (actor, *allies)),
-            "enemy": frozenset(str(entity.key) for entity in enemies),
+            'party': frozenset(stable_actor_id(entity) for entity in (actor, *allies)),
+            'enemy': frozenset(stable_actor_id(entity) for entity in enemies),
         },
         roster,
     )

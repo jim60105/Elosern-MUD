@@ -18,6 +18,7 @@ from world.rules.action import ActionRequest, ActionResolver, _stored_trait_valu
 from world.rules.action_preview import revalidate_submission
 from world.rules.combat import Battlefield, run_round
 from world.rules.combat_beats import RoundRecord, capture_round_hp
+from world.rules.combat_identity import stable_actor_id
 from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
     _commandable_required_actors,
@@ -213,7 +214,7 @@ def _preflight_skill_submission(
     if not isinstance(targets_or_shorthand, (list, str)):
         raise TypeError(f"{name} requires an explicit target list or shorthand")
     if not isinstance(targets_or_shorthand, str) and not all(
-        str(target.key) in battlefield.roster
+        stable_actor_id(target) in battlefield.roster
         for target in targets_or_shorthand
     ):
         raise CombatSessionError(SessionReason.NOT_PRESENT)
@@ -407,7 +408,7 @@ def _eligible_taunt_target(
     )
     if target is None or int(target.pk) not in record.enemy_ids:
         return None
-    if not battlefield.is_eligible(str(target.key)):
+    if not battlefield.is_eligible(stable_actor_id(target)):
         return None
     return target
 
@@ -814,7 +815,7 @@ def _draft_tactical_declarations(
     :func:`_draft_requests`, which raises for an unknown one.
     """
     keys_by_actor = {
-        int(entity.pk): str(entity.key) for entity in battlefield.roster.values()
+        int(entity.pk): key for key, entity in battlefield.roster.items()
     }
     declarations: dict[str, str] = {}
     for actor_id, entry in (record.draft_entries or {}).items():
@@ -843,11 +844,11 @@ def _draft_taunt_declarations(
     declaration is projected; this helper only binds identities.
     """
     keys_by_actor = {
-        int(entity.pk): str(entity.key) for entity in battlefield.roster.values()
+        int(entity.pk): key for key, entity in battlefield.roster.items()
     }
     enemy_keys = {
-        int(entity.pk): str(entity.key)
-        for entity in battlefield.roster.values()
+        int(entity.pk): key
+        for key, entity in battlefield.roster.items()
         if int(entity.pk) in record.enemy_ids
     }
     declarations: dict[str, str] = {}
@@ -1218,7 +1219,8 @@ def _party_retreat_outcome(
     able-bodied party either, so it takes the same no-acting-ally branch as an
     empty eligible set.
     """
-    party_team = battlefield.team_of(str(commander.key))
+    commander_id = stable_actor_id(commander)
+    party_team = battlefield.team_of(commander_id)
     if party_team is None:
         return None, {
             "roll": None,
@@ -1245,6 +1247,7 @@ def _party_retreat_event_log(
         template = party_retreat_line(verdict == "escaped")
     except Exception:  # observability: ignore R2: narration is presentation and degrades rather than abort a legal settlement (design D11)
         template = COMPACT_POOLS["party_retreat"]
+    commander_id = stable_actor_id(commander)
     entry = EventEntry(
         kind="party_retreat",
         actor=str(commander.key),
@@ -1256,8 +1259,9 @@ def _party_retreat_event_log(
             "pursuer_agility": detail["pursuer_agility"],
         },
         text_template=template,
+        actor_id=commander_id,
     )
-    return EventLog(str(commander.key), "", (), (entry,), 0)
+    return EventLog(str(commander.key), "", (), (entry,), 0, actor_id=commander_id)
 
 
 def _deliver_notifications(
@@ -1343,7 +1347,7 @@ def _escaped_party_retreat(
     than a further round, so no subset of the party can be left in combat.
     """
     round_identities, round_hp_before = capture_round_hp(battlefield)
-    party_team = battlefield.team_of(str(commander.key))
+    party_team = battlefield.team_of(stable_actor_id(commander))
     for key in battlefield.teams.get(party_team, frozenset()):
         if key in battlefield.roster:
             battlefield.fled.add(key)

@@ -50,6 +50,7 @@ from world.tests.synthetic_data import (
 from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import FakeMonster, _field
+from world.rules.combat_identity import stable_actor_id
 
 SPECIES = "t_ai_species"
 OTHER_SPECIES = "t_ai_other_species"
@@ -233,6 +234,8 @@ class FakeAIMonster:
         variant_key=None,
     ):
         self.key = key
+        # A nonpersistent double carries its own explicit stable identity.
+        self.combat_identity = key
         self.threat_tier = threat_tier
         self.behaviour_tree = behaviour_tree
         self.species_key = species_key
@@ -267,12 +270,12 @@ class MonsterBehaviourAuthoringTests(unittest.TestCase):
         # Two enemies whose HP order is the reverse of their power order, so
         # the authored target strategy is observable in the chosen target.
         weak = FakeEntity(
-            "t_ai_weak", hp=10, atk_phys=5, agility=5, defense=5, magic_power=5
+            "t_ai_weak", combat_identity='t_ai_weak', hp=10, atk_phys=5, agility=5, defense=5, magic_power=5
         )
         strong = FakeEntity(
-            "t_ai_strong", hp=90, atk_phys=1, agility=1, defense=1, magic_power=1
+            "t_ai_strong", combat_identity='t_ai_strong', hp=90, atk_phys=1, agility=1, defense=1, magic_power=1
         )
-        actor = FakeMonster("t_ai_actor", threat_tier=TIER, owned=[_CLAW.key])
+        actor = FakeMonster("t_ai_actor", combat_identity='t_ai_actor', threat_tier=TIER, owned=[_CLAW.key])
         weakest_first = self._decide(_rulebook(), actor, [weak, strong])
         self.assertEqual(weakest_first.skill_key, _CLAW.key)
         self.assertEqual(weakest_first.targets, [weak])
@@ -786,20 +789,29 @@ class SessionAITuningTests(unittest.TestCase):
         record_session_ai_tuning(SESSION, second, tuning=tuning)
         self.assertEqual(
             set(session_ai_tuning(SESSION)),
-            {"key:t_ai_first", "key:t_ai_second"},
+            {"fixture:t_ai_first", "fixture:t_ai_second"},
         )
         self.assertEqual(session_ai_tuning(OTHER_SESSION), {})
         recorded = session_ai_tuning(SESSION)
         self.assertEqual(
-            recorded["key:t_ai_first"].tuning_fingerprint, tuning.fingerprint
+            recorded["fixture:t_ai_first"].tuning_fingerprint, tuning.fingerprint
         )
         # The view is a copy, and the record itself is frozen: a caller can
         # never edit recorded tuning through one of its own containers.
         with self.assertRaises(FrozenInstanceError):
-            recorded["key:t_ai_first"].mode = DecisionMode.UTILITY
+            recorded["fixture:t_ai_first"].mode = DecisionMode.UTILITY
         with self.assertRaises(TypeError):
-            recorded["t_ai_first"] = recorded["key:t_ai_first"]
+            recorded["t_ai_first"] = recorded["fixture:t_ai_first"]
         self.assertEqual(len(session_ai_tuning(SESSION)), 2)
+
+    def test_rejected_identity_leaves_the_table_unchanged(self):
+        monster = FakeAIMonster(
+            "t_ai_no_identity", species_key=SPECIES, variant_key=ORDINARY
+        )
+        del monster.combat_identity
+        with self.assertRaises(ValueError):
+            record_session_ai_tuning(SESSION, monster, tuning=_tuning())
+        self.assertEqual(session_ai_tuning(SESSION), {})
 
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_an_active_session_keeps_the_tuning_the_process_loaded(self):
@@ -815,18 +827,18 @@ class SessionAITuningTests(unittest.TestCase):
         self.assertNotEqual(startup.fingerprint, edited.fingerprint)
         self.assertIs(behaviour.MONSTER_AI_TUNING, startup)
         self.assertEqual(
-            session_ai_tuning(SESSION)["key:t_ai_active"].tuning_fingerprint,
+            session_ai_tuning(SESSION)["fixture:t_ai_active"].tuning_fingerprint,
             startup.fingerprint,
         )
         self.assertNotEqual(
-            session_ai_tuning(SESSION)["key:t_ai_active"].tuning_fingerprint,
+            session_ai_tuning(SESSION)["fixture:t_ai_active"].tuning_fingerprint,
             edited.fingerprint,
         )
         # A newly started session in the same process uses the same startup
         # tuning, so a session can never adopt a disk edit without a restart.
         record_session_ai_tuning(OTHER_SESSION, FakeAIMonster("t_ai_new"))
         self.assertEqual(
-            session_ai_tuning(OTHER_SESSION)["key:t_ai_new"].tuning_fingerprint,
+            session_ai_tuning(OTHER_SESSION)["fixture:t_ai_new"].tuning_fingerprint,
             startup.fingerprint,
         )
 
@@ -840,7 +852,7 @@ class SessionAITuningTests(unittest.TestCase):
         self.assertEqual(session_ai_tuning(SESSION), {})
         restarted = _tuning(budget=BUDGET - 1)
         record_session_ai_tuning(SESSION, monster, tuning=restarted)
-        recorded = session_ai_tuning(SESSION)["key:t_ai_restart"]
+        recorded = session_ai_tuning(SESSION)["fixture:t_ai_restart"]
         self.assertEqual(recorded.tuning_fingerprint, restarted.fingerprint)
         self.assertIs(recorded.mode, DecisionMode.LEGACY)
 
@@ -853,7 +865,7 @@ class SessionAITuningTests(unittest.TestCase):
         record_session_ai_tuning(SESSION, monster, tuning=tuning)
         monster.behaviour_tree = ABSENT_ARCHETYPE
         record_session_ai_tuning(SESSION, monster, tuning=tuning)
-        recorded = session_ai_tuning(SESSION)["key:t_ai_drift"]
+        recorded = session_ai_tuning(SESSION)["fixture:t_ai_drift"]
         self.assertIs(recorded.invalid_reason, InvalidDecisionReason.INVALID_BINDING)
 
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
@@ -909,12 +921,12 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
     def _battlefield(self):
         return Battlefield(
             {
-                "monsters": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.opponent.key): self.opponent,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.opponent): self.opponent,
             },
         )
 

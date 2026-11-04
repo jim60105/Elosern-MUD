@@ -54,6 +54,7 @@ from ._support import (
 )
 
 
+from world.rules.combat_identity import stable_actor_id
 class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
     """overwhelm-log-attribution at the retained non-interactive boundary: the
     compressed log of ``resolve_overwhelm()`` marks the commanded skill
@@ -92,10 +93,10 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
             resolved = resolve_overwhelm(
                 field,
                 provider,
-                commanded_actor=str(self.player.key),
+                commanded_actor=stable_actor_id(self.player),
                 commanded_action_kind="skill",
                 commanded_action_key=_T_CAST,
-                first_actor=str(self.player.key),
+                first_actor=stable_actor_id(self.player),
                 # The compressed rounds resolve under this engagement's own
                 # authoritative occurrence identity.
                 decision_scope_base=execution_scope_base(record),

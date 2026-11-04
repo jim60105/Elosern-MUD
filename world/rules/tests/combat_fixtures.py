@@ -7,6 +7,7 @@ from world.rules.progression import (
     lineage_ownership_closure,
     seed_lineage_proficiency,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.skip_safety import _BATTLEFIELDS
 
 
@@ -139,6 +140,7 @@ class FakeEntity:
         self,
         key: str,
         *,
+        combat_identity: str | None = None,
         hp: int = 100,
         max_hp: int | None = None,
         atk_phys: int = 10,
@@ -147,7 +149,12 @@ class FakeEntity:
         magic_power: int = 10,
         owned: list[str] | None = None,
     ):
+        # A pure combatant has no dbref, so it must supply its own stable
+        # identity explicitly. There is no default and no label derivation: an
+        # identity-less fake fails closed the moment a battlefield, identity
+        # lookup or observation asks who it is.
         self.key = key
+        self.combat_identity = combat_identity
         self.skills = FakeSkills(
             {
                 "atk_phys": atk_phys,
@@ -164,3 +171,8 @@ class FakeEntity:
         # empty bundle without materializing any handler.
         self.buffs = SimpleNamespace(all={})
         self.db = SimpleNamespace(equipment=None)
+
+    @property
+    def identity(self) -> str:
+        """This fixture's stable individual identity."""
+        return stable_actor_id(self)

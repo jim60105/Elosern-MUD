@@ -39,6 +39,7 @@ from .combat_fixtures import BattlefieldIsolation
 # two-edge lineage (root -> storm). Shipped registry content claims stay in
 # the registered data-contract file world/skills/tests/test_skill_registry.py.
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
+from world.rules.combat_identity import stable_actor_id
 
 _SYNTH_ELEMENT = SYNTH_SKILLS["t_ember_burst"].element
 
@@ -312,10 +313,10 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
 
         battlefield = Battlefield(
             {
-                "party": frozenset({self.player.key}),
-                "foes": frozenset({self.monster.key}),
+                'party': frozenset({stable_actor_id(self.player)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
             },
-            {self.player.key: self.player, self.monster.key: self.monster},
+            {stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
         context = BattlefieldActionContext(battlefield)
         preview = preview_skill(self.player, _basic_attack_key(), context, [self.monster])

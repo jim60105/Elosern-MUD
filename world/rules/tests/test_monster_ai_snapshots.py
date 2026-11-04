@@ -66,6 +66,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
     synth_innate_overlay,
 )
+from world.rules.combat_identity import stable_actor_id
 
 # --- locally authored rows ---------------------------------------------------
 #: The buff key one synthetic cast condition requires of its target.
@@ -260,6 +261,9 @@ class _ProbeParticipant:
         pk: int | None = None,
     ):
         self.key = key
+        # The double is nonpersistent, so it carries its own explicit stable
+        # identity; no label-derived identity exists.
+        self.combat_identity = key
         if pk is not None:
             self.pk = pk
         self.db = SimpleNamespace(
@@ -328,14 +332,14 @@ class _ProbeParticipant:
 
 def _probe_field(actor: _ProbeParticipant, *others):
     """A two-team battlefield over probe participants."""
-    roster = {actor.key: actor}
-    enemies = frozenset({other.key for other in others})
+    roster = {stable_actor_id(actor): actor}
+    enemies = frozenset({stable_actor_id(other) for other in others})
     if not enemies:
         raise ValueError("a probe field needs at least one opponent")
     for other in others:
-        roster[other.key] = other
+        roster[stable_actor_id(other)] = other
     return Battlefield(
-        {"monsters": frozenset({actor.key}), "party": enemies}, roster
+        {'monsters': frozenset({stable_actor_id(actor)}), 'party': enemies}, roster
     )
 
 
@@ -416,7 +420,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         )
         self.assertEqual(snapshot.actor.traits["atk_phys"], 12.0)
         self.assertEqual(snapshot.actor.resources["mp"], (20, 20))
-        self.assertEqual(snapshot.actor.identity, "key:t_snap_actor")
+        self.assertEqual(snapshot.actor.identity, "fixture:t_snap_actor")
         self.assertEqual(snapshot.participants[0].identity, self.target.identity)
         self.assertFalse(snapshot.actor.capability.blocked_by_buff)
         self.assertEqual(

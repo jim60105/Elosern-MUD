@@ -284,8 +284,8 @@ class ProgressionTests(EvenniaTestCase):
         monster = self._monster("goblin")
         monster.traits.hp.current = 1
         battlefield = Battlefield(
-            {"party": frozenset({"fighter"}), "foes": frozenset({"goblin"})},
-            {"fighter": actor, "goblin": monster},
+            {'party': frozenset({"fixture:fighter"}), 'foes': frozenset({"fixture:goblin"})},
+            {"fixture:fighter": actor, "fixture:goblin": monster},
         )
         request = ActionRequest(
             actor,
@@ -317,14 +317,14 @@ class ProgressionTests(EvenniaTestCase):
         corpse.traits.hp.current = 0
         battlefield = Battlefield(
             {
-                "party": frozenset({"area-fighter"}),
-                "foes": frozenset({"first", "second", "corpse"}),
+                'party': frozenset({"fixture:area-fighter"}),
+                'foes': frozenset({"fixture:first", "fixture:second", "fixture:corpse"}),
             },
             {
-                "area-fighter": actor,
-                "first": first,
-                "second": second,
-                "corpse": corpse,
+                "fixture:area-fighter": actor,
+                "fixture:first": first,
+                "fixture:second": second,
+                "fixture:corpse": corpse,
             },
         )
         request = ActionRequest(
@@ -357,8 +357,8 @@ class ProgressionTests(EvenniaTestCase):
         monster = self._monster("duplicate-goblin")
         monster.traits.hp.current = 1
         battlefield = Battlefield(
-            {"party": frozenset({"duplicate-fighter"}), "foes": frozenset({"duplicate-goblin"})},
-            {"duplicate-fighter": actor, "duplicate-goblin": monster},
+            {'party': frozenset({"fixture:duplicate-fighter"}), 'foes': frozenset({"fixture:duplicate-goblin"})},
+            {"fixture:duplicate-fighter": actor, "fixture:duplicate-goblin": monster},
         )
         request = ActionRequest(
             actor,
@@ -379,8 +379,8 @@ class ProgressionTests(EvenniaTestCase):
         target.threat_tier = _monster_tier_key()
         target.traits.hp.current = 1
         battlefield = Battlefield(
-            {"party": frozenset({"player-fighter"}), "foes": frozenset({"tiered-player"})},
-            {"player-fighter": actor, "tiered-player": target},
+            {'party': frozenset({"fixture:player-fighter"}), 'foes': frozenset({"fixture:tiered-player"})},
+            {"fixture:player-fighter": actor, "fixture:tiered-player": target},
         )
         request = ActionRequest(
             actor,

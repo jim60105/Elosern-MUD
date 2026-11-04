@@ -107,7 +107,7 @@ from world.rules.action.event_log import (
     _FALLBACK_TEMPLATES,
     _defeated_entry,
     _entries_from_effect,
-    _logged_targets,
+    _logged_recipients,
     _step7_build_event_log,
 )
 from world.rules.action.gates import (

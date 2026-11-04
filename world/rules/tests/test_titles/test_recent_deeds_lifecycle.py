@@ -90,6 +90,7 @@ from world.rules.titles import (
     read_title_state,
 )
 from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, SYNTH_TITLES
+from world.rules.combat_identity import stable_actor_id
 
 
 _SYNTH_RANK_KEY = "t_lifecycle_exam_rank"
@@ -463,12 +464,12 @@ class RecentDeedsLifecycleBehaviorTests(
                 )
                 battlefield = Battlefield(
                     teams={
-                        "allies": frozenset({str(self.char.key)}),
-                        "foes": frozenset({str(enemy.key)}),
+                        'allies': frozenset({stable_actor_id(self.char)}),
+                        'foes': frozenset({stable_actor_id(enemy)}),
                     },
                     roster={
-                        str(self.char.key): self.char,
-                        str(enemy.key): enemy,
+                        stable_actor_id(self.char): self.char,
+                        stable_actor_id(enemy): enemy,
                     },
                 )
                 settle_session(self.char, session, battlefield, outcome)
@@ -514,10 +515,10 @@ class RecentDeedsLifecycleBehaviorTests(
         )
         battlefield = Battlefield(
             teams={
-                "allies": frozenset({str(self.char.key)}),
-                "foes": frozenset({str(host.key)}),
+                'allies': frozenset({stable_actor_id(self.char)}),
+                'foes': frozenset({stable_actor_id(host)}),
             },
-            roster={str(self.char.key): self.char, str(host.key): host},
+            roster={stable_actor_id(self.char): self.char, stable_actor_id(host): host},
         )
         settle_session(self.char, session, battlefield, "exam_passed")
 
@@ -552,10 +553,10 @@ class RecentDeedsLifecycleBehaviorTests(
         )
         battlefield = Battlefield(
             teams={
-                "allies": frozenset({str(self.char.key)}),
-                "foes": frozenset({str(enemy.key)}),
+                'allies': frozenset({stable_actor_id(self.char)}),
+                'foes': frozenset({stable_actor_id(enemy)}),
             },
-            roster={str(self.char.key): self.char, str(enemy.key): enemy},
+            roster={stable_actor_id(self.char): self.char, stable_actor_id(enemy): enemy},
         )
         settle_session(
             self.char,
@@ -636,10 +637,10 @@ class RecentDeedsLifecycleBehaviorTests(
         )
         battlefield = Battlefield(
             teams={
-                "allies": frozenset({str(self.char.key)}),
-                "foes": frozenset({str(enemy.key)}),
+                'allies': frozenset({stable_actor_id(self.char)}),
+                'foes': frozenset({stable_actor_id(enemy)}),
             },
-            roster={str(self.char.key): self.char, str(enemy.key): enemy},
+            roster={stable_actor_id(self.char): self.char, stable_actor_id(enemy): enemy},
         )
         source_id = build_encounter_source_id(
             session.engagement_id, kind="terminal", ordinal=1

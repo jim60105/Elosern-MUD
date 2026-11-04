@@ -110,7 +110,7 @@ class DamageHandlerTacticalTests(unittest.TestCase):
     def _strike(self, battlefield, targets, *, roll=60, event_context=None):
         with patch("world.rules.combat.damage.roll_d100", return_value=roll):
             return _handle_damage(
-                battlefield.roster["hero"],
+                battlefield.roster["fixture:hero"],
                 targets,
                 "damage:dark:physical",
                 {"battlefield": battlefield} if event_context is None else event_context,
@@ -121,14 +121,14 @@ class DamageHandlerTacticalTests(unittest.TestCase):
         "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
     )
     def test_defend_is_the_recipients_declaration_and_bypass_is_exempt(self):
-        hero = FakeEntity("hero", atk_phys=40, agility=10, defense=0)
-        defended = FakeEntity("defended", hp=100, max_hp=100, defense=0, agility=10)
-        plain = FakeEntity("plain", hp=100, max_hp=100, defense=0, agility=10)
+        hero = FakeEntity("hero", combat_identity='hero', atk_phys=40, agility=10, defense=0)
+        defended = FakeEntity("defended", combat_identity='defended', hp=100, max_hp=100, defense=0, agility=10)
+        plain = FakeEntity("plain", combat_identity='plain', hp=100, max_hp=100, defense=0, agility=10)
         battlefield = Battlefield(
-            {"hero": frozenset({"hero"}), "foe": frozenset({"defended", "plain"})},
-            {"hero": hero, "defended": defended, "plain": plain},
+            {'hero': frozenset({"fixture:hero"}), 'foe': frozenset({"fixture:defended", "fixture:plain"})},
+            {"fixture:hero": hero, "fixture:defended": defended, "fixture:plain": plain},
         )
-        battlefield.tactical = RoundTactical({"defended": "defend"})
+        battlefield.tactical = RoundTactical({"fixture:defended": "defend"})
 
         pending = self._strike(battlefield, [defended, plain])
         self.assertEqual(_damage_residual(pending[0]), 26)
@@ -153,14 +153,14 @@ class DamageHandlerTacticalTests(unittest.TestCase):
         "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
     )
     def test_dodge_is_applied_per_recipient_and_raw_100_never_overrides_it(self):
-        hero = FakeEntity("hero", atk_phys=40, agility=0, defense=0)
-        dodging = FakeEntity("dodging", hp=100, max_hp=100, defense=0, agility=30)
-        standing = FakeEntity("standing", hp=100, max_hp=100, defense=0, agility=30)
+        hero = FakeEntity("hero", combat_identity='hero', atk_phys=40, agility=0, defense=0)
+        dodging = FakeEntity("dodging", combat_identity='dodging', hp=100, max_hp=100, defense=0, agility=30)
+        standing = FakeEntity("standing", combat_identity='standing', hp=100, max_hp=100, defense=0, agility=30)
         battlefield = Battlefield(
-            {"hero": frozenset({"hero"}), "foe": frozenset({"dodging", "standing"})},
-            {"hero": hero, "dodging": dodging, "standing": standing},
+            {'hero': frozenset({"fixture:hero"}), 'foe': frozenset({"fixture:dodging", "fixture:standing"})},
+            {"fixture:hero": hero, "fixture:dodging": dodging, "fixture:standing": standing},
         )
-        battlefield.tactical = RoundTactical({"dodging": "dodge"})
+        battlefield.tactical = RoundTactical({"fixture:dodging": "dodge"})
 
         pending = self._strike(battlefield, [dodging, standing], roll=100)
         # Raw 100 lands the standing recipient (margin 19) but the dodging
@@ -175,16 +175,23 @@ class RoundTacticalScopeTests(unittest.TestCase):
         "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
     )
     def test_run_round_activates_declarations_for_the_whole_round_then_expires(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        fast = FakeEntity("fast", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', hp=100, agility=99)
         battlefield = Battlefield(
-            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
-            {"slow": slow, "fast": fast},
+            {'ally': frozenset({"fixture:slow"}), 'enemy': frozenset({"fixture:fast"})},
+            {"fixture:slow": slow, "fixture:fast": fast},
         )
         seen: list[tuple[str, str | None]] = []
 
         def provider(entity, field):
-            seen.append((str(entity.key), None if field.tactical is None else field.tactical.tactic_for("slow")))
+            seen.append(
+                (
+                    stable_actor_id(entity),
+                    None
+                    if field.tactical is None
+                    else field.tactical.tactic_for("fixture:slow"),
+                )
+            )
             return None
 
         with (
@@ -194,10 +201,14 @@ class RoundTacticalScopeTests(unittest.TestCase):
             patch("world.rules.combat.rounds.decay_tick"),
             patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
         ):
-            run_round(battlefield, provider, tactical_declarations={"slow": "defend"})
+            run_round(
+                battlefield,
+                provider,
+                tactical_declarations={"fixture:slow": "defend"},
+            )
         # The declaration was active before the fast enemy's first turn.
-        self.assertEqual(seen[0], ("fast", "defend"))
-        self.assertIn(("slow", "defend"), seen)
+        self.assertEqual(seen[0], ("fixture:fast", "defend"))
+        self.assertIn(("fixture:slow", "defend"), seen)
         # Round ended: the transient context expired and cannot stack.
         self.assertIsNone(battlefield.tactical)
 
@@ -218,11 +229,11 @@ class RoundTacticalScopeTests(unittest.TestCase):
         "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
     )
     def test_run_round_clears_declarations_when_the_round_raises(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        fast = FakeEntity("fast", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', hp=100, agility=99)
         battlefield = Battlefield(
-            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
-            {"slow": slow, "fast": fast},
+            {'ally': frozenset({"fixture:slow"}), 'enemy': frozenset({"fixture:fast"})},
+            {"fixture:slow": slow, "fixture:fast": fast},
         )
 
         def exploding_provider(entity, field):
@@ -233,20 +244,24 @@ class RoundTacticalScopeTests(unittest.TestCase):
             patch("world.rules.combat.rounds.roll_d100", return_value=90),
             self.assertRaises(RuntimeError),
         ):
-            run_round(battlefield, exploding_provider, tactical_declarations={"slow": "dodge"})
+            run_round(
+                battlefield,
+                exploding_provider,
+                tactical_declarations={"fixture:slow": "dodge"},
+            )
         self.assertIsNone(battlefield.tactical)
 
     def test_a_pre_set_round_context_is_not_an_input(self):
         # run_round is the sole writer: a context left on the battlefield by a
         # caller is neither read nor preserved, so a stale declaration can
         # never bleed into a round that declares none.
-        slow = FakeEntity("slow", hp=100, agility=1)
-        fast = FakeEntity("fast", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', hp=100, agility=99)
         battlefield = Battlefield(
-            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
-            {"slow": slow, "fast": fast},
+            {'ally': frozenset({"fixture:slow"}), 'enemy': frozenset({"fixture:fast"})},
+            {"fixture:slow": slow, "fixture:fast": fast},
         )
-        battlefield.tactical = RoundTactical({"slow": "defend"})
+        battlefield.tactical = RoundTactical({"fixture:slow": "defend"})
         seen: list[object] = []
 
         def provider(entity, field):
@@ -273,11 +288,11 @@ class UpkeepExemptionTests(unittest.TestCase):
     def test_defend_does_not_reduce_a_damaging_upkeep_tick(self):
         # Damaging upkeep is applied by the buff tick itself, outside
         # strike_amount, so a defending recipient takes the full tick.
-        slow = FakeEntity("slow", hp=100, agility=1)
-        fast = FakeEntity("fast", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', hp=100, agility=99)
         battlefield = Battlefield(
-            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
-            {"slow": slow, "fast": fast},
+            {'ally': frozenset({"fixture:slow"}), 'enemy': frozenset({"fixture:fast"})},
+            {"fixture:slow": slow, "fixture:fast": fast},
         )
         tick = TickRecord(definition_key="t_dot", source_pk=7, delta=-10, hp_before=100)
 
@@ -295,7 +310,11 @@ class UpkeepExemptionTests(unittest.TestCase):
             patch("world.rules.combat.rounds.decay_tick"),
             patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
         ):
-            run_round(battlefield, lambda entity, field: None, tactical_declarations={"slow": "defend"})
+            run_round(
+                battlefield,
+                lambda entity, field: None,
+                tactical_declarations={"fixture:slow": "defend"},
+            )
         # 10 lost, not floor(10 * 0.65) = 6: the Defend reduction never reaches
         # the upkeep tick.
         self.assertEqual(slow.traits.hp.current, 90)
@@ -306,11 +325,11 @@ class EnemyUnavailableTests(unittest.TestCase):
         "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
     )
     def test_declarations_are_scoped_to_the_named_roster_key_only(self):
-        tactical = RoundTactical({"slow": "defend"})
-        self.assertTrue(tactical.is_defending("slow"))
-        self.assertFalse(tactical.is_defending("fast"))
-        self.assertFalse(tactical.is_dodging("fast"))
-        self.assertIsNone(tactical.tactic_for("fast"))
+        tactical = RoundTactical({"fixture:slow": "defend"})
+        self.assertTrue(tactical.is_defending("fixture:slow"))
+        self.assertFalse(tactical.is_defending("fixture:fast"))
+        self.assertFalse(tactical.is_dodging("fixture:fast"))
+        self.assertIsNone(tactical.tactic_for("fixture:fast"))
 
 
 class RoundStartConstantValidationTests(unittest.TestCase):

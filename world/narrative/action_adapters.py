@@ -96,6 +96,7 @@ from typing import Any
 from django.db import transaction
 
 from world.observability import log_info
+from world.rules.combat_identity import stable_actor_id
 from world.rules.event_log import EventLog
 from world.rules.titles.awards import AutomaticTitleAward
 from world.skills.registry import SKILL_REGISTRY, SkillCategory
@@ -182,17 +183,17 @@ class RecordedAdultMilestones:
 
 
 def _durable_pk(entity: Any) -> str:
-    """Return the stable, persistent primary key for an entity."""
+    """Return one entity's stable narrative identity.
+
+    A validated persistent actor keeps its bare primary key; a supported
+    nonpersistent actor uses its canonical combat fixture identity. There is
+    no display-label or ``repr`` fallback: an entity that supplies neither is
+    malformed evidence and fails closed.
+    """
     pk = getattr(entity, "pk", None)
     if pk is not None:
         return str(pk)
-    entity_id = getattr(entity, "id", None)
-    if entity_id is not None:
-        return str(entity_id)
-    key = getattr(entity, "key", None)
-    if key is not None and str(key).strip():
-        return str(key).strip()
-    return str(entity).strip()
+    return stable_actor_id(entity)
 
 
 def capture_milestone_snapshot(entity: Any) -> MilestoneSnapshot | None:
@@ -844,28 +845,15 @@ def _entry_resistance_values(
     return resisted, auto_comply, roll
 
 
-def _unique_key_index(entities: Sequence[Any]) -> dict[str, str]:
-    """Map display keys to durable identities only where the key is unique.
-
-    A display key is not an identifier, so a key two distinct candidates share
-    resolves to nothing rather than to one of them.
-    """
-    seen: dict[str, list[str]] = {}
-    for entity in entities:
-        key = str(getattr(entity, "key", "") or "")
-        if not key:
-            continue
-        pk = _durable_pk(entity)
-        known = seen.setdefault(key, [])
-        if pk not in known:
-            known.append(pk)
-    return {key: pks[0] for key, pks in seen.items() if len(pks) == 1}
+def _identity_index(entities: Sequence[Any]) -> dict[str, str]:
+    """Map each candidate's stable combat identity to its durable identity."""
+    return {stable_actor_id(entity): _durable_pk(entity) for entity in entities}
 
 
 def _entry_target(
     entry: Any,
     kind: str,
-    key_index: Mapping[str, str],
+    identity_index: Mapping[str, str],
     actor_pk: str,
     actor_key: str,
     *,
@@ -874,14 +862,15 @@ def _entry_target(
     """Resolve one committed entry's target to ``(durable pk, display name)``.
 
     A kind whose semantics bind it to the acting entity resolves to the actor;
-    every other entry resolves only through a unique candidate key. An
-    ambiguous or unknown target fails its source transaction instead of being
-    attributed to a guessed recipient.
+    every other entry resolves through its stable identity against the
+    candidate set. An unknown target fails its source transaction instead of
+    being attributed to a guessed recipient; two candidates sharing a display
+    label stay distinguishable.
     """
     raw = str(getattr(entry, "target", "") or "")
     if kind in _SELF_BOUND_EFFECT_KINDS or not raw:
         return actor_pk, actor_key
-    resolved = key_index.get(raw)
+    resolved = identity_index.get(getattr(entry, "target_id", None))
     if resolved is None:
         raise ValueError(f"unresolvable settled evidence target in {source}")
     return resolved, raw
@@ -1155,10 +1144,10 @@ def record_action_settlement_evidence(
 
     # A caller that supplies no staged effects and no delivery identities (the
     # synthetic, committed-log-only form) can still name a recipient through the
-    # committed entries. Display keys are not identifiers, so attribution
-    # follows only a submitted target whose own key is unique among the
-    # candidates: a shared name must never imply participation. Production
-    # always passes its staged effects, so it never enters this path.
+    # committed entries. Attribution follows the entry's stable target identity,
+    # never its display label, so two same-label candidates stay
+    # distinguishable. Production always passes its staged effects, so it never
+    # enters this path.
     submitted_targets = getattr(request, "targets", None)
     if (
         not pending_effects
@@ -1166,22 +1155,16 @@ def record_action_settlement_evidence(
         and isinstance(submitted_targets, list)
         and submitted_targets
     ):
-        submitted_keys = [
-            str(getattr(target, "key", "") or "") for target in submitted_targets
-        ]
-        # The actor is a candidate too: an entry naming the actor's own key must
-        # never read as evidence that a same-named submitted target took part.
-        all_keys = [str(getattr(actor, "key", "") or ""), *submitted_keys]
-        entry_targets = {
-            str(getattr(entry, "target", "") or "") for entry in event_log.entries
+        entry_target_ids = {
+            entry.target_id
+            for entry in event_log.entries
+            if getattr(entry, "target_id", None) is not None
         }
         for target in submitted_targets:
-            t_key = str(getattr(target, "key", "") or "")
+            t_id = stable_actor_id(target)
             t_pk = _durable_pk(target)
             if (
-                not t_key
-                or all_keys.count(t_key) != 1
-                or t_key not in entry_targets
+                t_id not in entry_target_ids
                 or t_pk in seen_target_pks
                 or t_pk == actor_pk
             ):
@@ -1190,7 +1173,7 @@ def record_action_settlement_evidence(
             actual_target_entities.append(target)
             actual_recipient_records.append({
                 "id": t_pk,
-                "name": t_key,
+                "name": str(getattr(target, "key", "") or ""),
                 "role": "recipient",
             })
 
@@ -1225,8 +1208,21 @@ def record_action_settlement_evidence(
         for eff in pending_effects:
             desc = str(getattr(eff, "description", ""))
             eff_entity = getattr(eff, "entity", None)
-            eff_pk = _durable_pk(eff_entity) if eff_entity is not None else actor_pk
-            eff_name = str(getattr(eff_entity, "key", ""))
+            # A battlefield-shaped pending mutation (disengage) describes the
+            # acting entity, never the battlefield as a participant.
+            battlefield_shaped = eff_entity is not None and hasattr(
+                eff_entity, "fled"
+            ) and hasattr(eff_entity, "roster")
+            eff_pk = (
+                actor_pk
+                if eff_entity is None or battlefield_shaped
+                else _durable_pk(eff_entity)
+            )
+            eff_name = (
+                ""
+                if battlefield_shaped
+                else str(getattr(eff_entity, "key", ""))
+            )
             parts = desc.split("|")
             kind = parts[0] if parts else ""
             values = parts[2:]
@@ -1303,7 +1299,7 @@ def record_action_settlement_evidence(
         candidates = [actor, *actual_target_entities]
         if isinstance(getattr(request, "targets", None), list):
             candidates.extend(request.targets)
-        key_index = _unique_key_index(candidates)
+        identity_index = _identity_index(candidates)
         entities_by_pk = {_durable_pk(entity): entity for entity in candidates}
         for entry in event_log.entries:
             kind = str(getattr(entry, "kind", "") or "")
@@ -1315,7 +1311,7 @@ def record_action_settlement_evidence(
             source = f"{kind}:{source_id}"
             if kind == "sexual_resist":
                 target_id, target_name = _entry_target(
-                    entry, kind, key_index, actor_pk, actor_key, source=source
+                    entry, kind, identity_index, actor_pk, actor_key, source=source
                 )
                 resisted, auto_comply, roll = _entry_resistance_values(
                     data, source=source
@@ -1326,7 +1322,7 @@ def record_action_settlement_evidence(
                 ))
             elif kind == "sexual_transition":
                 target_id, target_name = _entry_target(
-                    entry, kind, key_index, actor_pk, actor_key, source=source
+                    entry, kind, identity_index, actor_pk, actor_key, source=source
                 )
                 transition_entries.append(_transition_record(
                     target_id,
@@ -1335,7 +1331,7 @@ def record_action_settlement_evidence(
                 ))
             elif kind == "sexual_counter":
                 target_id, target_name = _entry_target(
-                    entry, kind, key_index, actor_pk, actor_key, source=source
+                    entry, kind, identity_index, actor_pk, actor_key, source=source
                 )
                 counter_entries.append(_counter_record(
                     target_id,
@@ -1344,7 +1340,7 @@ def record_action_settlement_evidence(
                 ))
             elif kind in _SETTLED_EFFECT_RESULTS:
                 target_id, target_name = _entry_target(
-                    entry, kind, key_index, actor_pk, actor_key, source=source
+                    entry, kind, identity_index, actor_pk, actor_key, source=source
                 )
                 result = _settled_result_from_entry(kind, data, source=source)
                 if kind in _BOUNDED_RESULT_KINDS:

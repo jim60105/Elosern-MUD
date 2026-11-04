@@ -87,6 +87,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
     synth_innate_overlay,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SESSION = "hostile:7:0"
 #: The support-profile round owns its own session: the observation ring is
@@ -219,11 +220,11 @@ def _observation(
 
 def _field(actor, allies, enemies) -> Battlefield:
     """A two-team battlefield over real participants."""
-    roster = {str(entity.key): entity for entity in (actor, *allies, *enemies)}
+    roster = {stable_actor_id(entity): entity for entity in (actor, *allies, *enemies)}
     return Battlefield(
         {
-            "party": frozenset(str(entity.key) for entity in (actor, *allies)),
-            "enemies": frozenset(str(entity.key) for entity in enemies),
+            'party': frozenset(stable_actor_id(entity) for entity in (actor, *allies)),
+            'enemies': frozenset(stable_actor_id(entity) for entity in enemies),
         },
         roster,
     )
@@ -427,7 +428,7 @@ class FocusProjectionTests(CoordinationFixture):
             ),
             _observation(
                 ROUND,
-                source="key:ghost",
+                source="fixture:ghost",
                 recipients=(self.enemy,),
                 magnitudes=((self.enemy, -99.0),),
             ),
@@ -461,7 +462,7 @@ class FocusProjectionTests(CoordinationFixture):
             ),
             _observation(
                 ROUND,
-                source="key:ghost",
+                source="fixture:ghost",
                 recipients=(self.enemy,),
                 magnitudes=((self.enemy, -40.0),),
             ),
@@ -767,7 +768,7 @@ class ThreatProjectionTests(CoordinationFixture):
         observations = (
             _observation(
                 ROUND,
-                source="key:ghost",
+                source="fixture:ghost",
                 recipients=(self.ally,),
                 magnitudes=((self.ally, -60.0),),
             ),
@@ -1254,13 +1255,13 @@ class CoordinationRoundTests(EvenniaTestCase):
         target.traits.hp.current = 1000
         field = Battlefield(
             {
-                "monsters": frozenset({str(first.key), str(second.key)}),
-                "party": frozenset({str(target.key)}),
+                'monsters': frozenset({stable_actor_id(first), stable_actor_id(second)}),
+                'party': frozenset({stable_actor_id(target)}),
             },
             {
-                str(first.key): first,
-                str(second.key): second,
-                str(target.key): target,
+                stable_actor_id(first): first,
+                stable_actor_id(second): second,
+                stable_actor_id(target): target,
             },
         )
         traces: dict[str, list] = {}
@@ -1286,7 +1287,7 @@ class CoordinationRoundTests(EvenniaTestCase):
                     ROUND,
                     engagement_id=f"{SUPPORT_SESSION}:{ROUND}",
                 ),
-                first_actor=str(first.key),
+                first_actor=stable_actor_id(first),
             )
 
         warned = traces[str(first.key)][0]
@@ -1340,10 +1341,10 @@ class CoordinationRoundTests(EvenniaTestCase):
         party = (struck, bystander)
         field = Battlefield(
             {
-                "monsters": frozenset(str(entity.key) for entity in monsters),
-                "party": frozenset(str(entity.key) for entity in party),
+                'monsters': frozenset(stable_actor_id(entity) for entity in monsters),
+                'party': frozenset(stable_actor_id(entity) for entity in party),
             },
-            {str(entity.key): entity for entity in (*monsters, *party)},
+            {stable_actor_id(entity): entity for entity in (*monsters, *party)},
         )
         traces: dict[str, list] = {}
 
@@ -1366,7 +1367,7 @@ class CoordinationRoundTests(EvenniaTestCase):
                 decision_scope_base=ExecutionScopeBase(
                     SESSION, ROUND, engagement_id=f"{SESSION}:{ROUND}"
                 ),
-                first_actor=str(first.key),
+                first_actor=stable_actor_id(first),
             )
 
         opening = traces[str(first.key)][0]

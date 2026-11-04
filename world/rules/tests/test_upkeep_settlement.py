@@ -32,6 +32,7 @@ from world.rules.buffs import TickRecord, apply_buff, tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.party import join_party
 from world.rules.upkeep import UPKEEP_SKILL_KEY, settle_upkeep
+from world.rules.combat_identity import stable_actor_id
 
 
 def _player(key="upkeep player"):
@@ -64,8 +65,9 @@ def _field(*entities):
     roster = {}
     for index, entity in enumerate(entities):
         team = "party" if index == 0 else "foes"
-        teams.setdefault(team, set()).add(entity.key)
-        roster[entity.key] = entity
+        identity = stable_actor_id(entity)
+        teams.setdefault(team, set()).add(identity)
+        roster[identity] = entity
     return Battlefield(
         {team: frozenset(members) for team, members in teams.items()},
         roster,
@@ -74,7 +76,7 @@ def _field(*entities):
 
 def _tick_records(entity, seconds=10) -> dict[str, tuple[TickRecord, ...]]:
     """Fire one upkeep tick on an entity and return the record grouping."""
-    return {entity.key: tick_buffs(entity, seconds)}
+    return {stable_actor_id(entity): tick_buffs(entity, seconds)}
 
 
 class UpkeepSettlementTests(EvenniaTestCase):
@@ -261,13 +263,13 @@ class UpkeepSettlementTests(EvenniaTestCase):
         logs = settle_upkeep(
             field,
             records,
-            nonlethal_keys=frozenset({companion.key}),
+            nonlethal_keys=frozenset({stable_actor_id(companion)}),
         )
         kinds = self._kinds(logs)
         self.assertIn("target_knocked_out", kinds)
         self.assertNotIn("target_defeated", kinds)
         self.assertEqual(companion.traits.hp.current, 1)
-        self.assertIn(companion.key, field.knocked_out)
+        self.assertIn(stable_actor_id(companion), field.knocked_out)
         self.assertIsNone(self.actor.db.magic_xp)
 
     @covers_requirement("combat-upkeep-settlement::upkeep-settlement-honors-simulated-and-nonlethal-combat-policy")
@@ -279,9 +281,9 @@ class UpkeepSettlementTests(EvenniaTestCase):
         logs = settle_upkeep(
             field,
             records,
-            nonlethal_keys=frozenset({companion.key}),
+            nonlethal_keys=frozenset({stable_actor_id(companion)}),
         )
-        self.assertNotIn(companion.key, field.knocked_out)
+        self.assertNotIn(stable_actor_id(companion), field.knocked_out)
         self.assertEqual(companion.traits.hp.current, 95)
         self.assertEqual(self._kinds(logs), ["damage"])
 
@@ -410,15 +412,15 @@ class UpkeepKnockoutParityTests(QuestRegistryIsolation, EvenniaTestCase):
         records = _tick_records(self.monster)
         field = Battlefield(
             {
-                "party": frozenset({self.owner.key, self.companion.key}),
-                "foes": frozenset({self.monster.key}),
+                'party': frozenset({stable_actor_id(self.owner), stable_actor_id(self.companion)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
             },
             {
-                self.owner.key: self.owner,
-                self.companion.key: self.companion,
-                self.monster.key: self.monster,
+                stable_actor_id(self.owner): self.owner,
+                stable_actor_id(self.companion): self.companion,
+                stable_actor_id(self.monster): self.monster,
             },
-            knocked_out={self.companion.key},
+            knocked_out={stable_actor_id(self.companion)},
         )
         logs = settle_upkeep(field, records)
         # The companion owns the defeat entry (credit identity), but the

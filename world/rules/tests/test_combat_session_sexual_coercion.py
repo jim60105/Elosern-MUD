@@ -65,6 +65,7 @@ from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
 # A single-target synthetic damage skill: the strike the integration rounds
 # cast.
+from world.rules.combat_identity import stable_actor_id
 _T_STRIKE = "t_coercion_strike"
 _T_STRIKE_SKILL = synth_damage_skill(_T_STRIKE, "測試懲擊")
 
@@ -157,10 +158,20 @@ def _resist_log(actor, target, *, resisted, auto_comply, roll):
         kind="sexual_resist",
         actor=str(actor.key),
         target=str(target.key),
+        actor_id=stable_actor_id(actor),
+        target_id=stable_actor_id(target),
         data={"resisted": resisted, "auto_comply": auto_comply, "roll": roll},
         text_template="{actor} 對 {target} 施加了強制行為。",
     )
-    return EventLog(str(actor.key), _T_LOG_SKILL, (str(target.key),), (entry,), 0)
+    return EventLog(
+        str(actor.key),
+        _T_LOG_SKILL,
+        (str(target.key),),
+        (entry,),
+        0,
+        actor_id=stable_actor_id(actor),
+        target_ids=(stable_actor_id(target),),
+    )
 
 
 class SexualCoercionBase(BattlefieldIsolation, EvenniaTest):
@@ -414,7 +425,7 @@ class SexualCoercionScanTests(SexualCoercionBase):
         engage(self.player, self.monster)
         battlefield = self._battlefield()
         # A second player is a structurally valid non-NPC roster member.
-        battlefield.roster[str(other.key)] = other
+        battlefield.roster[stable_actor_id(other)] = other
         log = _resist_log(
             self.player, other, resisted=False, auto_comply=False, roll=55
         )

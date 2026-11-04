@@ -29,6 +29,7 @@ from world.rules.combat.battlefield import (
     _adjusted_defense,
     _max_hp,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat.scalars import (
     damage_multiplier,
     damage_rider,
@@ -217,13 +218,28 @@ def _handle_damage(
             source_tier = "學徒"
     pending: list[PendingEffect] = []
     for target in targets:
-        key = str(target.key)
-        protected = session_nonlethal or key in nonlethal_keys
+        label = str(target.key)
+        identity = (
+            stable_actor_id(target)
+            if tactical is not None or nonlethal_keys
+            else None
+        )
+        protected = session_nonlethal or (
+            identity is not None and identity in nonlethal_keys
+        )
         # The recipient's own active-round declarations drive both effects: a
         # Dodge raises this recipient's to-hit threshold, a Defend reduces this
         # recipient's damage. AREA resolves each recipient here separately.
-        defender_dodging = tactical is not None and tactical.is_dodging(key)
-        defender_defending = tactical is not None and tactical.is_defending(key)
+        defender_dodging = (
+            tactical is not None
+            and identity is not None
+            and tactical.is_dodging(identity)
+        )
+        defender_defending = (
+            tactical is not None
+            and identity is not None
+            and tactical.is_defending(identity)
+        )
         marked: list[str] = []
         extra = (
             damage_policy is not None
@@ -325,7 +341,7 @@ def _handle_damage(
                 target=target,
                 amount=residual,
                 hit=hit,
-                key=key,
+                identity=identity,
                 protected=protected,
                 marked=marked,
                 source_tier=source_tier,
@@ -344,9 +360,14 @@ def _handle_damage(
                     _apply_hp_delta(target, -amount)
                 else:
                     _apply_hp_delta_nonlethal(target, -amount)
-                    if before > 0 and before - amount <= 0 and key in nonlethal_keys:
-                        if key not in marked:
-                            marked.append(key)
+                    if (
+                        before > 0
+                        and before - amount <= 0
+                        and identity is not None
+                        and identity in nonlethal_keys
+                        and identity not in marked
+                    ):
+                        marked.append(identity)
                 after = _stored_trait_value(target.traits.hp)
                 actual_loss = max(0, int(before - max(0.0, after)))
                 if actual_loss > 0:
@@ -373,7 +394,7 @@ def _handle_damage(
                 PendingEffect(
                     entity=target,
                     description=(
-                        f"damage|{key}|{raw_roll}|{int(hit)}|{residual}"
+                        f"damage|{label}|{raw_roll}|{int(hit)}|{residual}"
                     ),
                     surfaces=frozenset({"traits", "buffs"}),
                     apply=apply,
@@ -427,13 +448,13 @@ def _handle_damage(
                     PendingEffect(
                         entity=target,
                         description=(
-                            f"damage_divert|{key}|{buff.definition_key}|{diverted}"
+                            f"damage_divert|{label}|{buff.definition_key}|{diverted}"
                         ),
                         surfaces=frozenset({"traits", "buffs"}),
                         apply=make_divert_apply(),
                     )
                 )
-        if key in nonlethal_keys and battlefield is not None:
+        if identity is not None and identity in nonlethal_keys and battlefield is not None:
             # One battlefield-shaped effect per protected target: the commit's
             # duck-typed snapshot/restore dispatch captures ``fled`` and
             # ``knocked_out`` by shape, so a later commit failure rolls the
@@ -441,7 +462,7 @@ def _handle_damage(
             pending.append(
                 PendingEffect(
                     entity=battlefield,
-                    description=f"knocked_out_mark|{key}",
+                    description=f"knocked_out_mark|{label}",
                     surfaces=frozenset(),
                     apply=lambda marked=marked: (
                         battlefield.knocked_out.update(marked)

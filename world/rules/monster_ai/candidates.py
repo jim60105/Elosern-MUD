@@ -469,7 +469,7 @@ def enumerate_candidates(
 
     battlefield = getattr(context, "battlefield", None)
     taunter = (
-        None if battlefield is None else battlefield.taunt_winner(str(actor.key))
+        None if battlefield is None else battlefield.taunt_winner(stable_identity(actor))
     )
 
     def taunt_narrow(skill: SkillDef, base: tuple[Any, ...]) -> tuple[Any, ...]:
@@ -1025,7 +1025,7 @@ def decision_pool(
             continue
         seen.add(participant.identity)
         entity = roster.get(participant.identity)
-        if entity is None or str(getattr(entity, "key", "")) in knocked_out:
+        if entity is None or participant.identity in knocked_out:
             continue
         if entity is not actor and participant.identity == snapshot.actor.identity:
             continue

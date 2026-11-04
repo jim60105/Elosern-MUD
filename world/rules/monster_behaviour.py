@@ -856,7 +856,7 @@ def _living_enemies(
     Knocked-out members are excluded through the shared predicate, so opposing
     combatants never select a knocked-out companion (party-combat D-2).
     """
-    actor_team = battlefield.team_of(str(actor.key))
+    actor_team = battlefield.team_of(stable_actor_id(actor))
     enemy_keys = next(
         (
             members
@@ -903,7 +903,7 @@ def _choose_target(
         raise ValueError(f"unknown target_strategy: {strategy!r}")
     tied = sorted(
         (enemy for enemy in enemies if metric(enemy) == best),
-        key=lambda enemy: str(enemy.key),
+        key=lambda enemy: stable_actor_id(enemy),
     )
     if len(tied) == 1:
         return tied[0]
@@ -1080,7 +1080,7 @@ def _legacy_action(
     # restriction excluded grants no exception. The seal preference above the
     # metric stays authoritative: when a seal selects a different bearer, the
     # taunter is excluded and the taunt changes nothing.
-    winner = battlefield.taunt_winner(str(entity.key))
+    winner = battlefield.taunt_winner(stable_actor_id(entity))
     if (
         winner is not None
         and any(candidate is winner for candidate in candidates)

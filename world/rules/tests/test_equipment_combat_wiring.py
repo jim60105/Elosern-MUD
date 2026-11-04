@@ -575,8 +575,8 @@ class DamageWiringTests(_FixtureFieldCase):
         "combat-modifier-table::worn-equipment-merges-into-the-merged-bundle-of-both-evaluation-paths"
     )
     def test_worn_weapon_raises_staged_physical_damage(self):
-        attacker = FakeEntity("wiring attacker", atk_phys=20, agility=10)
-        defender = FakeEntity("wiring defender", hp=1000, agility=10, defense=5)
+        attacker = FakeEntity("wiring attacker", combat_identity='wiring attacker', atk_phys=20, agility=10)
+        defender = FakeEntity("wiring defender", combat_identity='wiring defender', hp=1000, agility=10, defense=5)
         baseline = self._staged_damage(attacker, defender)
         _worn(attacker, weapon=_SABER.key)
         # This case's role is additive equipment wiring, so the borrowed
@@ -597,8 +597,8 @@ class DamageWiringTests(_FixtureFieldCase):
         "combat-modifier-table::worn-equipment-merges-into-the-merged-bundle-of-both-evaluation-paths"
     )
     def test_worn_armor_moves_the_defender_required_roll(self):
-        attacker = FakeEntity("roll attacker", agility=10)
-        defender = FakeEntity("roll defender", agility=30, defense=5)
+        attacker = FakeEntity("roll attacker", combat_identity='roll attacker', agility=10)
+        defender = FakeEntity("roll defender", combat_identity='roll defender', agility=30, defense=5)
         self.assertEqual(_required_roll(attacker, defender), 51 + 30 - 10)
         _worn(defender, armor=_MAIL.key)
         # The armor's percent agility scales the effective agility.
@@ -615,9 +615,9 @@ class AdjustedAgilityTests(_FixtureFieldCase):
         "combat-modifier-table::adjusted-agility-never-resolves-negative"
     )
     def test_flat_penalty_floors_agility_at_zero_everywhere(self):
-        floored = FakeEntity("floored agility", agility=2)
-        zero = FakeEntity("zero agility", agility=0)
-        attacker = FakeEntity("steady attacker", agility=10)
+        floored = FakeEntity("floored agility", combat_identity='floored agility', agility=2)
+        zero = FakeEntity("zero agility", combat_identity='zero agility', agility=0)
+        attacker = FakeEntity("steady attacker", combat_identity='steady attacker', agility=10)
         # The probed penalty row floors the 2-agility fixture at zero.
         _worn(floored, off=_ECHO.key)
 
@@ -659,7 +659,7 @@ class AdjustedAgilityTests(_FixtureFieldCase):
         "combat-modifier-table::adjusted-agility-never-resolves-negative"
     )
     def test_percent_scales_then_flat_adds_then_floor(self):
-        entity = FakeEntity("composed agility", agility=10)
+        entity = FakeEntity("composed agility", combat_identity='composed agility', agility=10)
         # -50% scales to 5, +3 lands on top of the scaled value.
         self.assertEqual(
             adjusted_agility(entity, {"agility": "-50%", "agility_flat": 3}),
@@ -677,17 +677,17 @@ class AdjustedAgilityTests(_FixtureFieldCase):
         "combat-modifier-table::adjusted-agility-never-resolves-negative"
     )
     def test_initiative_keeps_its_raw_agility_exception(self):
-        boosted = FakeEntity("cloak carrier", agility=10)
-        plain = FakeEntity("plain runner", agility=10 + _BLADE_AGILITY + 1)
+        boosted = FakeEntity("cloak carrier", combat_identity='cloak carrier', agility=10)
+        plain = FakeEntity("plain runner", combat_identity='plain runner', agility=10 + _BLADE_AGILITY + 1)
         # The blade's flat agility would let the adjusted bundle invert the
         # order — an initiative that consulted the bundle would flip it.
         _worn(boosted, weapon=_BLADE.key)
         field = Battlefield(
             {
-                "first": frozenset({"cloak carrier"}),
-                "second": frozenset({"plain runner"}),
+                'first': frozenset({"fixture:cloak carrier"}),
+                'second': frozenset({"fixture:plain runner"}),
             },
-            {"cloak carrier": boosted, "plain runner": plain},
+            {"fixture:cloak carrier": boosted, "fixture:plain runner": plain},
         )
         with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 1]):
             order = combat.roll_initiative(field)

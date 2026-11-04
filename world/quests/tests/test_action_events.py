@@ -32,6 +32,7 @@ from world.tests.synthetic_data import (
 )
 
 from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
+from world.rules.combat_identity import stable_actor_id
 
 #: Combat runs on the kit's spell row; the double-damage probe is a kit-shaped
 #: extra so the skill registry never holds a shipped row inside these tests.
@@ -69,10 +70,10 @@ def _enter_monster_scope(test) -> None:
 def fire_field(actor, target) -> Battlefield:
     return Battlefield(
         {
-            "party": frozenset({actor.key}),
-            "foes": frozenset({target.key}),
+            'party': frozenset({stable_actor_id(actor)}),
+            'foes': frozenset({stable_actor_id(target)}),
         },
-        {actor.key: actor, target.key: target},
+        {stable_actor_id(actor): actor, stable_actor_id(target): target},
     )
 
 

@@ -14,6 +14,7 @@ from typeclasses.monsters import Monster
 from world.observability import log_info
 from world.rules.action import _stored_trait_value
 from world.rules.combat import Battlefield
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.observations import discard_session_memory
 from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
@@ -170,10 +171,11 @@ def engage_group(
     runs no action before the player chooses one.
 
     ``opening_first_actor`` is the encounter's explicit opening-order policy
-    (``player-combat-session``): the roster key that acts first in the first
-    complete round, persisted with the session so it survives the waiting
-    seed and is consumed exactly once. ``engage()`` and every ordinary
-    engagement pass nothing, so ordinary entry order never changes initiative.
+    (``player-combat-session``): the stable individual identity that acts
+    first in the first complete round, persisted with the session so it
+    survives the waiting seed and is consumed exactly once. ``engage()`` and
+    every ordinary engagement pass nothing, so ordinary entry order never
+    changes initiative.
     """
     if not isinstance(actor, PlayerCharacter):
         raise CombatSessionError(SessionReason.NOT_A_PLAYER)
@@ -212,6 +214,19 @@ def engage_group(
 
     companion_entities = combat_companions(actor)
     companions = [int(companion.pk) for companion in companion_entities]
+    # Every admission input is checked by stable identity before the encounter
+    # counter or any session surface is written: the same entity supplied
+    # twice (as a target, a companion, or the actor) rejects atomically.
+    participant_identities = [
+        stable_actor_id(actor),
+        *(stable_actor_id(companion) for companion in companion_entities),
+        *(stable_actor_id(target) for target in targets),
+    ]
+    if len(participant_identities) != len(set(participant_identities)):
+        raise CombatSessionError(
+            SessionReason.DUPLICATE_PARTICIPANT,
+            "a participant identity is supplied more than once",
+        )
     # A sleeping body still joins the roster: sleep is a live posture that
     # excludes its own commands, never a knockout or an absence. The initial
     # posture is recorded as terminal-accounting evidence only; the live

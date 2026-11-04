@@ -33,6 +33,7 @@ from world.rules.monster_behaviour import resolve_behaviour_profile
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
+from world.rules.combat_identity import stable_actor_id
 
 # The representative the composition-coverage check derives for this group.
 REPRESENTATIVE_VARIANT = "cliff_stepper"
@@ -104,8 +105,8 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         engage(player, pecker)
         record = read_session(player)
         field = Battlefield(
-            {"party": frozenset({player.key}), "foes": frozenset({pecker.key})},
-            {player.key: player, pecker.key: pecker},
+            {'party': frozenset({stable_actor_id(player)}), 'foes': frozenset({stable_actor_id(pecker)})},
+            {stable_actor_id(player): player, stable_actor_id(pecker): pecker},
         )
         skill = SKILL_REGISTRY[SKILL_KEY]
         baseline_modifier = evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0)

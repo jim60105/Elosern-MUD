@@ -22,6 +22,7 @@ from world.rules.tests.combat_fixtures import grant_lineage
 from world.rules.traits import restore_gauges_to_full
 from world.skills.effects import DamageEffect, parse_effect
 from world.tests.synthetic_data import make_skill, synthetic_registries
+from world.rules.combat_identity import stable_actor_id
 
 # An elementless physical strike: the reserved ``damage:none:physical`` token.
 _T_ELEMENTLESS_STRIKE = make_skill(
@@ -132,8 +133,8 @@ class ElementlessDamageSettlementParityTests(EvenniaTestCase):
         restore_gauges_to_full(self.actor)
         restore_gauges_to_full(self.target)
         battlefield = Battlefield(
-            {"party": frozenset({"ed_actor"}), "foes": frozenset({"ed_target"})},
-            {"ed_actor": self.actor, "ed_target": self.target},
+            {'party': frozenset({"fixture:ed_actor"}), 'foes': frozenset({"fixture:ed_target"})},
+            {"fixture:ed_actor": self.actor, "fixture:ed_target": self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -202,8 +203,8 @@ class ElementlessPracticeAccrualParityTests(EvenniaTestCase):
         restore_gauges_to_full(actor)
         restore_gauges_to_full(self.target)
         battlefield = Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset({"ep_target"})},
-            {actor.key: actor, "ep_target": self.target},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset({"fixture:ep_target"})},
+            {stable_actor_id(actor): actor, "fixture:ep_target": self.target},
         )
         request = ActionRequest(
             actor,

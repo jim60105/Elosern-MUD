@@ -22,6 +22,7 @@ from world.tests.synthetic_data import SYNTH_SKILLS, synthetic_registries
 
 from ._combat_session_helpers import synth_damage_skill, synth_innate_overlay
 from .combat_fixtures import FakeEntity, FakeGauge
+from world.rules.combat_identity import stable_actor_id
 
 # Synthetic vehicles (test-data-independence): the kit's affordable spell is
 # made unaffordable by fixture MP, and a file-local deep skill carries a
@@ -41,29 +42,29 @@ _SCOPE = synthetic_registries(
 @_SCOPE
 class InitiativeAndTurnLoopTests(unittest.TestCase):
     def battlefield(self, gap: int = 10):
-        fast = FakeEntity("fast", agility=10 + gap)
-        slow = FakeEntity("slow", agility=10)
+        fast = FakeEntity("fast", combat_identity='fast', agility=10 + gap)
+        slow = FakeEntity("slow", combat_identity='slow', agility=10)
         return Battlefield(
-            {"a": frozenset({"fast"}), "b": frozenset({"slow"})},
-            {"fast": fast, "slow": slow},
+            {'a': frozenset({"fixture:fast"}), 'b': frozenset({"fixture:slow"})},
+            {"fixture:fast": fast, "fixture:slow": slow},
         )
 
     def test_ten_point_gap_dominates_every_roll_pair(self):
         battlefield = self.battlefield()
         with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 100]):
-            self.assertEqual(roll_initiative(battlefield), ["fast", "slow"])
+            self.assertEqual(roll_initiative(battlefield), ["fixture:fast", "fixture:slow"])
 
     @covers_requirement("combat-resolution::initiative-order-is-agility-dominant-with-d100-jitter")
     def test_small_gap_can_be_reordered(self):
         battlefield = self.battlefield(gap=9)
         with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 100]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 100]):
-            self.assertEqual(roll_initiative(battlefield), ["slow", "fast"])
+            self.assertEqual(roll_initiative(battlefield), ["fixture:slow", "fixture:fast"])
 
     @covers_requirement("combat-resolution::the-turn-loop-consumes-actions-per-turn-as-the-round-s-action-count-with-zero-skipping-before-actionresolver-is-called")
     def test_action_lock_skips_resolver_and_upkeep_runs(self):
         battlefield = self.battlefield()
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=[{"actions_per_turn": 0}, {}],
@@ -88,7 +89,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         from world.rules.action import ActionRequest
 
         battlefield = self.battlefield()
-        slow = battlefield.roster["slow"]
+        slow = battlefield.roster["fixture:slow"]
         success = SimpleNamespace(outcome="success", event_log=None, journal=None)
         scopes: list[str] = []
 
@@ -104,7 +105,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["fast", "slow"],
+                return_value=["fixture:fast", "fixture:slow"],
             ),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
@@ -134,7 +135,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
@@ -155,7 +156,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         for kind in ("skill", "item", "missing"):
             with self.subTest(kind=kind):
                 field = self.battlefield()
-                ally, enemy = field.roster["fast"], field.roster["slow"]
+                ally, enemy = field.roster["fixture:fast"], field.roster["fixture:slow"]
                 ally.pk, enemy.pk = 1, 2
                 request = (
                     ItemUseRequest(actor=ally, item_key="selected-item")
@@ -165,7 +166,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
                 provider = _party_round_provider(selected, field, SimpleNamespace(player_ids=(1,)))
                 success = SimpleNamespace(outcome="success", event_log=None, journal=None)
                 with (
-                    patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+                    patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
                     patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={"actions_per_turn": 2}),
                     patch("world.rules.combat.rounds.ActionResolver.resolve", return_value=success) as resolve,
                     patch("world.rules.combat.rounds.resolve_item_use", return_value=success) as use,
@@ -190,7 +191,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
@@ -212,7 +213,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 5} if entity.key == "fast" else {},
@@ -229,7 +230,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         calls1 = []
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
@@ -256,7 +257,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         calls2 = []
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
@@ -281,7 +282,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield = self.battlefield()
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
@@ -306,7 +307,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield2 = self.battlefield()
         calls2 = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 0} if entity.key == "fast" else {},
@@ -332,7 +333,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
         battlefield = self.battlefield()
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 1} if entity.key == "fast" else {},
@@ -355,7 +356,7 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
 
     def test_default_policy_does_not_retry_an_unaffordable_skill(self):
         battlefield = self.battlefield()
-        actor = battlefield.roster["fast"]
+        actor = battlefield.roster["fixture:fast"]
         actor.skills._owned = [_T_CAST]
         actor.traits.mp = type(
             "Gauge",
@@ -377,15 +378,15 @@ class DefaultAttackPolicyAffordabilityTests(unittest.TestCase):
         # affordability are the eligibility gates: a deep spell owned without
         # its prerequisite chain is not usable and the innate basic_attack
         # (no cost) takes over.
-        actor = FakeEntity(key, owned=[*owned, BASIC_ATTACK_KEY])
+        actor = FakeEntity(key, combat_identity=key, owned=[*owned, BASIC_ATTACK_KEY])
         actor.traits.mp = FakeGauge(mp, 30)
         return actor
 
     def _field(self, actor: FakeEntity) -> Battlefield:
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         return Battlefield(
-            {"a": frozenset({actor.key}), "b": frozenset({enemy.key})},
-            {actor.key: actor, enemy.key: enemy},
+            {'a': frozenset({stable_actor_id(actor)}), 'b': frozenset({stable_actor_id(enemy)})},
+            {stable_actor_id(actor): actor, stable_actor_id(enemy): enemy},
         )
 
     @covers_requirement("monster-action-policy::a-delegated-non-monster-entity-proposes-the-first-usable-resolver-backed-damage-skill")
@@ -434,30 +435,30 @@ class FirstActorOverrideTests(unittest.TestCase):
     def battlefield(self):
         # 100-point agility gaps (weight 10) dominate every d100 jitter, so
         # the rolled baseline order is fixed under any seeded rolls.
-        fast = FakeEntity("fast", agility=40)
-        mid = FakeEntity("mid", agility=30)
-        slow = FakeEntity("slow", agility=20)
+        fast = FakeEntity("fast", combat_identity='fast', agility=40)
+        mid = FakeEntity("mid", combat_identity='mid', agility=30)
+        slow = FakeEntity("slow", combat_identity='slow', agility=20)
         return Battlefield(
-            {"a": frozenset({"fast", "mid"}), "b": frozenset({"slow"})},
-            {"fast": fast, "mid": mid, "slow": slow},
+            {'a': frozenset({"fixture:fast", "fixture:mid"}), 'b': frozenset({"fixture:slow"})},
+            {"fixture:fast": fast, "fixture:mid": mid, "fixture:slow": slow},
         )
 
     def stale_battlefield(self):
         field = Battlefield(
             {
-                "a": frozenset({"fast", "dead", "fled", "fainted"}),
-                "b": frozenset({"slow"}),
+                'a': frozenset({"fixture:fast", "fixture:dead", "fixture:fled", "fixture:fainted"}),
+                'b': frozenset({"fixture:slow"}),
             },
             {
-                "fast": FakeEntity("fast", agility=40),
-                "dead": FakeEntity("dead", agility=40, hp=0),
-                "fled": FakeEntity("fled", agility=40),
-                "fainted": FakeEntity("fainted", agility=40),
-                "slow": FakeEntity("slow", agility=20),
+                "fixture:fast": FakeEntity("fast", combat_identity='fast', agility=40),
+                "fixture:dead": FakeEntity("dead", combat_identity='dead', agility=40, hp=0),
+                "fixture:fled": FakeEntity("fled", combat_identity='fled', agility=40),
+                "fixture:fainted": FakeEntity("fainted", combat_identity='fainted', agility=40),
+                "fixture:slow": FakeEntity("slow", combat_identity='slow', agility=20),
             },
         )
-        field.fled.add("fled")
-        field.knocked_out.add("fainted")
+        field.fled.add("fixture:fled")
+        field.knocked_out.add("fixture:fainted")
         return field
 
     def acting_order(self, battlefield, first_actor=(), rolls=_ROLLS):
@@ -485,7 +486,7 @@ class FirstActorOverrideTests(unittest.TestCase):
     def test_named_key_acts_first_and_rolls_stay_one_per_combatant(self):
         baseline, baseline_rolls = self.acting_order(self.battlefield())
         overridden, overridden_rolls = self.acting_order(
-            self.battlefield(), first_actor="slow"
+            self.battlefield(), first_actor="fixture:slow"
         )
         self.assertEqual(baseline, ["fast", "mid", "slow"])
         # The named key moves to the head; every other key keeps its rolled
@@ -499,7 +500,7 @@ class FirstActorOverrideTests(unittest.TestCase):
     def test_override_changes_order_never_the_action_multiset(self):
         baseline, _ = self.acting_order(self.battlefield())
         overridden, _ = self.acting_order(
-            self.battlefield(), first_actor="slow"
+            self.battlefield(), first_actor="fixture:slow"
         )
         # Exactly one action per capable combatant under both runs; the
         # override grants no extra action and skips nobody.
@@ -511,7 +512,7 @@ class FirstActorOverrideTests(unittest.TestCase):
     def test_stale_first_actor_keys_are_silent_noops(self):
         baseline, _ = self.acting_order(self.stale_battlefield())
         self.assertEqual(baseline, ["fast", "slow"])
-        for stale_key in ("dead", "fled", "fainted", "not-in-roster"):
+        for stale_key in ("fixture:dead", "fixture:fled", "fixture:fainted", "fixture:not-in-roster"):
             with self.subTest(first_actor=stale_key):
                 order, _ = self.acting_order(
                     self.stale_battlefield(), first_actor=stale_key
@@ -523,7 +524,7 @@ class FirstActorOverrideTests(unittest.TestCase):
         # A deliberately non-score-derived order: any implementation that
         # re-scored or re-rolled to honour the override could not reproduce
         # this exact sequence.
-        rolled = ["mid", "slow", "fast"]
+        rolled = ["fixture:mid", "fixture:slow", "fixture:fast"]
         seen: list[str] = []
 
         def provider(entity, field):
@@ -544,6 +545,6 @@ class FirstActorOverrideTests(unittest.TestCase):
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
-            run_round(self.battlefield(), provider, first_actor="slow")
+            run_round(self.battlefield(), provider, first_actor="fixture:slow")
         self.assertEqual(roller.call_count, 1)
         self.assertEqual(seen, ["slow", "mid", "fast"])

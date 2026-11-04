@@ -30,14 +30,15 @@ from world.rules.monster_behaviour import monster_behaviour_policy
 
 from .combat_fixtures import FakeEntity
 from .test_monster_behaviour_policy import FakeMonster
+from world.rules.combat_identity import stable_actor_id
 
 
 def _field(actor, *pursuers):
-    roster = {entity.key: entity for entity in (actor, *pursuers)}
+    roster = {stable_actor_id(entity): entity for entity in (actor, *pursuers)}
     return Battlefield(
         {
-            "escaping": frozenset({actor.key}),
-            "pursuing": frozenset(entity.key for entity in pursuers),
+            'escaping': frozenset({stable_actor_id(actor)}),
+            'pursuing': frozenset(stable_actor_id(entity) for entity in pursuers),
         },
         roster,
     )
@@ -46,8 +47,8 @@ def _field(actor, *pursuers):
 class DisengageFormulaTests(unittest.TestCase):
     @covers_requirement("disengage-action::the-disengage-effect-handler-computes-flee-success-from-the-same-agility-difference")
     def test_parity_is_about_half_over_fixed_seed_trials(self):
-        actor = FakeEntity("actor", agility=10)
-        field = _field(actor, FakeEntity("pursuer", agility=10))
+        actor = FakeEntity("actor", combat_identity='actor', agility=10)
+        field = _field(actor, FakeEntity("pursuer", combat_identity='pursuer', agility=10))
         generator = random.Random(20260731)
         with (
             patch(
@@ -63,8 +64,8 @@ class DisengageFormulaTests(unittest.TestCase):
         self.assertLess(abs(successes / 10_000 - 0.5), 0.02)
 
     def test_saturated_race_scale_outcomes_ignore_seed(self):
-        human = FakeEntity("human", agility=9)
-        elf = FakeEntity("elf", agility=92)
+        human = FakeEntity("human", combat_identity='human', agility=9)
+        elf = FakeEntity("elf", combat_identity='elf', agility=92)
         with patch(
             "world.rules.disengage.evaluate_combat_modifiers",
             return_value={},
@@ -78,13 +79,13 @@ class DisengageFormulaTests(unittest.TestCase):
                     self.assertTrue(_attempt_flee(elf, _field(elf, human))[0])
 
     def test_fastest_living_non_fled_pursuer_is_used(self):
-        actor = FakeEntity("actor", agility=20)
-        slow = FakeEntity("slow", agility=5)
-        fast = FakeEntity("fast", agility=30)
-        dead = FakeEntity("dead", hp=0, agility=90)
-        fled = FakeEntity("fled", agility=80)
+        actor = FakeEntity("actor", combat_identity='actor', agility=20)
+        slow = FakeEntity("slow", combat_identity='slow', agility=5)
+        fast = FakeEntity("fast", combat_identity='fast', agility=30)
+        dead = FakeEntity("dead", combat_identity='dead', hp=0, agility=90)
+        fled = FakeEntity("fled", combat_identity='fled', agility=80)
         field = _field(actor, slow, fast, dead, fled)
-        field.fled.add("fled")
+        field.fled.add(stable_actor_id(fled))
         with patch(
             "world.rules.disengage.evaluate_combat_modifiers",
             return_value={},
@@ -92,7 +93,7 @@ class DisengageFormulaTests(unittest.TestCase):
             self.assertEqual(_fastest_pursuer_agility(field, actor), 30)
 
     def test_adjusted_agility_reads_no_accuracy_modifier(self):
-        actor = FakeEntity("actor", agility=20)
+        actor = FakeEntity("actor", combat_identity='actor', agility=20)
         with patch(
             "world.rules.disengage.evaluate_combat_modifiers",
             return_value={"agility": "-25%", "accuracy": -1000},
@@ -105,8 +106,8 @@ class DisengageFormulaTests(unittest.TestCase):
         self.assertNotIn('"accuracy"', function_source)
 
     def test_no_remaining_pursuer_succeeds_without_roll(self):
-        actor = FakeEntity("actor")
-        pursuer = FakeEntity("pursuer", hp=0)
+        actor = FakeEntity("actor", combat_identity='actor')
+        pursuer = FakeEntity("pursuer", combat_identity='pursuer', hp=0)
         with (
             patch(
                 "world.rules.disengage.evaluate_combat_modifiers",
@@ -143,7 +144,7 @@ class DisengageStagingTests(unittest.TestCase):
 
     @covers_requirement("disengage-action::a-missing-battlefield-reference-in-event-context-is-a-named-rejection-not-a-crash")
     def test_missing_battlefield_is_named_rejection(self):
-        actor = FakeEntity("actor")
+        actor = FakeEntity("actor", combat_identity='actor')
         with self.assertRaises(RejectedAction) as caught:
             _handle_disengage(actor, [actor], "disengage:self", {}, 1.0)
         self.assertIs(
@@ -154,8 +155,8 @@ class DisengageStagingTests(unittest.TestCase):
 
     @covers_requirement("disengage-action::a-successful-flee-adds-the-fleeing-entity-s-key-to-battlefield-fled-a-failed-attempt")
     def test_success_and_failure_stage_expected_mutations_and_entries(self):
-        actor = FakeEntity("actor", agility=10)
-        field = _field(actor, FakeEntity("pursuer", agility=10))
+        actor = FakeEntity("actor", combat_identity='actor', agility=10)
+        field = _field(actor, FakeEntity("pursuer", combat_identity='pursuer', agility=10))
         with (
             patch(
                 "world.rules.disengage.evaluate_combat_modifiers",
@@ -177,8 +178,8 @@ class DisengageStagingTests(unittest.TestCase):
                 {"battlefield": field},
                 1.0,
             )[0]
-        success_entry = _entries_from_effect(actor.key, success)[0]
-        failure_entry = _entries_from_effect(actor.key, failure)[0]
+        success_entry = _entries_from_effect(actor.key, stable_actor_id(actor), success)[0]
+        failure_entry = _entries_from_effect(actor.key, stable_actor_id(actor), failure)[0]
         self.assertEqual(success_entry.kind, "disengage_attempt")
         self.assertEqual(
             success_entry.data,
@@ -191,20 +192,20 @@ class DisengageStagingTests(unittest.TestCase):
         )
         self.assertFalse(failure_entry.data["success"])
         failure.apply()
-        self.assertNotIn(actor.key, field.fled)
+        self.assertNotIn(stable_actor_id(actor), field.fled)
         success.apply()
-        self.assertIn(actor.key, field.fled)
+        self.assertIn(stable_actor_id(actor), field.fled)
 
     @covers_requirement("battlefield-commit-surface::a-commit-failure-rolls-back-a-battlefield-mutation-exactly-as-it-rolls-back-an-entity")
     def test_mixed_surface_commit_rolls_back_battlefield(self):
-        actor = FakeEntity("actor")
-        field = _field(actor, FakeEntity("pursuer"))
+        actor = FakeEntity("actor", combat_identity='actor')
+        field = _field(actor, FakeEntity("pursuer", combat_identity='pursuer'))
         effects = [
             PendingEffect(
                 field,
                 "disengage_attempt|actor|1|100|10|10",
                 frozenset({"battlefield"}),
-                lambda: field.fled.add(actor.key),
+                lambda: field.fled.add(stable_actor_id(actor)),
             ),
             PendingEffect(
                 field,
@@ -229,11 +230,11 @@ class DisengageStagingTests(unittest.TestCase):
         self.assertNotIn("isinstance(context, Battlefield", source)
 
     def test_monster_policy_ignores_fled_enemies_without_modification(self):
-        monster = FakeMonster("monster", owned=[BASIC_ATTACK_KEY])
-        active = FakeEntity("active")
-        fled = FakeEntity("fled")
+        monster = FakeMonster("monster", combat_identity="monster", owned=[BASIC_ATTACK_KEY])
+        active = FakeEntity("active", combat_identity='active')
+        fled = FakeEntity("fled", combat_identity='fled')
         field = _field(monster, active, fled)
-        field.fled.add("fled")
+        field.fled.add(stable_actor_id(fled))
         request = monster_behaviour_policy(monster, field)
         self.assertEqual(request.targets, [active])
 
@@ -260,10 +261,10 @@ class DisengageGoldenTests(unittest.TestCase):
             )[0]
 
     def test_same_tier_fixed_seed_has_exact_event_and_state(self):
-        actor = FakeEntity("actor", agility=10)
-        field = _field(actor, FakeEntity("pursuer", agility=10))
+        actor = FakeEntity("actor", combat_identity='actor', agility=10)
+        field = _field(actor, FakeEntity("pursuer", combat_identity='pursuer', agility=10))
         effect = self._seeded_effect(actor, field, 7)
-        entry = _entries_from_effect(actor.key, effect)[0]
+        entry = _entries_from_effect(actor.key, stable_actor_id(actor), effect)[0]
         self.assertEqual(entry.data["roll"], 42)
         self.assertFalse(entry.data["success"])
         effect.apply()
@@ -271,20 +272,20 @@ class DisengageGoldenTests(unittest.TestCase):
 
     def test_human_never_escapes_elf_across_fixed_seeds(self):
         for seed in (1, 7, 99, 2026):
-            human = FakeEntity("human", agility=9)
-            field = _field(human, FakeEntity("elf", agility=92))
+            human = FakeEntity("human", combat_identity='human', agility=9)
+            field = _field(human, FakeEntity("elf", combat_identity='elf', agility=92))
             effect = self._seeded_effect(human, field, seed)
-            entry = _entries_from_effect(human.key, effect)[0]
+            entry = _entries_from_effect(human.key, stable_actor_id(human), effect)[0]
             self.assertFalse(entry.data["success"])
             effect.apply()
             self.assertEqual(field.fled, set())
 
     def test_elf_always_escapes_human_across_fixed_seeds(self):
         for seed in (1, 7, 99, 2026):
-            elf = FakeEntity("elf", agility=92)
-            field = _field(elf, FakeEntity("human", agility=9))
+            elf = FakeEntity("elf", combat_identity='elf', agility=92)
+            field = _field(elf, FakeEntity("human", combat_identity='human', agility=9))
             effect = self._seeded_effect(elf, field, seed)
-            entry = _entries_from_effect(elf.key, effect)[0]
+            entry = _entries_from_effect(elf.key, stable_actor_id(elf), effect)[0]
             self.assertTrue(entry.data["success"])
             effect.apply()
-            self.assertEqual(field.fled, {"elf"})
+            self.assertEqual(field.fled, {stable_actor_id(elf)})

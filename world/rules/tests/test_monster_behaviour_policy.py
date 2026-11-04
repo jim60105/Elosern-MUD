@@ -15,6 +15,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
 )
 from .combat_fixtures import FakeEntity, FakeGauge
+from world.rules.combat_identity import stable_actor_id
 
 
 class FakeMonster(FakeEntity):
@@ -40,10 +41,10 @@ def _field(actor, enemies):
     entities = [actor, *enemies]
     return Battlefield(
         {
-            "monsters": frozenset({str(actor.key)}),
-            "party": frozenset(str(entity.key) for entity in enemies),
+            'monsters': frozenset({stable_actor_id(actor)}),
+            'party': frozenset(stable_actor_id(entity) for entity in enemies),
         },
-        {str(entity.key): entity for entity in entities},
+        {stable_actor_id(entity): entity for entity in entities},
     )
 
 
@@ -90,11 +91,11 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     def test_area_preference_and_single_enemy_suppression(self):
         actor = FakeMonster(
-            "actor",
+            "actor", combat_identity='actor',
             threat_tier="mid",
             owned=[_T_SPELL.key, _T_AREA.key],
         )
-        enemies = [FakeEntity("one"), FakeEntity("two")]
+        enemies = [FakeEntity("one", combat_identity='one'), FakeEntity("two", combat_identity='two')]
         request = monster_behaviour_policy(actor, _field(actor, enemies))
         self.assertEqual(request.skill_key, _T_AREA.key)
         self.assertEqual(request.targets, "all-enemies")
@@ -104,9 +105,9 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::area-versus-single-target-shape-is-decided-before-target-skill-selection-reusing-the")
     def test_area_fallback_and_no_eligible_skill(self):
-        actor = FakeMonster("actor", owned=[_T_AREA.key])
+        actor = FakeMonster("actor", combat_identity='actor', owned=[_T_AREA.key])
         actor.traits.mp = FakeGauge(24, 24)
-        enemy = FakeEntity("enemy")
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         request = monster_behaviour_policy(actor, _field(actor, [enemy]))
         self.assertEqual(request.targets, "all-enemies")
         actor.skills._owned = [_T_FLIGHT.key]
@@ -114,8 +115,8 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::a-non-monster-entity-is-delegated-to-change-9-s-default-attack-policy-unmodified")
     def test_non_monster_delegates_but_monster_does_not(self):
-        actor = FakeEntity("actor")
-        field = _field(actor, [FakeEntity("enemy")])
+        actor = FakeEntity("actor", combat_identity='actor')
+        field = _field(actor, [FakeEntity("enemy", combat_identity='enemy')])
         sentinel = object()
         with patch(
             "world.rules.monster_behaviour.combat.default_attack_policy",
@@ -123,8 +124,8 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         ) as default:
             self.assertIs(monster_behaviour_policy(actor, field), sentinel)
             default.assert_called_once_with(actor, field)
-        monster = FakeMonster("monster", owned=[])
-        field = _field(monster, [FakeEntity("enemy-two")])
+        monster = FakeMonster("monster", combat_identity='monster', owned=[])
+        field = _field(monster, [FakeEntity("enemy-two", combat_identity='enemy-two')])
         with patch(
             "world.rules.monster_behaviour.combat.default_attack_policy"
         ) as default:
@@ -134,13 +135,13 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
     @covers_requirement("monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected")
     def test_unaffordable_preference_falls_back_to_affordable_skill(self):
         actor = FakeMonster(
-            "actor",
+            "actor", combat_identity='actor',
             threat_tier="mid",
             owned=[_T_AREA.key, _T_CLAW.key],
         )
         actor.traits.mp = FakeGauge(0, 12)
         actor.traits.sp = FakeGauge(18, 18)
-        enemies = [FakeEntity("one", hp=40), FakeEntity("two", hp=60)]
+        enemies = [FakeEntity("one", combat_identity='one', hp=40), FakeEntity("two", combat_identity='two', hp=60)]
         # The area spell costs 12 MP the monster does not have, so only the
         # zero-cost strike remains eligible — a single-candidate choice that
         # must consume no tie-break dice (the targets differ in hp, so the

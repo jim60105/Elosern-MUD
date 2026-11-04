@@ -401,8 +401,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
     )
     def test_damage_scales_attack_component_before_defense_subtraction(self):
-        actor = FakeEntity("actor", atk_phys=45, agility=10)
-        target = FakeEntity("target", hp=100, agility=10, defense=20)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=45, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=10, defense=20)
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
@@ -432,8 +432,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(amt_2, 60)
 
     def test_direct_damage_handler_defaults_to_identity_without_binding(self):
-        actor = FakeEntity("actor", atk_phys=40, agility=10)
-        target = FakeEntity("target", hp=100, agility=10, defense=10)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=40, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=10, defense=10)
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=60),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
@@ -455,8 +455,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(amt_forged, 32)
 
     def test_miss_deals_zero_damage_and_no_floor_even_with_high_potency(self):
-        actor = FakeEntity("actor", atk_phys=10, agility=10)
-        target = FakeEntity("target", hp=100, agility=90, defense=50)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=10, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=90, defense=50)
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=1),
             patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}),
@@ -473,8 +473,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(target.traits.hp.value, 100)
 
     def test_sub_one_potency_respects_damage_floor_on_hit(self):
-        actor = FakeEntity("actor", atk_phys=10, agility=10)
-        target = FakeEntity("target", hp=100, agility=10, defense=50)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=10, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=10, defense=50)
         floor = int(COMBAT_YAML["damage"]["floor"])
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=60),
@@ -491,8 +491,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(amt, floor)
 
     def test_crit_multiplier_composes_with_potency(self):
-        actor = FakeEntity("actor", atk_phys=20, agility=10)
-        target = FakeEntity("target", hp=100, agility=10, defense=5)
+        actor = FakeEntity("actor", combat_identity='actor', atk_phys=20, agility=10)
+        target = FakeEntity("target", combat_identity='target', hp=100, agility=10, defense=5)
         crit_mult = float(COMBAT_YAML["damage"]["crit_multiplier"])
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=100),
@@ -511,12 +511,12 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(amt, expected)
 
     def test_heal_magnitude_inserts_coefficient_before_rounding_and_gain(self):
-        actor = FakeEntity("actor", magic_power=35)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=35)
         self.assertEqual(_heal_magnitude(actor, 1.0), 35)
         self.assertEqual(_heal_magnitude(actor, 2.0), 70)
 
     def test_heal_magnitude_sub_one_potency_respects_floor(self):
-        actor = FakeEntity("actor", magic_power=1)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=1)
         # magic 1 * mult 1.0 * coef 0.01 = 0.01 -> round is 0 -> clamped to floor (1)
         self.assertEqual(_heal_magnitude(actor, 0.01), 1)
 
@@ -528,7 +528,7 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         # Swapped order (gain before potency):
         #   floor(33 * 1.15) = 37
         #   round(37 * 2.0) = 74 != 75
-        actor = FakeEntity("actor", magic_power=33)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=33)
         with patch("world.rules.combat.healing.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}), patch(
             "world.rules.combat.battlefield.evaluate_combat_modifiers", return_value={"heal_gain": "+15%"}
         ):
@@ -537,8 +537,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertNotEqual(mag, 74)
 
     def test_direct_heal_handler_defaults_to_identity_without_binding(self):
-        actor = FakeEntity("actor", magic_power=30)
-        target = FakeEntity("target", hp=20, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', magic_power=30)
+        target = FakeEntity("target", combat_identity='target', hp=20, max_hp=100)
         pending_empty = _handle_heal(
             actor, [target], "heal:single", {}, 1.0
         )[0]
@@ -553,8 +553,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         self.assertEqual(amt_forged, 30)
 
     def test_heal_and_self_heal_clamp_at_hp_gap_and_never_revive(self):
-        actor = FakeEntity("actor", hp=0, max_hp=100, magic_power=40)
-        target = FakeEntity("target", hp=0, max_hp=100)
+        actor = FakeEntity("actor", combat_identity='actor', hp=0, max_hp=100, magic_power=40)
+        target = FakeEntity("target", combat_identity='target', hp=0, max_hp=100)
 
         # Target at 0 HP restores 0
         pending_heal = _handle_heal(
@@ -607,13 +607,13 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
 
         self.battlefield = Battlefield(
             {
-                "party": frozenset({"caster", "ally"}),
-                "foes": frozenset({"target"}),
+                'party': frozenset({"fixture:caster", "fixture:ally"}),
+                'foes': frozenset({"fixture:target"}),
             },
             {
-                "caster": self.caster,
-                "target": self.target,
-                "ally": self.ally,
+                "fixture:caster": self.caster,
+                "fixture:target": self.target,
+                "fixture:ally": self.ally,
             },
         )
 

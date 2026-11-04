@@ -33,6 +33,13 @@ from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from typing import Any
 
+from world.rules.combat_identity import (  # noqa: F401
+    DBREF_PREFIX,
+    FIXTURE_PREFIX,
+    CombatIdentityError,
+    stable_actor_id as _stable_actor_id,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ExecutionScopeBase:
@@ -99,11 +106,14 @@ class CombatProvenance:
 
 
 def stable_actor_id(entity: Any) -> str:
-    """Return one combatant's stable identity: its dbref, else its object key."""
-    dbref = getattr(entity, "pk", None)
-    if dbref is None:
-        return f"key:{getattr(entity, 'key', '')}"
-    return f"dbref:{dbref}"
+    """Return one combatant's stable individual identity.
+
+    Defined by :mod:`world.rules.combat_identity` so dependency-free modules
+    (input-function publication, combat beats) can share the contract without
+    importing the combat package; re-exported here as the combat core's
+    canonical entry point.
+    """
+    return _stable_actor_id(entity)
 
 
 _CURRENT_SCOPE: ContextVar[ExecutionScope | None] = ContextVar(

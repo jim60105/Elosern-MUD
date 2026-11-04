@@ -31,6 +31,7 @@ from world.rules.combat import (
     Battlefield,
     ItemUseRequest,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     engage,
     engage_group,
@@ -91,7 +92,12 @@ _MANA_VIAL_PROFILE = ItemEffectProfile(
 )
 
 
-def _item_used_log(actor_key: str, item_key: str) -> EventLog:
+def _item_used_log(
+    actor_key: str,
+    item_key: str,
+    *,
+    actor_id: str | None = None,
+) -> EventLog:
     return EventLog(
         actor_key,
         item_key,
@@ -108,13 +114,24 @@ def _item_used_log(actor_key: str, item_key: str) -> EventLog:
                     "amount": 40,
                 },
                 "你使用了測試物品。",
+                actor_id=actor_id,
+                target_id=actor_id,
             ),
         ),
         6,
+        actor_id=actor_id,
+        target_ids=(actor_id,) if actor_id is not None else (),
     )
 
 
-def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
+def _attack_log(
+    actor_key: str,
+    target_key: str,
+    amount: int,
+    *,
+    actor_id: str | None = None,
+    target_id: str | None = None,
+) -> EventLog:
     return EventLog(
         actor_key,
         _ATTACK_SKILL_KEY,
@@ -126,9 +143,13 @@ def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
                 target_key,
                 {"amount": amount},
                 "{actor} 對 {target} 造成 {data[amount]} 點傷害。",
+                actor_id=actor_id,
+                target_id=target_id,
             ),
         ),
         6,
+        actor_id=actor_id,
+        target_ids=(target_id,) if target_id is not None else (),
     )
 
 
@@ -748,13 +769,53 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(int(self.monster.traits.hp.current), 100)
         self.assertEqual(int(second.traits.hp.current), 100)
 
+    def test_same_label_recipients_keep_distinct_event_log_identities(self):
+        from world.rules.items import use_item
+
+        twin = create_object(NPC, key="multi companion")
+        twin.race = _race_key()
+        twin.apply_race_baseline()
+        twin.location = self.room
+        join_party(twin, self.player)
+        for entity in (self.companion, twin):
+            entity.traits.hp.current = 50
+        self.player.db.inventory = [_MANA_KEY]
+        materialize_registry_object(self.player, _MANA_KEY)
+
+        settlement = use_item(self.player, _MANA_KEY)
+        self.assertEqual(settlement.result.outcome, "success")
+        event_log = settlement.result.event_log
+        entries = [
+            entry
+            for entry in event_log.entries
+            if entry.kind == "item_used"
+        ]
+        self.assertEqual(
+            {entry.actor_id for entry in entries},
+            {stable_actor_id(self.player)},
+        )
+        self.assertEqual(event_log.actor_id, stable_actor_id(self.player))
+        # Both same-label companions are separate recipients: their readable
+        # label is shared, their identity is not.
+        twin_entries = [entry for entry in entries if entry.target == "multi companion"]
+        self.assertGreaterEqual(len(twin_entries), 2)
+        self.assertEqual(
+            len({entry.target_id for entry in twin_entries}),
+            2,
+        )
+        self.assertTrue(all(entry.target_id for entry in twin_entries))
+        self.assertEqual(
+            len(event_log.targets),
+            len(set(event_log.target_ids)),
+        )
+
 
 class CompressedItemTurnTests(EvenniaTestCase):
     def setUp(self):
         super().setUp()
         open_synthetic_scope(self, "items")
         attacker = FakeEntity(
-            "elf",
+            "elf", combat_identity='elf',
             hp=10000,
             max_hp=10000,
             atk_phys=88,
@@ -762,12 +823,12 @@ class CompressedItemTurnTests(EvenniaTestCase):
             defense=90,
             magic_power=250,
         )
-        defender = FakeEntity("human", hp=120, atk_phys=8, agility=9, defense=7)
+        defender = FakeEntity("human", combat_identity='human', hp=120, atk_phys=8, agility=9, defense=7)
         self.attacker = attacker
         self.defender = defender
         self.field = Battlefield(
-            {"elves": frozenset({"elf"}), "humans": frozenset({"human"})},
-            {"elf": attacker, "human": defender},
+            {'elves': frozenset({"fixture:elf"}), 'humans': frozenset({"fixture:human"})},
+            {"fixture:elf": attacker, "fixture:human": defender},
         )
 
     @covers_requirement(
@@ -783,7 +844,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             item_calls.append((request, context))
             return ItemUseResult(
                 outcome="success",
-                event_log=_item_used_log("elf", _TONIC_KEY),
+                event_log=_item_used_log("elf", _TONIC_KEY, actor_id="fixture:elf"),
                 journal=sentinel,
             )
 
@@ -792,7 +853,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             self.defender.traits.hp.current = 0
             return SimpleNamespace(
                 outcome="success",
-                event_log=_attack_log("elf", "human", 120),
+                event_log=_attack_log("elf", "human", 120, actor_id="fixture:elf", target_id="fixture:human"),
             )
 
         used_item = {"done": False}
@@ -819,7 +880,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["elf"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:elf"]),
             patch("world.rules.combat.rounds.resolve_item_use", side_effect=item_resolver),
             patch(
                 "world.rules.combat.rounds.ActionResolver.resolve",
@@ -832,7 +893,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 self.field,
                 provider,
                 max_rounds=12,
-                commanded_actor="elf",
+                commanded_actor="fixture:elf",
                 commanded_action_kind="item",
                 commanded_action_key=_TONIC_KEY,
                 journal_sink=journals,
@@ -892,7 +953,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             "elves",
             "humans",
             1,
-            commanded_actor="elf",
+            commanded_actor="fixture:elf",
             commanded_action_kind="item",
             commanded_action_key=_TONIC_KEY,
             commanded_window=logs,

@@ -18,10 +18,10 @@ from .combat_fixtures import FakeEntity
 class EffectivePowerTests(unittest.TestCase):
     def test_reference_ratios(self):
         human = FakeEntity(
-            "human", hp=120, atk_phys=8, agility=9, defense=7, magic_power=40
+            "human", combat_identity='human', hp=120, atk_phys=8, agility=9, defense=7, magic_power=40
         )
         elf = FakeEntity(
-            "elf",
+            "elf", combat_identity='elf',
             hp=10000,
             atk_phys=88,
             agility=92,
@@ -29,7 +29,7 @@ class EffectivePowerTests(unittest.TestCase):
             magic_power=250,
         )
         monster = FakeEntity(
-            "monster",
+            "monster", combat_identity='monster',
             hp=300,
             atk_phys=16,
             agility=16,
@@ -43,7 +43,7 @@ class EffectivePowerTests(unittest.TestCase):
 
     @covers_requirement("combat-resolution::effective-power-combines-four-effective-stats-multiplied-by-max-hp", "overwhelm-threshold::a-decided-direction-is-further-gated-by-an-estimated-round-count-bound-overwhelm", "overwhelm-threshold::the-hit-rate-signal-detects-to-hit-saturation-without-rolling-dice-checked-over-every", "overwhelm-threshold::the-power-ratio-signal-is-computed-from-team-summed-effective-power-checked-in-both")
     def test_current_hp_does_not_change_power_but_effective_stats_do(self):
-        entity = FakeEntity("entity", hp=100, max_hp=100)
+        entity = FakeEntity("entity", combat_identity='entity', hp=100, max_hp=100)
         before = effective_power(entity)
         entity.traits.hp.value = 1
         self.assertEqual(effective_power(entity), before)

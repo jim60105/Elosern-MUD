@@ -11,6 +11,7 @@ from world.rules.action import (
     register_effect_handler,
 )
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
+from world.rules.combat_identity import stable_actor_id
 from world.rules.dice import roll_d100
 from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import (
@@ -80,7 +81,7 @@ def _fastest_pursuer_agility(
     inactive floored companion never keeps a fleeing monster (or player) from
     an automatic success (party-combat D-2).
     """
-    actor_team = battlefield.team_of(str(actor.key))
+    actor_team = battlefield.team_of(stable_actor_id(actor))
     opposing = [
         key
         for team, members in battlefield.teams.items()
@@ -206,13 +207,14 @@ def _handle_disengage(
             ),
         )
     )
+    actor_id = stable_actor_id(actor)
     return [
         PendingEffect(
             entity=battlefield,
             description=description,
             surfaces=frozenset(),
             apply=(
-                lambda: battlefield.fled.add(str(actor.key))
+                lambda: battlefield.fled.add(actor_id)
                 if success
                 else _noop()
             ),

@@ -51,6 +51,7 @@ from ._combat_session_helpers import (
 # authored scales a node declares through its EffectPolicy coefficient.
 # ---------------------------------------------------------------------------
 
+from world.rules.combat_identity import stable_actor_id
 _RUNG_EARLY = make_skill(
     "t_rite_early",
     label="暮授初章",
@@ -246,7 +247,7 @@ class PartyAudienceConferralTests(EvenniaTest):
                     [(g.source_key, g.skill_key, g.scale) for g in grants],
                     [
                         (
-                            caster.key,
+                            stable_actor_id(caster),
                             _GILDED_PULSE.key,
                             _PARTY_CONFER.effect_policies[0].coefficient,
                         )
@@ -267,7 +268,9 @@ class PartyAudienceConferralTests(EvenniaTest):
         self.assertEqual(result.outcome, "success")
         for ally in allies:
             with self.subTest(ally=ally.key):
-                buff = ally.buffs.all[f"conferred_growth_rate:{caster.key}"]
+                buff = ally.buffs.all[
+                    f"conferred_growth_rate:{stable_actor_id(caster)}"
+                ]
                 self.assertIsNotNone(buff)
                 self.assertEqual(
                     buff.scale, _PARTY_GROWTH.effect_policies[0].coefficient

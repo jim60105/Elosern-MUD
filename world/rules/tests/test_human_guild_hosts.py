@@ -26,6 +26,7 @@ from world.skills.registry import SkillKind, SkillPrerequisite
 from world.skills.equipment import EquipmentSlot
 from world.tests.synthetic_data import make_item, make_skill, synthetic_registries
 from world.tests.synthetic_data import make_subrace
+from world.rules.combat_identity import stable_actor_id
 
 class PersistentHumanGuildHostTests(EvenniaTest):
     def setUp(self):
@@ -131,8 +132,8 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         target.race = "human"
         target.apply_race_baseline()
         context = BattlefieldActionContext(Battlefield(
-            teams={"hosts": frozenset({host.key}), "targets": frozenset({target.key})},
-            roster={host.key: host, target.key: target},
+            teams={'hosts': frozenset({stable_actor_id(host)}), 'targets': frozenset({stable_actor_id(target)})},
+            roster={stable_actor_id(host): host, stable_actor_id(target): target},
         ))
         result = ActionResolver.preflight(ActionRequest(host, self.skill.key, [target], context))
         self.assertNotEqual(result.outcome, "rejected", result.reason)

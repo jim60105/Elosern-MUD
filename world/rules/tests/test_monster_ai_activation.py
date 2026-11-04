@@ -70,6 +70,7 @@ from world.rules.monster_individual import construct_species_individual
 from world.skills.registry import SKILL_REGISTRY, SkillKind
 
 from ._combat_session_helpers import _player as _combat_player
+from world.rules.combat_identity import stable_actor_id
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ACTIVATION_RECORD = (
@@ -399,12 +400,12 @@ class RealEncounterTests(EvenniaTestCase):
         self.monster.location = self.room
         self.field = Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.defender.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.defender)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.defender.key): self.defender,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.defender): self.defender,
             },
         )
         self.record = CombatSessionRecord(
@@ -507,13 +508,13 @@ class RollbackTests(EvenniaTestCase):
         self.strong = _defender("rollback strong", 400)
         self.field = Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.weak.key), str(self.strong.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.weak), stable_actor_id(self.strong)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.weak.key): self.weak,
-                str(self.strong.key): self.strong,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.weak): self.weak,
+                stable_actor_id(self.strong): self.strong,
             },
         )
         self.record = CombatSessionRecord(

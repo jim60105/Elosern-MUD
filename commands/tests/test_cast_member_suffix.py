@@ -41,6 +41,7 @@ from world.rules.tests._combat_session_helpers import (
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
 
+from world.rules.combat_identity import stable_actor_id
 _HEAL = make_skill(
     "t_companion_heal",
     label="同伴癒合",
@@ -186,7 +187,7 @@ class CastMemberSuffixTests(
         record = read_session(self.char1)
         self.assertIsNotNone(record)
         self.assertIsNone(read_session(self.aila))
-        self.assertEqual(record.opening_first_actor, str(self.aila.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.aila))
         self.assertEqual(
             record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"],
             _HEAL.key,

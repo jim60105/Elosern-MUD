@@ -49,6 +49,7 @@ from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import make_skill
 
 from ._combat_session_helpers import open_synthetic_scope
+from world.rules.combat_identity import stable_actor_id
 
 _DISPLAYED_COMBAT_FIVE = ("atk_phys", "agility", "defense", "magic_power", "hp")
 
@@ -356,10 +357,10 @@ class DivineVeilPreviewTests(_VeilCastTestCase):
     def test_preview_in_combat_shape_with_empty_context_is_enabled(self):
         field = Battlefield(
             {
-                "party": frozenset({self.caster.key}),
-                "foes": frozenset({self.target.key}),
+                'party': frozenset({stable_actor_id(self.caster)}),
+                'foes': frozenset({stable_actor_id(self.target)}),
             },
-            {self.caster.key: self.caster, self.target.key: self.target},
+            {stable_actor_id(self.caster): self.caster, stable_actor_id(self.target): self.target},
         )
         preview = preview_skill(
             self.caster,

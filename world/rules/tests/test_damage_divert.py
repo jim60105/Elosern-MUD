@@ -510,8 +510,8 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         with patch.dict(skill_map, {skill.key: skill}):
             grant_lineage(self.attacker, [skill.key])
             battlefield = Battlefield(
-                {"party": frozenset({"synth_attacker"}), "foes": frozenset({"synth_defender"})},
-                {"synth_attacker": self.attacker, "synth_defender": self.defender},
+                {'party': frozenset({"fixture:synth_attacker"}), 'foes': frozenset({"fixture:synth_defender"})},
+                {"fixture:synth_attacker": self.attacker, "fixture:synth_defender": self.defender},
             )
             req = ActionRequest(
                 actor=self.attacker,

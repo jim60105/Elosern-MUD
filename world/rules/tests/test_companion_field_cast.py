@@ -58,6 +58,7 @@ from .combat_fixtures import BattlefieldIsolation, grant_lineage
 # ends at 12, and magic power 30 with the rulebook's 1.0 heal multiplier
 # restores exactly 30 HP. Element ``None`` keeps the practice factor free of
 # affinity scaling, so the award is the bare per-use constant.
+from world.rules.combat_identity import stable_actor_id
 _HEAL = make_skill(
     "t_companion_heal",
     label="同伴癒合",
@@ -392,7 +393,7 @@ class CompanionCastRuleTests(_CompanionCastCase):
         record = read_session(self.commander)
         self.assertIsNotNone(record)
         self.assertIsNone(read_session(self.aila))
-        self.assertEqual(record.opening_first_actor, str(self.aila.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.aila))
         self.assertEqual(
             record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"],
             _HEAL.key,

@@ -132,6 +132,7 @@ from .test_monster_ai_snapshots import (
     _probe_field,
     _trait_record,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SPECIES = "t_sel_species"
 VARIANT = "t_sel_ordinary"
@@ -935,11 +936,11 @@ class TargetMetricTests(unittest.TestCase):
 
 def _fake_field(actor, *others):
     """A two-team battlefield over in-memory fakes."""
-    roster = {str(entity.key): entity for entity in (actor, *others)}
+    roster = {stable_actor_id(entity): entity for entity in (actor, *others)}
     return Battlefield(
         {
-            "monsters": frozenset({str(actor.key)}),
-            "party": frozenset(str(entity.key) for entity in others),
+            'monsters': frozenset({stable_actor_id(actor)}),
+            'party': frozenset(stable_actor_id(entity) for entity in others),
         },
         roster,
     )
@@ -949,8 +950,8 @@ class ExecutionScopeTests(unittest.TestCase):
     """The round engine's real per-slot and per-round decision identity."""
 
     def setUp(self):
-        self.actor = FakeEntity("actor", hp=100, max_hp=100)
-        self.enemy = FakeEntity("enemy", hp=100, max_hp=100)
+        self.actor = FakeEntity("actor", combat_identity='actor', hp=100, max_hp=100)
+        self.enemy = FakeEntity("enemy", combat_identity='enemy', hp=100, max_hp=100)
         self.observed = []
 
     def _field(self):
@@ -985,7 +986,7 @@ class ExecutionScopeTests(unittest.TestCase):
             upkeep[1],
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["actor", "enemy"],
+                return_value=["fixture:actor", "fixture:enemy"],
             ),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
@@ -1004,10 +1005,10 @@ class ExecutionScopeTests(unittest.TestCase):
         self.assertEqual(
             self._shape(self.observed),
             [
-                ("sess", 7, "key:actor", 0, "normal"),
-                ("sess", 7, "key:actor", 1, "normal"),
-                ("sess", 7, "key:enemy", 0, "normal"),
-                ("sess", 7, "key:enemy", 1, "normal"),
+                ("sess", 7, "fixture:actor", 0, "normal"),
+                ("sess", 7, "fixture:actor", 1, "normal"),
+                ("sess", 7, "fixture:enemy", 0, "normal"),
+                ("sess", 7, "fixture:enemy", 1, "normal"),
             ],
         )
 
@@ -1023,7 +1024,7 @@ class ExecutionScopeTests(unittest.TestCase):
             patch("world.rules.overwhelm.combat.is_battle_over", return_value=False),
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["actor"],
+                return_value=["fixture:actor"],
             ),
         ):
             resolve_overwhelm(
@@ -1035,9 +1036,9 @@ class ExecutionScopeTests(unittest.TestCase):
         self.assertEqual(
             self._shape(self.observed),
             [
-                ("sess", 5, "key:actor", 0, "overwhelm"),
-                ("sess", 6, "key:actor", 0, "overwhelm"),
-                ("sess", 7, "key:actor", 0, "overwhelm"),
+                ("sess", 5, "fixture:actor", 0, "overwhelm"),
+                ("sess", 6, "fixture:actor", 0, "overwhelm"),
+                ("sess", 7, "fixture:actor", 0, "overwhelm"),
             ],
         )
 
@@ -1054,11 +1055,11 @@ class ExecutionScopeTests(unittest.TestCase):
     def test_an_omitted_base_keeps_one_rounds_canonical_identity(self):
         upkeep = self._upkeep()
         with upkeep[0], upkeep[1], patch(
-            "world.rules.combat.rounds.roll_initiative", return_value=["actor"]
+            "world.rules.combat.rounds.roll_initiative", return_value=["fixture:actor"]
         ):
             run_round(self._field(), self._recorder())
         self.assertEqual(
-            self._shape(self.observed), [("", 0, "key:actor", 0, "normal")]
+            self._shape(self.observed), [("", 0, "fixture:actor", 0, "normal")]
         )
 
     @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
@@ -1070,13 +1071,13 @@ class ExecutionScopeTests(unittest.TestCase):
 
         upkeep = self._upkeep()
         with upkeep[0], upkeep[1], patch(
-            "world.rules.combat.rounds.roll_initiative", return_value=["actor"]
+            "world.rules.combat.rounds.roll_initiative", return_value=["fixture:actor"]
         ):
             with decision_scope(
                 SimpleNamespace(
                     session_id="outer",
                     round_index=3,
-                    actor_id="key:actor",
+                    actor_id="fixture:actor",
                     slot_index=0,
                     context_mode="normal",
                 )
@@ -1125,11 +1126,11 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         entries = [(self.monster, "foes")] + [(other, "party") for other in others]
         if order:
             entries = [entries[index] for index in order]
-        roster = {str(entity.key): entity for entity, _team in entries}
+        roster = {stable_actor_id(entity): entity for entity, _team in entries}
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(other.key) for other in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(other) for other in others),
             },
             roster,
         )
@@ -1269,13 +1270,13 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
 
     def _battlefield(self, *players):
         others = players or (self.player,)
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for player in others:
-            roster[str(player.key)] = player
+            roster[stable_actor_id(player)] = player
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(player.key) for player in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(player) for player in others),
             },
             roster,
         )
@@ -1353,7 +1354,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         clock = WorldClock()
         with (
             patch("world.rules.clock.get_world_clock", return_value=clock),
-            patch("world.rules.combat.rounds.roll_initiative", return_value=[self.player.key, self.monster.key]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(self.player), stable_actor_id(self.monster)]),
             patch("world.rules.combat.rounds.roll_d100", return_value=95),
             patch("world.rules.combat.damage.roll_d100", return_value=95),
         ):
@@ -1414,7 +1415,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[self.player.key, self.monster.key],
+                return_value=[stable_actor_id(self.player), stable_actor_id(self.monster)],
             ),
             patch("world.rules.combat.rounds.roll_d100", return_value=95),
             patch("world.rules.combat.damage.roll_d100", return_value=95),
@@ -1489,10 +1490,10 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
     def _field(self, monster):
         return Battlefield(
             {
-                "foes": frozenset({str(monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'foes': frozenset({stable_actor_id(monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
-            {str(monster.key): monster, str(self.opponent.key): self.opponent},
+            {stable_actor_id(monster): monster, stable_actor_id(self.opponent): self.opponent},
         )
 
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
@@ -1620,12 +1621,12 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
     def _field(self):
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.opponent.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.opponent.key): self.opponent,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.opponent): self.opponent,
             },
         )
 
@@ -1702,13 +1703,13 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
 
     def _field(self, *opponents):
         others = opponents or (self.opponent,)
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for other in others:
-            roster[str(other.key)] = other
+            roster[stable_actor_id(other)] = other
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(other.key) for other in others),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(other) for other in others),
             },
             roster,
         )
@@ -1790,7 +1791,7 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[str(self.monster.key)],
+                return_value=[stable_actor_id(self.monster)],
             ),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",

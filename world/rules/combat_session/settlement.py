@@ -18,6 +18,7 @@ from world.observability import log_info, log_warn
 from world.rules.action import _stored_trait_value
 from world.rules.clock import get_world_clock, settle_combat_result
 from world.rules.combat import COMBAT_YAML, Battlefield
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.writer import serialized_combat_write
@@ -72,14 +73,14 @@ def _terminal_outcome(
     victory. A knocked-out companion is battlefield state, never a terminal
     condition.
     """
-    player_team = battlefield.team_of(str(actor.key))
+    player_id = stable_actor_id(actor)
+    player_team = battlefield.team_of(player_id)
     foe_team = next(team for team in battlefield.teams if team != player_team)
-    if str(actor.key) in battlefield.fled:
+    if player_id in battlefield.fled:
         return "fled"
-    player_key = str(actor.key)
     player_defeated = (
         _stored_trait_value(actor.traits.hp) <= 0
-        or player_key in battlefield.knocked_out
+        or player_id in battlefield.knocked_out
         or int(actor.pk) in record.knocked_out_ids
     )
     if player_defeated:
@@ -279,7 +280,7 @@ def _all_present_allies_forced_asleep(
     """Whether every present, living allied party participant is forced asleep."""
     from world.rules.fatigue import SleepPosture, read_optional_fatigue_state
 
-    player_team = battlefield.team_of(str(actor.key))
+    player_team = battlefield.team_of(stable_actor_id(actor))
     allies: list[Any] = []
     for key in battlefield.teams[player_team]:
         entity = battlefield.roster.get(key)
@@ -485,7 +486,7 @@ def settle_session(
         name = None
         if battlefield is not None:
             for entity in battlefield.roster.values():
-                if getattr(entity, "pk", None) == entity_id or str(getattr(entity, "key", None)) == id_str:
+                if getattr(entity, "pk", None) == entity_id:
                     name = str(getattr(entity, "name", entity.key))
                     break
         if name is None:
@@ -1295,7 +1296,7 @@ def _exam_session_coherent(actor: Any, record: CombatSessionRecord) -> bool:
     from world.skills.restrictions import exam_restriction
 
     host = _find_exam_opponent(actor, record)
-    if host is None or str(host.key) == str(actor.key):
+    if host is None or stable_actor_id(host) == stable_actor_id(actor):
         return False
     try:
         exam = next((r for r in _read_exams(actor) if r.exam_id == record.exam_id), None)

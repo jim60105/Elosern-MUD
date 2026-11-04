@@ -57,6 +57,7 @@ from ._combat_session_helpers import (
 )
 from .combat_fixtures import BattlefieldIsolation, grant_lineage
 
+from world.rules.combat_identity import stable_actor_id
 SEAM_AREA_KEY = SYNTH_SEAM_AREA_SKILL.key
 _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
 _T_HEAL = SYNTH_SKILLS["t_hush_mend"].key
@@ -497,7 +498,7 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
             [
                 key
                 for key, field in _BATTLEFIELDS.items()
-                if field.roster.get(self.player.key) is self.player
+                if field.roster.get(stable_actor_id(self.player)) is self.player
             ],
             [],
         )
@@ -667,7 +668,7 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         record = read_session(player)
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 0)
-        self.assertEqual(record.opening_first_actor, str(player.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(player))
         self.assertEqual(
             record.draft_entries[int(player.pk)]["payload"]["skill_key"],
             BASIC_ATTACK_KEY,

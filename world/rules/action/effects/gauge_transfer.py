@@ -15,6 +15,7 @@ from world.rules.action.contracts import (
     PendingEffect,
 )
 from world.rules.action.gates import _stored_trait_value, stored_gauge_pair
+from world.rules.combat_identity import stable_actor_id
 
 
 def _handle_gauge_transfer(
@@ -88,8 +89,10 @@ def _handle_gauge_transfer(
                 elif eff.gauge == "hp":
                     session_nonlethal = bool(context.get("nonlethal", False))
                     nonlethal_keys = frozenset(context.get("nonlethal_keys", ()))
-                    key = str(target.key)
-                    protected = session_nonlethal or key in nonlethal_keys
+                    protected = (
+                        session_nonlethal
+                        or stable_actor_id(target) in nonlethal_keys
+                    )
                     before = _stored_trait_value(target.traits.hp)
                     if not protected:
                         from world.rules.combat import _apply_hp_delta

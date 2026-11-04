@@ -63,6 +63,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from .combat_fixtures import BattlefieldIsolation
+from world.rules.combat_identity import stable_actor_id
 
 
 class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
@@ -435,8 +436,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
     def test_missing_or_contradictory_combat_provenance_fails_closed(self):
         """A malformed combat source is never relabeled as an out-of-combat cast."""
         battlefield = Battlefield(
-            {"party": frozenset({str(self.player.key)}), "foes": frozenset()},
-            {str(self.player.key): self.player},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset()},
+            {stable_actor_id(self.player): self.player},
         )
         request = ActionRequest(
             self.player,
@@ -482,8 +483,8 @@ class CombatDeedProvenanceTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.sexual.climax_phase.value = "進行中"
         self.assertEqual(self.player.sexual.climax_count, 0)
         battlefield = Battlefield(
-            {"party": frozenset({str(self.player.key)}), "foes": frozenset()},
-            {str(self.player.key): self.player},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset()},
+            {stable_actor_id(self.player): self.player},
         )
         # Look-alike optional attributes must not become the identity.
         battlefield.session_id = "not_authoritative"

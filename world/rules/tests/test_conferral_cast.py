@@ -35,6 +35,7 @@ from world.tests.synthetic_data import make_skill, synthetic_registries
 from ._combat_session_helpers import synth_innate_overlay
 
 # The caster row: one registered conferral prefix at a declared scale.
+from world.rules.combat_identity import stable_actor_id
 _DUSK_CONFER = make_skill(
     "t_duskward_confer",
     label="暮授術",
@@ -296,8 +297,8 @@ class ConferralCastPathTests(EvenniaTest):
         self.assertEqual(
             [(g.source_key, g.skill_key, g.scale) for g in grants],
             [
-                ("conferrer", _MIGHTY_PULSE.key, 0.25),
-                ("conferrer", _DEFENSE_INSTINCT.key, 0.25),
+                (stable_actor_id(caster), _MIGHTY_PULSE.key, 0.25),
+                (stable_actor_id(caster), _DEFENSE_INSTINCT.key, 0.25),
             ],
         )
 
@@ -344,13 +345,41 @@ class ConferralCastPathTests(EvenniaTest):
             [(_MIGHTY_PULSE.key, 0.25)],
         )
 
+    def test_same_label_sources_keep_distinct_grants(self):
+        first = self._caster("twin mentor", passive=[_MIGHTY_PULSE.key])
+        second = self._caster("twin mentor", passive=[_MIGHTY_PULSE.key])
+        target = self._caster("receiver")
+        for caster in (first, second):
+            self.assertEqual(self._cast(caster, target).outcome, "success")
+        grants = target.skills.conferred_grants()
+        self.assertEqual(
+            {g.source_key for g in grants},
+            {stable_actor_id(first), stable_actor_id(second)},
+        )
+        self.assertEqual(len(grants), 2)
+
+    def test_reconferral_after_rename_keeps_one_source_identity(self):
+        caster = self._caster("mentor", passive=[_MIGHTY_PULSE.key])
+        target = self._caster("receiver")
+        self.assertEqual(self._cast(caster, target).outcome, "success")
+        caster.key = "renamed mentor"
+        self.assertEqual(self._cast(caster, target).outcome, "success")
+        grants = target.skills.conferred_grants()
+        self.assertEqual(len(grants), 1)
+        self.assertEqual(grants[0].source_key, stable_actor_id(caster))
+
     def test_growth_rate_cast_reads_the_declared_scale(self):
         caster = self._caster("mentor", confer=_MENTORS_RITE)
         target = self._caster("t_protege")
         result = self._cast(caster, target, skill=_MENTORS_RITE)
         self.assertEqual(result.outcome, "success")
-        buff = target.buffs.all[f"conferred_growth_rate:{caster.key}"]
-        self.assertEqual((buff.source_key, buff.scale), (caster.key, 1.5))
+        buff = target.buffs.all[
+            f"conferred_growth_rate:{stable_actor_id(caster)}"
+        ]
+        self.assertEqual(
+            (buff.source_key, buff.scale),
+            (stable_actor_id(caster), 1.5),
+        )
 
     def test_growth_rate_ignores_a_caller_supplied_scale(self):
         caster = self._caster("mentor", confer=_MENTORS_RITE)
@@ -362,7 +391,9 @@ class ConferralCastPathTests(EvenniaTest):
             event_context={"confer_scale": 0.9},
         )
         self.assertEqual(result.outcome, "success")
-        buff = target.buffs.all[f"conferred_growth_rate:{caster.key}"]
+        buff = target.buffs.all[
+            f"conferred_growth_rate:{stable_actor_id(caster)}"
+        ]
         self.assertEqual(buff.scale, 1.5)
 
 

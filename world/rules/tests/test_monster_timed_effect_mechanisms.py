@@ -45,6 +45,7 @@ from world.tests.synthetic_data import (
     make_skill,
     synthetic_registries,
 )
+from world.rules.combat_identity import stable_actor_id
 
 RIDER_BUFF = "t_synth_rider_mark"
 GUARD_BUFF = "t_synth_guard_shell"
@@ -92,14 +93,14 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
         self.control = self._character("t_timed_control", agility=10, defense=10)
         self.battlefield = Battlefield(
             roster={
-                "t_timed_caster": self.caster,
-                "t_timed_enemy": self.enemy,
-                "t_timed_ally": self.ally,
-                "t_timed_control": self.control,
+                "fixture:t_timed_caster": self.caster,
+                "fixture:t_timed_enemy": self.enemy,
+                "fixture:t_timed_ally": self.ally,
+                "fixture:t_timed_control": self.control,
             },
             teams={
-                "party": {"t_timed_caster", "t_timed_ally"},
-                "foes": {"t_timed_enemy", "t_timed_control"},
+                'party': {"fixture:t_timed_caster", "fixture:t_timed_ally"},
+                'foes': {"fixture:t_timed_enemy", "fixture:t_timed_control"},
             },
         )
         self.context = BattlefieldActionContext(self.battlefield)
@@ -334,9 +335,9 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
                     victim.traits.agility.base = 10
                     actor.location = self.room
                     field = Battlefield(
-                        {"party": frozenset({victim.key}),
-                         "foes": frozenset({actor.key})},
-                        {victim.key: victim, actor.key: actor},
+                        {'party': frozenset({stable_actor_id(victim)}),
+                         'foes': frozenset({stable_actor_id(actor)})},
+                        {stable_actor_id(victim): victim, stable_actor_id(actor): actor},
                     )
                     self.assertIn(skill.key, actor.db.skills["active"])
                     request = ActionRequest(

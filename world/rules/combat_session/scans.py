@@ -10,6 +10,7 @@ notifies).
 from typing import Any
 
 from world.rules.combat import Battlefield
+from world.rules.combat_identity import stable_actor_id
 
 
 def _scan_friendly_fire(
@@ -39,15 +40,15 @@ def _scan_friendly_fire(
     companion_pks = set(live_companion_ids(actor))
     if not companion_pks:
         return ()
-    player_key = str(actor.key)
+    player_id = stable_actor_id(actor)
     hits: list[Any] = []
     for event_log in logs:
-        if event_log.actor != player_key:
+        if event_log.actor_id != player_id:
             continue
         for entry in event_log.entries:
             if entry.kind != "damage":
                 continue
-            target = battlefield.roster.get(entry.target)
+            target = battlefield.roster.get(entry.target_id)
             if (
                 target is None
                 or not isinstance(target, NPC)
@@ -119,10 +120,10 @@ def _scan_sexual_coercion(
     from world.rules.affinity import AffinitySource, apply_affinity_change
     from world.rules.affinity_config import get_config
 
-    player_key = str(actor.key)
+    player_id = stable_actor_id(actor)
     forced: list[Any] = []
     for event_log in logs:
-        if event_log.actor != player_key:
+        if event_log.actor_id != player_id:
             continue
         for entry in event_log.entries:
             if entry.kind != "sexual_resist":
@@ -137,7 +138,7 @@ def _scan_sexual_coercion(
                 continue
             if entry.data.get("auto_comply") is not False:
                 continue
-            target = battlefield.roster.get(entry.target)
+            target = battlefield.roster.get(entry.target_id)
             if target is None or not isinstance(target, NPC):
                 continue
             forced.append(target)

@@ -65,6 +65,7 @@ from world.skills.registry import (
     TargetSpec,
     validate_prerequisite_graph,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -176,15 +177,15 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         return skill
 
     def _battlefield(self, *others):
-        roster = {str(self.actor.key): self.actor}
+        roster = {stable_actor_id(self.actor): self.actor}
         enemies = set()
-        allies = {str(self.actor.key)}
+        allies = {stable_actor_id(self.actor)}
         for other, team in others:
-            roster[str(other.key)] = other
+            roster[stable_actor_id(other)] = other
             if team == "enemy":
-                enemies.add(str(other.key))
+                enemies.add(stable_actor_id(other))
             else:
-                allies.add(str(other.key))
+                allies.add(stable_actor_id(other))
         teams = {"players": frozenset(allies)}
         if enemies:
             teams["enemies"] = frozenset(enemies)
@@ -450,14 +451,14 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
 
         battlefield = ctx.battlefield
         for _ in range(2):
-            records = {str(victim.key): tick_buffs(victim, 10)}
+            records = {stable_actor_id(victim): tick_buffs(victim, 10)}
             settle_upkeep(battlefield, records)
         self.assertEqual(victim.traits.hp.current, 4)
         self.assertNotIn("t_synth_wound", entity_active_buffs(twin))
         self.assertEqual(twin.traits.hp.current, 100)
 
         # A further tick crosses zero HP; the defeat is credited to the striker.
-        records = {str(victim.key): tick_buffs(victim, 10)}
+        records = {stable_actor_id(victim): tick_buffs(victim, 10)}
         logs = settle_upkeep(battlefield, records)
         defeated = [e for log in logs for e in log.entries if e.kind == "target_defeated"]
         self.assertEqual(len(defeated), 1)
@@ -478,13 +479,13 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         ctx = BattlefieldActionContext(
             battlefield=Battlefield(
                 teams={
-                    "players": frozenset({str(self.actor.key), str(ally.key)}),
-                    "enemies": frozenset({str(target.key)}),
+                    'players': frozenset({stable_actor_id(self.actor), stable_actor_id(ally)}),
+                    'enemies': frozenset({stable_actor_id(target)}),
                 },
                 roster={
-                    str(self.actor.key): self.actor,
-                    str(ally.key): ally,
-                    str(target.key): target,
+                    stable_actor_id(self.actor): self.actor,
+                    stable_actor_id(ally): ally,
+                    stable_actor_id(target): target,
                 },
             )
         )

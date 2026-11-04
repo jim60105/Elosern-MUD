@@ -71,10 +71,10 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.actor.traits.mp.current = 1000
         self.field = Battlefield(
             {
-                "party": frozenset({"freeform caster"}),
-                "foes": frozenset({"freeform wolf"}),
+                'party': frozenset({"fixture:freeform caster"}),
+                'foes': frozenset({"fixture:freeform wolf"}),
             },
-            {"freeform caster": self.actor, "freeform wolf": self.monster},
+            {"fixture:freeform caster": self.actor, "fixture:freeform wolf": self.monster},
         )
         self.context = BattlefieldActionContext(self.field)
         grant_lineage(

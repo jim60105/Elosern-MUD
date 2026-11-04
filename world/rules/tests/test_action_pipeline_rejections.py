@@ -39,6 +39,7 @@ from ._combat_session_helpers import (
     resolve_combat_action,
     synth_innate_overlay,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _DAMAGE_PROBE = SkillDef(
     key="gate_probe",
@@ -167,10 +168,10 @@ class OutOfCombatDamageGateTests(EvenniaTestCase):
         self.room_context = RoomActionContext(self.actor.location)
         self.battlefield = Battlefield(
             {
-                "party": frozenset({self.actor.key}),
-                "foes": frozenset({self.target.key}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset({stable_actor_id(self.target)}),
             },
-            {self.actor.key: self.actor, self.target.key: self.target},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
 
     def _request(self, skill_key, context, targets=()):

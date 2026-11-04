@@ -47,6 +47,7 @@ from world.tests.synthetic_data import (
 )
 
 from ._fixtures import QuestRegistryIsolation, accept, defeat, quest, register
+from world.rules.combat_identity import stable_actor_id
 
 #: Casting paths run on the kit's spell rows: the combat spell and a
 #: self-targeted out-of-combat cast (kit-shaped extra over the heal template)
@@ -91,8 +92,8 @@ class OfflineRuntimePathTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _resolve_lethal(self, monster: Monster):
         field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({monster.key})},
-            {self.player.key: self.player, monster.key: monster},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset({stable_actor_id(monster)})},
+            {stable_actor_id(self.player): self.player, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             self.player,
@@ -157,8 +158,8 @@ class PlannerExecutionPathsTests(QuestRegistryIsolation, EvenniaCommandTestMixin
 
     def _field(self, actor, targets):
         return Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
-            {actor.key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {stable_actor_id(actor): actor, **{stable_actor_id(t): t for t in targets}},
         )
 
     def test_direct_resolver_use_executes_the_planner_exactly_once(self):

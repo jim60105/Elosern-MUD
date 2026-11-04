@@ -59,6 +59,7 @@ from world.skills.registry import (
     TargetSpec,
     validate_prerequisite_graph,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -122,13 +123,13 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
 
         self.bf = Battlefield(
             teams={
-                "party": frozenset({str(self.caster.key)}),
-                "enemy": frozenset({str(self.target.key), str(self.other.key)}),
+                'party': frozenset({stable_actor_id(self.caster)}),
+                'enemy': frozenset({stable_actor_id(self.target), stable_actor_id(self.other)}),
             },
             roster={
-                str(self.caster.key): self.caster,
-                str(self.target.key): self.target,
-                str(self.other.key): self.other,
+                stable_actor_id(self.caster): self.caster,
+                stable_actor_id(self.target): self.target,
+                stable_actor_id(self.other): self.other,
             },
         )
 
@@ -292,8 +293,8 @@ class DarkCurseErosionBehaviorTests(EvenniaTest):
         from .combat_fixtures import FakeEntity
 
         # High defense target: defense = 200, attacker magic_power = 50
-        actor = FakeEntity("caster", magic_power=50, agility=10)
-        target_high_def = FakeEntity("target", hp=1000, agility=10, defense=200)
+        actor = FakeEntity("caster", combat_identity='caster', magic_power=50, agility=10)
+        target_high_def = FakeEntity("target", combat_identity='target', hp=1000, agility=10, defense=200)
 
         # 1. Ordinary damage rung without defense bypass
         normal_policy = EffectPolicy(coefficient=2.0)

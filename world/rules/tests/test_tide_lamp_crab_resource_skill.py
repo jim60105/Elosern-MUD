@@ -36,6 +36,7 @@ from world.rules.monster_behaviour import resolve_behaviour_profile
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
+from world.rules.combat_identity import stable_actor_id
 
 # The representative the composition-coverage check derives for this group.
 REPRESENTATIVE_VARIANT = "burrow_maker"
@@ -92,8 +93,8 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         engage(player, crab)
         record = read_session(player)
         field = Battlefield(
-            {"party": frozenset({player.key}), "foes": frozenset({crab.key, ally.key})},
-            {player.key: player, crab.key: crab, ally.key: ally},
+            {'party': frozenset({stable_actor_id(player)}), 'foes': frozenset({stable_actor_id(crab), stable_actor_id(ally)})},
+            {stable_actor_id(player): player, stable_actor_id(crab): crab, stable_actor_id(ally): ally},
         )
         skill = SKILL_REGISTRY[SKILL_KEY]
         baseline_defense = evaluate_combat_modifiers(crab).get("defense", 0)

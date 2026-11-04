@@ -275,10 +275,10 @@ class PureAudiencePlannerTests(unittest.TestCase):
     """Pure side-effect-free audience planning unit tests."""
 
     def setUp(self):
-        self.actor = FakeEntity("actor", hp=100)
-        self.ally = FakeEntity("ally", hp=100)
-        self.enemy = FakeEntity("enemy", hp=100)
-        self.bystander = FakeEntity("bystander", hp=100)
+        self.actor = FakeEntity("actor", combat_identity='actor', hp=100)
+        self.ally = FakeEntity("ally", combat_identity='ally', hp=100)
+        self.enemy = FakeEntity("enemy", combat_identity='enemy', hp=100)
+        self.bystander = FakeEntity("bystander", combat_identity='bystander', hp=100)
         self.context = MockContext(
             relations={
                 (self.actor.key, self.ally.key): Relation.ALLY,
@@ -387,7 +387,7 @@ class PureAudiencePlannerTests(unittest.TestCase):
             category=SkillCategory.UTILITY,
             effect_policies=(EffectPolicy(audience=EffectAudience.SELF),),
         )
-        dead_actor = FakeEntity("dead_actor", hp=0)
+        dead_actor = FakeEntity("dead_actor", combat_identity='dead_actor', hp=0)
         with self.assertRaises(RejectedAction) as cm_dead:
             plan_effect_audiences(dead_actor, self.context, skill, [dead_actor])
         self.assertEqual(cm_dead.exception.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)

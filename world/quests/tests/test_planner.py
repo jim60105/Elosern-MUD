@@ -147,11 +147,11 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         npc.traits.hp._data["current"] = hp
         return npc
 
-    def _field(self, actor, targets, key_override: str | None = None):
-        actor_key = key_override or actor.key
+    def _field(self, actor, targets):
+        actor_key = stable_actor_id(actor)
         return Battlefield(
-            {"party": frozenset({actor_key}), "foes": frozenset(t.key for t in targets)},
-            {actor_key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({actor_key}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {actor_key: actor, **{stable_actor_id(t): t for t in targets}},
         )
 
     def _resolve(self, actor, skill_key, targets):
@@ -441,8 +441,8 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _field(self, actor, targets, *, knocked_out: frozenset[str] = frozenset()):
         return Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
-            {actor.key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {stable_actor_id(actor): actor, **{stable_actor_id(t): t for t in targets}},
             knocked_out=set(knocked_out),
         )
 
@@ -491,7 +491,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         companion = self._companion("ko")
         prey = self._monster("prey-ko")
         field = self._field(
-            companion, [prey], knocked_out=frozenset({companion.key})
+            companion, [prey], knocked_out=frozenset({stable_actor_id(companion)})
         )
         result = self._resolve(companion, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")
@@ -842,6 +842,9 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         "monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events"
     )
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
     def test_two_individuals_with_one_display_key_count_separately(self):
         self._counted_hunt()
         first = self._monster("lookalike")
@@ -947,6 +950,7 @@ _HUNT_STRONGER = next(
     key for key in _HUNT_VARIANTS if not SYNTH_MONSTER_VARIANTS[key].ordinary_variant
 )
 from world.tests.geography_fixture import publish_shipped_geography
+from world.rules.combat_identity import stable_actor_id
 
 publish_shipped_geography()
 _HUNT_REGION, _OTHER_REGION = _live_region_keys()[:2]
@@ -1021,8 +1025,8 @@ class SpeciesHuntPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     def _field(self, actor, targets):
         return Battlefield(
-            {"party": frozenset({actor.key}), "foes": frozenset(t.key for t in targets)},
-            {actor.key: actor, **{t.key: t for t in targets}},
+            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
+            {stable_actor_id(actor): actor, **{stable_actor_id(t): t for t in targets}},
         )
 
     def _resolve(self, actor, skill_key, targets):

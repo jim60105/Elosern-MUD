@@ -64,6 +64,7 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineag
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS
 
+from world.rules.combat_identity import stable_actor_id
 _T_DAMAGE = SYNTH_SKILLS["t_ember_burst"].key
 _T_HEAL = SYNTH_SKILLS["t_hush_mend"].key
 _T_SELF = SYNTH_SKILLS["t_moss_veil"].key
@@ -566,7 +567,7 @@ class FieldCastActionTests(_SkillUseCase):
         record = read_session(self.player)
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 0)
-        self.assertEqual(record.opening_first_actor, str(self.player.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.player))
         self.assertEqual(self.player.traits.mp.value, mp_before)
         kind, envelope = self._last_publication()
         self.assertEqual(kind, "ui_update")
@@ -645,15 +646,23 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(result["code"], "not_in_exploration")
         submit.assert_not_called()
 
-    def test_duplicate_named_area_opening_rejects_without_internal_error(self):
+    def test_duplicate_named_area_opening_addresses_the_named_identity(self):
+        # Two wolves share a label but are distinct individuals: the area
+        # opening addresses the named pk and is never rejected as ambiguous.
         first = self._wolf("twin wolf")
-        self._wolf("twin wolf")
+        twin = self._wolf("twin wolf")
         result = self._act(
             "explore.cast", {"skill_key": _T_AREA_DAMAGE, "opening_target_id": first.pk}
         )
-        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["outcome"], "success")
         self.assertNotEqual(result["code"], "internal_error")
-        self.assertIsNone(read_session(self.player))
+        record = read_session(self.player)
+        self.assertIsNotNone(record)
+        # Both same-label individuals resolve to separate persisted rows and
+        # both are members of the admitted encounter.
+        self.assertNotEqual(int(first.pk), int(twin.pk))
+        self.assertIn(int(first.pk), record.enemy_ids)
+        self.assertIn(int(twin.pk), record.enemy_ids)
 
     @covers_requirement("webclient-skillbook-casting::cast-settlement-is-atomic-and-publishes-the-complete-committed-view", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_duplicate_request_executes_once(self):
@@ -733,7 +742,7 @@ class FieldCastActionTests(_SkillUseCase):
             record = read_session(self.player)
             self.assertIsNotNone(record)
             self.assertIsNone(read_session(companion))
-            self.assertEqual(record.opening_first_actor, str(companion.key))
+            self.assertEqual(record.opening_first_actor, stable_actor_id(companion))
             self.assertEqual(
                 record.draft_entries[int(companion.pk)]["payload"]["skill_key"],
                 _T_DAMAGE,

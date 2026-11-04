@@ -83,6 +83,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from world.tests.synthetic_data import SYNTH_SKILLS
+from world.rules.combat_identity import stable_actor_id
 
 # Fixture mechanics resolve through the synthetic kit: the spell and martial
 # carriers are kit rows, the delivered-cast element is the kit element, and
@@ -171,8 +172,8 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(
             self.player, read_session(self.player)
         )
-        self.assertIn(str(first.key), battlefield.roster)
-        self.assertIn(str(second.key), battlefield.roster)
+        self.assertIn(stable_actor_id(first), battlefield.roster)
+        self.assertIn(stable_actor_id(second), battlefield.roster)
         self.assertEqual(party_ids(self.player), [first.pk, second.pk])
 
     @covers_requirement(
@@ -325,10 +326,10 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNotNone(request)
         self.assertNotEqual(request.skill_key, FLEE_SKILL_KEY)
         foe_team = next(
-            team for team in battlefield.teams if team != battlefield.team_of(str(companion.key))
+            team for team in battlefield.teams if team != battlefield.team_of(stable_actor_id(companion))
         )
         for target in request.targets:
-            self.assertIn(str(target.key), battlefield.teams[foe_team])
+            self.assertIn(stable_actor_id(target), battlefield.teams[foe_team])
 
     @covers_requirement("party-system::companions-fight-as-allies-in-the-player-s-combat-session")
     def test_companion_round_never_emits_a_flee_entry(self):
@@ -365,7 +366,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
                 if entry.actor == str(companion.key)
             ],
         )
-        self.assertNotIn(str(companion.key), battlefield.fled)
+        self.assertNotIn(stable_actor_id(companion), battlefield.fled)
 
 
 class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
@@ -410,7 +411,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         battlefield, logs = self._run_one_round()
         self.assertEqual(self.companion.traits.hp.current, 1)
-        self.assertIn(str(self.companion.key), battlefield.knocked_out)
+        self.assertIn(stable_actor_id(self.companion), battlefield.knocked_out)
         kinds = _entry_kinds(logs)
         self.assertIn("target_knocked_out", kinds)
         self.assertNotIn("target_defeated", kinds)
@@ -434,7 +435,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.monster.traits.hp.current, 0)
         kinds = _entry_kinds(logs)
         self.assertIn("target_defeated", kinds)
-        self.assertNotIn(str(self.monster.key), battlefield.knocked_out)
+        self.assertNotIn(stable_actor_id(self.monster), battlefield.knocked_out)
 
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
     def test_knocked_out_companion_receives_no_policy_request(self):
@@ -468,7 +469,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         record = read_session(self.player)
         battlefield = reconstruct_battlefield(self.player, record)
-        battlefield.knocked_out.add(str(self.companion.key))
+        battlefield.knocked_out.add(stable_actor_id(self.companion))
         context = _context_for(battlefield, record)
         for shorthand in ("all-allies", "all-enemies", "all"):
             candidates = expand_target_shorthand(
@@ -485,7 +486,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(
             self.player, read_session(self.player)
         )
-        battlefield.knocked_out.add(str(self.companion.key))
+        battlefield.knocked_out.add(stable_actor_id(self.companion))
         request = monster_behaviour_policy(self.monster, battlefield)
         self.assertIsNotNone(request)
         for target in request.targets:
@@ -506,7 +507,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(
             self.player, read_session(self.player)
         )
-        battlefield.knocked_out.add(str(companion.key))
+        battlefield.knocked_out.add(stable_actor_id(companion))
         self.assertEqual(
             _fastest_pursuer_agility(battlefield, self.monster),
             _adjusted_agility(self.companion),
@@ -521,7 +522,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         record = read_session(self.player)
         self.assertIn(int(self.companion.pk), record.knocked_out_ids)
         rebuilt = reconstruct_battlefield(self.player, record)
-        self.assertIn(str(self.companion.key), rebuilt.knocked_out)
+        self.assertIn(stable_actor_id(self.companion), rebuilt.knocked_out)
 
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
     def test_knocked_out_companion_cannot_reengage_before_recovery(self):
@@ -696,19 +697,19 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
     def test_area_damage_floors_and_marks_each_protected_target_once(self):
-        actor = FakeEntity("caster", atk_phys=20)
-        first = FakeEntity("第一", hp=5)
-        second = FakeEntity("第二", hp=5)
+        actor = FakeEntity("caster", combat_identity='caster', atk_phys=20)
+        first = FakeEntity("第一", combat_identity='第一', hp=5)
+        second = FakeEntity("第二", combat_identity='第二', hp=5)
         field = Battlefield(
             {
-                "party": frozenset({"caster", "第一", "第二"}),
-                "foes": frozenset({"foe"}),
+                'party': frozenset({"fixture:caster", "fixture:第一", "fixture:第二"}),
+                'foes': frozenset({"fixture:foe"}),
             },
             {
-                "caster": actor,
-                "第一": first,
-                "第二": second,
-                "foe": FakeEntity("foe"),
+                "fixture:caster": actor,
+                "fixture:第一": first,
+                "fixture:第二": second,
+                "fixture:foe": FakeEntity("foe", combat_identity='foe'),
             },
         )
         with (
@@ -728,7 +729,7 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
                 _T_DAMAGE_EFFECT,
                 {
                     "battlefield": field,
-                    "nonlethal_keys": frozenset({"第一", "第二"}),
+                    "nonlethal_keys": frozenset({"fixture:第一", "fixture:第二"}),
                 },
                 1.0,
             )
@@ -736,7 +737,7 @@ class MultiTargetKnockoutProjectionTests(unittest.TestCase):
             effect.apply()
         self.assertEqual(first.traits.hp.value, 1)
         self.assertEqual(second.traits.hp.value, 1)
-        self.assertEqual(field.knocked_out, {"第一", "第二"})
+        self.assertEqual(field.knocked_out, {"fixture:第一", "fixture:第二"})
 
 
 class BattlefieldCommitSurfaceTests(EvenniaTestCase):
@@ -745,10 +746,10 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
     def _field(self, entity):
         return Battlefield(
             {
-                "party": frozenset({str(entity.key)}),
-                "foes": frozenset({"pursuer"}),
+                'party': frozenset({stable_actor_id(entity)}),
+                'foes': frozenset({"fixture:pursuer"}),
             },
-            {str(entity.key): entity, "pursuer": FakeEntity("pursuer")},
+            {stable_actor_id(entity): entity, "fixture:pursuer": FakeEntity("pursuer", combat_identity='pursuer')},
         )
 
     @covers_requirement("battlefield-commit-surface::a-battlefield-shaped-object-is-snapshotted-and-restored-by-shape-not-by-explicit")
@@ -756,17 +757,17 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
         entity = create_object(PlayerCharacter, key="snapshot host")
         field = self._field(entity)
         field.fled.add("pursuer")
-        field.knocked_out.add(str(entity.key))
+        field.knocked_out.add(stable_actor_id(entity))
         snapshot = _snapshot_touched(field, frozenset())
         self.assertEqual(
             snapshot["battlefield"],
-            (frozenset({"pursuer"}), frozenset({str(entity.key)})),
+            (frozenset({"pursuer"}), frozenset({stable_actor_id(entity)})),
         )
         field.fled.clear()
         field.knocked_out.clear()
         _restore_touched(field, snapshot, frozenset())
         self.assertEqual(field.fled, {"pursuer"})
-        self.assertEqual(field.knocked_out, {str(entity.key)})
+        self.assertEqual(field.knocked_out, {stable_actor_id(entity)})
 
     @covers_requirement("battlefield-commit-surface::a-commit-failure-rolls-back-a-battlefield-mutation-exactly-as-it-rolls-back-an-entity")
     def test_knockout_mark_is_rolled_back_with_the_commit(self):
@@ -779,7 +780,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
                 field,
                 "knocked_out_mark|actor",
                 frozenset(),
-                lambda: field.knocked_out.add(str(entity.key)),
+                lambda: field.knocked_out.add(stable_actor_id(entity)),
             ),
             PendingEffect(
                 field,
@@ -804,7 +805,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
         entity.apply_race_baseline()
         before = entity.traits.atk_phys.value
         field = self._field(entity)
-        field.knocked_out.add(str(entity.key))
+        field.knocked_out.add(stable_actor_id(entity))
         effects = [
             PendingEffect(
                 entity,
@@ -829,7 +830,7 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
             _commit(effects, char="tester", action="test_skill")
         self.assertIs(caught.exception.reason, RejectReason.COMMIT_FAILED)
         self.assertEqual(entity.traits.atk_phys.value, before)
-        self.assertEqual(field.knocked_out, {str(entity.key)})
+        self.assertEqual(field.knocked_out, {stable_actor_id(entity)})
 
     def test_action_module_uses_shape_dispatch_for_both_sets(self):
         # The snapshot/restore mechanism moved to the action package's
@@ -909,14 +910,14 @@ class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
         companion.location = self.player.location
 
         # Fled companion
-        field.fled.add(str(companion.key))
+        field.fled.add(stable_actor_id(companion))
         with self.assertRaises(CombatSessionError) as caught:
             authorize_combat_actor(self.player, companion, record, field)
         self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
         field.fled.clear()
 
         # Knocked out companion
-        field.knocked_out.add(str(companion.key))
+        field.knocked_out.add(stable_actor_id(companion))
         with self.assertRaises(CombatSessionError) as caught:
             authorize_combat_actor(self.player, companion, record, field)
         self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
@@ -1673,11 +1674,11 @@ class PartyRetreatContestTests(EvenniaTestCase):
     """Task 1.1: the contest's own roll-free branches, at the helper boundary."""
 
     def _field(self, allies, foes):
-        roster = {entity.key: entity for entity in (*allies, *foes)}
+        roster = {stable_actor_id(entity): entity for entity in (*allies, *foes)}
         return Battlefield(
             teams={
-                "party": frozenset(entity.key for entity in allies),
-                "foes": frozenset(entity.key for entity in foes),
+                'party': frozenset(stable_actor_id(entity) for entity in allies),
+                'foes': frozenset(stable_actor_id(entity) for entity in foes),
             },
             roster=roster,
         )
@@ -1686,12 +1687,12 @@ class PartyRetreatContestTests(EvenniaTestCase):
     def test_no_pursuer_escapes_without_drawing_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
-        ally = FakeEntity("ally", agility=3)
-        fled = FakeEntity("fled foe", agility=90)
-        knocked = FakeEntity("knocked foe", agility=90, hp=0)
+        ally = FakeEntity("ally", combat_identity='ally', agility=3)
+        fled = FakeEntity("fled foe", combat_identity='fled foe', agility=90)
+        knocked = FakeEntity("knocked foe", combat_identity='knocked foe', agility=90, hp=0)
         field = self._field([ally], [fled, knocked])
-        field.fled.add("fled foe")
-        field.knocked_out.add("knocked foe")
+        field.fled.add(stable_actor_id(fled))
+        field.knocked_out.add(stable_actor_id(knocked))
         with patch("world.rules.disengage.roll_d100") as roll:
             success, detail = party_retreat_attempt(field, "party", [ally])
         roll.assert_not_called()
@@ -1704,7 +1705,7 @@ class PartyRetreatContestTests(EvenniaTestCase):
     def test_no_acting_ally_reports_the_defeat_branch_without_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
-        foe = FakeEntity("foe", agility=90)
+        foe = FakeEntity("foe", combat_identity='foe', agility=90)
         field = self._field([], [foe])
         with patch("world.rules.disengage.roll_d100") as roll:
             success, detail = party_retreat_attempt(field, "party", [])
@@ -1721,9 +1722,9 @@ class PartyRetreatContestTests(EvenniaTestCase):
         # or its formula.
         from world.rules.disengage import party_retreat_attempt
 
-        slow = FakeEntity("slow", agility=1)
-        fast = FakeEntity("fast", agility=200)
-        pursuer = FakeEntity("pursuer", agility=100)
+        slow = FakeEntity("slow", combat_identity='slow', agility=1)
+        fast = FakeEntity("fast", combat_identity='fast', agility=200)
+        pursuer = FakeEntity("pursuer", combat_identity='pursuer', agility=100)
         # The slowest ally can never reach this hill of a pursuer while the
         # fastest alone cannot miss it: the attempt that has both able allies
         # available must use the slower one and fail.
@@ -1741,9 +1742,9 @@ class PartyRetreatContestTests(EvenniaTestCase):
 
         # The same for the pursuer side: one puny pursuer cannot stop the
         # party, and adding a fearsome one must be the term the contest uses.
-        weak = FakeEntity("weak", agility=1)
-        fearsome = FakeEntity("fearsome", agility=200)
-        ally = FakeEntity("ally", agility=50)
+        weak = FakeEntity("weak", combat_identity='weak', agility=1)
+        fearsome = FakeEntity("fearsome", combat_identity='fearsome', agility=200)
+        ally = FakeEntity("ally", combat_identity='ally', agility=50)
         with patch("world.rules.disengage.roll_d100", return_value=100):
             escaped, weak_detail = party_retreat_attempt(
                 self._field([ally], [weak]), "party", [ally]

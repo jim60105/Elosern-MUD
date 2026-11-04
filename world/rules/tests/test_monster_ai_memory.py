@@ -59,6 +59,7 @@ from ._combat_session_helpers import (
     synth_damage_skill,
 )
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 #: The single file-local synthetic damage row the integration case casts.
 MEM_STRIKE = synth_damage_skill(
@@ -77,11 +78,11 @@ def _observation(
     round_index: int,
     *,
     action="t_action",
-    source="key:actor",
-    recipients=("key:enemy",),
+    source="fixture:actor",
+    recipients=("fixture:enemy",),
     statuses=("damage",),
     faction="monsters",
-    magnitudes=(("key:enemy", -5.0),),
+    magnitudes=(("fixture:enemy", -5.0),),
 ) -> PublicObservation:
     return PublicObservation(
         round_index=round_index,
@@ -99,10 +100,10 @@ def _field(actor, *others, actor_team="monsters", other_team="party") -> Battlef
     entities = (actor, *others)
     return Battlefield(
         {
-            actor_team: frozenset({actor.key}),
-            other_team: frozenset(other.key for other in others),
+            actor_team: frozenset({stable_actor_id(actor)}),
+            other_team: frozenset(stable_actor_id(other) for other in others),
         },
-        {entity.key: entity for entity in entities},
+        {stable_actor_id(entity): entity for entity in entities},
     )
 
 
@@ -127,6 +128,39 @@ class ObservationMemoryTests(EvenniaTestCase):
             [3, 4, 5],
         )
         self.assertEqual(MAX_RETAINED_ROUNDS, 3)
+
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
+    def test_same_label_sources_keep_independent_memory(self):
+        session = "hostile:1:0"
+        first = FakeEntity("twin", combat_identity="twin-first")
+        second = FakeEntity("twin", combat_identity="twin-second")
+        first_id = stable_actor_id(first)
+        second_id = stable_actor_id(second)
+        with self.captureOnCommitCallbacks(execute=True):
+            record_observation(
+                session,
+                _observation(
+                    1,
+                    source=first_id,
+                    recipients=(second_id,),
+                    magnitudes=((second_id, -2.0),),
+                ),
+            )
+            record_observation(
+                session,
+                _observation(
+                    1,
+                    source=second_id,
+                    recipients=(first_id,),
+                    magnitudes=((first_id, -3.0),),
+                ),
+            )
+        records = {record.source_id: record for record in session_observations(session)}
+        self.assertEqual(set(records), {first_id, second_id})
+        self.assertEqual(records[first_id].magnitudes, ((second_id, -2.0),))
+        self.assertEqual(records[second_id].magnitudes, ((first_id, -3.0),))
 
     @covers_requirement(
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
@@ -184,8 +218,8 @@ class ObservationTransactionTests(EvenniaTestCase):
         super().setUp()
         clear_session_memory()
         self.addCleanup(clear_session_memory)
-        self.actor = FakeEntity("actor")
-        self.enemy = FakeEntity("enemy")
+        self.actor = FakeEntity("actor", combat_identity='actor')
+        self.enemy = FakeEntity("enemy", combat_identity='enemy')
         self.field = _field(self.actor, self.enemy)
 
     @covers_requirement(
@@ -196,7 +230,7 @@ class ObservationTransactionTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=False):
             record_observation(
                 session,
-                _observation(1, source="key:actor", recipients=("key:enemy",)),
+                _observation(1, source="fixture:actor", recipients=("fixture:enemy",)),
             )
             projected = project_observations(session, self.field)
         self.assertEqual([record.action_key for record in projected], ["t_action"])
@@ -212,7 +246,7 @@ class ObservationTransactionTests(EvenniaTestCase):
             with transaction.atomic():
                 record_observation(
                     session,
-                    _observation(1, source="key:actor", recipients=("key:enemy",)),
+                    _observation(1, source="fixture:actor", recipients=("fixture:enemy",)),
                 )
                 raise _CaughtSavepointFailure
         except _CaughtSavepointFailure:
@@ -228,19 +262,19 @@ class ObservationTransactionTests(EvenniaTestCase):
         session = "hostile:1:0"
         with self.captureOnCommitCallbacks(execute=True):
             record_observation(
-                session, _observation(1, action="t_before", source="key:actor")
+                session, _observation(1, action="t_before", source="fixture:actor")
             )
             try:
                 with transaction.atomic():
                     record_observation(
-                        session, _observation(1, action="t_inside", source="key:actor")
+                        session, _observation(1, action="t_inside", source="fixture:actor")
                     )
                     raise _CaughtSavepointFailure
             except _CaughtSavepointFailure:
                 pass
             reconcile_session_memory(session)
             record_observation(
-                session, _observation(1, action="t_after", source="key:actor")
+                session, _observation(1, action="t_after", source="fixture:actor")
             )
         actions = [record.action_key for record in session_observations(session)]
         self.assertIn("t_before", actions)
@@ -254,12 +288,12 @@ class ObservationTransactionTests(EvenniaTestCase):
         session = "hostile:1:0"
         with self.captureOnCommitCallbacks(execute=True):
             record_observation(
-                session, _observation(1, action="t_before", source="key:actor")
+                session, _observation(1, action="t_before", source="fixture:actor")
             )
             try:
                 with transaction.atomic():
                     record_observation(
-                        session, _observation(1, action="t_inside", source="key:actor")
+                        session, _observation(1, action="t_inside", source="fixture:actor")
                     )
                     raise _CaughtSavepointFailure
             except _CaughtSavepointFailure:
@@ -278,7 +312,7 @@ class ObservationTransactionTests(EvenniaTestCase):
         try:
             with reusable:
                 record_observation(
-                    session, _observation(1, action="t_lost", source="key:actor")
+                    session, _observation(1, action="t_lost", source="fixture:actor")
                 )
                 raise _CaughtSavepointFailure
         except _CaughtSavepointFailure:
@@ -286,7 +320,7 @@ class ObservationTransactionTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=True):
             with reusable:
                 record_observation(
-                    session, _observation(1, action="t_fresh", source="key:actor")
+                    session, _observation(1, action="t_fresh", source="fixture:actor")
                 )
         actions = [record.action_key for record in session_observations(session)]
         self.assertEqual(actions, ["t_fresh"])
@@ -299,7 +333,7 @@ class ObservationTransactionTests(EvenniaTestCase):
         with self.captureOnCommitCallbacks(execute=False) as callbacks:
             record_observation(
                 session,
-                _observation(1, source="key:actor", recipients=("key:enemy",)),
+                _observation(1, source="fixture:actor", recipients=("fixture:enemy",)),
             )
         for callback in callbacks:
             callback()
@@ -314,7 +348,7 @@ class ObservationTransactionTests(EvenniaTestCase):
     def test_a_standalone_round_cannot_touch_shared_session_memory(self):
         self.assertFalse(
             record_observation(
-                "", _observation(1, source="key:actor", recipients=("key:enemy",))
+                "", _observation(1, source="fixture:actor", recipients=("fixture:enemy",))
             )
         )
         self.assertEqual(project_observations("", self.field), ())
@@ -327,14 +361,14 @@ class ObservationTerminalTests(EvenniaTestCase):
         super().setUp()
         clear_session_memory()
         self.addCleanup(clear_session_memory)
-        self.actor = FakeEntity("actor")
-        self.enemy = FakeEntity("enemy")
+        self.actor = FakeEntity("actor", combat_identity='actor')
+        self.enemy = FakeEntity("enemy", combat_identity='enemy')
         self.field = _field(self.actor, self.enemy)
 
     def _publish(self, session, action="t_action"):
         with self.captureOnCommitCallbacks(execute=True):
             record_observation(
-                session, _observation(1, action=action, source="key:actor")
+                session, _observation(1, action=action, source="fixture:actor")
             )
 
     @covers_requirement(
@@ -345,7 +379,7 @@ class ObservationTerminalTests(EvenniaTestCase):
         with patch(
             "world.rules.combat_session.observations.discard_session_ai_tuning"
         ) as drop, self.captureOnCommitCallbacks(execute=True):
-            record_observation(session, _observation(1, source="key:actor"))
+            record_observation(session, _observation(1, source="fixture:actor"))
             discard_session_memory(session)
         drop.assert_called_once_with(session)
         self.assertEqual(session_observations(session), ())
@@ -356,7 +390,7 @@ class ObservationTerminalTests(EvenniaTestCase):
     def test_a_late_publication_cannot_recreate_terminated_memory(self):
         session = "hostile:1:0"
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            record_observation(session, _observation(1, source="key:actor"))
+            record_observation(session, _observation(1, source="fixture:actor"))
             discard_session_memory(session)
         for callback in callbacks:
             callback()
@@ -379,7 +413,7 @@ class ObservationTerminalTests(EvenniaTestCase):
                 pass
             reconcile_session_memory(session)
             record_observation(
-                session, _observation(1, action="t_later", source="key:actor")
+                session, _observation(1, action="t_later", source="fixture:actor")
             )
         drop.assert_not_called()
         actions = [record.action_key for record in session_observations(session)]
@@ -440,7 +474,7 @@ class ObservationEligibilityTests(EvenniaTestCase):
             record_observation(
                 session,
                 _observation(
-                    1, source="key:actor", recipients=("key:enemy",), **overrides
+                    1, source="fixture:actor", recipients=("fixture:enemy",), **overrides
                 ),
             )
 
@@ -450,10 +484,10 @@ class ObservationEligibilityTests(EvenniaTestCase):
     def test_sessions_cannot_read_each_other(self):
         with self.captureOnCommitCallbacks(execute=True):
             record_observation(
-                "hostile:1:0", _observation(1, action="t_a", source="key:actor")
+                "hostile:1:0", _observation(1, action="t_a", source="fixture:actor")
             )
             record_observation(
-                "hostile:2:0", _observation(1, action="t_b", source="key:enemy")
+                "hostile:2:0", _observation(1, action="t_b", source="fixture:enemy")
             )
         self.assertEqual(
             [r.action_key for r in session_observations("hostile:1:0")], ["t_a"]
@@ -468,7 +502,7 @@ class ObservationEligibilityTests(EvenniaTestCase):
     def test_reconstruction_preserves_committed_history(self):
         session = "hostile:1:0"
         self._publish(session)
-        rebuilt = _field(FakeEntity("actor"), FakeEntity("enemy"))
+        rebuilt = _field(FakeEntity("actor", combat_identity='actor'), FakeEntity("enemy", combat_identity='enemy'))
         self.assertEqual(len(project_observations(session, rebuilt)), 1)
 
     @covers_requirement(
@@ -478,24 +512,24 @@ class ObservationEligibilityTests(EvenniaTestCase):
         session = "hostile:1:0"
         self._publish(session)
         # The recipient disappeared: the fact survives, the stale target does not.
-        projected = project_observations(session, _field(FakeEntity("actor")))
+        projected = project_observations(session, _field(FakeEntity("actor", combat_identity='actor')))
         self.assertEqual(len(projected), 1)
         self.assertEqual(projected[0].recipient_ids, ())
         self.assertEqual(projected[0].magnitudes, ())
         # The source changed faction: the fact is no longer eligible.
         changed = Battlefield(
             {
-                "monsters": frozenset({"witness"}),
-                "party": frozenset({"actor"}),
+                'monsters': frozenset({"fixture:witness"}),
+                'party': frozenset({"fixture:actor"}),
             },
             {
-                "witness": FakeEntity("witness"),
-                "actor": FakeEntity("actor"),
+                "fixture:witness": FakeEntity("witness", combat_identity='witness'),
+                "fixture:actor": FakeEntity("actor", combat_identity='actor'),
             },
         )
         self.assertEqual(project_observations(session, changed), ())
         # The source vanished entirely: nothing is eligible.
-        self.assertEqual(project_observations(session, _field(FakeEntity("npc"))), ())
+        self.assertEqual(project_observations(session, _field(FakeEntity("npc", combat_identity='npc'))), ())
 
     @covers_requirement(
         "monster-ai-observation-memory::observation-access-follows-current-session-membership"
@@ -531,8 +565,8 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_item_heal_is_a_positive_health_fact(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         # The production item pipeline emits ``item_used`` with the signed
         # gauge delta actually applied; a restoration carries a +amount and is
@@ -548,21 +582,25 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
                     "target",
                     {"item_key": "t_tonic", "consumable": True, "stat": "hp", "amount": 7},
                     "",
+                    actor_id="fixture:actor",
+                    target_id="fixture:target",
                 ),
             ),
             time_cost_seconds=0,
+            actor_id="fixture:actor",
+            target_ids=("fixture:target",),
         )
         self._observe("hostile:1:0", log, field)
         record = session_observations("hostile:1:0")[0]
         self.assertEqual(record.action_key, "t_tonic")
-        self.assertEqual(record.magnitudes, (("key:target", 7.0),))
+        self.assertEqual(record.magnitudes, (("fixture:target", 7.0),))
 
     @covers_requirement(
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_item_status_fact_is_recorded_without_a_health_magnitude(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         log = EventLog(
             actor="actor",
@@ -580,9 +618,13 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
                         "count": 1,
                     },
                     "",
+                    actor_id="fixture:actor",
+                    target_id="fixture:target",
                 ),
             ),
             time_cost_seconds=0,
+            actor_id="fixture:actor",
+            target_ids=("fixture:target",),
         )
         self._observe("hostile:1:0", log, field)
         record = session_observations("hostile:1:0")[0]
@@ -593,37 +635,62 @@ class ObservationBoundaryExtractionTests(EvenniaTestCase):
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_an_upkeep_tick_is_a_negative_health_fact(self):
-        actor = FakeEntity("actor")
-        target = FakeEntity("target")
+        actor = FakeEntity("actor", combat_identity='actor')
+        target = FakeEntity("target", combat_identity='target')
         field = _field(actor, target)
         log = EventLog(
             actor="actor",
             skill_key="combat_upkeep",
             targets=("target",),
-            entries=(EventEntry("damage", "actor", "target", {"amount": 3}, ""),),
+            entries=(
+                EventEntry(
+                    "damage",
+                    "actor",
+                    "target",
+                    {"amount": 3},
+                    "",
+                    actor_id="fixture:actor",
+                    target_id="fixture:target",
+                ),
+            ),
             time_cost_seconds=0,
+            actor_id="fixture:actor",
+            target_ids=("fixture:target",),
         )
         self._observe("hostile:1:0", log, field)
         record = session_observations("hostile:1:0")[0]
         self.assertEqual(record.action_key, "combat_upkeep")
-        self.assertEqual(record.magnitudes, (("key:target", -3.0),))
+        self.assertEqual(record.magnitudes, (("fixture:target", -3.0),))
 
     @covers_requirement(
         "monster-ai-observation-memory::resolved-observations-are-compact-and-bounded"
     )
     def test_a_large_group_is_summarized_to_bounded_recipients(self):
-        actor = FakeEntity("actor")
-        others = [FakeEntity(f"target-{index}") for index in range(12)]
+        actor = FakeEntity("actor", combat_identity='actor')
+        others = [
+            FakeEntity(f"target-{index}", combat_identity=f"target-{index}")
+            for index in range(12)
+        ]
         field = _field(actor, *others)
         log = EventLog(
             actor="actor",
             skill_key="t_sweep",
-            targets=tuple(other.key for other in others),
+            targets=tuple(stable_actor_id(other) for other in others),
             entries=tuple(
-                EventEntry("damage", "actor", other.key, {"amount": 2}, "")
+                EventEntry(
+                    "damage",
+                    "actor",
+                    other.key,
+                    {"amount": 2},
+                    "",
+                    actor_id="fixture:actor",
+                    target_id=stable_actor_id(other),
+                )
                 for other in others
             ),
             time_cost_seconds=0,
+            actor_id="fixture:actor",
+            target_ids=tuple(stable_actor_id(other) for other in others),
         )
         self._observe("hostile:1:0", log, field)
         record = session_observations("hostile:1:0")[0]
@@ -661,10 +728,10 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
         target.apply_race_baseline()
         field = Battlefield(
             {
-                "monsters": frozenset({str(monster.key)}),
-                "party": frozenset({str(target.key)}),
+                'monsters': frozenset({stable_actor_id(monster)}),
+                'party': frozenset({stable_actor_id(target)}),
             },
-            {str(monster.key): monster, str(target.key): target},
+            {stable_actor_id(monster): monster, stable_actor_id(target): target},
         )
 
         def provider(entity, battlefield):
@@ -704,8 +771,8 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
         "monster-ai-observation-memory::same-round-observations-remain-transaction-local"
     )
     def test_a_sessionless_round_records_nothing(self):
-        actor = FakeEntity("actor")
-        enemy = FakeEntity("enemy")
+        actor = FakeEntity("actor", combat_identity='actor')
+        enemy = FakeEntity("enemy", combat_identity='enemy')
         field = _field(actor, enemy)
 
         def provider(entity, battlefield):

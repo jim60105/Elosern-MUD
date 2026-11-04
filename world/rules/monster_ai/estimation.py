@@ -1402,7 +1402,7 @@ class _Decision:
         # staged damage. Both mirror settlement's damage handler exactly, and
         # an explicitly defense-bypassing occurrence skips Defend just as it
         # zeroes defense in settlement.
-        recipient_key = str(participant.entity.key)
+        recipient_key = stable_identity(participant.entity)
         # Dodge is deliberately bypass-independent (the design gives it no
         # damage-bypass exemption); only Defend below honors ``bypassing``.
         recipient_dodging = (
@@ -2225,7 +2225,6 @@ def _participant_reads(
     named ones, and everyone else floors at zero.
     """
     identity = stable_identity(entity)
-    key = str(getattr(entity, "key", ""))
     resources = reads.resources(entity)
     gauges = {
         gauge_key: _finite(current, f"{identity}.{gauge_key}")
@@ -2249,7 +2248,7 @@ def _participant_reads(
         relation=relation,
         hp=gauges.get("hp", 0.0),
         max_hp=maxima.get("hp", gauges.get("hp", 0.0)),
-        floor=1.0 if nonlethal or key in nonlethal_keys else 0.0,
+        floor=1.0 if nonlethal or identity in nonlethal_keys else 0.0,
         gauges=gauges,
         maxima=maxima,
         effective=effective,

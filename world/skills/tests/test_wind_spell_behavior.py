@@ -73,6 +73,7 @@ from world.skills.registry import (
     SkillPrerequisite,
     TargetSpec,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -212,13 +213,13 @@ class WindSpellBehaviorTests(EvenniaTestCase):
 
         bf = Battlefield(
             teams={
-                "players": frozenset({str(self.actor.key), str(ally.key)}),
-                "enemies": frozenset({str(enemy.key)}),
+                'players': frozenset({stable_actor_id(self.actor), stable_actor_id(ally)}),
+                'enemies': frozenset({stable_actor_id(enemy)}),
             },
             roster={
-                str(self.actor.key): self.actor,
-                str(ally.key): ally,
-                str(enemy.key): enemy,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(ally): ally,
+                stable_actor_id(enemy): enemy,
             },
         )
         ctx = BattlefieldActionContext(battlefield=bf)
@@ -278,14 +279,14 @@ class WindSpellBehaviorTests(EvenniaTestCase):
 
         bf = Battlefield(
             teams={
-                "players": frozenset({str(self.actor.key), str(ally.key)}),
-                "enemies": frozenset({str(target1.key), str(target_dead.key)}),
+                'players': frozenset({stable_actor_id(self.actor), stable_actor_id(ally)}),
+                'enemies': frozenset({stable_actor_id(target1), stable_actor_id(target_dead)}),
             },
             roster={
-                str(self.actor.key): self.actor,
-                str(ally.key): ally,
-                str(target1.key): target1,
-                str(target_dead.key): target_dead,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(ally): ally,
+                stable_actor_id(target1): target1,
+                stable_actor_id(target_dead): target_dead,
             },
         )
         ctx = BattlefieldActionContext(battlefield=bf)
@@ -364,8 +365,8 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         target.location = self.room
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(target.key)})},
-            roster={str(self.actor.key): self.actor, str(target.key): target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(target): target},
         )
         ctx = BattlefieldActionContext(battlefield=bf, event_context={"now": 100})
 
@@ -436,8 +437,8 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         high_def_target.traits.defense.base = 50
 
         bf = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(high_def_target.key)})},
-            roster={str(self.actor.key): self.actor, str(high_def_target.key): high_def_target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(high_def_target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(high_def_target): high_def_target},
         )
         ctx = BattlefieldActionContext(battlefield=bf)
 
@@ -488,8 +489,8 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         full_hp_target.location = self.room
 
         bf2 = Battlefield(
-            teams={"players": frozenset({str(self.actor.key)}), "enemies": frozenset({str(full_hp_target.key)})},
-            roster={str(self.actor.key): self.actor, str(full_hp_target.key): full_hp_target},
+            teams={'players': frozenset({stable_actor_id(self.actor)}), 'enemies': frozenset({stable_actor_id(full_hp_target)})},
+            roster={stable_actor_id(self.actor): self.actor, stable_actor_id(full_hp_target): full_hp_target},
         )
         ctx2 = BattlefieldActionContext(battlefield=bf2)
 
@@ -649,12 +650,12 @@ class WindSpellBehaviorTests(EvenniaTestCase):
         dummy_mob.location = self.room
         bf = Battlefield(
             teams={
-                "players": frozenset({str(self.actor.key)}),
-                "enemies": frozenset({str(dummy_mob.key)}),
+                'players': frozenset({stable_actor_id(self.actor)}),
+                'enemies': frozenset({stable_actor_id(dummy_mob)}),
             },
             roster={
-                str(self.actor.key): self.actor,
-                str(dummy_mob.key): dummy_mob,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(dummy_mob): dummy_mob,
             },
         )
         ctx = BattlefieldActionContext(battlefield=bf)

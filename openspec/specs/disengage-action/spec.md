@@ -139,20 +139,15 @@ player-chosen target
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
 ### Requirement: A successful flee adds the fleeing entity's key to Battlefield.fled; a failed attempt
-The individual mutation below SHALL remain the enemy and noninteractive mechanism. Allied interactive exit SHALL mutate the whole party only through confirmed retreat.
-
-mutates nothing
-`_handle_disengage()`'s returned `PendingEffect` SHALL, on success, stage `battlefield.fled.add(actor.
-key)` as its sole mutation. On failure, it SHALL stage a no-op (`apply` performs no mutation). Neither
-outcome SHALL write to any entity's `traits`, `sexual`, `buffs`, or `skill_grants`.
+An enemy or noninteractive individual flee SHALL add only the actor's stable individual identity to the fled set on success and mutate no participant state on failure; allied interactive escape SHALL retain confirmed whole-party retreat.
 
 #### Scenario: A successful flee is reflected in Battlefield.fled after commit
 - **WHEN** a `flee` request resolves successfully with the underlying attempt succeeding
-- **THEN** the actor's key is present in `battlefield.fled` after `resolve()` returns
+- **THEN** the actor's stable individual identity is present in `battlefield.fled` after `resolve()` returns
 
 #### Scenario: A failed flee attempt leaves Battlefield.fled unchanged
 - **WHEN** a `flee` request resolves with the underlying attempt failing
-- **THEN** the actor's key is absent from `battlefield.fled` after `resolve()` returns, and no entity's
+- **THEN** the actor's stable individual identity is absent from `battlefield.fled` after `resolve()` returns, and no entity's
   `traits`, `sexual`, `buffs`, or `skill_grants` values differ from their pre-call state
 
 #### Scenario: Both outcomes still produce a real EventLog
@@ -175,25 +170,18 @@ unhandled exception.
   with no exception escaping and no entity state mutated
 
 ### Requirement: A fled entity is immediately excluded from targeting, turn order, and team-power
-aggregation through existing combat and overwhelm mechanics
-Once `battlefield.fled` contains an entity's key, `world.rules.combat.BattlefieldActionContext.
-is_present()`/`is_in_range()`, `world.rules.combat.run_round()`'s turn-order loop, and
-`world.rules.overwhelm.team_effective_power()`/`hit_rate_verdict()` SHALL all treat that entity as no
-longer part of the encounter, using their existing, unmodified implementations.
+A fled individual SHALL remain roster-present by stable identity while failing range validation, receiving no further turns and contributing no active team power.
 
 #### Scenario: A fled entity is skipped by run_round's initiative loop
 - **WHEN** `combat.run_round(battlefield, action_provider)` is called on a battlefield where one roster
-  member's key is in `battlefield.fled`
-- **THEN** that member takes no action that round, using `run_round()`'s existing fled-member filter;
-  this change does not modify that function to produce the behavior
+  member's stable individual identity is in `battlefield.fled`
+- **THEN** that individual takes no action that round and a same-label non-fled member remains independently eligible
 
 #### Scenario: A fled entity contributes zero to its team's power aggregate
 - **WHEN** `overwhelm.team_effective_power(battlefield, team_key)` is computed for a team containing one
   fled member and one living, non-fled member
-- **THEN** the result equals the living, non-fled member's own `effective_power()` value exactly, using
-  `overwhelm.py`'s existing, unmodified filtering logic
+- **THEN** the result equals the living, non-fled member's own `effective_power()` value exactly
 
 #### Scenario: A fled entity cannot be targeted by any skill
-- **WHEN** any `TargetSpec.SINGLE` skill is resolved against a target whose key is in `battlefield.fled`
-- **THEN** it rejects with `RejectReason.TARGET_OUT_OF_RANGE`, via `BattlefieldActionContext.
-  is_in_range()`'s existing, unmodified behavior
+- **WHEN** any `TargetSpec.SINGLE` skill is resolved against a target whose stable individual identity is in `battlefield.fled`
+- **THEN** presence succeeds for that roster identity and targeting rejects with `RejectReason.TARGET_OUT_OF_RANGE`, without changing the flee contest or allied party-retreat policy

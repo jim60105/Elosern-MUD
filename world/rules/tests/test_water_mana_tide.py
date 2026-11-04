@@ -38,6 +38,7 @@ from world.skills.registry import (
     TargetSpec,
     validate_prerequisite_graph,
 )
+from world.rules.combat_identity import stable_actor_id
 
 _skills_mod = importlib.import_module("world.skills.registry")
 _SKILL_MAP = getattr(_skills_mod, "SKILL_" + "REGISTRY")
@@ -96,13 +97,13 @@ class WaterManaTideBehaviorTests(EvenniaTest):
 
         self.bf = Battlefield(
             teams={
-                "party": frozenset({str(self.actor.key), str(self.ally.key)}),
-                "enemy": frozenset({str(self.enemy.key)}),
+                'party': frozenset({stable_actor_id(self.actor), stable_actor_id(self.ally)}),
+                'enemy': frozenset({stable_actor_id(self.enemy)}),
             },
             roster={
-                str(self.actor.key): self.actor,
-                str(self.ally.key): self.ally,
-                str(self.enemy.key): self.enemy,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.ally): self.ally,
+                stable_actor_id(self.enemy): self.enemy,
             },
         )
 

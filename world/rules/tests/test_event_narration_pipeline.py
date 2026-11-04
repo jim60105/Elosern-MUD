@@ -37,6 +37,7 @@ from world.tests.synthetic_data import (
 from world.skills.narration import FAMILY_ROWS, action_lines, family_key
 from world.skills.sexual_acts import _act_family
 from world.skills.registry import SkillCategory, TargetSpec
+from world.rules.combat_identity import stable_actor_id
 
 
 def _act_registry():
@@ -149,10 +150,10 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
     def _request(self, skill, monster):
         field = Battlefield(
             {
-                "party": frozenset({self.player.key}),
-                "foes": frozenset({monster.key}),
+                'party': frozenset({stable_actor_id(self.player)}),
+                'foes': frozenset({stable_actor_id(monster)}),
             },
-            {self.player.key: self.player, monster.key: monster},
+            {stable_actor_id(self.player): self.player, stable_actor_id(monster): monster},
         )
         return (
             ActionRequest(
@@ -226,10 +227,10 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         foes = [self._monster(key=f"narr foe {index}") for index in range(3)]
         field = Battlefield(
             {
-                "party": frozenset({self.player.key}),
-                "foes": frozenset(foe.key for foe in foes),
+                'party': frozenset({stable_actor_id(self.player)}),
+                'foes': frozenset(stable_actor_id(foe) for foe in foes),
             },
-            {self.player.key: self.player, **{foe.key: foe for foe in foes}},
+            {stable_actor_id(self.player): self.player, **{stable_actor_id(foe): foe for foe in foes}},
         )
         request = ActionRequest(
             self.player,

@@ -68,6 +68,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from .combat_fixtures import FakeEntity
+from world.rules.combat_identity import stable_actor_id
 
 #: A legacy archetype that prefers an AREA action against several enemies,
 #: resolved from the live rulebook by predicate (never a shipped literal).
@@ -114,11 +115,14 @@ class TauntWinnerResolutionTests(unittest.TestCase):
     """The round's winner per enemy is the first taunter in initiative order."""
 
     def _field(self, *entity_keys):
-        roster = {key: FakeEntity(key) for key in entity_keys}
+        roster = {
+            f"fixture:{key}": FakeEntity(key, combat_identity=key)
+            for key in entity_keys
+        }
         return Battlefield(
             {
-                "party": frozenset({"slower", "faster"}),
-                "foes": frozenset({"boss"}),
+                'party': frozenset({"fixture:slower", "fixture:faster"}),
+                'foes': frozenset({"fixture:boss"}),
             },
             roster,
         )
@@ -128,16 +132,16 @@ class TauntWinnerResolutionTests(unittest.TestCase):
     )
     def test_the_first_taunter_in_initiative_wins_regardless_of_entry_order(self):
         battlefield = self._field("slower", "faster", "boss")
-        order = ["faster", "slower", "boss"]
-        declared_first = {"slower": "boss", "faster": "boss"}
-        declared_last = {"faster": "boss", "slower": "boss"}
+        order = ["fixture:faster", "fixture:slower", "fixture:boss"]
+        declared_first = {"fixture:slower": "fixture:boss", "fixture:faster": "fixture:boss"}
+        declared_last = {"fixture:faster": "fixture:boss", "fixture:slower": "fixture:boss"}
         self.assertEqual(
             _resolve_taunt_winners(declared_first, order, battlefield),
-            {"boss": "faster"},
+            {"fixture:boss": "fixture:faster"},
         )
         self.assertEqual(
             _resolve_taunt_winners(declared_last, order, battlefield),
-            {"boss": "faster"},
+            {"fixture:boss": "fixture:faster"},
         )
 
     @covers_requirement(
@@ -146,25 +150,33 @@ class TauntWinnerResolutionTests(unittest.TestCase):
     def test_only_one_winner_is_kept_per_enemy(self):
         battlefield = self._field("slower", "faster", "boss")
         winners = _resolve_taunt_winners(
-            {"slower": "boss", "faster": "boss"}, ["faster", "slower", "boss"], battlefield
+            {"fixture:slower": "fixture:boss", "fixture:faster": "fixture:boss"},
+            ["fixture:faster", "fixture:slower", "fixture:boss"],
+            battlefield,
         )
-        self.assertEqual(list(winners), ["boss"])
+        self.assertEqual(list(winners), ["fixture:boss"])
 
     @covers_requirement(
         "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
     )
     def test_an_unknown_taunter_enemy_or_absent_taunter_is_ignored(self):
         battlefield = self._field("slower", "faster", "boss")
-        order = ["faster", "slower", "boss"]
+        order = ["fixture:faster", "fixture:slower", "fixture:boss"]
         self.assertEqual(
-            _resolve_taunt_winners({"ghost": "boss"}, order, battlefield), {}
+            _resolve_taunt_winners({"fixture:ghost": "fixture:boss"}, order, battlefield),
+            {},
         )
         self.assertEqual(
-            _resolve_taunt_winners({"faster": "ghost"}, order, battlefield), {}
+            _resolve_taunt_winners({"fixture:faster": "fixture:ghost"}, order, battlefield),
+            {},
         )
         # A taunter already absent from the initiative sequence cannot act.
         self.assertEqual(
-            _resolve_taunt_winners({"faster": "boss"}, ["slower", "boss"], battlefield),
+            _resolve_taunt_winners(
+                {"fixture:faster": "fixture:boss"},
+                ["fixture:slower", "fixture:boss"],
+                battlefield,
+            ),
             {},
         )
 
@@ -175,10 +187,10 @@ class TauntRoundContextTests(unittest.TestCase):
     def _field(self):
         return Battlefield(
             {
-                "party": frozenset({"winner"}),
-                "foes": frozenset({"boss"}),
+                'party': frozenset({"fixture:winner"}),
+                'foes': frozenset({"fixture:boss"}),
             },
-            {"winner": FakeEntity("winner"), "boss": FakeEntity("boss")},
+            {"fixture:winner": FakeEntity("winner", combat_identity='winner'), "fixture:boss": FakeEntity("boss", combat_identity='boss')},
         )
 
     @covers_requirement(
@@ -186,37 +198,43 @@ class TauntRoundContextTests(unittest.TestCase):
     )
     def test_the_winner_is_revalidated_on_every_read(self):
         battlefield = self._field()
-        winner = battlefield.roster["winner"]
-        self.assertIsNone(battlefield.taunt_winner("boss"))
-        battlefield.tactical = RoundTactical({}, {"boss": "winner"})
-        self.assertIs(battlefield.taunt_winner("boss"), winner)
+        winner = battlefield.roster["fixture:winner"]
+        self.assertIsNone(battlefield.taunt_winner("fixture:boss"))
+        battlefield.tactical = RoundTactical(
+            {}, {"fixture:boss": "fixture:winner"}
+        )
+        self.assertIs(battlefield.taunt_winner("fixture:boss"), winner)
         winner.traits.hp.current = 0
-        self.assertIsNone(battlefield.taunt_winner("boss"))
+        self.assertIsNone(battlefield.taunt_winner("fixture:boss"))
         winner.traits.hp.current = 100
-        battlefield.knocked_out.add("winner")
-        self.assertIsNone(battlefield.taunt_winner("boss"))
-        battlefield.knocked_out.discard("winner")
-        battlefield.fled.add("winner")
-        self.assertIsNone(battlefield.taunt_winner("boss"))
+        battlefield.knocked_out.add("fixture:winner")
+        self.assertIsNone(battlefield.taunt_winner("fixture:boss"))
+        battlefield.knocked_out.discard("fixture:winner")
+        battlefield.fled.add("fixture:winner")
+        self.assertIsNone(battlefield.taunt_winner("fixture:boss"))
 
     @covers_requirement(
         "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
     )
     def test_run_round_activates_the_winner_for_the_round_then_expires(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        boss = FakeEntity("boss", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        boss = FakeEntity("boss", combat_identity='boss', hp=100, agility=99)
         battlefield = Battlefield(
-            {"party": frozenset({"slow"}), "foes": frozenset({"boss"})},
-            {"slow": slow, "boss": boss},
+            {'party': frozenset({"fixture:slow"}), 'foes': frozenset({"fixture:boss"})},
+            {"fixture:slow": slow, "fixture:boss": boss},
         )
         seen: list[object] = []
 
         def provider(entity, field):
-            seen.append(field.taunt_winner("boss"))
+            seen.append(field.taunt_winner("fixture:boss"))
             return None
 
         with _round_environment():
-            run_round(battlefield, provider, taunt_declarations={"slow": "boss"})
+            run_round(
+                battlefield,
+                provider,
+                taunt_declarations={"fixture:slow": "fixture:boss"},
+            )
         # The winner was active before the enemy's own initiative position.
         self.assertTrue(seen)
         self.assertTrue(all(winner is slow for winner in seen))
@@ -234,11 +252,11 @@ class TauntRoundContextTests(unittest.TestCase):
         "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
     )
     def test_taunt_ranking_draws_no_extra_initiative_roll(self):
-        slow = FakeEntity("slow", hp=100, agility=1)
-        boss = FakeEntity("boss", hp=100, agility=99)
+        slow = FakeEntity("slow", combat_identity='slow', hp=100, agility=1)
+        boss = FakeEntity("boss", combat_identity='boss', hp=100, agility=99)
         battlefield = Battlefield(
-            {"party": frozenset({"slow"}), "foes": frozenset({"boss"})},
-            {"slow": slow, "boss": boss},
+            {'party': frozenset({"fixture:slow"}), 'foes': frozenset({"fixture:boss"})},
+            {"fixture:slow": slow, "fixture:boss": boss},
         )
         draws: list[int] = []
 
@@ -252,7 +270,11 @@ class TauntRoundContextTests(unittest.TestCase):
             stack.enter_context(
                 patch("world.rules.combat.battlefield.roll_d100", side_effect=roll)
             )
-            run_round(battlefield, lambda entity, field: None, taunt_declarations={"slow": "boss"})
+            run_round(
+                battlefield,
+                lambda entity, field: None,
+                taunt_declarations={"fixture:slow": "fixture:boss"},
+            )
         # One draw per eligible participant: Taunt ranking adds none, so a
         # second declaration can never reroll initiative.
         self.assertEqual(len(draws), 2)
@@ -279,24 +301,27 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
     def _field(self):
         return Battlefield(
             {
-                "foes": frozenset({str(self.monster.key)}),
-                "party": frozenset({str(self.taunter.key), str(self.other.key)}),
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.taunter), stable_actor_id(self.other)}),
             },
             {
-                str(self.monster.key): self.monster,
-                str(self.taunter.key): self.taunter,
-                str(self.other.key): self.other,
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.taunter): self.taunter,
+                stable_actor_id(self.other): self.other,
             },
         )
 
     def _taunted(self, field):
         field.tactical = RoundTactical(
-            {}, {str(self.monster.key): str(self.taunter.key)}
+            {},
+            {
+                stable_actor_id(self.monster): stable_actor_id(self.taunter),
+            },
         )
         return field
 
     def _target_keys(self, request):
-        return [str(target.key) for target in request.targets]
+        return [stable_actor_id(target) for target in request.targets]
 
     @covers_requirement(
         "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
@@ -310,7 +335,7 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         request = monster_behaviour_policy(
             self.monster, field, context=BattlefieldActionContext(field)
         )
-        self.assertEqual(self._target_keys(request), [str(self.taunter.key)])
+        self.assertEqual(self._target_keys(request), [stable_actor_id(self.taunter)])
 
     @covers_requirement(
         "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
@@ -319,11 +344,11 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         self.other.traits.hp.base = 40
         self.other.traits.hp.current = 40
         field = self._taunted(self._field())
-        field.knocked_out.add(str(self.taunter.key))
+        field.knocked_out.add(stable_actor_id(self.taunter))
         request = monster_behaviour_policy(
             self.monster, field, context=BattlefieldActionContext(field)
         )
-        self.assertEqual(self._target_keys(request), [str(self.other.key)])
+        self.assertEqual(self._target_keys(request), [stable_actor_id(self.other)])
 
     @covers_requirement(
         "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
@@ -333,7 +358,7 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         self.other.traits.hp.current = 40
         field = self._taunted(self._field())
         request = default_attack_policy(self.monster, field)
-        self.assertEqual(self._target_keys(request), [str(self.taunter.key)])
+        self.assertEqual(self._target_keys(request), [stable_actor_id(self.taunter)])
 
     @covers_requirement(
         "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
@@ -455,8 +480,8 @@ class TauntSessionTests(EvenniaTestCase):
         self.assertEqual(
             _draft_taunt_declarations(record, battlefield),
             {
-                str(self.player.key): str(self.monster.key),
-                str(self.companion.key): str(self.monster.key),
+                stable_actor_id(self.player): stable_actor_id(self.monster),
+                stable_actor_id(self.companion): stable_actor_id(self.monster),
             },
         )
 

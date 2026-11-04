@@ -73,10 +73,10 @@ class FreeformPreviewTests(EvenniaTestCase):
         )
         self.field = Battlefield(
             {
-                "party": frozenset({"freeform caster"}),
-                "foes": frozenset({"preview target"}),
+                'party': frozenset({"fixture:freeform caster"}),
+                'foes': frozenset({"fixture:preview target"}),
             },
-            {"freeform caster": self.actor, "preview target": self.target},
+            {"fixture:freeform caster": self.actor, "fixture:preview target": self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 

@@ -26,6 +26,7 @@ from world.rules.action import (
 )
 from world.rules.action_preview import revalidate_submission
 from world.rules.clock import read_world_clock
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     CombatSessionError,
     CombatSessionRecord,
@@ -407,7 +408,7 @@ def initiate_field_combat(
             # the session, so the initiating actor keeps the first action of
             # the first complete round while companions still have to choose.
             engaged = engage_group(
-                commander, targets, opening_first_actor=str(actor.key)
+                commander, targets, opening_first_actor=stable_actor_id(actor)
             )
             engaged_record = engaged["record"]
             if actor is not commander:

@@ -79,6 +79,7 @@ from ._compile_helpers import _anchor_key, _archetype_key, _issuer_key
 
 from tools.spec_traceability import covers_requirement
 from world.quests.tests._card_fixtures import occupant_card_record
+from world.rules.combat_identity import stable_actor_id
 
 #: The restart-cast class fights on the kit's spell row.
 _T_SKILL = SYNTH_SKILLS["t_ember_burst"].key
@@ -463,8 +464,8 @@ class RestartRestoreIntegrationTests(RegistryIsolationMixin, EvenniaTestCase):
 
     def _resolve_lethal(self, monster: Monster):
         field = Battlefield(
-            {"party": frozenset({self.player.key}), "foes": frozenset({monster.key})},
-            {self.player.key: self.player, monster.key: monster},
+            {'party': frozenset({stable_actor_id(self.player)}), 'foes': frozenset({stable_actor_id(monster)})},
+            {stable_actor_id(self.player): self.player, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             self.player,

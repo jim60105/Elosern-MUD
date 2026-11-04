@@ -54,7 +54,6 @@ from django.db import transaction
 
 from world.observability import log_info
 from world.rules.action import _stored_trait_value
-from world.rules.combat.decision_scope import stable_actor_id
 from world.rules.combat_session.ai_tuning import discard_session_ai_tuning
 from world.rules.monster_ai.models import PublicObservation
 
@@ -192,7 +191,7 @@ def _eligible(
             continue
         faction = battlefield.team_of(key)
         if faction is not None:
-            live[stable_actor_id(entity)] = faction
+            live[key] = faction
     projected: list[PublicObservation] = []
     for record in records:
         current_faction = live.get(record.source_id)
@@ -318,28 +317,25 @@ def observe_action(
     """
     if not session_id:
         return False
-    source_key = str(event_log.actor)
-    source_entity = roster.get(source_key)
-    source_id = (
-        stable_actor_id(source_entity)
-        if source_entity is not None
-        else f"key:{source_key}"
-    )
-    faction = battlefield.team_of(source_key) or ""
+    source_id = event_log.actor_id
+    if source_id is None or source_id not in roster:
+        # A log that names no roster participant (a team summary or a
+        # source-less casualty) records no observation.
+        return False
+    faction = battlefield.team_of(source_id) or ""
     recipients: list[str] = []
     magnitudes: dict[str, float] = {}
     statuses: list[str] = []
 
-    def note(key: str | None) -> str | None:
-        if key is None or key not in roster:
+    def note(identity: str | None) -> str | None:
+        if identity is None or identity not in roster:
             return None
-        identity = stable_actor_id(roster[key])
         if identity not in recipients:
             recipients.append(identity)
         return identity
 
-    for key in event_log.targets:
-        note(str(key))
+    for identity in event_log.target_ids:
+        note(identity)
     for entry in event_log.entries:
         if entry.kind == "item_used":
             keys = entry.data.get("status_keys") if isinstance(entry.data, Mapping) else None
@@ -350,9 +346,9 @@ def observe_action(
         elif entry.kind not in statuses:
             statuses.append(entry.kind)
         magnitude = _health_magnitude(entry)
-        if magnitude is None or entry.target is None:
+        if magnitude is None or entry.target_id is None:
             continue
-        identity = note(str(entry.target))
+        identity = note(entry.target_id)
         if identity is not None:
             magnitudes[identity] = magnitudes.get(identity, 0.0) + magnitude
     omitted = max(0, len(recipients) - MAX_RECORD_RECIPIENTS)

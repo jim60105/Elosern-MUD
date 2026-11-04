@@ -533,3 +533,193 @@ whole module requires an already-published map world (a pre-existing shard
 ordering assumption unrelated to this change), which is why only the new class
 was run alone. CI shards and `tools.spec_traceability verify --evidence` remain
 CI-owned and were not claimed locally.
+
+# Regional monster population — developer notes
+
+Developer document for the `combat-individual-identity` prerequisite of the
+regional monster population work. It records the combat identity contract, the
+caller dispositions of the cutover, and the evidence behind this change.
+
+## Identity contract
+
+`world/rules/combat_identity.py` is the single definition and has no Evennia or
+domain imports, so it can be imported from `combat_beats` and inputfuncs
+without an import-order cycle. `world.rules.combat.decision_scope` re-exports
+it, and `world/rules/monster_ai/models.stable_identity` delegates to it.
+
+- Persisted actor: `dbref:<positive integer pk>`.
+- Nonpersistent actor: an explicit non-empty `combat_identity` string becomes
+  `fixture:<identity>`. Internal spaces are allowed; leading/trailing
+  whitespace, empty values, booleans and control characters raise
+  `CombatIdentityError` before any mutation.
+- Display labels are presentation only. No suffix is appended to a name, no
+  identity is derived from a label, and no name-key fallback or second
+  battlefield path exists.
+
+`Battlefield` validates `key == stable_actor_id(entity)` for every roster
+member and rejects duplicate participant identities. Membership, presence,
+range, initiative order, tactical and taunt declarations, nonlethal key sets,
+flee/knockout sets, action bookkeeping, session records and EventLog
+participant references all use the stable identity. `EventEntry`/`EventLog`
+carry `actor_id`/`target_id`/`target_ids` beside the readable labels, so prose
+rendering is unchanged while attribution, credit and targeting never parse a
+label.
+
+Pure combat tests construct ordinary `Battlefield` instances with explicit
+`combat_identity` fixtures. There is no synthetic-name identity.
+
+## Caller dispositions
+
+- `world/rules/combat/{battlefield,rounds,damage,healing,decision_scope}.py`,
+  `combat_session/{battlefield,lifecycle,rounds,policies,scans,settlement,
+  observations,records,ai_tuning}.py`, `combat_beats.py`, `targeting.py`,
+  `disengage.py`, `overwhelm.py`, `monster_behaviour.py` and
+  `monster_ai/{models,snapshot,candidates,legality,estimation,utility,
+  manual_campaign}.py`: identity-based membership and bookkeeping; labels are
+  kept only where prose is rendered.
+- `world/rules/action/event_log.py`, `effects/gauge_transfer.py`,
+  `world/rules/state_reactions.py`, `buffs/surface.py`,
+  `defeat_aftermath/{aftermath,digest,violation}.py`: participant, nonlethal
+  and buff-bookkeeping references resolved by identity; violation/digest
+  outcome maps are keyed by identity while their wake lines still render the
+  label.
+- `world/quests/planner.py`, `world/narrative/action_adapters.py`
+  (including the deleted `_unique_key_index` and label-key recipient
+  discovery), `world/narrative/projector.py`, command/combat-result rendering
+  and `web/webclient/presentation/{combat_panel,combat_beats,skill_use}.py`:
+  defeat credit, delivery and presentation read identities; displayed labels
+  and dbref-bound `a`/`e` tokens are preserved.
+- Harmless display `.key` reads (titles, roster names, logs, status views) are
+  intentionally unchanged; they are not identity decisions.
+
+## Label review
+
+Labels remain the human-facing text. `EventEntry.target` and `EventLog.targets`
+stay labels so every authored template renders unchanged; a consumer that
+attributes or credits reads the identity fields instead. `Battlefield` roster
+keys are identities, so two individuals sharing a label are listed and
+targeted independently, and renaming either cannot redirect an existing
+selection because selections persist pks, not labels.
+
+## Evidence and assertion roles
+
+Focused commands (run from the worktree with the single-token environment
+file described in the design):
+
+```
+uv run --locked --env-file=/tmp/mud-population-test.env evennia test --settings test_settings.py --keepdb <LABELS>
+```
+
+Verified labels and results:
+
+- `world.rules.tests.test_combat_session_targeting` — 11 pass, including the
+  same-label acceptance cases: independent HP/resources/flee/effects and a
+  durable saved selection that survives rename, a reload through the session
+  owner, roster reorder and completion.
+- `world.rules.tests.test_combat_session_targeting world.rules.tests.test_combat_beats world.rules.tests.test_defend_dodge world.rules.tests.test_disengage` — 48 pass.
+- `world.rules.tests.test_disengage_integration world.rules.tests.test_upkeep_settlement` — 30 pass.
+- `world.rules.tests.test_taunt_constraints world.rules.tests.test_monster_behaviour_integration world.rules.tests.test_monster_flee_decision world.rules.tests.test_positional_marker` — 57 pass.
+- `world.rules.tests.test_combat_session_persistence` — 37 pass (includes the
+  commit-failure round rollback).
+- `world.rules.tests.test_combat_session_recovery world.rules.tests.test_combat_initiation` — 50 pass.
+- `world.rules.tests.test_combat_party` — 65 pass.
+- `world.rules.tests.test_combat_session_flow world.rules.tests.test_combat_session_sexual_coercion world.skills.tests.test_martial_arts_behavior` — 66 pass.
+- `world.rules.tests.test_monster_ai_selection` — 58 pass;
+  `test_monster_ai_snapshots test_monster_ai_tuning test_monster_ai_memory` — 85 pass;
+  `test_monster_ai_candidates test_monster_ai_coordination` — 72 pass;
+  `test_monster_ai_estimation.SpreadProjectionTests test_initiative_and_turn_loop test_lightning_turn_behavior test_turn_order_control` — 65 pass.
+- `world.rules.tests.test_action_evidence test_on_hit_counter_damage` — 42 pass;
+  `test_multi_strike_cap_widening test_unconditional_multi_strike test_monster_provisioning` — 35 pass;
+  `test_cast_settlement test_cmd_cast test_climax_settlement test_erosion_leech` — 66 pass.
+- `world.quests.tests.test_planner test_settlement` — 68 pass;
+  `test_escort_lifecycle` — 38 pass (same-label defeat credit is exercised by
+  `test_same_display_key_creates_no_false_failure` and the bound-objective
+  dbref cases).
+- `world.rules.tests.test_defeat_aftermath_digest world.rules.tests.test_defeat_aftermath_violation` — 81 pass.
+- `world.rules.tests.test_item_combat_turn world.maps.tests.test_gm` — 22 pass.
+- `web.webclient.actions.tests.test_skill_use_actions commands.tests.test_cast_member_suffix` — 47 pass; the former duplicate-label ambiguity case now asserts identity-addressed success.
+- `world.narrative.tests.test_narrative_events` — pass with the escort run.
+- `world.rules.tests.test_monster_ai_manual_reports.CampaignEncounterTests` — 9 pass,
+  including the named encounter, the same-label opponent selection and the
+  refusal batch.
+- `world.rules.tests.test_conferral_cast world.rules.tests.test_divine_mystery_progression.PartyAudienceConferralTests` — 22 pass, including same-label
+  sources and reconferral after rename.
+- `world.rules.tests.test_stateful_spells` — 11 pass (contact-policy identity).
+- `world.rules.tests.test_action_narrative_deeds` — 41 pass (committed-log
+  identity, same-label resolution, fixture occurrence identity).
+- `world.rules.tests.test_monster_ai_tuning.SessionAITuningTests` — 6 pass
+  (rejected identity leaves the session table empty).
+
+Assertion roles: the migrated assertions are synthetic-mechanism checks with
+independently known outcomes (fixed rolls, explicit fixtures) or registry-
+contract checks; none echoes shipped data or wording. No browser suite was run
+locally. No new test module was added, so `.github/evennia-shards.json` is
+unchanged.
+
+## Requirement annotations
+
+The apply slice added no `covers_requirement` annotation: the three
+ADDED/MODIFIED deltas have no canonical IDs before archival. After the sync,
+the archive step attached the generated ID
+`player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels`
+(the only requirement the sync introduced) to the discoverable tests whose
+assertions establish its clauses:
+
+- `SameLabelIndividualTests.test_same_label_individuals_keep_independent_state`
+  — participant, effect and outcome state: distinct identities and team
+  membership, damage and resource loss on the selected twin only, and flee
+  state that removes only its own range while the twin stays targetable.
+- `SameLabelIndividualTests.test_rename_and_reorder_cannot_redirect_a_saved_selection`
+  — selection and restoration: a saved pk selection survives rename, the
+  owner's reload and roster reorder, and resolves only the chosen individual.
+- `SameLabelIndividualTests.test_duplicate_identity_rejects_before_any_session_write`
+  — identity uniqueness: the same entity supplied twice rejects before any
+  session write.
+- `ObservationMemoryTests.test_same_label_sources_keep_independent_memory`
+  — AI state: two same-label sources keep independent observation memory.
+- `QuestPlannerTests.test_two_individuals_with_one_display_key_count_separately`
+  — outcome state: two same-label individuals each count their own defeat.
+
+The remaining acceptance tests cited in the apply slice establish the delta
+scenarios or extend requirements already covered by their own annotations, so
+they were left unannotated here:
+
+- `SameLabelIndividualTests.test_same_label_individuals_keep_independent_state`
+  and `test_rename_and_reorder_cannot_redirect_a_saved_selection` also carry
+  the delta scenarios "Independent removal and credit", "Repeated labels are
+  independent" and "Independent selected recipient" as behavior evidence.
+- `QuestPlannerTests.test_a_redelivered_defeat_entry_advances_once` supplies
+  the duplicate-delivery half of "Independent removal and credit" under its
+  own `monster-individual-construction` annotation.
+- `SessionItemMultiTargetRollbackTests.test_same_label_recipients_keep_distinct_event_log_identities`
+  → `player-combat-session` "Independent selected recipient" (item recipient
+  identity population feeding observation memory).
+- `CampaignEncounterTests.test_legal_opponent_addresses_same_label_monsters_by_identity`
+  → same identity contract at the manual-campaign boundary.
+- `ConferralCastPathTests.test_same_label_sources_keep_distinct_grants` and
+  `test_reconferral_after_rename_keeps_one_source_identity` → same identity
+  contract for grant sources.
+- `SettledResultNormalizationTests.test_shared_display_keys_resolve_by_identity_only`
+  and `test_fixture_occurrence_identity_is_not_the_display_label` → narrative
+  occurrence/recipient attribution; `SettledEffectVocabularyTests.test_committed_log_form_states_the_same_settled_results`
+  now supplies explicit identities and keeps the identity-less rejection.
+
+Rollback disposition: the identity cutover adds no new durable write path, so
+the existing verified rollback controls remain authoritative instead of a
+duplicated synthetic failure test — `test_commit_failed_after_prior_actor_aborts_entire_selected_round`
+(round HP/revision/draft), `test_receipt_failure_after_terminal_clock_and_clear_restores_round`
+(terminal clock/receipt/clear), the item journal rollback cases
+(`test_upkeep_fault_restores_actor_and_companion_surfaces`,
+`test_terminal_settlement_failure_after_item_use_restores_everything`) and the
+defeat-aftermath rollback/replay suite. They assert durable rows, live handler
+caches and draft state against the pre-call baseline.
+
+Nearest current anchors (from the design's generated list) whose scope these
+behaviours extend; the existing annotations on them already cover those main
+requirements, so no additional claim was added:
+
+- `battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership`
+- `player-combat-session::startup-restores-valid-sessions-and-terminates-invalid-references-safely`
+- `monster-individual-construction::kill-accounting-keys-on-persistent-individual-identity-and-dedupes-duplicate-defeat-events`
+
+No retired, empty or skipped claim is retained.

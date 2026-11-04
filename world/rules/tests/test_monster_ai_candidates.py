@@ -76,6 +76,7 @@ from .test_monster_ai_snapshots import (
     _buff_record,
     _probe_field,
 )
+from world.rules.combat_identity import stable_actor_id
 
 SCOPE = "normal:41:0"
 ROUND = 41
@@ -663,16 +664,16 @@ class CandidateShapeTests(unittest.TestCase):
         outsider = _ProbeParticipant("t_cand_outsider", pk=5)
         field = Battlefield(
             {
-                "monsters": frozenset({str(self.actor.key), str(outsider.key)}),
-                "party": frozenset({str(self.enemy.key)}),
+                'monsters': frozenset({stable_actor_id(self.actor), stable_actor_id(outsider)}),
+                'party': frozenset({stable_actor_id(self.enemy)}),
             },
             {
-                str(self.actor.key): self.actor,
-                str(self.enemy.key): self.enemy,
-                str(outsider.key): outsider,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.enemy): self.enemy,
+                stable_actor_id(outsider): outsider,
             },
         )
-        field.knocked_out.add(str(self.actor.key))
+        field.knocked_out.add(stable_actor_id(self.actor))
         result = _enumerate(
             self.actor,
             (self.enemy,),
@@ -1031,13 +1032,13 @@ class CandidateRestrictionTests(EvenniaTestCase):
         return entity
 
     def _field(self, *opponents):
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for entity in opponents:
-            roster[str(entity.key)] = entity
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {
-                "monsters": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(entity.key) for entity in opponents),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(entity) for entity in opponents),
             },
             roster,
         )
@@ -1296,13 +1297,13 @@ class TauntConstraintTests(EvenniaTestCase):
         return entity
 
     def _field(self, *opponents):
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for entity in opponents:
-            roster[str(entity.key)] = entity
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {
-                "monsters": frozenset({str(self.monster.key)}),
-                "party": frozenset(str(entity.key) for entity in opponents),
+                'monsters': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset(stable_actor_id(entity) for entity in opponents),
             },
             roster,
         )
@@ -1310,7 +1311,10 @@ class TauntConstraintTests(EvenniaTestCase):
     def _taunted(self, field, winner):
         """Record one active Taunt winner for the acting monster this round."""
         field.tactical = RoundTactical(
-            {}, {str(self.monster.key): str(winner.key)}
+            {},
+            {
+                stable_actor_id(self.monster): stable_actor_id(winner),
+            },
         )
         return field
 
@@ -1392,7 +1396,7 @@ class TauntConstraintTests(EvenniaTestCase):
         )
         # The winner is knocked out before the enemy's decision: the ordinary
         # legal candidates return and no losing declaration takes over.
-        field.knocked_out.add(str(winner.key))
+        field.knocked_out.add(stable_actor_id(winner))
         self.assertEqual(
             _targets_by_skill(self._enumerate((winner, loser, other), field))[
                 MAGIC.key

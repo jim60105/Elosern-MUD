@@ -12,12 +12,12 @@ from .combat_fixtures import FakeEntity
 
 class BattlefieldActionContextTests(unittest.TestCase):
     def setUp(self):
-        self.actor = FakeEntity("actor")
-        self.ally = FakeEntity("ally")
-        self.enemy = FakeEntity("enemy")
+        self.actor = FakeEntity("actor", combat_identity='actor')
+        self.ally = FakeEntity("ally", combat_identity='ally')
+        self.enemy = FakeEntity("enemy", combat_identity='enemy')
         self.battlefield = Battlefield(
-            {"party": frozenset({"actor", "ally"}), "foes": frozenset({"enemy"})},
-            {"actor": self.actor, "ally": self.ally, "enemy": self.enemy},
+            {'party': frozenset({"fixture:actor", "fixture:ally"}), 'foes': frozenset({"fixture:enemy"})},
+            {"fixture:actor": self.actor, "fixture:ally": self.ally, "fixture:enemy": self.enemy},
         )
         self.context = BattlefieldActionContext(self.battlefield)
 
@@ -32,15 +32,15 @@ class BattlefieldActionContextTests(unittest.TestCase):
     @covers_requirement("battlefield-action-context::is-in-range-checks-fled-status-alone-melee-versus-ranged-is-structurally-unreachable", "battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership")
     @covers_requirement("disengage-action::a-fled-entity-is-immediately-excluded-from-targeting-turn-order-and-team-power")
     def test_fled_entity_is_absent_and_out_of_range(self):
-        self.battlefield.fled.add("enemy")
+        self.battlefield.fled.add(self.enemy.identity)
         self.assertTrue(self.context.is_present(self.actor, self.enemy))
         self.assertFalse(self.context.is_in_range(self.actor, self.enemy))
 
     @covers_requirement("battlefield-action-context::relation-to-is-derived-from-two-team-membership-not-a-stored-relation-field")
     def test_event_context_cannot_reference_a_different_battlefield(self):
         other = Battlefield(
-            {"a": frozenset({"actor"}), "b": frozenset({"enemy"})},
-            {"actor": self.actor, "enemy": self.enemy},
+            {'a': frozenset({"fixture:actor"}), 'b': frozenset({"fixture:enemy"})},
+            {"fixture:actor": self.actor, "fixture:enemy": self.enemy},
         )
         with self.assertRaisesRegex(ValueError, "must match"):
             BattlefieldActionContext(

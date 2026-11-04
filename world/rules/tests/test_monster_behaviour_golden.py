@@ -41,8 +41,8 @@ class MonsterBehaviourGoldenTests(unittest.TestCase):
 
     @staticmethod
     def _field_for(monster):
-        weak = FakeEntity("weak", hp=10, max_hp=100, atk_phys=2)
-        strong = FakeEntity("strong", hp=90, atk_phys=40)
+        weak = FakeEntity("weak", combat_identity='weak', hp=10, max_hp=100, atk_phys=2)
+        strong = FakeEntity("strong", combat_identity='strong', hp=90, atk_phys=40)
         return _field(monster, [weak, strong])
 
     def _decision(self, tier):

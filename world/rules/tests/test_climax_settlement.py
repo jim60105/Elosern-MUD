@@ -38,6 +38,7 @@ from ._combat_session_helpers import (
     engagement_provenance,
     open_synthetic_scope,
 )
+from world.rules.combat_identity import stable_actor_id
 
 # Synthetic cast rows: the two-event sexual caster (mid-round settlement)
 # and the kit damage spell (combat-session rollback carrier).
@@ -150,8 +151,8 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         roster = {}
         for index, entity in enumerate(entities):
             team = "party" if index == 0 else "foes"
-            teams.setdefault(team, set()).add(entity.key)
-            roster[entity.key] = entity
+            teams.setdefault(team, set()).add(stable_actor_id(entity))
+            roster[stable_actor_id(entity)] = entity
         teams.setdefault("foes", set())
         return Battlefield(
             {team: frozenset(members) for team, members in teams.items()},
@@ -209,7 +210,7 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[entity.key],
+                return_value=[stable_actor_id(entity)],
             ),
             patch("world.rules.combat.rounds.tick_buffs", return_value=()),
         ):
@@ -271,8 +272,8 @@ class ClimaxDeadEndRegressionTests(EvenniaTestCase):
         self.assertEqual(entity.sexual.climax_phase.level, "進行中")
 
         field = Battlefield(
-            {"a": frozenset({entity.key}), "b": frozenset()},
-            {entity.key: entity},
+            {'a': frozenset({stable_actor_id(entity)}), 'b': frozenset()},
+            {stable_actor_id(entity): entity},
         )
         with patch("world.rules.combat.rounds.tick_buffs", return_value=()):
             with combat_provenance(engagement_provenance()):

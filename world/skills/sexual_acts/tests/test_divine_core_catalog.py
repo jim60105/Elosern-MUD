@@ -271,13 +271,13 @@ class DivineCastTests(EvenniaTest):
         other.location = self.room1
         battlefield = Battlefield(
             {
-                "party": frozenset({"divine caster", "divine target"}),
-                "foes": frozenset({"second target"}),
+                'party': frozenset({"fixture:divine caster", "fixture:divine target"}),
+                'foes': frozenset({"fixture:second target"}),
             },
             {
-                "divine caster": self.actor,
-                "divine target": self.target,
-                "second target": other,
+                "fixture:divine caster": self.actor,
+                "fixture:divine target": self.target,
+                "fixture:second target": other,
             },
         )
         context = BattlefieldActionContext(battlefield)

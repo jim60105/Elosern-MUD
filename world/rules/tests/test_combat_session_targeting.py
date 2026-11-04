@@ -31,6 +31,7 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 from .combat_fixtures import grant_lineage
+from world.rules.combat_identity import stable_actor_id
 
 # Synthetic vehicles for the facade (test-data-independence): ANY-faction
 # single-target and AREA damage skills carry the same resolver semantics the
@@ -236,8 +237,8 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(record.initial_sleep_ids, (int(self.player.pk),))
         self.assertNotIn(int(self.player.pk), record.knocked_out_ids)
         field = reconstruct_battlefield(self.player, record)
-        self.assertIn(str(self.player.key), field.roster)
-        self.assertTrue(field.is_eligible(str(self.player.key)))
+        self.assertIn(stable_actor_id(self.player), field.roster)
+        self.assertTrue(field.is_eligible(stable_actor_id(self.player)))
         required = set(get_required_combat_actors(record, field))
         self.assertNotIn(int(self.player.pk), required)
         self.assertIn(int(self.companion.pk), required)
@@ -292,11 +293,12 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         )
         _persist(self.player, knocked)
         knocked_field = reconstruct_battlefield(self.player, knocked)
-        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))
+        self.assertFalse(knocked_field.is_eligible(stable_actor_id(self.companion)))
         self.assertNotIn(
             int(self.companion.pk),
             get_required_combat_actors(knocked, knocked_field),
         )
+
 
     @covers_requirement(
         "party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die"
@@ -326,7 +328,7 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         engage(self.player, self.monster)
         record = read_session(self.player)
         field = reconstruct_battlefield(self.player, record)
-        self.assertTrue(field.is_eligible(str(self.companion.key)))
+        self.assertTrue(field.is_eligible(stable_actor_id(self.companion)))
         self.assertNotIn(
             int(self.companion.pk),
             get_required_combat_actors(record, field),
@@ -378,4 +380,145 @@ class SleepingRosterCases(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(states[int(self.companion.pk)], "knocked_out")
         knocked_field = reconstruct_battlefield(self.player, knocked)
-        self.assertFalse(knocked_field.is_eligible(str(self.companion.key)))
+        self.assertFalse(knocked_field.is_eligible(stable_actor_id(self.companion)))
+
+
+class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
+    """Repeated labels stay independent individuals end to end."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "races",
+            "subraces",
+            "static_tiers",
+            "monster_tiers",
+            extra=_scope_extra(),
+        )
+        super().setUp()
+        self.room = create_object(Room, key="twin arena")
+        self.player = _player()
+        self.player.location = self.room
+        grant_lineage(self.player, [_T_ANY_SINGLE])
+        self.first = _monster("twin wolf", hp=100)
+        self.second = _monster("twin wolf", hp=100)
+        self.first.location = self.room
+        self.second.location = self.room
+
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
+    def test_same_label_individuals_keep_independent_state(self):
+        from world.rules.combat import BattlefieldActionContext
+        from world.rules.combat_session import engage_group, reconstruct_battlefield
+
+        first_id = stable_actor_id(self.first)
+        second_id = stable_actor_id(self.second)
+        self.assertNotEqual(first_id, second_id)
+        engage_group(self.player, [self.first, self.second])
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+        self.assertIn(first_id, field.roster)
+        self.assertIn(second_id, field.roster)
+        self.assertIsNotNone(field.team_of(first_id))
+        self.assertEqual(field.team_of(first_id), field.team_of(second_id))
+
+        self.first.traits.hp.current = 100
+        self.second.traits.hp.current = 100
+        first_mp = self.first.traits.mp.current
+        second_mp = self.second.traits.mp.current
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            result = submit_player_action(self.player, _T_ANY_SINGLE, [self.second])
+        self.assertIn(result["outcome"], ("round", "victory", "defeat"))
+        self.assertLess(self.second.traits.hp.current, 100)
+        self.assertEqual(self.first.traits.hp.current, 100)
+        # Each individual keeps its own resource pool.
+        self.assertEqual(self.first.traits.mp.current, first_mp)
+        self.assertEqual(self.second.traits.mp.current, second_mp)
+
+        # Flee state belongs to one identity: it keeps presence but loses
+        # range, while its same-label twin stays fully targetable.
+        field = reconstruct_battlefield(self.player, read_session(self.player))
+        field.fled.add(stable_actor_id(self.first))
+        context = BattlefieldActionContext(field)
+        self.assertTrue(context.is_present(self.player, self.first))
+        self.assertFalse(context.is_in_range(self.player, self.first))
+        self.assertTrue(context.is_in_range(self.player, self.second))
+
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
+    def test_rename_and_reorder_cannot_redirect_a_saved_selection(self):
+        from dataclasses import replace
+
+        from world.rules.action import ActionResolver
+        from world.rules.combat import Battlefield, combat_provenance
+        from world.rules.combat_session import (
+            _persist,
+            engage_group,
+            reconstruct_battlefield,
+        )
+        from world.rules.combat_session.records import read_session_uncached
+        from world.rules.combat_session.rounds import _draft_requests
+        from ._combat_session_helpers import engagement_provenance
+
+        engage_group(self.player, [self.first, self.second])
+        saved = replace(
+            read_session(self.player),
+            draft_entries={
+                int(self.player.pk): {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _T_ANY_SINGLE,
+                        "targets_or_shorthand": [int(self.second.pk)],
+                        "scale": 1.0,
+                    },
+                }
+            },
+        )
+        _persist(self.player, saved)
+
+        # Rename both twins after the durable selection, then reload from the
+        # owner's stored row: the saved pk still resolves to the same
+        # individual through its stable identity, not its label.
+        self.first.key = "renamed first twin"
+        self.second.key = "renamed second twin"
+        reloaded = read_session_uncached(self.player)
+        field = reconstruct_battlefield(self.player, reloaded)
+        request = _draft_requests(reloaded, field)[int(self.player.pk)]
+        self.assertEqual(request.targets, [self.second])
+
+        # Completing that reloaded selection resolves only the chosen twin.
+        first_hp = self.first.traits.hp.current
+        second_hp = self.second.traits.hp.current
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            combat_provenance(engagement_provenance().at_slot(0)),
+        ):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(self.second.traits.hp.current, second_hp)
+        self.assertEqual(self.first.traits.hp.current, first_hp)
+
+        # Reversing the roster insertion order changes nothing either.
+        reordered = Battlefield(
+            dict(field.teams), dict(reversed(list(field.roster.items())))
+        )
+        self.assertEqual(
+            _draft_requests(reloaded, reordered)[int(self.player.pk)].targets,
+            [self.second],
+        )
+
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
+    def test_duplicate_identity_rejects_before_any_session_write(self):
+        from world.rules.combat_session import engage_group
+
+        with self.assertRaises(CombatSessionError) as caught:
+            engage_group(self.player, [self.first, self.first])
+        self.assertEqual(caught.exception.args[0], SessionReason.DUPLICATE_PARTICIPANT)
+        self.assertIsNone(read_session(self.player))
+        self.assertIsNone(self.player.db.active_combat)

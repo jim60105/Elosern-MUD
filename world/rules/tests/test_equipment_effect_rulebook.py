@@ -1326,6 +1326,7 @@ class MilitaryAuthoringContractTests(unittest.TestCase):
 
 
 from evennia.utils.test_resources import EvenniaTest
+from world.rules.combat_identity import stable_actor_id
 
 
 class MilitaryRuntimeSmokeTests(EvenniaTest):
@@ -1502,8 +1503,8 @@ class GuildRestrictionAuthoredKitTests(EvenniaTest):
             self.assertTrue(skill_effect_allowed(host, "body_enhancement_basic"))
             if rank == "S":
                 battlefield = Battlefield(
-                    {"one": frozenset({str(host.key)}), "two": frozenset({str(target.key)})},
-                    {str(host.key): host, str(target.key): target},
+                    {'one': frozenset({stable_actor_id(host)}), 'two': frozenset({stable_actor_id(target)})},
+                    {stable_actor_id(host): host, stable_actor_id(target): target},
                 )
                 context = BattlefieldActionContext(battlefield, event_context={"simulated": True}, nonlethal=True)
                 with patch("world.rules.combat.damage.roll_d100", return_value=1):
