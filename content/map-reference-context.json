@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "1025ac836bac326b4e60e4929444475b8dc96760b88074684c4beaccb8d3e6b0",
+  "fingerprint": "c9b7800737d472784396ad15884cf43465ed130538804c489a6c1775c0788060",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -988,7 +988,7 @@
     "world/quests/apps.py": "c8fd1d104d7bf2e270d1cd2504445dc667c2ba49d4da38f99d8e894c9bdeaeb5",
     "world/quests/binding.py": "4d50b7f94eb1ad272bf691ec1b9508c8475b2ca1d1139d5f6ab9be1847879c16",
     "world/quests/bootstrap.py": "d64a567757362d79a1162a9d9c4fbff9adcfefa3329f612093ea91a82d45e49b",
-    "world/quests/catalog.py": "e1d97746b56aee56c25a9aad429e24baa8bef1706c7cb89b4edc8498184b388a",
+    "world/quests/catalog.py": "b87308d7f7f0a218bc47b4969fe477522a7d85786a87ebb2351ebd9432486822",
     "world/quests/characterization.py": "0125ecad710e2d61683c4cad0137e5c61fb02de6fe2887cc134a7e6ea6eabcaf",
     "world/quests/compile/__init__.py": "e52ae929e45be519dbc5ad638c4a1db4e56e017201fe613a1dddb4e0623da4d7",
     "world/quests/compile/canonical.py": "b70508b66845c24019760d3ab77e7d598ae081744c1bc4442fb7cd1a75bac51d",
@@ -998,7 +998,7 @@
     "world/quests/compile/payload.py": "3a0bfa2d8935f1089e23d8d8d83eb2db2338edb62da9a7d85cc87dd3a20cf653",
     "world/quests/compile/registration.py": "95c96af5211bcf15cde0c699b9717ed050379872534b2ae1e7a35e898391c3ba",
     "world/quests/deadlines.py": "05965c10ca387b4764d9a595488ba1898c04f1f06c52a532fede0a88630bc1db",
-    "world/quests/definitions.py": "05fa8d592003843d6133042bb96c0b6b8e36a11e8cb20ea94f8a93a3daafacd5",
+    "world/quests/definitions.py": "c41fff576044c389087753c7bcbe6a4320b0c63ea1e210f66cf05bec67cc2cc6",
     "world/quests/deliver.py": "84e3222b8fb9bec0ca55118b6448f24b16e329a1baf3d305fb858294f7d2a700",
     "world/quests/describe.py": "0ec5fbacc828160d2e0500eca87fe1da719e60ae70780125982cac188946c4e5",
     "world/quests/encounter_activation.py": "1080887bd0a6003906d1691497ff50e4b2a74a4f48ca7428b5c26e4313a46126",
@@ -1021,7 +1021,7 @@
     "world/quests/planner.py": "758063633840a0ea112af9cb1603599b15ac2fa9f7d603bf37a19ab005caccb0",
     "world/quests/retention.py": "0dc112629dea61ae4bb3ad034e7d3dd7920950cb77b86ddf6615e2cf06568003",
     "world/quests/room_observation.py": "e3e16618f1801807215a7b61315858746332b34df06f35db2bcac3518fa0ef8c",
-    "world/quests/runtime.py": "ef4bb6775e0cdd8d2fb1420e567196f2fe0921d68ee2001e0d00f380100656fd",
+    "world/quests/runtime.py": "1796316b8e7bbd7dd522d11af842cf536093afa0cc088539f213df8e664c48ab",
     "world/quests/scene_api.py": "f5079982282beea88a87b81a7aaea2d3bf7c0b5d27c301d9dda43e8dd248461f",
     "world/quests/scene_builder.py": "2a8089ec03f15d62cb3d154ad0ff788fc8b93b7ac93a257c9b7e4221f8ce31d6",
     "world/quests/scene_package.py": "3e2bb587b3ee3a71705527acc0aad6fb918b10c47a6a23d5e6c471fb8dcf0206",
@@ -1136,7 +1136,7 @@
     "world/rules/guild_exam_request.py": "66daa72bb0503343893166bfd55404806891f5b7a0c324d5fa0f8f093f01c239",
     "world/rules/guild_exam_restrictions.py": "39f636f1d41a9d6145665aedaee673469d4ef864e6aa1f8164ba071e6c549e90",
     "world/rules/guild_exams.py": "416859debdba7a91df6b66df48adedd4536a2ce8b46b89f0536de9f37153c2b1",
-    "world/rules/guild_offers.py": "b382f9892afcb564ebb2dd485ebebbb771082c36eeeed5fea9af0c894ce8d5a5",
+    "world/rules/guild_offers.py": "cc352fd49b6f07e246e86c581b3583fda3a024bd6c7d4242a03734bcd0eecf3a",
     "world/rules/human_guild_hosts.py": "20b1695cfa4fbb1a1f862c4cd4eb8a7c45e981b5468dde62b91c644b2eab27b8",
     "world/rules/item_effects.py": "86dcfa1a1ae00e7d76c528b893ed668e484874525a8a1133008d27f45df69c07",
     "world/rules/items/__init__.py": "184b90e6f20a67389238f8731471ac03d1aac89be2d9caab646eee0fbbef531c",
@@ -1171,7 +1171,7 @@
     "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
     "world/rules/npc_identity.py": "6de367d1960090137d420daeeb54e8361877e71d57aa71f597ef3502482bf6fa",
-    "world/rules/npc_intents.py": "504e305b39c8680b245d6f6c8adbd8f9002e1b5820451edaf8ad654bd341c2c6",
+    "world/rules/npc_intents.py": "6d5e95f69a24cacf54850be13c595e81b450ad1f5cba5aa0881ccd05114b247a",
     "world/rules/npc_persona.py": "518649e21c3419bb3b4137d18a533afba35971d4b07edcdc0ca37c262467b1de",
     "world/rules/npc_roster_validation.py": "c0a5af57ee35d357a04f0bb7d50b03a4bdfac2bbb11385115bb526ea7f3b54e5",
     "world/rules/npc_schedules.py": "36d3befd7c99b72dcba1ac5f116fe82964c4072efa604553b9ddec26b8b8d0fb",
