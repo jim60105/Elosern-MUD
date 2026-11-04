@@ -9,7 +9,7 @@ Future implementation only. Begin after `activity-group-formation`, `mudfilm-sli
 
 ## 2. Evidence and documentation
 
-- [ ] 2.1 Run `world.maps.tests.test_bootstrap` and `world.maps.tests.test_regional_population` focused labels; write the review subsection (design D5) with those results; regenerate `content/map-reference-context.json`. Check: tests pass, `uv run --locked python -m tools.map_reference_context --check` exits 0, and the subsection contains no coordinate, density or count.
+- [ ] 2.1 Run `world.maps.tests.test_bootstrap` and `world.maps.tests.test_regional_population` focused labels; write the review subsection (design D5) with those results; regenerate `content/map-reference-context.json`. Check: tests pass, `uv run --locked python -m tools.map_reference_context --check` exits 0, and the subsection contains no coordinate, density or count and records the slime damp-cell deviation.
 
 ## 3. Handoff
 

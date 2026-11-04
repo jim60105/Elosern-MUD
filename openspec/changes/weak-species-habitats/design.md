@@ -46,13 +46,15 @@ Defended sub-areas (6×6, centred): `ActivityArea("western_quarry_nest", "wester
 
 ### D4. Zones (append to `_ECOLOGY_ZONE_DECLARATIONS`)
 
-One zone per table row with `pool=(WeightedComposition(<its composition>, 1),)`. Start from the shipped trailing values; raise `cell_capacity` and `wave_budget` to at least the composition's maximum (3, 4 and 5 respectively) and keep `upper_density` high enough that `validate_ecology_registries`' complete-recovery rule passes. Adjust only what validation requires and record why in the review subsection.
+One zone per table row with `pool=(WeightedComposition(<its composition>, 1),)`. Start from the shipped trailing values; raise `cell_capacity` and `wave_budget` to at least the composition's maximum (3, 4 and 5 respectively) and keep `upper_density` high enough that `validate_ecology_registries`' complete-recovery rule passes. The checks that decide these values are, verbatim from the validators: each composition's largest total must be `<= cell_capacity` and `<= wave_budget`; `lower_density <= upper_density < 100`; and `world/maps/population_geometry.py::validate_ecology_geometry`'s complete-composition recoverability rule (the density interval converted with `density_bounds` over the zone's eligible birth cells must leave room for the largest composition above the lower bound). Change only values those checks require and record why in the review subsection.
 
 ### D5. Review documentation
 
 Add "Content expansion habitats" under "Authoring review (human judgment)" in `docs/development/regional-monster-population.md`: per zone, the dossier fact it serves and why the rectangle's terrain (inland water for the slime; remote dry hills for the goblin quarry; plains margin and hill transport ground for the rats) fits; the passive/defended-area choice; that no high-tier variant joins an ordinary pool; and the commands/results of D6. No coordinate, density or count is copied there (the existing rule of that section).
 
 ## Risks / Trade-offs
+
+- [Design §4.1 limits the slime to explicitly authored damp cells, but the zone model has no per-cell wetness and only about 26 of 400 cells of each slime rectangle lie within 3 cells of inland water] → record this in the review subsection as an accepted deviation; a later change may shrink the slime rectangles onto the water cluster without any test edit.
 
 - [Published geography carries no explicit quarry or granary feature] → the rectangles are remote, passable, region-correct candidates; the human review decides fidelity and may move a rectangle within the same constraints without any test edit.
 - [Five zones increase background population] → each zone is sparse and bounded; the density interval is the single source.
