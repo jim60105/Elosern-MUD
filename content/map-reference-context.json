@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b17ad70fbd31141b8292363be7bce974cffa043e163befb82d180b33a5d4f92c",
+  "fingerprint": "df13e6bf118d29a9035c5e6e91f121ba8efb533eca0b3da942dc4bc722feac3e",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1074,7 +1074,7 @@
     "world/rules/combat/scalars.py": "42e20bfdbe8b0e79f03956f28a03f2029b2f087a148c7ceaa55ba71df478490a",
     "world/rules/combat_beats.py": "0faddf1855fb3dc971fc9a05ec1d9932030a1912f2cfee35ed8beaa958a1893f",
     "world/rules/combat_identity.py": "547c95c5f63215a4ee3408e5f0a6206f876fb929ff4da2f79c06d62d19785946",
-    "world/rules/combat_initiation.py": "ed610132a628ddd523902f0dfbf33abd1ff914fbb6010def9b9408528488d942",
+    "world/rules/combat_initiation.py": "f7d1501f7feccc23f0161c4652739509659bfd38628079ea9833d6412e4c0dc6",
     "world/rules/combat_modifiers.py": "e92118029122d78857a12311167090bfb5e6303f95318ae1c197581c71598b22",
     "world/rules/combat_result.py": "959975c30966790d43f32d7e4f44634b699421b086ab111078829132e0ff84e8",
     "world/rules/combat_session/__init__.py": "743b969b7194ed4b455ab38e460ffde6c595dcab1034394142c3497eb5cfcff5",
@@ -1082,7 +1082,7 @@
     "world/rules/combat_session/battlefield.py": "cda8e66640e78750f6f17a887d18dfcee26242413c7b2a4385943a5f72d6217f",
     "world/rules/combat_session/errors.py": "5b7bdca13f2e68fc6608b97ae9a2d650cc3213f1cad267419ac75e409b2fad0e",
     "world/rules/combat_session/exit.py": "2201050d4c919fba3d94d077f26bd3c964f42e312654dc376450c06883f0b611",
-    "world/rules/combat_session/lifecycle.py": "db3375fdcf6d58d2a16cfbb12d01a2f6402d0c634a4e133897783dc814ff912c",
+    "world/rules/combat_session/lifecycle.py": "84b5836aba33a1b7108b73ecaef871aa73632c2b936d533b9fbacef9364e8974",
     "world/rules/combat_session/observations.py": "519997b958ac35208dbf8407550de5de7d7075e6d7bda48a2a0e408a5300cbb7",
     "world/rules/combat_session/policies.py": "fb06ff301d4b72df6d616f2a6e4dd27114df338d68de78ba0e09c770a8f82e24",
     "world/rules/combat_session/records.py": "b4b0d461d30cc49d9edfec7e5349853c09f2656158c9cd6fbe154d386a7a97d9",
@@ -1121,7 +1121,7 @@
     "world/rules/event_log.py": "fc92123fe7ac5f1b2d12202cbf1f372d9c7e7958af90fe580778fea9b757e3aa",
     "world/rules/exam_schedule_holds.py": "d52a96c326f2289617147fbb3167b5442ad43922f4a893f7ef63f825b829f814",
     "world/rules/fatigue.py": "24f59cfecd5a252c5dc2772ad593b724dca043a6d28263b8c5082009dff9abf9",
-    "world/rules/field_cast.py": "451653d3e6b2d83703f65fbf7c7296cd3b187c4d28992be79039f2ed588a01c1",
+    "world/rules/field_cast.py": "26c9153f1a06567e7b36fe87196c3b334e71b21f69f88d62f5b7433e59764f70",
     "world/rules/gm.py": "592f310633780a24c1f1499fddf3934f0613f8ad5e7f8584dc810ff24389e18b",
     "world/rules/guild.py": "8346664c98b6271e5b2fb79a0d44efb5659aea06ebdf8799a85e73f401652f32",
     "world/rules/guild_config/__init__.py": "b7e8db471b5e5f64f8fa72915b11bc90606b28479366d8bb7c64707c39cda7c0",

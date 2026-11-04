@@ -222,7 +222,7 @@ After existing dispatcher stale/duplicate checks, `explore.cast` SHALL reject cu
 
 #### Scenario: Anchor engagement follows the skill shape
 - **WHEN** an admitted monster opening resolves
-- **THEN** SINGLE engages the anchor alone and AREA engages all current living room monsters in deterministic order
+- **THEN** every current living room monster enters the encounter in deterministic order, while SINGLE resolves its effect only against the anchor and AREA against all current living room monsters
 
 #### Scenario: Damage without an opening never touches state
 - **WHEN** a damaging cast arrives without a valid monster opening

@@ -136,15 +136,40 @@ def clear_session(
             )
 
 
+def _require_engagement_target(actor: Any, target: Any) -> None:
+    """Apply ``engage_group()``'s exact per-target gates to one target."""
+    if not isinstance(target, Monster):
+        raise CombatSessionError(SessionReason.NOT_HOSTILE)
+    if actor.location is None or target.location is not actor.location:
+        raise CombatSessionError(SessionReason.NOT_PRESENT)
+    if _stored_trait_value(target.traits.hp) <= 0:
+        raise CombatSessionError(SessionReason.TARGET_DEAD)
+
+
 def engage(actor: Any, target: Any) -> dict[str, Any]:
     """Create one persistent hostile session for a present living monster.
 
-    Thin single-target wrapper (combat-session-opening-dispatch D-4): every
-    step lives in :func:`engage_group`, so ``engage``'s signature, return
-    shape, and raised ``CombatSessionError`` reasons are unchanged for its
-    existing call sites.
+    The named target is re-validated with ``engage_group()``'s exact gates
+    first, so a dead, remote or non-monster anchor is refused without
+    substituting a same-labeled bystander. Ordinary engagement then admits
+    every living, co-located Monster in persistent-ID order (the whole-cell
+    roster), while the `target` only chooses which identity the caller named.
+    The signature, return shape, and raised ``CombatSessionError`` reasons
+    remain unchanged for existing call sites.
+
+    This is the sole ordinary entry point; explicitly staged callers that
+    need a declared participant set use :func:`engage_group` directly.
     """
-    return engage_group(actor, [target])
+    if not isinstance(actor, PlayerCharacter):
+        raise CombatSessionError(SessionReason.NOT_A_PLAYER)
+    if read_session(actor) is not None:
+        raise CombatSessionError(SessionReason.ALREADY_IN_COMBAT)
+    _require_engagement_target(actor, target)
+    # Deferred: ``combat_initiation`` imports this package, so the shared
+    # roster helper is resolved at call time to keep the dependency one-way.
+    from world.rules.combat_initiation import field_enemy_roster
+
+    return engage_group(actor, field_enemy_roster(actor))
 
 
 @serialized_combat_write
@@ -202,12 +227,7 @@ def engage_group(
             )
         seen_pks.add(pk)
     for target in targets:
-        if not isinstance(target, Monster):
-            raise CombatSessionError(SessionReason.NOT_HOSTILE)
-        if actor.location is None or target.location is not actor.location:
-            raise CombatSessionError(SessionReason.NOT_PRESENT)
-        if _stored_trait_value(target.traits.hp) <= 0:
-            raise CombatSessionError(SessionReason.TARGET_DEAD)
+        _require_engagement_target(actor, target)
 
     from world.rules.fatigue import sleep_blocks_actions
     from world.rules.party import combat_companions

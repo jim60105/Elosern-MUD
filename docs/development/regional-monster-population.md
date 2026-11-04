@@ -871,3 +871,91 @@ No logging path changed (the touched modules only had docstrings updated); the
 observability lint ran because they are facade-adopter files. CI shards, the
 managed browser suite and `tools.spec_traceability verify --evidence` remain
 CI-owned and were not claimed locally.
+
+## Whole-cell field engagement
+
+Ordinary field engagement and field-cast openings now share one encounter
+roster and one recipient rule:
+
+| Concern | Rule |
+| --- | --- |
+| Encounter roster | `field_enemy_roster(actor)` in `world/rules/combat_initiation.py`: every living, co-located `Monster`, sorted by integer pk, or `()` when the actor is unlocated. It reads no ownership, species or group marker. |
+| Ordinary text/browser `engage` | Validates the named anchor with `engage_group()`'s own per-target gates, then calls `engage_group(actor, field_enemy_roster(actor))`. A dead, remote or non-monster anchor rejects instead of resolving a same-labeled bystander. |
+| Explicitly staged combat | `engage_group(actor, targets)` keeps its declared participant set. Guild examinations build their session directly with the host as the only enemy; manual campaigns pass their own list. Neither consults the roster. |
+| Opening recipients | `_prepare_opening` computes `enemies = field_enemy_roster(commander)` and `recipients = _opening_recipients(...)`: the anchor alone for SINGLE/NONE/SELF, every roster member for AREA. The candidate battlefield is built from `enemies`; only `recipients` are revalidated and preflighted. |
+| Preview and commit | `FieldOpeningPreview.enemies` is the admitted roster; `FieldOpeningPreview.targets` stays the concrete recipients. The committed path calls `engage_group(..., preview.enemies)` and then `submit_opening_action(..., preview.targets)` inside the same transaction. `FieldChoice.line_up` remains the action's recipient line-up, so the browser protocol's SINGLE-opening shape is unchanged. |
+
+All ordinary entry points reach the same rule: the text `engage` command and
+the `explore.engage` browser adapter call `engage`; field `cast`, `cast ... 由
+<成員>` and `explore.cast` route through `cast_in_field` / `cast_as_member` to
+`initiate_field_combat`. No one-element `engage_group` bypass remains.
+The `webclient-skillbook-casting` delta records the browser routing contract so
+the main spec's opening-membership scenario matches this rule after the archive
+sync.
+
+### Assertion roles and requirement hand-off
+
+After the archive sync, the whole-cell requirement the sync generated is
+`field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients`,
+and the retired single-target/AREA requirement no longer exists as an ID. Three
+assertion-bearing `LineUpSelectionTests` methods carry that generated ID as
+their `covers_requirement` claim, each because its assertions establish a
+clause of it:
+`test_area_opens_against_every_living_room_monster` (AREA membership admits
+every living occupant and excludes the dead),
+`test_single_open_admits_the_whole_room_but_targets_only_the_named_monster`
+(membership in persistent-ID order plus exactly one opening recipient), and
+`test_preview_roster_matches_the_committed_admission` (preview `enemies` equals
+the persisted `enemy_ids` while `targets` stays the anchor). The other tests in
+the table establish scenarios of the `player-combat-session` and
+`webclient-skillbook-casting` requirements, whose own annotated tests already
+carry those IDs.
+
+| Test | Role | Requirement / scenario |
+| --- | --- | --- |
+| `LineUpSelectionTests.test_single_open_admits_the_whole_room_but_targets_only_the_named_monster` | synthetic mechanism: same-label roster, selected-recipient HP, dead and remote exclusion | `field-combat-initiation` "Whole-cell field membership is independent of opening recipients" / "Single recipient in mixed cell", "Dead and absent exclusion" |
+| `LineUpSelectionTests.test_preview_roster_matches_the_committed_admission` | synthetic mechanism: preview `enemies` equals persisted `enemy_ids`, `targets` is the anchor | same / "Preview and companion parity" |
+| `LineUpSelectionTests.test_area_opens_against_every_living_room_monster` | synthetic mechanism: AREA recipients and roster both exclude a dead occupant | same / "Area opening", "Dead and absent exclusion" |
+| `LineUpSelectionTests.test_area_in_a_one_monster_room_takes_the_same_path` | synthetic mechanism: single-monster AREA path | same / "Area opening" |
+| `EngageGroupTests.test_engage_admits_every_living_colocated_monster_in_persistent_id_order` | synthetic mechanism: ordinary A + A + B admission by identity | `player-combat-session` "engage creates one persistent local combat session" / "Whole-cell ordinary membership" |
+| `EngageGroupTests.test_explicit_group_roster_stays_exact` | synthetic mechanism: staged `engage_group` does not sweep | same / designated/staged participants |
+| `EngageGroupTests.test_engage_rejects_an_invalid_anchor_without_substituting_a_bystander` | synthetic mechanism: dead anchor refusal with a living same-label twin | same / "Remote or dead target is rejected", "Whole-cell ordinary membership" |
+| `CombatActionsCommandTests.test_engage_command_admits_the_whole_cell_of_same_label_monsters` | real text owner: `CmdEngage` with `#dbref`, same-label A + A + B | same / "Whole-cell ordinary membership" |
+| `ExplorationActionAdapterTests.test_engage_adapter_admits_every_living_monster_in_the_cell` | real browser adapter: authoritative `explore.engage` entry | same / "Whole-cell ordinary membership" |
+| `ExplorationActionAdapterTests.test_engage_rejects_remote_or_dead_target_without_session` | real browser adapter: dead id with a living same-label twin is not substituted | same / "Remote or dead target is rejected" |
+| `FieldCastActionTests.test_a_companion_opening_opens_the_commanders_encounter` | real browser companion cast: roster parity, commander-owned session, caster-owned draft | same / "Whole-cell ordinary membership" |
+| `ExamStartTests.test_an_examination_roster_never_sweeps_a_co_located_monster` | real guild examination start: exact host-only enemy roster | same / designated examination participants |
+| `PreviewFieldSkillTests.test_duplicate_display_labels_keep_individual_line_up_identities` | synthetic mechanism: preview discloses both same-label individuals instead of disabling | `field-combat-initiation` "Whole-cell field membership is independent of opening recipients" / "Single recipient in mixed cell" |
+| `OpeningOrderPolicyTests.test_ordinary_entry_order_never_reorders_initiative` | synthetic mechanism: whole-cell admission keeps `opening_first_actor` empty and the initiator does not act first | `player-combat-session` "engage creates one persistent local combat session" / "Whole-cell ordinary membership" |
+| `FieldCombatTargetTests.test_roster_is_empty_for_an_unlocated_actor` | synthetic mechanism: unlocated roster | `field-combat-initiation` / "Dead and absent exclusion" |
+| `SkillPreviewActionTests.test_single_openings_keep_recipient_shape_in_a_mixed_cell` | real browser preview panel: every same-cell anchor is listed while each SINGLE row keeps one recipient | `webclient-skillbook-casting` "Field submissions revalidate and preserve deterministic routing" / "Anchor engagement follows the skill shape" |
+
+### Verification evidence (this change)
+
+Focused runs, each executed independently with the single-token environment
+file:
+
+| Command label | Result |
+| --- | --- |
+| `world.rules.tests.test_combat_initiation` | 32 tests, OK |
+| `world.rules.tests.test_combat_session_flow.test_engage_group_flow` | 8 tests, OK |
+| `commands.tests.test_combat_actions` | 36 tests, OK |
+| `web.webclient.actions.tests.test_exploration_actions.test_party_and_engage` | 18 tests, OK |
+| `world.rules.tests.test_field_cast` | 17 tests, OK |
+| `world.rules.tests.test_companion_field_opening` | 16 tests, OK |
+| `world.rules.tests.test_companion_field_cast` | 15 tests, OK |
+| `world.rules.tests.test_combat_session_flow.test_opening_draft_seed` | 7 tests, OK |
+| `commands.tests.test_cast_member_suffix` | 11 tests, OK |
+| `world.rules.tests.test_combat_session_targeting` | 12 tests, OK |
+| `world.rules.tests.test_combat_session_persistence` | 37 tests, OK |
+| `world.rules.tests.test_combat_party` | 65 tests, OK |
+| `web.webclient.actions.tests.test_skill_use_actions.FieldCastActionTests.test_a_companion_opening_opens_the_commanders_encounter` | 1 test, OK |
+| `web.webclient.actions.tests.test_skill_use_actions.SkillPreviewActionTests` | 13 tests, OK |
+| `world.rules.tests.test_guild_exams.ExamStartTests.test_an_examination_roster_never_sweeps_a_co_located_monster` | 1 test, OK |
+
+The full `world.rules.tests.test_guild_exams` module also reproduces a
+pre-existing failure in
+`ExamSettlementRecoveryTests.test_incoherent_cold_start_fails_once_and_restores_the_host`
+on unmodified `master`; it is unrelated to this change and was not modified
+here. No browser suite beyond the listed authoritative action tests was run.
+No new test module was added, so `.github/evennia-shards.json` is unchanged.

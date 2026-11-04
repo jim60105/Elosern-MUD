@@ -31,7 +31,9 @@ from world.rules.combat import Relation
 from world.rules.combat_initiation import (
     _candidate_record,
     field_combat_target,
+    field_enemy_roster,
     initiate_field_combat,
+    preview_field_opening,
 )
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
@@ -176,6 +178,12 @@ class FieldCombatTargetTests(BattlefieldIsolation, EvenniaTestCase):
         monster = _monster("nowhere wolf")
         self.assertIsNone(player.location)
         self.assertIsNone(monster.location)
+        self.assertIsNone(field_combat_target(player, monster))
+
+    def test_roster_is_empty_for_an_unlocated_actor(self):
+        player = _player("nowhere roster")
+        monster = _monster("nowhere pack wolf")
+        self.assertEqual(field_enemy_roster(player), ())
         self.assertIsNone(field_combat_target(player, monster))
 
 
@@ -412,8 +420,8 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room
 
     @covers_requirement(
-    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
-)
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
+    )
     def test_area_opens_against_every_living_room_monster(self):
         grant_lineage(self.player, [SEAM_AREA_KEY])
         monsters = [
@@ -437,23 +445,62 @@ class LineUpSelectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn(int(dead.pk), record.enemy_ids)
 
     @covers_requirement(
-    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
-)
-    def test_single_opens_against_only_the_named_monster(self):
-        monsters = [
-            _monster(f"room {index}", hp=2000, atk=1) for index in range(3)
-        ]
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
+    )
+    def test_single_open_admits_the_whole_room_but_targets_only_the_named_monster(self):
+        # Same label, distinct persistent identities: display names carry no
+        # membership and must not merge the roster.
+        monsters = [_monster("pack wolf", hp=2000, atk=1) for _ in range(3)]
         for monster in monsters:
             monster.location = self.room
-        with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
-            result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monsters[1])
+        dead = _monster("pack wolf", hp=1)
+        dead.location = self.room
+        dead.traits.hp.current = 0
+        remote = _monster("pack wolf", hp=2000, atk=1)
+        remote.location = create_object(Room, key="pack elsewhere")
+        anchor = monsters[1]
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            result = initiate_field_combat(self.player, BASIC_ATTACK_KEY, anchor)
         self.assertEqual(result["outcome"], "round")
         record = read_session(self.player)
-        self.assertEqual(record.enemy_ids, (int(monsters[1].pk),))
+        self.assertEqual(
+            record.enemy_ids,
+            tuple(sorted(int(monster.pk) for monster in monsters)),
+        )
+        self.assertNotIn(int(dead.pk), record.enemy_ids)
+        self.assertNotIn(int(remote.pk), record.enemy_ids)
+        # Only the named anchor is the opening recipient; the other living
+        # individuals in the same cell keep their controls untouched.
+        self.assertLess(int(anchor.traits.hp.current), 2000)
+        for bystander in monsters:
+            if bystander is not anchor:
+                self.assertEqual(int(bystander.traits.hp.current), 2000)
 
     @covers_requirement(
-    "field-combat-initiation::a-single-skill-opens-against-the-named-monster-and-an-area-skill-opens-against-every-living-hostile-monster-in-the-room"
-)
+        "field-combat-initiation::whole-cell-field-membership-is-independent-of-opening-recipients"
+    )
+    def test_preview_roster_matches_the_committed_admission(self):
+        monsters = [_monster("preview wolf", hp=2000, atk=1) for _ in range(3)]
+        for monster in monsters:
+            monster.location = self.room
+        anchor = monsters[2]
+        preview = preview_field_opening(
+            self.player, BASIC_ATTACK_KEY, anchor
+        )
+        self.assertTrue(preview.enabled)
+        self.assertEqual(
+            preview.enemies,
+            tuple(sorted(monsters, key=lambda monster: int(monster.pk))),
+        )
+        self.assertEqual(preview.targets, (anchor,))
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            initiate_field_combat(self.player, BASIC_ATTACK_KEY, anchor)
+        record = read_session(self.player)
+        self.assertEqual(
+            record.enemy_ids,
+            tuple(int(monster.pk) for monster in preview.enemies),
+        )
+
     def test_area_in_a_one_monster_room_takes_the_same_path(self):
         grant_lineage(self.player, [SEAM_AREA_KEY])
         monster = _monster("lone pack wolf", hp=2000, atk=1)
@@ -473,6 +520,10 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room
         self.monster = _monster("failure wolf", hp=2000, atk=1)
         self.monster.location = self.room
+        # A second living participant makes the rollback control cover the
+        # whole-cell roster rather than a one-enemy session.
+        self.bystander = _monster("failure wolf", hp=2000, atk=1)
+        self.bystander.location = self.room
 
     def _force_opening_failure(self):
         with (
@@ -494,14 +545,7 @@ class FailureBoundaryTests(BattlefieldIsolation, EvenniaTestCase):
         with patch.dict(_BATTLEFIELDS, {}, clear=True):
             self._force_opening_failure()
         self.assertIsNone(read_session(self.player))
-        self.assertEqual(
-            [
-                key
-                for key, field in _BATTLEFIELDS.items()
-                if field.roster.get(stable_actor_id(self.player)) is self.player
-            ],
-            [],
-        )
+        self.assertEqual(_BATTLEFIELDS, {})
         self.assertEqual(self.player.traits.mp.value, mp_before)
         self.assertEqual(self.player.traits.hp.value, hp_before)
         singleton = read_world_clock()

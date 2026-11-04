@@ -23,8 +23,8 @@ from typing import Any, Literal
 from world.rules.action import ActionRequest, RejectReason
 from world.rules.action_preview import adjusted_cost, revalidate_submission
 from world.rules.combat_initiation import (
-    _room_monsters,
     field_combat_target,
+    field_enemy_roster,
     initiate_field_combat,
     preview_field_opening,
 )
@@ -267,12 +267,11 @@ def field_candidate_entities(actor: Any) -> list[Any]:
 def field_opening_anchors(actor: Any) -> list[Any]:
     """Every living co-located Monster, in deterministic sorted-pk order.
 
-    Exactly the set an AREA opening engages (``_room_monsters``), so an AREA
-    disclosure can never omit a participant the initiation would add.
+    Exactly the set an ordinary field opening admits (``field_enemy_roster``),
+    so an AREA disclosure can never omit a participant the initiation would
+    add, and a SINGLE disclosure never advertises a different encounter.
     """
-    if getattr(actor, "location", None) is None:
-        return []
-    return _room_monsters(actor)
+    return list(field_enemy_roster(actor))
 
 
 def owned_active_skill(actor: Any, skill_key: str) -> SkillDef | None:

@@ -72,7 +72,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`engage`](/game/command-reference?id=engage) | 與敵對魔物開戰。 |
+| [`engage`](/game/command-reference?id=engage) | 與敵對魔物開戰；同格所有活著的魔物（含同名個體）一起加入敵方，指定的目標只是開戰對象。 |
 | [`combat forfeit`](/game/command-reference?id=combat-forfeit) | `combat forfeit` 取得整隊投降的確認提示，`combat forfeit confirm <token>` 才是確認；未確認前不改變戰況、不丟棄已選指令，也不推進時間。 |
 | [`combat retreat`](/game/command-reference?id=combat-retreat) | `combat retreat` 取得整隊撤退的確認提示，`combat retreat confirm <token>` 才嘗試脫離戰鬥；戰鬥中施放 `flee` 取得的是同一份提示。這兩個指令的 `confirm` 是同一個確認入口，token 綁定哪一種整隊操作就執行哪一種。 |
 | [`combat command`](/game/command-reference?id=combat-command) | `combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]`、`combat command <actor-token> item <item_key>[=<target-token>]`、`combat command <actor-token> defend/dodge/taunt[=<enemy-token>]`：以同伴代號（`a2` 等）確認該成員的指令，不需要附身該成員；再次輸入同一成員即改選並取代前一筆，最後一位成員確認後自動結算本回合。 |
@@ -88,7 +88,7 @@
 
 | 指令 | 說明 |
 | --- | --- |
-| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。`cast ... 由 <成員>` 改以同隊且同房的成員身分施法：探索中由該成員支付 MP、自身效果與熟練度都記在該成員，時間消耗與你相同；戰鬥中則替該成員存下與 `combat command` 相同的技能指令，不立即施法。探索中瞄準同場怪物會直接開戰並以該技能為開場指令（同伴指令到齊後才結算回合）；以 `由 <成員>` 施放時，開戰的也是該成員的這次施放，該技能成為該成員的開場指令、由該成員先出手，戰鬥仍記在你名下，你與其他同伴的指令到齊後才結算。傷害技能只能瞄準怪物。具狀態或接觸條件的法術需滿足條件方可施展；性愛技能亦屬可施放之列，隨遊玩解鎖後可經 `combat actions` 的分類檢視。 |
+| [`cast`](/game/command-reference?id=cast) | 施放技能；持有屬性主宰者可搭配 `@<scale>` 比例調整威力與 MP 消耗。`cast ... 由 <成員>` 改以同隊且同房的成員身分施法：探索中由該成員支付 MP、自身效果與熟練度都記在該成員，時間消耗與你相同；戰鬥中則替該成員存下與 `combat command` 相同的技能指令，不立即施法。探索中瞄準同場怪物會直接開戰，同格所有活著的魔物一起加入敵方，但單體技能只作用於選定的目標，並以該技能為開場指令（同伴指令到齊後才結算回合）；以 `由 <成員>` 施放時，開戰的也是該成員的這次施放，該技能成為該成員的開場指令、由該成員先出手，戰鬥仍記在你名下，你與其他同伴的指令到齊後才結算。傷害技能只能瞄準怪物。具狀態或接觸條件的法術需滿足條件方可施展；性愛技能亦屬可施放之列，隨遊玩解鎖後可經 `combat actions` 的分類檢視。 |
 | [`lineage`](/game/command-reference?id=lineage) | 檢視指定成員（省略時為指揮者）的技能系譜圖：各圖的根、已持有／總節點數、前置關係與解鎖門檻、見頂與可解鎖節點。 |
 
 網頁客戶端不需輸入指令也能施放：開啟 **隊伍 → 技能**，在左側成員列選擇施放者（自己或同伴），再選擇主動技能；右側詳情卡會列出目標、消耗、熟練度、系譜位置，以及「可於戰鬥外使用」或「僅能在戰鬥中使用」，擁有該元素精通時另列 **威力與消耗**。按 **施放** 後，隊伍視窗會關閉，由右下的行動面板替該成員接手選擇目標（範圍技能以 Space 勾選）、調整威力與最後確認；對同場魔物施放會另行確認 **開戰並施放**。按 Esc 可逐層返回，回到技能分頁時焦點停在原本的技能。戰鬥中 **施放** 與 **排入修煉** 皆停用，請改用指令卡的「技能」。文字 `cast` 的語法與判定完全不變。

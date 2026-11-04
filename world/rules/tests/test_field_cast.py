@@ -265,18 +265,18 @@ class PreviewFieldSkillTests(_FieldCase):
         for opening in preview.openings:
             self.assertEqual(opening.line_up, expected)
 
-    def test_duplicate_named_line_up_disables_without_raising(self):
-        self._wolf("twin wolf")
-        self._wolf("twin wolf")
+    def test_duplicate_display_labels_keep_individual_line_up_identities(self):
+        first = self._wolf("twin wolf")
+        second = self._wolf("twin wolf")
         grant_lineage(self.player, [_T_AREA_DAMAGE])
         preview = preview_field_skill(
             self.player, owned_active_skill(self.player, _T_AREA_DAMAGE)
         )
         self.assertEqual(len(preview.openings), 2)
+        expected = tuple(sorted([first, second], key=lambda wolf: int(wolf.pk)))
         for opening in preview.openings:
-            self.assertFalse(opening.enabled)
-            self.assertEqual(opening.session_reason, "duplicate_participant")
-            self.assertEqual(len(opening.line_up), 2)
+            self.assertTrue(opening.enabled)
+            self.assertEqual(opening.line_up, expected)
 
     def test_preview_never_creates_the_world_clock(self):
         self._wolf("clockless wolf")

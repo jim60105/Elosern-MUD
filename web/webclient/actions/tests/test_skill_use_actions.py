@@ -367,6 +367,20 @@ class SkillPreviewActionTests(_SkillUseCase):
             self.assertEqual(row["target_ids"], ids)
             self.assertIn("3", row["label"])
 
+    def test_single_openings_keep_recipient_shape_in_a_mixed_cell(self):
+        first = self._wolf("single wolf")
+        second = self._wolf("single wolf")
+        third = self._wolf("single bear")
+        self._act("explore.skill_preview", {"skill_key": _T_DAMAGE})
+        openings = self._panel()["skill"]["openings"]
+        self.assertEqual(
+            [row["identity"] for row in openings],
+            sorted(int(monster.pk) for monster in (first, second, third)),
+        )
+        # Whole-cell membership does not widen a SINGLE action's recipients.
+        for row in openings:
+            self.assertEqual(row["target_ids"], [row["identity"]])
+
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_a_companion_preview_is_computed_for_the_companion(self):
         from world.rules import field_cast as field_cast_rules
@@ -723,6 +737,10 @@ class FieldCastActionTests(_SkillUseCase):
         grant_lineage(companion, [_T_DAMAGE])
         self._freeze_gauges(self.player, companion)
         wolf = self._wolf("companion opening wolf")
+        # Same-label and different-label bystanders are admitted by the same
+        # whole-cell roster, while the opening entry keeps its own recipient.
+        same_label = self._wolf("companion opening wolf")
+        other = self._wolf("companion opening bear")
         mp_before = companion.traits.mp.value
         commander_mp = self.player.traits.mp.value
         payload = {
@@ -746,6 +764,15 @@ class FieldCastActionTests(_SkillUseCase):
             self.assertEqual(
                 record.draft_entries[int(companion.pk)]["payload"]["skill_key"],
                 _T_DAMAGE,
+            )
+            self.assertEqual(
+                record.enemy_ids,
+                tuple(
+                    sorted(
+                        int(monster.pk)
+                        for monster in (wolf, same_label, other)
+                    )
+                ),
             )
             # The seed charges nothing yet; the entry pays once when it runs.
             self.assertEqual(companion.traits.mp.value, mp_before)

@@ -264,8 +264,15 @@ class OpeningOrderPolicyTests(BattlefieldIsolation, EvenniaTestCase):
         fast.traits.agility.base = 100
         fast.location = self.room
         engage(self.player, fast)
-        self.assertIsNone(read_session(self.player).opening_first_actor)
+        record = read_session(self.player)
+        self.assertIsNone(record.opening_first_actor)
+        # Whole-cell admission joins the room's other living monster too;
+        # ordinary entry order still grants no first-action override.
+        self.assertEqual(
+            record.enemy_ids,
+            tuple(sorted([int(self.monster.pk), int(fast.pk)])),
+        )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=50), patch("world.rules.combat.damage.roll_d100", return_value=50), patch("world.rules.combat.rounds.roll_d100", return_value=50):
             result = submit_opening_action(self.player, BASIC_ATTACK_KEY, [fast])
         self.assertIn(result["outcome"], ("round", "continue"))
-        self.assertEqual(_acting_actors(result)[0], str(fast.key))
+        self.assertNotEqual(_acting_actors(result)[0], str(self.player.key))
