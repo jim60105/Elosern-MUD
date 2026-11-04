@@ -40,6 +40,7 @@ from world.rules.combat import (
     _max_hp,
     _stored_hp,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.target_facts import (
     get_affinity_elements,
     get_combat_traits,
@@ -455,12 +456,17 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
             list(_EXTRA_SKILLS.keys()),
         )
 
+    def _make_battlefield(self) -> Battlefield:
+        actor_id = stable_actor_id(self.actor)
+        target_id = stable_actor_id(self.target)
+        return Battlefield(
+            {'party': frozenset({actor_id}), 'foes': frozenset({target_id})},
+            {actor_id: self.actor, target_id: self.target},
+        )
+
     def _resolve_cast(self, skill_key: str, roll: int = 60, scale: float = 1.0):
         restore_gauges_to_full(self.actor)
-        battlefield = Battlefield(
-            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
-            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
-        )
+        battlefield = self._make_battlefield()
         request = ActionRequest(
             self.actor,
             skill_key,
@@ -719,10 +725,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         # High magic power to ensure lethal crossing
         self.actor.traits.magic_power.base = 100
 
-        battlefield = Battlefield(
-            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
-            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
-        )
+        battlefield = self._make_battlefield()
         request = ActionRequest(
             self.actor,
             _T_BYPASS_DEVASTATION.key,
@@ -822,10 +825,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         """A multi-effect commit failure cleanly rolls back the damage effect."""
         restore_gauges_to_full(self.target)
         before_hp = _stored_hp(self.target)
-        battlefield = Battlefield(
-            {'party': frozenset({"fixture:cond_actor"}), 'foes': frozenset({"fixture:cond_target"})},
-            {"fixture:cond_actor": self.actor, "fixture:cond_target": self.target},
-        )
+        battlefield = self._make_battlefield()
         request = ActionRequest(
             self.actor,
             _T_JUDGMENT_BURST.key,
@@ -839,6 +839,50 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
 
         # Target HP must remain unchanged
         self.assertEqual(_stored_hp(self.target), before_hp)
+
+    @covers_requirement(
+        "battlefield-action-context::battlefieldactioncontext-conforms-to-change-8-s-actioncontext-protocol"
+    )
+    def test_battlefield_construction_uses_persisted_identity(self):
+        """Shared display labels never become roster identities."""
+        self.actor.key = "twin"
+        self.target.key = "twin"
+
+        battlefield = self._make_battlefield()
+        actor_id = f"dbref:{self.actor.pk}"
+        target_id = f"dbref:{self.target.pk}"
+
+        self.assertNotEqual(actor_id, target_id)
+        self.assertEqual(set(battlefield.roster), {actor_id, target_id})
+        self.assertIs(battlefield.roster[actor_id], self.actor)
+        self.assertIs(battlefield.roster[target_id], self.target)
+        self.assertEqual(stable_actor_id(self.actor), actor_id)
+        self.assertEqual(stable_actor_id(self.target), target_id)
+        self.assertEqual(battlefield.team_of(actor_id), 'party')
+        self.assertEqual(battlefield.team_of(target_id), 'foes')
+
+        context = BattlefieldActionContext(battlefield)
+        self.assertTrue(context.is_present(self.actor, self.target))
+        self.assertTrue(context.is_present(self.target, self.actor))
+
+        self.actor.key = "renamed"
+        self.assertEqual(stable_actor_id(self.actor), actor_id)
+        self.assertIs(battlefield.roster[actor_id], self.actor)
+        self.assertEqual(battlefield.team_of(actor_id), 'party')
+        self.assertEqual(battlefield.team_of(target_id), 'foes')
+        self.assertTrue(context.is_present(self.actor, self.target))
+        self.assertTrue(context.is_present(self.target, self.actor))
+
+        with self.assertRaisesRegex(ValueError, "does not match combatant identity"):
+            Battlefield(
+                {'party': frozenset({"fixture:twin"}), 'foes': frozenset({target_id})},
+                {"fixture:twin": self.actor, target_id: self.target},
+            )
+        with self.assertRaisesRegex(ValueError, "multiple teams"):
+            Battlefield(
+                {'party': frozenset({actor_id, target_id}), 'foes': frozenset({actor_id})},
+                {actor_id: self.actor, target_id: self.target},
+            )
 
 
 class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
