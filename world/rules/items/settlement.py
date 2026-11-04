@@ -429,6 +429,28 @@ def use_item(
                 outcome="rejected", reason=ItemUseReason.ACTIVE_SESSION
             )
         )
+    # A present authored contact admits before an exploration item spends any
+    # effect or world time. The refusal reports the now-active encounter with
+    # the existing message; a passive/defended-false/daypart-false cell admits
+    # nothing and the ordinary use proceeds.
+    from world.rules.field_contact import (
+        SOURCE_PRE_ACTION,
+        admit_field_contact_at,
+    )
+    from world.rules.party_scope import PartyScopeError, resolve_commander
+
+    try:
+        contact_owner = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a user outside any resolvable party has no field-contact commander
+        contact_owner = None
+    if contact_owner is not None and admit_field_contact_at(
+        contact_owner, source_id=SOURCE_PRE_ACTION
+    ) is not None:
+        return ItemUseSettlement(
+            ItemUseResult(
+                outcome="rejected", reason=ItemUseReason.ACTIVE_SESSION
+            )
+        )
     request = ItemUseRequest(actor=actor, item_key=item_key, target=target)
     preflight = preflight_item_use(
         request, in_combat=False, context=RoomActionContext(actor.location)

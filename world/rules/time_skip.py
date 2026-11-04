@@ -32,16 +32,20 @@ from world.rules.clock import (
     _restore_advance_registry,
     _restore_clock_tick,
     _snapshot_clock_tick,
+    advance_scope,
     build_advance_snapshot_registry,
     get_world_clock,
 )
 from world.rules.fatigue import (
     FATIGUE_ATTRIBUTE_SURFACES,
     FatigueActivity,
+    FatigueInterval,
+    IntervalCompletion,
     SleepPosture,
     get_policy,
     project_fatigue_status,
     read_optional_fatigue_state,
+    settle_fatigue_intervals,
     sleep_blocks_actions,
     write_fatigue_state,
 )
@@ -79,6 +83,7 @@ from world.rules.sleep_receipt import (
     MODE_UNTIL_DAWN,
     SLEEP_RECEIPT_SURFACES,
     STATE_COMPLETED,
+    STATE_INTERRUPTED,
     STATE_SLEEPING,
     SleepReceipt,
     SleepReceiptError,
@@ -430,6 +435,28 @@ def unsafe_rejection(actor: Any) -> str | None:
     return _REJECTION_MESSAGES[reason]
 
 
+def admit_contact_before_action(actor: Any) -> None:
+    """Admit authored contact before any time-consuming exploration mutation.
+
+    The present party's real co-location and the authored aggression condition
+    are the only authority: a passive/defended-area-false/daypart-false cell
+    admits nothing, and a read/preview never calls this. On admission the
+    caller's ordinary safety gate still refuses its action (active combat or a
+    co-located monster), so no resource, effect or clock second is spent and
+    the player is already in the encounter.
+    """
+    from world.rules.field_contact import (
+        SOURCE_PRE_ACTION,
+        admit_field_contact_at,
+    )
+
+    try:
+        commander = resolve_commander(actor)
+    except PartyScopeError:  # observability: ignore R2: a body outside any resolvable party has no field-contact commander
+        return
+    admit_field_contact_at(commander, source_id=SOURCE_PRE_ACTION)
+
+
 @checkpoint_owner
 def advance_wait(
     actor: Any,
@@ -465,6 +492,7 @@ def advance_wait(
     # span up to one full game day (MAX_ADVANCE_SECONDS). Applying the
     # twelve-hour rest cap here would silently truncate a next-day daypart.
     limit = seconds
+    admit_contact_before_action(actor)
     reason = evaluate_skip_safety(actor)
     if reason is not None:
         raise SkipRefused(reason)
@@ -482,18 +510,38 @@ def advance_wait(
     if practice_skill is not None:
         previous_booking = actor.db.practice_booking
         actor.db.practice_booking = practice_skill
-    try:
-        events = clock.advance(
-            elapsed,
+    # The accepted advance, any authored contact admitted at its endpoint and
+    # the predecessor's automatic rounds share one outer durable unit: a late
+    # failure restores the clock, every registered surface and the booking, so
+    # no success is ever published for a rolled-back skip.
+    with advance_scope(entities):
+        registry = build_advance_snapshot_registry(
+            clock,
+            int(elapsed),
             AdvanceSource.SKIP,
             entities,
-            mental=mental,
-            ground_observer=observation if elapsed > 0 else None,
+            mental_scope=entities,
+            ground_observer=observation,
         )
+    tick_snapshot = _snapshot_clock_tick(clock)
+    try:
+        with transaction.atomic():
+            events = clock.advance(
+                elapsed,
+                AdvanceSource.SKIP,
+                entities,
+                mental=mental,
+                ground_observer=observation if elapsed > 0 else None,
+            )
+            from world.rules.field_contact import continue_admitted_contacts
+
+            continue_admitted_contacts(actor, events)
     except Exception:
         # Clock rollback already restored its entry snapshot, which contains
         # this declaration; restoring the previous booking here keeps a failed
         # combined book-and-skip from leaving a declaration behind.
+        _restore_clock_tick(clock, tick_snapshot)
+        _restore_advance_registry(registry, entities)
         if practice_skill is not None:
             actor.db.practice_booking = previous_booking
         raise
@@ -729,6 +777,7 @@ def enter_sleep(
     completed elapsed sleep.
     """
     duration = _validate_sleep_request(mode, seconds)
+    admit_contact_before_action(actor)
     reason = evaluate_skip_safety(actor)
     if reason is not None:
         raise SkipRefused(reason)
@@ -902,6 +951,7 @@ def continue_sleep(
     if recorded is not None:
         return recorded
     interval_operation = operation_id or uuid4().hex
+    admit_contact_before_action(actor)
     reason = evaluate_skip_safety(actor)
     if reason is not None:
         raise SkipRefused(reason)
@@ -912,14 +962,15 @@ def continue_sleep(
     commits: list[Any] = []
     mental = replace(plan_for(entities), record=commits)
     observation = _ground_observation_target(actor)
-    registry = build_advance_snapshot_registry(
-        clock,
-        0,
-        AdvanceSource.SKIP,
-        entities,
-        mental_scope=entities,
-        ground_observer=observation,
-    )
+    with advance_scope(entities):
+        registry = build_advance_snapshot_registry(
+            clock,
+            0,
+            AdvanceSource.SKIP,
+            entities,
+            mental_scope=entities,
+            ground_observer=observation,
+        )
     tick_snapshot = _snapshot_clock_tick(clock)
     elapsed = 0
     events: list[ScheduledEvent] = []
@@ -973,6 +1024,12 @@ def continue_sleep(
                 mental=mental,
                 ground_observer=observation if elapsed > 0 else None,
             )
+            # The interval's accepted advance has returned: any authored
+            # contact admitted at its endpoint now receives the predecessor's
+            # automatic rounds inside this same durable unit.
+            from world.rules.field_contact import continue_admitted_contacts
+
+            continue_admitted_contacts(actor, events)
             updated = read_sleep_receipt(member)
             summary = render_skip_summary(elapsed, list(events))
             if updated is not None and updated.sleeping and updated.target_tick >= updated.limit_tick:
@@ -1157,6 +1214,114 @@ def owner_sleep_view_state(actor: Any) -> dict[str, Any] | None:
         ),
         "receipt": receipt,
     }
+
+
+def interrupt_sleep_for_contact(
+    body: Any, *, tick: int, operation_id: str
+) -> None:
+    """Interrupt one voluntary sleep at an authored contact, through its owner.
+
+    The accepted receipt's cursor is advanced to ``tick`` through the sole
+    fatigue writer, so the body keeps exactly the reserve it actually
+    recovered and is never refilled. The posture becomes awake, the receipt is
+    persisted interrupted at that tick, and any pending owner/camp
+    continuation is revoked so the old plan cannot resume. A forced receipt,
+    a defeated body and an awake body are left completely unchanged; this
+    owner writes no HP and revives nothing.
+    """
+    del operation_id  # the receipt revision is the durable identity here
+    tick = int(tick)
+    try:
+        receipt = read_sleep_receipt(body)
+    except SleepReceiptError as error:
+        log_warn(
+            "sleep_interrupt_receipt_unusable",
+            context={"char": str(getattr(body, "pk", "?")), "reason": error.code},
+        )
+        return
+    if receipt is None or not receipt.sleeping or receipt.kind != KIND_VOLUNTARY:
+        return
+    state = read_optional_fatigue_state(body)
+    if state is None or state.posture is not SleepPosture.VOLUNTARY:
+        return
+    start = max(int(receipt.settled_through_tick), int(receipt.entry_tick))
+    if tick > start:
+        settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    body,
+                    FatigueActivity.SLEEP,
+                    tick - start,
+                    state,
+                    IntervalCompletion.INTERRUPTIBLE,
+                ),
+            ),
+            context={"stage": "field_contact_interrupt", "tick": tick},
+            in_combat=True,
+            start_tick=start,
+        )
+    settled = read_optional_fatigue_state(body)
+    if settled is None:
+        return
+    write_fatigue_state(body, settled.reserve_units, SleepPosture.AWAKE)
+    project_fatigue_status(body)
+    write_sleep_receipt(
+        body,
+        receipt.with_progress(
+            settled_through_tick=max(tick, receipt.settled_through_tick),
+            state=STATE_INTERRUPTED,
+            partial=True,
+        ),
+    )
+    _revoke_sleep_continuations(body)
+
+
+def _revoke_sleep_continuations(body: Any) -> None:
+    """Make every pending owner/camp continuation of ``body`` unresumable."""
+    from world.rules.sleep_receipt import (
+        CAMP_STATUS_PAUSED,
+        CAMP_STATUS_PENDING,
+        read_camp_operation,
+        write_camp_operation,
+    )
+
+    targets = [body]
+    try:
+        commander = resolve_commander(body)
+    except Exception:  # observability: ignore R2: a body outside any resolvable party has no owner continuation to revoke
+        commander = None
+    if commander is not None and commander is not body:
+        targets.append(commander)
+    for target in targets:
+        try:
+            decision = read_sleep_view_decision(target)
+        except Exception:  # observability: ignore R2: an unreadable intent is unresumable already; nothing is invented
+            decision = None
+        if decision is not None and decision["continuation"] in (
+            CONTINUATION_PENDING,
+            CONTINUATION_PAUSED,
+        ):
+            write_sleep_view_decision(
+                target,
+                {
+                    **decision,
+                    "continuation": CONTINUATION_PAUSED,
+                    "interrupted": True,
+                },
+            )
+        try:
+            camp = read_camp_operation(target)
+        except Exception:  # observability: ignore R2: a malformed camp record reads as absent by its own owner
+            camp = None
+        if camp is None:
+            continue
+        progress = camp.get("progress") or {}
+        if progress.get("status") != CAMP_STATUS_PENDING:
+            continue
+        write_camp_operation(
+            target,
+            {**camp, "progress": {**progress, "status": CAMP_STATUS_PAUSED}},
+        )
 
 
 def record_owner_sleep_decision(
@@ -1792,6 +1957,7 @@ def enter_party_sleep(
     no possession changes.
     """
     duration = _validate_sleep_request(mode, seconds)
+    admit_contact_before_action(actor)
     reason = evaluate_skip_safety(actor)
     if reason is not None:
         raise SkipRefused(reason)

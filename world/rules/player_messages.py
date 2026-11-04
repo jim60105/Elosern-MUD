@@ -44,6 +44,7 @@ _REJECTION_MESSAGES: dict[RejectReason, str] = {
     RejectReason.RITE_COOLDOWN_ACTIVE: "聖禮冷卻中，尚無法再次施展。",
     RejectReason.RITE_OUTSIDE_VENUE: "此處並非教會聖所，無法施展此聖禮。",
     RejectReason.RITE_ALREADY_SHELTERED: "今日已獲得聖所庇護，無法再次施展。",
+    RejectReason.ACTIVE_COMBAT: "敵人已經逼近，戰鬥開始。",
 }
 
 _REJECTION_FALLBACK = "這項行動無法完成。"

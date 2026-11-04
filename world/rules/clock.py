@@ -1,6 +1,8 @@
 """Player-driven deterministic world time and settlement ordering."""
 
+import contextvars
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from math import floor, gcd
@@ -103,7 +105,41 @@ _STAGE_ORDER = (
     "correspondence_delivery",
     "instance_reclamation",
     "monster_site_lifecycle",
+    # Field contact admits only at the interval endpoint, after every arrival,
+    # birth and idle departure of that same tick has settled: it is the last
+    # boundary stage so an accepted contact owns the final committed state.
+    "field_contact",
 )
+
+
+#: The bodies the running advance settles time for. A boundary source that
+#: admits a field contact limits admission to these bodies' parties, so the
+#: owning action can drain the continuation and its compensation covers every
+#: surface the admission wrote.
+_ADVANCE_SCOPE: contextvars.ContextVar[tuple[int, ...]] = contextvars.ContextVar(
+    "elosern_advance_scope", default=()
+)
+
+
+def current_advance_scope() -> tuple[int, ...]:
+    """The persistent IDs of the bodies the running advance settles for."""
+    return _ADVANCE_SCOPE.get()
+
+
+@contextmanager
+def advance_scope(entities: Iterable[Any]):
+    """Bind the settled bodies for one outer owner's snapshot and advance."""
+    token = _ADVANCE_SCOPE.set(
+        tuple(
+            int(entity.pk)
+            for entity in entities
+            if isinstance(getattr(entity, "pk", None), int)
+        )
+    )
+    try:
+        yield
+    finally:
+        _ADVANCE_SCOPE.reset(token)
 
 
 @dataclass
@@ -214,6 +250,63 @@ def _daypart_index(tick: int) -> int:
         if current >= start:
             index = position
     return index
+
+
+def _daypart_starts() -> tuple[tuple[int, str], ...]:
+    """Every authored daypart start as ``(second_of_day, name)``, ordered."""
+    seconds_per_hour = CLOCK_YAML["seconds_per_hour"]
+    return tuple(
+        sorted(
+            (
+                (int(hour) * seconds_per_hour, str(name))
+                for name, hour in CLOCK_YAML["dayparts"].items()
+            ),
+            key=lambda entry: entry[0],
+        )
+    )
+
+
+def _second_of_day(tick: int) -> int:
+    calendar = WorldDateTime.from_tick(tick)
+    return (
+        calendar.hour * CLOCK_YAML["seconds_per_hour"]
+        + calendar.minute * 60
+        + calendar.second
+    )
+
+
+def daypart_at(tick: int) -> str:
+    """The authored daypart name covering ``tick`` (pure calendar arithmetic)."""
+    current = _second_of_day(tick)
+    name = _daypart_starts()[0][1]
+    for start, candidate in _daypart_starts():
+        if current >= start:
+            name = candidate
+    return name
+
+
+def next_daypart_boundary(tick: int, end_tick: int) -> int | None:
+    """The first daypart-region start strictly after ``tick`` up to ``end_tick``.
+
+    A contact condition authored for declared dayparts is a pure function of
+    this region, so this is the only boundary at which it can begin or stop
+    holding without an occupant or physiology change. Returns ``None`` when no
+    crossing falls inside the window.
+    """
+    if end_tick <= tick:
+        return None
+    current = _second_of_day(tick)
+    day_start = tick - current
+    candidates = [
+        day_start + start
+        for start, _name in _daypart_starts()
+        if day_start + start > tick
+    ]
+    # The next region start after midnight is the first region of the next
+    # day; a window may legally span that crossing.
+    candidates.append(day_start + _DAY_SECONDS + _daypart_starts()[0][0])
+    inside = [candidate for candidate in candidates if tick < candidate <= end_tick]
+    return min(inside) if inside else None
 
 
 @dataclass(frozen=True)
@@ -1373,14 +1466,29 @@ class WorldClock:
         scope = tuple(entities)
         mental_scope = mental.scope if mental is not None else ()
         validate_advance_sleep_receipts(scope, mental_scope)
-        registry = build_advance_snapshot_registry(
-            self,
-            seconds,
-            source,
-            scope,
-            mental_scope=mental_scope,
-            ground_observer=ground_observer,
+        # Bind the settled bodies before the snapshot registry is built: the
+        # field-contact contract discovers the same parties its settlement
+        # admits for, so a rollback after a later stage failure restores the
+        # session, encounter counter, dialogue and receipt surfaces too.
+        scope_token = _ADVANCE_SCOPE.set(
+            tuple(
+                int(entity.pk)
+                for entity in scope
+                if isinstance(getattr(entity, "pk", None), int)
+            )
         )
+        try:
+            registry = build_advance_snapshot_registry(
+                self,
+                seconds,
+                source,
+                scope,
+                mental_scope=mental_scope,
+                ground_observer=ground_observer,
+            )
+        except Exception:
+            _ADVANCE_SCOPE.reset(scope_token)
+            raise
         tick_snapshot = _snapshot_clock_tick(self)
         tick_from = self.tick
         try:
@@ -1429,6 +1537,8 @@ class WorldClock:
             _restore_clock_tick(self, tick_snapshot)
             _restore_advance_registry(registry, scope)
             raise
+        finally:
+            _ADVANCE_SCOPE.reset(scope_token)
         return events
 
     def advance_bounded(

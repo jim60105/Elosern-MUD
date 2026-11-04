@@ -194,6 +194,65 @@ def engage_group(
 ) -> dict[str, Any]:
     """Create one persistent hostile session against several present monsters.
 
+    The voluntary authority: every step single-target engagement performed
+    before this change is carried here (combat-session-opening-dispatch D-4).
+    ``_create_hostile_session`` owns the shared validated body; this wrapper
+    preserves the established entry point, immediate registration and the
+    automatic continuation of an incapacitated party.
+    """
+    return _create_hostile_session(
+        actor,
+        targets,
+        authority="voluntary",
+        opening_first_actor=opening_first_actor,
+    )
+
+
+def create_hostile_contact_session(
+    commander: Any,
+    targets: Any,
+    *,
+    started_tick: int,
+) -> dict[str, Any]:
+    """Create one authored-contact session at its exact occurrence tick.
+
+    Rules-owner only: ``hostile_contact`` authority is never reachable from a
+    client payload. The admission does not run the predecessor continuation
+    (a clock source must never advance the clock) and registers skip-safety
+    only once the enclosing transaction committed, re-reading the surviving
+    engagement so a terminal interval leaves no stale registration.
+    """
+    return _create_hostile_session(
+        commander,
+        targets,
+        authority="hostile_contact",
+        started_tick=int(started_tick),
+        settle_continuation=False,
+        defer_registration=True,
+    )
+
+
+def _register_surviving_session(commander: Any) -> None:
+    """Register the final committed engagement for skip safety, if it survives."""
+    record = read_session(commander)
+    if record is None or record.settled_tick is not None:
+        return
+    register_active_battlefield(reconstruct_battlefield(commander, record))
+
+
+@serialized_combat_write
+def _create_hostile_session(
+    actor: Any,
+    targets: Any,
+    *,
+    authority: str,
+    opening_first_actor: str | None = None,
+    started_tick: int | None = None,
+    settle_continuation: bool = True,
+    defer_registration: bool = False,
+) -> dict[str, Any]:
+    """Create one persistent hostile session against several present monsters.
+
     Carries every step single-target engagement performed before this change
     (combat-session-opening-dispatch D-4): the PlayerCharacter check, the
     no-active-session check, the per-target living-hostile-``Monster``-in-room
@@ -214,7 +273,22 @@ def engage_group(
     survives the waiting seed and is consumed exactly once. ``engage()`` and
     every ordinary engagement pass nothing, so ordinary entry order never
     changes initiative.
+
+    ``authority`` is the closed ``voluntary``/``hostile_contact`` vocabulary.
+    Only the rules owner of field contact may request hostile authority; the
+    only voluntary sleep-action gate on initiation is
+    ``authorize_member(..., PURPOSE_ACT)`` in ``combat_initiation``'s opening
+    path, which hostile contact deliberately never traverses. Party ownership
+    and battlefield eligibility are retained unchanged, and a sleeping body
+    gains no action authority. ``started_tick`` is the exact occurrence the
+    caller observed (never a later persisted clock read); ``settle_continuation``
+    and ``defer_registration`` exist for the source/owner split.
     """
+    if authority not in ("voluntary", "hostile_contact"):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"unknown admission authority {authority!r}",
+        )
     if not isinstance(actor, PlayerCharacter):
         raise CombatSessionError(SessionReason.NOT_A_PLAYER)
     if read_session(actor) is not None:
@@ -272,10 +346,20 @@ def engage_group(
         )
     )
     counter = int(getattr(actor.db, "combat_encounter_seq", 0) or 0) + 1
+    sequence_before = (actor.attributes.has("combat_encounter_seq"),
+                       actor.attributes.get("combat_encounter_seq"))
     actor.db.combat_encounter_seq = counter
-    session_id = session_id_for(actor, "hostile")
+    if started_tick is None:
+        from world.rules.clock import get_world_clock
+
+        occurrence_tick = int(get_world_clock().tick)
+        session_id = session_id_for(actor, "hostile")
+    else:
+        from world.rules.combat_session.records import format_session_id
+
+        occurrence_tick = int(started_tick)
+        session_id = format_session_id(actor, "hostile", occurrence_tick)
     from world.maps.regional_population import mapped_population_cell
-    from world.rules.clock import get_world_clock
 
     record = CombatSessionRecord(
         session_id=session_id,
@@ -293,7 +377,7 @@ def engage_group(
         # The engagement's own game-time occurrence and real battlefield cell:
         # a later-round defeat is placed from these, never from the pre-combat
         # tick, and the cell stays protected independently of room reuse.
-        started_tick=int(get_world_clock().tick),
+        started_tick=occurrence_tick,
         population_cell=mapped_population_cell(actor),
     )
     battlefield = reconstruct_battlefield(actor, record)
@@ -334,17 +418,19 @@ def engage_group(
     )
     dedupe_before = snapshot_practice_dedupe()
     item_journals: list[Any] = []
+    continuation: dict[str, Any] | None = None
     try:
         with transaction.atomic():
             _persist(actor, record)
             _own_mapped_combat_time(record)
-            from world.rules.combat_session.rounds import (
-                continue_incapacitated_hostile_rounds,
-            )
+            if settle_continuation:
+                from world.rules.combat_session.rounds import (
+                    continue_incapacitated_hostile_rounds,
+                )
 
-            continuation = continue_incapacitated_hostile_rounds(
-                actor, journals=item_journals
-            )
+                continuation = continue_incapacitated_hostile_rounds(
+                    actor, journals=item_journals
+                )
     except Exception:
         # Admission may already have paid an idle prefix or opened room
         # protection, and the continuation may have paid real rounds; the
@@ -366,12 +452,29 @@ def engage_group(
             relations_before,
         )
         restore_practice_dedupe(dedupe_before)
+        # The encounter counter is an in-process idmapper surface like the
+        # session itself: a rolled-back admission never consumes an encounter
+        # sequence number.
+        if sequence_before[0]:
+            actor.attributes.add(
+                "combat_encounter_seq", sequence_before[1]
+            )
+        else:
+            actor.attributes.remove("combat_encounter_seq")
         raise
     final = read_session(actor)
     if final is not None:
         # A terminal continuation has already cleared the session and its
-        # registrations; only a surviving active session is registered.
-        register_active_battlefield(battlefield)
+        # registrations; only a surviving active session is registered. A
+        # deferred registration waits for the enclosing commit and re-reads
+        # the surviving engagement, so an interval that ended before the
+        # commit (or a later rollback) leaves no stale battlefield behind.
+        if defer_registration:
+            transaction.on_commit(
+                lambda commander=actor: _register_surviving_session(commander)
+            )
+        else:
+            register_active_battlefield(battlefield)
     # Hostility ends a conversation (webclient-align-07): the session is
     # retired in the same deterministic-core path that persisted the session,
     # so no snapshot can ever render dialogue mode over a live combat session.

@@ -47,6 +47,9 @@ class RejectReason(StrEnum):
     RITE_COOLDOWN_ACTIVE = "rite_cooldown_active"
     RITE_OUTSIDE_VENUE = "rite_outside_venue"
     RITE_ALREADY_SHELTERED = "rite_already_sheltered"
+    # An authored hostile contact was admitted at this action's boundary, so
+    # the exploration action performs no effect, cost, roll or world time.
+    ACTIVE_COMBAT = "active_combat"
 
 
 

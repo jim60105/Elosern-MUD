@@ -465,6 +465,11 @@ def begin_all_party_sleep(
     receipt, projection and the exact prior control/session/bookkeeping
     surfaces. No time passes.
     """
+    from world.rules.time_skip import admit_contact_before_action
+
+    # Whole-party sleep is a time-consuming exploration mutation: a real
+    # authored contact admits before this gate can simply refuse the room.
+    admit_contact_before_action(actor)
     commander = resolve_commander(actor)
     account = _resolve_account(commander, actor)
     build_sleep_control_view(actor, account=account, session=session)
