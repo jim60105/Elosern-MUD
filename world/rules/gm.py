@@ -6,8 +6,14 @@ from server.console.errors import ConsoleError
 from server.console.validation import integer, resolve_target, text
 from world.lore.items import ITEM_REGISTRY
 from world.rules import equipment
-from world.rules.clock import AdvanceSource, MAX_ADVANCE_SECONDS, read_world_clock, _flush_deleted_instance, _flush_rolled_back_instances
-from world.rules.surfaces import snapshot_attributes, restore_attributes, snapshot_traits, restore_traits
+from world.rules.clock import AdvanceSource, MAX_ADVANCE_SECONDS, read_world_clock, _flush_deleted_instance
+from world.rules.surfaces import (
+    flush_orphan_instances,
+    restore_attributes,
+    restore_traits,
+    snapshot_attributes,
+    snapshot_traits,
+)
 
 
 def _identity(entity):
@@ -72,7 +78,7 @@ def _inventory(target, key, quantity, *, removing):
             restore_pin_reasons(room, before)
         for obj, pk in (*mirrors, *((obj, obj.pk) for obj in created)):
             _flush_deleted_instance(obj)
-        _flush_rolled_back_instances()
+        flush_orphan_instances()
         entity.contents_cache.init()
         raise
     return _identity(entity)

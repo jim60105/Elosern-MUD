@@ -1276,3 +1276,63 @@ class OuterOwnerSeamTests(EvenniaTestCase):
         # surface writes along with the tick.
         self.assertEqual(clock.tick, before_tick)
         self.assertEqual(self.player.traits.hp.current, before_hp)
+
+
+class CacheRecoveryTests(EvenniaTest):
+    """Rollback cache recovery keeps Evennia's contents handlers live."""
+
+    def _probe(self, key):
+        probe = create_object(
+            "evennia.objects.objects.DefaultObject", key=key, location=self.room1
+        )
+        # Force the location setter so the room's contents cache holds the pk.
+        probe.location = self.room1
+        return probe
+
+    def test_inplace_idmapper_flush_does_not_detach_a_room_contents_handler(self):
+        from evennia.objects.models import ObjectDB
+
+        from world.rules.surfaces import flush_idmapper_cache
+
+        probe = self._probe("cache-recovery-probe")
+        contents = self.room1.contents_cache
+        before = {obj.pk for obj in contents.get()}
+        self.assertTrue(before)
+
+        flush_idmapper_cache()
+
+        # Evennia's flush_cache() would have replaced the mapping, leaving this
+        # handler reading the detached one and logging a cache failure forever.
+        self.assertIs(contents._idcache, ObjectDB.__instance_cache__)
+        self.assertIsNone(ObjectDB.get_cached_instance(probe.pk))
+        with patch("evennia.objects.models.logger.log_err") as logged:
+            after = {obj.pk for obj in contents.get()}
+        self.assertEqual(after, before)
+        logged.assert_not_called()
+
+    def test_orphan_sweep_reconciles_the_room_cache_for_a_rolled_back_row(self):
+        from django.db import transaction
+        from evennia.objects.models import ObjectDB
+
+        from world.rules.surfaces import flush_orphan_instances
+
+        contents = self.room1.contents_cache
+        with transaction.atomic():
+            probe = self._probe("orphan-sweep-probe")
+            probe_pk = probe.pk
+            self.assertIn(probe_pk, contents._pkcache)
+            # A rolled-back transaction removes the row while the idmapper and
+            # the room's contents cache keep the created instance.
+            transaction.set_rollback(True)
+
+        self.assertFalse(ObjectDB.objects.filter(pk=probe_pk).exists())
+        self.assertIs(ObjectDB.get_cached_instance(probe_pk), probe)
+        self.assertIn(probe_pk, contents._pkcache)
+
+        flush_orphan_instances()
+
+        self.assertNotIn(probe_pk, contents._pkcache)
+        with patch("evennia.objects.models.logger.log_err") as logged:
+            remaining = {obj.pk for obj in contents.get()}
+        self.assertNotIn(probe_pk, remaining)
+        logged.assert_not_called()

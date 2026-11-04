@@ -42,6 +42,8 @@ from world.rules.npc_capabilities import (
     validate_capabilities,
 )
 from world.rules.surfaces import (
+    flush_idmapper_cache,
+    flush_orphan_instances,
     restore_component_state,
     snapshot_attributes,
 )
@@ -524,14 +526,13 @@ def _evict_batch_cache() -> None:
 
     The database rollback restores the rows, but interior preparation also
     created rooms/exits and rewrote their attributes inside the same process;
-    the idmapper would keep serving those live objects. A global flush is the
-    engine's own recovery idiom (the same reason
-    ``world/rules/surfaces.py`` documents attribute-cache restoration), and this
-    path only runs when the batch refused to commit.
+    the idmapper would keep serving those live objects. The orphan sweep
+    reconciles the rooms' contents caches for rows the rollback removed, then
+    the in-place idmapper flush drops the rest without detaching those caches;
+    this path only runs when the batch refused to commit.
     """
-    from evennia.utils.idmapper.models import flush_cache
-
-    flush_cache()
+    flush_orphan_instances()
+    flush_idmapper_cache()
 
 
 def _initialize_merchant_stock(hosts: list[NPC]) -> None:

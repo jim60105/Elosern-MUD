@@ -61,6 +61,7 @@ from world.maps.wilderness_provider import (
     region_search_boxes,
 )
 from world.observability import log_info, log_warn
+from world.rules.surfaces import flush_orphan_instances
 
 #: The closed refusal vocabulary. ``world_unavailable`` means no world is
 #: provisioned yet, ``no_ambient_rule`` that the region has no authored ambient
@@ -131,7 +132,7 @@ class ProvisioningSnapshot:
                         "obj": str(getattr(room, "pk", room)),
                     },
                 )
-        _discard_orphan_instances()
+        flush_orphan_instances()
 
 
 def _wilderness() -> Any | None:
@@ -166,28 +167,6 @@ def restore_provisioning_surfaces(snapshot: ProvisioningSnapshot | None) -> None
     """Restore a snapshot taken by :func:`snapshot_provisioning_surfaces`."""
     if snapshot is not None:
         snapshot.restore()
-
-
-def _discard_orphan_instances() -> None:
-    """Evict cached instances whose rows a rollback removed.
-
-    Evennia's idmapper is not transaction-aware and this module *creates*
-    individuals inside the caller's transaction, so a rollback leaves the
-    created instances cached while their rows are gone; a later row reusing such
-    a primary key would otherwise be served as the stale object. The failure path
-    is bounded — everything cached then is what the failed acceptance touched —
-    so a straight sweep of the shared instance cache is exact and cheap.
-    """
-    from evennia.objects.models import ObjectDB
-
-    cache = getattr(ObjectDB, "__instance_cache__", None)
-    if cache is None:
-        return
-    for key, instance in list(cache.items()):
-        if key is None or getattr(instance, "_is_deleted", False):
-            continue
-        if not ObjectDB.objects.filter(pk=key).exists():
-            instance.flush_from_cache(force=True)
 
 
 def _living_region_individuals(

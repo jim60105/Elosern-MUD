@@ -10,7 +10,6 @@ from django.conf import settings
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.prototypes.spawner import spawn
-from evennia.utils.idmapper.models import flush_cache
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
@@ -27,7 +26,11 @@ from world.rules.clock import (
     register_event_source,
 )
 from world.rules.map_knowledge import KNOWLEDGE_ATTR
-from world.rules.surfaces import attribute_snapshot
+from world.rules.surfaces import (
+    attribute_snapshot,
+    flush_idmapper_cache,
+    flush_orphan_instances,
+)
 
 INSTANCE_PROTOTYPE_WHITELIST: tuple[str, ...] = ("instance_room",)
 
@@ -369,7 +372,8 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
             # still holds the deleted instance, so the cache is flushed. Like
             # the activation boundary's rollback, this runs only on the rare
             # failure path.
-            flush_cache()
+            flush_orphan_instances()
+            flush_idmapper_cache()
             for destination in retention_failure.destinations:
                 destination.contents_cache.clear()
             log_warn(

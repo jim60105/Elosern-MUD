@@ -34,7 +34,6 @@ from world.rules.clock import (
     ScheduledEvent,
     WorldClock,
     _flush_deleted_instance,
-    _flush_rolled_back_instances,
     _refresh_advance_entity_caches,
     _restore_advance_location,
     _restore_clock_tick,
@@ -51,7 +50,7 @@ from world.rules.progression import (
     restore_practice_dedupe,
     snapshot_practice_dedupe,
 )
-from world.rules.surfaces import attribute_snapshot
+from world.rules.surfaces import attribute_snapshot, flush_orphan_instances
 from world.rules.unlock_notices import UnlockNotice
 
 
@@ -312,7 +311,7 @@ def _restore_settlement_state(
     # Instances the rolled-back transaction created (a nested clock advance may
     # populate a monster site) have no pre-action snapshot: evict them last, so
     # a later row that reuses one of their primary keys is served fresh.
-    _flush_rolled_back_instances()
+    flush_orphan_instances()
 
 
 @dataclass(frozen=True)

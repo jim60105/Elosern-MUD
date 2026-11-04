@@ -5,6 +5,11 @@ plans all follow one order: parse, validate, compute replacement values, then
 apply every write inside one ``transaction.atomic()`` block. On any exception
 the database rolls back; Evennia's in-process attribute/trait caches must be
 restored to their pre-operation values so no caller serves a stale read.
+
+The same module owns the engine-cache recovery those failure paths need
+(:func:`flush_idmapper_cache`, :func:`flush_orphan_instances`,
+:func:`flush_instance`): a rolled-back write also leaves the idmapper and
+every room's contents cache disagreeing with the database.
 """
 
 from copy import deepcopy
@@ -165,3 +170,107 @@ def restore_component_state(
                 exc=error,
                 context={"stage": stage, "obj": str(obj)},
             )
+
+
+def _refresh_contents_cache(container: Any) -> None:
+    """Re-read one container's contents cache from the database.
+
+    Best-effort: a refresh failure on a rollback path is logged and never
+    masks the operation failure that opened the compensation.
+    """
+    try:
+        container.contents_cache.init()
+    except Exception as error:  # observability: ignore R2: the warn below is this handler's facade event
+        log_warn(
+            "rollback_restore_failed",
+            exc=error,
+            context={
+                "stage": "contents_cache",
+                "obj": str(getattr(container, "pk", container)),
+            },
+        )
+
+
+def flush_idmapper_cache() -> None:
+    """Flush the shared idmapper caches without replacing their dictionaries.
+
+    Evennia's ``flush_cache()`` rebuilds each ``__instance_cache__`` mapping.
+    ``ContentsHandler`` captures that mapping by reference when a room's
+    contents cache is first built, so a rebuild detaches every existing handler
+    from the live idmapper permanently: ``contents_cache.get()`` then falls
+    back to a database read and logs ``contents cache failed for <room>`` on
+    every call. Mutating the same mapping in place applies Evennia's identical
+    ``at_idmapper_flush`` filter while keeping those handles live. Instances a
+    rolled-back transaction deleted in memory are evicted unconditionally: the
+    rollback restored their rows, so the stale deletion must not survive.
+    """
+    import gc
+
+    from evennia.utils.idmapper.models import SharedMemoryModel
+
+    def leaf_classes(cls: type) -> Any:
+        subclasses = cls.__subclasses__()
+        if subclasses:
+            for subclass in subclasses:
+                yield from leaf_classes(subclass)
+        else:
+            yield cls
+
+    for cls in leaf_classes(SharedMemoryModel):
+        cache = getattr(getattr(cls, "__dbclass__", None), "__instance_cache__", None)
+        if cache is None:
+            continue
+        for key in list(cache.keys()):
+            instance = cache.get(key)
+            if (
+                instance is None
+                or getattr(instance, "_is_deleted", False)
+                or instance.at_idmapper_flush()
+            ):
+                cache.pop(key, None)
+    gc.collect()
+
+
+def flush_instance(instance: Any) -> None:
+    """Force one cached instance out of the idmapper and refresh its room.
+
+    ``delete()`` evicts only when ``at_idmapper_flush()`` returns True, which
+    ``TypedObject`` refuses while the object holds an NAttribute, and a row a
+    rolled-back transaction created leaves no in-process trace to evict it. The
+    room's contents cache keeps the evicted primary key otherwise, so it is
+    re-read from the rolled-back rows here.
+    """
+    container = getattr(instance, "location", None)
+    instance.flush_from_cache(force=True)
+    if container is not None:
+        _refresh_contents_cache(container)
+
+
+def flush_orphan_instances() -> None:
+    """Evict every cached instance whose row a rollback removed.
+
+    Evennia's idmapper is not transaction-aware: a stage that *creates*
+    objects inside a transaction has no pre-operation snapshot to restore, so
+    the row disappears while the instance and its room's cached primary key
+    stay in process. A later row reusing that primary key would otherwise be
+    served as the stale object, and every contents read would log a cache
+    failure. This runs only on failure paths, where the cache is bounded by
+    what the failed operation touched.
+    """
+    from evennia.objects.models import ObjectDB
+
+    cache = getattr(ObjectDB, "__instance_cache__", None)
+    if cache is None:
+        return
+    containers: dict[int, Any] = {}
+    for key, instance in list(cache.items()):
+        if key is None or getattr(instance, "_is_deleted", False):
+            continue
+        if ObjectDB.objects.filter(pk=key).exists():
+            continue
+        container = getattr(instance, "location", None)
+        if container is not None:
+            containers[id(container)] = container
+        instance.flush_from_cache(force=True)
+    for container in containers.values():
+        _refresh_contents_cache(container)

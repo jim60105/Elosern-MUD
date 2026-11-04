@@ -38,10 +38,10 @@ from typing import Any
 
 from django.db import transaction
 from evennia.objects.models import ObjectDB
-from evennia.utils.idmapper.models import flush_cache
 
 from world.observability import log_info, log_warn
 from world.rules.quest_issuance import Settlement
+from world.rules.surfaces import flush_instance
 
 from . import scene_store
 from .binding import _is_living
@@ -649,11 +649,17 @@ def evict_created_actors(created_pks: list[int]) -> None:
 
     Django rolls the rows back; the idmapper would otherwise keep a cached
     instance for a primary key whose row no longer exists, so a later read could
-    observe a phantom actor. Shared by every caller that materializes package
-    roles inside a transaction.
+    observe a phantom actor and the actor's room would keep serving a stale
+    contents cache. Evicting exactly the created pks keeps every other cached
+    instance (and its room's contents cache) untouched. Shared by every caller
+    that materializes package roles inside a transaction.
     """
-    if created_pks:
-        flush_cache()
+    if not created_pks:
+        return
+    for pk in created_pks:
+        instance = ObjectDB.get_cached_instance(pk)
+        if instance is not None:
+            flush_instance(instance)
 
 
 def _capability_surfaces() -> tuple[str, ...]:

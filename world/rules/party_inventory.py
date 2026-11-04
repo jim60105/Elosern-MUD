@@ -66,6 +66,7 @@ from world.rules.party_scope import (
 )
 from world.rules.service_messages import SERVICE_REASON_MESSAGES
 from world.rules.surfaces import (
+    flush_orphan_instances,
     restore_attributes,
     restore_traits,
     snapshot_attributes,
@@ -319,27 +320,6 @@ def _restore_pin_snapshots(snapshots: dict[int, tuple[Any, Any]]) -> None:
         restore_pin_reasons(room, snapshot)
 
 
-def _flush_rolled_back_instances() -> None:
-    """Evict idmapper entries whose rows the rollback removed.
-
-    Evennia's idmapper is not transaction-aware, and materializing a missing
-    mirror *creates* a row with no pre-transfer snapshot to restore: the row
-    rolls back while the instance stays cached, the same failure mode
-    ``world/rules/clock.py`` reconciles for created stage objects. Runs only
-    on the failure path, where the number of cached objects is small.
-    """
-    from evennia.objects.models import ObjectDB
-
-    cache = getattr(ObjectDB, "__instance_cache__", None)
-    if cache is None:
-        return
-    for key, instance in list(cache.items()):
-        if key is None or getattr(instance, "_is_deleted", False):
-            continue
-        if not ObjectDB.objects.filter(pk=key).exists():
-            instance.flush_from_cache(force=True)
-
-
 def _restore_transfer(
     holders: tuple[Any, ...],
     surfaces: list[dict[str, Any]],
@@ -354,7 +334,7 @@ def _restore_transfer(
     for obj, location in contents.values():
         obj.db_location = location
     try:
-        _flush_rolled_back_instances()
+        flush_orphan_instances()
     except Exception as error:
         log_warn(
             "party_transfer_restore_failed",

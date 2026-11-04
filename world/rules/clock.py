@@ -53,7 +53,11 @@ from world.rules.sleep_receipt import (
     recovery_target_tick,
     write_sleep_receipt,
 )
-from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
+from world.rules.surfaces import (
+    attribute_snapshot,
+    flush_orphan_instances,
+    restore_attribute_best_effort,
+)
 from world.rules.traits import GAUGE_KEYS
 from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT, UnlockNotice
 
@@ -1257,7 +1261,7 @@ def _restore_advance_registry(
         if not hasattr(entity, "attributes"):
             continue
         _refresh_advance_entity_caches(entity)
-    _flush_rolled_back_instances()
+    flush_orphan_instances()
 
 
 def _refresh_advance_entity_caches(entity: Any) -> None:
@@ -1281,29 +1285,6 @@ def _refresh_advance_entity_caches(entity: Any) -> None:
             exc=error,
             context={"stage": "sexual_cache", "obj": str(entity), "key": "sexual"},
         )
-
-
-def _flush_rolled_back_instances() -> None:
-    """Evict cached instances whose rows the rolled-back advance removed.
-
-    Evennia's idmapper is not transaction-aware, and a stage that *creates*
-    objects (monster-site-placement's settlement) has no pre-advance snapshot
-    to restore: the row is gone with the transaction while the instance stays
-    cached, and a later row that reuses that primary key would be served as the
-    stale object. This runs only on the failure path, where the number of
-    cached objects is small, and flushes exactly the entries the database no
-    longer backs.
-    """
-    from evennia.objects.models import ObjectDB
-
-    cache = getattr(ObjectDB, "__instance_cache__", None)
-    if cache is None:
-        return
-    for key, instance in list(cache.items()):
-        if key is None or getattr(instance, "_is_deleted", False):
-            continue
-        if not ObjectDB.objects.filter(pk=key).exists():
-            instance.flush_from_cache(force=True)
 
 
 @dataclass

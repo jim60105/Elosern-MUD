@@ -6,8 +6,11 @@ from django.db import transaction
 from server.console.errors import ConsoleError
 from server.console.validation import integer, resolve_target, text
 from world.quests import runtime, transitions
-from world.rules.surfaces import snapshot_attributes, restore_attributes
-from world.rules.clock import _flush_rolled_back_instances
+from world.rules.surfaces import (
+    flush_orphan_instances,
+    restore_attributes,
+    snapshot_attributes,
+)
 
 
 def _resolve_definition(key, issuer=None):
@@ -96,7 +99,7 @@ def _repair(target, quest_id, *, state=None, stage=None):
         restore_attributes(actor, attrs)
         for room, before in rooms:
             transitions.restore_pin_reasons(room, before)
-        _flush_rolled_back_instances()
+        flush_orphan_instances()
         if actor.location is not None:
             actor.location.contents_cache.init()
         raise

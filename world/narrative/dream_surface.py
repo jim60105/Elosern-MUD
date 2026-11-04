@@ -296,9 +296,9 @@ def reset_cache(actor):
     attributes = getattr(actor, "attributes", None)
     if attributes is not None:
         attributes.reset_cache()
-    from evennia.utils.idmapper.models import flush_cache
+    from world.rules.surfaces import flush_idmapper_cache
 
-    flush_cache()
+    flush_idmapper_cache()
 
 
 def dream_state(actor):

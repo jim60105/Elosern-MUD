@@ -5,8 +5,12 @@ from evennia.objects.models import ObjectDB
 
 from server.console.errors import ConsoleError
 from server.console.validation import resolve_target, text
-from world.rules.clock import _flush_deleted_instance, _flush_rolled_back_instances
-from world.rules.surfaces import snapshot_attributes, restore_attributes
+from world.rules.clock import _flush_deleted_instance
+from world.rules.surfaces import (
+    flush_orphan_instances,
+    restore_attributes,
+    snapshot_attributes,
+)
 
 
 def teleport(target, room):
@@ -39,8 +43,7 @@ def spawn_monster(species, variant, room):
             if not monster.move_to(destination, quiet=True, move_type="spawn"):
                 raise RuntimeError("monster placement refused")
     except Exception:
-        _flush_rolled_back_instances()
-        destination.contents_cache.init()
+        flush_orphan_instances()
         raise
     return {"target": f"#{monster.pk}", "room": room}
 

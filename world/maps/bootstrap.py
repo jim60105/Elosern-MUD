@@ -40,6 +40,7 @@ from typeclasses.rooms import GridRoom, Room
 from world.lore.wilderness_entry import OPPOSITE_DIRECTION, WILDERNESS_ENTRY_REGISTRY
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.map_data import SETTLEMENT_GRAPHS
+from world.rules.surfaces import flush_idmapper_cache, flush_orphan_instances
 from elosern_map_core.sparse import (
     SparseGraphError,
     SparseSettlementGraph,
@@ -355,15 +356,15 @@ def _evict_batch_cache(touched=()) -> None:
     The database rollback restores the rows, but this batch created rooms and
     exits and rewrote their keys, aliases and attributes in the same process,
     and the identity map would keep serving those live objects (Evennia keeps
-    objects that carry non-persistent attributes). The global flush is the
-    engine's own recovery idiom; the batch's own objects are forced out as
-    well, because a map room's non-persistent attributes are never authored
-    state and the persisted baseline must win over them.
+    objects that carry non-persistent attributes). The orphan sweep first
+    reconciles every room's contents cache for rows the rollback removed, then
+    the in-place idmapper flush drops the rest; the batch's own objects are
+    forced out as well, because a map room's non-persistent attributes are
+    never authored state and the persisted baseline must win over them.
     """
 
-    from evennia.utils.idmapper.models import flush_cache
-
-    flush_cache()
+    flush_orphan_instances()
+    flush_idmapper_cache()
     for obj in touched:
         flusher = getattr(obj, "flush_from_cache", None)
         if flusher is None:

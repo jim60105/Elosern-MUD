@@ -565,7 +565,7 @@ class TransferAtomicityTests(PartyTransferTestCase):
         with patch.object(party_inventory, "apply_inventory_plan", failing):
             with patch.object(
                 party_inventory,
-                "_flush_rolled_back_instances",
+                "flush_orphan_instances",
                 side_effect=RuntimeError("injected cleanup failure"),
             ):
                 with self.assertRaisesRegex(
