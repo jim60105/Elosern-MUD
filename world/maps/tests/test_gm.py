@@ -177,3 +177,118 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertIn(str(self.monster.key),field.roster)
         self.assertNotIn(str(ghost.key),stale.roster)
         self.assertIn(str(ally.key),stale.roster)
+
+
+class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
+    """A GM spawn into a wilderness room is an explicit owner registration."""
+
+    CELL = (500, 700)
+
+    def setUp(self):
+        super().setUp()
+        from unittest.mock import patch
+
+        from evennia.contrib.grid.wilderness.wilderness import (
+            WildernessScript,
+            create_wilderness,
+            enter_wilderness,
+        )
+
+        from world.maps.wilderness_provider import (
+            WILDERNESS_NAME,
+            ElosernWildernessMapProvider,
+        )
+        from world.tests.geography_fixture import publish_shipped_map_world
+
+        publish_shipped_map_world()
+        # The retired ambient owner is a different change's subject.
+        self.enterContext(
+            patch(
+                "world.maps.wilderness_population.ensure_population",
+                lambda *arguments, **keywords: None,
+            )
+        )
+        create_wilderness(
+            name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
+        )
+        self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.assertTrue(
+            enter_wilderness(self.player, coordinates=self.CELL, name=WILDERNESS_NAME)
+        )
+        self.room = self.player.location
+
+    def test_a_wilderness_spawn_registers_the_actual_individual_at_its_cell(self):
+        from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+
+        result = gm.spawn_monster(
+            "t_whisper_quail", "t_whisper_quail_ordinary", f"#{self.room.pk}"
+        )
+        monster = ObjectDB.objects.get(pk=int(result["target"][1:]))
+
+        self.assertIs(monster.location, self.room)
+        self.assertEqual(self.wilderness.db.itemcoordinates[monster], self.CELL)
+        # Explicit placement never stamps ordinary home ownership.
+        self.assertIsNone(monster.db.home_ecology_zone)
+        self.assertIn(
+            monster.pk,
+            [
+                obj.pk
+                for obj in self.room.contents
+                if not getattr(obj, "destination", None)
+            ],
+        )
+
+        # Room recycling keeps the registration and the same identity visible.
+        self.assertTrue(
+            enter_wilderness(self.player, coordinates=(501, 700), name=WILDERNESS_NAME)
+        )
+        self.assertIsNone(monster.location)
+        self.assertEqual(
+            {
+                obj.pk
+                for obj in self.wilderness.get_objs_at_coordinates(self.CELL)
+                if obj.pk == monster.pk
+            },
+            {monster.pk},
+        )
+        self.assertTrue(ObjectDB.objects.filter(pk=monster.pk).exists())
+
+    def test_a_fault_after_registration_restores_every_surface(self):
+        from unittest.mock import patch
+
+        from world.maps import regional_population
+
+        real_register = regional_population.register_explicit_individual
+        registrations_before = dict(self.wilderness.db.itemcoordinates)
+        created: list[int] = []
+
+        def register_then_fail(wilderness, individual, coordinates, *, tick):
+            real_register(wilderness, individual, coordinates, tick=tick)
+            created.append(individual.pk)
+            raise RuntimeError("after actual registration")
+
+        with patch.object(
+            regional_population,
+            "register_explicit_individual",
+            side_effect=register_then_fail,
+        ):
+            with self.assertRaises(RuntimeError):
+                gm.spawn_monster(
+                    "t_whisper_quail", "t_whisper_quail_ordinary", f"#{self.room.pk}"
+                )
+
+        self.assertTrue(created)
+        self.assertEqual(dict(self.wilderness.db.itemcoordinates), registrations_before)
+        for pk in created:
+            self.assertFalse(ObjectDB.objects.filter(pk=pk).exists())
+            self.assertNotIn(pk, ObjectDB.__instance_cache__)
+        self.assertNotIn(
+            created[0],
+            [
+                obj.pk
+                for obj in self.room.contents
+                if not getattr(obj, "destination", None)
+            ],
+        )

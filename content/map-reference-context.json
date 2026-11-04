@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "286161bb256d03610da91b2b300099b0f492f733e86b1e1f325c284293349418",
+  "fingerprint": "0e5bc6f1320af25709ab046d5cb85599a5506347bc1e6159a349b142e0386626",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1009,7 +1009,7 @@
     "world/quests/escort_lifecycle.py": "5a2a012593ee84763bf64016e713fb07d108a01d6ae776123314c8215b35140a",
     "world/quests/generated_quest_store.py": "7b37e9d8a7dbb38be4169a3f0a9cd8ab5703fa548466a0c432435f4e98807b01",
     "world/quests/gm.py": "3f565b5e65db9965d1850fe2f6317b6bdf34fb5b7cd5194bd32d764a1d7963f6",
-    "world/quests/materializer.py": "e3f4b74f6b2ab10dd7f3bf01ef3d7ffcbf537a5a7d1478415677829417693950",
+    "world/quests/materializer.py": "70333832180d14ca1c2f3562eba5cbe7453f7494e114da9a5a483fc9497be7ba",
     "world/quests/migrations/0001_scene_packages.py": "03369ecc87982871e06417521167c2f6d25b542a9eba5a4a24f1a8996d12902d",
     "world/quests/migrations/0002_encounter_room.py": "8a85c42b01d98d8b8ee140cef39ca938cc04712767caf88ab066ca2d44661ac4",
     "world/quests/migrations/0003_escort_outcomes.py": "5a207863f63fbb607482a5bd4d13c75d0b159cac5520fa8757fde6e8adbbc32b",

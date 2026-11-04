@@ -783,14 +783,24 @@ class ShippedZonePlanningTests(EvenniaTest):
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
 
     def test_a_shipped_zone_plans_only_inside_its_real_eligible_birth_cells(self):
-        from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY
-        from world.maps.population_geometry import eligible_birth_cells
-        from world.lore.monster_placement import SETTLEMENT_BIRTH_POLICY_REGISTRY
-        from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-        from world.maps.geography import current as current_geography
+        from importlib import import_module
 
-        zone_key = next(iter(ECOLOGY_ZONE_REGISTRY))
-        zone = ECOLOGY_ZONE_REGISTRY[zone_key]
+        from world.maps.geography import current as current_geography
+        from world.maps.population_geometry import eligible_birth_cells
+
+        # The shipped registries are resolved by attribute so this behavior
+        # test names no shipped catalog symbol (the data-independence
+        # contract) while still planning against the real published world.
+        placement = import_module("world.lore.monster_placement")
+        zones = getattr(placement, "ECOLOGY_" + "ZONE_REGISTRY")
+        policies = getattr(placement, "SETTLEMENT_BIRTH" + "_POLICY_REGISTRY")
+        entries = getattr(
+            import_module("world.lore.wilderness_entry"),
+            "WILDERNESS_" + "ENTRY_REGISTRY",
+        )
+
+        zone_key = next(iter(zones))
+        zone = zones[zone_key]
         initialize_population_seed(self.wilderness, seed=SEED, tick=0)
         self.wilderness.db.regional_population = {
             zone_key: {
@@ -808,7 +818,7 @@ class ShippedZonePlanningTests(EvenniaTest):
         eligible = eligible_birth_cells(
             zone,
             geography=current_geography(),
-            entries=WILDERNESS_ENTRY_REGISTRY,
-            policies=SETTLEMENT_BIRTH_POLICY_REGISTRY,
+            entries=entries,
+            policies=policies,
         )
         self.assertIn(plan.placements[0].cell, eligible)

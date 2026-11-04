@@ -318,3 +318,210 @@ the registry index contract requires every indexed registry to ship at least one
 entry. `world/lore/sync.py` is untouched: the lore-startup-sync requirement
 enumerates the specific registries it mirrors, and this change activates no
 system that reads a mirrored row.
+
+# Regional monster population: the persistent owner
+
+`world/maps/regional_population.py` is the single writer of a wilderness
+world's regional population, added by the OpenSpec change
+`regional-population-owner`. It owns selection state, birth waves and explicit
+placement registration. It is **not** a scheduler: no clock stage, ambient
+branch or room-entry hook is registered in this slice, so nothing spawns until
+`regional-population-runtime-cutover` activates the stage.
+
+## Ownership boundary
+
+| Concern | Owner |
+| --- | --- |
+| Durable per-zone selection state, shared world seed | `world/maps/regional_population.py` |
+| Eligible birth cells, local band `[L, U]` | `world/maps/population_geometry.py` (already published; unchanged here) |
+| Ordinary home ownership of a born individual | the born individual's `db.home_ecology_zone` Attribute |
+| Actual wilderness position | the wilderness script's `db.itemcoordinates` |
+| Explicit manual/quest placement registration | `register_explicit_individual`, called by the placing owner |
+| Fixed-clock scheduling, recovery episodes, history | `regional-population-recovery` and later slices; not this one |
+
+Nothing here invents a compatibility path. An existing development world whose
+script has no saved seed **refuses** (`read_population_seed` raises
+`population_seed_uninitialized`); repair it explicitly through the GM console
+or reset the development world. There is no missing-seed default, no seed
+reroll, no zone initialization on restart and no save conversion.
+
+## Public interface (for the successor slices)
+
+Durable shapes, all JSON-safe:
+
+```python
+wilderness.db.regional_population = {
+    "<zone_key>": {
+        "initialized": True,
+        "seed": int,                  # the shared world seed it was initialized with
+        "generation_sequence": int,   # one per committed wave
+        "recovery_due_tick": int | None,   # reserved for the recovery slice
+        "settled_through_tick": int,
+    }
+}
+wilderness.db.regional_population_seed = int   # written exactly once
+individual.db.home_ecology_zone = "<zone_key>" # ordinary home ownership only
+```
+
+```python
+current_population_tick() -> int                      # 0 before any clock advance
+initialize_population_seed(wilderness, *, seed, tick) -> int   # write-once, never rerolls
+read_population_seed(wilderness) -> int                        # refuses when absent/malformed
+zone_state(wilderness, zone_key) -> ZonePopulationState | None # None = uninitialized
+population_counts(wilderness, zone_key) -> PopulationCounts     # pure read
+plan_population_wave(wilderness, zone_key, *, tick) -> PopulationWavePlan   # pure read
+commit_population_wave(wilderness, plan) -> tuple[int, ...]     # atomic
+initialize_zone(wilderness, zone_key, *, seed, tick) -> tuple[int, ...]  # once, atomic
+register_explicit_individual(wilderness, individual, coordinates, *, tick) -> None
+wilderness_registration_target(room) -> (wilderness, cell) | None
+snapshot_population_surfaces(wilderness) -> dict[id(obj), SurfaceSnapshot]
+restore_population_surfaces(snapshot) -> None
+snapshot_regional_population_surfaces(start_tick, end_tick) -> dict[int, SurfaceSnapshot]
+```
+
+Reading rules a later slice must preserve:
+
+- **Local** = every living `Monster` whose registered cell is inside the zone's
+  rectangles intersected with its parent terrain region. Excluded-buffer cells
+  are included, and ambient, manual, site, quest and visitor individuals all
+  count. **Home** = every living individual carrying this zone's
+  `home_ecology_zone`, wherever it stands — a travelling, unregistered or
+  detached owner keeps consuming home headroom while counting locally only
+  where it actually is. **Per-cell** = living occupants of each local cell.
+- Position is read from `db.itemcoordinates` first and only falls back to a
+  room's active coordinates when that room belongs to the same wilderness and
+  the entity has no registration.
+- Stored HP decides living; no gauge is ticked. Every set deduplicates IDs, so
+  registering the same individual twice counts once.
+
+### Blocked plans versus refusals
+
+`PopulationWavePlan.blocked_reason` is a lawful, temporary answer:
+`uninitialized`, `local_satisfied`, `home_saturated`, `no_legal_space`. A
+blocked plan creates nothing, deletes nothing and does not advance the
+sequence; `commit_population_wave` on it is a no-op returning `()`.
+
+An absent world (`world_unavailable`), an unknown zone (`unknown_zone`), a
+malformed record (`malformed_state`), an unusable or missing seed
+(`population_seed_uninitialized`), a seed mismatch (`population_seed_mismatch`),
+a stale plan (`stale_plan`) and an invalid explicit placement
+(`explicit_placement_refused`) are refusals that raise before any write.
+
+### Selection
+
+One wave places exactly one complete composition. Cell first (lexicographic
+eligible cells that are unprotected and have room for the smallest feasible
+group), then a weighted pool composition among those with a fitting outcome,
+then a uniformly chosen fitting count vector. Every draw is
+`SHA-256(seed, zone_key, generation_sequence, tick, placement_ordinal, purpose,
+draw_ordinal)` with rejection sampling, so replaying the same occurrence inputs
+reproduces the same plan and different inputs can differ. Composition weights
+are conditional on the drawn cell: a composition that fits fewer cells occurs
+less often in aggregate, which the position-first design intends.
+
+## Atomicity and rollback contract
+
+`commit_population_wave` and `initialize_zone` each open one
+`transaction.atomic()` covering every construction, home marker, coordinate
+registration, active-room attachment and the state write. Before the write they
+snapshot the world's population state, seed and coordinate registry, so a
+failure at any point restores the durable values, clears the contents cache of
+every registered room (Evennia's contents handler is not transaction-aware) and
+evicts the idmapper entries of created objects. A rolled-back wave publishes no
+`monster_population_wave` event and leaves no stray registration.
+
+A **caller-owned** rollback (a later stage failing after a committed wave) uses
+the same pair:
+
+```python
+surfaces = snapshot_population_surfaces(wilderness)   # before the caller's writes
+try:
+    with transaction.atomic():
+        ...  # commit_population_wave / register_explicit_individual
+        ...  # any later write that may fail
+except Exception:
+    restore_population_surfaces(surfaces)
+    raise
+```
+
+`snapshot_regional_population_surfaces` is the clock advance-surface shape for
+the future stage registration; it discovers the world the way the owner's
+writes do and answers `{}` before the world exists. The generic clock restore
+cannot clear a room contents cache, so the runtime-cutover stage must call
+`restore_population_surfaces` with the same mapping on its own failure path.
+
+## Events
+
+All three are info-level facade events scheduled with `transaction.on_commit`,
+so only a durable change emits one:
+
+| event | context |
+| --- | --- |
+| `monster_population_seed_initialized` | `seed`, `tick` (only on the actual first write) |
+| `monster_population_wave` | `zone`, `region`, `individual`, `species`, `variant`, `cell`, `tick`, `created`, `sequence` |
+| `monster_population_individual_registered` | `individual`, `coordinate`, `species`, `variant`, `tick` |
+
+Reads, blocked plans and unchanged operations emit nothing.
+
+## Assertion roles and requirement hand-off
+
+The delta requirements below are not synced yet, so these tests carry **no**
+`covers_requirement` annotation (delta IDs exist only after the archive sync).
+This table is the hand-off: each test name, its role, and the delta
+requirement/scenario it establishes.
+
+| Test | Role | Delta requirement and scenario |
+| --- | --- | --- |
+| `RegionalPopulationTests.test_a_complete_group_consumes_one_unit_of_each_measure` | synthetic mechanism | Automatic births satisfy local and home-owned individual ceilings — complete fitting groups |
+| `RegionalPopulationTests.test_a_departed_home_owner_keeps_home_headroom_but_stops_counting_locally` | synthetic mechanism | …ceilings — local and home measures |
+| `RegionalPopulationTests.test_duplicate_registration_is_counted_once_and_moves_the_one_identity` | synthetic mechanism | …ceilings — local and home measures (each ID once per measure) |
+| `RegionalPopulationTests.test_manual_excess_above_the_band_blocks_births_without_modifying_it` | synthetic mechanism | …ceilings — manual excess |
+| `RegionalPopulationTests.test_home_owned_excess_outside_the_zone_saturates_births` | synthetic mechanism | …ceilings — manual excess (home measure) |
+| `RegionalPopulationTests.test_a_full_cell_ceiling_leaves_no_legal_space_and_keeps_the_occupants` | synthetic mechanism | …ceilings — manual excess (cell measure) |
+| `RegionalPopulationTests.test_replaying_an_occurrence_reproduces_its_own_complete_plan` | synthetic mechanism | Birth occurrences retain deterministic persistent individual state — occurrence selection |
+| `RegionalPopulationTests.test_no_composition_is_ever_split_below_its_minimum_or_above_the_budget` | synthetic mechanism | …ceilings — complete fitting groups (no truncated row) |
+| `RegionalPopulationTests.test_a_failed_wave_leaves_no_partial_group_and_a_retry_selects_the_same_plan` | synthetic mechanism | Population wave commit is atomic across durable and live surfaces — failure after real writes |
+| `RegionalPopulationTests.test_a_failure_during_the_state_write_restores_every_surface` | synthetic mechanism | …atomic — failure after real writes |
+| `RegionalPopulationTests.test_a_failure_after_the_state_write_publishes_no_wave_event` | synthetic mechanism | …atomic — commit observability (no rolled-back event) |
+| `RegionalPopulationTests.test_a_committed_wave_emits_one_bounded_boundary_event` | synthetic mechanism | …atomic — commit observability |
+| `RegionalPopulationTests.test_a_stale_or_hand_built_plan_is_rejected_before_any_write` | synthetic mechanism | …atomic — protection and refusals (rejects stale plans) |
+| `RegionalPopulationTests.test_initialization_runs_once_and_never_refills_on_reload_or_preparation` | synthetic mechanism | …individual state — initialization once |
+| `RegionalPopulationTests.test_initialization_on_an_inactive_cell_creates_no_room` | synthetic mechanism | …individual state — no materialized room |
+| `RegionalPopulationTests.test_named_refusals_are_distinct_from_blocked_space` | synthetic mechanism | …atomic — protection and refusals; Shared population seed — no implicit seed default |
+| `RegionalPopulationTests.test_reads_create_nothing_and_emit_nothing` | synthetic mechanism | …atomic — commit observability (reads emit nothing) |
+| `RegionalPopulationTests.test_explicit_registration_never_reads_birth_geometry_or_stamps_ownership` | synthetic mechanism | Shared population seed and explicit registrations are owner supplied — manual and quest actual registration |
+| `RegionalPopulationTests.test_registration_target_reads_only_a_real_wilderness_room` | synthetic mechanism | …explicit registrations — manual and quest actual registration (valid surface only) |
+| `RegionalPopulationTests.test_the_clock_contract_snapshots_the_population_surfaces` | synthetic mechanism | …atomic — protection and refusals (declared surface, pure read) |
+| `RegionalPopulationTests.test_a_caller_owned_rollback_restores_registrations_and_room_contents` | representative integration control | …atomic — failure after real writes (enclosing rollback) |
+| `ShippedZonePlanningTests.test_a_shipped_zone_plans_only_inside_its_real_eligible_birth_cells` | representative integration control | …ceilings — complete fitting groups, inside the published geometry |
+| `MapConsoleWildernessSpawnTests.test_a_wilderness_spawn_registers_the_actual_individual_at_its_cell` | representative integration control | Shared population seed and explicit registrations — manual and quest actual registration |
+| `MapConsoleWildernessSpawnTests.test_a_fault_after_registration_restores_every_surface` | representative integration control | …explicit registrations — complete post-registration rollback |
+| `WildernessSceneMonsterPlacementTests.test_a_wilderness_scene_monster_is_registered_as_its_actual_identity` | representative integration control | …explicit registrations — manual and quest actual registration |
+| `WildernessSceneMonsterPlacementTests.test_a_fault_after_registration_leaves_no_object_or_registration` | representative integration control | …explicit registrations — complete post-registration rollback |
+| `WildernessBootstrapTests.test_fresh_wilderness_provisioning_saves_the_population_seed_once` | representative integration control | …no implicit seed default (fresh script writes once) |
+
+Affected existing assertions (no new claim attached):
+
+| Test | Change | Role |
+| --- | --- | --- |
+| `MapConsoleTests.test_spawn_authoritative_identity_and_placement_rollback` | unchanged; still the non-wilderness explicit path and its rollback | representative integration control |
+| `PermanentPackageOccupantTests.*` | unchanged; their package may still place only in the instance layer or a permanent anchor room | representative integration control |
+
+## Verification evidence (this change)
+
+Run from the worktree root with the single-token environment file
+(`/tmp/mud-population-test.env` containing `MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-population-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | `Ran 22 tests ... OK` |
+| `… world.maps.tests.test_gm` | `Ran 8 tests ... OK` |
+| `… world.maps.tests.test_bootstrap.WildernessBootstrapTests` | `Ran 15 tests ... OK` |
+| `… world.quests.tests.test_permanent_occupants.WildernessSceneMonsterPlacementTests` | `Ran 2 tests ... OK` |
+| `… world.quests.tests.test_scene_builder_offline` | `Ran 10 tests ... OK` |
+
+A note for the archivist: `world.quests.tests.test_permanent_occupants` as a
+whole module requires an already-published map world (a pre-existing shard
+ordering assumption unrelated to this change), which is why only the new class
+was run alone. CI shards and `tools.spec_traceability verify --evidence` remain
+CI-owned and were not claimed locally.

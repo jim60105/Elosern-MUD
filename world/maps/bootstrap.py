@@ -1448,7 +1448,7 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
     if not graphs:
         return
 
-    create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
+    _provision_wilderness_script()
 
     script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
     for coordinates, room in list(script.db.rooms.items()):
@@ -1459,6 +1459,52 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
             if gate.destination.map_id not in settlement_id_set:
                 continue
             _provision_gate_exit(entry.anchor_key, gate)
+
+
+def _provision_wilderness_script() -> None:
+    """Create the wilderness script once, seeding its shared population seed.
+
+    A genuinely new script receives the explicit configured initial seed in the
+    same transaction that creates it, before any manual-site source can read
+    it, so a failed fresh provisioning never leaves a script whose seed can
+    never be written (the next run treats it as existing). An existing script
+    is left completely untouched: there is no implicit seed default and no
+    reroll, so an older development world refuses a seed read by name instead
+    of being silently converted.
+    """
+    from django.db import transaction
+
+    from world.maps.regional_population import (
+        INITIAL_POPULATION_SEED,
+        current_population_tick,
+        initialize_population_seed,
+        restore_population_surfaces,
+        snapshot_population_surfaces,
+    )
+
+    if WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists():
+        # The contrib's own no-op branch, kept as the single creation surface.
+        create_wilderness(
+            name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
+        )
+        return
+
+    surfaces: dict = {}
+    try:
+        with transaction.atomic():
+            create_wilderness(
+                name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
+            )
+            script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+            surfaces = snapshot_population_surfaces(script)
+            initialize_population_seed(
+                script,
+                seed=INITIAL_POPULATION_SEED,
+                tick=current_population_tick(),
+            )
+    except Exception:
+        restore_population_surfaces(surfaces)
+        raise
 
 
 def _provision_gate_exit(anchor_key: str, gate) -> None:

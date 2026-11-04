@@ -28,6 +28,13 @@ def teleport(target, room):
 
 def spawn_monster(species, variant, room):
     from world.lore.monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+    from world.maps.regional_population import (
+        current_population_tick,
+        register_explicit_individual,
+        restore_population_surfaces,
+        snapshot_population_surfaces,
+        wilderness_registration_target,
+    )
     from world.rules.monster_individual import construct_species_individual
 
     destination = resolve_target(room, {"rooms"})
@@ -37,12 +44,28 @@ def spawn_monster(species, variant, room):
         raise ConsoleError("registry_key_not_found")
     if MONSTER_VARIANT_REGISTRY[variant].species_key != species:
         raise ConsoleError("invalid_argument")
+    # A wilderness destination is an explicit placement: the actual individual
+    # is registered by the map population owner at the room's real coordinate
+    # (it may sit inside an automatic birth buffer). Any other room keeps the
+    # ordinary move.
+    target = wilderness_registration_target(destination)
+    surfaces = snapshot_population_surfaces(target[0]) if target is not None else {}
     try:
         with transaction.atomic():
             monster = construct_species_individual(species, variant)
-            if not monster.move_to(destination, quiet=True, move_type="spawn"):
+            if target is not None:
+                wilderness, coordinates = target
+                register_explicit_individual(
+                    wilderness,
+                    monster,
+                    coordinates,
+                    tick=current_population_tick(),
+                )
+            elif not monster.move_to(destination, quiet=True, move_type="spawn"):
                 raise RuntimeError("monster placement refused")
     except Exception:
+        if target is not None:
+            restore_population_surfaces(surfaces)
         flush_orphan_instances()
         raise
     return {"target": f"#{monster.pk}", "room": room}

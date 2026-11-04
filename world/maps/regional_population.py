@@ -246,6 +246,19 @@ def _require_wilderness(wilderness: Any) -> Any:
     return wilderness
 
 
+def current_population_tick() -> int:
+    """The current game-time tick for population boundary events.
+
+    Reads the existing clock without creating it (a world that was never
+    advanced reports ``0``), so a placement or provisioning step never depends
+    on -- or forces -- world-clock provisioning.
+    """
+    from world.rules.clock import read_world_clock
+
+    clock = read_world_clock()
+    return 0 if clock is None else clock.tick
+
+
 def _wilderness() -> Any | None:
     """The live wilderness script, or ``None`` before the world is provisioned.
 
@@ -1137,6 +1150,7 @@ __all__ = [
     "UnknownEcologyZone",
     "ZonePopulationState",
     "commit_population_wave",
+    "current_population_tick",
     "initialize_population_seed",
     "initialize_zone",
     "plan_population_wave",

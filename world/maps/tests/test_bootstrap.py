@@ -299,6 +299,38 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         self.assertEqual(len(scripts), 1)
         self.assertEqual(WildernessGateExit.objects.all().count(), 0)
 
+    def test_fresh_wilderness_provisioning_saves_the_population_seed_once(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+        from world.maps.regional_population import (
+            INITIAL_POPULATION_SEED,
+            POPULATION_SEED_ATTRIBUTE,
+            PopulationSeedUninitialized,
+            initialize_population_seed,
+            read_population_seed,
+        )
+
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        # A genuinely new script is seeded before any reader (such as the
+        # manual-site source) can ask for it.
+        self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED)
+
+        # A rerun never reseeds, rerolls or converts an existing script.
+        script.attributes.add(POPULATION_SEED_ATTRIBUTE, INITIAL_POPULATION_SEED + 5)
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED + 5)
+
+        # A script provisioned before this operation refuses rather than
+        # selecting an implicit default, and an explicit write fixes it once.
+        script.attributes.remove(POPULATION_SEED_ATTRIBUTE)
+        self.assertRaises(
+            PopulationSeedUninitialized, lambda: read_population_seed(script)
+        )
+        self.assertEqual(initialize_population_seed(script, seed=7, tick=0), 7)
+        self.assertEqual(read_population_seed(script), 7)
+        self.assertEqual(initialize_population_seed(script, seed=9, tick=0), 7)
+
     def test_sync_grid_body_is_unmodified(self):
         source = inspect.getsource(sync_grid)
         # The sparse synchronizer is the spawn path; the xyzgrid contrib's
