@@ -22,7 +22,7 @@ None.
 
 ## Impact
 
-Consumes landed mechanisms: Persistent individual IDs and current map registration are consumed as identities. Existing population transitions and clock/movement compensation remain authoritative; whole-cell engagement is unchanged.
+Consumes landed mechanisms. Persistent individual IDs and current map registration are consumed as identities. Existing population transitions and clock/movement compensation remain authoritative; whole-cell engagement is unchanged.
 
 Attaches at world/rules/movement_settlement.py::settle_movement and settle_relocation, world/rules/travel_cost.py::resolve_traversal_cost, typeclasses/exits.py and world/maps/wilderness_destination.py.
 
@@ -38,4 +38,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: none
 
-Code conflicts: mapped-monster-escape and paid-party-retreat consume the new edge contract; serialize their movement/pricing edits. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts are mapped-monster-escape and paid-party-retreat, which consume the new edge contract; serialize their movement/pricing edits. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
