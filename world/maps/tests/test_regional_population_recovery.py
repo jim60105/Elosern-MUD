@@ -427,6 +427,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
     @covers_requirement(
         "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
     )
+    @covers_requirement(
+        "wilderness-monster-population::active-encounters-retain-protected-individuals-and-cells"
+    )
     def test_a_protected_cell_blocks_the_due_wave_and_retries_next_interval(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -465,6 +468,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
     )
     @covers_requirement(
         "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
+    @covers_requirement(
+        "wilderness-monster-population::active-encounters-retain-protected-individuals-and-cells"
     )
     def test_a_terminal_mapped_session_protects_its_closed_interval(self):
         cell = LOCAL[0]
@@ -1240,6 +1246,9 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
 
     @covers_requirement(
         "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
+    @covers_requirement(
+        "wilderness-monster-population::active-encounters-retain-protected-individuals-and-cells"
     )
     def test_a_real_session_persists_its_occurrence_and_protection(self):
         self.assertEqual(self._round()["outcome"], "round")

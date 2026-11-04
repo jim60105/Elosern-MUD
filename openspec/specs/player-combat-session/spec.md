@@ -155,16 +155,13 @@ SHALL return false, and hostile engagement or forfeit SHALL reject with the norm
   `TypeError` or `ValueError` escapes
 
 ### Requirement: Startup restores combat sessions before wilderness population reconciliation
-The deterministic startup sequence SHALL restore persisted combat sessions (or otherwise protect
-their recorded participants) before any wilderness population reconciliation can delete or replace a
-monster referenced by an active session, so a committed terminal outcome is never converted into a
-defeat by the reconciliation.
+Startup SHALL register population clock sources before restoring combat sessions and restore recorded sessions before fresh wilderness population initialization, protecting recorded individuals throughout.
 
 #### Scenario: Defeated population monster survives until session restore
 - **WHEN** a restart follows a terminal round against a wilderness population monster whose session
   was not yet settled
-- **THEN** session restoration runs before population reconciliation and settles the committed
-  outcome, and the reconciliation does not delete or respawn the recorded participant first
+- **THEN** session restoration runs before fresh population initialization and settles the committed
+  outcome, and the population owner does not delete, respawn or replace the recorded participant first
 
 ### Requirement: Startup combat restoration advances time only after every deterministic clock source is registered
 
@@ -193,6 +190,10 @@ The deterministic startup sequence SHALL run every deterministic sync that prece
 - **THEN** it runs the same registered stage set as any ordinary advance (`quest_deadlines`,
   `caravan_arrivals`, `shop_hours`, `npc_schedules`, plus `instance_reclamation` registered by
   `sync_grid`), which is why every deterministic sync precedes restoration
+
+#### Scenario: Population sources are registered before catch-up
+- **WHEN** session restoration advances world time
+- **THEN** site and regional population sources and rollback contracts are already registered; fresh initialization never precedes protected session restoration
 
 ### Requirement: Active sessions block movement and define pause, forfeit, and recovery outcomes
 A PlayerCharacter with an active session SHALL be unable to traverse or otherwise leave the

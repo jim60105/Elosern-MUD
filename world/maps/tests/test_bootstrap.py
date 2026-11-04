@@ -302,6 +302,9 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
     @covers_requirement(
         "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
     )
+    @covers_requirement(
+        "wilderness-monster-population::runtime-population-uses-authored-regions-without-implicit-fallback"
+    )
     def test_fresh_wilderness_provisioning_initializes_population_once(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
         from typeclasses.monsters import Monster
@@ -340,6 +343,9 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
             living,
         )
 
+    @covers_requirement(
+        "wilderness-monster-population::runtime-population-uses-authored-regions-without-implicit-fallback"
+    )
     def test_preexisting_world_without_population_state_refuses(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
