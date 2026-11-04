@@ -959,3 +959,164 @@ pre-existing failure in
 on unmodified `master`; it is unrelated to this change and was not modified
 here. No browser suite beyond the listed authoritative action tests was run.
 No new test module was added, so `.github/evennia-shards.json` is unchanged.
+
+# Manual monster compositions
+
+Developer document for the OpenSpec change `manual-monster-compositions`. Manual
+sites no longer cycle `variant_keys` until `capacity`: a site names one complete
+authored composition, owns exactly the individuals that composition places,
+and resolves them by persistent identity rather than by standing on its cell.
+
+## Declarations
+
+`world/lore/monster_placement.MonsterSite` is
+`(key, kind, region_key, coordinates, composition_key, capacity, one_shot,
+recover_after_ticks=None)`; `kind` comes from
+`camp | nest | boss_site | stray | encounter`. `capacity` is the ceiling every
+legal outcome of the composition must fit, never an instruction to fill absent
+rows. `validate_monster_placement_registry(..., compositions=...)` resolves the
+named composition, checks every member variant against the variant and species
+registries and the site's habitat, and rejects an empty, unknown, or
+over-capacity reference before publication. `composition_variant_keys`
+projects a composition's member keys for reporting and validation.
+
+The three shipped sites keep their declared membership and lifecycle as three
+new site-only composition rows (`ridge_burrow_nest_group`,
+`cliff_echo_camp_group`, `tide_mouth_boss`); no composition is pooled into an
+ecology zone unless a zone actually selects it.
+
+## Durable site state and member identity
+
+Each site's record on the wilderness script is
+
+```text
+{
+  "state": "populated" | "cleared",
+  "cleared_at_tick": int | None,
+  "seed": int,                  # derived once, on first population
+  "generation_sequence": int,   # 0 first, +1 per recovery
+  "member_ids": list[int],      # authoritative persistent identities
+}
+```
+
+`seed` derives deterministically from the world seed supplied by
+`world.maps.regional_population.read_population_seed` and the site's own key.
+The world seed is read only when a site needs its first population; a missing
+or malformed seed raises the owner's `population_seed_uninitialized` refusal
+before any construction, registration, or site write. There is no implicit
+default.
+
+`member_ids` is the site's authority. `monster_sites._members` resolves those
+IDs through the database in persistent-ID order and keeps only rows whose
+`db.site_key` still matches, so a member that moved away, lost its room, or was
+detached is still the site's own living individual. A living absent member
+therefore prevents a false clear. A row merely carrying the site marker without
+being in `member_ids` is never adopted, counted, or deleted.
+
+Clearing keeps the defeated IDs (ownership history); recovery replaces them
+with fresh IDs at `generation_sequence + 1`, so an old quest binding can never
+count a recovered individual. An existing record that cannot be interpreted
+(missing seed/sequence/member IDs, or a non-integer ID list) raises
+`MalformedPopulationState` before any write; the pure read answers the
+`state_unreadable` verdict instead. Nothing repairs or converts such a save:
+the documented development-save repair is an explicit GM reset/repair, never a
+startup mutation.
+
+### Interface for the successor slice
+
+`site_state(site_key)` answers `SiteState(key, state, cleared_at_tick, seed,
+generation_sequence, member_ids, readable)`; `site_living_members(site_key)`
+answers `SiteLivingMembers(site_key, site, state, cleared_at_tick, members,
+reason)`. Both are pure reads. The recovery slice consumes the record keys and
+these reads; it must keep first population and matured recovery clock-owned.
+
+## Selection and manual exceptions
+
+`world.maps.regional_population.sample_composition_counts` is the shared pure
+sampler: it enumerates the composition's inclusive count vectors inside a
+budget and picks one through the existing SHA-256 draw stream under the distinct
+`site_counts` purpose. A site occurrence is identified by its saved seed, site
+key, and generation sequence only, so replaying the same occurrence reproduces
+the same complete group after a retry at any in-game tick.
+
+`monster_sites._populate` constructs every sampled row with its own identity
+and stored resources and registers each through
+`register_explicit_individual`, the population owner's explicit-placement
+operation. That operation validates the shared wilderness surface while
+applying no automatic settlement buffer, zone/cell density, or wave budget:
+explicit manual placement is a lawful exception that ordinary maintenance
+neither fills, caps, nor culls. A mixed group, a same-variant group, and a
+solitary stray therefore all place exactly their authored rows.
+
+## Assertion roles and requirement hand-off
+
+The change's delta contains a REMOVED requirement
+(`monster-site-placement::placement-honors-capacity-and-determinism`) and three
+ADDED/MODIFIED requirements. The retired requirement's two annotations were
+deleted rather than re-pointed, so the checkout-local
+`tools.spec_traceability check` necessarily reports that removed requirement as
+uncovered until the archive sync; it reports `0 errors` and no other gap. This
+is the documented pre-sync state (`docs/development/spec-test-traceability.md`,
+the `actual-live-population-view` precedent). No generated ID is fabricated.
+
+New tests carry no `covers_requirement` annotation because the ADDED delta
+requirement IDs exist only after the sync. Their hand-off:
+
+| Test | Role / defect detected | Delta requirement and scenario |
+| --- | --- | --- |
+| `MonsterSiteLifecycleTests.test_a_mixed_composition_places_each_row_with_its_own_identity_and_resources` | synthetic mechanism: a mixed A+A+B group constructs three distinct IDs with independent stored HP and records them as the site's member IDs | `monster-site-placement` ADDED "Placement samples complete deterministic occurrences" / "Selection stays inside the authored variant set" |
+| `MonsterSiteLifecycleTests.test_a_solitary_stray_places_exactly_one_individual` | synthetic mechanism: the `stray` kind places one authored row | ADDED / "Selection stays inside the authored variant set" |
+| `MonsterSiteLifecycleTests.test_the_saved_occurrence_reproduces_its_group_and_ignores_the_retry_tick` | synthetic mechanism: the sampler reads its seed; an interrupted first population replays the same group at a later tick | ADDED / "Same saved occurrence, same composition" and "Selection uses persisted occurrence inputs" |
+| `MonsterSiteLifecycleTests.test_a_living_absent_member_prevents_false_clearing` | synthetic mechanism: an unregistered, unlocated living member keeps the site populated | ADDED / "Missing presence is not clearing" |
+| `MonsterSiteLifecycleTests.test_an_unchanged_site_pass_keeps_its_identities_and_resources` | synthetic mechanism: a repeat pass is a no-op | ADDED / "Capacity is a ceiling, not a reshuffle" |
+| `MonsterSiteLifecycleTests.test_a_foreign_marked_individual_is_never_adopted_or_replaced` | synthetic mechanism: a marked row outside `member_ids` is untouched | MODIFIED "Every placed individual carries its owner marker..." / "All foreign owners are protected" |
+| `MonsterSiteLifecycleTests.test_a_one_shot_site_is_never_refilled_by_a_regional_deficit_wave` | real owner integration: a genuine regional deficit wave births ambient individuals and leaves the cleared site empty | ADDED / "Manual exceptions"; existing "One-shot sites stay cleared..." |
+| `MonsterSiteLifecycleTests.test_an_explicit_site_inside_a_settlement_ring_survives_maintenance` | real geometry + owner: an excluded-but-valid cell hosts the explicit site while ordinary birth geometry admits none; ambient reconciliation leaves it untouched | ADDED / "Manual exceptions" |
+| `MonsterSiteLifecycleTests.test_manual_excess_counts_against_ordinary_ceilings_without_culling` | real owner: site individuals count locally and the wave is blocked without changes | ADDED / "Manual exceptions" and "Capacity is a ceiling, not a reshuffle" |
+| `MonsterSiteLifecycleTests.test_an_unreadable_record_answers_a_named_verdict_and_refuses_work` | synthetic mechanism: corrupt member IDs answer `state_unreadable` and refuse lifecycle work without writes | ADDED / "Selection uses persisted occurrence inputs" (save integrity) |
+| `MonsterSiteLifecycleTests.test_an_incomplete_saved_record_refuses_instead_of_repopulating` | synthetic mechanism: a pre-identity record refuses instead of being reinterpreted | ADDED / "Selection uses persisted occurrence inputs" |
+| `MonsterSiteWithoutWorldSeedTests.test_first_population_refuses_without_an_explicit_world_seed` | synthetic mechanism: no implicit seed default | ADDED / "Selection uses persisted occurrence inputs" |
+| `MonsterSiteLifecycleTests.test_a_direct_recovery_advances_the_sequence_with_fresh_identities` | real owner: a variable-range site recovers with new IDs at sequence + 1 and keeps its seed | existing "One-shot sites stay cleared..." / "A recoverable camp recovers at its in-game condition with fresh identities" |
+| `MonsterSiteLifecycleTests.test_a_failed_direct_recovery_after_a_registration_restores_everything` | fault injection after a real registration: the direct recovery entry point restores state, coordinates and caches, emits no success, and its retry completes the group | ADDED / "Selection uses persisted occurrence inputs" (retry repeats the failed selection) |
+| `MonsterSiteLifecycleTests.test_a_failed_state_write_restores_the_cleared_record` | fault injection after the state write: the cleared record and registrations are restored | ADDED / "Selection uses persisted occurrence inputs" |
+| `MonsterSiteCandidatePublicationTests.test_an_unwalkable_site_surface_is_rejected_before_publication` / `…test_a_settlement_footprint_site_surface_is_rejected` / `…test_a_site_on_another_region_is_rejected` / `…test_a_lawful_manual_site_still_publishes` | candidate publication: site surfaces are validated against the candidate terrain and footprints, reject before publication, and a lawful site still publishes | MODIFIED "Ambient and site placement are frozen keyed lore data validated at construction" / "Sites are frozen values with the authored fields" |
+| `SiteClearOutAcceptanceTests.test_a_binding_survives_the_site_clearing_without_generating_members` | real quest acceptance: the bound IDs survive the clear and later reads create nothing | existing "A site's living individuals are the quest layer's binding source..." / "A cleared site offers no targets and stays cleared" |
+| `PlacementValidationTests.test_a_site_names_one_known_complete_composition` | registry contract: empty/unknown composition rejects at construction | MODIFIED "Ambient and site placement are frozen keyed lore data validated at construction" / "Sites are frozen values with the authored fields" |
+| `PlacementValidationTests.test_every_legal_composition_outcome_must_fit_the_site_capacity` | registry contract: minimum fits, maximum exceeds, so capacity is the ceiling of every outcome | MODIFIED / "Sites are frozen values with the authored fields" |
+| `PlacementValidationTests.test_explicit_site_kinds_admit_solitary_and_mixed_placements` | registry contract: `stray`/`encounter` accepted, `lair` rejected | MODIFIED / "Sites are frozen values with the authored fields" |
+
+## Verification evidence (this change)
+
+Run from the worktree root with the single-token environment file
+(`/tmp/mud-population-test.env` containing `MUD_TEST_SETTINGS=1`):
+
+| Command label | Result |
+| --- | --- |
+| `world.lore.tests.test_monster_placement world.lore.tests.test_registry_index_contract` | 64 tests, OK |
+| `world.maps.tests.test_monster_sites` | 35 tests, OK |
+| `world.maps.tests.test_geography_source` | 18 tests, OK |
+| `world.quests.tests.test_site_clear_out_acceptance` | 20 tests, OK |
+| `world.maps.tests.test_monster_provisioning` | 15 tests, OK |
+| `world.quests.tests.test_definitions` | 46 tests, OK |
+| `world.quests.tests.test_compile_registration.SiteClearOutPayloadTests` | 3 tests, OK |
+| `world.quests.tests.test_hunt_catalog_content` | 22 tests, OK |
+| `world.maps.tests.test_wilderness_population.WildernessPopulationViewTests` | 10 tests, OK |
+| `world.tests.test_synthetic_data` | 27 tests, OK |
+| `web.gm.tests.test_reader_monsters` | 12 tests, OK |
+
+`python -m tools.observability_lint check` → `violations=0`. `openspec validate
+manual-monster-compositions --strict` → valid. `content/map-reference-context.json`
+was regenerated (`python -m tools.map_reference_context`) because the site
+declaration shape changed, and its check reports up to date. `python -m
+tools.contract_gate` passes reference-context, observability, test-data,
+manifests, and the contract suite; its traceability gate reports the single
+removed requirement described above and is expected to stay red until the
+archive sync. The full `world.quests.tests.test_compile_registration` module was
+also run: four pre-existing rollback tests
+(`RegisterGeneratedQuestTests.test_conflicting_offer_rolls_back_the_definition_write`,
+`…test_definition_new_plus_offer_conflicting_leaves_both_registries_unchanged`,
+`SceneRequirementRegistryTests.test_conflicting_offer_rollback_leaves_no_requirement_entry`,
+`PrivateCommissionRegistrationTests.test_a_conflicting_private_issuance_rolls_back_the_definition`)
+reach the durable store through an unpatched rollback call in a module with no
+database test class and fail with `no such table: django_content_type`; they do
+not touch this change's code and are unrelated.

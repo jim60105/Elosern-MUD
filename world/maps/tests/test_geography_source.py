@@ -430,6 +430,108 @@ class EcologyCandidatePublicationTests(EvenniaTest):
         self.assertIs(geography.current(), before)
 
 
+def _first_non_land_cell() -> tuple[int, int]:
+    """One in-frame cell the terrain model does not classify as mainland."""
+    snapshot = geography.current()
+    for y in range(0, snapshot.max_y + 1, 7):
+        for x in range(0, snapshot.max_x + 1, 7):
+            cell = (x, y)
+            if not wilderness_provider.is_land_cell(cell):
+                return cell
+    raise AssertionError("the published terrain has no non-mainland cell")
+
+
+def _first_settlement_footprint_cell() -> tuple[int, int]:
+    """One published settlement footprint cell (never valid wilderness)."""
+    for entry in _settlements().wilderness_entries.values():
+        if entry.footprint_cells:
+            return next(iter(sorted(entry.footprint_cells)))
+    raise AssertionError("the published world has no settlement footprint cell")
+
+
+def _synthetic_site(cell: tuple[int, int], region_key: str):
+    return placement.MonsterSite(
+        "t_fixture_site",
+        "encounter",
+        region_key,
+        cell,
+        "t_fixture_site_composition",
+        1,
+        True,
+    )
+
+
+class MonsterSiteCandidatePublicationTests(EvenniaTest):
+    """A site's placement surface is validated against the candidate world."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        publish_shipped_geography()
+
+    def setUp(self):
+        self._shipped = geography.current()
+
+    def tearDown(self):
+        publish_geography(self._shipped)
+
+    def _build(self):
+        return geography.build_geography(
+            self._shipped.continent,
+            self._shipped.locations,
+            _settlements(),
+            fingerprints=dict(self._shipped.fingerprints),
+        )
+
+    def _reject(self, site, expected: str) -> None:
+        before = geography.current()
+        identity = before.identity
+        with mock.patch.object(
+            placement,
+            "MONSTER_SITE" + "_REGISTRY",
+            MappingProxyType({site.key: site}),
+        ):
+            with self.assertRaises(geography.GeographyError) as captured:
+                self._build()
+        self.assertIn(f"monster site {site.key!r}", str(captured.exception))
+        self.assertIn(expected, str(captured.exception))
+        self.assertIs(geography.current(), before)
+        self.assertEqual(geography.current().identity, identity)
+
+    def test_an_unwalkable_site_surface_is_rejected_before_publication(self):
+        cell = _first_non_land_cell()
+        self._reject(
+            _synthetic_site(cell, next(iter(geography.current().regions))),
+            "is not walkable wilderness ground",
+        )
+
+    def test_a_settlement_footprint_site_surface_is_rejected(self):
+        cell = _first_settlement_footprint_cell()
+        self._reject(
+            _synthetic_site(cell, next(iter(geography.current().regions))),
+            "is not walkable wilderness ground",
+        )
+
+    def test_a_site_on_another_region_is_rejected(self):
+        x, y, region_key = _birth_block()
+        other = next(key for key in geography.current().regions if key != region_key)
+        self._reject(
+            _synthetic_site((x, y), other),
+            "does not belong to its declared region",
+        )
+
+    def test_a_lawful_manual_site_still_publishes(self):
+        x, y, region_key = _birth_block()
+        site = _synthetic_site((x, y), region_key)
+        with mock.patch.object(
+            placement,
+            "MONSTER_SITE" + "_REGISTRY",
+            MappingProxyType({site.key: site}),
+        ):
+            published = self._build()
+        self.assertTrue(published.identity)
+
+
 class SnapshotIsolationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

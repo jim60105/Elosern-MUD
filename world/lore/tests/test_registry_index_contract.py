@@ -66,7 +66,7 @@ FIRST_BATCH = {
     },
     "world.lore.monster_placement": {
         "AmbientPlacementRule": {"region_key", "variant_keys"},
-        "MonsterSite": {"region_key", "variant_keys"},
+        "MonsterSite": {"region_key", "composition_key"},
     },
     "world.quests.definitions": {
         "QuestDefinition": {"rank"},

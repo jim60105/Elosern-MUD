@@ -10,7 +10,11 @@ payload helpers come from ``_compile_helpers``.
 from unittest.mock import patch
 import unittest
 
-from world.lore.monster_placement import MonsterSite
+from world.lore.monster_placement import (
+    CompositionMember,
+    EncounterComposition,
+    MonsterSite,
+)
 from world.quests.compile import (
     CompiledQuest,
     IssuanceDescriptor,
@@ -638,18 +642,27 @@ class SpeciesHuntPayloadTests(CompileRegistryIsolation, unittest.TestCase):
 # the payload boundary. Every key below is a kit row or an invented one.
 # ---------------------------------------------------------------------------
 _CLEAR_OUT_SITE = "t_payload_site"
+_CLEAR_OUT_COMPOSITION = "t_payload_composition"
 _CLEAR_OUT_SITES = {
     _CLEAR_OUT_SITE: MonsterSite(
         _CLEAR_OUT_SITE,
         "nest",
         _HUNT_REGION,
         (4, 4),
-        (_HUNT_ORDINARY,),
+        _CLEAR_OUT_COMPOSITION,
         1,
         True,
     )
 }
-_CLEAR_OUT_EXTRA = {"monster_sites": _CLEAR_OUT_SITES}
+_CLEAR_OUT_EXTRA = {
+    "encounter_compositions": {
+        _CLEAR_OUT_COMPOSITION: EncounterComposition(
+            _CLEAR_OUT_COMPOSITION,
+            (CompositionMember(_HUNT_ORDINARY, 1, 1),),
+        )
+    },
+    "monster_sites": _CLEAR_OUT_SITES,
+}
 
 
 def _clear_out_definition() -> QuestDefinition:

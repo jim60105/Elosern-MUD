@@ -37,8 +37,8 @@ from world.lore.registry_refs import ref, ref_many
 @dataclass(frozen=True)
 class MonsterSite:
     region_key: str = field(metadata=ref("wilderness_regions", inverse="monster_sites"))
-    variant_keys: tuple[str, ...] = field(
-        metadata=ref_many("monster_variants", inverse="monster_sites")
+    composition_key: str = field(
+        metadata=ref("encounter_compositions", inverse="monster_sites")
     )
 ```
 

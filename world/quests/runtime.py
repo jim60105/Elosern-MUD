@@ -752,7 +752,9 @@ def _provision_hunt_targets(definition: QuestDefinition) -> None:
 #: are the site owner's own verdicts (``world/maps/monster_sites.py`` owns their
 #: spelling), so the closed set the acceptance and the board share is
 #: ``world_unavailable`` / ``unknown_site`` / ``site_unpopulated`` /
-#: ``site_cleared`` / ``site_short``.
+#: ``site_cleared`` / ``state_unreadable`` / ``site_short``. The owner answers
+#: ``state_unreadable`` for an existing site record it cannot interpret; the
+#: layer refuses the binding rather than guessing, and repair stays explicit.
 SITE_CLEAR_OUT_SHORT = "site_short"
 
 
@@ -820,20 +822,29 @@ def site_clear_out_available(definition: QuestDefinition) -> bool:
 
 def _site_read_context(objective: QuestObjective, read: Any) -> dict[str, object]:
     """The boundary-event context a site clear-out carries (no prose)."""
-    from world.lore.monster_placement import variant_species_key
+    from world.lore.monster_placement import (
+        ENCOUNTER_COMPOSITION_REGISTRY,
+        composition_variant_keys,
+        variant_species_key,
+    )
 
     site = read.site
+    variants = (
+        ()
+        if site is None
+        else composition_variant_keys(
+            ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
+        )
+    )
     return {
         "site": objective.site_key,
         "region": None if site is None else site.region_key,
         "species": (
             ()
             if site is None
-            else tuple(
-                sorted({variant_species_key(key) for key in site.variant_keys})
-            )
+            else tuple(sorted({variant_species_key(key) for key in variants}))
         ),
-        "variant": () if site is None else tuple(site.variant_keys),
+        "variant": variants,
         "required": objective.quantity,
         "available": len(read.members),
     }

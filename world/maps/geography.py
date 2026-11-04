@@ -306,6 +306,10 @@ def _validate_game_joins(
     from world.maps import population_geometry
     from world.rules.sight import validate_sight_region_coverage
     from world.rules.travel_cost import validate_wilderness_region_coverage
+    from elosern_map_core.terrain import (
+        is_valid_wilderness_cell,
+        region_for_coordinates as core_region_for_coordinates,
+    )
 
     problems: list[str] = []
     regions = set(snapshot.regions)
@@ -344,10 +348,31 @@ def _validate_game_joins(
             problems.append(
                 f"ambient placement {key!r} names unknown terrain region {rule.region_key!r}"
             )
+    # Explicit manual placement is a lawful exception to the automatic birth
+    # buffer and density rules, but it still needs a valid shared placement
+    # surface: a walkable wilderness cell inside the region the site declares.
+    # Validating it against this candidate world means a site that could never
+    # register an individual is rejected before publication instead of at the
+    # first clock settlement.
+    footprints = frozenset().union(
+        *(entry.footprint_cells for entry in settlements.wilderness_entries.values())
+    )
     for key, site in sorted(MONSTER_SITE_REGISTRY.items()):
         if getattr(site, "region_key", None) not in regions:
             problems.append(
                 f"monster site {key!r} names unknown terrain region {site.region_key!r}"
+            )
+            continue
+        cell = tuple(site.coordinates)
+        if not is_valid_wilderness_cell(snapshot.terrain, footprints, cell):
+            problems.append(
+                f"monster site {key!r} cell {cell!r} is not walkable wilderness ground"
+            )
+            continue
+        if core_region_for_coordinates(snapshot.terrain, *cell) != site.region_key:
+            problems.append(
+                f"monster site {key!r} cell {cell!r} does not belong to its "
+                f"declared region {site.region_key!r}"
             )
     # The ecology declarations and the geometry they imply are validated
     # together against this candidate world: the same candidate settlements

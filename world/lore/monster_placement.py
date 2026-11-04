@@ -38,8 +38,15 @@ class MonsterPlacementRegistryError(ValueError):
     """A placement registry row violates the authored-data contract."""
 
 
-# The closed site-kind vocabulary: authored camps, nests, and boss sites.
-MONSTER_SITE_KINDS: tuple[str, ...] = ("camp", "nest", "boss_site")
+# The closed site-kind vocabulary: authored camps, nests, boss sites, and the
+# explicit solitary (``stray``) and mixed (``encounter``) manual placements.
+MONSTER_SITE_KINDS: tuple[str, ...] = (
+    "camp",
+    "nest",
+    "boss_site",
+    "stray",
+    "encounter",
+)
 
 # The closed recovery-condition vocabulary. One in-game-clock condition ships
 # (`recover_after_ticks`, measured in game seconds by the world clock); a future
@@ -74,23 +81,27 @@ class AmbientPlacementRule:
 
 @dataclass(frozen=True, slots=True)
 class MonsterSite:
-    """One authored camp, nest, or boss site and its authored lifecycle.
+    """One authored manual site and its authored life cycle.
 
     ``coordinates`` is the wilderness cell the site owns; every individual the
     site owner creates is registered there and carries the site's ``key`` as its
-    persistent ownership marker. ``capacity`` is the number of individuals the
-    site holds when populated. ``one_shot`` sites stay cleared after their
-    individuals are defeated until an author-side re-issue; a recoverable site
-    declares exactly one condition from the closed
-    :data:`RECOVERY_CONDITION_FIELDS` vocabulary.
+    persistent ownership marker. ``composition_key`` names one complete
+    :class:`EncounterComposition`: the site's individuals are exactly that
+    composition's member rows, so a mixed group, a same-variant group, and a
+    solitary stray each express their whole membership directly. ``capacity``
+    is the ceiling every legal outcome of that composition must fit — a
+    definition-validation bound, never an instruction to fill absent rows.
+    ``one_shot`` sites stay cleared after their individuals are defeated until
+    an author-side re-issue; a recoverable site declares exactly one condition
+    from the closed :data:`RECOVERY_CONDITION_FIELDS` vocabulary.
     """
 
     key: str
     kind: str
     region_key: str = field(metadata=ref("wilderness_regions", inverse="monster_sites"))
     coordinates: tuple[int, int]
-    variant_keys: tuple[str, ...] = field(
-        metadata=ref_many("monster_variants", inverse="monster_sites")
+    composition_key: str = field(
+        metadata=ref("encounter_compositions", inverse="monster_sites")
     )
     capacity: int
     one_shot: bool
@@ -265,6 +276,45 @@ def _check_coordinates(coordinates: object, what: str) -> None:
         )
 
 
+def _check_site_composition(
+    site: MonsterSite,
+    compositions: Mapping[str, EncounterComposition],
+    variants: Mapping[str, object],
+    species: Mapping[str, object],
+    what: str,
+) -> None:
+    """Reject a site whose complete composition is unnamed, unknown, or too large.
+
+    A site holds exactly one authored complete composition, so the reference
+    must resolve and every member must be a habitat-compatible variant of the
+    site's region. ``capacity`` is that composition's legal ceiling: the
+    largest outcome it can ever place must fit, not merely its smallest one.
+    """
+    composition_key = site.composition_key
+    if not isinstance(composition_key, str) or not composition_key:
+        raise MonsterPlacementRegistryError(
+            f"{what} declares no complete composition key"
+        )
+    composition = compositions.get(composition_key)
+    if composition is None:
+        raise MonsterPlacementRegistryError(
+            f"{what} references unknown encounter composition {composition_key!r}"
+        )
+    _check_variant_keys(
+        composition_variant_keys(composition),
+        site.region_key,
+        variants,
+        species,
+        what,
+    )
+    _, largest = composition_bounds(composition)
+    if largest > site.capacity:
+        raise MonsterPlacementRegistryError(
+            f"{what} composition {composition_key!r} can place {largest} "
+            f"individuals, above its capacity {site.capacity}"
+        )
+
+
 def build_monster_site_registry(
     declarations: Iterable[MonsterSite],
 ) -> dict[str, MonsterSite]:
@@ -342,6 +392,16 @@ def composition_bounds(composition: EncounterComposition) -> tuple[int, int]:
         sum(member.minimum for member in composition.members),
         sum(member.maximum for member in composition.members),
     )
+
+
+def composition_variant_keys(composition: EncounterComposition) -> tuple[str, ...]:
+    """The variant keys of one complete composition, in member order.
+
+    A site's authored membership is its composition's membership: consumers
+    that report or validate "which variants this placement can hold" read this
+    one projection instead of re-deriving a row order of their own.
+    """
+    return tuple(member.variant_key for member in composition.members)
 
 
 def _check_rectangles(rectangles: object, what: str) -> None:
@@ -537,6 +597,7 @@ def validate_monster_placement_registry(
     variant_face: Mapping[str, object] | None = None,
     species_face: Mapping[str, object] | None = None,
     kind_face: Iterable[str] | None = None,
+    compositions: Mapping[str, EncounterComposition] | None = None,
 ) -> None:
     """Raise :class:`MonsterPlacementRegistryError` unless every row is valid.
 
@@ -545,10 +606,12 @@ def validate_monster_placement_registry(
     validated through this one function while they are built, so a malformed
     authored row can never be observed by a consumer.
 
-    The four vocabulary faces default to the static lore registries and the
-    closed local kind vocabulary, and are injectable so behavior tests can
-    exercise this function with invented keys. Validation only reads its inputs
-    and raises before anything is published.
+    The vocabulary faces and the composition registry default to the static
+    lore values and are injectable so behavior tests can exercise this function
+    with invented keys. A site is validated against the complete composition it
+    names, so a site can never publish a membership the site owner could not
+    place. Validation only reads its inputs and raises before anything is
+    published.
     """
     # The terrain-region vocabulary is map-owned (a continent declaration), so
     # it has no import-time lore face: publication of the geography candidate
@@ -558,6 +621,9 @@ def validate_monster_placement_registry(
     variants = MONSTER_VARIANT_REGISTRY if variant_face is None else variant_face
     species = MONSTER_SPECIES_REGISTRY if species_face is None else species_face
     kinds = frozenset(MONSTER_SITE_KINDS) if kind_face is None else frozenset(kind_face)
+    composition_rows = (
+        ENCOUNTER_COMPOSITION_REGISTRY if compositions is None else compositions
+    )
 
     for mapping_key, rule in ambient.items():
         what = f"ambient placement rule {mapping_key!r}"
@@ -589,8 +655,10 @@ def validate_monster_placement_registry(
         if regions is not None:
             _check_region(site.region_key, regions, what)
         _check_coordinates(site.coordinates, what)
-        _check_variant_keys(site.variant_keys, site.region_key, variants, species, what)
         _require_int(site.capacity, f"{what} capacity", 1)
+        _check_site_composition(
+            site, composition_rows, variants, species, what
+        )
         if not isinstance(site.one_shot, bool):
             raise MonsterPlacementRegistryError(
                 f"{what} must author its one-shot/recoverable life cycle as a "
@@ -688,37 +756,40 @@ _AMBIENT_PLACEMENT_DECLARATIONS: tuple[AmbientPlacementRule, ...] = (
 
 _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
     # A hare nest: one-shot, so clearing it is a durable authored victory until
-    # an author re-issues it. The stronger variant guards the ordinary one.
+    # an author re-issues it. Its complete composition pairs the stronger
+    # variant with the ordinary one.
     MonsterSite(
         "ridge_burrow_nest",
         "nest",
         "western_hills_valleys",
         (700, 1000),
-        ("burrow_maker", "nest_guard"),
+        "ridge_burrow_nest_group",
         2,
         True,
     ),
     # A goat camp: recoverable, so the pass re-forms one in-game day after it is
-    # cleared, with fresh individuals only.
+    # cleared, with fresh individuals only. Its complete composition is the
+    # stronger variant beside the ordinary one.
     MonsterSite(
         "cliff_echo_camp",
         "camp",
         "western_hills_valleys",
         (760, 1150),
-        ("cliff_stepper", "pass_warden"),
+        "cliff_echo_camp_group",
         2,
         False,
         86400,
     ),
     # A river-mouth boss site: one-shot, holding the stronger crocodile variant
-    # alone. Its authored site carries no ability mechanic, because the species'
-    # resource-drain effect is not part of the approved implementation.
+    # alone, so its complete composition is one solitary row. Its authored site
+    # carries no ability mechanic, because the species' resource-drain effect is
+    # not part of the approved implementation.
     MonsterSite(
         "tide_mouth_boss_site",
         "boss_site",
         "southeast_coast",
         (2100, 300),
-        ("bay_warden",),
+        "tide_mouth_boss",
         1,
         True,
     ),
@@ -798,6 +869,27 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
             CompositionMember("burrow_maker", 1, 1),
             CompositionMember("cliff_stepper", 1, 1),
         ),
+    ),
+    # Complete compositions of the three authored manual sites. They are not
+    # pooled into any ecology zone: an explicit site names its own composition,
+    # so its membership never depends on automatic birth selection.
+    EncounterComposition(
+        "ridge_burrow_nest_group",
+        (
+            CompositionMember("burrow_maker", 1, 1),
+            CompositionMember("nest_guard", 1, 1),
+        ),
+    ),
+    EncounterComposition(
+        "cliff_echo_camp_group",
+        (
+            CompositionMember("cliff_stepper", 1, 1),
+            CompositionMember("pass_warden", 1, 1),
+        ),
+    ),
+    EncounterComposition(
+        "tide_mouth_boss",
+        (CompositionMember("bay_warden", 1, 1),),
     ),
 )
 
@@ -894,7 +986,11 @@ _SETTLEMENT_BIRTH_POLICY_ROWS: dict[str, SettlementBirthPolicy] = (
 # Shipped content must be valid the moment the module loads (titles.py
 # precedent): validation runs here, before either registry is published, so an
 # authored typo cannot produce a partially valid registry.
-validate_monster_placement_registry(_AMBIENT_PLACEMENT_ROWS, _MONSTER_SITE_ROWS)
+validate_monster_placement_registry(
+    _AMBIENT_PLACEMENT_ROWS,
+    _MONSTER_SITE_ROWS,
+    compositions=_ENCOUNTER_COMPOSITION_ROWS,
+)
 validate_ecology_registries(
     _ECOLOGY_ZONE_ROWS, _ENCOUNTER_COMPOSITION_ROWS, _SETTLEMENT_BIRTH_POLICY_ROWS
 )
