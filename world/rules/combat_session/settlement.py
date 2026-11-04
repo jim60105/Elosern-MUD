@@ -821,6 +821,7 @@ class _SettlementRestore:
     battlefield_registrations: tuple[tuple[str, Any], ...]
     clock: Any
     clock_tick: tuple[int, tuple[bool, Any] | None] | None
+    advance_registry: tuple[dict[int, Any], tuple[Any, ...]] | None
 
     def restore(self) -> None:
         """Reinstate every snapshotted surface, in the round path's order."""
@@ -858,6 +859,16 @@ class _SettlementRestore:
             # A later write of the same unit rolls the durable tick back, but
             # the idmapper-cached Script attribute is not transaction-aware.
             _restore_clock_tick(self.clock, self.clock_tick)
+        if self.advance_registry is not None:
+            # A standalone settlement advances the clock through the whole
+            # registered stage set (including regional waves). When a later
+            # write of the same unit fails, the durable rows roll back but the
+            # stages' in-process surfaces do not, so their registry is
+            # restored here exactly as the round and confirmed-exit paths do.
+            from world.rules.clock import _restore_advance_registry
+
+            registry, scope = self.advance_registry
+            _restore_advance_registry(registry, scope)
 
 
 def _snapshot_settlement_restore(
@@ -919,6 +930,24 @@ def _snapshot_settlement_restore(
 
             exam_host = (host, snapshot_exam_host_surfaces(host))
     clock = read_world_clock()
+    advance_registry = None
+    if record.population_cell is not None:
+        from world.rules.clock import (
+            AdvanceSource,
+            WorldClock,
+            build_advance_snapshot_registry,
+        )
+
+        scope = () if battlefield is None else tuple(battlefield.roster.values())
+        advance_registry = (
+            build_advance_snapshot_registry(
+                clock if clock is not None else WorldClock(),
+                record.rounds_elapsed * _ROUND_SECONDS,
+                AdvanceSource.COMBAT,
+                scope,
+            ),
+            scope,
+        )
     battlefield_registrations: tuple[tuple[str, Any], ...] = ()
     if battlefield is not None:
         battlefield_registrations = tuple(
@@ -938,6 +967,7 @@ def _snapshot_settlement_restore(
         battlefield_registrations=battlefield_registrations,
         clock=clock,
         clock_tick=_snapshot_clock_tick(clock) if clock is not None else None,
+        advance_registry=advance_registry,
     )
 
 

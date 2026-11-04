@@ -784,6 +784,18 @@ def population_counts(
     )
 
 
+def protected_cells(wilderness: Any, *, at_tick: int) -> frozenset[tuple[int, int]]:
+    """Cells that hold no lawful birth space at ``at_tick`` (a pure read).
+
+    The single protection decision every birth route shares: an explicit site
+    or regional wave must not place individuals on a cell an encounter owned
+    during the evaluated interval.
+    """
+    _require_wilderness(wilderness)
+    _require_argument_int(at_tick, "at_tick")
+    return _protected_cells(wilderness, at_tick=at_tick)
+
+
 # ---------------------------------------------------------------------------
 # Presence timeline
 # ---------------------------------------------------------------------------
@@ -857,10 +869,15 @@ def _presence_to_dict(presence: PopulationPresence) -> dict:
 def _presence_from_dict(value: object, what: str) -> PopulationPresence:
     if not isinstance(value, Mapping):
         raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} is not a mapping")
-    alive = value.get("alive")
+    required = {"alive", "position", "home_zone", "site_key"}
+    if set(value) != required:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {what} must carry exactly {sorted(required)}"
+        )
+    alive = value["alive"]
     if not isinstance(alive, bool):
         raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.alive must be a boolean")
-    raw_position = value.get("position")
+    raw_position = value["position"]
     position = None
     if raw_position is not None:
         cell = _protection_cell(raw_position)
@@ -869,8 +886,12 @@ def _presence_from_dict(value: object, what: str) -> PopulationPresence:
                 f"{MALFORMED_STATE}: {what}.position is not a wilderness cell"
             )
         position = PopulationPosition(*cell)
-    home_zone = _require_optional_name(value.get("home_zone"), f"{what}.home_zone")
-    site_key = _require_optional_name(value.get("site_key"), f"{what}.site_key")
+    home_zone = _require_optional_name(value["home_zone"], f"{what}.home_zone")
+    site_key = _require_optional_name(value["site_key"], f"{what}.site_key")
+    if not alive and position is not None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {what} is absent but carries a position"
+        )
     return PopulationPresence(alive, position, home_zone, site_key)
 
 
@@ -915,15 +936,24 @@ def _protection_from_dict(value: object, index: int) -> PopulationProtection:
     what = f"protection {index}"
     if not isinstance(value, Mapping):
         raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} is not a mapping")
-    engagement_id = value.get("engagement_id")
+    required = {"engagement_id", "cell", "start_tick", "end_tick"}
+    if set(value) != required:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {what} must carry exactly {sorted(required)}"
+        )
+    engagement_id = value["engagement_id"]
     if not isinstance(engagement_id, str) or not engagement_id:
         raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.engagement_id is empty")
-    cell = _protection_cell(value.get("cell"))
+    cell = _protection_cell(value["cell"])
     if cell is None:
         raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.cell is not a cell")
-    start_tick = _require_int(value.get("start_tick"), f"{what}.start_tick")
-    raw_end = value.get("end_tick")
+    start_tick = _require_int(value["start_tick"], f"{what}.start_tick")
+    raw_end = value["end_tick"]
     end_tick = None if raw_end is None else _require_int(raw_end, f"{what}.end_tick")
+    if end_tick is not None and end_tick < start_tick:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {what} ends before it starts"
+        )
     return PopulationProtection(engagement_id, PopulationPosition(*cell), start_tick, end_tick)
 
 
@@ -1167,12 +1197,16 @@ def presence_at(
     return presence
 
 
-def settle_timeline_through(wilderness: Any, tick: int) -> None:
+def settle_timeline_through(
+    wilderness: Any, tick: int, *, retain: frozenset[int] = frozenset()
+) -> None:
     """Consume every fact at or before ``tick`` after its boundary was applied.
 
     Pending transitions are dropped only once the coordinator has settled their
     boundary, and a closed protection interval is retired only after progress
-    has passed its inclusive end. Repeating the same tick is a no-op.
+    has passed its inclusive end. ``retain`` names individuals whose latest
+    loss is still owed to a deferred site clear: their evidence is not
+    consumed until the site has used it. Repeating the same tick is a no-op.
     """
     _require_wilderness(wilderness)
     if not population_provisioned(wilderness):
@@ -1185,7 +1219,11 @@ def settle_timeline_through(wilderness: Any, tick: int) -> None:
         wilderness,
         PopulationTimeline(
             tick,
-            tuple(t for t in timeline.transitions if t.occurred_tick > tick),
+            tuple(
+                t
+                for t in timeline.transitions
+                if t.occurred_tick > tick or t.individual_id in retain
+            ),
             tuple(
                 p for p in timeline.protection if p.end_tick is None or p.end_tick >= tick
             ),
@@ -1961,6 +1999,7 @@ __all__ = [
     "population_counts",
     "presence_at",
     "presence_of",
+    "protected_cells",
     "read_population_seed",
     "read_population_timeline",
     "record_population_protection",

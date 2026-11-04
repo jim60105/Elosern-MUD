@@ -313,11 +313,23 @@ def _commit(
         id(entity): _snapshot_touched(entity, surfaces_of[id(entity)])
         for entity in touched
     }
+    population = _population_commit_context(touched)
+    before_hp = (
+        {}
+        if population is None
+        else {
+            id(entity): persisted_hp(entity)
+            for entity in touched
+            if isinstance(entity, Monster)
+        }
+    )
     try:
         started = time.monotonic()
         with transaction.atomic():
             for effect in pending:
                 effect.apply()
+            if population is not None:
+                _record_population_crossings(population, touched, before_hp)
             if post_commit_hook is not None:
                 post_commit_hook()
             # Boundary event fires only on the OUTERMOST durable commit: the
@@ -335,4 +347,66 @@ def _commit(
     except Exception as error:
         for entity in touched:
             _restore_touched_best_effort(entity, snapshots[id(entity)], surfaces_of[id(entity)])
+        if population is not None:
+            population[0].restore_population_surfaces(population[2])
         raise CommitFailed(RejectReason.COMMIT_FAILED, str(error)) from error
+
+
+def _population_commit_context(touched: list[Any]) -> tuple | None:
+    """The population surfaces an out-of-round action commit may change.
+
+    Only a mapped, provisioned world with a touched ``Monster`` carries this
+    evidence, and only outside any round provenance: a persistent session's
+    round finalizer and the bounded battle loop own their own occurrences, so
+    notifying here would double-count and could backdate a later-round death.
+    """
+    from typeclasses.monsters import Monster
+    from world.rules.combat.decision_scope import current_combat_provenance
+    from world.maps import regional_population
+
+    if current_combat_provenance() is not None:
+        return None
+    if not any(isinstance(entity, Monster) for entity in touched):
+        return None
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(wilderness):
+        return None
+    return (
+        regional_population,
+        wilderness,
+        regional_population.snapshot_population_surfaces(wilderness),
+    )
+
+
+def _record_population_crossings(
+    population: tuple, touched: list[Any], before_hp: dict[int, float]
+) -> None:
+    """Record each real live/dead crossing of a touched mapped Monster once.
+
+    A non-round action or upkeep commit has no round offset: its occurrence is
+    the current committed game tick. Abstract encounters never reach here
+    (``_population_commit_context`` refuses them), and a crossing already
+    recorded by its owning round path is deduplicated by the timeline.
+    """
+    from typeclasses.monsters import Monster
+    from world.rules.surfaces import persisted_hp
+
+    owner, wilderness, _surfaces = population
+    tick = owner.current_population_tick()
+    for entity in touched:
+        if not isinstance(entity, Monster):
+            continue
+        was_alive = before_hp.get(id(entity), 0) > 0
+        is_alive = persisted_hp(entity) > 0
+        if was_alive == is_alive:
+            continue
+        owner.record_population_transition(
+            wilderness,
+            owner.PopulationTransition(
+                source_id=f"action-commit:{entity.pk}:{tick}:{int(is_alive)}",
+                individual_id=int(entity.pk),
+                occurred_tick=tick,
+                before=owner.presence_of(wilderness, entity, alive=was_alive),
+                after=owner.presence_of(wilderness, entity, alive=is_alive),
+            ),
+        )

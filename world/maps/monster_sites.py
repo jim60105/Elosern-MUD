@@ -65,6 +65,7 @@ from world.maps.regional_population import (
     MALFORMED_STATE,
     MalformedPopulationState,
     presence_at,
+    protected_cells,
     read_population_seed,
     read_population_timeline,
     register_explicit_individual,
@@ -732,6 +733,54 @@ def _clear_boundary(
     return max(boundaries) if boundaries else start_tick
 
 
+def _birth_cell_protected(wilderness: Any, site: MonsterSite, tick: int) -> bool:
+    """Whether this site's coordinate holds no lawful birth space at ``tick``."""
+    return site.coordinates in protected_cells(wilderness, at_tick=tick)
+
+
+def retained_loss_ids(wilderness: Any | None = None) -> frozenset[int]:
+    """Owned IDs whose committed loss a deferred site clear still needs.
+
+    A populated site whose members are all lost cannot be declared clear while
+    a persisted combat session still references them. Its members' loss
+    transitions are the evidence that carries the true occurrence tick to the
+    later clear, so the coordinator must not consume them yet. IDs are
+    retained only for a populated site with no living member and a session
+    reference, and are otherwise consumed normally.
+    """
+    wilderness = _wilderness() if wilderness is None else wilderness
+    if wilderness is None:
+        return frozenset()
+    states = _read_state_map(wilderness)
+    if states is None:
+        return frozenset()
+    presence = presence_at(wilderness)
+    retained: set[int] = set()
+    for key, site in MONSTER_SITE_REGISTRY.items():
+        record = states.get(key)
+        if record is None or _saved_state(record) != SITE_STATE_POPULATED:
+            continue
+        member_ids = _saved_member_ids(record) or ()
+        if not member_ids:
+            continue
+        living = {
+            individual_id
+            for individual_id in member_ids
+            if (fact := presence.get(individual_id)) is not None and fact.alive
+        }
+        if living:
+            continue
+        members = _members_from_ids(site, member_ids)
+        if not members:
+            continue
+        if not _session_participant_ids().intersection(
+            member.pk for member in members
+        ):
+            continue
+        retained.update(int(member.pk) for member in members)
+    return frozenset(retained)
+
+
 def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
     """The earliest site lifecycle boundary up to ``end_tick`` (pure read).
 
@@ -759,17 +808,22 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
         if state == SITE_STATE_POPULATED:
             boundary = _clear_boundary(wilderness, site, start_tick)
             if boundary is not None:
-                candidates.append(boundary)
+                # A boundary already reached is re-evaluated at the interval
+                # start (a deferred clear or an avoided protected cell), so a
+                # later pass is not stranded behind it.
+                candidates.append(boundary if boundary > start_tick else start_tick)
         elif state == SITE_STATE_CLEARED and not site.one_shot:
             cleared_at = record.get("cleared_at_tick")
             if isinstance(cleared_at, int) and not isinstance(cleared_at, bool):
-                candidates.append(cleared_at + site.recover_after_ticks)
+                due = cleared_at + site.recover_after_ticks
+                candidates.append(due if due > start_tick else start_tick)
     if uninitialized:
         candidates.append(start_tick)
     due = [candidate for candidate in candidates if start_tick < candidate <= end_tick]
     if uninitialized and start_tick <= end_tick:
         due.append(start_tick)
-    return min(due) if due else None
+    later = [candidate for candidate in due if candidate > start_tick]
+    return min(later) if later else None
 
 
 def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
@@ -800,6 +854,11 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
         site = MONSTER_SITE_REGISTRY[key]
         record = states.get(key)
         if record is None:
+            if _birth_cell_protected(wilderness, site, tick):
+                # An encounter owns this cell during the evaluated interval:
+                # no individual is placed, and the site retries at the next
+                # interval start once protection has passed.
+                continue
             seed = _site_seed(wilderness, site)
             created = _populate(
                 wilderness, site, seed=seed, sequence=0, tick=tick
@@ -824,17 +883,20 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
                 # A committed combat session still owns this defeat: the
                 # clearing decision waits for the session to settle.
                 continue
+            clear_tick = _clear_boundary(wilderness, site, tick)
+            if clear_tick is None or clear_tick > tick:
+                clear_tick = tick
             # The defeated identities stay recorded: they are the site's
             # ownership history and no recovered group may reuse them.
             states[key] = {
                 **record,
                 "state": SITE_STATE_CLEARED,
-                "cleared_at_tick": tick,
+                "cleared_at_tick": clear_tick,
             }
             changed = True
             _emit(
                 "monster_site_cleared",
-                _site_context(site, tick=tick, cleared_at_tick=tick),
+                _site_context(site, tick=tick, cleared_at_tick=clear_tick),
             )
             continue
         if site.one_shot:
@@ -842,6 +904,8 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
         if not _condition_matured(site, record.get("cleared_at_tick"), tick):
             continue
         if _recovery_refusal(wilderness, site, record, tick) is not None:
+            continue
+        if _birth_cell_protected(wilderness, site, tick):
             continue
         created = _apply_recovery(
             wilderness,

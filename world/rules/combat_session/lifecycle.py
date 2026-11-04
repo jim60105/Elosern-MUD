@@ -90,6 +90,17 @@ def clear_session(
     from world.rules.skip_safety import unregister_participants
 
     session_id = _terminal_session_id(actor, record)
+    if record is not None:
+        # Every lawful clear -- the terminal settlement, an operator deletion
+        # of a participant, or startup restoration of a committed receipt --
+        # retains the session's exact cell and closed interval before the
+        # record disappears. The population owner deduplicates the evidence,
+        # and a malformed record never reaches here (it was not parsed).
+        from world.rules.combat_session.settlement import (
+            _record_terminal_population_protection,
+        )
+
+        _record_terminal_population_protection(record)
     actor.db.active_combat = None
     actor.ndb.action_context = None
     if session_id is not None:

@@ -133,6 +133,7 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         cell_capacity: int = 3,
         cells: tuple[tuple[int, int], ...] = LOCAL,
         site: MonsterSite | None = None,
+        recovery_delay: int = DELAY,
     ) -> EcologyZone:
         zone = EcologyZone(
             ZONE_KEY,
@@ -142,7 +143,7 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             LOWER_DENSITY,
             UPPER_DENSITY,
             cell_capacity,
-            recovery_delay=DELAY,
+            recovery_delay=recovery_delay,
             replenishment_interval=REPLENISH,
             wave_budget=wave_budget,
         )
@@ -534,7 +535,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(outcome[2], 3)
         self.assertIsNone(outcome[1])
 
-    def _use_site(self) -> MonsterSite:
+    def _use_site(
+        self, *, cleared_at_tick: int = 100, recover_after_ticks: int = 40
+    ) -> MonsterSite:
         site = MonsterSite(
             key=SITE_KEY,
             kind="camp",
@@ -543,12 +546,12 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             composition_key="t_recovery_solo",
             capacity=1,
             one_shot=False,
-            recover_after_ticks=40,
+            recover_after_ticks=recover_after_ticks,
         )
         self.wilderness.db.monster_sites = {
             SITE_KEY: {
                 "state": "cleared",
-                "cleared_at_tick": 100,
+                "cleared_at_tick": cleared_at_tick,
                 "seed": 7,
                 "generation_sequence": 0,
                 "member_ids": [999999],
@@ -561,6 +564,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         zone = self._use_zone(wave_budget=1, site=site)
 
         def run(parts: tuple[int, ...]):
+            # Both runs start from the identical site baseline: the record is
+            # part of the input, not leftover state from the previous run.
+            self._use_site()
             created = self._reset(zone, 100)
             baseline = zone_state(self.wilderness, ZONE_KEY).generation_sequence
             self._kill(Monster.objects.get(pk=created[0]), 100)
@@ -591,6 +597,226 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(outcome[2], 4)
         self.assertEqual(single[2], "populated")
         self.assertEqual(single[3], 1)
+
+    def test_a_same_tick_site_birth_cancels_the_pending_episode(self):
+        site = self._use_site(cleared_at_tick=95, recover_after_ticks=25)
+        zone = self._use_zone(
+            wave_budget=1, recovery_delay=30, site=site
+        )
+
+        def run(parts: tuple[int, ...]):
+            self._use_site(cleared_at_tick=95, recover_after_ticks=25)
+            created = self._reset(zone, 100)
+            baseline = zone_state(self.wilderness, ZONE_KEY).generation_sequence
+            self._kill(Monster.objects.get(pk=created[0]), 100)
+            # A later loss is recorded while the first episode is still
+            # pending; the 120 site birth must cancel that episode first.
+            self._kill(Monster.objects.get(pk=created[1]), 125)
+            self._advance_parts(parts)
+            state = zone_state(self.wilderness, ZONE_KEY)
+            return (
+                baseline,
+                state.generation_sequence,
+                state.recovery_due_tick,
+                len(self._local()),
+            )
+
+        single = run((60,))
+        split = run((21, 39))
+        self.assertEqual(single, split)
+        # One wave only: the 155 due from the 125 loss, not an early 130 wave.
+        self.assertEqual(single[1], single[0] + 1)
+        self.assertIsNone(single[2])
+        self.assertEqual(single[3], 3)
+
+    def test_a_protected_cell_defers_site_births_until_it_passes(self):
+        site = self._use_site(cleared_at_tick=100, recover_after_ticks=10)
+        self._use_zone(site=site)
+        self._initialized(tick=100)
+        self.clock.tick = 100
+        record_population_protection(
+            self.wilderness,
+            engagement_id="t-site-fight",
+            cell=LOCAL[0],
+            start_tick=100,
+            end_tick=110,
+        )
+
+        settle_population_lifecycle(100, 110)
+        self.assertEqual(
+            monster_sites.site_state(SITE_KEY, wilderness=self.wilderness).state,
+            "cleared",
+        )
+        self.assertEqual(
+            [
+                individual
+                for individual in self._individuals()
+                if individual.db.site_key == SITE_KEY
+            ],
+            [],
+        )
+        settle_population_lifecycle(110, 111)
+        self.assertEqual(
+            monster_sites.site_state(SITE_KEY, wilderness=self.wilderness).state,
+            "populated",
+        )
+        self.assertEqual(
+            len(
+                [
+                    individual
+                    for individual in self._individuals()
+                    if individual.db.site_key == SITE_KEY
+                ]
+            ),
+            1,
+        )
+
+    def test_a_lawful_clear_still_retains_the_closed_protection(self):
+        from world.rules.combat_session.lifecycle import clear_session
+        from world.rules.combat_session.records import to_storage
+
+        cell = LOCAL[0]
+        monster = construct_species_individual(
+            variant_species_key(ORDINARY), ORDINARY
+        )
+        self.wilderness.db.itemcoordinates[monster] = cell
+        record = CombatSessionRecord(
+            session_id="hostile:1:100",
+            engagement_id="hostile:1:100:1",
+            mode="hostile",
+            room_id=1,
+            player_ids=(self.char1.pk,),
+            enemy_ids=(monster.pk,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=3,
+            exam_id=None,
+            started_tick=100,
+            population_cell={
+                "wilderness": WILDERNESS_NAME,
+                "x": cell[0],
+                "y": cell[1],
+            },
+        )
+        self.char1.db.active_combat = to_storage(record)
+
+        # An operator/GM cleanup clears the session directly; the interval must
+        # not disappear with the record.
+        clear_session(self.char1, None, record)
+        self.assertIsNone(self.char1.db.active_combat)
+        protection = read_population_timeline(self.wilderness).protection
+        self.assertEqual([(p.start_tick, p.end_tick) for p in protection], [(100, 118)])
+
+    def test_a_deferred_site_clear_keeps_the_loss_occurrence(self):
+        from world.rules.combat_session.records import to_storage
+
+        site = self._use_site(cleared_at_tick=0, recover_after_ticks=1000)
+        self._use_zone(site=site)
+        # The site has never been populated: its first settlement creates the
+        # group whose loss this test follows.
+        self.wilderness.db.monster_sites = {}
+        self._initialized(tick=100)
+        self.clock.tick = 100
+        settle_population_lifecycle(100, 100)
+        members = [
+            individual
+            for individual in self._individuals()
+            if individual.db.site_key == SITE_KEY
+        ]
+        self.assertEqual(len(members), 1)
+        member = members[0]
+        self._kill(member, 106)
+        # A persisted combat session still owns this defeat.
+        record = CombatSessionRecord(
+            session_id="hostile:1:100",
+            engagement_id="hostile:1:100:1",
+            mode="hostile",
+            room_id=1,
+            player_ids=(self.char1.pk,),
+            enemy_ids=(member.pk,),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=1,
+            exam_id=None,
+            started_tick=100,
+            population_cell=None,
+        )
+        self.char1.db.active_combat = to_storage(record)
+
+        settle_population_lifecycle(100, 110)
+        self.assertEqual(
+            monster_sites.site_state(SITE_KEY, wilderness=self.wilderness).state,
+            "populated",
+        )
+        # The committed occurrence survives the deferred clear.
+        self.assertTrue(read_population_timeline(self.wilderness).transitions)
+
+        self.char1.db.active_combat = None
+        settle_population_lifecycle(110, 120)
+        cleared = monster_sites.site_state(SITE_KEY, wilderness=self.wilderness)
+        self.assertEqual(cleared.state, "cleared")
+        self.assertEqual(cleared.cleared_at_tick, 106)
+
+    def test_the_pure_boundary_projects_an_unpersisted_episode(self):
+        self._use_zone()
+        created = self._initialized(tick=100)
+        self.clock.tick = 100
+        self._kill(Monster.objects.get(pk=created[0]), 100)
+        self.assertIsNone(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick)
+        self.assertEqual(
+            population_lifecycle.next_population_lifecycle_boundary(100, 130), 110
+        )
+
+    def test_incomplete_timeline_evidence_refuses(self):
+        from world.maps.regional_population import MalformedPopulationState
+
+        good = {
+            "alive": True,
+            "position": {"wilderness": WILDERNESS_NAME, "x": 1, "y": 2},
+            "home_zone": None,
+            "site_key": None,
+        }
+        self.wilderness.db.population_timeline = {
+            "settled_through_tick": 0,
+            "transitions": [
+                {
+                    "source_id": "s",
+                    "individual_id": 1,
+                    "occurred_tick": 5,
+                    "before": {"alive": True},
+                    "after": good,
+                }
+            ],
+            "protection": [],
+        }
+        with self.assertRaises(MalformedPopulationState):
+            read_population_timeline(self.wilderness)
+
+        self.wilderness.db.population_timeline = {
+            "settled_through_tick": 0,
+            "transitions": [],
+            "protection": [
+                {
+                    "engagement_id": "e",
+                    "cell": {"wilderness": WILDERNESS_NAME, "x": 1, "y": 2},
+                    "start_tick": 10,
+                    "end_tick": 5,
+                }
+            ],
+        }
+        with self.assertRaises(MalformedPopulationState):
+            read_population_timeline(self.wilderness)
+
+    def test_settlement_progress_agrees_under_partition(self):
+        zone = self._use_zone()
+
+        def run(parts: tuple[int, ...]) -> int:
+            self._reset(zone, 100)
+            self._advance_parts(parts)
+            return read_population_timeline(self.wilderness).settled_through_tick
+
+        self.assertEqual(run((60,)), run((25, 35)))
+        self.assertEqual(run((60,)), 160)
 
     # -- observation routes -------------------------------------------------
 

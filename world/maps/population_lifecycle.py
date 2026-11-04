@@ -57,13 +57,22 @@ def _settle_population_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
             wilderness, zone_key, tick=tick
         )
     events = list(monster_sites.settle_monster_sites_at(tick))
+    # Same-tick explicit site births restore local density: cancel or refresh
+    # each episode from the post-site counts before any regional wave is
+    # considered, so a restored episode never survives into a later due time.
+    for zone_key in zone_keys:
+        regional_population.note_population_boundary(
+            wilderness, zone_key, tick=tick
+        )
     for zone_key in zone_keys:
         events.extend(
             regional_population.settle_recovery_due(
                 wilderness, zone_key, tick=tick
             )
         )
-    regional_population.settle_timeline_through(wilderness, tick)
+    regional_population.settle_timeline_through(
+        wilderness, tick, retain=monster_sites.retained_loss_ids(wilderness)
+    )
     return events
 
 
@@ -80,6 +89,14 @@ def _next_population_boundary(
     site_boundary = monster_sites.next_site_boundary(tick, end_tick)
     if site_boundary is not None:
         candidates.append(site_boundary)
+    # A birth route deferred by encounter protection retries on the first
+    # unprotected tick, so protection end is a real merged boundary.
+    for protection in timeline.protection:
+        if protection.end_tick is None:
+            continue
+        resumed = protection.end_tick + 1
+        if tick < resumed <= end_tick:
+            candidates.append(resumed)
     for zone_key in _zone_keys(wilderness):
         state = regional_population.zone_state(wilderness, zone_key)
         due = None if state is None else state.recovery_due_tick
@@ -107,6 +124,12 @@ def settle_population_lifecycle(
         if following is None or following <= tick:
             break
         tick = following
+    # Progress is the interval endpoint whether or not a boundary fell there:
+    # equal elapsed time must leave equal settlement progress and equal
+    # protection retirement.
+    regional_population.settle_timeline_through(
+        wilderness, end_tick, retain=monster_sites.retained_loss_ids(wilderness)
+    )
     return events
 
 
@@ -117,7 +140,26 @@ def next_population_lifecycle_boundary(
     wilderness = _wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return None
-    return _next_population_boundary(wilderness, start_tick, end_tick)
+    earliest = _next_population_boundary(wilderness, start_tick, end_tick)
+    candidates = [] if earliest is None else [earliest]
+    # A loss already recorded at the interval start has no persisted due time
+    # until settlement runs: project the episode the first boundary would
+    # establish, so a wait stops before that wave instead of running past it.
+    for zone_key in _zone_keys(wilderness):
+        state = regional_population.zone_state(wilderness, zone_key)
+        if state is not None and state.recovery_due_tick is not None:
+            continue
+        lower = regional_population.density_lower_bound(wilderness, zone_key)
+        local = regional_population.population_counts(
+            wilderness, zone_key, at_tick=start_tick
+        )
+        if len(local.local_ids) >= lower:
+            continue
+        zone = regional_population.ECOLOGY_ZONE_REGISTRY[zone_key]
+        candidate = start_tick + zone.recovery_delay
+        if start_tick < candidate <= end_tick:
+            candidates.append(candidate)
+    return min(candidates) if candidates else None
 
 
 def snapshot_population_lifecycle_surfaces(
