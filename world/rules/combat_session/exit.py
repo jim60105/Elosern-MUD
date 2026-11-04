@@ -67,6 +67,15 @@ from world.rules.combat_session.writer import (
     durable_combat_atomic,
     serialized_combat_write,
 )
+from world.rules.movement_edges import (
+    MovementEdgeError,
+    MovementHistoryError,
+    PhysicalEdge,
+    encode_physical_edge,
+    legal_edges,
+    location_ref,
+    read_previous_edge,
+)
 from world.rules.player_messages import (
     PARTY_EXIT_CONSEQUENCE_LINES,
     PARTY_EXIT_OPERATION_LABELS,
@@ -91,7 +100,11 @@ _HEX_DIGITS = frozenset("0123456789ABCDEF")
 
 
 def _token_digest(
-    commander: Any, session_id: str, round_revision: int, operation: str
+    commander: Any,
+    session_id: str,
+    round_revision: int,
+    operation: str,
+    route_fingerprint: str | None = None,
 ) -> str:
     """Return the confirmation digest binding the four authoritative values.
 
@@ -101,6 +114,11 @@ def _token_digest(
     above, not concealment.
     """
     payload = f"{int(commander.pk)}|{session_id}|{int(round_revision)}|{operation}"
+    if operation == PARTY_EXIT_RETREAT:
+        # The retreat's server-captured route history is part of the bound
+        # record: a client can never redirect the exit, and a teleport that
+        # invalidated the history cannot reuse the old confirmation.
+        payload = f"{payload}|route:{route_fingerprint or '-'}"
     digest = hmac.new(
         str(settings.SECRET_KEY).encode("utf-8"),
         payload.encode("utf-8"),
@@ -110,13 +128,67 @@ def _token_digest(
 
 
 def party_exit_token(
-    commander: Any, session_id: str, round_revision: int, operation: str
+    commander: Any,
+    session_id: str,
+    round_revision: int,
+    operation: str,
+    *,
+    route_fingerprint: str | None = None,
 ) -> str:
     """Return the bounded confirmation token for one bound party exit."""
     if operation not in PARTY_EXIT_OPERATIONS:
         raise CombatSessionError(SessionReason.UNKNOWN_PARTY_EXIT_OPERATION)
-    digest = _token_digest(commander, session_id, round_revision, operation)
+    digest = _token_digest(
+        commander, session_id, round_revision, operation, route_fingerprint
+    )
     return f"{_OPCODE_BY_OPERATION[operation]}-{int(round_revision)}-{digest}"
+
+
+def _route_history(commander: Any) -> PhysicalEdge | None:
+    """Read the commander's last completed edge, refusing a malformed record."""
+    try:
+        return read_previous_edge(commander)
+    except MovementHistoryError as error:
+        raise CombatSessionError(
+            SessionReason.MOVEMENT_HISTORY_INVALID, str(error)
+        ) from error
+
+
+def _route_fingerprint(commander: Any) -> str:
+    """The stable fingerprint of the server-captured previous reverse edge."""
+    previous = _route_history(commander)
+    if previous is None:
+        return "-"
+    encoded = encode_physical_edge(previous)
+    return hashlib.sha256(
+        repr(sorted(encoded.items())).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def _captured_reverse_edge(commander: Any) -> PhysicalEdge | None:
+    """The currently legal reverse of the party's last completed edge.
+
+    The stored history identifies the edge; this resolves the actual reverse
+    route execution would take from the party's current position. A missing
+    history, a changed position or a now-blocked reverse simply yields no
+    preferred route, so the retreat falls back to its deterministic choice.
+    """
+    previous = _route_history(commander)
+    if previous is None:
+        return None
+    try:
+        source = location_ref(commander)
+    except MovementEdgeError:
+        return None
+    if previous.destination != source:
+        return None
+    try:
+        for edge in legal_edges(commander, source, (commander,)):
+            if edge.destination == previous.source:
+                return edge
+    except MovementEdgeError:
+        return None
+    return None
 
 
 def _parse_token(confirmation_token: Any) -> tuple[str, int, str]:
@@ -162,13 +234,17 @@ def _verify_confirmation_token(
     round_revision: Any,
     operation: Any,
     confirmation_token: Any,
-) -> str:
-    """Return the verified operation, or raise the exact rejection reason.
+) -> tuple[str, str | None]:
+    """Return ``(verified operation, bound route fingerprint)`` or raise.
 
     Only caller-supplied values are compared until the digest verifies, so no
     server state is disclosed by which check failed. A token whose revision no
     longer matches the claimed round is stale; a token that does not verify for
-    the claimed commander/session/round/operation is invalid.
+    the claimed commander/session/round/operation is invalid. A retreat token
+    additionally binds the server-captured route history; once that operation
+    committed and the party relocated, the committed receipt's recorded
+    fingerprint is the second accepted binding, so a replay reaches the
+    receipt-only answer instead of repeating the unit.
     """
     if not isinstance(operation, str) or operation not in PARTY_EXIT_OPERATIONS:
         raise CombatSessionError(SessionReason.UNKNOWN_PARTY_EXIT_OPERATION)
@@ -183,10 +259,32 @@ def _verify_confirmation_token(
         raise CombatSessionError(SessionReason.INVALID_CONFIRMATION_TOKEN)
     if token_revision != round_revision:
         raise CombatSessionError(SessionReason.STALE_ROUND_REVISION)
-    expected = _token_digest(commander, session_id, round_revision, operation)
-    if not hmac.compare_digest(expected, digest):
-        raise CombatSessionError(SessionReason.INVALID_CONFIRMATION_TOKEN)
-    return operation
+    if operation != PARTY_EXIT_RETREAT:
+        expected = _token_digest(commander, session_id, round_revision, operation)
+        if not hmac.compare_digest(expected, digest):
+            raise CombatSessionError(SessionReason.INVALID_CONFIRMATION_TOKEN)
+        return operation, None
+    candidates = [_route_fingerprint(commander)]
+    committed = read_last_combat_receipt(commander)
+    if (
+        committed is not None
+        and committed.get("session_id") == session_id
+        and committed.get("round_revision") == round_revision
+        and committed.get("operation") == operation
+        and isinstance(committed.get("route_fingerprint"), str)
+    ):
+        # A committed retreat recorded the fingerprint it bound. The party has
+        # since relocated, so the live history no longer names that edge; the
+        # replay still verifies against the committed operation record and is
+        # then routed to the receipt-only path.
+        candidates.append(committed["route_fingerprint"])
+    for route_fingerprint in candidates:
+        expected = _token_digest(
+            commander, session_id, round_revision, operation, route_fingerprint
+        )
+        if hmac.compare_digest(expected, digest):
+            return operation, route_fingerprint
+    raise CombatSessionError(SessionReason.INVALID_CONFIRMATION_TOKEN)
 
 
 def request_party_exit(
@@ -215,6 +313,11 @@ def request_party_exit(
         or record.round_revision != round_revision
     ):
         raise CombatSessionError(SessionReason.STALE_ROUND_REVISION)
+    preferred = (
+        _captured_reverse_edge(commander)
+        if operation == PARTY_EXIT_RETREAT
+        else None
+    )
     return {
         "outcome": "prompt",
         "operation": operation,
@@ -222,7 +325,18 @@ def request_party_exit(
         "session_id": record.session_id,
         "round_revision": record.round_revision,
         "confirmation_token": party_exit_token(
-            commander, record.session_id, record.round_revision, operation
+            commander,
+            record.session_id,
+            record.round_revision,
+            operation,
+            route_fingerprint=(
+                _route_fingerprint(commander)
+                if operation == PARTY_EXIT_RETREAT
+                else None
+            ),
+        ),
+        "route": (
+            None if preferred is None else encode_physical_edge(preferred)
         ),
         "party_scope": tuple(sorted(record.player_ids)),
         "consequences": tuple(PARTY_EXIT_CONSEQUENCE_LINES[operation]),
@@ -251,6 +365,9 @@ class _ExitSnapshots:
     battlefield: Battlefield | None
     skip_safety: tuple[tuple[str, Any], ...]
     practice_dedupe: tuple[int | None, frozenset]
+    party_extra: tuple[
+        tuple[Any, dict[tuple[str, str | None], tuple[bool, Any]]], ...
+    ]
 
     def restore(self, actor: Any, action_context: Any) -> None:
         """Reinstate every snapshotted surface, in the round path's order."""
@@ -260,6 +377,11 @@ class _ExitSnapshots:
         _restore_round_touched(actor, self.touched, self.extra, *self.party)
         _restore_exam_host(self.exam_host)
         actor.ndb.action_context = action_context
+        for entity, extra in self.party_extra:
+            for (key, category), snapshot in extra.items():
+                from world.rules.action import _restore_attribute
+
+                _restore_attribute(entity, key, snapshot, category)
         # A confirmed retreat's failed round resolves real actions, which claim
         # per-tick practice entries; the exit unit is their outer transaction
         # owner, so a rolled-back unit must release those claims for a
@@ -286,6 +408,8 @@ def _snapshot_exit_surfaces(
     commander: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
+    *,
+    command_seconds: int = 0,
 ) -> _ExitSnapshots:
     """Snapshot every in-process surface the exit unit may touch.
 
@@ -354,10 +478,13 @@ def _snapshot_exit_surfaces(
             battlefield=None,
             skip_safety=skip_safety,
             practice_dedupe=practice_dedupe,
+            party_extra=_snapshot_party_extra((commander,)),
         )
     touched, extra = _snapshot_round_touched(commander, battlefield, record)
     return _ExitSnapshots(
-        clock_snapshot=_snapshot_round_clock(record, battlefield),
+        clock_snapshot=_snapshot_round_clock(
+            record, battlefield, command_seconds=command_seconds
+        ),
         touched=touched,
         extra=extra,
         party=_snapshot_party_surfaces(commander, battlefield),
@@ -365,6 +492,54 @@ def _snapshot_exit_surfaces(
         battlefield=battlefield,
         skip_safety=(),
         practice_dedupe=practice_dedupe,
+        party_extra=_snapshot_party_extra(
+            _present_party_bodies(commander, battlefield)
+        ),
+    )
+
+
+def _present_party_bodies(
+    commander: Any, battlefield: Battlefield
+) -> tuple[Any, ...]:
+    """The commander's present source team, in roster order."""
+    from world.rules.combat_identity import stable_actor_id
+
+    team = battlefield.team_of(stable_actor_id(commander))
+    if team is None:
+        return (commander,)
+    bodies = [
+        battlefield.roster[key]
+        for key in sorted(battlefield.teams.get(team, frozenset()))
+        if key in battlefield.roster
+    ]
+    return tuple(bodies) or (commander,)
+
+
+def _snapshot_party_extra(
+    bodies: tuple[Any, ...],
+) -> tuple[tuple[Any, dict[tuple[str, str | None], tuple[bool, Any]]], ...]:
+    """Snapshot every non-round attribute a retreat/arrival may write."""
+    from world.rules.action import _attribute_snapshot
+    from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
+
+    surfaces = tuple(
+        (key, None)
+        for key in (
+            "last_combat_receipt",
+            "dialogue_session",
+            "combat_encounter_seq",
+            "previous_traversal",
+        )
+    ) + tuple(SLEEP_RECEIPT_SURFACES)
+    return tuple(
+        (
+            body,
+            {
+                (key, category): _attribute_snapshot(body, key, category)
+                for key, category in surfaces
+            },
+        )
+        for body in bodies
     )
 
 
@@ -372,6 +547,7 @@ def _confirm_surrender(
     commander: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
+    context: dict[str, Any],
 ) -> dict[str, Any]:
     """Discard the draft and enter the existing defeat/FAIL settlement once.
 
@@ -381,6 +557,7 @@ def _confirm_surrender(
     write, so the draft is discarded atomically with the terminal outcome and a
     failed unit keeps it.
     """
+    del context
     outcome = "defeat" if record.mode == "hostile" else "exam_failed"
     return _settle_with_restore(
         commander,
@@ -396,6 +573,7 @@ def _confirm_retreat(
     commander: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
+    context: dict[str, Any],
 ) -> dict[str, Any]:
     """Resolve one confirmed retreat round at this serialized revision boundary.
 
@@ -408,7 +586,17 @@ def _confirm_retreat(
     """
     from world.rules.combat_session.rounds import resolve_party_retreat
 
-    return resolve_party_retreat(commander, record, battlefield)
+    result = resolve_party_retreat(
+        commander,
+        record,
+        battlefield,
+        preferred=context.get("preferred"),
+        plan=context.get("plan"),
+    )
+    traversal = result.pop("_retreat_traversal", None)
+    if traversal is not None:
+        context["traversal"] = traversal
+    return result
 
 
 #: One dispatch per operation, so confirming either party exit reaches its own
@@ -417,7 +605,11 @@ def _confirm_retreat(
 #: ``party_exit_unavailable`` guard below stays as the fail-closed answer for
 #: an operation the boundary knows but dispatches nowhere.
 _OPERATION_HANDLERS: dict[
-    str, Callable[[Any, CombatSessionRecord, "Battlefield | None"], dict[str, Any]]
+    str,
+    Callable[
+        [Any, CombatSessionRecord, "Battlefield | None", dict[str, Any]],
+        dict[str, Any],
+    ],
 ] = {
     PARTY_EXIT_SURRENDER: _confirm_surrender,
     PARTY_EXIT_RETREAT: _confirm_retreat,
@@ -533,7 +725,7 @@ def confirm_party_exit(
     surface from the pre-unit snapshot and drops the armed aftermath undo, so
     the durable session and the pending draft both survive for a valid retry.
     """
-    verified = _verify_confirmation_token(
+    verified, bound_route_fingerprint = _verify_confirmation_token(
         commander, session_id, round_revision, operation, confirmation_token
     )
     handler = _OPERATION_HANDLERS.get(verified)
@@ -543,6 +735,7 @@ def confirm_party_exit(
 
     action_context = commander.ndb.action_context
     snapshots: _ExitSnapshots | None = None
+    context: dict[str, Any] = {}
     result: dict[str, Any] = {}
     try:
         with durable_combat_atomic():
@@ -560,8 +753,32 @@ def confirm_party_exit(
             ):
                 raise CombatSessionError(SessionReason.STALE_ROUND_REVISION)
             battlefield = _reconstruct(commander, record)
-            snapshots = _snapshot_exit_surfaces(commander, record, battlefield)
-            result = handler(commander, record, battlefield)
+            command_seconds = 0
+            if verified == PARTY_EXIT_RETREAT:
+                from world.rules import world_escape
+
+                context["preferred"] = _captured_reverse_edge(commander)
+                context["route_fingerprint"] = bound_route_fingerprint
+                if battlefield is not None:
+                    # Pure read: the route and the exact travel window the
+                    # rollback snapshot must cover.
+                    context["plan"] = world_escape.plan_party_retreat(
+                        commander,
+                        record,
+                        battlefield,
+                        operation_id=(
+                            f"{record.engagement_id or record.session_id}:retreat:"
+                            f"{int(record.rounds_elapsed)}"
+                        ),
+                        preferred=context["preferred"],
+                    )
+                    plan = context["plan"]
+                    if plan is not None and plan.traversal.cost is not None:
+                        command_seconds = int(plan.traversal.cost.seconds)
+            snapshots = _snapshot_exit_surfaces(
+                commander, record, battlefield, command_seconds=command_seconds
+            )
+            result = handler(commander, record, battlefield, context)
             receipt = {
                 "session_id": record.session_id,
                 "round_revision": record.round_revision,
@@ -569,6 +786,17 @@ def confirm_party_exit(
                 "outcome": result.get("outcome"),
                 "operation": verified,
             }
+            if verified == PARTY_EXIT_RETREAT:
+                # Server-captured route evidence: the receipt records the
+                # actual bound route so a replay can never be mistaken for a
+                # second relocation.
+                preferred = context.get("preferred")
+                receipt["route"] = (
+                    None
+                    if preferred is None
+                    else encode_physical_edge(preferred)
+                )
+                receipt["route_fingerprint"] = context.get("route_fingerprint")
             write_last_combat_receipt(commander, receipt)
             result["receipt"] = receipt
             result["operation"] = verified
@@ -579,6 +807,13 @@ def confirm_party_exit(
         # reader observes a settlement the database never committed.
         for undo in drain_pending_undos():
             undo()
+        traversal = context.get("traversal")
+        if traversal is not None:
+            from world.rules.movement_settlement import (
+                restore_failed_retreat_traversal,
+            )
+
+            restore_failed_retreat_traversal(traversal)
         if snapshots is not None:
             snapshots.restore(commander, action_context)
         raise

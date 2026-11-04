@@ -985,6 +985,35 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["code"], "invalid_confirmation_token")
         self.assertEqual(self._record().round_revision, record.round_revision)
 
+    def test_a_confirmed_retreat_moves_the_party_over_a_real_edge(self):
+        from typeclasses.exits import Exit
+
+        other = create_object(Room, key="transport escape")
+        create_object(Exit, key="out", location=self.room, destination=other)
+        record = self._engage()
+        prompt = _exit_prompt_adapter(
+            self.player,
+            {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "operation": PARTY_EXIT_RETREAT,
+            },
+        )
+        payload = {
+            "session_id": record.session_id,
+            "round_revision": record.round_revision,
+            "operation": PARTY_EXIT_RETREAT,
+            "confirmation_token": prompt["data"]["confirmation_token"],
+        }
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            result = _exit_confirm_adapter(self.player, payload)
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], CODE_COMBAT_TERMINAL)
+        self.assertIs(self.player.location, other)
+        replay = _exit_confirm_adapter(self.player, payload)
+        self.assertEqual(replay["outcome"], "success")
+        self.assertEqual(replay["code"], CODE_ALREADY_COMMITTED)
+
     def test_settlement_narrative_is_emitted_only_for_a_committed_round(self):
         companion = self._companion()
         record = self._engage()

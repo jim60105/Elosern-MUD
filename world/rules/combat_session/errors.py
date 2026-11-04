@@ -37,6 +37,10 @@ class SessionReason(StrEnum):
     INVALID_CONFIRMATION_TOKEN = "invalid_confirmation_token"
     PARTY_EXIT_UNAVAILABLE = "party_exit_unavailable"
     PERSONAL_FLEE_FORBIDDEN = "personal_flee_forbidden"
+    # The server-captured retreat route history is unreadable. The departure
+    # needs a real edge, and a malformed saved record can never be silently
+    # reset to a different route.
+    MOVEMENT_HISTORY_INVALID = "movement_history_invalid"
     # Party combat command transport: an actorless item use during an active
     # session; the member's item selection is a draft entry of the guarded
     # combat command path, never of the exploration item adapter.

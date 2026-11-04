@@ -825,6 +825,50 @@ class ExamCombatTests(ExamHostFixture, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement(
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::successful-retreat-carries-the-entire-present-party-and-counts-one-round",
+    )
+    def test_a_confirmed_retreat_fails_the_exam_over_a_real_edge(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+        from world.rules.combat_session import (
+            PARTY_EXIT_RETREAT,
+            confirm_party_exit,
+            request_party_exit,
+        )
+
+        baseline = self._host_normal()
+        start_guild_exam(self.player, self.host, "E")
+        exam_room = self.player.location
+        escape = create_object(Room, key="exam exit hall")
+        create_object(Exit, key="leave", location=exam_room, destination=escape)
+        record = read_session(self.player)
+        prompt = request_party_exit(
+            self.player,
+            record.session_id,
+            record.round_revision,
+            PARTY_EXIT_RETREAT,
+        )
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            result = confirm_party_exit(
+                self.player,
+                prompt["session_id"],
+                prompt["round_revision"],
+                prompt["operation"],
+                prompt["confirmation_token"],
+            )
+        # The exam records FAIL and the party travels the actual examination
+        # room's edge; the persistent host is restored in the same unit.
+        self.assertEqual(result["outcome"], "fled")
+        self.assertEqual(result["exam"]["state"], ExamState.FAILED.value)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self.assertEqual(self.player.guild_rank, "F")
+        self.assertIs(self.player.location, escape)
+        self._assert_host_restored(baseline)
+
+    @covers_requirement(
         "guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles",
         "guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys",
     )

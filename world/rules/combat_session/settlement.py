@@ -588,6 +588,136 @@ def _settle_monster_combat_terminal(
         )
 
 
+def _settle_prefix_segments(
+    entity: Any,
+    segments: tuple[tuple[bool, int], ...],
+    *,
+    start_tick: int,
+    session_id: str,
+) -> None:
+    """Pay an already-completed allied prefix from its recorded posture order."""
+    from world.rules.fatigue import (
+        FatigueActivity,
+        FatigueInterval,
+        IntervalCompletion,
+        SleepPosture,
+        read_optional_fatigue_state,
+        settle_fatigue_intervals,
+        write_fatigue_state,
+    )
+
+    current = read_optional_fatigue_state(entity)
+    if current is None or not segments:
+        return
+    sleeping_posture = (
+        current.posture
+        if current.posture is not SleepPosture.AWAKE
+        else SleepPosture.FORCED
+    )
+    first_asleep = segments[0][0]
+    if first_asleep and current.posture is SleepPosture.AWAKE:
+        current = write_fatigue_state(entity, current.reserve_units, sleeping_posture)
+    elif not first_asleep and current.posture is not SleepPosture.AWAKE:
+        current = write_fatigue_state(entity, current.reserve_units, SleepPosture.AWAKE)
+    tick = start_tick
+    for asleep, seconds in segments:
+        target = sleeping_posture if asleep else SleepPosture.AWAKE
+        if current.posture is not target:
+            current = write_fatigue_state(entity, current.reserve_units, target)
+        if seconds > 0:
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        (
+                            FatigueActivity.SLEEP
+                            if asleep
+                            else FatigueActivity.AWAKE_COMBAT
+                        ),
+                        seconds,
+                        current,
+                        IntervalCompletion.INDIVISIBLE,
+                    ),
+                ),
+                context={"stage": "fled_combat_prefix", "session": session_id},
+                in_combat=True,
+                start_tick=tick,
+            )
+            current = settlement.commits[0].end
+        tick += seconds
+
+
+def settle_fled_combat_prefix(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+    *,
+    through_round: int,
+) -> CombatSessionRecord:
+    """Pay exactly the old encounter's unpaid allied physiology and clock once.
+
+    Called by the confirmed retreat after the whole party is marked fled, so the
+    terminal settlement that follows excludes those departed bodies from gauge
+    regeneration while the clock still advances the unpaid prefix plus the
+    attempt round exactly once. The durable ``settled_rounds`` cursor is the
+    authority: this call pays ``[settled_rounds, through_round)`` and the
+    terminal settlement then pays nothing. Only the allied party's mental
+    intervals settle here; the enemy cursors keep their own terminal writer.
+    """
+    first = int(record.settled_rounds)
+    through = int(through_round)
+    if through <= first:
+        return record
+    allied = {int(pk) for pk in record.player_ids}
+    if battlefield is not None:
+        for entity in battlefield.roster.values():
+            pk = getattr(entity, "pk", None)
+            if not isinstance(pk, int) or isinstance(pk, bool) or int(pk) not in allied:
+                continue
+            if getattr(entity, "_is_deleted", False):
+                continue
+            from world.rules.fatigue import SleepPosture, read_optional_fatigue_state
+
+            state = read_optional_fatigue_state(entity)
+            if state is None:
+                continue
+            segments = posture_segments(
+                record,
+                int(pk),
+                from_round=first,
+                through_round=int(record.rounds_elapsed),
+            )
+            # The attempt round has no recorded boundary yet: its one
+            # six-second interval is the live posture the confirmation
+            # observed.
+            segments = (
+                *segments,
+                (state.posture is not SleepPosture.AWAKE, _ROUND_SECONDS),
+            )
+            _settle_prefix_segments(
+                entity,
+                segments,
+                start_tick=int(record.started_tick) + first * _ROUND_SECONDS,
+                session_id=record.session_id,
+            )
+    participants = (
+        tuple(
+            entity
+            for key, entity in battlefield.roster.items()
+            if key not in battlefield.fled
+            and _stored_trait_value(entity.traits.hp) > 0
+        )
+        if battlefield is not None
+        else ()
+    )
+    seconds = (through - first) * _ROUND_SECONDS
+    settle_combat_result(SimpleNamespace(total_seconds=seconds), participants)
+    # No persist here: the caller's round finalization writes the durable
+    # record (with this cursor) in the same transaction, so the record is never
+    # observable in a state the parser refuses.
+    return replace(record, settled_rounds=through)
+
+
 @checkpoint_owner
 @serialized_combat_write
 def settle_session(
@@ -750,11 +880,18 @@ def settle_session(
             # and it runs before the clock's own combat settlement below.
             _settle_monster_combat_terminal(record, battlefield)
             unpaid_rounds = int(record.rounds_elapsed) - int(record.settled_rounds)
-            events = settle_combat_result(
-                SimpleNamespace(
-                    total_seconds=unpaid_rounds * _ROUND_SECONDS
-                ),
-                participants,
+            # A confirmed retreat (or any earlier paid prefix) may already own
+            # the whole interval; a zero-second clock advance is not a
+            # settlement and must not emit another source event.
+            events = (
+                settle_combat_result(
+                    SimpleNamespace(
+                        total_seconds=unpaid_rounds * _ROUND_SECONDS
+                    ),
+                    participants,
+                )
+                if unpaid_rounds > 0
+                else []
             )
             aftermath_logs: tuple = ()
             if record.mode == "hostile" and outcome == "defeat":
