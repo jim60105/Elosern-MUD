@@ -26,7 +26,7 @@ None.
 
 ## Impact
 
-Consumes landed mechanisms: The landed home-owned ceiling already covers detached/unlocated living individuals and must not be reimplemented. PopulationPresence/PopulationTransition, historical protected_cells and identity-based site clearing supply accounting. The preceding journey change supplies real durable movement. Existing whole-cell membership remains independent of movement groups.
+Consumes landed mechanisms. The landed home-owned ceiling already covers detached/unlocated living individuals and must not be reimplemented. PopulationPresence/PopulationTransition, historical protected_cells and identity-based site clearing supply accounting. The preceding journey change supplies real durable movement. Existing whole-cell membership remains independent of movement groups.
 
 Attaches at world/maps/regional_population.py::commit_population_wave, monster_sites.py::_populate, monster_activity.py and population_lifecycle.py::settle_population_lifecycle.
 
@@ -42,4 +42,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: mapped-monster-escape
 
-Code conflicts: mapped-monster-escape owns the journey engine first; incapacitated-hostile-rounds consumes physiology ownership next; hostile-field-admission subsequently changes same-tick contact ordering. Shared lore and shard changes serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts run in ownership order, where mapped-monster-escape owns the journey engine first, incapacitated-hostile-rounds consumes physiology ownership next and hostile-field-admission subsequently changes same-tick contact ordering. Shared lore and shard changes serialize. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
