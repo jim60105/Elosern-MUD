@@ -254,8 +254,8 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 "camp",
                 self.region,
                 PROBE,
-                SOLO,
-                1,
+                PAIR,
+                2,
                 False,
                 HOUR,
             ),
@@ -485,46 +485,49 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             ),
         )
 
-        # An interrupted first population leaves no site record; the retry
-        # derives the same occurrence and selects the same complete group.
-        real_construct = construct_species_individual
-        calls: list[Monster] = []
-
-        def interrupt(species_key, variant_key, **kwargs):
-            individual = real_construct(species_key, variant_key, **kwargs)
-            calls.append(individual)
-            if len(calls) == 2:
-                raise RuntimeError("injected site population failure")
-            return individual
-
-        with patch(
-            "world.maps.monster_sites.construct_species_individual",
-            side_effect=interrupt,
-        ):
-            with self.assertRaises(RuntimeError):
-                self.clock.advance(60, AdvanceSource.SKIP, [])
-        self.assertIsNone(site_state(GROUP_KEY, wilderness=self.wilderness))
-
-        self._settle()
-        first = sorted(
-            member.variant_key for member in _members(self.wilderness, self.sites[GROUP_KEY])
+        # The real owner replays its occurrence after the record and rows are
+        # lost (an interrupted attempt leaves exactly that state). A variable
+        # range makes a tick-dependent or seed-ignoring sample observable.
+        flock = MonsterSite(
+            "t_probe_flock_site", "encounter", self.region, PROBE, FLOCK, 3, True
         )
-        # Same occurrence, same complete group, whatever tick the retry lands
-        # on: the sampling input is the saved seed and sequence, never a tick.
-        for member in list(_members(self.wilderness, self.sites[GROUP_KEY])):
+        self.enterContext(
+            synthetic_registries(
+                "monster_species",
+                "monster_variants",
+                "monster_tiers",
+                "monster_sites",
+                extra={
+                    "encounter_compositions": COMPOSITIONS,
+                    "monster_sites": {flock.key: flock},
+                },
+            )
+        )
+        self._settle()
+        first_state = site_state(flock.key, wilderness=self.wilderness)
+        first = sorted(
+            member.variant_key for member in _members(self.wilderness, flock)
+        )
+        self.assertIn(len(first), (1, 2, 3))
+        for member in list(_members(self.wilderness, flock)):
             self.wilderness.db.itemcoordinates.pop(member, None)
             member.delete()
         states = {
             key: dict(value)
             for key, value in self.wilderness.db.monster_sites.items()
         }
-        states.pop(GROUP_KEY, None)
+        states.pop(flock.key, None)
         self.wilderness.db.monster_sites = states
+
         self._settle(end_tick=10 * HOUR)
+
+        second_state = site_state(flock.key, wilderness=self.wilderness)
         second = sorted(
-            member.variant_key for member in _members(self.wilderness, self.sites[GROUP_KEY])
+            member.variant_key for member in _members(self.wilderness, flock)
         )
         self.assertEqual(second, first)
+        self.assertEqual(second_state.seed, first_state.seed)
+        self.assertEqual(second_state.generation_sequence, 0)
 
     def test_a_living_absent_member_prevents_false_clearing(self):
         self._settle()
@@ -712,44 +715,60 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
     def test_an_unreadable_record_answers_a_named_verdict_and_refuses_work(self):
         self._settle()
         monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
-        states_before = {
+        base = {
             key: dict(value)
             for key, value in self.wilderness.db.monster_sites.items()
         }
-        states = {
-            key: dict(value)
-            for key, value in self.wilderness.db.monster_sites.items()
+        nest_member = base[NEST_KEY]["member_ids"][0]
+        corruptions = {
+            "non-sequence identities": lambda record: record.update(
+                member_ids="not-a-list"
+            ),
+            # Every lawful composition has positive membership, so an empty
+            # identity list is corrupt, never an empty site.
+            "empty identities": lambda record: record.update(member_ids=[]),
+            "duplicate identities": lambda record: record.update(
+                member_ids=[nest_member, nest_member]
+            ),
+            "unknown lifecycle state": lambda record: record.update(state="sleeping"),
+            "populated record with a clearing tick": lambda record: record.update(
+                cleared_at_tick=5
+            ),
         }
-        states[NEST_KEY]["member_ids"] = "not-a-list"
-        self.wilderness.db.monster_sites = states
+        for name, corrupt in corruptions.items():
+            with self.subTest(corruption=name):
+                states = {key: dict(value) for key, value in base.items()}
+                corrupt(states[NEST_KEY])
+                self.wilderness.db.monster_sites = states
 
+                read = site_living_members(NEST_KEY, wilderness=self.wilderness)
+
+                self.assertFalse(read.available)
+                self.assertEqual(read.reason, SITE_READ_STATE_UNREADABLE)
+                self.assertEqual(read.members, ())
+                with self.assertRaises(MalformedPopulationState):
+                    self._settle()
+                self.assertEqual(
+                    sorted(Monster.objects.values_list("pk", flat=True)),
+                    monsters_before,
+                )
+                # The corrupt value is exactly what remains: nothing
+                # reinterpreted it.
+                self.assertEqual(
+                    {
+                        key: dict(value)
+                        for key, value in self.wilderness.db.monster_sites.items()
+                    },
+                    states,
+                )
+
+        # A corrupt state-map container is answered by the same verdict.
+        self.wilderness.db.monster_sites = "not-a-map"
         read = site_living_members(NEST_KEY, wilderness=self.wilderness)
-
-        self.assertFalse(read.available)
         self.assertEqual(read.reason, SITE_READ_STATE_UNREADABLE)
-        self.assertEqual(read.members, ())
         with self.assertRaises(MalformedPopulationState):
             self._settle()
-        self.assertEqual(
-            sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
-        )
-        # The corrupt value is exactly what remains: nothing reinterpreted it.
-        self.assertEqual(
-            self.wilderness.db.monster_sites[NEST_KEY]["member_ids"],
-            "not-a-list",
-        )
-        self.assertEqual(
-            {
-                key: dict(value)
-                for key, value in states_before.items()
-                if key != NEST_KEY
-            },
-            {
-                key: dict(value)
-                for key, value in self.wilderness.db.monster_sites.items()
-                if key != NEST_KEY
-            },
-        )
+        self.wilderness.db.monster_sites = base
 
     def test_an_incomplete_saved_record_refuses_instead_of_repopulating(self):
         self._settle()
@@ -905,7 +924,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             [event.kind for event in events], ["monster_site_recovered"]
         )
         camp_variants = list(
-            composition_variant_keys(COMPOSITIONS[SOLO])
+            composition_variant_keys(COMPOSITIONS[PAIR])
         )
         self.assertEqual(events[0].payload["variants"], camp_variants)
         recovered_calls = [
@@ -972,6 +991,127 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         warn.assert_called_once()
         self.assertEqual(
             warn.call_args.kwargs["context"]["reason"], "capacity_reached"
+        )
+
+    def test_a_direct_recovery_advances_the_sequence_with_fresh_identities(self):
+        herd = MonsterSite(
+            "t_probe_herd", "camp", self.region, PROBE, FLOCK, 3, False, HOUR
+        )
+        self.enterContext(
+            synthetic_registries(
+                "monster_species",
+                "monster_variants",
+                "monster_tiers",
+                "monster_sites",
+                extra={
+                    "encounter_compositions": COMPOSITIONS,
+                    "monster_sites": {herd.key: herd},
+                },
+            )
+        )
+        self._settle()
+        first = site_state(herd.key, wilderness=self.wilderness)
+        first_ids = set(first.member_ids)
+        for member in _members(self.wilderness, herd):
+            member.traits.hp.current = 0
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        cleared = site_state(herd.key, wilderness=self.wilderness)
+        self.assertEqual(cleared.state, SITE_STATE_CLEARED)
+        self.assertEqual(cleared.member_ids, tuple(sorted(first_ids)))
+
+        recovered = settle_site_recovery(
+            herd.key, 60 + HOUR, wilderness=self.wilderness
+        )
+
+        self.assertTrue(recovered)
+        state = site_state(herd.key, wilderness=self.wilderness)
+        self.assertEqual(state.state, SITE_STATE_POPULATED)
+        self.assertEqual(state.seed, first.seed)
+        self.assertEqual(state.generation_sequence, first.generation_sequence + 1)
+        self.assertTrue(set(state.member_ids).isdisjoint(first_ids))
+        self.assertEqual(
+            {member.pk for member in _living(self.wilderness, herd)},
+            set(state.member_ids),
+        )
+
+    def test_a_failed_direct_recovery_after_a_registration_restores_everything(self):
+        self._settle()
+        self._defeat(self.sites[CAMP_KEY])
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        cleared = site_state(CAMP_KEY, wilderness=self.wilderness)
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+        real_construct = construct_species_individual
+        created: list[Monster] = []
+
+        def flaky(species_key, variant_key, **kwargs):
+            individual = real_construct(species_key, variant_key, **kwargs)
+            created.append(individual)
+            if len(created) == 2:
+                raise RuntimeError("injected direct recovery failure")
+            return individual
+
+        with (
+            patch(
+                "world.maps.monster_sites.construct_species_individual",
+                side_effect=flaky,
+            ),
+            patch("world.maps.monster_sites.log_info") as info,
+        ):
+            with self.assertRaises(RuntimeError):
+                settle_site_recovery(
+                    CAMP_KEY, 60 + HOUR, wilderness=self.wilderness
+                )
+        info.assert_not_called()
+        self.assertTrue(created)
+        self.assertEqual(
+            site_state(CAMP_KEY, wilderness=self.wilderness), cleared
+        )
+        self.assertEqual(
+            dict(self.wilderness.db.itemcoordinates), coordinates_before
+        )
+        for individual in created:
+            self.assertFalse(ObjectDB.objects.filter(pk=individual.pk).exists())
+            self.assertNotIn(individual.pk, ObjectDB.__instance_cache__)
+
+        # The retry replays the same occurrence and completes the group.
+        self.assertTrue(
+            settle_site_recovery(
+                CAMP_KEY, 60 + HOUR, wilderness=self.wilderness
+            )
+        )
+        state = site_state(CAMP_KEY, wilderness=self.wilderness)
+        self.assertEqual(state.state, SITE_STATE_POPULATED)
+        self.assertEqual(state.generation_sequence, cleared.generation_sequence + 1)
+        self.assertEqual(len(_living(self.wilderness, self.sites[CAMP_KEY])), 2)
+
+    def test_a_failed_state_write_restores_the_cleared_record(self):
+        self._settle()
+        self._defeat(self.sites[CAMP_KEY])
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        cleared = site_state(CAMP_KEY, wilderness=self.wilderness)
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+        real_write = monster_sites._write_state
+        writes: list[int] = []
+
+        def fail_after_write(wilderness, states):
+            real_write(wilderness, states)
+            if not writes:
+                writes.append(1)
+                raise RuntimeError("injected state write failure")
+
+        with patch(
+            "world.maps.monster_sites._write_state", side_effect=fail_after_write
+        ):
+            with self.assertRaises(RuntimeError):
+                settle_site_recovery(
+                    CAMP_KEY, 60 + HOUR, wilderness=self.wilderness
+                )
+
+        self.assertEqual(
+            site_state(CAMP_KEY, wilderness=self.wilderness), cleared
+        )
+        self.assertEqual(
+            dict(self.wilderness.db.itemcoordinates), coordinates_before
         )
 
     # -- ownership domains --------------------------------------------------

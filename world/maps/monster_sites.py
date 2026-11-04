@@ -156,12 +156,36 @@ def _wilderness() -> Any | None:
     return WildernessScript.objects.filter(db_key=WILDERNESS_NAME).first()
 
 
+#: The closed durable lifecycle-state vocabulary of one site record.
+_SITE_STATES: tuple[str, ...] = (SITE_STATE_POPULATED, SITE_STATE_CLEARED)
+
+
+def _read_state_map(wilderness: Any) -> dict[str, dict] | None:
+    """The durable per-site state map, or ``None`` when it cannot be read.
+
+    A pure reader answers a corrupt container with its named verdict rather
+    than an exception; a lifecycle decision refuses through
+    :func:`_state_map` instead.
+    """
+    raw = wilderness.db.monster_sites or {}
+    if not isinstance(raw, Mapping):
+        return None
+    states: dict[str, dict] = {}
+    for key, value in raw.items():
+        if not isinstance(value, Mapping):
+            return None
+        states[str(key)] = dict(value)
+    return states
+
+
 def _state_map(wilderness: Any) -> dict[str, dict]:
     """The durable per-site state map, copied out for a whole-value write."""
-    return {
-        str(key): dict(value)
-        for key, value in (wilderness.db.monster_sites or {}).items()
-    }
+    states = _read_state_map(wilderness)
+    if states is None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: the monster-site state map is unreadable"
+        )
+    return states
 
 
 def _write_state(wilderness: Any, states: Mapping[str, dict]) -> None:
@@ -182,6 +206,34 @@ def _saved_occurrence(site_key: str, record: Mapping[str, object]) -> tuple[int,
     if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
         return None
     return seed, sequence
+
+
+def _saved_state(record: Mapping[str, object]) -> str | None:
+    """The record's lifecycle state, or ``None`` when it is inconsistent.
+
+    A cleared record must remember a non-negative clearing tick; a populated
+    one must not. The closed vocabulary is the one this owner writes.
+    """
+    state = record.get("state")
+    if state not in _SITE_STATES:
+        return None
+    cleared_at = record.get("cleared_at_tick")
+    if state == SITE_STATE_CLEARED:
+        if isinstance(cleared_at, bool) or not isinstance(cleared_at, int) or cleared_at < 0:
+            return None
+    elif cleared_at is not None:
+        return None
+    return state
+
+
+def _require_state(site: MonsterSite, record: Mapping[str, object]) -> str:
+    """The record's lifecycle state, refusing a malformed record by name."""
+    state = _saved_state(record)
+    if state is None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: site {site.key!r} has no readable lifecycle state"
+        )
+    return state
 
 
 def _require_occurrence(site: MonsterSite, record: Mapping[str, object]) -> tuple[int, int]:
@@ -209,6 +261,10 @@ def _saved_member_ids(record: Mapping[str, object]) -> tuple[int, ...] | None:
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             return None
         members.append(value)
+    if not members or len(set(members)) != len(members):
+        # Every lawful composition has positive membership, so an empty or
+        # duplicated identity list is a corrupt save, never an empty site.
+        return None
     return tuple(members)
 
 
@@ -248,7 +304,10 @@ def _members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
     populated, and an unreadable one yields no answer rather than an inferred
     set. Lifecycle decisions go through :func:`_require_member_ids` first.
     """
-    record = _state_map(wilderness).get(site.key)
+    states = _read_state_map(wilderness)
+    if states is None:
+        return ()
+    record = states.get(site.key)
     if record is None:
         return ()
     member_ids = _saved_member_ids(record)
@@ -274,19 +333,25 @@ def site_state(site_key: str, *, wilderness: Any | None = None) -> SiteState | N
     wilderness = _wilderness() if wilderness is None else wilderness
     if wilderness is None:
         return None
-    record = _state_map(wilderness).get(site_key)
+    states = _read_state_map(wilderness)
+    if states is None:
+        return SiteState(site_key, None, None, readable=False)
+    record = states.get(site_key)
     if record is None:
         return None
     occurrence = _saved_occurrence(site_key, record)
     member_ids = _saved_member_ids(record)
+    state = _saved_state(record)
     return SiteState(
         site_key,
-        record.get("state"),
-        record.get("cleared_at_tick"),
+        state,
+        record.get("cleared_at_tick") if state == SITE_STATE_CLEARED else None,
         seed=None if occurrence is None else occurrence[0],
         generation_sequence=None if occurrence is None else occurrence[1],
         member_ids=() if member_ids is None else member_ids,
-        readable=occurrence is not None and member_ids is not None,
+        readable=(
+            occurrence is not None and member_ids is not None and state is not None
+        ),
     )
 
 
@@ -565,6 +630,7 @@ def settle_site_recovery(
         # A present record must be interpretable: a corrupt save is never
         # reinterpreted as an empty site, so no replacement group is created
         # over survivors.
+        _require_state(site, record)
         _require_occurrence(site, record)
         _require_member_ids(site, record)
     record = record or {}
@@ -628,9 +694,10 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
                 _site_context(site, tick=end_tick, created=len(created)),
             )
             continue
+        state = _require_state(site, record)
         seed, saved_sequence = _require_occurrence(site, record)
         member_ids = _require_member_ids(site, record)
-        if record.get("state") == SITE_STATE_POPULATED:
+        if state == SITE_STATE_POPULATED:
             members = _members_from_ids(site, member_ids)
             if any(_persisted_hp(member) > 0 for member in members):
                 continue

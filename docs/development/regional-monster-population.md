@@ -1076,6 +1076,10 @@ requirement IDs exist only after the sync. Their hand-off:
 | `MonsterSiteLifecycleTests.test_an_unreadable_record_answers_a_named_verdict_and_refuses_work` | synthetic mechanism: corrupt member IDs answer `state_unreadable` and refuse lifecycle work without writes | ADDED / "Selection uses persisted occurrence inputs" (save integrity) |
 | `MonsterSiteLifecycleTests.test_an_incomplete_saved_record_refuses_instead_of_repopulating` | synthetic mechanism: a pre-identity record refuses instead of being reinterpreted | ADDED / "Selection uses persisted occurrence inputs" |
 | `MonsterSiteWithoutWorldSeedTests.test_first_population_refuses_without_an_explicit_world_seed` | synthetic mechanism: no implicit seed default | ADDED / "Selection uses persisted occurrence inputs" |
+| `MonsterSiteLifecycleTests.test_a_direct_recovery_advances_the_sequence_with_fresh_identities` | real owner: a variable-range site recovers with new IDs at sequence + 1 and keeps its seed | existing "One-shot sites stay cleared..." / "A recoverable camp recovers at its in-game condition with fresh identities" |
+| `MonsterSiteLifecycleTests.test_a_failed_direct_recovery_after_a_registration_restores_everything` | fault injection after a real registration: the direct recovery entry point restores state, coordinates and caches, emits no success, and its retry completes the group | ADDED / "Selection uses persisted occurrence inputs" (retry repeats the failed selection) |
+| `MonsterSiteLifecycleTests.test_a_failed_state_write_restores_the_cleared_record` | fault injection after the state write: the cleared record and registrations are restored | ADDED / "Selection uses persisted occurrence inputs" |
+| `MonsterSiteCandidatePublicationTests.test_an_unwalkable_site_surface_is_rejected_before_publication` / `…test_a_settlement_footprint_site_surface_is_rejected` / `…test_a_site_on_another_region_is_rejected` / `…test_a_lawful_manual_site_still_publishes` | candidate publication: site surfaces are validated against the candidate terrain and footprints, reject before publication, and a lawful site still publishes | MODIFIED "Ambient and site placement are frozen keyed lore data validated at construction" / "Sites are frozen values with the authored fields" |
 | `SiteClearOutAcceptanceTests.test_a_binding_survives_the_site_clearing_without_generating_members` | real quest acceptance: the bound IDs survive the clear and later reads create nothing | existing "A site's living individuals are the quest layer's binding source..." / "A cleared site offers no targets and stays cleared" |
 | `PlacementValidationTests.test_a_site_names_one_known_complete_composition` | registry contract: empty/unknown composition rejects at construction | MODIFIED "Ambient and site placement are frozen keyed lore data validated at construction" / "Sites are frozen values with the authored fields" |
 | `PlacementValidationTests.test_every_legal_composition_outcome_must_fit_the_site_capacity` | registry contract: minimum fits, maximum exceeds, so capacity is the ceiling of every outcome | MODIFIED / "Sites are frozen values with the authored fields" |
@@ -1089,7 +1093,8 @@ Run from the worktree root with the single-token environment file
 | Command label | Result |
 | --- | --- |
 | `world.lore.tests.test_monster_placement world.lore.tests.test_registry_index_contract` | 64 tests, OK |
-| `world.maps.tests.test_monster_sites` | 32 tests, OK |
+| `world.maps.tests.test_monster_sites` | 35 tests, OK |
+| `world.maps.tests.test_geography_source` | 18 tests, OK |
 | `world.quests.tests.test_site_clear_out_acceptance` | 20 tests, OK |
 | `world.maps.tests.test_monster_provisioning` | 15 tests, OK |
 | `world.quests.tests.test_definitions` | 46 tests, OK |
