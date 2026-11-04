@@ -1,8 +1,10 @@
-"""Behavior tests for authored monster field-activity declarations.
+"""Data-contract test: published field-activity declarations stay immutable and every shipped composition/site binding resolves
 
-Every row here is a file-local synthetic fixture with invented keys. The tests
-prove declared geometry, closed vocabularies, count-compatible bindings and
-candidate-world checks without pinning a shipped coordinate, name or count.
+Every row in the mechanism classes is a file-local synthetic fixture with
+invented keys. Those tests prove declared geometry, closed vocabularies,
+count-compatible bindings and candidate-world checks without pinning a shipped
+coordinate, name or count. The published-registry class additionally checks the
+shipped declarations' immutability and reference integrity.
 """
 
 from __future__ import annotations

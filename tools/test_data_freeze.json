@@ -101,6 +101,10 @@
    "reason": "shipped map-district landmarks against the authored continent"
   },
   {
+   "path": "world/lore/tests/test_monster_activity.py",
+   "reason": "published field-activity declarations stay immutable and every shipped composition/site binding resolves"
+  },
+  {
    "path": "world/lore/tests/test_monster_species_content.py",
    "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
   },
