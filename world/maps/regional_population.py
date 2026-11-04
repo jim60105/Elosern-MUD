@@ -1464,6 +1464,26 @@ def _draw(
     return sample
 
 
+def draw_index(
+    *,
+    seed: int,
+    stream_key: str,
+    sequence: int,
+    tick: int,
+    ordinal: int,
+    purpose: str,
+    upper: int,
+) -> int:
+    """One deterministic index from this owner's rejection-sampling stream.
+
+    The single sampling discipline shared by the wave/count selectors and the
+    map owner's ordinary activity decisions: the same saved seed, stream key,
+    sequence, tick, ordinal and purpose always select the same index. Pure:
+    no draw state is persisted or consumed.
+    """
+    return _draw(seed, stream_key, sequence, tick, ordinal, purpose)(upper)
+
+
 def _weighted_pick(sample, rows: list[tuple[int, Any]]) -> Any:
     """Pick one row by its positive authored weight, in the given row order."""
     total = sum(weight for weight, _row in rows)
@@ -2123,6 +2143,7 @@ __all__ = [
     "coordinate_pair",
     "current_population_tick",
     "density_lower_bound",
+    "draw_index",
     "initialized_zone_keys",
     "initialize_population_seed",
     "initialize_zone",
