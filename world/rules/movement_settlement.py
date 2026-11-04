@@ -290,6 +290,22 @@ def in_passage(body: Any, tick: int) -> bool:
     return False
 
 
+def traversal_arrival_tick(body: Any) -> int | None:
+    """The committed arrival tick of the passage currently covering ``body``.
+
+    ``None`` when no committed traversal covers it. A read-only forecast uses
+    this to treat a walking party as non-presence until its edge completes,
+    exactly as :func:`field_presence` does for the committed evaluator.
+    """
+    body_id = getattr(body, "id", None)
+    if not isinstance(body_id, int):
+        return None
+    for scope in reversed(_traversal_scopes.get()):
+        if scope.covers(body_id):
+            return int(scope.arrival_tick)
+    return None
+
+
 @contextmanager
 def settlement_scope(actor: Any) -> Iterator[None]:
     """Mark that the movement settlement owns ``actor``'s relocation here.

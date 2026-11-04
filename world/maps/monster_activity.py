@@ -940,6 +940,19 @@ def decision_interval(wilderness: Any, group_id: str) -> int:
     return _activity_interval(group.activity_key)
 
 
+def activity_decision_interval(activity_key: str) -> int:
+    """The positive decision interval of one activity binding (pure)."""
+    return _activity_interval(activity_key)
+
+
+def living_member_bodies(wilderness: Any, group_id: str) -> tuple[Any, ...]:
+    """Every living member row of one committed group (pure read)."""
+    committed = group(wilderness, group_id)
+    if committed is None:
+        return ()
+    return _member_bodies(committed)
+
+
 def create_group(
     wilderness: Any,
     *,
@@ -1263,6 +1276,24 @@ def _projected_member_states(
             state = read_optional_fatigue_state(body)
         states.append(TravellerState.from_state(state, member_id=int(body.pk)))
     return tuple(states)
+
+
+def projected_member_states(
+    wilderness: Any, group_id: str, *, tick: int
+) -> tuple[Any, ...]:
+    """Detached member physiology at one decision occurrence (pure read).
+
+    The same projection :func:`plan_group_decision` prices with, exposed so a
+    read-only forecast can price the chosen route's committed duration without
+    writing the idle prefix the commitment will write first.
+    """
+    committed = group(wilderness, group_id)
+    if committed is None:
+        return ()
+    bodies = _member_bodies(committed)
+    if not bodies:
+        return ()
+    return _projected_member_states(committed, bodies, tick=int(tick))
 
 
 def _bounded_candidates(

@@ -92,5 +92,8 @@ def register_shop_hours() -> None:
     never writes durable state, so no advance-surface contract is declared.
     """
     register_event_source(
-        "shop_hours", settle_shop_hours, next_boundary=next_shop_boundary
+        "shop_hours",
+        settle_shop_hours,
+        next_boundary=next_shop_boundary,
+        interactive=True,
     )

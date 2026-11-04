@@ -165,11 +165,19 @@ class EventSourceRegistration:
 
     ``surfaces`` is ``None`` for a read-only seam (or a test/synthetic
     source): ``advance()`` performs no snapshot or restore for it.
+
+    ``interactive`` declares that *every* event this source settles is an
+    interactive boundary (the shop calendar). A source whose settlement runs
+    across many internal maintenance ticks declares ``False`` and marks only
+    the events that really interrupt (the population coordinator's accepted
+    contact event), so a long skip never returns control for distant
+    housekeeping.
     """
 
     settle: Callable[[int, int], list["ScheduledEvent"]]
     surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None
     next_boundary: Callable[[int, int], int | None] | None = None
+    interactive: bool = False
 
 
 _EVENT_SOURCES: dict[str, EventSourceRegistration] = {}
@@ -553,6 +561,7 @@ def register_event_source(
     surfaces: Callable[[int, int], Mapping[int, SurfaceSnapshot]] | None = None,
     *,
     next_boundary: Callable[[int, int], int | None] | None = None,
+    interactive: bool = False,
 ) -> None:
     """Register a boundary-query seam owned by a future subsystem.
 
@@ -564,7 +573,9 @@ def register_event_source(
     source registered with ``surfaces=None`` is a read-only seam (or a test
     seam) and is never snapshotted or restored by ``advance()``.
     """
-    _EVENT_SOURCES[kind] = EventSourceRegistration(source, surfaces, next_boundary)
+    _EVENT_SOURCES[kind] = EventSourceRegistration(
+        source, surfaces, next_boundary, interactive
+    )
 
 
 def next_registered_boundary(start_tick: int, end_tick: int) -> int | None:
@@ -986,7 +997,7 @@ def _settle_boundary_stages(start_tick: int, end_tick: int, entities: tuple[Any,
     for kind in _STAGE_ORDER[5:]:
         registration = _EVENT_SOURCES.get(kind)
         if registration is not None:
-            interactive = registration.next_boundary is not None
+            interactive = registration.interactive
             for event in registration.settle(start_tick, end_tick):
                 events.append(
                     ScheduledEvent(

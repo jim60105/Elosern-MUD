@@ -498,7 +498,11 @@ def advance_wait(
         raise SkipRefused(reason)
     entities = present_party_scope(actor)
     clock = get_world_clock()
-    elapsed = planned_seconds(entities, limit, tick=clock.tick)
+    # The accepted interval's own query runs under the same settled-body scope
+    # the advance uses, so the contact forecast discovers exactly the parties
+    # this skip settles for.
+    with advance_scope(entities):
+        elapsed = planned_seconds(entities, limit, tick=clock.tick)
     from world.rules.travel_events import capture_travel_facts, on_wilderness, record_position_change
 
     travel_scope = elapsed > 0 and on_wilderness(actor)
@@ -525,7 +529,7 @@ def advance_wait(
         )
     tick_snapshot = _snapshot_clock_tick(clock)
     try:
-        with transaction.atomic():
+        with advance_scope(entities), transaction.atomic():
             events = clock.advance(
                 elapsed,
                 AdvanceSource.SKIP,
@@ -979,7 +983,10 @@ def continue_sleep(
     travel_scope = on_wilderness(actor)
     travel_before = None
     try:
-        with transaction.atomic():
+        # The interval query, its accepted advance and the endpoint contact
+        # admission share the settled-body scope, so the forecast discovers
+        # exactly the parties this sleep settles for.
+        with advance_scope(entities), transaction.atomic():
             _lock_members(entities)
             if travel_scope:
                 # Read under the member locks the interval settles with.

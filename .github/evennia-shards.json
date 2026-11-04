@@ -79,7 +79,8 @@
     "world.rules.tests.test_combat_session_sexual_coercion",
     "world.rules.tests.test_combat_session_targeting",
     "world.rules.tests.test_hostile_incapacitated_rounds",
-    "world.rules.tests.test_combat_view"
+    "world.rules.tests.test_combat_view",
+    "world.rules.tests.test_field_contact_boundaries"
    ],
    "index": 2
   },

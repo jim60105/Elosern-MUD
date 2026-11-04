@@ -116,20 +116,20 @@ def _cell_of(wilderness: Any, body: Any) -> tuple[int, int] | None:
     return regional_population.actual_cell(wilderness, body)
 
 
-def _defended_area_admits(
-    declaration: Any, group: Any, wilderness: Any, body: Any
+def _defended_area_at(
+    condition: Any,
+    *,
+    cell: tuple[int, int] | None,
+    room_id: int | None,
+    home: LocationRef,
 ) -> bool:
     from world.lore.monster_activity import ACTIVITY_AREA_REGISTRY
 
-    area = ACTIVITY_AREA_REGISTRY.get(declaration.aggression.area_key)
+    area = ACTIVITY_AREA_REGISTRY.get(condition.area_key)
     if area is None:
         return False
-    home = group.home
     if home.kind == "room":
-        return area.home_radius == 0 and getattr(
-            getattr(body, "location", None), "pk", None
-        ) == home.id
-    cell = _cell_of(wilderness, body)
+        return area.home_radius == 0 and room_id == home.id
     if cell is None or home.kind != "wilderness":
         return False
     if area.home_radius is not None:
@@ -138,6 +138,35 @@ def _defended_area_admits(
         x_min <= cell[0] <= x_max and y_min <= cell[1] <= y_max
         for x_min, x_max, y_min, y_max in area.rectangles
     )
+
+
+def contact_condition_admits(
+    declaration: Any,
+    *,
+    tick: int,
+    cell: tuple[int, int] | None,
+    room_id: int | None,
+    home: LocationRef,
+) -> bool:
+    """Whether one authored declaration admits contact at one position (pure).
+
+    The shared condition rule: the committed evaluator resolves a live
+    individual's own wilderness cell and room identity, and the read-only
+    forecast resolves both from detached projected facts. Daypart and
+    defended-area geometry are evaluated identically on each path.
+    """
+    condition = declaration.aggression
+    if condition.kind == "passive":
+        return False
+    if not _daypart_admits(condition, tick):
+        return False
+    if condition.kind == "contact":
+        return True
+    if condition.kind == "defended_area":
+        return _defended_area_at(
+            condition, cell=cell, room_id=room_id, home=home
+        )
+    return False
 
 
 def _admits_contact(monster: Any, wilderness: Any, tick: int) -> bool:
@@ -154,16 +183,13 @@ def _admits_contact(monster: Any, wilderness: Any, tick: int) -> bool:
         # A staged/unpublished binding has no authored aggression condition;
         # it is passive by construction, never inferred from a name.
         return False
-    condition = declaration.aggression
-    if condition.kind == "passive":
-        return False
-    if condition.kind == "contact":
-        return _daypart_admits(condition, tick)
-    if condition.kind == "defended_area":
-        return _daypart_admits(condition, tick) and _defended_area_admits(
-            declaration, group, wilderness, monster
-        )
-    return False
+    return contact_condition_admits(
+        declaration,
+        tick=int(tick),
+        cell=_cell_of(wilderness, monster),
+        room_id=getattr(getattr(monster, "location", None), "pk", None),
+        home=group.home,
+    )
 
 
 def evaluate_field_contact(
@@ -529,28 +555,45 @@ def settle_population_contact_at(
 
 
 def next_field_contact_boundary(start_tick: int, end_tick: int) -> int | None:
-    """The conservative next contact-capable boundary inside the window.
+    """The first relevant projected contact inside the window.
 
-    Until the forecast successor replaces these conservative returns with the
-    first relevant contact, every next daypart and population
-    activity/arrival/birth/decision tick is a boundary: an interruptible skip
-    therefore stops before a contact it might otherwise run past.
+    One formula for both contact sources: the population coordinator's pure
+    chronological forecast answers the tick, including daypart condition flips
+    and the births/arrivals that create a later contact. The conservative
+    per-maintenance-tick answer is retired, so a distant recovery or idle
+    decision stays internal to the skip it happens inside.
     """
     from world.maps.population_lifecycle import (
         next_population_lifecycle_boundary,
     )
 
-    candidates = [
-        next_daypart_boundary(int(start_tick), int(end_tick)),
-        next_population_lifecycle_boundary(int(start_tick), int(end_tick)),
-    ]
-    inside = [
-        candidate
-        for candidate in candidates
-        if candidate is not None
-        and int(start_tick) < int(candidate) <= int(end_tick)
-    ]
-    return min(inside) if inside else None
+    return next_population_lifecycle_boundary(int(start_tick), int(end_tick))
+
+
+def forecast_observers() -> tuple[Any, ...]:
+    """The running advance's parties as projected contact observers (pure).
+
+    Discovers the same scope commanders this source admits for and captures
+    each one's stable logical position plus any committed passage end, so the
+    forecast never observes a party from a cell it is only travelling to.
+    """
+    from world.maps.population_forecast import FieldObserver
+    from world.rules.movement_settlement import traversal_arrival_tick
+
+    observers: list[Any] = []
+    for commander in _scope_commanders():
+        try:
+            location = location_ref(commander)
+        except (LocationRefError, ValueError):  # observability: ignore R2: an unrepresentable commander position observes nothing
+            continue
+        observers.append(
+            FieldObserver(
+                commander_id=int(commander.pk),
+                location=location,
+                traversing_until=traversal_arrival_tick(commander),
+            )
+        )
+    return tuple(observers)
 
 
 def _snapshot_entity(body: Any) -> SurfaceSnapshot:
@@ -605,8 +648,10 @@ __all__ = [
     "SOURCE_SOURCE",
     "admit_field_contact",
     "admit_field_contact_at",
+    "contact_condition_admits",
     "continue_admitted_contacts",
     "evaluate_field_contact",
+    "forecast_observers",
     "next_field_contact_boundary",
     "register_field_contact_stage",
     "settle_field_contact_at",

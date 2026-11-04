@@ -443,6 +443,33 @@ def site_living_members(
     )
 
 
+def site_occurrence_groups(
+    site: MonsterSite, *, seed: int, sequence: int
+) -> tuple[tuple[str, int], ...]:
+    """The complete sampled composition of one site occurrence (pure).
+
+    The shared sampler: ``_populate`` constructs exactly these rows, and the
+    read-only forecast counts them without creating anything. The saved
+    occurrence ``(seed, sequence)`` alone identifies the outcome, so a forecast
+    and the later commit select the same group across restarts and retries.
+    """
+    return sample_composition_counts(
+        site.composition_key,
+        seed=seed,
+        stream_key=site.key,
+        sequence=sequence,
+        budget=site.capacity,
+    )
+
+
+def recovery_condition_matured(site_key: str, cleared_at_tick: Any, tick: int) -> bool:
+    """Whether a cleared site's authored in-game condition is satisfied (pure)."""
+    site = MONSTER_SITE_REGISTRY.get(site_key)
+    if site is None:
+        return False
+    return _condition_matured(site, cleared_at_tick, tick)
+
+
 def _populate(
     wilderness: Any,
     site: MonsterSite,
@@ -467,13 +494,7 @@ def _populate(
     same complete group).
     """
     created: list[Monster] = []
-    rows = sample_composition_counts(
-        site.composition_key,
-        seed=seed,
-        stream_key=site.key,
-        sequence=sequence,
-        budget=site.capacity,
-    )
+    rows = site_occurrence_groups(site, seed=seed, sequence=sequence)
     for variant_key, count in rows:
         species_key = variant_species_key(variant_key)
         for _ in range(count):
