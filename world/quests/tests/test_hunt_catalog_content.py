@@ -6,12 +6,11 @@ content (``monster-site-clear-out-hunts``), so this module guards the properties
 that keep each of them lawful, provisionable, and bindable instead of
 re-asserting the authored numbers for their own sake:
 
-- every published hunt names a region whose authored ambient placement rule
-  exists, declares the complete regional selector, holds at least one ordinary
-  countable variant that is eligible in that rule, and asks for no more than the
-  rule's authored per-coordinate legal supply ``min(quantity, capacity)``;
-- a placement-covered region carries exactly one hunt per species its rule
-  places, and a region with no ambient rule carries none at all;
+- every published hunt declares the complete regional selector and resolves at
+  least one lawful authored supply source (an ecology composition pool or an
+  explicit monster-site composition) in its region for every variant it counts,
+  so no hunt is advertised for a species the region cannot lawfully supply;
+- no two published hunts name the same region and species pair;
 - every hunt carries its own authored rank, rating rationale, background flavor
   (each inside the rendered-detail budget) and a reward inside its rank's copper
   band, registered as an ordinary commission of a registered guild branch;
@@ -55,7 +54,6 @@ from typing import Mapping
 from tools.spec_traceability import covers_requirement
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.monster_placement import (
-    AMBIENT_PLACEMENT_REGISTRY,
     ENCOUNTER_COMPOSITION_REGISTRY,
     MONSTER_SITE_REGISTRY,
     MonsterSite,
@@ -73,7 +71,7 @@ from world.quests.definitions import (
     MAX_DEFINITION_PROSE_TOTAL,
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
-    ordinary_countable_variant_keys,
+    hunt_supply_sources,
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.guild_config import load_guild_catalog
@@ -163,11 +161,6 @@ AUTHORED_GRADE_DIVERGENCES = {
     "western_hills_valleys_rock_echo_goat": ("D", "C"),
 }
 
-#: The region with no authored ambient placement. Its only species presence is
-#: the authored boss site published by the bound clear-out change, so a regional
-#: hunt there could never be satisfied by construction.
-UNPLACED_REGION_KEY = "southeast_coast"
-
 #: The mid-tier clear-outs and the rank they keep although their site's strongest
 #: placed variant is graded above it (the same authoring rule the hunts follow:
 #: the rank is authored for the arrangement, never inherited from an individual
@@ -254,10 +247,6 @@ def _region_key(definition: QuestDefinition) -> str:
     return definition.stages[0].objective.region_key
 
 
-def _hunt_regions() -> set[str]:
-    return {_region_key(definition) for definition in _regional_hunts().values()}
-
-
 def _strongest_countable_grade(definition: QuestDefinition) -> str:
     """The highest-ranked danger grade among the hunt's countable variants."""
     objective = definition.stages[0].objective
@@ -303,106 +292,59 @@ class ShippedHuntRegistrationTests(_ShippedCatalogTestCase):
                 )
 
 
-class RegionalHuntProvisionabilityTests(_ShippedCatalogTestCase):
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_every_published_hunt_names_a_region_with_an_authored_ambient_rule(self):
+class RegionalHuntSupplySourceTests(_ShippedCatalogTestCase):
+    """Every published hunt resolves a lawful authored source, never a promise.
+
+    The old requirement this class replaces demanded current provisionability
+    and a one-cell quantity cap; the delta removes it. These assertions establish
+    the replacement content contract instead: a shipped hunt names a selector
+    every lawful source can actually place, and no shipped pair is advertised
+    twice.
+    """
+
+    def test_every_published_hunt_names_a_lawful_authored_source(self):
         hunts = _regional_hunts()
         self.assertTrue(hunts)
         for key, definition in hunts.items():
+            objective = definition.stages[0].objective
+            sources = hunt_supply_sources(
+                _region_key(definition),
+                objective.species_key,
+                objective.countable_variant_keys,
+            )
             with self.subTest(hunt=key):
-                self.assertIsNotNone(
-                    AMBIENT_PLACEMENT_REGISTRY.get(_region_key(definition))
+                self.assertTrue(sources, f"{key} has no lawful source")
+                self.assertEqual(
+                    {source.region_key for source in sources},
+                    {_region_key(definition)},
                 )
 
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_every_published_hunt_declares_the_complete_selector(self):
-        # A partial selector would not register, but the content contract states
-        # the property rather than inferring it from the validator: a definition
-        # carrying only a region key is not a regional hunt.
+    def test_selected_variants_come_from_the_hunts_own_sources(self):
         for key, definition in _regional_hunts().items():
             objective = definition.stages[0].objective
-            with self.subTest(hunt=key):
-                self.assertTrue(objective.species_key)
-                self.assertTrue(objective.countable_variant_keys)
-
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_at_least_one_ordinary_countable_variant_is_eligible_in_the_rule(self):
-        # This is what makes the acceptance-time guarantee expressible: the
-        # provisioning owner can only create a variant the rule places.
-        for key, definition in _regional_hunts().items():
-            objective = definition.stages[0].objective
-            rule = AMBIENT_PLACEMENT_REGISTRY[_region_key(definition)]
-            ordinary = ordinary_countable_variant_keys(objective)
-            with self.subTest(hunt=key):
-                self.assertTrue(ordinary)
-                self.assertTrue(set(ordinary) & set(rule.variant_keys))
-
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_the_quantity_is_at_or_below_the_regions_authored_supply(self):
-        for key, definition in _regional_hunts().items():
-            objective = definition.stages[0].objective
-            rule = AMBIENT_PLACEMENT_REGISTRY[_region_key(definition)]
+            sourced = {
+                variant_key
+                for source in hunt_supply_sources(
+                    _region_key(definition),
+                    objective.species_key,
+                    objective.countable_variant_keys,
+                )
+                for variant_key in source.variant_keys
+            }
             with self.subTest(hunt=key):
                 self.assertLessEqual(
-                    objective.quantity, min(rule.quantity, rule.capacity)
+                    set(objective.countable_variant_keys), sourced
                 )
 
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_the_uncovered_region_carries_no_hunt(self):
-        # A region with no authored placement could never satisfy a hunt, so the
-        # board must not offer one there.
-        self.assertNotIn(UNPLACED_REGION_KEY, AMBIENT_PLACEMENT_REGISTRY)
-        self.assertIn(UNPLACED_REGION_KEY, regions())
-        self.assertNotIn(UNPLACED_REGION_KEY, _hunt_regions())
-
-    @covers_requirement(
-        "quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region"
-    )
-    def test_one_hunt_per_placed_species_in_every_covered_region(self):
-        hunts = _regional_hunts()
-        for region_key, rule in AMBIENT_PLACEMENT_REGISTRY.items():
-            placed_species = {
-                MONSTER_VARIANT_REGISTRY[variant_key].species_key
-                for variant_key in rule.variant_keys
-            }
-            self.assertTrue(placed_species)
-            for species_key in sorted(placed_species):
-                with self.subTest(region=region_key, species=species_key):
-                    matching = [
-                        key
-                        for key, definition in hunts.items()
-                        if _region_key(definition) == region_key
-                        and definition.stages[0].objective.species_key == species_key
-                    ]
-                    self.assertEqual(
-                        len(matching),
-                        1,
-                        f"{region_key}/{species_key} hunts: {sorted(matching)}",
-                    )
-                    objective = hunts[matching[0]].stages[0].objective
-                    placed_variants = {
-                        variant_key
-                        for variant_key in rule.variant_keys
-                        if MONSTER_VARIANT_REGISTRY[variant_key].species_key
-                        == species_key
-                    }
-                    # Equality both ways: a hunt may not count a variant its
-                    # region does not place, and it must count every variant its
-                    # region places for the species it is commissioned against
-                    # the ambient owner selects from.
-                    self.assertEqual(
-                        placed_variants, set(objective.countable_variant_keys)
-                    )
+    def test_each_region_species_pair_is_advertised_once(self):
+        pairs = [
+            (
+                _region_key(definition),
+                definition.stages[0].objective.species_key,
+            )
+            for definition in _regional_hunts().values()
+        ]
+        self.assertEqual(len(pairs), len(set(pairs)))
 
 
 class HuntAuthoredContentTests(_ShippedCatalogTestCase):

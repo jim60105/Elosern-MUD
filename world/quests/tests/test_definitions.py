@@ -718,6 +718,18 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    def test_a_hunt_wider_than_one_cell_still_registers(self):
+        zone = next(iter(SYNTH_ECOLOGY_ZONES.values()))
+        wide = zone.cell_capacity + 7
+        registered = register(
+            quest("hunt-wide", stages=(QuestStage(0, _hunt(quantity=wide)),))
+        )
+        self.assertEqual(registered.stages[0].objective.quantity, wide)
+        self.assertGreater(wide, zone.cell_capacity)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
     @covers_requirement(
         "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
