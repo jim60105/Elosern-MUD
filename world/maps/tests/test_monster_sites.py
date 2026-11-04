@@ -366,6 +366,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             self.assertEqual(context["region"], self.region)
             self.assertEqual(context["coordinate"], PROBE)
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_an_unchanged_site_pass_keeps_its_identities_and_resources(self):
         self._settle()
         nest = self.sites[NEST_KEY]
@@ -414,6 +415,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     # -- complete compositions and manual exceptions -----------------------
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_a_mixed_composition_places_each_row_with_its_own_identity_and_resources(
         self,
     ):
@@ -455,6 +457,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertIsInstance(state.seed, int)
         self.assertTrue(state.readable)
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_a_solitary_stray_places_exactly_one_individual(self):
         self._settle()
 
@@ -465,6 +468,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(members[0].variant_key, STRONGER)
         self.assertEqual(members[0].db.site_key, STRAY_KEY)
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_the_saved_occurrence_reproduces_its_group_and_ignores_the_retry_tick(
         self,
     ):
@@ -529,6 +533,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(second_state.seed, first_state.seed)
         self.assertEqual(second_state.generation_sequence, 0)
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_a_living_absent_member_prevents_false_clearing(self):
         self._settle()
         nest = self.sites[NEST_KEY]
@@ -560,6 +565,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             SITE_STATE_CLEARED,
         )
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_a_one_shot_site_is_never_refilled_by_a_regional_deficit_wave(self):
         nest = self.sites[NEST_KEY]
         zone = EcologyZone(
@@ -622,6 +628,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         for pk in created:
             self.assertNotEqual(Monster.objects.get(pk=pk).db.site_key, NEST_KEY)
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_an_explicit_site_inside_a_settlement_ring_survives_maintenance(self):
         cell = _buffer_cell_inside_a_settlement_ring()
         region = region_for_coordinates(*cell)
@@ -670,6 +677,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             SITE_STATE_POPULATED,
         )
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_manual_excess_counts_against_ordinary_ceilings_without_culling(self):
         zone = EcologyZone(
             "t_probe_zone",
@@ -1543,6 +1551,7 @@ class MonsterSiteStageWithoutWorldTests(EvenniaTest):
 class MonsterSiteWithoutWorldSeedTests(EvenniaTest):
     """A world that never initialized its seed refuses before any site write."""
 
+    @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_first_population_refuses_without_an_explicit_world_seed(self):
         from evennia.contrib.grid.wilderness.wilderness import (
             WildernessScript,
