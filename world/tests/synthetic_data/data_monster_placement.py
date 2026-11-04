@@ -1,12 +1,12 @@
 """Synthetic monster placement slice (monster-site-placement).
 
-One region-keyed ambient rule per synthetic region, the complete encounter
-compositions those rules and the synthetic sites name, and three authored
-sites, built from the real definition classes, so scopes that read the
-placement registries (and the lore-sync capture that mirrors them) have a
-complete synthetic stand-in. Every region key, composition key and site key is
-``t_``-prefixed and every referenced variant is a synthetic one, so no shipped
-key appears here.
+One region-keyed ambient rule per synthetic region, one authored ecology zone,
+the complete encounter compositions those rules, zones and sites name, and
+three authored sites, built from the real definition classes, so scopes that
+read the placement registries (and the lore-sync capture that mirrors them)
+have a complete synthetic stand-in. Every region key, composition key and site
+key is ``t_``-prefixed and every referenced variant is a synthetic one, so no
+shipped key appears here.
 """
 
 from __future__ import annotations
@@ -14,8 +14,10 @@ from __future__ import annotations
 from world.lore.monster_placement import (
     AmbientPlacementRule,
     CompositionMember,
+    EcologyZone,
     EncounterComposition,
     MonsterSite,
+    WeightedComposition,
 )
 
 SYNTH_ENCOUNTER_COMPOSITIONS: dict[str, EncounterComposition] = {
@@ -56,6 +58,28 @@ SYNTH_AMBIENT_PLACEMENTS: dict[str, AmbientPlacementRule] = {
         ("t_whisper_quail_ordinary",),
         1,
         2,
+    ),
+}
+
+SYNTH_ECOLOGY_ZONES: dict[str, EcologyZone] = {
+    # One bounded habitat in the first synthetic region. Its pool places the
+    # ordinary and stronger quail together or alone, so a synthetic regional
+    # hunt has a lawful authored source without any ambient-rule inference.
+    "t_bramble_wold_habitat": EcologyZone(
+        "t_bramble_wold_habitat",
+        "t_bramble_wold",
+        ((500, 519, 700, 719),),
+        (
+            WeightedComposition("t_whisper_quail_solitary", 1),
+            WeightedComposition("t_whisper_quail_pair", 1),
+            WeightedComposition("t_whisper_quail_group", 1),
+        ),
+        1,
+        3,
+        3,
+        3600,
+        600,
+        3,
     ),
 }
 

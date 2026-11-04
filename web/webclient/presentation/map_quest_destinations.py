@@ -12,10 +12,11 @@ destination carries two separate facts:
   the destination lies on the map being viewed.
 
 Supported families: ANCHOR locators, GRID locators, bound instances, regional
-species hunts (the legal cell of the target terrain region nearest the player)
-and authored monster sites. Every other objective (tier hunts, acquire,
-deliver, rendezvous escorts) and every destination whose canonical source is
-missing resolves to nothing: no node or coordinate is ever invented.
+species hunts (the nearest legal cell of a lawful authored supply source, a
+habitat destination that needs no living target) and authored monster sites.
+Every other objective (tier hunts, acquire, deliver, rendezvous escorts) and
+every destination whose canonical source is missing resolves to nothing: no
+node or coordinate is ever invented.
 
 This module is server-only. It reads the quest log, lore registries and the
 terrain classifier; it never writes quests, knowledge, rooms or the clock, and
@@ -29,9 +30,16 @@ from typing import Any, Callable
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.anchors import anchor_geography
-from world.lore.monster_placement import MONSTER_SITE_REGISTRY
+from world.lore.monster_placement import (
+    ECOLOGY_ZONE_REGISTRY,
+    MONSTER_SITE_REGISTRY,
+    SETTLEMENT_BIRTH_POLICY_REGISTRY,
+)
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps import wilderness_provider
+from world.maps.geography import current as current_geography
 from world.maps.map_data import settlement_graph
+from world.maps.population_geometry import eligible_birth_cells
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     is_valid_wilderness_cell,
@@ -39,7 +47,13 @@ from world.maps.wilderness_provider import (
     region_search_boxes,
 )
 from world.observability import log_warn
-from world.quests.definitions import DestinationKind, ObjectiveKind
+from world.quests.definitions import (
+    HUNT_SUPPLY_ECOLOGY_ZONE,
+    HUNT_SUPPLY_MONSTER_SITE,
+    DestinationKind,
+    ObjectiveKind,
+    hunt_supply_sources,
+)
 from world.quests.runtime import (
     QuestState,
     definition_for,
@@ -59,6 +73,20 @@ class DestinationFamily(StrEnum):
     MONSTER_SITE = "monster_site"
 
 
+class DestinationEvidence(StrEnum):
+    """What a resolved destination's position is evidence of.
+
+    ``HABITAT`` is an authored hunting habitat with no living target implied;
+    ``ENTITY`` would require actual living target identities/positions; and
+    ``LOCATION`` is a static room, settlement or authored site identity. A
+    habitat destination never becomes a hostile observation.
+    """
+
+    HABITAT = "habitat"
+    ENTITY = "entity"
+    LOCATION = "location"
+
+
 @dataclass(frozen=True, slots=True)
 class QuestDestination:
     """One accepted commission's resolved destination (server-internal).
@@ -67,7 +95,8 @@ class QuestDestination:
     A bound instance can have none (its origin room is gone or has no world
     cell), so the field is optional. ``map_key``/``node_id`` name the
     canonical local node when one exists; an ANCHOR whose anchor has no built
-    settlement node keeps only its world cell.
+    settlement node keeps only its world cell. ``destination_kind`` states
+    whether the position is a habitat, an entity, or a static location.
     """
 
     quest_id: str
@@ -76,6 +105,7 @@ class QuestDestination:
     world_cell: tuple[int, int] | None
     map_key: str | None
     node_id: str | None
+    destination_kind: DestinationEvidence
 
 
 #: The edge length, in cells, of one search tile of the nearest-cell search.
@@ -309,6 +339,7 @@ def _bound_instance_destination(record) -> QuestDestination | None:
         _room_world_cell(room),
         None,
         node_id,
+        DestinationEvidence.LOCATION,
     )
 
 
@@ -337,6 +368,7 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
             tuple(geography.cell),
             placement.zcoord if node_id is not None else None,
             node_id,
+            DestinationEvidence.LOCATION,
         )
     if locator.kind is DestinationKind.GRID:
         if locator.xyz is None:
@@ -355,6 +387,7 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
             world_cell,
             map_key if node_id is not None else None,
             node_id,
+            DestinationEvidence.LOCATION,
         )
     if locator.kind is DestinationKind.BOUND_INSTANCE:
         return _bound_instance_destination(record)
@@ -362,7 +395,9 @@ def _resolve_locator(record, definition, locator) -> QuestDestination | None:
     return None
 
 
-def _wild_destination(record, family, cell) -> QuestDestination | None:
+def _wild_destination(
+    record, family, cell, destination_kind: DestinationEvidence
+) -> QuestDestination | None:
     if not is_valid_wilderness_cell((cell[0], cell[1])):
         return None
     node_id = _wild_node(cell)
@@ -375,6 +410,66 @@ def _wild_destination(record, family, cell) -> QuestDestination | None:
         (cell[0], cell[1]),
         WILDERNESS_NAME,
         node_id,
+        destination_kind,
+    )
+
+
+def _zone_source_cells(zone: Any) -> tuple[tuple[int, int], ...]:
+    """The zone's ordinary eligible birth cells, or every lawful zone cell.
+
+    The population geometry owner decides eligibility (parent region, shared
+    validity and inhabited-settlement buffers). Those exclusions make a cell
+    permanently unusable for the zone's own supply, so guidance must not point
+    there even though it is walkable. No occupancy, headroom, or living-count
+    fact participates: this is authored habitat, not current supply.
+    """
+    return eligible_birth_cells(
+        zone,
+        geography=current_geography(),
+        entries=WILDERNESS_ENTRY_REGISTRY,
+        policies=SETTLEMENT_BIRTH_POLICY_REGISTRY,
+    )
+
+
+def _hunt_source_cells(sources) -> frozenset[tuple[int, int]]:
+    """Every habitat cell the hunt's lawful authored sources can supply."""
+    cells: set[tuple[int, int]] = set()
+    for source in sources:
+        if source.kind == HUNT_SUPPLY_ECOLOGY_ZONE:
+            zone = ECOLOGY_ZONE_REGISTRY.get(source.key)
+            if zone is not None:
+                cells.update(_zone_source_cells(zone))
+        elif source.kind == HUNT_SUPPLY_MONSTER_SITE:
+            site = MONSTER_SITE_REGISTRY.get(source.key)
+            if site is not None:
+                # An explicit site is a manual exception to ordinary birth
+                # buffers; its authored cell is lawful by construction.
+                cells.add((int(site.coordinates[0]), int(site.coordinates[1])))
+    return frozenset(cells)
+
+
+def _nearest_hunt_source_cell(
+    origin: tuple[int, int], region_key: str, sources
+) -> tuple[int, int] | None:
+    """The nearest legal habitat cell among the hunt's lawful sources.
+
+    Uses the shared nearest-cell search, so the order stays the smallest
+    squared cell distance, then the smallest x, then the smallest y. A hunt
+    with no lawful source cell resolves to nothing rather than to an arbitrary
+    region cell.
+    """
+    cells = _hunt_source_cells(sources)
+    if not cells:
+        return None
+    xs = [cell[0] for cell in cells]
+    ys = [cell[1] for cell in cells]
+    bounds = (min(xs), max(xs), min(ys), max(ys))
+    return nearest_region_cell(
+        origin,
+        region_key,
+        classify=region_for_coordinates,
+        is_legal=lambda cell: cell in cells and is_valid_wilderness_cell(cell),
+        bounds=bounds,
     )
 
 
@@ -397,21 +492,29 @@ def resolve_record_destination(
         site = MONSTER_SITE_REGISTRY.get(objective.site_key)
         if site is None:
             return None
-        return _wild_destination(record, DestinationFamily.MONSTER_SITE, site.coordinates)
-    if objective.region_key is not None:
-        bounds = region_search_boxes().get(objective.region_key)
-        if origin_cell is None or bounds is None:
-            return None
-        cell = nearest_region_cell(
-            origin_cell,
-            objective.region_key,
-            classify=region_for_coordinates,
-            is_legal=is_valid_wilderness_cell,
-            bounds=bounds,
+        return _wild_destination(
+            record,
+            DestinationFamily.MONSTER_SITE,
+            site.coordinates,
+            DestinationEvidence.LOCATION,
         )
+    if objective.region_key is not None:
+        if origin_cell is None or objective.region_key not in region_search_boxes():
+            return None
+        sources = hunt_supply_sources(
+            objective.region_key,
+            objective.species_key,
+            objective.countable_variant_keys,
+        )
+        cell = _nearest_hunt_source_cell(origin_cell, objective.region_key, sources)
         if cell is None:
             return None
-        return _wild_destination(record, DestinationFamily.SPECIES_HUNT, cell)
+        return _wild_destination(
+            record,
+            DestinationFamily.SPECIES_HUNT,
+            cell,
+            DestinationEvidence.HABITAT,
+        )
     return None
 
 

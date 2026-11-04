@@ -12,7 +12,12 @@ from enum import StrEnum
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.items import ITEM_REGISTRY
-from world.lore.monster_placement import MONSTER_SITE_REGISTRY
+from world.lore.monster_placement import (
+    ECOLOGY_ZONE_REGISTRY,
+    ENCOUNTER_COMPOSITION_REGISTRY,
+    MONSTER_SITE_REGISTRY,
+    composition_variant_keys,
+)
 from world.lore.monster_species import (
     MONSTER_SPECIES_REGISTRY,
     MONSTER_VARIANT_REGISTRY,
@@ -136,8 +141,9 @@ class QuestObjective:
     #: species key, and the countable variant keys owned by that species. The
     #: three are legal only together, mutually exclusive with ``monster_tier``
     #: and ``requires_bound_targets``, and at least one countable variant must be
-    #: an ordinary baseline variant, so the acceptance-time guarantee about
-    #: ordinary-eligible living targets is always expressible.
+    #: an ordinary baseline variant with a lawful authored supply source inside
+    #: the region. Current living quantity never limits the selector: a hunt may
+    #: be completed across encounters and recovery waves.
     region_key: str | None = field(
         default=None,
         metadata=ref("wilderness_regions", inverse="quest_objectives", nullable=True),
@@ -228,9 +234,11 @@ def _validate_hunt_selector(
 
     Every reference is a stable registry key (a display name is never a
     selector), every countable variant is owned by the declared species, and at
-    least one countable variant is an ordinary baseline variant: without that,
-    the acceptance-time guarantee about ordinary-eligible living targets could
-    not be expressed (design D-Q2).
+    least one countable variant is an ordinary baseline variant. The region must
+    also carry at least one lawful authored source for that ordinary variant —
+    an ecology zone's composition pool or an explicit monster-site composition
+    — so a published hunt is never advertised for a species the region cannot
+    lawfully supply. The source's current living quantity is irrelevant.
     """
     region_key = objective.region_key
     if not isinstance(region_key, str) or not region_key:
@@ -281,6 +289,13 @@ def _validate_hunt_selector(
             definition,
             "species hunt requires at least one ordinary baseline variant "
             "among its countable variants",
+        )
+    if not hunt_supply_sources(region_key, species_key, variant_keys):
+        _reject(
+            definition,
+            f"species hunt names no lawful authored supply source in "
+            f"{region_key!r} for species {species_key!r} and its countable "
+            "variants",
         )
 
 
@@ -336,21 +351,122 @@ def _validate_prose(
         )
 
 
-def ordinary_countable_variant_keys(objective: QuestObjective) -> tuple[str, ...]:
-    """The objective's countable variants that are ordinary baseline variants.
+#: The closed kinds of lawful authored supply a regional hunt may name.
+HUNT_SUPPLY_ECOLOGY_ZONE = "ecology_zone"
+HUNT_SUPPLY_MONSTER_SITE = "monster_site"
 
-    Ordinary-eligibility is derived, countability is authored (design D-Q2):
-    the acceptance-time guarantee covers only ordinary variants, and
-    registration guarantees at least one countable variant is ordinary, so a
-    registered hunt selector never yields an empty tuple here. An objective
-    that was never validated degrades to an empty tuple instead of raising.
+
+@dataclass(frozen=True, slots=True)
+class HuntSupplySource:
+    """One lawful authored source of a regional hunt's countable variants.
+
+    ``kind`` is one of :data:`HUNT_SUPPLY_ECOLOGY_ZONE` /
+    :data:`HUNT_SUPPLY_MONSTER_SITE`; ``key`` names that zone or site and
+    ``region_key`` is its authored parent region. ``variant_keys`` holds the
+    returned entities' countable variants this source's authored compositions
+    actually place, including at least one ordinary baseline variant.
+
+    A source is authored legality, never current supply: the zone's or site's
+    living quantity is irrelevant, so a hunt may outlast one cell, one site,
+    or one wave.
     """
-    ordinary: list[str] = []
-    for variant_key in objective.countable_variant_keys:
+
+    kind: str
+    key: str
+    region_key: str
+    variant_keys: tuple[str, ...]
+
+
+def _sourced_variants(
+    source_variant_keys: tuple[str, ...],
+    species_key: str,
+    countable_variant_keys: frozenset[str],
+) -> tuple[str, ...]:
+    """The countable, species-owned variants one authored source places."""
+    matched: set[str] = set()
+    for variant_key in source_variant_keys:
+        if variant_key not in countable_variant_keys:
+            continue
+        variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
+        if variant is None or variant.species_key != species_key:
+            continue
+        matched.add(variant_key)
+    return tuple(sorted(matched))
+
+
+def _has_ordinary_variant(variant_keys: tuple[str, ...]) -> bool:
+    """Whether ``variant_keys`` includes at least one ordinary baseline variant."""
+    for variant_key in variant_keys:
         variant = MONSTER_VARIANT_REGISTRY.get(variant_key)
         if variant is not None and variant.ordinary_variant:
-            ordinary.append(variant_key)
-    return tuple(ordinary)
+            return True
+    return False
+
+
+def hunt_supply_sources(
+    region_key: str,
+    species_key: str,
+    countable_variant_keys: tuple[str, ...],
+) -> tuple[HuntSupplySource, ...]:
+    """Every lawful authored source of ``countable_variant_keys`` in a region.
+
+    Sources are the immutable ecology composition pools and the explicit
+    monster-site compositions whose parent region matches. A source counts
+    only when its authored compositions place at least one requested variant
+    owned by ``species_key`` and that intersection includes an ordinary
+    baseline variant, so the selector's ordinary eligibility is expressible
+    without a current population. Habitat tags, art keys, and prose never
+    authorize supply, and neither does a source's current living quantity.
+
+    The result is deterministic: matching ecology zones by key, then matching
+    monster sites by key. An unknown region, species, or variant simply
+    contributes no source.
+    """
+    countable = frozenset(countable_variant_keys)
+    if not isinstance(region_key, str) or not region_key or not countable:
+        return ()
+    species = MONSTER_SPECIES_REGISTRY.get(species_key)
+    if species is None:
+        return ()
+    sources: list[HuntSupplySource] = []
+    for zone_key in sorted(ECOLOGY_ZONE_REGISTRY):
+        zone = ECOLOGY_ZONE_REGISTRY[zone_key]
+        if zone.region_key != region_key:
+            continue
+        placed: list[str] = []
+        for pool_row in zone.pool:
+            composition = ENCOUNTER_COMPOSITION_REGISTRY.get(
+                pool_row.composition_key
+            )
+            if composition is None:
+                continue
+            placed.extend(composition_variant_keys(composition))
+        matched = _sourced_variants(
+            tuple(placed), species_key, countable
+        )
+        if matched and _has_ordinary_variant(matched):
+            sources.append(
+                HuntSupplySource(
+                    HUNT_SUPPLY_ECOLOGY_ZONE, zone_key, region_key, matched
+                )
+            )
+    for site_key in sorted(MONSTER_SITE_REGISTRY):
+        site = MONSTER_SITE_REGISTRY[site_key]
+        if site.region_key != region_key:
+            continue
+        composition = ENCOUNTER_COMPOSITION_REGISTRY.get(site.composition_key)
+        if composition is None:
+            continue
+        matched = _sourced_variants(
+            composition_variant_keys(composition), species_key, countable
+        )
+        if matched and _has_ordinary_variant(matched):
+            sources.append(
+                HuntSupplySource(
+                    HUNT_SUPPLY_MONSTER_SITE, site_key, region_key, matched
+                )
+            )
+    return tuple(sources)
 
 
 @dataclass(frozen=True, slots=True)

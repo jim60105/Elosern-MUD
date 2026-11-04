@@ -243,9 +243,10 @@ def _offer_available_now(offer: GuildQuestOffer) -> bool:
     """Whether an eligible offer can currently be accepted.
 
     Only a bound site clear-out is availability-sensitive: every other offer's
-    acceptance-time guarantee is satisfiable by the managers themselves. The
-    predicate is the quest layer's own, so the board and an acceptance answer
-    the same question about the same site read.
+    acceptance has no current-supply precondition — a regional hunt stays
+    listed while the region temporarily holds fewer living targets than its
+    quantity. The predicate is the quest layer's own, so the board and an
+    acceptance answer the same question about the same site read.
     """
     definition = QUEST_DEFINITION_REGISTRY.get(offer.definition_key)
     if definition is None:
@@ -291,10 +292,10 @@ def accept_guild_offer(
     spelling. The quest-record creation and the +1 ``guild`` affinity gain
     with the issuing host commit in one all-or-nothing operation: the actor's
     quest-log surface and the host's affinity record are snapshotted before
-    the writes and restored on any failure, together with the wilderness
-    bookkeeping surfaces a species-hunt acceptance may have provisioned (the
-    affinity write happens after ``accept_quest`` returns, so the runtime's own
-    failure path cannot cover this boundary).
+    the writes and restored on any failure (the affinity write happens after
+    ``accept_quest`` returns, so the runtime's own failure path cannot cover
+    this boundary). A regional hunt's undersupply is never a refusal here: the
+    same acceptance commits at zero living targets.
 
     The precheck is the eligibility seam alone — the issuing branch plus the
     actor's rank — never the availability-filtered listing: the availability
@@ -318,18 +319,10 @@ def accept_guild_offer(
     branch_key = guild_staff.branch_key
     if not isinstance(branch_key, str) or not branch_key:
         raise BoardAccessError("GuildStaff host has no branch_key")
-    from world.quests.runtime import (
-        accept_quest,
-        provisioning_snapshot_for,
-        restore_provisioning,
-    )
+    from world.quests.runtime import accept_quest
 
     quest_log_snapshot = attribute_snapshot(actor, "quest_log")
     relations_snapshot = attribute_snapshot(staff, "relations_data")
-    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
-    provisioning_snapshot = (
-        None if definition is None else provisioning_snapshot_for(definition)
-    )
     try:
         with transaction.atomic():
             record = accept_quest(actor, definition_key, guild_issuer_key(branch_key))
@@ -337,7 +330,6 @@ def accept_guild_offer(
     except Exception:
         restore_attribute_best_effort(actor, "quest_log", quest_log_snapshot)
         restore_attribute_best_effort(staff, "relations_data", relations_snapshot)
-        restore_provisioning(provisioning_snapshot)
         raise
     return record
 
