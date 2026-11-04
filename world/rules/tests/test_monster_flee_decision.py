@@ -37,6 +37,7 @@ from .test_monster_behaviour_policy import FakeMonster, _field
 # One file-local affordable damage skill (12 MP, magic-scaled): every
 # affordability/threshold fixture below spends its own hp/mp numbers
 # against it, and the FakeMonster fixture's magic_power makes it eligible.
+from world.rules.combat_identity import stable_actor_id
 _T_STRIKE = synth_damage_skill(
     "t_flee_strike",
     "合成突擊",
@@ -181,13 +182,13 @@ class MonsterFleeProfileTests(unittest.TestCase):
 
     def test_override_changes_threshold_without_mutating_monster_state(self):
         default = FakeMonster(
-            "default",
+            "default", combat_identity='default',
             hp=30,
             max_hp=100,
             owned=[_T_STRIKE.key],
         )
         override = FakeMonster(
-            "override",
+            "override", combat_identity='override',
             hp=30,
             max_hp=100,
             owned=[_T_STRIKE.key],
@@ -248,7 +249,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
         owned=None,
     ):
         monster = FakeMonster(
-            "monster",
+            "monster", combat_identity='monster',
             hp=hp,
             max_hp=max_hp,
             threat_tier=threat_tier,
@@ -313,7 +314,7 @@ class MonsterFleePolicyTests(unittest.TestCase):
 
     @covers_requirement("monster-flee-policy::flee-selection-has-priority-over-attack-selection-without-consuming-decision-dice")
     def test_flee_precedes_skill_selection_and_consumes_no_policy_roll(self):
-        monster = FakeMonster("monster", hp=20, max_hp=100, owned=[_T_STRIKE.key])
+        monster = FakeMonster("monster", combat_identity='monster', hp=20, max_hp=100, owned=[_T_STRIKE.key])
         enemies = [FakeEntity("first", combat_identity='first'), FakeEntity("second", combat_identity='second')]
         battlefield = _field(monster, enemies)
         with patch("world.rules.monster_behaviour.dice.roll_d100") as roller:
@@ -322,10 +323,10 @@ class MonsterFleePolicyTests(unittest.TestCase):
         roller.assert_not_called()
 
     def test_no_living_enemy_returns_none_before_flee(self):
-        monster = FakeMonster("monster", hp=20, max_hp=100, owned=[])
+        monster = FakeMonster("monster", combat_identity='monster', hp=20, max_hp=100, owned=[])
         enemy = FakeEntity("enemy", combat_identity='enemy')
         battlefield = _field(monster, [enemy])
-        battlefield.fled.add(enemy.key)
+        battlefield.fled.add(stable_actor_id(enemy))
         self.assertIsNone(monster_behaviour_policy(monster, battlefield))
 
     @covers_requirement("monster-flee-policy::a-flee-decision-is-a-complete-actionresolver-request-and-never-a-state-mutation")
@@ -435,8 +436,8 @@ class MonsterFleePolicyTests(unittest.TestCase):
                 "from world.skills.registry import SKILL_REGISTRY",
                 "assert FLEE_SKILL_KEY in SKILL_REGISTRY",
                 "assert 'disengage' in _EFFECT_HANDLERS",
-                "monster = FakeMonster('monster', hp=20, max_hp=100, owned=[FLEE_SKILL_KEY])",
-                "request = monster_behaviour_policy(monster, _field(monster, [FakeEntity('enemy')]))",
+                "monster = FakeMonster('monster', combat_identity='monster', hp=20, max_hp=100, owned=[FLEE_SKILL_KEY])",
+                "request = monster_behaviour_policy(monster, _field(monster, [FakeEntity('enemy', combat_identity='enemy')]))",
                 "assert _step1_ownership(request).key == FLEE_SKILL_KEY",
             )
         )

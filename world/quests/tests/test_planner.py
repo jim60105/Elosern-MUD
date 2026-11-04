@@ -147,8 +147,8 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         npc.traits.hp._data["current"] = hp
         return npc
 
-    def _field(self, actor, targets, key_override: str | None = None):
-        actor_key = key_override or actor.key
+    def _field(self, actor, targets):
+        actor_key = stable_actor_id(actor)
         return Battlefield(
             {'party': frozenset({actor_key}), 'foes': frozenset(stable_actor_id(t) for t in targets)},
             {actor_key: actor, **{stable_actor_id(t): t for t in targets}},
@@ -491,7 +491,7 @@ class CompanionDefeatCreditTests(QuestRegistryIsolation, EvenniaTestCase):
         companion = self._companion("ko")
         prey = self._monster("prey-ko")
         field = self._field(
-            companion, [prey], knocked_out=frozenset({companion.key})
+            companion, [prey], knocked_out=frozenset({stable_actor_id(companion)})
         )
         result = self._resolve(companion, CLAW_SKILL.key, [prey], field)
         self.assertEqual(result.outcome, "success")

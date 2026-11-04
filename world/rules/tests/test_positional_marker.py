@@ -565,13 +565,13 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
             teams={'players': frozenset({stable_actor_id(self.player)}), 'enemies': frozenset({stable_actor_id(self.monster)})},
             roster={stable_actor_id(self.player): self.player, stable_actor_id(self.monster): self.monster},
         )
-        bf.fled.add(str(self.monster.key))
+        bf.fled.add(stable_actor_id(self.monster))
 
         apply_buff(self.monster, "t_displaced_hazard", battlefield=bf)
         self.assertNotIn("t_displaced_hazard", entity_active_buffs(self.monster))
 
         bf.fled.clear()
-        bf.knocked_out.add(str(self.monster.key))
+        bf.knocked_out.add(stable_actor_id(self.monster))
         apply_buff(self.monster, "t_displaced_hazard", battlefield=bf)
         self.assertNotIn("t_displaced_hazard", entity_active_buffs(self.monster))
 

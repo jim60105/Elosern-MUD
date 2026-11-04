@@ -65,7 +65,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_seal_redirects_over_lowest_hp_strategy(self):
         """A lowest_hp monster picks the seal-bearer over a cheaper target."""
         monster = FakeMonster(
-            "seal actor", behaviour_tree="instinctive", owned=[_T_SPELL.key]
+            "seal actor", combat_identity='seal actor', behaviour_tree="instinctive", owned=[_T_SPELL.key]
         )
         sealed = _party_member("sealed sister", hp=90)
         _seal(sealed)
@@ -77,7 +77,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_seal_redirects_over_highest_effective_power_strategy(self):
         """A highest_effective_power monster still picks the seal-bearer."""
         monster = FakeMonster(
-            "seal brute", behaviour_tree="brute", owned=[_T_SPELL.key]
+            "seal brute", combat_identity='seal brute', behaviour_tree="brute", owned=[_T_SPELL.key]
         )
         sealed = _party_member("weak sealed", hp=1)
         _seal(sealed)
@@ -89,7 +89,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_multi_seal_canonical_order_player_first_then_ascending_pk(self):
         """Two seal-bearers resolve player-first, then ascending pk."""
         monster = FakeMonster(
-            "seal order", behaviour_tree="instinctive", owned=[_T_SPELL.key]
+            "seal order", combat_identity='seal order', behaviour_tree="instinctive", owned=[_T_SPELL.key]
         )
         player = _party_member("sealed player", hp=50)
         _seal(player)
@@ -111,7 +111,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_no_seal_decisions_are_byte_identical(self):
         """Zero seals: the metric path runs exactly as before, dice included."""
         monster = FakeMonster(
-            "seal free actor", behaviour_tree="instinctive", owned=[_T_SPELL.key]
+            "seal free actor", combat_identity='seal free actor', behaviour_tree="instinctive", owned=[_T_SPELL.key]
         )
         low = _party_member("low target", hp=30)
         high = _party_member("high target", hp=70)
@@ -136,7 +136,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_area_path_is_untouched_by_seals(self):
         """An AREA decision neither narrows nor substitutes with seals present."""
         monster = FakeMonster(
-            "seal area", behaviour_tree="pack_hunter", owned=[_T_AREA.key, _T_SPELL.key]
+            "seal area", combat_identity='seal area', behaviour_tree="pack_hunter", owned=[_T_AREA.key, _T_SPELL.key]
         )
         sealed_a = _party_member("sealed a", hp=90)
         _seal(sealed_a)
@@ -152,7 +152,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
     def test_positional_exclusion_is_never_substituted_by_the_seal(self):
         """A strike-only kit still refuses a displaced seal-bearer."""
         monster = FakeMonster(
-            "seal strike", behaviour_tree="instinctive", owned=[_T_CLAW.key]
+            "seal strike", combat_identity='seal strike', behaviour_tree="instinctive", owned=[_T_CLAW.key]
         )
         displaced_sealed = _party_member("displaced sealed", hp=80)
         _seal(displaced_sealed)
@@ -163,7 +163,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         # A magic kit reaches the displaced seal-bearer: the seal narrows the
         # base, while the positional hygiene stays an orthogonal exclusion.
         caster = FakeMonster(
-            "seal caster", behaviour_tree="instinctive", owned=[_T_SPELL.key]
+            "seal caster", combat_identity='seal caster', behaviour_tree="instinctive", owned=[_T_SPELL.key]
         )
         request = monster_behaviour_policy(caster, _field(caster, [displaced_sealed]))
         self.assertEqual(
@@ -176,7 +176,7 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         """Two 進行中 transitions consume the charges; the seal then vanishes
         without a fresh cast, so the policy returns to its metric path."""
         monster = FakeMonster(
-            "seal lift", behaviour_tree="instinctive", owned=[_T_SPELL.key]
+            "seal lift", combat_identity='seal lift', behaviour_tree="instinctive", owned=[_T_SPELL.key]
         )
         sealed = _party_member("lifting sister", hp=90)
         _seal(sealed)

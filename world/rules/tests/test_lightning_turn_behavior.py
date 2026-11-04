@@ -157,8 +157,14 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         slow = _player("slow")
         slow.location = self.room
         bf = Battlefield(
-            {'team_a': frozenset({"fixture:fast"}), 'team_b': frozenset({"fixture:slow"})},
-            {"fixture:fast": fast, "fixture:slow": slow},
+            {
+                'team_a': frozenset({stable_actor_id(fast)}),
+                'team_b': frozenset({stable_actor_id(slow)}),
+            },
+            {
+                stable_actor_id(fast): fast,
+                stable_actor_id(slow): slow,
+            },
         )
 
         # 1. Mount is live: evaluate_combat_modifiers returns actions_per_turn: 2
@@ -167,7 +173,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls: list[str] = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(fast), stable_actor_id(slow)]),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
@@ -183,7 +189,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls.clear()
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(fast), stable_actor_id(slow)]),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
         ):
@@ -252,7 +258,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
 
         calls: list[str] = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=[str(fast.key)]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(fast)]),
             patch("world.rules.combat.battlefield.roll_d100", return_value=10),
             patch("world.rules.combat.damage.roll_d100", return_value=10),
             patch("world.rules.combat.rounds.roll_d100", return_value=10),
@@ -269,7 +275,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         # Winning dice (> 15, e.g. 50) lets attacker act
         calls.clear()
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=[str(fast.key)]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(fast)]),
             patch("world.rules.combat.battlefield.roll_d100", return_value=50),
             patch("world.rules.combat.damage.roll_d100", return_value=50),
             patch("world.rules.combat.rounds.roll_d100", return_value=50),
@@ -293,8 +299,22 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
         p4.location = self.room
 
         bf = Battlefield(
-            {'team_a': frozenset({"fixture:p1", "fixture:p2", "fixture:p4"}), 'team_b': frozenset({"fixture:p3"})},
-            {"fixture:p1": p1, "fixture:p2": p2, "fixture:p3": p3, "fixture:p4": p4},
+            {
+                'team_a': frozenset(
+                    {
+                        stable_actor_id(p1),
+                        stable_actor_id(p2),
+                        stable_actor_id(p4),
+                    }
+                ),
+                'team_b': frozenset({stable_actor_id(p3)}),
+            },
+            {
+                stable_actor_id(p1): p1,
+                stable_actor_id(p2): p2,
+                stable_actor_id(p3): p3,
+                stable_actor_id(p4): p4,
+            },
         )
 
         # p4 carries flicker_advance (action: advance_to_head)
@@ -311,7 +331,7 @@ class LightningTurnBehaviorTests(EvenniaTestCase):
             return None
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["p1", "p2", "p3", "p4"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[stable_actor_id(p1), stable_actor_id(p2), stable_actor_id(p3), stable_actor_id(p4)]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),

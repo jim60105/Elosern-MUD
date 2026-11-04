@@ -2225,7 +2225,6 @@ def _participant_reads(
     named ones, and everyone else floors at zero.
     """
     identity = stable_identity(entity)
-    key = str(getattr(entity, "key", ""))
     resources = reads.resources(entity)
     gauges = {
         gauge_key: _finite(current, f"{identity}.{gauge_key}")
@@ -2249,7 +2248,7 @@ def _participant_reads(
         relation=relation,
         hp=gauges.get("hp", 0.0),
         max_hp=maxima.get("hp", gauges.get("hp", 0.0)),
-        floor=1.0 if nonlethal or key in nonlethal_keys else 0.0,
+        floor=1.0 if nonlethal or identity in nonlethal_keys else 0.0,
         gauges=gauges,
         maxima=maxima,
         effective=effective,

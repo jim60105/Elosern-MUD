@@ -74,13 +74,15 @@ def apply_buff(
 
             battlefield = _active_battlefield_for(entity)
         if battlefield is not None:
-            roster_key = str(getattr(entity, "key", ""))
-            if roster_key in getattr(battlefield, "fled", ()):
+            from world.rules.combat_identity import stable_actor_id
+
+            roster_identity = stable_actor_id(entity)
+            if roster_identity in getattr(battlefield, "fled", ()):
                 return
             is_ko = getattr(battlefield, "is_knocked_out", None)
-            if callable(is_ko) and is_ko(roster_key):
+            if callable(is_ko) and is_ko(roster_identity):
                 return
-            if roster_key in getattr(battlefield, "knocked_out", ()):
+            if roster_identity in getattr(battlefield, "knocked_out", ()):
                 return
             from world.rules.combat_session import CombatSessionError, read_session
 

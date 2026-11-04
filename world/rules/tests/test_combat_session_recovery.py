@@ -35,6 +35,7 @@ from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
 from ._combat_session_helpers import fail_on_round_persist, open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import grant_lineage
 
+from world.rules.combat_identity import stable_actor_id
 _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
 # Handler-context probes: effects whose handlers declare requires_event_context,
 # used to prove preflight rejects a missing context before any round cost.
@@ -360,7 +361,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         record = replace(read_session(self.player), rounds_elapsed=1)
         _persist(self.player, record)
         battlefield = reconstruct_battlefield(self.player, record)
-        battlefield.fled.add(str(self.player.key))
+        battlefield.fled.add(stable_actor_id(self.player))
         with (
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(

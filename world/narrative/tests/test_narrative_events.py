@@ -222,7 +222,7 @@ class NarrativeEventsStorageTests(EvenniaTestCase):
         self.assertFalse(recorded_defeat)
 
         # 2. Companion was knocked out -> no record
-        battlefield.knocked_out.add(str(self.companion.key))
+        battlefield.knocked_out.add(stable_actor_id(self.companion))
         recorded_knocked = select_and_record_protection_event(
             actor=self.player,
             record=record,

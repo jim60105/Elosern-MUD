@@ -26,6 +26,7 @@ from world.rules.clock import (
     _snapshot_clock_tick,
     build_advance_snapshot_registry,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.defeat_aftermath.contracts import (
     DefeatAftermathResult,
     DigestOutcome,
@@ -37,7 +38,6 @@ from world.rules.defeat_aftermath.rulebook import DEFEAT_AFTERMATH_RULEBOOK
 from world.rules.defeat_aftermath.violation import _call_violation_hook
 from world.rules.event_log import EventEntry, EventLog
 from world.rules.player_messages import defeat_aftermath_template
-
 
 _PENDING_OUTER_UNDOS: list[Callable[[], None]] = []
 
@@ -157,8 +157,9 @@ def run_defeat_aftermath(
             "pending_climax_extension",
         )
     }
+    actor_id = stable_actor_id(actor)
     knocked_out_before = (
-        str(actor.key) in battlefield.knocked_out
+        actor_id in battlefield.knocked_out
         if battlefield is not None
         else False
     )
@@ -196,7 +197,7 @@ def run_defeat_aftermath(
         # at 0 HP, and the floor is the declared writer-owned write.
         actor.traits.hp.current = 1
         if battlefield is not None:
-            battlefield.knocked_out.add(str(actor.key))
+            battlefield.knocked_out.add(actor_id)
         if int(actor.pk) not in session.knocked_out_ids:
             session = replace(
                 session,
@@ -514,7 +515,7 @@ def _restore_aftermath_surfaces(
     actor.traits._cache.clear()
     actor.__dict__.pop("sexual", None)
     if battlefield is not None and not knocked_out_before:
-        battlefield.knocked_out.discard(str(actor.key))
+        battlefield.knocked_out.discard(stable_actor_id(actor))
 
 
 def _schedule_boundary_event(actor: Any, seconds: int, hp_wake: int) -> None:

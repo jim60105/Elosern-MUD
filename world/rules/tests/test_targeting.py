@@ -29,6 +29,7 @@ from world.tests.synthetic_data import SYNTH_ACT_SKILL, SYNTH_SKILLS, make_skill
 # resolver consumes the requirement a SkillDef produces and never consults
 # the registry, so invented rows exercise every target-spec/faction branch
 # identically.
+from world.rules.combat_identity import stable_actor_id
 _T_ANY_SINGLE = SYNTH_SKILLS["t_ember_burst"]  # SINGLE + ANY + damage
 _T_ANY_AREA = replace(
     _T_ANY_SINGLE,
@@ -444,7 +445,7 @@ class TightenedShapeTests(unittest.TestCase):
     def test_single_rejects_shorthand_even_when_one_target(self):
         actor = self._actor()
         skill = replace(_T_ZERO_COST_SINGLE, target_spec=TargetSpec.SINGLE)
-        roster = {actor.key: actor}
+        roster = {stable_actor_id(actor): actor}
         context = _BattlefieldContext(object(), roster)
         request = self._request(actor, skill.key, "all-enemies", context)
         from world.rules.action import _step3_targeting
@@ -521,7 +522,7 @@ class TightenedShapeTests(unittest.TestCase):
     def test_all_allies_includes_actor_and_team(self):
         actor = _Entity("actor", object())
         ally = _Entity("ally", object())
-        roster = {actor.key: actor, ally.key: ally}
+        roster = {stable_actor_id(actor): actor, stable_actor_id(ally): ally}
         context = _BattlefieldContext(object(), roster)
         expanded = expand_target_shorthand(actor, context, "all-allies")
         self.assertEqual(set(expanded), {actor, ally})
@@ -529,7 +530,7 @@ class TightenedShapeTests(unittest.TestCase):
     def test_mapping_roster_expands_to_values_not_keys(self):
         actor = _Entity("actor", object())
         ally = _Entity("ally", object())
-        roster = {actor.key: actor, ally.key: ally}
+        roster = {stable_actor_id(actor): actor, stable_actor_id(ally): ally}
         context = _BattlefieldContext(object(), roster)
         expanded = expand_target_shorthand(actor, context, "all")
         self.assertTrue(all(hasattr(item, "traits") for item in expanded))

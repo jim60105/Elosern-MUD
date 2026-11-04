@@ -177,11 +177,11 @@ class MartialArtsBehaviorTests(EvenniaTestCase):
         return skill
 
     def _battlefield(self, *others):
-        roster = {str(self.actor.key): self.actor}
+        roster = {stable_actor_id(self.actor): self.actor}
         enemies = set()
         allies = {str(self.actor.key)}
         for other, team in others:
-            roster[str(other.key)] = other
+            roster[stable_actor_id(other)] = other
             if team == "enemy":
                 enemies.add(str(other.key))
             else:

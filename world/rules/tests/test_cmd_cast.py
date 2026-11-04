@@ -170,7 +170,7 @@ class CmdCastTests(EvenniaCommandTestMixin, EvenniaTest):
             rejection_message(RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT),
             output,
         )
-        self.assertNotIn(self.char1.key, field.fled)
+        self.assertNotIn(stable_actor_id(self.char1), field.fled)
 
 
 class CmdCastSexualCoercionTests(EvenniaCommandTestMixin, EvenniaTest):

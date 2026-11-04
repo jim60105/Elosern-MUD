@@ -28,17 +28,15 @@ from world.rules.monster_behaviour import (
     MonsterAITuning,
     resolve_monster_ai,
 )
+from world.rules.combat_identity import stable_actor_id
 
 #: session id -> stable actor identity -> the resolution recorded for it.
 _SESSION_AI_TUNING: dict[str, dict[str, MonsterAIDecision]] = {}
 
 
 def _actor_identity(monster: Any) -> str:
-    """The stable identity (dbref, else object key) one recording is keyed by."""
-    dbref = getattr(monster, "pk", None)
-    if dbref is None:
-        return f"key:{getattr(monster, 'key', '')}"
-    return f"dbref:{dbref}"
+    """The stable individual identity one recording is keyed by."""
+    return stable_actor_id(monster)
 
 
 def record_session_ai_tuning(

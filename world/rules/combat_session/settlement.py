@@ -486,7 +486,7 @@ def settle_session(
         name = None
         if battlefield is not None:
             for entity in battlefield.roster.values():
-                if getattr(entity, "pk", None) == entity_id or str(getattr(entity, "key", None)) == id_str:
+                if getattr(entity, "pk", None) == entity_id:
                     name = str(getattr(entity, "name", entity.key))
                     break
         if name is None:

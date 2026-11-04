@@ -30,7 +30,6 @@ def stable_actor_id(entity: Any) -> str:
         or not isinstance(identity, str)
         or not identity
         or identity != identity.strip()
-        or any(character.isspace() for character in identity)
         or any(ord(character) < 32 for character in identity)
     ):
         raise CombatIdentityError(

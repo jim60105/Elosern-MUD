@@ -419,7 +419,7 @@ def _step7_build_event_log(
                 amount,
                 projected,
                 defeated_ids,
-                nonlethal=nonlethal or str(effect.entity.key) in nonlethal_keys,
+                nonlethal=nonlethal or stable_actor_id(effect.entity) in nonlethal_keys,
                 simulated=simulated,
             )
             if defeated is not None:

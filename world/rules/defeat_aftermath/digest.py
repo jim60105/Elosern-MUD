@@ -25,6 +25,7 @@ from world.rules.defeat_aftermath.violation import (
     _rewrite_wake_line,
     _violation_pool,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.event_log import EventEntry
 from world.rules.player_messages import defeat_aftermath_template
 
@@ -90,7 +91,7 @@ def _match_digest_row(entity: Any, outcome: "ViolationOutcome") -> DigestRow:
 
 
 def _rewrite_companion_wake(
-    entries: list[EventEntry], victim_key: str, wake_line: str
+    entries: list[EventEntry], victim_id: str, wake_line: str
 ) -> None:
     """Reselect one selected companion's wake line by digest (D-D3).
 
@@ -100,7 +101,7 @@ def _rewrite_companion_wake(
     because ``EventEntry`` is frozen.
     """
     for index, entry in enumerate(entries):
-        if entry.kind == "companion_wake" and entry.actor == victim_key:
+        if entry.kind == "companion_wake" and entry.actor_id == victim_id:
             entries[index] = replace(entry, text_template=wake_line)
             return
 
@@ -120,9 +121,9 @@ def _digest_bystanders(
     is the settlement's own, so neither can be a bystander.
     """
     selected = set(violation)
-    actor_key = str(actor.key)
+    actor_id = stable_actor_id(actor)
     if battlefield is not None:
-        player_team = battlefield.team_of(actor_key)
+        player_team = battlefield.team_of(actor_id)
         ally_keys = (
             battlefield.teams.get(player_team, set())
             if player_team is not None
@@ -131,7 +132,7 @@ def _digest_bystanders(
         return [
             battlefield.roster[key]
             for key in ally_keys
-            if key != actor_key
+            if key != actor_id
             and key not in battlefield.fled
             and key not in battlefield.knocked_out
             and key not in selected
@@ -146,7 +147,7 @@ def _digest_bystanders(
         and dbref not in session.fled_ids
         and dbref not in session.knocked_out_ids
         for entity in (ObjectDB.objects.filter(id=dbref).first(),)
-        if entity is not None and str(entity.key) not in selected
+        if entity is not None and stable_actor_id(entity) not in selected
     ]
 
 
@@ -199,7 +200,7 @@ def _run_digest_phase(
     never a digest row or a buff (D-D7).
     """
     entities = {
-        str(entity.key): entity
+        stable_actor_id(entity): entity
         for entity in _violation_pool(actor, session, battlefield)
     }
     digests: list[DigestOutcome] = []
@@ -247,19 +248,21 @@ def _run_digest_phase(
             )
         )
     for entity in _digest_bystanders(actor, session, battlefield, violation):
-        key = str(entity.key)
+        participant = stable_actor_id(entity)
+        label = str(entity.key)
         template = defeat_aftermath_template("wake_bystander")
         wake_observations.append(
             WakeObservation(
-                participant=key,
-                line=template.format(actor=key, target=None, data={}),
+                participant=participant,
+                line=template.format(actor=label, target=None, data={}),
             )
         )
         entries.append(
             EventEntry(
                 kind="wake_observation",
-                actor=key,
+                actor=label,
                 target=None,
+                actor_id=participant,
                 data={},
                 text_template=template,
             )

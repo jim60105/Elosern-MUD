@@ -673,7 +673,7 @@ class CandidateShapeTests(unittest.TestCase):
                 stable_actor_id(outsider): outsider,
             },
         )
-        field.knocked_out.add(str(self.actor.key))
+        field.knocked_out.add(stable_actor_id(self.actor))
         result = _enumerate(
             self.actor,
             (self.enemy,),
@@ -1032,9 +1032,9 @@ class CandidateRestrictionTests(EvenniaTestCase):
         return entity
 
     def _field(self, *opponents):
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for entity in opponents:
-            roster[str(entity.key)] = entity
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {
                 'monsters': frozenset({stable_actor_id(self.monster)}),
@@ -1297,9 +1297,9 @@ class TauntConstraintTests(EvenniaTestCase):
         return entity
 
     def _field(self, *opponents):
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for entity in opponents:
-            roster[str(entity.key)] = entity
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {
                 'monsters': frozenset({stable_actor_id(self.monster)}),
@@ -1311,7 +1311,10 @@ class TauntConstraintTests(EvenniaTestCase):
     def _taunted(self, field, winner):
         """Record one active Taunt winner for the acting monster this round."""
         field.tactical = RoundTactical(
-            {}, {str(self.monster.key): str(winner.key)}
+            {},
+            {
+                stable_actor_id(self.monster): stable_actor_id(winner),
+            },
         )
         return field
 
@@ -1393,7 +1396,7 @@ class TauntConstraintTests(EvenniaTestCase):
         )
         # The winner is knocked out before the enemy's decision: the ordinary
         # legal candidates return and no losing declaration takes over.
-        field.knocked_out.add(str(winner.key))
+        field.knocked_out.add(stable_actor_id(winner))
         self.assertEqual(
             _targets_by_skill(self._enumerate((winner, loser, other), field))[
                 MAGIC.key

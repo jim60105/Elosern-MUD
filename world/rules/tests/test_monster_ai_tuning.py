@@ -234,6 +234,8 @@ class FakeAIMonster:
         variant_key=None,
     ):
         self.key = key
+        # A nonpersistent double carries its own explicit stable identity.
+        self.combat_identity = key
         self.threat_tier = threat_tier
         self.behaviour_tree = behaviour_tree
         self.species_key = species_key
@@ -273,7 +275,7 @@ class MonsterBehaviourAuthoringTests(unittest.TestCase):
         strong = FakeEntity(
             "t_ai_strong", combat_identity='t_ai_strong', hp=90, atk_phys=1, agility=1, defense=1, magic_power=1
         )
-        actor = FakeMonster("t_ai_actor", threat_tier=TIER, owned=[_CLAW.key])
+        actor = FakeMonster("t_ai_actor", combat_identity='t_ai_actor', threat_tier=TIER, owned=[_CLAW.key])
         weakest_first = self._decide(_rulebook(), actor, [weak, strong])
         self.assertEqual(weakest_first.skill_key, _CLAW.key)
         self.assertEqual(weakest_first.targets, [weak])
@@ -787,19 +789,19 @@ class SessionAITuningTests(unittest.TestCase):
         record_session_ai_tuning(SESSION, second, tuning=tuning)
         self.assertEqual(
             set(session_ai_tuning(SESSION)),
-            {"key:t_ai_first", "key:t_ai_second"},
+            {"fixture:t_ai_first", "fixture:t_ai_second"},
         )
         self.assertEqual(session_ai_tuning(OTHER_SESSION), {})
         recorded = session_ai_tuning(SESSION)
         self.assertEqual(
-            recorded["key:t_ai_first"].tuning_fingerprint, tuning.fingerprint
+            recorded["fixture:t_ai_first"].tuning_fingerprint, tuning.fingerprint
         )
         # The view is a copy, and the record itself is frozen: a caller can
         # never edit recorded tuning through one of its own containers.
         with self.assertRaises(FrozenInstanceError):
-            recorded["key:t_ai_first"].mode = DecisionMode.UTILITY
+            recorded["fixture:t_ai_first"].mode = DecisionMode.UTILITY
         with self.assertRaises(TypeError):
-            recorded["t_ai_first"] = recorded["key:t_ai_first"]
+            recorded["t_ai_first"] = recorded["fixture:t_ai_first"]
         self.assertEqual(len(session_ai_tuning(SESSION)), 2)
 
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
@@ -816,18 +818,18 @@ class SessionAITuningTests(unittest.TestCase):
         self.assertNotEqual(startup.fingerprint, edited.fingerprint)
         self.assertIs(behaviour.MONSTER_AI_TUNING, startup)
         self.assertEqual(
-            session_ai_tuning(SESSION)["key:t_ai_active"].tuning_fingerprint,
+            session_ai_tuning(SESSION)["fixture:t_ai_active"].tuning_fingerprint,
             startup.fingerprint,
         )
         self.assertNotEqual(
-            session_ai_tuning(SESSION)["key:t_ai_active"].tuning_fingerprint,
+            session_ai_tuning(SESSION)["fixture:t_ai_active"].tuning_fingerprint,
             edited.fingerprint,
         )
         # A newly started session in the same process uses the same startup
         # tuning, so a session can never adopt a disk edit without a restart.
         record_session_ai_tuning(OTHER_SESSION, FakeAIMonster("t_ai_new"))
         self.assertEqual(
-            session_ai_tuning(OTHER_SESSION)["key:t_ai_new"].tuning_fingerprint,
+            session_ai_tuning(OTHER_SESSION)["fixture:t_ai_new"].tuning_fingerprint,
             startup.fingerprint,
         )
 
@@ -841,7 +843,7 @@ class SessionAITuningTests(unittest.TestCase):
         self.assertEqual(session_ai_tuning(SESSION), {})
         restarted = _tuning(budget=BUDGET - 1)
         record_session_ai_tuning(SESSION, monster, tuning=restarted)
-        recorded = session_ai_tuning(SESSION)["key:t_ai_restart"]
+        recorded = session_ai_tuning(SESSION)["fixture:t_ai_restart"]
         self.assertEqual(recorded.tuning_fingerprint, restarted.fingerprint)
         self.assertIs(recorded.mode, DecisionMode.LEGACY)
 
@@ -854,7 +856,7 @@ class SessionAITuningTests(unittest.TestCase):
         record_session_ai_tuning(SESSION, monster, tuning=tuning)
         monster.behaviour_tree = ABSENT_ARCHETYPE
         record_session_ai_tuning(SESSION, monster, tuning=tuning)
-        recorded = session_ai_tuning(SESSION)["key:t_ai_drift"]
+        recorded = session_ai_tuning(SESSION)["fixture:t_ai_drift"]
         self.assertIs(recorded.invalid_reason, InvalidDecisionReason.INVALID_BINDING)
 
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")

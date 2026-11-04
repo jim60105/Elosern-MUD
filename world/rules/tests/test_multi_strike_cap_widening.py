@@ -40,6 +40,7 @@ from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import make_skill, synthetic_registries
 
 # Synthetic three-strike skill (total strikes = 1 + 2 = 3)
+from world.rules.combat_identity import stable_actor_id
 _T_THREE_STRIKE = make_skill(
     "t_three_strike",
     element="lightning",
@@ -86,8 +87,8 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
 
     def _make_bf(self, nonlethal: bool = False, nonlethal_keys: tuple[str, ...] = ()):
         bf = Battlefield(
-            {'party': frozenset({"fixture:three_actor"}), 'foes': frozenset({"fixture:three_target"})},
-            {"fixture:three_actor": self.actor, "fixture:three_target": self.target},
+            {'party': frozenset({stable_actor_id(self.actor)}), 'foes': frozenset({stable_actor_id(self.target)})},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         event_ctx = {"now": 100}
         if nonlethal:
@@ -300,7 +301,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         self.target.traits.hp.base = 40
         restore_gauges_to_full(self.target)
 
-        bf, ctx = self._make_bf(nonlethal=True, nonlethal_keys=(str(self.target.key),))
+        bf, ctx = self._make_bf(nonlethal=True, nonlethal_keys=(stable_actor_id(self.target),))
         req = ActionRequest(self.actor, _T_THREE_STRIKE.key, [self.target], ctx)
 
         with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
@@ -312,7 +313,7 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
         kos = [e for e in res.event_log.entries if e.kind == "target_knocked_out"]
         self.assertEqual(len(kos), 1)
         self.assertEqual(kos[0].target, str(self.target.key))
-        self.assertIn(str(self.target.key), bf.knocked_out)
+        self.assertIn(stable_actor_id(self.target), bf.knocked_out)
 
     @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_three_strike_atomic_rollback_restores_state_on_commit_failure(self):

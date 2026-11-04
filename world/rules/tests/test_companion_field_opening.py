@@ -67,6 +67,7 @@ from .combat_fixtures import BattlefieldIsolation, grant_lineage
 # A synthetic single-target spell with a bare per-use practice factor: MP 20
 # with cost 12 ends at 8, and the element-free row keeps the award the
 # constant itself (no affinity scaling), so an exact value proves one award.
+from world.rules.combat_identity import stable_actor_id
 _SPELL = make_skill(
     "t_opening_ember",
     label="同伴開場燼火",
@@ -197,7 +198,7 @@ class CompanionOpeningTests(_CompanionOpeningCase):
         )
         self.assertEqual(record.enemy_ids, (int(self.wolf.pk),))
         self.assertEqual(record.room_id, int(self.room.pk))
-        self.assertEqual(record.opening_first_actor, str(self.aila.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.aila))
         self.assertEqual(
             record.draft_entries[int(self.aila.pk)]["payload"]["skill_key"], _CAST
         )

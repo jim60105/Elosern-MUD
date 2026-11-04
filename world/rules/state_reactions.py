@@ -22,6 +22,7 @@ import math
 from typing import Any
 
 from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
+from world.rules.combat_identity import stable_actor_id
 from world.rules.phase_hooks import register_phase_dispatcher
 
 _RULES_PATH = Path(__file__).parent / "rulebook" / "state_reactions.yaml"
@@ -749,8 +750,8 @@ def dispatch_outcome_reaction(
                 raw_amount = round(atk_phys * coeff) - source_def
                 counter_amount = int(max(raw_amount, floor))
 
-                src_key = str(getattr(source, "key", ""))
-                is_protected = nonlethal or src_key in nonlethal_keys
+                src_identity = stable_actor_id(source)
+                is_protected = nonlethal or src_identity in nonlethal_keys
                 if not is_protected:
                     _apply_hp_delta(source, -counter_amount)
                 else:
@@ -758,12 +759,12 @@ def dispatch_outcome_reaction(
                     if (
                         source_hp_before > 0
                         and source_hp_before - counter_amount <= 0
-                        and src_key in nonlethal_keys
+                        and src_identity in nonlethal_keys
                     ):
                         if battlefield is not None and hasattr(
                             battlefield, "knocked_out"
                         ):
-                            battlefield.knocked_out.add(src_key)
+                            battlefield.knocked_out.add(src_identity)
 
                 source_hp_after = _stored_trait_value(source.traits.hp)
                 source_actual_loss = max(
@@ -800,7 +801,7 @@ def dispatch_outcome_reaction(
                 if definition is None:
                     continue
 
-                holder_key = str(getattr(entity, "key", ""))
+                holder_key = stable_actor_id(entity)
                 instance_key: str | None = None
                 if definition.stacking == "unique_per_source":
                     instance_key = f"{buff_key}:{holder_key}"
@@ -833,7 +834,7 @@ def dispatch_outcome_reaction(
                 if definition is None or not getattr(definition, "round_order", None):
                     continue
 
-                holder_key = str(getattr(entity, "key", ""))
+                holder_key = stable_actor_id(entity)
                 instance_key: str | None = None
                 if definition.stacking == "unique_per_source":
                     instance_key = f"{buff_key}:{holder_key}"

@@ -478,9 +478,12 @@ class DefeatActionSettlementTests(QuestRegistryIsolation, EvenniaTestCase):
         field = Battlefield(
             {
                 'party': frozenset({stable_actor_id(self.actor)}),
-                'foes': frozenset({targets[0].key}),
+                'foes': frozenset({stable_actor_id(targets[0])}),
             },
-            {stable_actor_id(self.actor): self.actor, targets[0].key: targets[0]},
+            {
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(targets[0]): targets[0],
+            },
         )
         request = ActionRequest(
             self.actor,

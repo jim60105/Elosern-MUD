@@ -1025,7 +1025,7 @@ def decision_pool(
             continue
         seen.add(participant.identity)
         entity = roster.get(participant.identity)
-        if entity is None or str(getattr(entity, "key", "")) in knocked_out:
+        if entity is None or participant.identity in knocked_out:
             continue
         if entity is not actor and participant.identity == snapshot.actor.identity:
             continue

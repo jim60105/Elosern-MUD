@@ -77,7 +77,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
     def setUp(self):
         open_synthetic_scope(self, "skills", "elements", extra=_SCOPE_EXTRA)
         self.monster = FakeMonster(
-            "monster",
+            "monster", combat_identity='monster',
             hp=10000,
             max_hp=10000,
             owned=[_T_CLAW.key],
@@ -106,7 +106,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["monster"],
+                return_value=["fixture:monster"],
             ),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
@@ -160,7 +160,7 @@ class MonsterBehaviourIntegrationTests(unittest.TestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=["monster"],
+                return_value=["fixture:monster"],
             ),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
@@ -266,7 +266,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
             with combat_provenance(engagement_provenance().at_slot(0)):
                 result = ActionResolver.resolve(request)
         self.assertEqual(result.outcome, "success")
-        self.assertIn(self.monster.key, self.field.fled)
+        self.assertIn(stable_actor_id(self.monster), self.field.fled)
         self.assertEqual(result.event_log.entries[0].kind, "disengage_attempt")
 
     def test_run_round_successful_flee_removes_monster_from_combat(self):
@@ -274,7 +274,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[self.monster.key, self.target.key],
+                return_value=[stable_actor_id(self.monster), stable_actor_id(self.target)],
             ),
             patch("world.rules.disengage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.tick_buffs"),
@@ -287,7 +287,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
             )
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
         self.assertTrue(logs[0].entries[0].data["success"])
-        self.assertIn(self.monster.key, self.field.fled)
+        self.assertIn(stable_actor_id(self.monster), self.field.fled)
         self.assertEqual(
             team_effective_power(self.field, "monsters"),
             0,
@@ -299,7 +299,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[self.monster.key, self.target.key],
+                return_value=[stable_actor_id(self.monster), stable_actor_id(self.target)],
             ),
             patch("world.rules.disengage.roll_d100", return_value=1),
             patch("world.rules.combat.rounds.tick_buffs"),
@@ -312,7 +312,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
             )
         self.assertEqual(logs[0].entries[0].kind, "disengage_attempt")
         self.assertFalse(logs[0].entries[0].data["success"])
-        self.assertNotIn(self.monster.key, self.field.fled)
+        self.assertNotIn(stable_actor_id(self.monster), self.field.fled)
         self.assertEqual(self.target.traits.hp.current, before)
 
     @covers_requirement("monster-flee-policy::existing-combat-orchestration-resolves-monster-flee-through-the-sole-writer")
@@ -328,7 +328,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[self.monster.key, self.target.key],
+                return_value=[stable_actor_id(self.monster), stable_actor_id(self.target)],
             ),
             patch(
                 "world.rules.disengage._attempt_flee",
@@ -351,7 +351,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                 decision_scope_base=engagement_base(),
             )
         self.assertTrue(result.battle_over)
-        self.assertIn(self.monster.key, self.field.fled)
+        self.assertIn(stable_actor_id(self.monster), self.field.fled)
         self.assertEqual(result.verdict_after, "party")
 
     def test_tier_default_and_override_decisions_have_fixed_outcomes(self):
@@ -418,7 +418,7 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                             result = ActionResolver.resolve(request)
                     self.assertEqual(result.outcome, "success")
                     self.assertTrue(result.event_log.entries[0].data["success"])
-                    self.assertIn(monster.key, battlefield.fled)
+                    self.assertIn(stable_actor_id(monster), battlefield.fled)
                 else:
                     with (
                         patch(
@@ -432,4 +432,4 @@ class MonsterFleeResolverIntegrationTests(EvenniaTestCase):
                         ):
                             result = ActionResolver.resolve(request)
                     self.assertEqual(result.outcome, "success")
-                    self.assertNotIn(monster.key, battlefield.fled)
+                    self.assertNotIn(stable_actor_id(monster), battlefield.fled)

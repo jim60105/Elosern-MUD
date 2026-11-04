@@ -51,6 +51,7 @@ from ._support import (
 )
 
 
+from world.rules.combat_identity import stable_actor_id
 class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
     """combat-session-opening-dispatch 5.9/5.10/5.13: group engagement."""
 
@@ -249,7 +250,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(sorted(captured), ["round"])
         self.assertFalse(captured["round"]["simulated"])
         self.assertEqual(
-            captured["round"]["nonlethal_keys"], {companion.key}
+            captured["round"]["nonlethal_keys"], {stable_actor_id(companion)}
         )
         for key in ("journal_sink", "notifications_sink"):
             self.assertIsInstance(captured["round"][key], list, key)

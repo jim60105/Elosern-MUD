@@ -819,7 +819,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 return_value={},
             ),
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["elf"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:elf"]),
             patch("world.rules.combat.rounds.resolve_item_use", side_effect=item_resolver),
             patch(
                 "world.rules.combat.rounds.ActionResolver.resolve",

@@ -449,8 +449,8 @@ class CastSettlementRestoreTests(_CastSettlementTestCase):
         self.char2.db.skill_grants = [
             {"source_key": "x", "skill_key": "y", "scale": 0.5}
         ]
-        field.fled = {self.char2.key}
-        field.knocked_out = {self.char1.key}
+        field.fled = {stable_actor_id(self.char2)}
+        field.knocked_out = {stable_actor_id(self.char1)}
         _restore_settlement_state(snapshot, clock)
         # Cache and raw rows both equal the pre-action (rolled-back) state.
         self.assertEqual(clock.tick, 0)

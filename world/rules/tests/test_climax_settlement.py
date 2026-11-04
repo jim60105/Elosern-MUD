@@ -151,8 +151,8 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         roster = {}
         for index, entity in enumerate(entities):
             team = "party" if index == 0 else "foes"
-            teams.setdefault(team, set()).add(entity.key)
-            roster[entity.key] = entity
+            teams.setdefault(team, set()).add(stable_actor_id(entity))
+            roster[stable_actor_id(entity)] = entity
         teams.setdefault("foes", set())
         return Battlefield(
             {team: frozenset(members) for team, members in teams.items()},
@@ -210,7 +210,7 @@ class CombatClimaxSettlementTests(EvenniaTestCase):
         with (
             patch(
                 "world.rules.combat.rounds.roll_initiative",
-                return_value=[entity.key],
+                return_value=[stable_actor_id(entity)],
             ),
             patch("world.rules.combat.rounds.tick_buffs", return_value=()),
         ):

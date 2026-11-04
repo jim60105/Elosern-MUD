@@ -718,8 +718,8 @@ class EscortCasualtyTests(EscortTestBase):
         teams, roster = {}, {}
         for index, entity in enumerate(entities):
             team = "party" if index == 0 else "foes"
-            teams.setdefault(team, set()).add(entity.key)
-            roster[entity.key] = entity
+            teams.setdefault(team, set()).add(stable_actor_id(entity))
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {team: frozenset(members) for team, members in teams.items()}, roster,
         )
@@ -734,7 +734,7 @@ class EscortCasualtyTests(EscortTestBase):
         self.protected.traits.hp.base = 3
         self.protected.traits.hp.current = 3
         apply_buff(self.protected, "poisoned")
-        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        records = {stable_actor_id(self.protected): tick_buffs(self.protected, 10)}
         self.assertEqual(self.protected.traits.hp.current, 0)
         settle_upkeep(field, records)
         failed = read_records(self.owner)[0]
@@ -753,7 +753,7 @@ class EscortCasualtyTests(EscortTestBase):
         apply_buff(self.protected, "poisoned", source_pk=int(source.pk))
         source.delete()
         field = self._field(self.owner, self.protected)
-        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        records = {stable_actor_id(self.protected): tick_buffs(self.protected, 10)}
         settle_upkeep(field, records)
         failed = read_records(self.owner)[0]
         self.assertEqual(failed.state.value, "failed")
@@ -769,7 +769,7 @@ class EscortCasualtyTests(EscortTestBase):
         self.protected.traits.hp.current = 3
         apply_buff(self.protected, "poisoned", source_pk=int(monster.pk))
         field = self._field(self.owner, monster, self.protected)
-        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        records = {stable_actor_id(self.protected): tick_buffs(self.protected, 10)}
         settle_upkeep(field, records)
         failed = read_records(self.owner)[0]
         self.assertEqual(failed.quest_id, record.quest_id)
@@ -803,7 +803,7 @@ class EscortCasualtyTests(EscortTestBase):
         self.protected.traits.hp.current = 100
         apply_buff(self.protected, "poisoned")
         field = self._field(self.owner, monster)
-        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        records = {stable_actor_id(self.protected): tick_buffs(self.protected, 10)}
         self.assertGreater(self.protected.traits.hp.current, 0)
         settle_upkeep(field, records)
         stored = read_records(self.owner)[0]
@@ -819,7 +819,7 @@ class EscortCasualtyTests(EscortTestBase):
         self.protected.traits.hp.current = 3
         apply_buff(self.protected, "poisoned")
         field = self._field(self.owner, monster)
-        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        records = {stable_actor_id(self.protected): tick_buffs(self.protected, 10)}
         settle_upkeep(field, records, simulated=True)
         stored = read_records(self.owner)[0]
         self.assertEqual(stored.quest_id, record.quest_id)

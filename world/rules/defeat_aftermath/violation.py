@@ -34,6 +34,7 @@ from world.rules.defeat_aftermath.contracts import (
     ViolationOutcome,
 )
 from world.rules.defeat_aftermath.rulebook import DEFEAT_AFTERMATH_RULEBOOK
+from world.rules.combat_identity import stable_actor_id
 from world.rules.event_log import EventEntry
 from world.rules.player_messages import defeat_aftermath_template
 from world.rules.pleasure import apply_pleasure_gain
@@ -230,6 +231,8 @@ def _violation_attempt_entry(
         kind="violation_attempt",
         actor=str(violator.key),
         target=str(victim.key),
+        actor_id=stable_actor_id(violator),
+        target_id=stable_actor_id(victim),
         data={
             "attempt": attempt_index,
             "roll": rolls[-1] if rolls else None,
@@ -251,6 +254,8 @@ def _violation_resisted_entry(
         kind="violation_resisted",
         actor=str(violator.key),
         target=str(victim.key),
+        actor_id=stable_actor_id(violator),
+        target_id=stable_actor_id(victim),
         data={"attempt": attempt_index},
         text_template=defeat_aftermath_template(
             "violation_resisted" if player_victim else "violation_resisted_companion"
@@ -266,6 +271,8 @@ def _violation_act_entry(
         kind="violation_act",
         actor=str(violator.key),
         target=str(victim.key),
+        actor_id=stable_actor_id(violator),
+        target_id=stable_actor_id(victim),
         data={"attempt": attempt_index, "climax": climax},
         text_template=defeat_aftermath_template(
             "violation_act" if player_victim else "violation_act_companion"
@@ -284,6 +291,7 @@ def _companion_wake_entry(victim: Any, outcome: ViolationOutcome) -> EventEntry:
         kind="companion_wake",
         actor=str(victim.key),
         target=None,
+        actor_id=stable_actor_id(victim),
         data={
             "selected": outcome.selected,
             "landed": outcome.landed,
@@ -385,14 +393,15 @@ def _violation_pool(
     """
     companions: list[Any] = []
     if battlefield is not None:
-        player_team = battlefield.team_of(str(actor.key))
+        actor_id = stable_actor_id(actor)
+        player_team = battlefield.team_of(actor_id)
         ally_keys = (
             battlefield.teams.get(player_team, set())
             if player_team is not None
             else set()
         )
         for key in ally_keys:
-            if key == str(actor.key) or key in battlefield.fled:
+            if key == actor_id or key in battlefield.fled:
                 continue
             if key not in battlefield.knocked_out:
                 continue
@@ -452,7 +461,7 @@ def _martyr_pool_collapse(
         if member_id is None or member_id not in stamps:
             continue
         if (
-            str(member.key) in getattr(battlefield, "fled", ())
+            stable_actor_id(member) in getattr(battlefield, "fled", ())
             or int(member.pk) in session.fled_ids
         ):
             # The marker fled: not an eligible survivor, match the next one.
@@ -581,7 +590,7 @@ def run_violation_sequence(
             victim = _select_violation_victim(
                 pool, session.session_id, violator, attempt_index
             )
-            tally = tallies.setdefault(str(victim.key), [0, 0, 0, 0])
+            tally = tallies.setdefault(stable_actor_id(victim), [0, 0, 0, 0])
             tally[0] += 1
             rolls: list[int] = []
             verdict = resist_verdict(
@@ -683,11 +692,11 @@ def run_violation_sequence(
     }
     # The player's wake prose keys on the player's own landed attempts: a
     # sequence that only landed on companions leaves the PG wake line.
-    player_outcome = outcomes.get(str(actor.key))
+    player_outcome = outcomes.get(stable_actor_id(actor))
     if player_outcome is not None and not player_outcome.zero_landed:
         _rewrite_wake_line(entries, rulebook.violated_wake_line)
     for victim in pool[1:]:
-        outcome = outcomes.get(str(victim.key))
+        outcome = outcomes.get(stable_actor_id(victim))
         if outcome is not None:
             entries.append(_companion_wake_entry(victim, outcome))
     if not outcomes:

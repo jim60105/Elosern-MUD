@@ -359,7 +359,7 @@ def _suppress_innate_skills(test) -> None:
 
 def _field(actor, allies, enemies) -> Battlefield:
     """A two-team battlefield over real participants."""
-    roster = {str(entity.key): entity for entity in (actor, *allies, *enemies)}
+    roster = {stable_actor_id(entity): entity for entity in (actor, *allies, *enemies)}
     return Battlefield(
         {
             'party': frozenset(stable_actor_id(entity) for entity in (actor, *allies)),

@@ -116,7 +116,7 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
@@ -134,7 +134,7 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
@@ -155,7 +155,7 @@ class OrderFoldTests(unittest.TestCase):
             return None
 
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
@@ -170,7 +170,7 @@ class OrderFoldTests(unittest.TestCase):
         self._attach_marker(self.slow, self.advance_def)
         calls_r1 = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
@@ -182,7 +182,7 @@ class OrderFoldTests(unittest.TestCase):
         self.slow.buffs.all.clear()
         calls_r2 = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),
@@ -197,7 +197,7 @@ class OrderFoldTests(unittest.TestCase):
         self._attach_marker(self.fast, self.retreat_def)
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch(
                 "world.rules.combat.rounds.evaluate_combat_modifiers",
                 side_effect=lambda entity: {"actions_per_turn": 2} if entity.key == "fast" else {},
@@ -232,7 +232,7 @@ class OrderFoldTests(unittest.TestCase):
 
         calls = []
         with (
-            patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "mid", "slow"]),
+            patch("world.rules.combat.rounds.roll_initiative", return_value=["fixture:fast", "fixture:mid", "fixture:slow"]),
             patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
             patch("world.rules.combat.rounds.tick_buffs"),
             patch("world.rules.combat.rounds.decay_tick"),

@@ -64,6 +64,7 @@ from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineag
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS
 
+from world.rules.combat_identity import stable_actor_id
 _T_DAMAGE = SYNTH_SKILLS["t_ember_burst"].key
 _T_HEAL = SYNTH_SKILLS["t_hush_mend"].key
 _T_SELF = SYNTH_SKILLS["t_moss_veil"].key
@@ -566,7 +567,7 @@ class FieldCastActionTests(_SkillUseCase):
         record = read_session(self.player)
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 0)
-        self.assertEqual(record.opening_first_actor, str(self.player.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.player))
         self.assertEqual(self.player.traits.mp.value, mp_before)
         kind, envelope = self._last_publication()
         self.assertEqual(kind, "ui_update")
@@ -733,7 +734,7 @@ class FieldCastActionTests(_SkillUseCase):
             record = read_session(self.player)
             self.assertIsNotNone(record)
             self.assertIsNone(read_session(companion))
-            self.assertEqual(record.opening_first_actor, str(companion.key))
+            self.assertEqual(record.opening_first_actor, stable_actor_id(companion))
             self.assertEqual(
                 record.draft_entries[int(companion.pk)]["payload"]["skill_key"],
                 _T_DAMAGE,

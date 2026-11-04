@@ -184,7 +184,14 @@ class RoundTacticalScopeTests(unittest.TestCase):
         seen: list[tuple[str, str | None]] = []
 
         def provider(entity, field):
-            seen.append((str(entity.key), None if field.tactical is None else field.tactical.tactic_for("slow")))
+            seen.append(
+                (
+                    stable_actor_id(entity),
+                    None
+                    if field.tactical is None
+                    else field.tactical.tactic_for("fixture:slow"),
+                )
+            )
             return None
 
         with (
@@ -194,10 +201,14 @@ class RoundTacticalScopeTests(unittest.TestCase):
             patch("world.rules.combat.rounds.decay_tick"),
             patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
         ):
-            run_round(battlefield, provider, tactical_declarations={"slow": "defend"})
+            run_round(
+                battlefield,
+                provider,
+                tactical_declarations={"fixture:slow": "defend"},
+            )
         # The declaration was active before the fast enemy's first turn.
-        self.assertEqual(seen[0], ("fast", "defend"))
-        self.assertIn(("slow", "defend"), seen)
+        self.assertEqual(seen[0], ("fixture:fast", "defend"))
+        self.assertIn(("fixture:slow", "defend"), seen)
         # Round ended: the transient context expired and cannot stack.
         self.assertIsNone(battlefield.tactical)
 
@@ -233,7 +244,11 @@ class RoundTacticalScopeTests(unittest.TestCase):
             patch("world.rules.combat.rounds.roll_d100", return_value=90),
             self.assertRaises(RuntimeError),
         ):
-            run_round(battlefield, exploding_provider, tactical_declarations={"slow": "dodge"})
+            run_round(
+                battlefield,
+                exploding_provider,
+                tactical_declarations={"fixture:slow": "dodge"},
+            )
         self.assertIsNone(battlefield.tactical)
 
     def test_a_pre_set_round_context_is_not_an_input(self):
@@ -246,7 +261,7 @@ class RoundTacticalScopeTests(unittest.TestCase):
             {'ally': frozenset({"fixture:slow"}), 'enemy': frozenset({"fixture:fast"})},
             {"fixture:slow": slow, "fixture:fast": fast},
         )
-        battlefield.tactical = RoundTactical({"slow": "defend"})
+        battlefield.tactical = RoundTactical({"fixture:slow": "defend"})
         seen: list[object] = []
 
         def provider(entity, field):
@@ -295,7 +310,11 @@ class UpkeepExemptionTests(unittest.TestCase):
             patch("world.rules.combat.rounds.decay_tick"),
             patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
         ):
-            run_round(battlefield, lambda entity, field: None, tactical_declarations={"slow": "defend"})
+            run_round(
+                battlefield,
+                lambda entity, field: None,
+                tactical_declarations={"fixture:slow": "defend"},
+            )
         # 10 lost, not floor(10 * 0.65) = 6: the Defend reduction never reaches
         # the upkeep tick.
         self.assertEqual(slow.traits.hp.current, 90)
@@ -306,11 +325,11 @@ class EnemyUnavailableTests(unittest.TestCase):
         "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
     )
     def test_declarations_are_scoped_to_the_named_roster_key_only(self):
-        tactical = RoundTactical({"slow": "defend"})
-        self.assertTrue(tactical.is_defending("slow"))
-        self.assertFalse(tactical.is_defending("fast"))
-        self.assertFalse(tactical.is_dodging("fast"))
-        self.assertIsNone(tactical.tactic_for("fast"))
+        tactical = RoundTactical({"fixture:slow": "defend"})
+        self.assertTrue(tactical.is_defending("fixture:slow"))
+        self.assertFalse(tactical.is_defending("fixture:fast"))
+        self.assertFalse(tactical.is_dodging("fixture:fast"))
+        self.assertIsNone(tactical.tactic_for("fixture:fast"))
 
 
 class RoundStartConstantValidationTests(unittest.TestCase):

@@ -269,7 +269,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
         self.assertIn("target_knocked_out", kinds)
         self.assertNotIn("target_defeated", kinds)
         self.assertEqual(companion.traits.hp.current, 1)
-        self.assertIn(companion.key, field.knocked_out)
+        self.assertIn(stable_actor_id(companion), field.knocked_out)
         self.assertIsNone(self.actor.db.magic_xp)
 
     @covers_requirement("combat-upkeep-settlement::upkeep-settlement-honors-simulated-and-nonlethal-combat-policy")
@@ -283,7 +283,7 @@ class UpkeepSettlementTests(EvenniaTestCase):
             records,
             nonlethal_keys=frozenset({stable_actor_id(companion)}),
         )
-        self.assertNotIn(companion.key, field.knocked_out)
+        self.assertNotIn(stable_actor_id(companion), field.knocked_out)
         self.assertEqual(companion.traits.hp.current, 95)
         self.assertEqual(self._kinds(logs), ["damage"])
 

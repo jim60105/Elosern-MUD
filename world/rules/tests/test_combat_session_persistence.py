@@ -11,6 +11,7 @@ from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.rooms import Room
 from world.rules.clock import WorldClock
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     CombatSessionError,
     engage,
@@ -340,7 +341,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn(self.player.pk, _draft_requests(record, battlefield))
         self.assertEqual(
             _draft_tactical_declarations(record, battlefield),
-            {str(self.player.key): "defend"},
+            {stable_actor_id(self.player): "defend"},
         )
 
         # A taunt entry is a round-start declaration too: the declaring actor
@@ -358,7 +359,9 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn(self.player.pk, _draft_requests(taunt_record, battlefield))
         self.assertEqual(
             _draft_taunt_declarations(taunt_record, battlefield),
-            {str(self.player.key): str(self.monster.key)},
+            {
+                stable_actor_id(self.player): stable_actor_id(self.monster),
+            },
         )
         self.assertEqual(_draft_tactical_declarations(taunt_record, battlefield), {})
 
@@ -469,7 +472,10 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         survivor_hp = survivor.traits.hp.current
         with (
             patch("world.rules.combat.rounds.roll_initiative", return_value=[
-                self.player.key, companion.key, self.monster.key, survivor.key,
+                stable_actor_id(self.player),
+                stable_actor_id(companion),
+                stable_actor_id(self.monster),
+                stable_actor_id(survivor),
             ]),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
@@ -613,7 +619,9 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
 
         with (
             patch("world.rules.combat.rounds.roll_initiative", return_value=[
-                self.player.key, companion.key, self.monster.key,
+                stable_actor_id(self.player),
+                stable_actor_id(companion),
+                stable_actor_id(self.monster),
             ]),
             patch("world.rules.combat.rounds.ActionResolver.resolve", side_effect=resolve),
             patch("world.rules.combat.rounds._end_of_round_upkeep") as upkeep,
@@ -891,7 +899,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         session_id = record.session_id
         self.assertEqual(record.initial_sleep_ids, (int(companion.pk),))
         battlefield = reconstruct_battlefield(self.player, record)
-        self.assertIn(str(companion.key), battlefield.roster)
+        self.assertIn(stable_actor_id(companion), battlefield.roster)
         self.assertTrue(sleep_blocks_actions(companion))
         progress = preflight_draft_entries(self.player, record, battlefield)
         self.assertNotIn(int(companion.pk), progress["required_actors"])

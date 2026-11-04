@@ -192,9 +192,9 @@ class DisengageStagingTests(unittest.TestCase):
         )
         self.assertFalse(failure_entry.data["success"])
         failure.apply()
-        self.assertNotIn(actor.key, field.fled)
+        self.assertNotIn(stable_actor_id(actor), field.fled)
         success.apply()
-        self.assertIn(actor.key, field.fled)
+        self.assertIn(stable_actor_id(actor), field.fled)
 
     @covers_requirement("battlefield-commit-surface::a-commit-failure-rolls-back-a-battlefield-mutation-exactly-as-it-rolls-back-an-entity")
     def test_mixed_surface_commit_rolls_back_battlefield(self):
@@ -205,7 +205,7 @@ class DisengageStagingTests(unittest.TestCase):
                 field,
                 "disengage_attempt|actor|1|100|10|10",
                 frozenset({"battlefield"}),
-                lambda: field.fled.add(actor.key),
+                lambda: field.fled.add(stable_actor_id(actor)),
             ),
             PendingEffect(
                 field,

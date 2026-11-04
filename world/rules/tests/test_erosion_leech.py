@@ -29,6 +29,7 @@ from world.rules.skip_safety import (
 from world.rules.upkeep import settle_upkeep
 
 
+from world.rules.combat_identity import stable_actor_id
 _cost_mod = importlib.import_module("world.skills.cost_tiers")
 _cost_tiers_table = getattr(_cost_mod, "MP_COST_" + "TIERS")
 _APPRENTICE = list(_cost_tiers_table.keys())[0]
@@ -38,8 +39,8 @@ def _field(*entities):
     roster = {}
     for index, entity in enumerate(entities):
         team = "party" if index == 0 else "foes"
-        teams.setdefault(team, set()).add(entity.key)
-        roster[entity.key] = entity
+        teams.setdefault(team, set()).add(stable_actor_id(entity))
+        roster[stable_actor_id(entity)] = entity
     return Battlefield(
         {team: frozenset(members) for team, members in teams.items()},
         roster,
@@ -453,7 +454,7 @@ class ErosionLeechBehaviorTests(EvenniaTestCase):
         # Caster credited for the actual 5 HP loss
         self.assertEqual(self.caster.traits.hp.current, 55)
 
-        logs = settle_upkeep(field, {monster.key: records})
+        logs = settle_upkeep(field, {stable_actor_id(monster): records})
         defeat_entries = [e for log in logs for e in log.entries if e.kind == "target_defeated"]
         # Exactly one defeat entry emitted
         self.assertEqual(len(defeat_entries), 1)

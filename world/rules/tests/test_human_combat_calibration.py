@@ -134,7 +134,7 @@ def _build_synthetic_probe_monster(name: str, hp: int, attack: int, agility: int
 
 def _human_combatant_policy(human: NPC, battlefield: Battlefield, full_b: bool = False) -> ActionRequest | None:
     enemy_team = next(
-        (members for team, members in battlefield.teams.items() if team != battlefield.team_of(str(human.key))),
+        (members for team, members in battlefield.teams.items() if team != battlefield.team_of(stable_actor_id(human))),
         frozenset(),
     )
     candidates = [
@@ -200,8 +200,8 @@ def _run_single_trial(
         h.traits.sp.current = h.traits.sp.base
     monster.traits.hp.current = monster.traits.hp.base
 
-    roster = {str(h.key): h for h in humans}
-    roster[str(monster.key)] = monster
+    roster = {stable_actor_id(h): h for h in humans}
+    roster[stable_actor_id(monster)] = monster
     battlefield = Battlefield(
         teams={'humans': frozenset(roster.keys() - {stable_actor_id(monster)}), 'monsters': frozenset({stable_actor_id(monster)})},
         roster=roster,
@@ -261,7 +261,7 @@ def _run_single_trial(
             rounds_elapsed += 1
 
     monster_defeated = _stored_hp(monster) <= 0
-    monster_retreated = str(monster.key) in battlefield.fled
+    monster_retreated = stable_actor_id(monster) in battlefield.fled
     living_humans = [h for h in humans if _stored_hp(h) > 0]
     human_loss = len(living_humans) == 0
     all_standing = len(living_humans) == len(humans)
@@ -1042,7 +1042,7 @@ class CombatFactorBudgetTests(EvenniaTest):
                 },
                 {stable_actor_id(attacker): attacker, stable_actor_id(defender): defender},
             )
-            battlefield.tactical = RoundTactical({str(defender.key): tactic})
+            battlefield.tactical = RoundTactical({stable_actor_id(defender): tactic})
         if battlefield is not None:
             event_context["battlefield"] = battlefield
         weapon = case.weapon
@@ -1163,7 +1163,7 @@ class CombatFactorBudgetTests(EvenniaTest):
                 stable_actor_id(standing): standing,
             },
         )
-        area_field.tactical = RoundTactical({str(dodging.key): "dodge"})
+        area_field.tactical = RoundTactical({stable_actor_id(dodging): "dodge"})
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=_FACTOR_BASE_ROLL),
             patch(
@@ -1648,7 +1648,7 @@ def _item_turn(
     choice is the party's most wounded living member, exactly the command a
     player would issue.
     """
-    party_keys = battlefield.teams.get(battlefield.team_of(str(ally.key)), frozenset())
+    party_keys = battlefield.teams.get(battlefield.team_of(stable_actor_id(ally)), frozenset())
     candidates = [
         battlefield.roster[key]
         for key in party_keys
@@ -1757,7 +1757,7 @@ def _deterministic_enemy_policy(entity, battlefield, *, context=None, scale=1.0,
         (
             members
             for team, members in battlefield.teams.items()
-            if team != battlefield.team_of(str(entity.key))
+            if team != battlefield.team_of(stable_actor_id(entity))
         ),
         frozenset(),
     )
@@ -1855,7 +1855,7 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
         if callable(getattr(provider, "is_interactive_ally", None)):
             counters["draft"] += 1
         logs = real_run_round(field, provider, **kwargs)
-        monster_fled = monster_fled or str(monster.key) in field.fled
+        monster_fled = monster_fled or stable_actor_id(monster) in field.fled
         return logs
 
     simulated_policy = lambda battlefield, record: (True, frozenset())  # noqa: E731
@@ -1952,7 +1952,7 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
 
     living_allies = [hp for hp in final_hps if hp > 0]
     monster_defeated = final_monster_hp <= 0
-    monster_retreated = monster_fled or str(monster.key) in battlefield.fled
+    monster_retreated = monster_fled or stable_actor_id(monster) in battlefield.fled
     ally_loss = not living_allies
     all_standing = len(living_allies) == len(allies)
     unfinished = not (monster_defeated or monster_retreated or ally_loss)

@@ -43,6 +43,7 @@ from ._support import (
 )
 
 
+from world.rules.combat_identity import stable_actor_id
 def _dominant_player(key):
     """A player that dominates floor-tier monsters (overwhelming verdict)."""
     player = _player(key)
@@ -143,7 +144,7 @@ class OpeningSeedTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(seeded["outcome"], "draft")
         self.assertEqual(classify_overwhelm(reconstruct_battlefield(self.player, record)), "party")
         self.assertEqual(record.rounds_elapsed, 0)
-        self.assertEqual(record.opening_first_actor, str(self.player.key))
+        self.assertEqual(record.opening_first_actor, stable_actor_id(self.player))
         self.assertEqual(int(weak.traits.hp.current), 100)
         self.assertEqual(int(companion.traits.hp.current), companion.traits.hp.base)
         with _dice(50):

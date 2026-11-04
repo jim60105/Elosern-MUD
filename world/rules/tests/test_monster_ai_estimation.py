@@ -616,7 +616,7 @@ class SpreadProjectionTests(unittest.TestCase):
             _estimate(
                 self.actor,
                 (self.enemy,),
-                event_context={"nonlethal_keys": frozenset({self.enemy.key})},
+                event_context={"nonlethal_keys": frozenset({stable_actor_id(self.enemy)})},
             )
         )
         lethal = _only(_estimate(self.actor, (self.enemy,)))
@@ -1059,7 +1059,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
     def _declared(self, verb):
         """Estimate the plain strike with one round-start declaration active."""
         snapshot, reads, roster, context = _shaped(self.actor, (self.enemy,))
-        context.battlefield.tactical = RoundTactical({self.enemy.key: verb})
+        context.battlefield.tactical = RoundTactical({stable_actor_id(self.enemy): verb})
         return estimate_plan(
             _hand(STRIKE, (self.enemy,), ((self.enemy,),)),
             snapshot=snapshot,
@@ -1242,9 +1242,9 @@ class EstimationIntegrationTests(EvenniaTestCase):
         return entity
 
     def _field(self, *opponents):
-        roster = {str(self.monster.key): self.monster}
+        roster = {stable_actor_id(self.monster): self.monster}
         for entity in opponents:
-            roster[str(entity.key)] = entity
+            roster[stable_actor_id(entity)] = entity
         return Battlefield(
             {
                 'monsters': frozenset({stable_actor_id(self.monster)}),

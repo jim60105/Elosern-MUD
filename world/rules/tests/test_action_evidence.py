@@ -668,8 +668,8 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
 
     def _battlefield(self, nonlethal: bool = False, nonlethal_keys: tuple[str, ...] = ()):
         bf = Battlefield(
-            {'party': frozenset({"fixture:strike_actor"}), 'foes': frozenset({"fixture:strike_target"})},
-            {"fixture:strike_actor": self.actor, "fixture:strike_target": self.target},
+            {'party': frozenset({stable_actor_id(self.actor)}), 'foes': frozenset({stable_actor_id(self.target)})},
+            {stable_actor_id(self.actor): self.actor, stable_actor_id(self.target): self.target},
         )
         event_ctx = {"now": 100}
         if nonlethal:
@@ -779,7 +779,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.target.traits.hp.base = 20
         restore_gauges_to_full(self.target)
 
-        bf, ctx = self._battlefield(nonlethal=True, nonlethal_keys=(str(self.target.key),))
+        bf, ctx = self._battlefield(nonlethal=True, nonlethal_keys=(stable_actor_id(self.target),))
         request = ActionRequest(
             self.actor,
             _T_PENANCE_BURST.key,
@@ -797,7 +797,7 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
         self.assertEqual(len(ko_entries), 1)
         self.assertEqual(ko_entries[0].target, str(self.target.key))
         # Battlefield knockout mark recorded
-        self.assertIn(str(self.target.key), bf.knocked_out)
+        self.assertIn(stable_actor_id(self.target), bf.knocked_out)
 
     @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_atomic_rollback_restores_hp_and_evidence(self):
@@ -870,13 +870,15 @@ class ConditionalExtraStrikeMechanicsTests(EvenniaTestCase):
 
         bf = Battlefield(
             {
-                'party': frozenset({"fixture:strike_actor"}),
-                'foes': frozenset({"fixture:strike_target", "fixture:target_clean"}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset(
+                    {stable_actor_id(self.target), stable_actor_id(target2)}
+                ),
             },
             {
-                "fixture:strike_actor": self.actor,
-                "fixture:strike_target": self.target,
-                "fixture:target_clean": target2,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.target): self.target,
+                stable_actor_id(target2): target2,
             },
         )
         ctx = BattlefieldActionContext(bf, event_context={"now": 100})

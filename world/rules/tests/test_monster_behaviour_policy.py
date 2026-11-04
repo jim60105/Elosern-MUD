@@ -91,7 +91,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     def test_area_preference_and_single_enemy_suppression(self):
         actor = FakeMonster(
-            "actor",
+            "actor", combat_identity='actor',
             threat_tier="mid",
             owned=[_T_SPELL.key, _T_AREA.key],
         )
@@ -105,7 +105,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
 
     @covers_requirement("monster-action-policy::area-versus-single-target-shape-is-decided-before-target-skill-selection-reusing-the")
     def test_area_fallback_and_no_eligible_skill(self):
-        actor = FakeMonster("actor", owned=[_T_AREA.key])
+        actor = FakeMonster("actor", combat_identity='actor', owned=[_T_AREA.key])
         actor.traits.mp = FakeGauge(24, 24)
         enemy = FakeEntity("enemy", combat_identity='enemy')
         request = monster_behaviour_policy(actor, _field(actor, [enemy]))
@@ -124,7 +124,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         ) as default:
             self.assertIs(monster_behaviour_policy(actor, field), sentinel)
             default.assert_called_once_with(actor, field)
-        monster = FakeMonster("monster", owned=[])
+        monster = FakeMonster("monster", combat_identity='monster', owned=[])
         field = _field(monster, [FakeEntity("enemy-two", combat_identity='enemy-two')])
         with patch(
             "world.rules.monster_behaviour.combat.default_attack_policy"
@@ -135,7 +135,7 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
     @covers_requirement("monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected")
     def test_unaffordable_preference_falls_back_to_affordable_skill(self):
         actor = FakeMonster(
-            "actor",
+            "actor", combat_identity='actor',
             threat_tier="mid",
             owned=[_T_AREA.key, _T_CLAW.key],
         )
