@@ -102,10 +102,6 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 - **THEN** the quest log and the host's affinity record — and their in-process caches — equal
   their pre-acceptance values
 
-#### Scenario: A legally unsatisfiable hunt offer is refused cleanly
-- **WHEN** a member accepts a species-hunt offer whose ordinary-eligible target guarantee cannot be met
-- **THEN** the refusal names the reason, and the quest log, affinity record, and every individual owned by the ambient/site managers equal their pre-acceptance values
-
 #### Scenario: A legally unsatisfiable clear-out offer is refused cleanly
 - **WHEN** a member accepts a bound clear-out whose site can no longer supply its living individuals
 - **THEN** the refusal names the site-cleared or site-short reason, no quest record and no affinity gain exist, and the site's durable state and its individuals are unchanged
@@ -143,12 +139,20 @@ The guild layer SHALL NOT construct, mutate, or reinterpret quest-record dicts i
 - **THEN** no affinity is granted
 
 #### Scenario: An unsatisfiable hunt refusal is surfaced by name with nothing left behind
-- **WHEN** `accept_quest()` refuses an offer because the hunt cannot be legally satisfied (the target-availability guarantee fails) — a regional species hunt whose region cannot supply the count, or a bound clear-out whose site cannot supply its living individuals
+- **WHEN** `accept_quest()` refuses an offer because a bound clear-out's site cannot supply its standing bound individuals
 - **THEN** the board path surfaces that named refusal as an ordinary rejection: no quest record, no affinity gain, and no partial provisioning, population, or binding left behind
 
 #### Scenario: The acceptance precheck remains branch plus rank alone
 - **WHEN** acceptance eligibility is evaluated after board availability has narrowed the listing
 - **THEN** the precheck remains the issuing branch plus the actor's rank alone — the availability rule narrows what the board lists, never what acceptance will attempt — so a player who names an offer's key directly or who accepts a listing taken before the site changed state receives the lifecycle's named refusal instead of a generic eligibility error
+
+#### Scenario: Regional shortage is not a board refusal
+- **WHEN** a rank-eligible member accepts a valid source-backed regional hunt at zero living supply
+- **THEN** the quest and normal affinity gain commit without creating targets, changing population state or hiding habitat guidance
+
+#### Scenario: A legally unsatisfiable hunt offer is refused cleanly
+- **WHEN** acceptance validation encounters an invalid regional selector with no lawful authored source
+- **THEN** the named definition/source refusal leaves no quest record, affinity gain or population write; a valid source with too few living targets still accepts
 
 ### Requirement: Player-facing guild commands resolve one local service host
 The character cmdset SHALL provide commands for guild registration, offer listing, acceptance,

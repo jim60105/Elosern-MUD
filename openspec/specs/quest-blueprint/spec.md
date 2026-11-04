@@ -249,8 +249,7 @@ keys owned by that species. Display names SHALL NOT participate in selector reso
 
 #### Scenario: A hunt with no ordinary baseline variant is rejected
 - **WHEN** a hunt's countable variants include no ordinary baseline variant of that species
-- **THEN** registration raises `QuestDefinitionError`, because the guarantee that ordinary-eligible
-  living targets exist at acceptance must be expressible
+- **THEN** registration raises `QuestDefinitionError`, because the selector must include an ordinary eligible variant with a lawful authored source, without guaranteeing current living supply
 
 #### Scenario: Bulk tier sweeps are not expressible
 - **WHEN** content attempts to represent an ordinary hunt as "count every variant of every species in
@@ -283,40 +282,6 @@ SHALL be bounded, immutable, and Traditional Chinese player-facing text.
 #### Scenario: Flavor carries no ability
 - **WHEN** a definition carries the rationale or flavor without any ability reference
 - **THEN** registration accepts it, and flavor SHALL NOT grant, imply, or require an unregistered ability
-
-### Requirement: Published regional species hunts are legally provisionable in their authored region
-A published regional species hunt SHALL be provisionable by the region's own authored placement: the
-hunt's region SHALL have an ambient placement rule, at least one of the hunt's ordinary countable
-variants SHALL be in that rule's eligible variant set, and the hunt's required quantity SHALL NOT
-exceed the region's authored per-coordinate legal supply — `min(quantity, capacity)` of that rule.
-
-#### Scenario: Every published hunt can be provisioned by its region
-- **WHEN** each published regional hunt is compared against its region's authored ambient placement rule
-- **THEN** the rule exists, at least one ordinary countable variant is eligible in it, and the hunt's quantity is at or below `min(quantity, capacity)`
-
-#### Scenario: A region without authored placement carries no regional hunt
-- **WHEN** the shipped catalog is inspected for a hunt naming a region that has no ambient placement rule
-- **THEN** none exists, and the region's species presence is expressed only through its authored site content
-
-#### Scenario: A hunt beyond the region's legal supply is not published
-- **WHEN** a hunt's quantity exceeds its region's authored per-coordinate legal supply
-- **THEN** the content contract reports it rather than letting the board offer work whose guarantee must refuse
-
-#### Scenario: One hunt per placed species in a covered region
-- **WHEN** a placement-covered region's ambient rule names variants of two species
-- **THEN** the shipped catalog carries one hunt for each of them, each naming its own species and the countable variants that species owns
-
-#### Scenario: Provisionability is a content property, not an acceptance promise
-- **WHEN** a published hunt's acceptance runs while the world is not provisioned or the region's
-  authored capacity is momentarily exhausted
-- **THEN** the acceptance-time guarantee still refuses with its named reason; the requirement binds
-  published content, not every acceptance
-
-#### Scenario: An unplaceable hunt could only ever refuse
-- **WHEN** a hunt's region has an ambient placement rule that names none of the hunt's ordinary
-  countable variants, or a region with no authored ambient placement were to carry a regional hunt
-- **THEN** such a hunt could never be satisfied — the acceptance-time guarantee could only ever refuse,
-  and the board is not an inventory of impossible work
 
 ### Requirement: Every shipped hunt carries authored rank, rating rationale, background flavor, and a rank-banded reward
 Every published hunt SHALL carry an authored guild rank, an authored rating rationale describing the
@@ -390,3 +355,18 @@ site's authored variant set, placed at its authored coordinate under its ownersh
 #### Scenario: A clear-out never becomes a second population owner
 - **WHEN** a clear-out binds or runs
 - **THEN** it causes no individual to be spawned, moved, populated, or recovered
+
+### Requirement: Published regional hunts require lawful authored sources
+Published regional species hunts SHALL reference valid region/species/variant selectors and at least one lawful authored ecological or explicit supply source, without limiting total quantity to one cell's current or potential supply.
+
+#### Scenario: Quantity spans encounters
+- **WHEN** a valid source-backed hunt quantity exceeds one cell, site or wave quantity
+- **THEN** publication accepts it without promising immediate targets or completion before its existing deadline
+
+#### Scenario: No lawful source
+- **WHEN** a selector names no permitted ecological or explicit authored source
+- **THEN** publication rejects without promoting habitat prose, visual examples or unknown species to supply
+
+#### Scenario: Current shortage
+- **WHEN** a lawful source currently has zero living targets or blocked automatic headroom
+- **THEN** the definition remains valid and acceptance does not invoke provisioning

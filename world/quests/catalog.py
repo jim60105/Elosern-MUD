@@ -31,7 +31,11 @@ from .definitions import (
     register_quest_definition,
 )
 
-
+#: The permanent offline introductory commission. It remains a general low-tier
+#: wilderness hunt with no guaranteed immediate target outside any gate: the
+#: old capital-band supply promise is gone, and any lawful ordinary encounter
+#: the world supplies completes it. Its tier objective and reward identity are
+#: unchanged.
 INTRODUCTORY_HUNT = QuestDefinition(
     key="introductory_hunt",
     display_name="討伐低階魔物",
@@ -51,14 +55,15 @@ INTRODUCTORY_HUNT = QuestDefinition(
 )
 
 #: The approved regional species hunts (``monster-regional-species-hunts``).
-#: Coverage is derived from the authored ambient placement, never invented: the
+#: Coverage is derived from lawful authored supply sources, never invented: the
 #: countable variants are the species' ordinary baseline plus its stronger
-#: partner (so a qualifying stronger individual counts once), the quantity sits
-#: at the region's authored per-coordinate legal supply ``min(quantity,
-#: capacity)``, and no hunt asks for more than its region can legally provision.
-#: ``southeast_coast`` carries no hunt because it has no authored ambient rule,
-#: so a hunt there could never be satisfied by construction; its species
-#: presence is published as bound site content instead.
+#: partner (so a qualifying stronger individual counts once), and every region
+#: must carry an ecology composition pool or explicit site composition that
+#: places those variants. Quantity is not limited to one cell, site, or wave:
+#: a hunt may be completed across encounters and recovery waves, and acceptance
+#: promises neither an immediate target nor completion before its deadline.
+#: ``southeast_coast`` carries no hunt because it has no authored ecology zone;
+#: its species presence is published as bound site content instead.
 #: Ranks are authored from the arrangement — group composition, numbers, and
 #: terrain — and never from a countable variant's individual danger grade: the
 #: two mid hunts stay ``D`` although their strongest countable variant is graded

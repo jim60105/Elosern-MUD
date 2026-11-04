@@ -1120,3 +1120,174 @@ also run: four pre-existing rollback tests
 reach the durable store through an unpatched rollback call in a module with no
 database test class and fail with `no such table: django_content_type`; they do
 not touch this change's code and are unrelated.
+
+# Regional hunt supply cutover
+
+Developer document for the OpenSpec change `regional-hunt-supply-cutover` of the
+regional monster population programme. It records the supply contract, the
+removed provisioning path, the habitat-guidance boundary, the assertion-role
+ledger and the focused evidence for this slice.
+
+## Supply contract
+
+`world/quests/definitions.py` owns the read-only supply surface:
+
+```python
+HUNT_SUPPLY_ECOLOGY_ZONE = "ecology_zone"
+HUNT_SUPPLY_MONSTER_SITE = "monster_site"
+
+@dataclass(frozen=True, slots=True)
+class HuntSupplySource:
+    kind: str
+    key: str
+    region_key: str
+    variant_keys: tuple[str, ...]
+
+def hunt_supply_sources(
+    region_key: str, species_key: str, countable_variant_keys: tuple[str, ...]
+) -> tuple[HuntSupplySource, ...]
+```
+
+Sources are only the immutable ecology composition pools (`EcologyZone.pool` →
+`EncounterComposition.members`) and the explicit monster-site compositions whose
+parent region matches. A source qualifies when its authored compositions place
+at least one requested, species-owned variant and that intersection includes an
+ordinary baseline variant. The intersection becomes `variant_keys`; zones are
+returned by key and then sites by key, so the order is deterministic. Current
+living quantity, habitat tags, art keys and prose never participate.
+
+`_validate_hunt_selector` rejects a definition when no source resolves, so a
+hunt is never advertised for a species the region cannot lawfully supply.
+Quantity is not compared with any cell, site or wave capacity: completion may
+span encounters and recovery waves.
+
+## Acceptance and the removed provisioning path
+
+`world/quests/runtime.py::accept_quest` still owns issuance, rank-external
+eligibility, duplicate-active refusal, deterministic `quest_id`, deadline
+conversion and quest-log atomicity. It no longer snapshots, creates, moves or
+restores population state for a regional hunt: an undersupplied hunt (including
+zero living targets) commits a normal active record and writes nothing else.
+`world/rules/guild_offers.py::accept_guild_offer` and
+`world/rules/npc_intents.py::_apply_offer_quest` retain their quest-log and
+relations cache compensation but no provisioning snapshot.
+
+Deleted outright: `world/maps/monster_provisioning.py` (ensure/snapshot/restore
+API and the `hunt_targets_provisioned` / `hunt_targets_unavailable` events), its
+test module and shard label, and the runtime helpers `_stage_zero_hunt`,
+`provisioning_snapshot_for`, `restore_provisioning` and
+`_provision_hunt_targets`. `QuestTargetsUnavailable` now documents only the
+bound-site refusal. `ordinary_countable_variant_keys` was removed with its last
+caller; ordinary-variant validation remains inside `_validate_hunt_selector`.
+`docs/superpowers/specs/2026-09-02-observability-logging-design.md` drops the two
+provisioning event rows; the site binding events remain.
+
+## Habitat guidance
+
+`web/webclient/presentation/map_quest_destinations.py` adds the closed
+`DestinationEvidence` vocabulary (`habitat`, `entity`, `location`) as a required
+`QuestDestination.destination_kind`. ANCHOR, GRID, bound-instance and authored
+site positions are `LOCATION`; a regional hunt is `HABITAT`. `ENTITY` is
+reserved for a future destination whose position is supplied by surviving target
+identities; no current family claims that evidence.
+
+A regional hunt resolves to the nearest legal cell among its lawful sources,
+using the shared `nearest_region_cell` order (squared distance, then x, then y)
+and the union bounds of the source cells. Ecology-zone cells come from
+`world.maps.population_geometry.eligible_birth_cells`, so parent-region,
+wilderness-validity and inhabited-settlement-buffer exclusions are applied;
+explicit site cells are lawful manual exceptions to those buffers. No living
+monster is read and no topology is disclosed. The area and world maps keep their
+existing quest-marker wire shape (`node` / `bearing`), so an empty habitat stays
+a guidance marker and never becomes an entity observation. The browser payload
+gains no field.
+
+## Caller and contract dispositions
+
+- `world/quests/catalog.py`: comments now describe source legality, no
+  single-cell supply cap, and the introductory hunt's removal of any gate-local
+  supply promise. Definition keys, objectives, ranks, prose and rewards are
+  unchanged.
+- `docs/game/commands.md` and `docs/game/command-reference.md`: `guild list`
+  states that only legally unacceptable offers are omitted, that an undersupplied
+  regional hunt stays listed, and that acceptance promises neither an immediate
+  target nor completion before the deadline.
+- `docs/superpowers/specs/2026-10-05-monster-data-model-design.md` §6 regional
+  hunt text and §8 acceptance evidence were amended; the superseded
+  proposal-delivery wording is marked historical.
+- The capital hunting band in `world/maps/wilderness_population.py` and its
+  main-spec requirement remain intentionally owned by
+  `regional-population-runtime-cutover` (programme design §14), together with the
+  legacy ambient-rule generation paths. This slice removes only the quest-side
+  contracts that relied on a guaranteed immediate target.
+
+## Assertion-role ledger
+
+| Retired assertion | Prior role | Substantive replacement |
+| --- | --- | --- |
+| `test_hunt_catalog_content.RegionalHuntProvisionabilityTests.*` (ambient rule exists, quantity ≤ min(quantity, capacity), one hunt per placed species) | data contract for acceptance-time provisionability | `RegionalHuntSupplySourceTests` (lawful source resolves, sourced variants cover the selector, one advertisement per region/species) plus the synthetic wide-quantity registration test |
+| `test_species_hunt_acceptance.test_a_shortfall_is_provisioned_and_the_record_commits` | provisioning creates the shortfall on acceptance | `test_an_undersupplied_hunt_accepts_without_creating_a_target` and `test_a_hunt_wider_than_one_cell_accepts_without_generating_members` |
+| `…test_an_illegal_hunt_is_refused_with_no_partial_state` | acceptance-time named refusal | `test_a_species_with_no_authored_source_is_rejected_at_publication` (refusal moved to publication) |
+| `…test_a_provisioned_target_waits_on_a_walkable_cell_of_the_region` | provisioning placement legality | `test_map_quest_destinations.test_habitat_guidance_skips_geometry_excluded_cells` (guidance legality) |
+| `…test_a_post_provisioning_write_failure_rolls_back_everything` | rollback of provisioned individuals | `test_the_board_rolls_back_the_record_when_the_affinity_write_fails` and the retained cached-log restore test; no population surface is written to roll back |
+| `world.maps.tests.test_monster_provisioning.*` | owner-level provisioning guarantee | acceptance/population-state assertions in `test_species_hunt_acceptance`; the module is deleted |
+
+Delta requirements carry no canonical identifier until the archive sync puts
+them into `openspec/specs/`; the tests below therefore ran unannotated during
+the slice. The archive step attached the tool-generated post-sync identifiers
+recorded here. Two judgments went beyond the hand-off list:
+`test_each_region_species_pair_is_advertised_once` was left unannotated because
+its single assertion (distinct region/species pairs) establishes no clause of
+either replacement requirement, and `test_a_definition_that_is_not_a_clear_out_is_always_available`
+lost its retired identifier without a replacement because it exercises only the
+availability predicate and accepts nothing. Every other site was re-mounted
+one by one onto the scenario its assertions establish:
+
+| Test | Delta requirement and scenario |
+| --- | --- |
+| `world.quests.tests.test_species_hunt_acceptance.HuntAcceptanceTests.test_an_undersupplied_hunt_accepts_without_creating_a_target` | quest-lifecycle ADDED "Quest acceptance persists validated records without ordinary provisioning" — "Undersupplied hunt accepts without birth" |
+| `…test_a_hunt_wider_than_one_cell_accepts_without_generating_members` | quest-lifecycle ADDED (same requirement) — "Undersupplied hunt accepts without birth"; quest-blueprint ADDED "Published regional hunts require lawful authored sources" — "Quantity spans encounters" |
+| `…test_an_undersupplied_hunt_still_resolves_habitat_guidance` | no delta requirement: design-only "Guidance and introductory cutover" (owner-backed habitat guidance after an empty acceptance); its population-state assertions also support quest-lifecycle ADDED — "Undersupplied hunt accepts without birth" |
+| `…test_a_species_with_no_authored_source_is_rejected_at_publication` | quest-blueprint ADDED — "No lawful source" |
+| `…test_the_board_accepts_an_undersupplied_hunt_without_targets` | guild-quest-board MODIFIED "Board acceptance and abandonment delegate to quest lifecycle" — "Regional shortage is not a board refusal" |
+| `…test_the_board_rolls_back_the_record_when_the_affinity_write_fails` | guild-quest-board MODIFIED — "A failed acceptance restores every surface" |
+| `…test_no_provisioning_module_or_helper_survives` | quest-lifecycle ADDED — "Undersupplied hunt accepts without birth" (registration does not invoke provisioning) |
+| `world.quests.tests.test_definitions.SpeciesHuntDefinitionTests.test_hunt_supply_sources_resolve_authored_zone_and_site_sources` | quest-blueprint ADDED — "No lawful source" |
+| `…test_hunt_supply_sources_require_a_matching_region_and_ordinary_variant` | quest-blueprint ADDED — "No lawful source" |
+| `…test_a_hunt_whose_species_has_no_authored_source_is_rejected` | quest-blueprint ADDED — "No lawful source" |
+| `…test_a_hunt_wider_than_one_cell_still_registers` | quest-blueprint ADDED — "Quantity spans encounters" |
+| `world.quests.tests.test_hunt_catalog_content.RegionalHuntSupplySourceTests.test_every_published_hunt_names_a_lawful_authored_source` | quest-blueprint ADDED — "No lawful source" |
+| `…test_selected_variants_come_from_the_hunts_own_sources` | quest-blueprint ADDED — "No lawful source" |
+| `…test_each_region_species_pair_is_advertised_once` | quest-blueprint ADDED — "No lawful source" (no duplicate advertisement) |
+| `web.webclient.presentation.tests.test_map_quest_destinations.ResolveRecordDestinationTests.test_habitat_guidance_skips_geometry_excluded_cells` | no delta requirement: design-only "Guidance and introductory cutover" (habitat cells must be lawful authored habitat) |
+| `web.webclient.presentation.tests.test_area_map.GridAreaTests.test_a_habitat_destination_is_guidance_not_an_entity` | no delta requirement: design-only "Guidance and introductory cutover" (habitat destination, not a live observation) |
+
+## Verification evidence (this change)
+
+Run from the worktree root with the single-token environment file
+(`/tmp/mud-population-test.env` containing `MUD_TEST_SETTINGS=1`):
+
+| Command label | Result |
+| --- | --- |
+| `world.quests.tests.test_definitions.SpeciesHuntDefinitionTests` | 14 tests, OK |
+| `world.quests.tests.test_compile_registration.SpeciesHuntPayloadTests` | 2 tests, OK |
+| `world.quests.tests.test_planner.SpeciesHuntPlannerTests` | 7 tests, OK |
+| `commands.tests.test_guild_economy_commands.SpeciesHuntBoardCommandTests` | 2 tests, OK |
+| `world.quests.tests.test_species_hunt_acceptance` | 8 tests, OK |
+| `world.quests.tests.test_hunt_catalog_content` | 19 tests, OK |
+| `web.webclient.presentation.tests.test_map_quest_destinations` | 19 tests, OK |
+| `web.webclient.presentation.tests.test_area_map.GridAreaTests` | 6 tests, OK |
+| `world.maps.tests.test_wilderness_geography_contract.BorderRiverContractTests.test_region_consumers_follow_the_amended_boundaries` | 1 test, OK |
+| `world.rules.tests.test_npc_intents.test_offer_quest_intents` | 26 tests, OK |
+| `tests.test_command_docs` | 33 tests, OK |
+
+`python -m tools.observability_lint check` → `scanned=823 frozen=0
+violations=0 exemptions=375`. `python -m tools.test_data_lint check` →
+`violations=0`. `openspec validate regional-hunt-supply-cutover --strict` →
+valid. `content/map-reference-context.json` was regenerated because the quest
+module source hashes changed. `python -m tools.contract_gate` passes
+reference-context, observability, test-data, manifests and the contract suite.
+Its traceability step reports exactly one uncovered identifier with 0 errors —
+`quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region`, which this delta removes — and stays red until the archive
+sync, following the archived `manual-monster-compositions` precedent. No retired
+or unrelated annotation was re-pointed.

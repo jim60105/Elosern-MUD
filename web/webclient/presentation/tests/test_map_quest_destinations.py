@@ -23,6 +23,7 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import GridRoom, InstanceRoom, TerrainRoom
 from web.webclient.presentation import map_quest_destinations as resolver
 from web.webclient.presentation.map_quest_destinations import (
+    DestinationEvidence,
     DestinationFamily,
     QuestDestination,
     accepted_destinations_for,
@@ -36,6 +37,8 @@ from web.webclient.presentation.map_quest_destinations import (
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
     DestinationKind,
+    HUNT_SUPPLY_ECOLOGY_ZONE,
+    HuntSupplySource,
     ObjectiveKind,
     QuestDefinition,
     QuestObjective,
@@ -75,6 +78,30 @@ _SITES = {
     "den": SimpleNamespace(key="den", coordinates=(120, 130)),
     "sunken": SimpleNamespace(key="sunken", coordinates=(5, 5)),
 }
+_HABITAT_ZONE = SimpleNamespace(
+    key="fen_habitat", region_key="fen", rectangles=((40, 49, 0, 9),)
+)
+#: Every fen cell except the flooded (40, 4): the population geometry owner's
+#: eligibility already removes illegal and settlement-buffered cells.
+_HABITAT_CELLS = tuple(
+    (x, y)
+    for x in range(40, 50)
+    for y in range(0, 10)
+    if (x, y) != (40, 4)
+)
+
+
+def _hunt_supply_sources(region_key, species_key, countable_variant_keys):
+    if region_key != "fen":
+        return ()
+    return (
+        HuntSupplySource(
+            HUNT_SUPPLY_ECOLOGY_ZONE,
+            _HABITAT_ZONE.key,
+            "fen",
+            tuple(sorted(countable_variant_keys)),
+        ),
+    )
 
 
 def _settlement_graph(map_key):
@@ -104,6 +131,9 @@ def _patch_geography(test):
         ("anchor_geography", lambda: _GEOGRAPHY),
         ("ANCHOR_PLACEMENT_REGISTRY", _PLACEMENTS),
         ("MONSTER_SITE_REGISTRY", _SITES),
+        ("ECOLOGY_ZONE_REGISTRY", {_HABITAT_ZONE.key: _HABITAT_ZONE}),
+        ("eligible_birth_cells", lambda zone, **kwargs: _HABITAT_CELLS),
+        ("hunt_supply_sources", _hunt_supply_sources),
         ("region_search_boxes", lambda: _BOXES),
         ("settlement_graph", _settlement_graph),
         ("region_for_coordinates", _classify),
@@ -318,6 +348,7 @@ class ResolveRecordDestinationTests(unittest.TestCase):
             QuestDestination(
                 "q_anchor", "map_dest_anchor", DestinationFamily.ANCHOR,
                 (300, 400), "town_map", "grid:town_map:10:20",
+                DestinationEvidence.LOCATION,
             ),
         )
         # The GRID world position is the settlement's anchor cell, not a local
@@ -327,6 +358,7 @@ class ResolveRecordDestinationTests(unittest.TestCase):
             QuestDestination(
                 "q_grid", "map_dest_grid", DestinationFamily.GRID,
                 (300, 400), "town_map", "grid:town_map:35:60",
+                DestinationEvidence.LOCATION,
             ),
         )
         escort = _resolve("escort_grid")
@@ -336,6 +368,7 @@ class ResolveRecordDestinationTests(unittest.TestCase):
             QuestDestination(
                 "q_site", "map_dest_site", DestinationFamily.MONSTER_SITE,
                 (120, 130), "elosern", "wild:elosern:120:130",
+                DestinationEvidence.LOCATION,
             ),
         )
         self.assertEqual(
@@ -343,8 +376,27 @@ class ResolveRecordDestinationTests(unittest.TestCase):
             QuestDestination(
                 "q_hunt", "map_dest_hunt", DestinationFamily.SPECIES_HUNT,
                 (40, 3), "elosern", "wild:elosern:40:3",
+                DestinationEvidence.HABITAT,
             ),
         )
+        self.assertEqual(
+            _resolve("hunt", origin=(10, 4)).destination_kind,
+            DestinationEvidence.HABITAT,
+        )
+
+    @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
+    def test_habitat_guidance_skips_geometry_excluded_cells(self):
+        # The population geometry owner removes settlement-buffered and illegal
+        # cells before guidance is chosen: the nearest walkable rectangle cell
+        # is never preferred over an actual lawful habitat cell.
+        excluded = {(40, 3), (40, 4)}
+        cells = tuple(cell for cell in _HABITAT_CELLS if cell not in excluded)
+        with mock.patch.object(
+            resolver, "eligible_birth_cells", lambda zone, **kwargs: cells
+        ):
+            destination = _resolve("hunt", origin=(10, 4))
+        self.assertEqual(destination.world_cell, (40, 5))
+        self.assertEqual(destination.destination_kind, DestinationEvidence.HABITAT)
 
     @covers_requirement("map-quest-destinations::accepted-commission-destinations-resolve-on-the-server")
     def test_settlement_anchor_cells_survive_a_missing_local_node(self):

@@ -12,8 +12,10 @@ from world.lore.monster_placement import (
     MonsterSite,
 )
 from world.tests.synthetic_data import (
+    SYNTH_ECOLOGY_ZONES,
     SYNTH_ITEMS,
     SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_SITES,
     SYNTH_MONSTER_TIERS,
     SYNTH_MONSTER_VARIANTS,
     SYNTH_REGIONS,
@@ -24,6 +26,8 @@ from world.tests.synthetic_data import (
 from world.quests.definitions import (
     DestinationKind,
     EscortCompletion,
+    HUNT_SUPPLY_ECOLOGY_ZONE,
+    HUNT_SUPPLY_MONSTER_SITE,
     MAX_DEFINITION_PROSE_LENGTH,
     MAX_DEFINITION_PROSE_TOTAL,
     ObjectiveKind,
@@ -34,6 +38,7 @@ from world.quests.definitions import (
     QuestStage,
     QuestType,
     RoomLocator,
+    hunt_supply_sources,
     register_quest_definition,
 )
 
@@ -544,6 +549,8 @@ def _hunt(
     "monster_species",
     "monster_variants",
     "regions",
+    "ecology_zones",
+    "monster_sites",
     extra=_HUNT_EXTRA,
 )
 class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
@@ -638,8 +645,8 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
         "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
     )
     def test_a_hunt_without_an_ordinary_variant_is_rejected(self):
-        # Without an ordinary baseline variant the "guarantee ordinary targets"
-        # contract could not be expressed at acceptance.
+        # Without an ordinary baseline variant no lawful source can establish
+        # the selector's ordinary eligibility.
         with self.assertRaises(QuestDefinitionError):
             register(
                 quest(
@@ -648,6 +655,81 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
                 )
             )
         self.assertNotIn("hunt-stronger-only", QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
+    )
+    def test_hunt_supply_sources_resolve_authored_zone_and_site_sources(self):
+        sources = hunt_supply_sources(
+            _HUNT_REGION, _HUNT_SPECIES, (_HUNT_ORDINARY, _HUNT_STRONGER)
+        )
+        self.assertEqual(
+            [source.kind for source in sources],
+            [HUNT_SUPPLY_ECOLOGY_ZONE, HUNT_SUPPLY_MONSTER_SITE],
+        )
+        self.assertEqual(
+            [source.region_key for source in sources], [_HUNT_REGION, _HUNT_REGION]
+        )
+        self.assertEqual(sources[0].key, next(iter(SYNTH_ECOLOGY_ZONES)))
+        self.assertEqual(sources[1].key, "t_breakwater_nest")
+        self.assertIn(sources[1].key, SYNTH_MONSTER_SITES)
+        expected_variants = tuple(sorted((_HUNT_ORDINARY, _HUNT_STRONGER)))
+        for source in sources:
+            self.assertEqual(source.variant_keys, expected_variants)
+
+    @covers_requirement(
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
+    )
+    def test_hunt_supply_sources_require_a_matching_region_and_ordinary_variant(self):
+        variants = (_HUNT_ORDINARY, _HUNT_STRONGER)
+        self.assertEqual(
+            hunt_supply_sources(_ABSENT_REGION, _HUNT_SPECIES, variants), ()
+        )
+        self.assertEqual(
+            hunt_supply_sources(_HUNT_REGION, _FOREIGN_SPECIES, variants), ()
+        )
+        # A stronger-only selector has no ordinary variant in any intersection.
+        self.assertEqual(
+            hunt_supply_sources(_HUNT_REGION, _HUNT_SPECIES, (_HUNT_STRONGER,)), ()
+        )
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
+    )
+    def test_a_hunt_whose_species_has_no_authored_source_is_rejected(self):
+        before = dict(QUEST_DEFINITION_REGISTRY)
+        with self.assertRaises(QuestDefinitionError):
+            register(
+                quest(
+                    "hunt-unsourced",
+                    stages=(
+                        QuestStage(
+                            0,
+                            _hunt(
+                                species_key=_FOREIGN_SPECIES,
+                                countable=(_FOREIGN_VARIANT,),
+                            ),
+                        ),
+                    ),
+                )
+            )
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), before)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
+    )
+    def test_a_hunt_wider_than_one_cell_still_registers(self):
+        zone = next(iter(SYNTH_ECOLOGY_ZONES.values()))
+        wide = zone.cell_capacity + 7
+        registered = register(
+            quest("hunt-wide", stages=(QuestStage(0, _hunt(quantity=wide)),))
+        )
+        self.assertEqual(registered.stages[0].objective.quantity, wide)
+        self.assertGreater(wide, zone.cell_capacity)
 
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"

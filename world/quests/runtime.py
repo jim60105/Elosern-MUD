@@ -16,7 +16,6 @@ from .definitions import (
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
     QuestObjective,
-    ordinary_countable_variant_keys,
 )
 from .transitions import (
     apply_quest_log_replacement,
@@ -47,17 +46,16 @@ class QuestIssuanceNotFound(ValueError):
 
 
 class QuestTargetsUnavailable(ValueError):
-    """An acceptance cannot legally guarantee its declared targets.
+    """A bound site clear-out cannot legally bind its declared targets.
 
-    The named refusal of the acceptance-time guarantee: a regional species hunt's
-    region could not legally provide enough reachable, living,
-    ordinary-eligible targets for the objective's quantity, or a bound site
-    clear-out's authored site cannot currently supply its living individuals.
+    The named refusal of the bound clear-out contract: the authored site cannot
+    currently supply the objective's living individuals. Regional species hunts
+    no longer raise this — an undersupplied hunt accepts without provisioning.
     Nothing was persisted and no target arrangement was left behind.
 
-    The first argument is the objective's own supply key — the hunt's region key
-    or the clear-out's site key — and ``reason`` is the closed named refusal,
-    which both this refusal and the board's availability predicate answer with.
+    The first argument is the clear-out's site key and ``reason`` is the closed
+    named refusal, which both this refusal and the board's availability
+    predicate answer with.
     """
 
     def __init__(self, region_key: str, reason: str) -> None:
@@ -689,64 +687,6 @@ def _current_tick() -> int:
     return get_world_clock().tick
 
 
-def _stage_zero_hunt(definition: QuestDefinition) -> QuestObjective | None:
-    """The definition's current (stage-zero) objective when it is a species hunt."""
-    objective = definition.stages[0].objective
-    return objective if objective.region_key is not None else None
-
-
-def provisioning_snapshot_for(definition: QuestDefinition) -> Any | None:
-    """The map-owned surfaces a rolled-back acceptance's provisioning touched.
-
-    ``None`` when the definition's current objective is not a regional species
-    hunt, so every other acceptance pays nothing. The acceptance owners that
-    wrap ``accept_quest`` in their own transaction capture this before opening
-    it and call :func:`restore_provisioning` in their failure path: provisioning
-    writes the wilderness owner's bookkeeping, whose in-process cache a database
-    rollback does not reach (the idmapper/attribute caches are not
-    transaction-aware).
-    """
-    if _stage_zero_hunt(definition) is None:
-        return None
-    from world.maps.monster_provisioning import snapshot_provisioning_surfaces
-
-    return snapshot_provisioning_surfaces()
-
-
-def restore_provisioning(snapshot: Any | None) -> None:
-    """Restore the target-arrangement surfaces of a rolled-back acceptance."""
-    if snapshot is None:
-        return
-    from world.maps.monster_provisioning import restore_provisioning_surfaces
-
-    restore_provisioning_surfaces(snapshot)
-
-
-def _provision_hunt_targets(definition: QuestDefinition) -> None:
-    """Guarantee the current hunt's ordinary-eligible targets, or refuse.
-
-    The quest layer never creates, moves, or deletes an individual itself: it
-    asks the ambient/site managers' own ensure API for the guarantee, and that
-    API decides legality under habitat, authored placement capacity, ownership
-    markers, and current site state. A shortfall raises the named refusal before
-    anything is persisted, so an acceptance that cannot be legally satisfied
-    leaves no partial target arrangement behind.
-    """
-    objective = _stage_zero_hunt(definition)
-    if objective is None:
-        return
-    from world.maps.monster_provisioning import ensure_hunt_targets
-
-    result = ensure_hunt_targets(
-        objective.region_key,
-        objective.species_key,
-        ordinary_countable_variant_keys(objective),
-        objective.quantity,
-    )
-    if not result.satisfied:
-        raise QuestTargetsUnavailable(objective.region_key, result.reason)
-
-
 #: The quest layer's own refusal for a site clear-out: the site holds living
 #: individuals, but fewer than the objective asks for. The other four reasons
 #: are the site owner's own verdicts (``world/maps/monster_sites.py`` owns their
@@ -883,13 +823,12 @@ def accept_quest(
     key raises ``IssuerKeyError``; a well-formed key with no registered
     issuance raises ``QuestIssuanceNotFound``.
 
-    When the definition's current stage is a regional species hunt, the
-    acceptance additionally obtains the target-availability guarantee through
-    the ambient/site managers, and provisioning plus record creation commit in
-    one all-or-nothing transaction: any validation or manager failure rolls
-    back both, leaving no active record and no partial target arrangement. A
-    hunt whose condition cannot be legally satisfied raises
-    ``QuestTargetsUnavailable`` before any persistence.
+    A regional species hunt is accepted on its published, source-backed
+    selector alone: the acceptance reads no population, creates no individual,
+    and writes no target, due, or generation state. Fewer living targets than
+    the quantity (including none) is legitimate undersupply, not a refusal —
+    the hunt may span encounters and recovery waves up to its existing deadline.
+    Its lawful authored supply source is established at publication.
 
     When it is a bound clear-out over an authored site, the guarantee is a read
     of the site owner's own state and population — acceptance never creates,
@@ -949,7 +888,6 @@ def accept_quest(
         protected_entity_ids=(),
         failure_reason=None,
     )
-    provisioning = provisioning_snapshot_for(definition)
     # This operation now owns an outer transaction, so it also owns every
     # in-process surface a failure *after* the quest-log writer returned would
     # otherwise leave divergent: the writer restores the actor's quest log only
@@ -958,7 +896,6 @@ def accept_quest(
     quest_log_snapshot = snapshot_quest_log(actor)
     try:
         with transaction.atomic():
-            _provision_hunt_targets(definition)
             site_plan = _site_clear_out_plan(definition)
             if site_plan is not None:
                 site_objective, site_read = site_plan
@@ -987,7 +924,6 @@ def accept_quest(
                 _emit_site_targets_bound(site_objective, site_read)
     except Exception:
         restore_quest_log(actor, quest_log_snapshot)
-        restore_provisioning(provisioning)
         raise
     return record
 

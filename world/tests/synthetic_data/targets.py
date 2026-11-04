@@ -23,6 +23,7 @@ from world.tests.synthetic_data.data_monster_species import (
 )
 from world.tests.synthetic_data.data_monster_placement import (
     SYNTH_AMBIENT_PLACEMENTS,
+    SYNTH_ECOLOGY_ZONES,
     SYNTH_ENCOUNTER_COMPOSITIONS,
     SYNTH_MONSTER_SITES,
 )
@@ -73,6 +74,7 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "monster_variants": lambda: SYNTH_MONSTER_VARIANTS,
         "ambient_placements": lambda: SYNTH_AMBIENT_PLACEMENTS,
         "encounter_compositions": lambda: SYNTH_ENCOUNTER_COMPOSITIONS,
+        "ecology_zones": lambda: SYNTH_ECOLOGY_ZONES,
         "monster_sites": lambda: SYNTH_MONSTER_SITES,
         "anchors": lambda: SYNTH_ANCHORS,
         "anchor_placements": lambda: SYNTH_ANCHOR_PLACEMENTS,
@@ -155,6 +157,7 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
         "world.lore.monster_placement",
         "ENCOUNTER_COMPOSITION" + "_REGISTRY",
     ),
+    "ecology_zones": ("world.lore.monster_placement", "ECOLOGY_ZONE" + "_REGISTRY"),
     "monster_sites": ("world.lore.monster_placement", "MONSTER_SITE" + "_REGISTRY"),
     "archetypes": ("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY"),
     "settlements": ("world.lore.settlements.settlements", "SETTLEMENT" + "_REGISTRY"),
@@ -209,6 +212,9 @@ _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     # A site names one complete composition, so a scope that swaps the site
     # registry must swap the composition registry it resolves against first.
     "monster_sites": ("encounter_compositions",),
+    # An ecology zone's pool rows name complete compositions, so the same
+    # ordering applies to a zone scope.
+    "ecology_zones": ("encounter_compositions",),
     # Bundle rows carry band-bound items: validating them reads the live
     # price table, so every bundle scope brings items and prices with it.
     _BUNDLES_LOGICAL: ("items", "prices"),

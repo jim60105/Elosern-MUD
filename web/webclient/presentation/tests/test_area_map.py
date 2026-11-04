@@ -54,7 +54,11 @@ from web.webclient.presentation.map_panels import (
     validate_area_map,
 )
 from web.webclient.presentation.map_parts import decode_map_parts, encode_map_parts
-from web.webclient.presentation.map_quest_destinations import DestinationFamily, QuestDestination
+from web.webclient.presentation.map_quest_destinations import (
+    DestinationEvidence,
+    DestinationFamily,
+    QuestDestination,
+)
 from web.webclient.presentation.protocol import ProtocolValidationError, json_byte_size
 from web.webclient.presentation.registry import (
     PanelUnavailableError,
@@ -342,8 +346,14 @@ class GridAreaTests(EvenniaTestCase):
         self._goto(plaza)
         hidden = next(node_id for node_id in self.adjacency if node_id not in _by_id(_render(self.char)))
         destinations = (
-            QuestDestination("t_q1", "t_def", DestinationFamily.GRID, (0, 0), _T_MAP_KEY, hidden),
-            QuestDestination("t_q2", "t_def", DestinationFamily.MONSTER_SITE, (900, 900), "t_other", "wild:t:1:1"),
+            QuestDestination(
+                "t_q1", "t_def", DestinationFamily.GRID, (0, 0), _T_MAP_KEY, hidden,
+                DestinationEvidence.LOCATION,
+            ),
+            QuestDestination(
+                "t_q2", "t_def", DestinationFamily.MONSTER_SITE, (900, 900),
+                "t_other", "wild:t:1:1", DestinationEvidence.LOCATION,
+            ),
         )
         definitions = {"t_def": SimpleNamespace(display_name="合成委託")}
         with mock.patch(
@@ -363,6 +373,38 @@ class GridAreaTests(EvenniaTestCase):
             markers["t_q2"]["destination"], {"kind": "bearing", "bearing_deg": 0.0, "distance_km": 100.0}
         )
         self.assertTrue(markers["t_q2"]["tracked"])
+
+    @covers_requirement(
+        "webclient-area-map::area-commission-markers-distinguish-same-map-identity-from-elsewhere"
+    )
+    def test_a_habitat_destination_is_guidance_not_an_entity(self):
+        plaza = _t_grid_id(*_T_PLAZA_XYZ[:2])
+        self._goto(plaza)
+        destination = QuestDestination(
+            "q_habitat", "t_def", DestinationFamily.SPECIES_HUNT,
+            (900, 900), None, None, DestinationEvidence.HABITAT,
+        )
+        definitions = {"t_def": SimpleNamespace(display_name="合成委託")}
+        with mock.patch(
+            "web.webclient.presentation.map_quest_destinations.accepted_destinations_with_tracking",
+            return_value=((destination,), frozenset()),
+        ), mock.patch(
+            "web.webclient.presentation.map_quest_destinations.actor_world_cell",
+            return_value=(900, 800),
+        ), mock.patch.dict("world.quests.definitions.QUEST_DEFINITION_REGISTRY", definitions):
+            payload = _render(self.char)
+        marker = next(
+            row for row in payload["quest_markers"] if row["id"] == "q_habitat"
+        )
+        # An empty habitat still points somewhere: the authored region, never a
+        # fabricated target or an entity observation.
+        self.assertEqual(
+            marker["destination"],
+            {"kind": "bearing", "bearing_deg": 0.0, "distance_km": 100.0},
+        )
+        self.assertEqual(
+            set(marker), {"id", "title", "tracked", "destination"}
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -646,7 +688,10 @@ class RoomGraphAreaTests(EvenniaTestCase):
 
     def test_markers_without_a_known_position_are_omitted(self):
         self._visit("a")
-        destination = QuestDestination("t_q", "t_def", DestinationFamily.GRID, (1, 1), "t_m", "grid:t_m:1:1")
+        destination = QuestDestination(
+            "t_q", "t_def", DestinationFamily.GRID, (1, 1), "t_m",
+            "grid:t_m:1:1", DestinationEvidence.LOCATION,
+        )
         with mock.patch(
             "web.webclient.presentation.map_quest_destinations.accepted_destinations_with_tracking",
             return_value=((destination,), frozenset()),
@@ -910,6 +955,7 @@ class WildernessAreaTests(EvenniaTest):
         destination = QuestDestination(
             quest_id="q_far", definition_key="t_def", family=list(DestinationFamily)[0],
             world_cell=unknown, map_key=None, node_id=_t_wild_id(*unknown),
+            destination_kind=DestinationEvidence.LOCATION,
         )
         definition = SimpleNamespace(display_name="合成委託")
         with mock.patch(

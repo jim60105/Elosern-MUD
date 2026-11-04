@@ -992,7 +992,6 @@
    "name": "maps-34",
    "workers": 4,
    "labels": [
-    "world.maps.tests.test_monster_provisioning",
     "world.maps.tests.test_monster_sites",
     "world.maps.tests.test_movement_roundtrip",
     "world.maps.tests.test_regional_population",

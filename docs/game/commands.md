@@ -105,7 +105,7 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`guild register`](/game/command-reference?id=guild-register) | 註冊為冒險者；結尾可用 `@#<編號>` 指定這一位服務人員。 |
-| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板與每個委託的第一目標說明；任務板只列出目前能完成的委託；結尾可用 `@#<編號>` 指定這一位服務人員。 |
+| [`guild list`](/game/command-reference?id=guild-list) | 查看任務板與每個委託的第一目標說明；任務板只略過目前無法合法接取的委託（例如已清剿而尚未復原的站點）。區域物種狩獵即使當地暫時沒有足額存活目標仍會列出，完成可能需要多次遭遇與族群恢復；結尾可用 `@#<編號>` 指定這一位服務人員。 |
 | [`guild accept`](/game/command-reference?id=guild-accept) | 接取委託；結尾可用 `@#<編號>` 指定這一位服務人員。 |
 | [`guild log`](/game/command-reference?id=guild-log) | 查看任務記錄。 |
 | [`guild show`](/game/command-reference?id=guild-show) | 查看任務詳情（含階級、評價理由與背景）。 |
