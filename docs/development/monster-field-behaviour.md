@@ -525,7 +525,10 @@ New (not yet synced) requirement IDs:
 | `monster-journeys::activity-ordering-protects-encounters-across-deferred-time` | Newly due facts | `test_advance_processes_decision_arrival_then_next_decision` (one advance processes the 60-tick decision, the later arrival and a strictly later decision); `test_newly_created_group_is_due_within_one_advance`; `test_equal_partitions_preserve_resources_and_schedule` (equal partitions produce identical positions, sequences, schedules, reserves and cursors, and a repeated endpoint is a no-op) |
 | `world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry` | Explicit activity-owned interval | `test_supplied_activity_member_settles_once_under_its_owner` (a supplied member and an unobserved twin end with equal reserve, gauge and cursor after one advance) |
 | `world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities` | Forced-sleep receipt depth (carried follow-up) | `test_forced_sleep_receipt_rolls_back_with_a_late_source_fault` (the owner's idle settlement crosses the forced-sleep threshold and creates a threshold receipt; a late source fault restores the activity record, reserve, cursor, trait store and receipt cache; a retry then commits the same receipt and 12 seconds of sleep recovery) |
-| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Unobserved partition and restart | `test_unobserved_wandering_waits_for_a_live_encounter_then_reloads` (a real unobserved group departs, waits outside the live protected destination, reloads its journey, then arrives with no room created at either cell) |
+| `world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities` | Newly born group inside a failed advance | `test_a_birth_and_departure_in_one_advance_roll_back_completely` (a group created at a boundary departs inside the advance; a late fault removes the row and its group, restores the tick, and a deterministic retry recreates and moves it) |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Unobserved partition and restart | `test_unobserved_wandering_waits_for_a_live_encounter_then_reloads` (a real unobserved group departs, waits outside the live protected destination, reloads its journey, then arrives with no room created at either cell); `test_equal_partitions_preserve_resources_and_schedule` (departure, arrival and a later decision across one advance versus two partitions, including gauges) |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Death in transit | `test_a_member_killed_in_transit_is_not_resurrected` (no physiology or gauge is paid for a dead member; the recorded arrival fact is `alive=False` and no destination registration is minted) |
+| `world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry` | Combat prefix gauge ownership | `test_combat_prefix_regenerates_gauges_before_ownership_release` (the combat owner pays the exact gauge interval once, then releases the cursor; a replay is a no-op) |
 
 ### Changed-logging evidence
 
@@ -569,6 +572,42 @@ resolutions before implementation:
   the committed one.
 - **Coverage gaps:** the unobserved/live-encounter, partition, same-tick
   ordering and forced-sleep receipt tests above close them.
+
+The final independent review of the complete diff added these dispositions:
+
+- **Combat survivors lost their gauge interval (blocking):** fixed. The
+  combat owner now pays the combat prefix's gauge regeneration through
+  `settle_gauge_regeneration` before releasing the cursor, and admission pays
+  the idle prefix's gauge; the clock skips every activity-owned body for
+  gauges so the owner is the only payer. Regression:
+  `ChokepointLifecycleTests.test_combat_prefix_regenerates_gauges_before_ownership_release`.
+- **A released participant could wander at the terminal boundary
+  (blocking):** fixed. Planning and commit consult the persisted active
+  hostile session's non-fled enemy IDs and keep such a member in place, even
+  when terminal settlement has already paid its prefix and released it to
+  idle. Regression:
+  `SeededDecisionTests.test_active_combat_participant_never_wanders_even_when_released`.
+- **Immediate posture transitions were projected but not committed
+  (blocking):** fixed. A zero-length depletion/wake is now committed through
+  the sole fatigue writer before the next segment, so the persisted state and
+  the projection cannot disagree. Regression:
+  `test_immediate_posture_transitions_are_committed` (both immediate depletion
+  and immediate wake).
+- **A dead journey member could be regenerated into life (blocking):** fixed.
+  Journey settlement pays nothing for a dead member, arrival records its
+  truthful `alive=False` presence, and it is never registered or attached at
+  the destination. Regression:
+  `test_a_member_killed_in_transit_is_not_resurrected`.
+- **Partition evidence was too shallow (non-blocking):** fixed. The test now
+  runs a departure, arrival and later decision across one advance versus two
+  partitions, compares positions, sequences, schedules, cursors, reserves and
+  gauges, and checks a repeated endpoint on the same world.
+- **Newly born group rollback and the two population budgets were untested
+  (non-blocking):** fixed. `test_a_birth_and_departure_in_one_advance_roll_back_completely`
+  creates a group inside the failed advance and verifies the row, owner record
+  and tick are restored before a deterministic retry; the departure test now
+  asserts retained home ceiling for emigrants and a foreign visitor consuming
+  local headroom.
 
 ### Focused verification run
 
