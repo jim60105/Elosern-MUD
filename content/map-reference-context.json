@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "df13e6bf118d29a9035c5e6e91f121ba8efb533eca0b3da942dc4bc722feac3e",
+  "fingerprint": "1025ac836bac326b4e60e4929444475b8dc96760b88074684c4beaccb8d3e6b0",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -935,7 +935,7 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_placement.py": "a51ac11dca0ea4e099a92a3b4bd28310004e31f7f4d5d116cd25c0e933b1c2f0",
+    "world/lore/monster_placement.py": "eef7f3fc67b0e752a4db5ec5b562fa1728e4b8df6ea3940ae19657bd240821e8",
     "world/lore/monster_species.py": "95997e3dd88cfd96ef5974a52f73e568f59088439050254bfbda5064159b075a",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
@@ -960,7 +960,7 @@
     "world/lore/player_presets/validation.py": "084c3ff9755e870076bf84f4a0b617968fe5967285519e988eccd120edb3bca9",
     "world/lore/player_presets/vocab.py": "a9563a1af1e464e4f018de4a1b1158cae7aeed2573ca42a13244893d2f1bfc71",
     "world/lore/races.py": "d1d3672182c64eae1dfb17f1fe16962c9db5f51fb5a0b7404e70d88b20887ae4",
-    "world/lore/registry_index.py": "f18a18df9d6027f91870eaaa0ebaa492ad3ee6e1065b5cb74b19a665543356dd",
+    "world/lore/registry_index.py": "7aac28aef22d273530cc549cfd5cee350be13fc5a08d6fa6a1fbafb11a4bef58",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/scene_archetypes.py": "737c650a1a5223defef655520242cc162301181b63f1f783e451def3f19b4388",
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
@@ -1021,7 +1021,7 @@
     "world/quests/planner.py": "758063633840a0ea112af9cb1603599b15ac2fa9f7d603bf37a19ab005caccb0",
     "world/quests/retention.py": "0dc112629dea61ae4bb3ad034e7d3dd7920950cb77b86ddf6615e2cf06568003",
     "world/quests/room_observation.py": "e3e16618f1801807215a7b61315858746332b34df06f35db2bcac3518fa0ef8c",
-    "world/quests/runtime.py": "0143094a149f5f461c0bf63814e68a95ebe969831b11a52d725ecf63717edb85",
+    "world/quests/runtime.py": "ef4bb6775e0cdd8d2fb1420e567196f2fe0921d68ee2001e0d00f380100656fd",
     "world/quests/scene_api.py": "f5079982282beea88a87b81a7aaea2d3bf7c0b5d27c301d9dda43e8dd248461f",
     "world/quests/scene_builder.py": "2a8089ec03f15d62cb3d154ad0ff788fc8b93b7ac93a257c9b7e4221f8ce31d6",
     "world/quests/scene_package.py": "3e2bb587b3ee3a71705527acc0aad6fb918b10c47a6a23d5e6c471fb8dcf0206",

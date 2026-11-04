@@ -97,7 +97,9 @@ ORDINARY, STRONGER = _VARIANTS[0], _VARIANTS[1]
 SPECIES = SYNTH_MONSTER_SPECIES[next(iter(SYNTH_MONSTER_SPECIES))].key
 
 #: A walkable south-western wild cell, far from the contract-pinned hunting band.
-PROBE = (30, 30)
+#: It must be a valid explicit-placement surface: the site owner registers each
+#: member through the population owner's surface-validating operation.
+PROBE = (500, 700)
 HOUR = 3600
 _SEED = 13
 _BRANCH = SYNTH_GUILD_BRANCH_KEY
@@ -188,7 +190,13 @@ class SiteClearOutAcceptanceTests(
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
         enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
-        self.room = self.char1.location
+        self.wilderness_room = self.char1.location
+        self.wilderness_room.db.region_key = self.region
+        # A guild clerk is a place-bound settlement service: its anchor must be
+        # an ordinary Room, not a pooled wilderness room. The member and the
+        # clerk stand in the plain test room while the site settles at PROBE.
+        self.char1.move_to(self.room1)
+        self.room = self.room1
         self.room.db.region_key = self.region
         self.clock = get_world_clock()
 

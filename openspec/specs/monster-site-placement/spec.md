@@ -1,10 +1,11 @@
 # monster-site-placement Specification
 
 ## Purpose
-Author where species actually appear: deterministic regional ambient placement rules plus explicit
-camps, nests, and boss sites with owned individuals, authored one-shot or in-game-time recoverable
-lives, and reconciliation that never crosses ownership boundaries. Habitat tags constrain what may be
-authored, never what spawns.
+Author where species actually appear: bounded ecology habitats with weighted complete birth
+compositions, plus explicit manual camps, nests, boss sites, strays, and encounters that each own one
+complete composition and its individuals, with authored one-shot or in-game-time recoverable lives.
+Reconciliation never crosses ownership boundaries, and habitat tags constrain what may be authored,
+never what spawns.
 
 ## Requirements
 
