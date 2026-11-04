@@ -2,7 +2,7 @@
 
 ## Context
 
-`field_enemy_roster` already collects every living local Monster in numeric-ID order. `engage_group` is the staged opponent API and gates voluntary sleeping actors. `settle_forced_sleep_opening` is called by engagement and exams and currently declares zero-round defeat. Natural fatigue/wake is deferred until terminal settlement. These current contracts need explicit amendments.
+`field_enemy_roster` already collects every living local Monster in numeric-ID order. `engage_group` is the staged opponent API and gates voluntary sleeping actors. `settle_forced_sleep_opening` is called by engagement and exams and currently declares zero-round defeat. Natural fatigue/wake is deferred until terminal settlement. The required incapacitated-hostile-rounds predecessor amends those timing/wake contracts before this contact slice starts.
 
 ## Goals / Non-Goals
 
@@ -28,13 +28,9 @@ Add `interrupt_sleep_for_contact(body: Any, *, tick: int, operation_id: str) -> 
 
 Remove the hostile zero-defeat branch of settle_forced_sleep_opening and migrate callers/tests. Retain a narrowly named examination-only helper for existing exam FAIL. Voluntary engage and movement still reject sleeping initiation. Hostile admission does not grant the sleeping body action authority.
 
-### Real enemy-only rounds and paid-prefix cursor
+### Existing real continuation API
 
-Add `continue_incapacitated_hostile_rounds(commander: Any) -> dict[str,Any]` to combat_session/rounds.py. For a nonterminal hostile session with no get_required_combat_actors, invoke existing run_round with empty allied selection, ordinary enemy policy/initiative/ActionResolver/upkeep and _finalize_resolved_round. Temporary action-blocking buffs also qualify. Stop immediately on an actionable ally, terminal result or existing cap. Never synthesize allied commands or convert sleep into defeat/knockout.
-
-Add strict serialized `settled_rounds: int`, 0 <= settled_rounds <= rounds_elapsed, to CombatSessionRecord, all builders and fixtures. Before automatic continuation, settle the unpaid accumulated combat prefix once at its logical endpoint. Each automatic round settles its next six seconds through sanctioned settle_combat_result and current population/protection source. Ordinary interactive rounds remain deferred. Terminal settlement pays only (rounds_elapsed-settled_rounds)*6; mental/posture accounting uses that same unsettled prefix. Retain historical round evidence for attribution. Cursor, clock and round revision commit atomically; restart/replay cannot bill twice.
-
-Extend canonical fatigue interval context with `allow_hostile_round_wake: bool = False`, true only for forced sleepers in these actual hostile enemy-only rounds. Preserve the authored 72000 threshold and receipt identity while narrowly allowing natural wake in this context. No new wake skill or refill. Apply gauge/physiology/upkeep exactly once to each paid prefix; terminal regen must not repeat it. An awake companion ends continuation under existing control rules, even while commander sleeps. Unused original skip duration supplies no automatic-round budget.
+Consume the preceding change’s `continue_incapacitated_hostile_rounds(commander)` API and its strict settled_rounds accounting. This change does not reimplement automatic rounds, fatigue wake policy or terminal remainder billing. The contact writer calls the API only after the accepted clock advance has returned, as specified below. Contact admission itself never wakes a forced sleeper.
 
 ### Publication and observability
 
@@ -48,24 +44,14 @@ The zero-round defeat and live-wake prohibitions conflict with the approved targ
 
 ## Verification
 
-Register new `world.rules.tests.test_field_contact` and `world.rules.tests.test_hostile_incapacitated_rounds` in evennia-shards. Real A+A+B player/monster/birth contact admits all IDs once with no extra attack; passive/defended-area/daypart/read controls remain. Forced reserve71928 reaches72000 after one real six-second enemy round and becomes actionable. Test awake companion, all temporarily blocked party, defeat/cap, unpaid prefix, terminal replay and post-reserve/session fault restoration. Voluntary receipt interrupts without refill, forced receipt persists. Exams retain FAIL and voluntary sleep gates. Text/browser and both command docs expose identical authority and mode.
+Register new `world.rules.tests.test_field_contact` in evennia-shards; extend the predecessor-owned hostile continuation tests without registering a second owner. Real A+A+B player/monster/birth contact admits all IDs once with no extra attack; passive/defended-area/daypart/read controls remain. Forced reserve71928 reaches72000 after one real six-second enemy round and becomes actionable. Test awake companion, all temporarily blocked party, defeat/cap, unpaid prefix, terminal replay and post-reserve/session fault restoration. Voluntary receipt interrupts without refill, forced receipt persists. Exams retain FAIL and voluntary sleep gates. Text/browser and both command docs expose identical authority and mode.
 
 ## Implementation evidence contract
 
 Canonical IDs copied from traceability list output for the equivalent merged tree:
 
-- `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat`, tasks1.1/4.1, test_field_contact.
+- `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat`, tasks1.1/3.1, test_field_contact.
 - `hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state`, task2.1, sleep-receipt and contact tests.
-- `player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds`, task3.1, test_hostile_incapacitated_rounds.
-- `player-combat-session::combat-time-settles-once-at-terminal-session-outcome`, task3.1, paid-prefix and terminal replay controls.
-- `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits`, tasks1.1/3.1, actual writer versus read controls.
-- `player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening`, task3.1, ordinary-interactive versus paid-hostile intervals.
-- `player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals`, task3.1, exact interval accounting.
-- `player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath`, task3.1, survivor/defeat controls.
-- `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped`, tasks2.1-3.1, threshold/receipt controls.
-
-Retire `player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat`, obtained from the current-tree list output. Its hostile tests become substantive enemy-round tests; preserve exam FAIL assertions. Existing names remain for modified requirements, with their explicit new hostile-continuation exceptions.
-
 Create `/tmp/mud-field-tests.env` containing `MUD_TEST_SETTINGS=1` outside tracked source. Run one focused method/class at a time using the guarded command shown below; never concatenate the inventory or exceed 100 discovered tests. Register every new Python test module exactly once in `.github/evennia-shards.json`; new managed browser modules/methods belong exactly once in `.github/browser-shards.json`. Full managed-browser and complete traceability evidence remain CI-owned.
 
 `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb <named-label>`

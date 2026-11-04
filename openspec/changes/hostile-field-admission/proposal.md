@@ -6,7 +6,7 @@ Current combat admission requires player initiation and forced-sleep opening bec
 
 ## What Changes
 
-Admit immediate whole-cell hostile contacts with no free opening attack; preserve forced-sleep thresholds through normal enemy-only rounds.
+Admit immediate whole-cell hostile contacts with no free opening attack, consuming the preceding real enemy-only continuation and forced-sleep threshold contract.
 
 This is a bounded one-engineer-day slice. **BREAKING** where a current behavior is replaced, with every caller and substantive test migrated in that slice. No feature code is authorized by this proposal.
 
@@ -18,8 +18,7 @@ This is a bounded one-engineer-day slice. **BREAKING** where a current behavior 
 
 ### Modified Capabilities
 
-- `player-combat-session`.
-- `mental-reserve`.
+None.
 
 ## Impact
 
@@ -37,6 +36,6 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 ## Batch:
 
-depends-on: global-monster-activity
+depends-on: incapacitated-hostile-rounds
 
 Code conflicts: interruptible-field-contact consumes this admission and automatic-round accounting. paid-party-retreat later changes session terminal billing; serialize all session/clock edits. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
