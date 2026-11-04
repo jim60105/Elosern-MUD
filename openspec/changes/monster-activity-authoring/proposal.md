@@ -22,7 +22,7 @@ None.
 
 ## Impact
 
-Consumes landed mechanisms: Landed ecology compositions, site composition references and variant identity supply references only. Population ownership, whole-cell rosters and clock event sources are retained without runtime changes.
+Consumes landed mechanisms. Landed ecology compositions, site composition references and variant identity supply references only. Population ownership, whole-cell rosters and clock event sources are retained without runtime changes.
 
 Attaches at world/lore/monster_placement.py, registry reference metadata and world/maps/runtime.py candidate publication.
 
@@ -38,4 +38,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: none
 
-Code conflicts: global-monster-activity shares placement bindings and runtime publication; mapped-monster-escape consumes the declarations. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts are global-monster-activity, which shares placement bindings and runtime publication, and mapped-monster-escape, which consumes the declarations. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
