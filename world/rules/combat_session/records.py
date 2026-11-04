@@ -23,6 +23,13 @@ _RECORD_FIELDS = frozenset(
         "fled_ids",
         "knocked_out_ids",
         "rounds_elapsed",
+        # The durable paid-prefix cursor: every completed round below this
+        # value has already settled its six seconds of world time, gauges and
+        # actual mental posture through the paid hostile-round writer. A
+        # record always satisfies ``0 <= settled_rounds <= rounds_elapsed``;
+        # ordinary interactive rounds stay deferred, so the cursor only moves
+        # with the durable commit of the interval it pays.
+        "settled_rounds",
         "exam_id",
         "round_revision",
         "draft_version",
@@ -75,6 +82,7 @@ class CombatSessionRecord:
     knocked_out_ids: tuple[int, ...]
     rounds_elapsed: int
     exam_id: str | None
+    settled_rounds: int = 0
     round_revision: int = 0
     draft_version: int = 0
     draft_entries: dict[int, dict[str, Any]] = dataclasses.field(default_factory=dict)
@@ -361,6 +369,12 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION, "rounds_elapsed must be non-negative"
         )
+    settled_rounds = _require_int(data["settled_rounds"], "settled_rounds")
+    if not 0 <= settled_rounds <= rounds_elapsed:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "settled_rounds must lie within the completed rounds",
+        )
     settled_tick = data.get("settled_tick")
     if settled_tick is not None:
         settled_tick = _require_int(settled_tick, "settled_tick")
@@ -411,6 +425,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         knocked_out_ids=_parse_id_list(data["knocked_out_ids"], "knocked_out_ids"),
         rounds_elapsed=rounds_elapsed,
         exam_id=exam_id,
+        settled_rounds=settled_rounds,
         round_revision=round_revision,
         draft_version=draft_version,
         draft_entries=draft_entries,
@@ -429,6 +444,12 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
 
 
 def _validate_participant_shape(record: CombatSessionRecord) -> None:
+    settled_rounds = _require_int(record.settled_rounds, "settled_rounds")
+    if not 0 <= settled_rounds <= record.rounds_elapsed:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "settled_rounds must lie within the completed rounds",
+        )
     if not record.player_ids or not record.enemy_ids:
         raise CombatSessionError(
             SessionReason.MALFORMED_SESSION, "a session needs player and enemy dbrefs"
@@ -496,6 +517,7 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         "fled_ids": list(record.fled_ids),
         "knocked_out_ids": list(record.knocked_out_ids),
         "rounds_elapsed": record.rounds_elapsed,
+        "settled_rounds": record.settled_rounds,
         "exam_id": record.exam_id,
         "round_revision": record.round_revision,
         "draft_version": record.draft_version,

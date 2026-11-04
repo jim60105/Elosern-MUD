@@ -639,3 +639,124 @@ keeps four pre-existing settlement-map/quest-registration errors.
 None. The synced `wilderness-monster-population` Purpose was amended in this
 slice to include explicitly bound activity as required by task 3.1; its
 requirement text is updated by the delta at archive.
+
+## Incapacitated Hostile Rounds: Real Paid Enemy Rounds
+
+### Human review of the player-facing wording
+
+The two command documents no longer claim that an all-forced-sleep opening
+enters zero-round defeat. `docs/game/commands.md` and
+`docs/game/command-reference.md` now state the actual contract: ordinary
+interactive rounds still defer combat time, while a party with no actionable
+member receives normal enemy-only rounds; each real round pays six seconds and
+actual physiology, a forced sleeper wakes only at the authored threshold inside
+those paid rounds, any unpaid interactive prefix is paid once when continuation
+starts, and terminal settlement pays only the remaining suffix. The examination
+FAIL policy, the voluntary sleep gates and the requested-retreat no-acting-ally
+defeat are stated explicitly, so no player reads the old zero-round story. An
+ecology/wording reviewer should confirm the Traditional Chinese sentence rhythm
+and that no sentence promises a new ability or a proactive contact path (this
+change adds neither).
+
+### Requirement traceability (delta not yet synced)
+
+The new `player-combat-session` requirement
+`incapacitated-hostile-parties-receive-normal-enemy-rounds` is defined only in
+`openspec/changes/incapacitated-hostile-rounds/specs/`. Because the delta is
+not merged into `openspec/specs/` yet, every substantive test is annotated with
+currently reported IDs only, and this table records the pending mapping; after
+archive sync the same test identities should also annotate the new requirement.
+
+| Test identity | Pending delta requirement | Current IDs that also cover it |
+| --- | --- | --- |
+| `world.rules.tests.test_hostile_incapacitated_rounds.PaidRoundTests.test_one_paid_round_reaches_the_threshold_and_returns_choice` | `player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds` | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits`, `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped` |
+| `...PaidRoundTests.test_sleep_alone_never_declares_defeat` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `...PaidRoundTests.test_a_waking_companion_ends_automatic_play_under_normal_authority` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `...PaidRoundTests.test_the_existing_cap_still_terminates_an_all_sleep_party` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `...BlockingContinuationTests.test_a_confirmed_round_applies_a_blocking_effect_then_continues` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `...BlockingContinuationTests.test_a_late_failure_restores_the_round_and_the_retry_pays_once` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `...MappedPaidCursorTests.test_the_paid_endpoint_advances_the_map_cursor_once` | same | `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+| `world.rules.tests.test_guild_exams.ExamSettlementRecoveryTests.test_all_forced_sleep_candidate_enters_exam_fail_without_a_round` | same (examination scenario retained) | `player-combat-session::combat-time-settles-once-at-terminal-session-outcome`, `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits`, `guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate` |
+| `world.rules.tests.test_combat_party.ForcedSleepOpeningTests.test_opening_runs_real_rounds_until_the_existing_cap` | same | `player-combat-session::combat-time-settles-once-at-terminal-session-outcome`, `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits` |
+
+The old `player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat`
+requirement is retired by the delta, but it remains a main-spec requirement
+until archive synchronization. Its only remaining annotation is on the
+examination FAIL control, which still establishes the requirement's retained
+examination clause; no test asserts sleep-caused hostile defeat any more. The
+annotation and this mapping are removed/repointed at archive.
+
+### Scenario evidence
+
+- **One real wake round:** a forced sleeper at 71928 receives exactly one
+  enemy-only six-second round and reaches 72000/AWAKE; the paid cursor is 1/1,
+  the clock advanced six seconds and the next normal player command resolves.
+- **Temporary incapacity and terminal outcome:** a real confirmed self-cast
+  applies the rulebook `paralysis` (20 s) to the last actionable ally; three
+  automatic enemy rounds plus ordinary upkeep expire it, the committed
+  `combat_incapacitated_continued` event is registered once and choice returns.
+  A party that stays asleep runs to the existing 100-round cap; a lethal enemy
+  deals a defeat through real attacks over at least one paid round, never from
+  sleep alone.
+- **Paid automatic prefix:** one wake round is paid, two interactive rounds stay
+  deferred, and forfeit advances only twelve combat seconds (lifetime eighteen),
+  consuming only the two unpaid awake rounds.
+- **Reload equivalence:** after a paid wake and one deferred awake round,
+  `restore_active_session` runs no round and no time; terminal settlement
+  charges the deferred round at its actual awake rate, not as pre-payment sleep.
+- **Failure and retry:** a fault injected on the durable cursor write after the
+  clock/physiology writes rolls back the round unit, the cursor, the clock and
+  the blocking buff; a retry pays every accepted round exactly once.
+- **Mapped cursor:** a mapped enemy paid through `settle_monster_combat_through`
+  at the six-second endpoint is re-marked combat-owned at that exact cursor; the
+  terminal settlement charges no second interval. The dead/fled exclusion is
+  enforced in the writer (and the dead-enemy interval recorder) but is not
+  separately exercised by a multi-round mapped test in this slice.
+- **Examination and invalid request:** the exam-only zero-round FAIL helper is
+  the sole surviving forced-opening terminal path; a malformed/remote target
+  still rejects before any round or time.
+- **World time:** a guard raises if `WorldClock.advance` runs while a combatant
+  action is on the stack; the wake scenario passes, proving the enemy action
+  itself never advances the clock.
+
+### Review dispositions
+
+The plan review's blocking findings were incorporated before implementation:
+the unpaid prefix now replays recorded posture segments (not the live posture);
+payment-induced posture changes are reconciled into the durable boundary
+evidence with the cursor; rollback ownership moved to the enclosing admission
+and round operations with a maximal continuation snapshot horizon; automatic
+round journals and practice dedupe join the owner's compensation; admission only
+re-registers a surviving session; the automatic loop's terminal round is never
+paid twice; and focused tests cover both the cursor-write failure and a receipt-write
+failure after a successful continuation, plus the text command consumer, the
+browser `explore.engage` adapter, the waking-companion control path, the cap,
+the clock guard, the preserved boundary-evidence transition, the
+knocked-out no-wake rule and the mapped cursor.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_hostile_incapacitated_rounds
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_combat_session_persistence
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_combat_party.ForcedSleepOpeningTests
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_party_time_settlement
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_settlement_alignment
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_action_preview
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate incapacitated-hostile-rounds --strict
+```
+
+`world.rules.tests.test_hostile_incapacitated_rounds` is registered exactly once
+in `.github/evennia-shards.json` (evennia shard 2). The managed browser suite is
+CI-owned and was not executed here; only its fixture comment/docstring was
+updated, so no browser evidence is claimed.
+
+Known pre-existing baseline failures that remain identical on the untouched
+parent (`master` at `dc7ac8d9`) and are not attributed to this change:
+`world.rules.tests.test_clock` keeps its four settlement-map/quest-registration
+errors, `world.rules.tests.test_guild_exams.ExamSettlementRecoveryTests` keeps
+its three `examiner_engaged`/collision errors, and
+`world.rules.tests.test_combat_session_recovery.OverwhelmDirectionTests.test_player_overwhelming_in_session_submission_never_dispatches`
+keeps its `None != 'party'` classification failure.

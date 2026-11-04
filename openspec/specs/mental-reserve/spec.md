@@ -28,7 +28,7 @@ Ordinary deterministic entity construction and authored synchronization SHALL ex
 - **THEN** its valid reserve remains 120000; status reads write nothing
 
 ### Requirement: Posture and forced-sleep hysteresis are body scoped
-Posture SHALL persist as awake, voluntary sleep or forced sleep, separate from defeat and knockout. Zero at an accepted boundary SHALL latch forced sleep. Natural release SHALL require at least 72000 units and no live combat. Explicit future effects SHALL remain representable without adding one now.
+Posture SHALL remain body-scoped and distinct from defeat/knockout, zero reserve SHALL latch forced sleep, and natural wake SHALL require72000 units at a terminal/noncombat boundary or an explicitly paid incapacitated-hostile round; admission alone SHALL never release the latch.
 
 #### Scenario: Latch and wake
 - **WHEN** a body reaches zero then recovers to 1, 71999 and 72000 outside combat
@@ -37,6 +37,10 @@ Posture SHALL persist as awake, voluntary sleep or forced sleep, separate from d
 #### Scenario: Reload
 - **WHEN** a forced sleeper at 71999 is reloaded
 - **THEN** posture and eligibility remain asleep; knockout/defeat sets are unchanged
+
+#### Scenario: Paid hostile threshold
+- **WHEN** actual enemy-only hostile rounds restore a living forced sleeper to the existing threshold
+- **THEN** the existing receipt completes/wakes through the physiology owner without refill or revival; below threshold hostile admission leaves it asleep
 
 ### Requirement: Activity rates are exact net per-second effects
 Ordinary awake activity, waiting and study SHALL consume 4 units/second; foot travel 8; awake combat 12; actual sleep SHALL restore 12. Effects SHALL clamp to [0,360000], use each member's declared activity, and never add ordinary awake cost again. Terrain SHALL add no exertion multiplier.

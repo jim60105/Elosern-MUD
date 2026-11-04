@@ -285,7 +285,7 @@ class SleepHandoffBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
 
 
 class TerminalSleepStatusBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
-    """A zero-round all-forced-sleep opening settles and keeps sleep visible."""
+    """An all-forced-sleep opening settles through real rounds, sleep visible."""
 
     @classmethod
     def setUpClass(cls) -> None:

@@ -181,8 +181,7 @@ rejected. During an active persistent combat session, CmdCast SHALL NOT advance 
 
 #### Scenario: Terminal session settles all round time once
 - **WHEN** a combat session terminates after three completed six-second rounds
-- **THEN** `settle_combat_result()` advances exactly 18 seconds with `AdvanceSource.COMBAT` and no earlier
-  in-session CmdCast added command time
+- **THEN** lifetime combat settlement totals18 seconds with `AdvanceSource.COMBAT`; the terminal call pays only the unpaid suffix after any paid hostile prefix, and no in-session CmdCast adds command time
 
 #### Scenario: Settlement nests resolve and advance in one transaction
 - **WHEN** the settlement runs for an out-of-combat cast
@@ -197,8 +196,7 @@ rejected. During an active persistent combat session, CmdCast SHALL NOT advance 
 
 #### Scenario: Completed round time accumulates until terminal settlement
 - **WHEN** combat rounds complete during a session
-- **THEN** their time accumulates in the session and advances exactly once through
-  `settle_combat_result(..., AdvanceSource.COMBAT)` at terminal settlement
+- **THEN** their time accumulates and each unpaid interval advances once through sanctioned combat settlement at a terminal outcome or real incapacitated-hostile continuation; a paid prefix is excluded from later terminal billing
 
 ### Requirement: move and converse command-default time costs are declared as rulebook data only
 `world/rules/rulebook/clock.yaml`'s `command_defaults` SHALL declare valid

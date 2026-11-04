@@ -67,7 +67,6 @@ from world.rules.combat_session import (
     settle_session,
 )
 from world.rules.combat_session.records import to_storage
-from world.rules.combat_session.settlement import settle_forced_sleep_opening
 from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.party import join_party
 from world.rules.presentation_events import (
@@ -251,13 +250,14 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
         self.assertEqual(self.recorder.facts, [])
 
     @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
-    def test_a_terminal_sleep_opening_publishes_the_checkpoint(self):
-        record = self._engage()
+    def test_a_terminal_automatic_round_publishes_the_checkpoint(self):
+        monster = self._spawn()
+        monster.traits.atk_phys.base = 100000
+        monster.traits.atk_phys.current = 100000
         write_fatigue_state(self.player, 0, SleepPosture.FORCED)
-        battlefield = reconstruct_battlefield(self.player, record)
         with self.captureOnCommitCallbacks(execute=True):
-            result = settle_forced_sleep_opening(self.player, record, battlefield)
-        self.assertIsNotNone(result, "the all-asleep opening settled terminally")
+            result = engage(self.player, monster)
+        self.assertEqual(result["continuation"]["outcome"], "defeat")
         self.assertEqual(self.recorder.causes(), [COMBAT_TERMINAL])
 
     @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")

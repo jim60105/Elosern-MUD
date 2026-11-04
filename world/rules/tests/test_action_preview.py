@@ -261,8 +261,11 @@ class ActionPreviewTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("action-resolution-pipeline::actionresolver-exposes-shared-side-effect-free-action-preview")
     def test_zero_action_state_rejects_before_initiative(self):
-        self.player.sexual.climax_phase.value = "進行中"
         context = self._context()
+        # The block is applied after the session opens: an engagement whose
+        # side cannot act now resolves real enemy rounds, so the preview is
+        # read against the live session exactly as a mid-fight block would be.
+        self.player.sexual.climax_phase.value = "進行中"
         preview = preview_skill(self.player, _basic_attack_key(), context, [self.monster])
         self.assertFalse(preview.enabled)
         self.assertIs(preview.reason, RejectReason.ACTION_FORBIDDEN)

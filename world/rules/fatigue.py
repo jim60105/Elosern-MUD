@@ -912,6 +912,7 @@ def predict_interval(
     *,
     in_combat: bool = False,
     completion: IntervalCompletion = IntervalCompletion.INTERRUPTIBLE,
+    allow_hostile_round_wake: bool = False,
 ) -> FatiguePrediction:
     """Predict one interval's exact effect without writing or reading the world.
 
@@ -919,6 +920,14 @@ def predict_interval(
     inside an indivisible action or terminal combat settlement is therefore a
     completion fact, never retroactive sleeping time. ``applicable_seconds``
     is what an interruptible caller may commit now.
+
+    ``allow_hostile_round_wake`` is the one paid hostile-round exception to the
+    live-combat wake suppression: an actual enemy-only combat round settles
+    real physiology, so an undefeated forced sleeper whose reserve reaches the
+    authored threshold inside it wakes through the ordinary receipt. Only that
+    writer sets it; ordinary interactive rounds and every other in-combat
+    interval keep the suppression, and a voluntary sleeper is never released
+    by it.
     """
     resolved = _resolve_policy(policy)
     state = _require_state(state, resolved)
@@ -926,7 +935,9 @@ def predict_interval(
     seconds = _require_seconds(seconds)
     completion = _require_completion(completion)
     _require_compatible(state, activity)
-    suppress_wake = in_combat or completion is IntervalCompletion.TERMINAL_COMBAT
+    suppress_wake = (
+        in_combat or completion is IntervalCompletion.TERMINAL_COMBAT
+    ) and not allow_hostile_round_wake
     rate = resolved.rates[activity]
     reserve = min(resolved.max_units, max(0, state.reserve_units + rate * seconds))
     boundary = next_fatigue_boundary(
@@ -975,6 +986,7 @@ def _plan_interval(
     interval: FatigueInterval,
     policy: FatiguePolicy,
     in_combat: bool,
+    allow_hostile_round_wake: bool = False,
 ) -> FatiguePrediction:
     if not isinstance(interval, FatigueInterval):
         raise FatigueStateError(
@@ -1001,6 +1013,7 @@ def _plan_interval(
         policy,
         in_combat=in_combat,
         completion=interval.completion,
+        allow_hostile_round_wake=allow_hostile_round_wake,
     )
     if (
         interval.completion is IntervalCompletion.INTERRUPTIBLE
@@ -1130,6 +1143,7 @@ def settle_fatigue_intervals(
     context: Mapping[str, Any] | None = None,
     in_combat: bool = False,
     start_tick: int | None = None,
+    allow_hostile_round_wake: bool = False,
 ) -> FatigueSettlement:
     """Commit accepted intervals atomically and emit committed transitions.
 
@@ -1137,6 +1151,11 @@ def settle_fatigue_intervals(
     Any failure restores every snapshotted reserve/posture attribute (durable
     rows roll back with the transaction) and re-raises, so no success event is
     ever emitted for a rolled-back write.
+
+    ``allow_hostile_round_wake`` is the paid enemy-only hostile-round writer's
+    narrow allowance: only it may release an undefeated forced sleeper at the
+    authored threshold while combat is live. Defaults keep every other caller
+    byte-identical.
     """
     policy = get_policy()
     planned: list[tuple[FatigueInterval, FatiguePrediction]] = []
@@ -1153,7 +1172,17 @@ def settle_fatigue_intervals(
                 "one settlement cannot list the same member twice",
             )
         seen.add(id(entity))
-        planned.append((interval, _plan_interval(interval, policy, in_combat)))
+        planned.append(
+            (
+                interval,
+                _plan_interval(
+                    interval,
+                    policy,
+                    in_combat,
+                    allow_hostile_round_wake=allow_hostile_round_wake,
+                ),
+            )
+        )
 
     caller_context = dict(context or {})
     snapshots: list[tuple[Any, dict[str, tuple[bool, Any]]]] = []

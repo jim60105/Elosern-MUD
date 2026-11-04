@@ -36,11 +36,7 @@ Ordinary engagement SHALL require a player, a living local anchor target and no 
 - **THEN** all local living monsters join in persistent-ID order; designated examination and explicitly staged encounters retain their declared participants
 
 ### Requirement: Combat time settles once at terminal session outcome
-Session rounds SHALL accumulate without command-default cast time. Every terminal outcome (either
-side's defeat, party retreat, nonlethal exam, bounded condition) SHALL settle rounds times six
-seconds once via `settle_combat_result()` and settle mental intervals once from recorded activity
-accounting, waking naturally only after live combat ends and never for defeated bodies. Session
-state SHALL then clear. A durable settled marker SHALL keep settlement idempotent across restart.
+Interactive rounds SHALL defer combat time until terminal settlement except for paid incapacitated-hostile continuation; a durable settled-round cursor SHALL charge each six-second round and its actual mental intervals once, preserve recorded occurrence times and clear terminal session state idempotently.
 
 #### Scenario: Three-round victory advances eighteen seconds once
 - **WHEN** a hostile session ends after three completed rounds
@@ -57,18 +53,22 @@ state SHALL then clear. A durable settled marker SHALL keep settlement idempoten
 
 #### Scenario: Companion gauges regenerate from combat settlement
 - **WHEN** a session with a wounded or knocked-out companion reaches a terminal outcome
-- **THEN** the companion's HP/MP/SP are regenerated for the accumulated combat seconds, and a knocked-out
+- **THEN** the companion's HP/MP/SP are regenerated for only the remaining unpaid combat seconds, and a knocked-out
   companion rises above the nonlethal HP floor when its regen allows
 
 #### Scenario: Settlement scope is the living non-fled roster
 - **WHEN** a terminal settlement runs
 - **THEN** the settlement entity scope is every living, non-fled member of the session's battlefield
   roster (player, companions, and any non-defeated foe still present), so all participants receive
-  gauge regen for the accumulated combat time
+  gauge regen for only the remaining unpaid combat interval; any previously paid prefix is excluded
 
 #### Scenario: Population loss carries actual round offset
 - **WHEN** a mapped session records a defeat in a later round before terminal-only clock settlement
 - **THEN** the persisted start tick and completed-round offset identify its occurrence for delayed population settlement, without advancing the live clock early or double-settling rounds
+
+#### Scenario: Paid automatic prefix
+- **WHEN** enemy-only continuation pays prior unpaid rounds and its next real round, then ordinary play later terminates
+- **THEN** the clock, gauges and physiology pay that prefix once and terminal settlement pays only remaining rounds; restart replay cannot pay it again
 
 ### Requirement: The knocked-out player settles the session as defeat
 If the player is in the battlefield's knocked-out set at the round cap or
@@ -433,11 +433,11 @@ Confirmed entries SHALL survive disconnect and process restart. Reconnection SHA
 - **THEN** the confirmed entry remains, missing members remain unselected and elapsed rounds/time are unchanged
 
 ### Requirement: No eligible actors leaves command collection paused with explicit party exits
-Except for canonical engagement where every present allied participant is forced asleep, when the required actor set is empty, draft collection SHALL remain paused and report no eligible actors. It SHALL NOT execute an empty draft or trigger enemy actions, upkeep or time while querying/editing. Confirmed surrender SHALL remain available, and confirmed retreat SHALL use the ordinary no-acting-ally defeat path.
+No-actionable-ally hostile combat SHALL continue normal enemy-only rounds through the rules owner until an ally can act or combat terminates; inspection/editing SHALL run no rounds. Confirmed surrender and requested retreat retain their existing authority and no-acting-ally outcome.
 
 #### Scenario: All members action forbidden
 - **WHEN** transient capability rules other than the all-forced-sleep opening leave no member eligible to choose a command
-- **THEN** progress shows no-eligible-actors and party exit paths; reconnect or preview does not execute all-empty completeness
+- **THEN** the rules continuation executes normal hostile enemy-only rounds until eligibility returns or a terminal policy applies; reconnect or preview itself executes no draft
 
 ### Requirement: Final member confirmation automatically submits one complete ordinary round
 The last required valid member confirmation SHALL automatically submit the complete draft without another whole-party confirmation. All commands SHALL preflight against current state before initiative. Initiative SHALL be computed once; each eligible allied selected command SHALL be supplied once and enemies SHALL retain their deterministic policies.
@@ -569,10 +569,10 @@ Otherwise eligible living present sleeping allies SHALL join and rebuild in the 
 - **THEN** sleep restriction and valid draft entries restore without time, automatic action or synthetic knockout
 
 ### Requirement: Live rounds do not simulate natural fatigue or awakening
-Ordinary completed rounds SHALL change neither reserve nor projected fatigue merely through elapsed time. The clock SHALL remain terminal-only, with six-second round accounting and the existing 100-round cap. Sleep SHALL persist until terminal settlement unless a future explicit state effect changes it.
+Ordinary interactive rounds SHALL retain deferred natural fatigue; paid enemy-only hostile rounds SHALL settle actual physiology and release undefeated forced sleepers only at the authored threshold, retaining the existing round duration and cap.
 
 #### Scenario: Threshold sleeper
-- **WHEN** a sleeper just below the wake threshold completes multiple nonterminal rounds
+- **WHEN** a sleeper just below the wake threshold completes ordinary interactive rounds with an awake actionable ally
 - **THEN** reserve and posture remain unchanged, no natural wake timer runs, and normal targeting remains available
 
 #### Scenario: Future explicit boundary
@@ -580,7 +580,7 @@ Ordinary completed rounds SHALL change neither reserve nor projected fatigue mer
 - **THEN** eligibility can change without a permanent sleep lock, without ticking fatigue or advancing the clock; no waking ability is authored
 
 ### Requirement: Terminal mental accounting records actual round-boundary posture intervals
-Session accounting SHALL retain initial posture and explicit posture transitions by completed-round boundary. Terminal fatigue SHALL derive awake/sleep durations from those intervals and actual elapsed rounds, consume awake time at 12 units/second and restore sleep at 12. No early simulated collapse or retrospective sleep recovery SHALL occur.
+Session accounting SHALL retain actual posture intervals and a paid-round cursor, settle only unpaid awake/sleep durations at terminal outcome and avoid retrospective recovery or duplicate consumption of previously settled hostile rounds.
 
 #### Scenario: Ten rounds awake
 - **WHEN** a continuously awake survivor starts at 360 reserve units (0.1%) and completes ten rounds
@@ -594,27 +594,8 @@ Session accounting SHALL retain initial posture and explicit posture transitions
 - **WHEN** a synthetic explicit effect changes a member from asleep to awake after four of ten rounds
 - **THEN** terminal accounting restores 24 seconds and consumes 36 seconds, a net loss of 144 units rather than crediting the entire fight as sleep
 
-### Requirement: All-forced-sleep engagement enters ordinary zero-round defeat
-After canonical engagement validation, every present allied party participant being forced asleep SHALL immediately use the ordinary deterministic terminal defeat writer with zero completed combat rounds. It SHALL run no command collection, enemy round or spectator loop. Exam mode SHALL use its existing FAIL policy; existing aftermath time SHALL remain applicable.
-
-#### Scenario: Opening hostile defeat
-- **WHEN** a valid direct engagement opens with every eligible present ally forced asleep
-- **THEN** ordinary defeat aftermath and diagnostics run once with rounds_elapsed zero and zero invented combat seconds
-
-#### Scenario: Repeat terminal attempt
-- **WHEN** that engagement receipt is retried after reload
-- **THEN** no second aftermath, fatigue recovery or combat time settles
-
-#### Scenario: Exam opening
-- **WHEN** the same canonical all-forced-sleep condition occurs in an examination
-- **THEN** ordinary exam FAIL and host restoration apply, without ordinary hostile aftermath
-
-#### Scenario: Invalid engagement
-- **WHEN** a remote or otherwise invalid target is submitted with all allies asleep
-- **THEN** validation rejects before any session/defeat/time mutation
-
 ### Requirement: Terminal physiology cannot reverse defeat and prompts follow aftermath
-Mental recovery SHALL never revive a dead/deleted actor, clear existing defeat or undo aftermath. Undefeated sleepers may wake only at terminal settlement; below-threshold forced sleepers SHALL remain stationary after victory. Handoff SHALL be emitted only after the whole terminal/aftermath transaction commits, using actual survivors.
+Mental recovery SHALL preserve defeat/aftermath and never revive dead bodies; undefeated forced sleepers SHALL wake only at their threshold during paid hostile continuation or terminal settlement, and post-commit handoff SHALL use actual survivors.
 
 #### Scenario: Defeated sleeper
 - **WHEN** terminal sleep recovery would cross 20% for an actor already established defeated
@@ -657,3 +638,22 @@ Interactive combat SHALL keep participant, selection, action, effect, AI and out
 #### Scenario: Atomic identity state
 - **WHEN** a later round write fails after a real recipient mutation
 - **THEN** durable reload and in-process participant, observation and draft state equal the pre-round state
+
+### Requirement: Incapacitated hostile parties receive normal enemy rounds
+A nonterminal hostile encounter with no actionable ally SHALL resolve and pay normal enemy-only rounds until an ally becomes actionable or the ordinary terminal policy applies, preserving forced-sleep thresholds and stopping automatic play immediately when choice returns.
+
+#### Scenario: One real wake round
+- **WHEN** a forced sleeper starts71928 and one real six-second sleep interval reaches72000 while enemies attack normally
+- **THEN** its existing receipt/threshold authorizes wake, enemy effects and ordinary upkeep occur once, and automatic continuation stops for a normal player choice
+
+#### Scenario: Temporary incapacity and terminal outcome
+- **WHEN** all allies are sleeping or action-blocked but not ordinarily defeated
+- **THEN** real enemy rounds continue until eligibility, ordinary defeat/victory or existing cap; sleep alone never declares defeat or immunity
+
+#### Scenario: Examination and invalid request
+- **WHEN** a designated exam has its all-forced opening or voluntary sleeping initiation has invalid authority
+- **THEN** exam keeps its existing FAIL policy and invalid voluntary initiation rejects before session/time changes
+
+#### Scenario: Failure and retry
+- **WHEN** a fault follows actual automatic-round enemy, fatigue, cursor or session writes
+- **THEN** the complete DB/live state restores and retry/restart pays and resolves each accepted round once

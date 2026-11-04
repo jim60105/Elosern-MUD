@@ -192,8 +192,20 @@ def _restore_exam_host(snapshot: tuple[Any, dict[str, Any]] | None) -> None:
     restore_exam_host_surfaces(host, surfaces)
 
 
-def _snapshot_round_clock(record: CombatSessionRecord, battlefield: Battlefield):
-    """Capture clock stage surfaces before any round or terminal write."""
+def _snapshot_round_clock(
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    *,
+    horizon_rounds: int | None = None,
+):
+    """Capture clock stage surfaces before any round or terminal write.
+
+    ``horizon_rounds`` widens the advance-surface window for the one owner
+    that may settle more than its own round: a paid hostile continuation pays
+    the unpaid prefix and then every automatic enemy-only round up to the
+    session cap. The window is counted from the current tick, so a larger
+    horizon only ever adds surfaces to the rollback contract.
+    """
     from world.rules.clock import (
         AdvanceSource, WorldClock, _snapshot_clock_tick,
         build_advance_snapshot_registry, read_world_clock,
@@ -202,9 +214,14 @@ def _snapshot_round_clock(record: CombatSessionRecord, battlefield: Battlefield)
 
     clock = read_world_clock()
     scope = tuple(battlefield.roster.values())
+    rounds = (
+        record.rounds_elapsed + 1
+        if horizon_rounds is None
+        else max(int(horizon_rounds), record.rounds_elapsed + 1)
+    )
     registry = build_advance_snapshot_registry(
         clock if clock is not None else WorldClock(),
-        (record.rounds_elapsed + 1) * _ROUND_SECONDS,
+        rounds * _ROUND_SECONDS,
         AdvanceSource.COMBAT, scope,
     )
     return clock, _snapshot_clock_tick(clock) if clock is not None else None, registry, scope

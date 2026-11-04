@@ -41,6 +41,7 @@ class CombatSessionRecordTests(unittest.TestCase):
                 "fled_ids": [],
                 "knocked_out_ids": [],
                 "rounds_elapsed": 0,
+                "settled_rounds": 0,
                 "exam_id": None,
                 "engagement_id": "hostile:1:0:1",
                 "started_tick": 0,
@@ -54,6 +55,36 @@ class CombatSessionRecordTests(unittest.TestCase):
         self.assertEqual(record.session_id, "hostile:1:0")
         self.assertEqual(to_storage(record)["room_id"], 5)
 
+    def test_settled_rounds_is_required_serialized_and_bounded(self):
+        base = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 5,
+            "player_ids": [1],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 3,
+            "settled_rounds": 2,
+            "exam_id": None,
+            "engagement_id": "hostile:1:0:1",
+            "started_tick": 0,
+            "population_cell": None,
+            "round_revision": 3,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        paid = from_storage(base)
+        self.assertEqual(paid.settled_rounds, 2)
+        self.assertEqual(to_storage(paid)["settled_rounds"], 2)
+        self.assertEqual(from_storage(to_storage(paid)), paid)
+        # The cursor is part of the strict serialized contract, not an
+        # optional compatibility field.
+        missing = {key: value for key, value in base.items() if key != "settled_rounds"}
+        with self.assertRaises(CombatSessionError):
+            from_storage(missing)
+
     def test_settled_tick_is_optional_and_round_trips(self):
         base = {
             "session_id": "hostile:1:0",
@@ -64,6 +95,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
+            "settled_rounds": 0,
             "exam_id": None,
                 "engagement_id": "hostile:1:0:1",
             "started_tick": 0,
@@ -89,6 +121,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
+            "settled_rounds": 0,
             "exam_id": None,
                 "engagement_id": "hostile:1:0:1",
             "started_tick": 0,
@@ -116,6 +149,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
+            "settled_rounds": 0,
             "exam_id": None,
                 "engagement_id": "hostile:1:0:1",
             "started_tick": 0,
@@ -132,6 +166,10 @@ class CombatSessionRecordTests(unittest.TestCase):
             {"player_ids": [1, 1]},
             {"player_ids": [1, 2]},
             {"rounds_elapsed": -1},
+            {"settled_rounds": -1},
+            {"settled_rounds": 1},
+            {"settled_rounds": True},
+            {"settled_rounds": "zero"},
             {"fled_ids": [99]},
             {"exam_id": None, "mode": "guild_exam"},
             {"settled_tick": "six"},
@@ -171,6 +209,7 @@ class CombatSessionRecordTests(unittest.TestCase):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 2,
+            "settled_rounds": 0,
             "exam_id": None,
                 "engagement_id": "hostile:1:0:1",
             "started_tick": 0,
@@ -260,6 +299,7 @@ class CombatSessionIdTests(EvenniaTest):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
+            "settled_rounds": 0,
             "exam_id": None,
             "round_revision": 0,
             "draft_version": 0,

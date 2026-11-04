@@ -306,8 +306,8 @@ def _exploration_fixture(character) -> None:
 
         if os.environ.get("ELOSERN_BROWSER_TERMINAL_FATIGUE") == "1":
             # The terminal-fatigue journey opens a canonical engagement whose
-            # whole present party is forced asleep: the ordinary zero-round
-            # terminal writer must settle it and the sleeping status stays
+            # whole present party is forced asleep: the real enemy-only rounds
+            # resolve through the ordinary writer and the sleeping status stays
             # visible afterwards. Only this opt-in run sees it.
             from world.rules.fatigue import SleepPosture, write_fatigue_state
             from world.rules.party import live_companions

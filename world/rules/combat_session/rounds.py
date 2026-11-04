@@ -10,6 +10,7 @@ compresses an interactive encounter.
 
 from collections.abc import Sequence
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 
 from world.observability import log_info
@@ -19,7 +20,7 @@ from world.rules.action_preview import revalidate_submission
 from world.rules.combat import Battlefield, run_round
 from world.rules.combat_beats import RoundRecord, capture_round_hp
 from world.rules.combat_identity import stable_actor_id
-from world.rules.clock import read_world_clock
+from world.rules.clock import read_world_clock, settle_combat_result
 from world.rules.combat_session.battlefield import (
     _commandable_required_actors,
     _context_for,
@@ -39,7 +40,9 @@ from world.rules.combat_session.lifecycle import _persist
 from world.rules.settlement_alignment import checkpoint_owner
 from world.rules.combat_session.records import (
     CombatSessionRecord,
+    SleepTransition,
     boundary_sleep_evidence,
+    recorded_sleep_state,
     read_session,
     read_session_uncached,
     read_last_combat_receipt,
@@ -50,20 +53,29 @@ from world.rules.combat_session.scans import (
     _scan_sexual_coercion,
 )
 from world.rules.combat_session.settlement import (
+    _AUTOMATIC_HOSTILE_ROUNDS,
     _continue_or_settle,
+    _defeated_participant_ids,
     _ROUND_SECONDS,
+    _round_cap,
     _settle_with_restore,
+    _terminal_outcome,
+    posture_segments,
+    settlement_participants,
 )
 from world.rules.combat_session.snapshot import (
     _restore_exam_host,
+    _restore_round_clock,
     _restore_round_touched,
     _snapshot_exam_host,
     _snapshot_party_surfaces,
+    _snapshot_round_clock,
     _snapshot_round_touched,
 )
 from world.rules.disengage import FLEE_SKILL_KEY, party_retreat_attempt
 from world.rules.event_log import EventEntry, EventLog
 from django.db import transaction
+from world.rules.overwhelm import classify_overwhelm
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.unlock_notices import UnlockNotice, deliver_unlocks
@@ -979,7 +991,7 @@ def _finalize_resolved_round(
         opening_first_actor=None,
     )
     _persist(actor, new_record)
-    _record_monster_combat_intervals(new_record, completed_round)
+    _record_monster_combat_intervals(new_record, battlefield, completed_round)
     _record_round_defeats(
         new_record,
         battlefield,
@@ -1012,7 +1024,9 @@ def _finalize_resolved_round(
 
 
 def _record_monster_combat_intervals(
-    record: CombatSessionRecord, completed_round: int
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    completed_round: int,
 ) -> None:
     """Record every combat-owned mapped enemy's completed posture interval.
 
@@ -1020,7 +1034,9 @@ def _record_monster_combat_intervals(
     cursor and carries the posture the round's boundary evidence declares, so
     a sleep transition is paid as sleep and an awake round as awake combat.
     The map owner rejects an unowned member, so this records nothing for an
-    abstract or staged participant.
+    abstract or staged participant. A dead member records nothing: its cursor
+    stops at its last paid/live point, so no later payment can require a
+    contiguous interval for a body that owns no further physiology.
     """
     if record.mode != "hostile":
         return
@@ -1041,6 +1057,16 @@ def _record_monster_combat_intervals(
             continue
         group = monster_activity.group_of_member(wilderness, int(individual_id))
         if group is None:
+            continue
+        body = next(
+            (
+                entity
+                for entity in battlefield.roster.values()
+                if getattr(entity, "pk", None) == int(individual_id)
+            ),
+            None,
+        )
+        if body is not None and _stored_trait_value(body.traits.hp) <= 0:
             continue
         activity = (
             monster_activity.ACTIVITY_SLEEP
@@ -1115,6 +1141,518 @@ def _record_round_defeats(
         )
 
 
+def _paid_posture_activity(state: Any) -> Any:
+    """The activity one body's live posture settles for the paid round."""
+    from world.rules.fatigue import FatigueActivity, SleepPosture
+
+    return (
+        FatigueActivity.SLEEP
+        if state.posture is not SleepPosture.AWAKE
+        else FatigueActivity.AWAKE_COMBAT
+    )
+
+
+def _settle_paid_live_posture(
+    entity: Any,
+    seconds: int,
+    *,
+    start_tick: int,
+    session_id: str,
+    allow_wake: bool,
+) -> None:
+    """Pay one actual enemy-only round's physiology from the live posture.
+
+    The round has just been executed and its boundary evidence was recorded
+    from this same live posture, so a six-second interval with that activity is
+    the actual one. ``allow_hostile_round_wake`` lets an undefeated forced
+    sleeper reach the authored threshold here — the only writer that may; an
+    already defeated or knocked-out body settles its physiology but is never
+    woken by it.
+    """
+    from world.rules.fatigue import (
+        FatigueInterval,
+        IntervalCompletion,
+        read_optional_fatigue_state,
+        settle_fatigue_intervals,
+    )
+
+    state = read_optional_fatigue_state(entity)
+    if state is None or seconds <= 0:
+        return
+    settle_fatigue_intervals(
+        (
+            FatigueInterval(
+                entity,
+                _paid_posture_activity(state),
+                seconds,
+                state,
+                IntervalCompletion.INDIVISIBLE,
+            ),
+        ),
+        context={"stage": "hostile_round", "session": session_id},
+        in_combat=True,
+        start_tick=start_tick,
+        allow_hostile_round_wake=allow_wake,
+    )
+
+
+def _settle_paid_posture_segments(
+    entity: Any,
+    segments: Sequence[tuple[bool, int]],
+    *,
+    start_tick: int,
+    session_id: str,
+) -> None:
+    """Pay an already-completed unpaid prefix from its recorded posture timeline.
+
+    Those rounds were ordinary interactive rounds whose time stayed deferred,
+    so only the boundary evidence can say whether each was awake or asleep.
+    Wake stays suppressed exactly as in terminal settlement; the paid-round
+    exception belongs to the enemy-only rounds this writer executes.
+    """
+    from world.rules.fatigue import (
+        FatigueActivity,
+        FatigueInterval,
+        IntervalCompletion,
+        SleepPosture,
+        read_optional_fatigue_state,
+        settle_fatigue_intervals,
+        write_fatigue_state,
+    )
+
+    current = read_optional_fatigue_state(entity)
+    if current is None or not segments:
+        return
+    sleeping_posture = (
+        current.posture
+        if current.posture is not SleepPosture.AWAKE
+        else SleepPosture.FORCED
+    )
+    first_asleep = segments[0][0]
+    if first_asleep and current.posture is SleepPosture.AWAKE:
+        current = write_fatigue_state(
+            entity, current.reserve_units, sleeping_posture
+        )
+    elif not first_asleep and current.posture is not SleepPosture.AWAKE:
+        current = write_fatigue_state(
+            entity, current.reserve_units, SleepPosture.AWAKE
+        )
+    tick = start_tick
+    for asleep, seconds in segments:
+        target = sleeping_posture if asleep else SleepPosture.AWAKE
+        if current.posture is not target:
+            current = write_fatigue_state(
+                entity, current.reserve_units, target
+            )
+        if seconds > 0:
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        entity,
+                        (
+                            FatigueActivity.SLEEP
+                            if asleep
+                            else FatigueActivity.AWAKE_COMBAT
+                        ),
+                        seconds,
+                        current,
+                        IntervalCompletion.INDIVISIBLE,
+                    ),
+                ),
+                context={"stage": "hostile_round_prefix", "session": session_id},
+                in_combat=True,
+                start_tick=tick,
+            )
+            current = settlement.commits[0].end
+        tick += seconds
+
+
+def _paid_sleep_evidence(
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    round_index: int,
+) -> tuple[SleepTransition, ...]:
+    """Return the boundary evidence reconciled with what the paid interval did.
+
+    A paid interval can wake a forced sleeper or deplete an awake member; the
+    boundary was observed before that settlement, so the recorded posture at
+    ``round_index`` is corrected here for the members whose paid end posture
+    actually differs from the declared evidence, and persisted with the
+    cursor. Every other transition — including an explicit posture change
+    observed at exactly this boundary and every enemy transition — is
+    preserved untouched.
+    """
+    from world.rules.fatigue import SleepPosture, read_optional_fatigue_state
+
+    recorded = recorded_sleep_state(record)
+    transitions = list(record.sleep_transitions)
+    allied = {int(pk) for pk in record.player_ids}
+    for key, entity in battlefield.roster.items():
+        pk = getattr(entity, "pk", None)
+        if not isinstance(pk, int) or int(pk) not in allied:
+            continue
+        if key in battlefield.fled:
+            continue
+        if _stored_trait_value(entity.traits.hp) <= 0:
+            continue
+        state = read_optional_fatigue_state(entity)
+        if state is None:
+            continue
+        live_asleep = state.posture is not SleepPosture.AWAKE
+        if recorded.get(int(pk), False) != live_asleep:
+            transitions = [
+                transition
+                for transition in transitions
+                if not (
+                    transition.round_index == round_index
+                    and transition.actor_id == int(pk)
+                )
+            ]
+            transitions.append(
+                SleepTransition(int(round_index), int(pk), live_asleep)
+            )
+    return tuple(
+        sorted(transitions, key=lambda item: (item.round_index, item.actor_id))
+    )
+
+
+def _settle_monster_combat_paid(
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+    *,
+    through_round: int,
+) -> None:
+    """Pay every still-combat-owned mapped enemy's paid endpoint once.
+
+    ``settle_monster_combat_through`` pays the recorded combat intervals and
+    the member's remaining posture, then releases the cursor to idle; the
+    member is immediately re-marked combat-owned at the same endpoint so the
+    next paid round's interval starts exactly at that cursor. Fled members
+    already belong to a journey and dead members own no further physiology.
+    """
+    if record.mode != "hostile":
+        return
+    from evennia.objects.models import ObjectDB
+
+    from world.maps import monster_activity, regional_population
+    from world.rules import world_escape
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return
+    endpoint = int(record.started_tick) + int(through_round) * _ROUND_SECONDS
+    owned = set(
+        monster_activity.combat_owned_member_ids(wilderness, record.session_id)
+    )
+    fled = set(record.fled_ids)
+    if battlefield is not None:
+        fled.update(
+            int(entity.pk)
+            for key, entity in battlefield.roster.items()
+            if key in battlefield.fled
+        )
+    operation_id = (
+        f"{record.engagement_id or record.session_id}:paid:{through_round}"
+    )
+    for individual_id in record.enemy_ids:
+        member_id = int(individual_id)
+        if member_id not in owned or member_id in fled:
+            continue
+        entity = ObjectDB.objects.filter(id=member_id).first()
+        if entity is None or _stored_trait_value(entity.traits.hp) <= 0:
+            continue
+        world_escape.settle_monster_combat_through(
+            entity, through_tick=endpoint, operation_id=operation_id
+        )
+        group = monster_activity.group_of_member(wilderness, member_id)
+        if group is not None:
+            monster_activity.mark_member_combat(
+                wilderness,
+                group_id=group.group_id,
+                individual_id=member_id,
+                session_id=record.session_id,
+                tick=endpoint,
+            )
+
+
+def _pay_round_time(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    *,
+    through_round: int,
+    automatic: bool,
+) -> tuple[CombatSessionRecord, tuple[Any, ...]]:
+    """Pay one contiguous unpaid round range exactly once.
+
+    The allied mental interval, the mapped-enemy cursor and the clock/gauge
+    interval all advance to ``through_round`` inside this writer's enclosing
+    transaction, and the durable ``settled_rounds`` cursor commits with them.
+    ``automatic`` selects the actual enemy-only round's live-posture interval
+    (with the one authored wake allowance); otherwise the range is an
+    ordinary deferred prefix settled from its recorded posture segments.
+    """
+    first = int(record.settled_rounds)
+    through = int(through_round)
+    if through <= first:
+        return record, ()
+    participants = settlement_participants(commander, battlefield)
+    allied = {int(pk) for pk in record.player_ids}
+    defeated = _defeated_participant_ids(record, battlefield)
+    start = int(record.started_tick)
+    for entity in participants:
+        pk = getattr(entity, "pk", None)
+        if not isinstance(pk, int) or int(pk) not in allied:
+            continue
+        if getattr(entity, "_is_deleted", False):
+            continue
+        if automatic and through == first + 1:
+            _settle_paid_live_posture(
+                entity,
+                _ROUND_SECONDS,
+                start_tick=start + first * _ROUND_SECONDS,
+                session_id=record.session_id,
+                allow_wake=int(pk) not in defeated,
+            )
+            continue
+        _settle_paid_posture_segments(
+            entity,
+            posture_segments(
+                record, int(pk), from_round=first, through_round=through
+            ),
+            start_tick=start + first * _ROUND_SECONDS,
+            session_id=record.session_id,
+        )
+    _settle_monster_combat_paid(record, battlefield, through_round=through)
+    seconds = (through - first) * _ROUND_SECONDS
+    events = settle_combat_result(
+        SimpleNamespace(total_seconds=seconds), participants
+    )
+    paid = replace(
+        record,
+        settled_rounds=through,
+        sleep_transitions=_paid_sleep_evidence(record, battlefield, through),
+    )
+    _persist(commander, paid)
+    return paid, tuple(events)
+
+
+def _no_continuation(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> dict[str, Any]:
+    """Return the benign result for a session that needs no automatic round."""
+    return {
+        "outcome": "round",
+        "rounds_elapsed": record.rounds_elapsed,
+        "logs": (),
+        "overwhelming_team": classify_overwhelm(battlefield),
+        "notifications": (),
+        "events": (),
+        "continued_rounds": 0,
+    }
+
+
+def continue_incapacitated_hostile_rounds(
+    commander: Any,
+    *,
+    journals: list[Any] | None = None,
+) -> dict[str, Any]:
+    """Resolve normal enemy-only rounds while no ally can act.
+
+    Runs only for a valid nonterminal hostile encounter whose
+    ``get_required_combat_actors`` set is empty. The unpaid completed prefix is
+    paid once, then each real automatic round resolves through the ordinary
+    ``run_round``/enemy-policy/ActionResolver/upkeep path and pays exactly six
+    seconds before the next eligibility read. It stops immediately when an ally
+    can act, on an ordinary terminal result, or at the existing cap; it never
+    invents an allied action, never declares defeat from sleep alone and never
+    advances the clock from a combatant action.
+
+    The caller owns the durable transaction and the compensation surfaces:
+    ``journals`` is that owner's item-journal list, so a rolled-back admission
+    or round restores the mirrors the automatic rounds deleted. The returned
+    dict carries the internal ``notifications`` slot the owner delivers only
+    after its own commit; ``round_record`` is intentionally absent (the
+    confirmed ordinary round's record is the one the caller presents).
+    """
+    record = read_session(commander)
+    if record is None:
+        raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
+    battlefield = reconstruct_battlefield(commander, record)
+    if (
+        record.mode != "hostile"
+        or record.settled_tick is not None
+        or _terminal_outcome(commander, battlefield, record) is not None
+        or get_required_combat_actors(record, battlefield)
+    ):
+        return _no_continuation(commander, record, battlefield)
+
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    activity_before = (
+        monster_activity.snapshot_activity_surfaces(wilderness)
+        if wilderness is not None
+        and monster_activity.activity_provisioned(wilderness)
+        else None
+    )
+    clock_before = _snapshot_round_clock(
+        record, battlefield, horizon_rounds=_round_cap()
+    )
+    touched, extra = _snapshot_round_touched(commander, battlefield, record)
+    party_before, members_before, relations_before = _snapshot_party_surfaces(
+        commander, battlefield
+    )
+    owns_journals = journals is None
+    journal_list: list[Any] = [] if journals is None else journals
+    guard = _AUTOMATIC_HOSTILE_ROUNDS.set(True)
+    logs: list[Any] = []
+    notifications: list[str | UnlockNotice] = []
+    events: list[Any] = []
+    first_settled = int(record.settled_rounds)
+    continued = 0
+    outcome = "round"
+    final_rounds = int(record.rounds_elapsed)
+    final_settled = int(record.settled_rounds)
+    try:
+        with durable_combat_atomic(nested=True):
+            record, paid_events = _pay_round_time(
+                commander,
+                record,
+                battlefield,
+                through_round=record.rounds_elapsed,
+                automatic=False,
+            )
+            events.extend(paid_events)
+            final_rounds = int(record.rounds_elapsed)
+            final_settled = int(record.settled_rounds)
+            while True:
+                current = read_session_uncached(commander)
+                if (
+                    current is None
+                    or current.mode != "hostile"
+                    or current.settled_tick is not None
+                ):
+                    break
+                record = current
+                battlefield = reconstruct_battlefield(commander, record)
+                if _terminal_outcome(commander, battlefield, record) is not None:
+                    break
+                if get_required_combat_actors(record, battlefield):
+                    break
+                if int(record.rounds_elapsed) >= _round_cap():
+                    break
+                round_identities, round_hp_before = capture_round_hp(battlefield)
+                hp_before = _stored_trait_value(commander.traits.hp)
+                simulated, nonlethal_keys = _session_policy(battlefield, record)
+                grants: list[str | UnlockNotice] = []
+                round_logs = run_round(
+                    battlefield,
+                    _party_round_provider({}, battlefield, record),
+                    simulated=simulated,
+                    nonlethal_keys=nonlethal_keys,
+                    journal_sink=journal_list,
+                    notifications_sink=grants,
+                    first_actor=record.opening_first_actor,
+                    decision_scope_base=execution_scope_base(record),
+                )
+                result, round_notifications = _finalize_resolved_round(
+                    commander,
+                    record,
+                    battlefield,
+                    round_logs,
+                    hp_before=hp_before,
+                    round_identities=round_identities,
+                    round_hp_before=round_hp_before,
+                    grants=grants,
+                )
+                continued += 1
+                logs.extend(result.get("logs", ()))
+                notifications.extend(round_notifications)
+                events.extend(result.get("events", ()))
+                if result["outcome"] != "round":
+                    outcome = result["outcome"]
+                    final_rounds = int(
+                        result.get("rounds_elapsed", record.rounds_elapsed)
+                    )
+                    # The terminal settlement paid this last round through the
+                    # unpaid suffix and closed the cursor at the round count.
+                    final_settled = final_rounds
+                    break
+                # Nonterminal: this round's own six seconds are unpaid until
+                # the cursor advances with the same durable commit.
+                fresh = read_session_uncached(commander)
+                if fresh is None:
+                    break
+                record, paid_events = _pay_round_time(
+                    commander,
+                    fresh,
+                    battlefield,
+                    through_round=fresh.rounds_elapsed,
+                    automatic=True,
+                )
+                events.extend(paid_events)
+                final_rounds = int(record.rounds_elapsed)
+                final_settled = int(record.settled_rounds)
+            final = read_session_uncached(commander)
+            if final is not None:
+                final_rounds = int(final.rounds_elapsed)
+                final_settled = int(final.settled_rounds)
+            if continued:
+                boundary = {
+                    "session": record.session_id,
+                    "revision": int(getattr(final, "round_revision", record.round_revision) or 0),
+                    "from_round": first_settled,
+                    "to_round": final_settled,
+                    "members": ",".join(
+                        str(pk) for pk in sorted(int(pk) for pk in record.player_ids)
+                    ),
+                }
+                transaction.on_commit(
+                    lambda boundary=boundary: log_info(
+                        "combat_incapacitated_continued", context=boundary
+                    )
+                )
+    except Exception:
+        from world.rules.defeat_aftermath import drain_pending_undos
+
+        for undo in drain_pending_undos():
+            undo()
+        if owns_journals:
+            for journal in journal_list:
+                journal.restore()
+        _restore_round_clock(clock_before)
+        _restore_round_touched(
+            commander,
+            touched,
+            extra,
+            party_before,
+            members_before,
+            relations_before,
+        )
+        if activity_before is not None:
+            monster_activity.restore_activity_surfaces(
+                activity_before, wilderness=wilderness
+            )
+        # Skip-safety registration is restored by the owning operation (its
+        # own rollback boundary knows whether a live session remains); a
+        # continuation inside a rolled-back admission must not resurrect it.
+        raise
+    finally:
+        _AUTOMATIC_HOSTILE_ROUNDS.reset(guard)
+    return {
+        "outcome": outcome,
+        "rounds_elapsed": final_rounds,
+        "logs": tuple(logs),
+        "overwhelming_team": classify_overwhelm(battlefield),
+        "notifications": tuple(notifications),
+        "events": tuple(events),
+        "continued_rounds": continued,
+    }
+
+
 @checkpoint_owner
 def _submit_request(
     actor: Any,
@@ -1147,9 +1685,12 @@ def _submit_request(
     slot is internal: the presentation layer reads it into the read context
     and the result normalizer drops it before any send.
     """
-    from world.rules.combat_session.snapshot import _snapshot_round_clock, _restore_round_clock
-
-    clock_before = _snapshot_round_clock(record, battlefield)
+    # The round's own unit may also pay an unpaid prefix and every automatic
+    # enemy-only round up to the session cap, so its clock-source rollback
+    # window covers that whole horizon rather than one round.
+    clock_before = _snapshot_round_clock(
+        record, battlefield, horizon_rounds=_round_cap()
+    )
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     exam_host_before = _snapshot_exam_host(record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
@@ -1243,6 +1784,26 @@ def _submit_request(
                 round_hp_before=round_hp_before,
                 grants=grant_notifications,
             )
+            if result.get("continuation_required"):
+                continuation = continue_incapacitated_hostile_rounds(
+                    actor, journals=item_journals
+                )
+                result = {
+                    **result,
+                    "outcome": continuation["outcome"],
+                    "rounds_elapsed": continuation["rounds_elapsed"],
+                    "logs": (*result["logs"], *continuation["logs"]),
+                    "overwhelming_team": continuation["overwhelming_team"],
+                    "events": (
+                        *result.get("events", ()),
+                        *continuation["events"],
+                    ),
+                }
+                result.pop("continuation_required", None)
+                notifications = (
+                    *notifications,
+                    *continuation["notifications"],
+                )
             receipt = {
                 "session_id": record.session_id,
                 "round_revision": record.round_revision,

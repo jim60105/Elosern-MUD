@@ -14,7 +14,7 @@ from evennia.objects.models import ObjectDB
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.observability import log_info
-from world.rules.action import _attribute_snapshot, _restore_attribute, _stored_trait_value
+from world.rules.action import _stored_trait_value
 from world.rules.combat import Battlefield
 from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.observations import discard_session_memory
@@ -297,20 +297,18 @@ def engage_group(
         population_cell=mapped_population_cell(actor),
     )
     battlefield = reconstruct_battlefield(actor, record)
-    # A canonical engagement whose whole present allied party is already in
-    # forced sleep has no eligible command to collect. Enter the ordinary
-    # zero-round terminal writer now: no round, enemy action or spectator
-    # loop is fabricated, and existing defeat aftermath and diagnostics run.
-    from world.rules.combat_session.settlement import settle_forced_sleep_opening
-
-    settlement = settle_forced_sleep_opening(actor, record, battlefield)
-    if settlement is not None:
-        return {
-            "record": record,
-            "overwhelming_team": classify_overwhelm(battlefield),
-            "settlement": settlement,
-        }
     from world.maps import monster_activity, regional_population
+    from world.rules.combat_session.snapshot import (
+        _restore_round_clock,
+        _restore_round_touched,
+        _snapshot_party_surfaces,
+        _snapshot_round_clock,
+        _snapshot_round_touched,
+    )
+    from world.rules.progression import (
+        restore_practice_dedupe,
+        snapshot_practice_dedupe,
+    )
 
     wilderness = regional_population.live_wilderness()
     activity_before = (
@@ -319,22 +317,61 @@ def engage_group(
         and monster_activity.activity_provisioned(wilderness)
         else None
     )
-    active_combat_before = _attribute_snapshot(actor, "active_combat")
+    # Admission plus the automatic enemy-only continuation form one durable
+    # unit: a canonical engagement whose whole present allied party is already
+    # asleep (or otherwise action-forbidden) pays its real rounds now instead
+    # of entering a fabricated zero-round defeat, and a failure anywhere in
+    # that unit restores every clock-source, physiology, activity and session
+    # surface.
+    from world.rules.combat_session.settlement import _round_cap
+
+    clock_before = _snapshot_round_clock(
+        record, battlefield, horizon_rounds=_round_cap()
+    )
+    touched, extra = _snapshot_round_touched(actor, battlefield, record)
+    party_before, members_before, relations_before = _snapshot_party_surfaces(
+        actor, battlefield
+    )
+    dedupe_before = snapshot_practice_dedupe()
+    item_journals: list[Any] = []
     try:
         with transaction.atomic():
             _persist(actor, record)
             _own_mapped_combat_time(record)
+            from world.rules.combat_session.rounds import (
+                continue_incapacitated_hostile_rounds,
+            )
+
+            continuation = continue_incapacitated_hostile_rounds(
+                actor, journals=item_journals
+            )
     except Exception:
         # Admission may already have paid an idle prefix or opened room
-        # protection; the database rolled back, so restore the process-memory
-        # activity surfaces it left behind before the failure escapes.
+        # protection, and the continuation may have paid real rounds; the
+        # database rolled back, so restore every process-memory surface it
+        # left behind before the failure escapes.
+        for journal in item_journals:
+            journal.restore()
         if activity_before is not None:
             monster_activity.restore_activity_surfaces(
                 activity_before, wilderness=wilderness
             )
-        _restore_attribute(actor, "active_combat", active_combat_before)
+        _restore_round_clock(clock_before)
+        _restore_round_touched(
+            actor,
+            touched,
+            extra,
+            party_before,
+            members_before,
+            relations_before,
+        )
+        restore_practice_dedupe(dedupe_before)
         raise
-    register_active_battlefield(battlefield)
+    final = read_session(actor)
+    if final is not None:
+        # A terminal continuation has already cleared the session and its
+        # registrations; only a surviving active session is registered.
+        register_active_battlefield(battlefield)
     # Hostility ends a conversation (webclient-align-07): the session is
     # retired in the same deterministic-core path that persisted the session,
     # so no snapshot can ever render dialogue mode over a live combat session.
@@ -342,8 +379,11 @@ def engage_group(
 
     clear_dialogue_session(actor)
     return {
-        "record": record,
+        "record": final if final is not None else record,
         "overwhelming_team": classify_overwhelm(battlefield),
+        # Internal slot: the entry adapters render the automatic rounds' logs
+        # and select the terminal or interactive message from its outcome.
+        "continuation": continuation,
     }
 
 
