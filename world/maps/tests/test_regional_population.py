@@ -28,6 +28,8 @@ from evennia.contrib.grid.wilderness.wilderness import (
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import (
     CompositionMember,
@@ -236,6 +238,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- measures -----------------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_a_complete_group_consumes_one_unit_of_each_measure(self):
         zone = self._use(
             zone=_zone(lower=50, upper=75, capacity=5, budget=5, pool=(("t_quint", 1),))
@@ -255,6 +260,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(state.generation_sequence, 1)
         self.assertEqual(state.seed, SEED)
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_a_departed_home_owner_keeps_home_headroom_but_stops_counting_locally(self):
         zone = self._use()
         self._seed()
@@ -278,6 +286,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(counts.home_ids, frozenset({member.pk}))
         self.assertEqual(counts.local_ids, frozenset({visitor.pk}))
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_duplicate_registration_is_counted_once_and_moves_the_one_identity(self):
         zone = self._use()
         self._seed()
@@ -293,6 +304,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertEqual(self.wilderness.db.itemcoordinates[individual], LOCAL[1])
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_manual_excess_above_the_band_blocks_births_without_modifying_it(self):
         zone = self._use()
         self._seed()
@@ -314,6 +328,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self._assert_untouched(manual, markers, coordinates)
         self.assertEqual(zone_state(self.wilderness, zone.key).generation_sequence, 0)
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_home_owned_excess_outside_the_zone_saturates_births(self):
         zone = self._use()
         self._seed()
@@ -332,6 +349,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(population_counts(self.wilderness, zone.key).local_ids, frozenset())
         self._assert_untouched(owners, markers, coordinates)
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_a_full_cell_ceiling_leaves_no_legal_space_and_keeps_the_occupants(self):
         zone = self._use(
             zone=_zone(lower=50, upper=75, capacity=2, budget=3, pool=(("t_trio", 1),)),
@@ -357,6 +377,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- deterministic selection -------------------------------------------
 
+    @covers_requirement(
+        "regional-population::birth-occurrences-retain-deterministic-persistent-individual-state"
+    )
     def test_replaying_an_occurrence_reproduces_its_own_complete_plan(self):
         zone = self._use(pool=(("t_trio", 1), ("t_mixed", 1)))
         self._seed()
@@ -384,6 +407,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.wilderness.db.regional_population[zone.key]["generation_sequence"] = 0
         self.assertEqual(plan_population_wave(self.wilderness, zone.key, tick=0), first)
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_no_composition_is_ever_split_below_its_minimum_or_above_the_budget(self):
         zone = self._use(
             zone=_zone(lower=1, upper=99, capacity=6, budget=4, pool=(("t_mixed", 1),)),
@@ -406,6 +432,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- atomic commit ------------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_failed_wave_leaves_no_partial_group_and_a_retry_selects_the_same_plan(self):
         zone = self._use(
             zone=_zone(lower=50, upper=75, capacity=5, budget=5, pool=(("t_quint", 1),))
@@ -454,6 +483,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             len(commit_population_wave(self.wilderness, retried)), plan.placements[0].total
         )
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_failure_during_the_state_write_restores_every_surface(self):
         zone = self._use(pool=(("t_trio", 1),))
         self._seed()
@@ -497,6 +529,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             self.assertNotIn(individual.pk, ObjectDB.__instance_cache__)
         self.assertEqual(zone_state(self.wilderness, zone.key).generation_sequence, 0)
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_failure_after_the_state_write_publishes_no_wave_event(self):
         zone = self._use(pool=(("t_trio", 1),))
         self._seed()
@@ -513,6 +548,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         info.assert_not_called()
         self.assertEqual(zone_state(self.wilderness, zone.key).generation_sequence, 0)
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_committed_wave_emits_one_bounded_boundary_event(self):
         zone = self._use(pool=(("t_trio", 1),))
         self._seed()
@@ -534,6 +572,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(context["tick"], 9)
         self.assertEqual(tuple(context["individual"]), created)
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_stale_or_hand_built_plan_is_rejected_before_any_write(self):
         zone = self._use(pool=(("t_trio", 1),))
         self._seed()
@@ -567,6 +608,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- initialization -----------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::birth-occurrences-retain-deterministic-persistent-individual-state"
+    )
     def test_initialization_runs_once_and_never_refills_on_reload_or_preparation(self):
         zone = self._use(pool=(("t_quint", 1),))
         self._seed()
@@ -588,6 +632,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             initialize_zone(self.wilderness, zone.key, seed=SEED + 1, tick=0)
         self.assertEqual(zone_state(self.wilderness, zone.key), state)
 
+    @covers_requirement(
+        "regional-population::birth-occurrences-retain-deterministic-persistent-individual-state"
+    )
     def test_initialization_on_an_inactive_cell_creates_no_room(self):
         zone = self._use(
             zone=_zone(lower=1, upper=99, capacity=3, budget=3, pool=(("t_trio", 1),)),
@@ -620,6 +667,10 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- refusals and pure reads -------------------------------------------
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces",
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied",
+    )
     def test_named_refusals_are_distinct_from_blocked_space(self):
         zone = self._use()
         self.assertRaises(
@@ -647,6 +698,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(MalformedPopulationState):
             zone_state(self.wilderness, zone.key)
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_a_malformed_persisted_seed_refuses_instead_of_being_replaced(self):
         self.wilderness.attributes.add(owner.POPULATION_SEED_ATTRIBUTE, None)
 
@@ -665,6 +719,10 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(PopulationSeedUninitialized):
             initialize_population_seed(self.wilderness, seed=3, tick=0)
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied",
+        "regional-population::birth-occurrences-retain-deterministic-persistent-individual-state",
+    )
     def test_a_negative_world_seed_still_initializes_and_replays(self):
         zone = self._use(
             zone=_zone(lower=60, upper=90, capacity=3, budget=3, pool=(("t_trio", 1),))
@@ -676,6 +734,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(zone_state(self.wilderness, zone.key).seed, -1)
         self.assertEqual(initialize_zone(self.wilderness, zone.key, seed=-1, tick=0), ())
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_malformed_state_envelope_refuses_before_any_write(self):
         zone = self._use()
         self._seed()
@@ -710,6 +771,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(MalformedPopulationState):
             zone_state(self.wilderness, zone.key)
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_reads_create_nothing_and_emit_nothing(self):
         zone = self._use(
             zone=_zone(lower=60, upper=90, capacity=3, budget=3, pool=(("t_trio", 1),))
@@ -749,6 +813,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         for individual in individuals:
             self.assertEqual(individual.db.home_ecology_zone, zone.key)
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_explicit_registration_never_reads_birth_geometry_or_stamps_ownership(self):
         zone = self._use()
         self._seed()
@@ -763,6 +830,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertNotIn(individual.pk, population_counts(self.wilderness, zone.key).home_ids)
         self.assertIn(individual.pk, population_counts(self.wilderness, zone.key).local_ids)
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_registration_target_reads_only_a_real_wilderness_room(self):
         self.assertIsNone(wilderness_registration_target(self.room1))
         self.assertTrue(enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME))
@@ -774,6 +844,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             lambda: register_explicit_individual(self.wilderness, self.obj1, (0, 0), tick=0),
         )
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_the_clock_contract_snapshots_the_population_surfaces(self):
         self._seed()
         snapshot = snapshot_regional_population_surfaces(0, 10)
@@ -792,6 +865,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(dict(self.wilderness.db.itemcoordinates), before)
         self.assertEqual(read_population_seed(self.wilderness), SEED)
 
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
+    )
     def test_a_caller_owned_rollback_restores_registrations_and_room_contents(self):
         candidate_cells = ALL_CELLS[:2]
         zone = self._use(
@@ -866,6 +942,9 @@ class ShippedZonePlanningTests(EvenniaTest):
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
 
+    @covers_requirement(
+        "regional-population::automatic-births-satisfy-local-and-home-owned-individual-ceilings"
+    )
     def test_a_shipped_zone_plans_only_inside_its_real_eligible_birth_cells(self):
         from importlib import import_module
 

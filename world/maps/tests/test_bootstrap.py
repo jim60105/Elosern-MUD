@@ -299,6 +299,9 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         self.assertEqual(len(scripts), 1)
         self.assertEqual(WildernessGateExit.objects.all().count(), 0)
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_fresh_wilderness_provisioning_saves_the_population_seed_once(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 

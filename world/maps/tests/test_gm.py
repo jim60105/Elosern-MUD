@@ -217,6 +217,9 @@ class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
         )
         self.room = self.player.location
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_a_wilderness_spawn_registers_the_actual_individual_at_its_cell(self):
         from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
@@ -255,6 +258,9 @@ class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
         )
         self.assertTrue(ObjectDB.objects.filter(pk=monster.pk).exists())
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_a_fault_after_registration_restores_every_surface(self):
         from unittest.mock import patch
 

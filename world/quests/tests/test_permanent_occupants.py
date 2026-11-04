@@ -13,6 +13,8 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom
 from world.quests import scene_store
@@ -224,6 +226,9 @@ class WildernessSceneMonsterPlacementTests(EvenniaTest):
         )
         self.room = self.char1.location
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_a_wilderness_scene_monster_is_registered_as_its_actual_identity(self):
         from world.quests.materializer import spawn_monster
 
@@ -241,6 +246,9 @@ class WildernessSceneMonsterPlacementTests(EvenniaTest):
             ],
         )
 
+    @covers_requirement(
+        "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
+    )
     def test_a_fault_after_registration_leaves_no_object_or_registration(self):
         from unittest.mock import patch
 
