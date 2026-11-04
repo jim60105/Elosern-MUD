@@ -179,12 +179,22 @@ _ENTITY_SURFACES = frozenset(
 def _snapshot_touched(obj: Any, surfaces: frozenset[str]) -> dict[str, Any]:
     """Snapshot the aggregated declared surfaces of one touched object."""
     if _is_battlefield_like(obj):
-        return {
+        snapshot: dict[str, Any] = {
             "battlefield": (
                 frozenset(obj.fled),
                 frozenset(getattr(obj, "knocked_out", ())),
             )
         }
+        if "monster_journey" in surfaces:
+            from world.maps import monster_activity, regional_population
+
+            wilderness = regional_population.live_wilderness()
+            snapshot["monster_journey"] = (
+                None
+                if wilderness is None
+                else monster_activity.snapshot_departure_surfaces(wilderness)
+            )
+        return snapshot
     snapshot: dict[str, Any] = {}
     if surfaces & _ENTITY_SURFACES:
         snapshot["entity"] = _snapshot_entity_state(obj)
@@ -234,6 +244,13 @@ def _restore_touched(
         obj.fled = set(fled)
         if hasattr(obj, "knocked_out"):
             obj.knocked_out = set(knocked_out)
+        if "monster_journey" in snapshot and snapshot["monster_journey"] is not None:
+            from world.maps import monster_activity, regional_population
+
+            monster_activity.restore_activity_surfaces(
+                snapshot["monster_journey"],
+                wilderness=regional_population.live_wilderness(),
+            )
         return
     if "entity" in snapshot:
         _restore_entity_state(obj, snapshot["entity"])

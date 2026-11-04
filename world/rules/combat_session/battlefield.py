@@ -62,6 +62,15 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
             )
         entities[identity] = entity
         key_by_pk[dbref] = identity
+    # A non-fled participant must still be present. A fled mapped escapee has
+    # lawfully left the room (its durable journey owns its position), so only
+    # that departed, fled entity may be absent; nothing else is loosened.
+    for dbref in record.enemy_ids:
+        entity = entities[key_by_pk[dbref]]
+        if dbref in record.fled_ids:
+            continue
+        if getattr(entity, "location", None) is not room:
+            raise CombatSessionError(SessionReason.MOVED)
 
     player_entity = resolve(player_id)
     if player_entity is None or _stored_trait_value(player_entity.traits.hp) <= 0:
@@ -280,8 +289,54 @@ def _context_for(battlefield: Battlefield, record: CombatSessionRecord) -> Battl
     """
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     event_context: dict[str, Any] = {"battlefield": battlefield}
+    event_context["escape_context"] = _escape_context_for(record)
     if simulated:
         event_context["simulated"] = True
     elif nonlethal_keys:
         event_context["nonlethal_keys"] = nonlethal_keys
     return BattlefieldActionContext(battlefield, event_context=event_context)
+
+
+def _escape_context_for(record: CombatSessionRecord) -> Any:
+    """The session's explicit escape authority at this action's occurrence.
+
+    A mapped session (one carrying its actual wilderness cell) passes a world
+    context priced at the logical action-end time: ``started_tick`` minus the
+    pre-combat idle prefix is already the session's own start, plus the round
+    this resolution consumes. An abstract or staged session passes the explicit
+    abstract context; neither path ever falls back to the other.
+    """
+    from world.rules.combat import COMBAT_YAML
+
+    from world.rules.world_escape import AbstractEscapeContext, WorldEscapeContext
+
+    if record.mode != "hostile":
+        # Guild examinations and other staged simulations are explicitly
+        # abstract: their resolution claims no world relocation.
+        return AbstractEscapeContext()
+    from world.rules.movement_edges import LocationRef
+
+    occurred_tick = int(record.started_tick) + (
+        int(record.rounds_elapsed) + 1
+    ) * int(COMBAT_YAML["round"]["seconds"])
+    if record.population_cell is not None:
+        cell = record.population_cell
+        source = LocationRef.wilderness(
+            cell.get("wilderness"), int(cell.get("x")), int(cell.get("y"))
+        )
+    else:
+        # A real hostile engagement in an authored room carries world
+        # authority at the durable room locator, so its monsters escape
+        # through real exits instead of silently falling back to abstract
+        # eligibility.
+        source = LocationRef.room(int(record.room_id))
+    operation_id = (
+        f"{record.engagement_id or record.session_id}:"
+        f"round:{int(record.rounds_elapsed) + 1}:flee"
+    )
+    return WorldEscapeContext(
+        session_id=record.session_id,
+        occurred_tick=occurred_tick,
+        source=source,
+        operation_id=operation_id,
+    )

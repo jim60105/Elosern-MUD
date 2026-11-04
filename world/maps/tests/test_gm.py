@@ -209,6 +209,12 @@ class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        from world.maps.regional_population import initialize_population_seed
+
+        # A provisioned world owns the shared population seed and the
+        # map-owned activity record; an explicit placement creates the
+        # concrete group only inside that complete owner state.
+        initialize_population_seed(self.wilderness, seed=0, tick=0)
         self.assertTrue(
             enter_wilderness(self.player, coordinates=self.CELL, name=WILDERNESS_NAME)
         )
@@ -267,8 +273,8 @@ class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
         registrations_before = dict(self.wilderness.db.itemcoordinates)
         created: list[int] = []
 
-        def register_then_fail(wilderness, individual, coordinates, *, tick):
-            real_register(wilderness, individual, coordinates, tick=tick)
+        def register_then_fail(wilderness, individual, coordinates, **kwargs):
+            real_register(wilderness, individual, coordinates, **kwargs)
             created.append(individual.pk)
             raise RuntimeError("after actual registration")
 

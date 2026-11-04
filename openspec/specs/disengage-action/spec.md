@@ -71,12 +71,7 @@ This individual mechanism SHALL apply to enemies and noninteractive combat; alli
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
 ### Requirement: The disengage effect handler computes flee success from the same agility-difference
-This contest SHALL remain the enemy and noninteractive mechanism; allied interactive retreat uses the party contest.
-
-formula and the same recalibrated constant dice-combat's own to-hit check uses
-`world/rules/disengage.py` SHALL register `register_effect_handler("disengage", ...,
-surfaces=frozenset({"battlefield"}))`; success is `roll_d100() +
-fleeing_entity_adjusted_agility >= combat.COMBAT_YAML["to_hit"]["defender_constant"] + fastest_pursuer_adjusted_agility`.
+The individual flee agility contest SHALL use d100 plus actor adjusted agility against the shared combat defender constant plus fastest eligible pursuer agility; no pursuer SHALL skip that contest only, while mapped escape SHALL still require a legal affordable route and declared atomic effect surfaces.
 
 #### Scenario: Exact agility parity yields a 50% escape rate
 - **WHEN** a flee attempt is evaluated where the fleeing entity's adjusted agility exactly equals the
@@ -95,7 +90,7 @@ fleeing_entity_adjusted_agility >= combat.COMBAT_YAML["to_hit"]["defender_consta
 - **WHEN** a flee attempt is evaluated for a human-elite-tier fleeing entity (effective agility in
   `STATIC_TIER_REGISTRY`'s human elite band, e.g. 9) against an elf-tier pursuer (effective agility in
   that registry's elf band, e.g. 92)
-- **THEN** the escape rate is exactly 0% — the same agility-difference saturation that makes the human
+- **THEN** the escape rate is exactly 0% , the same agility-difference saturation that makes the human
   unable to land a to-hit roll against that elf also makes escape from them impossible
 
 #### Scenario: An elf can always escape a pursuing human
@@ -117,11 +112,11 @@ player-chosen target
 
 #### Scenario: No living, non-fled opposing combatant makes escape automatic
 - **WHEN** a flee attempt is evaluated and every member of the opposing team is dead or already fled
-- **THEN** the attempt succeeds unconditionally, without calling `roll_d100()`
+- **THEN** the agility contest succeeds without calling `roll_d100()`; mapped escape still fails when no legal affordable route exists
 
 #### Scenario: The threshold constant is combat's own, reused verbatim
 - **WHEN** the success check's `defender_constant` is sourced
-- **THEN** it uses `world.rules.combat.COMBAT_YAML`'s existing constant verbatim — no new constant
+- **THEN** it uses `world.rules.combat.COMBAT_YAML`'s existing constant verbatim , no new constant
   is declared for this check
 
 #### Scenario: Agility adjustment uses the agility percentage only
@@ -139,7 +134,7 @@ player-chosen target
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
 ### Requirement: A successful flee adds the fleeing entity's key to Battlefield.fled; a failed attempt
-An enemy or noninteractive individual flee SHALL add only the actor's stable individual identity to the fled set on success and mutate no participant state on failure; allied interactive escape SHALL retain confirmed whole-party retreat.
+Individual flee SHALL preserve the existing agility contest and stable fled identity, require a committed legal affordable journey in mapped combat, and use explicit abstract context in standalone combat; allied interactive escape SHALL retain confirmed party retreat.
 
 #### Scenario: A successful flee is reflected in Battlefield.fled after commit
 - **WHEN** a `flee` request resolves successfully with the underlying attempt succeeding
@@ -158,6 +153,10 @@ An enemy or noninteractive individual flee SHALL add only the actor's stable ind
 #### Scenario: Allied interactive escape uses party confirmation
 - **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
+
+#### Scenario: Mapped flee departure
+- **WHEN** a mapped enemy succeeds through the resolver
+- **THEN** fled state and actual source departure commit together; failure preserves position/group and no abstract world fallback is selected
 
 ### Requirement: A missing battlefield reference in event_context is a named rejection, not a crash
 `_handle_disengage()` SHALL raise `RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, ...)` naming

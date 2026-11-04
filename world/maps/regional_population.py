@@ -80,6 +80,7 @@ from world.maps.population_geometry import density_bounds, eligible_birth_cells
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
+from world.rules.movement_edges import LocationRef
 from world.rules.monster_individual import construct_species_individual
 from world.rules.surfaces import persisted_hp
 
@@ -213,11 +214,16 @@ class PopulationPlacement:
 
     ``groups`` is the composition's member order, so a caller reading the
     placement sees the authored group shape; the sum of the counts is the
-    number of individuals the placement creates.
+    number of individuals the placement creates. ``composition_key`` and
+    ``activity_key`` are the exact selected composition and its resolved
+    binding: the commit compares them and the map-owned group is created from
+    this retained selection, never by a reverse lookup of the member rows.
     """
 
     cell: tuple[int, int]
     groups: tuple[tuple[str, int], ...]
+    composition_key: str
+    activity_key: str
 
     @property
     def total(self) -> int:
@@ -494,6 +500,12 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
         # The explicit fresh provisioning operation is the only creator of the
         # empty timeline. It carries no ordinary births and no recovery state.
         _write_timeline(wilderness, PopulationTimeline(int(tick), (), ()))
+    from world.maps import monster_activity
+
+    # The same explicit fresh provisioning initializes the map-owned activity
+    # record once. A preexisting world without it refuses by name through the
+    # activity owner; nothing is filled in implicitly on load.
+    monster_activity.initialize_monster_activity(wilderness, tick=int(tick))
     _emit(
         "monster_population_seed_initialized",
         {"seed": int(seed), "tick": int(tick)},
@@ -850,6 +862,19 @@ def require_initialized_population(wilderness: Any) -> None:
     try:
         read_population_timeline(wilderness)
     except MalformedPopulationState as error:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: {error}"
+        ) from error
+    from world.maps import monster_activity
+
+    if not monster_activity.activity_provisioned(wilderness):
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: no "
+            f"{monster_activity.MONSTER_ACTIVITY_ATTRIBUTE} state"
+        )
+    try:
+        monster_activity.read_monster_activity(wilderness)
+    except monster_activity.MonsterActivityError as error:
         raise PopulationStateUninitialized(
             f"{STATE_UNINITIALIZED}: {error}"
         ) from error
@@ -1629,7 +1654,14 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
         tick=tick,
         expected_seed=state.seed,
         expected_generation_sequence=state.generation_sequence,
-        placements=(PopulationPlacement(cell=cell, groups=groups),),
+        placements=(
+            PopulationPlacement(
+                cell=cell,
+                groups=groups,
+                composition_key=composition.key,
+                activity_key=composition.activity_key,
+            ),
+        ),
         blocked_reason=None,
     )
 
@@ -1719,6 +1751,25 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
                     if room is not None:
                         _attach(individual, room)
                     created.append(individual)
+            from world.maps import monster_activity
+
+            monster_activity.create_group(
+                wilderness,
+                operation_id=f"wave:{zone.key}:{state.generation_sequence + 1}",
+                ordinal=0,
+                owner_kind="zone",
+                owner_key=zone.key,
+                activity_key=placement.activity_key,
+                home=LocationRef.wilderness(
+                    _wilderness_name(wilderness), *placement.cell
+                ),
+                position=LocationRef.wilderness(
+                    _wilderness_name(wilderness), *placement.cell
+                ),
+                member_ids=tuple(individual.pk for individual in created),
+                seed=state.seed,
+                tick=plan.tick,
+            )
             states = _state_map(wilderness)
             record = dict(states[zone.key])
             record["generation_sequence"] = state.generation_sequence + 1
@@ -1828,6 +1879,9 @@ def register_explicit_individual(
     coordinates: tuple[int, int],
     *,
     tick: int,
+    owner_kind: str,
+    owner_key: str,
+    activity_key: str,
 ) -> None:
     """Register one explicitly placed individual on a valid wilderness surface.
 
@@ -1838,6 +1892,14 @@ def register_explicit_individual(
     automatic density or settlement birth exclusions, and does not reconstruct
     the individual's identity or profile. It joins the placing owner's own
     transaction; it opens none and compensates nothing by itself.
+
+    ``owner_kind``/``owner_key`` and ``activity_key`` are the placing owner's
+    complete activity binding: the same call creates the individual's single
+    initial movement group in the map-owned activity record, so no consumer
+    ever infers ownership or activity from the species, the cell or a reverse
+    row lookup. A staged GM/quest/exam placement names
+    :data:`~world.maps.monster_activity.STAGED_STATIONARY_ACTIVITY`; an
+    authored site names its own published activity declaration.
     """
     _require_wilderness(wilderness)
     cell = coordinate_pair(coordinates)
@@ -1853,17 +1915,33 @@ def register_explicit_individual(
         raise ExplicitPlacementRefused(
             f"{PLACEMENT_REFUSED}: {cell} is not a valid wilderness placement surface"
         )
+    from world.maps import monster_activity
+
+    seed = read_population_seed(wilderness)
+    operation_id = f"explicit:{cell[0]}:{cell[1]}:{individual.pk}"
     wilderness.db.itemcoordinates[individual] = cell
     room = (wilderness.db.rooms or {}).get(cell)
     if room is not None:
         _attach(individual, room)
+    monster_activity.create_group(
+        wilderness,
+        operation_id=operation_id,
+        owner_kind=owner_kind,
+        owner_key=owner_key,
+        activity_key=activity_key,
+        home=LocationRef.wilderness(_wilderness_name(wilderness), *cell),
+        position=LocationRef.wilderness(_wilderness_name(wilderness), *cell),
+        member_ids=(individual.pk,),
+        seed=seed,
+        tick=tick,
+    )
     # The arrival is presence evidence, not only a coordinate write: a later
     # historical projection must know this individual did not stand here
     # before this tick, so an earlier wave cannot borrow its headroom.
     record_population_transition(
         wilderness,
         PopulationTransition(
-            source_id=f"explicit:{cell[0]}:{cell[1]}:{individual.pk}",
+            source_id=operation_id,
             individual_id=individual.pk,
             occurred_tick=tick,
             before=PopulationPresence(False, None, None, None),
@@ -1917,6 +1995,12 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
                 ),
                 (POPULATION_TIMELINE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
                     wilderness, POPULATION_TIMELINE_ATTRIBUTE
+                ),
+                # The map-owned activity record is written by the same
+                # construction/registration operations; a caller-owned rollback
+                # must restore it with the population surfaces it belongs to.
+                ("monster_activity", None): _db_safe_attribute_snapshot(
+                    wilderness, "monster_activity"
                 ),
             }
         )

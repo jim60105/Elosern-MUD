@@ -226,7 +226,51 @@ def placement_section(monster: Any) -> dict[str, Any]:
                 link_to=link("rooms", dbref_of(location), label_of(location)),
             )
         )
+    journey = _journey_of(monster)
+    if journey is not None:
+        # A travelling individual is a real fact, but it is present at neither
+        # endpoint: inspection reports the durable journey separately instead
+        # of inventing a source or destination presence.
+        rows.append(
+            row(
+                "旅程",
+                f"{journey['source']} → {journey['destination']}",
+                mono=True,
+            )
+        )
+        rows.append(row("出發時刻", str(journey["depart"]), mono=True))
+        rows.append(row("抵達時刻", str(journey["arrival"]), mono=True))
+        if journey["retry"] is not None:
+            rows.append(row("延後重試", str(journey["retry"]), mono=True))
     return ledger(rows)
+
+
+def _journey_of(monster: Any) -> dict[str, Any] | None:
+    """One individual's durable journey facts, or ``None`` when not travelling."""
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return None
+    group = monster_activity.group_of_member(wilderness, int(monster.pk))
+    if group is None or group.journey_id is None:
+        return None
+    journey = monster_activity.journey(wilderness, group.journey_id)
+    if journey is None:
+        return None
+
+    def label(ref: Any) -> str:
+        if ref.kind == "wilderness":
+            return f"{ref.x}, {ref.y}"
+        return f"#{ref.id}"
+
+    return {
+        "source": label(journey.source),
+        "destination": label(journey.destination),
+        "depart": journey.depart_tick,
+        "arrival": journey.arrival_tick,
+        "retry": journey.retry_tick,
+    }
 
 
 def loot_section(monster: Any) -> dict[str, Any]:

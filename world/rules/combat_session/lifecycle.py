@@ -7,12 +7,14 @@ session, its skip-safety registration, and its ground/positional markers.
 
 from typing import Any
 
+from django.db import transaction
+
 from evennia.objects.models import ObjectDB
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from world.observability import log_info
-from world.rules.action import _stored_trait_value
+from world.rules.action import _attribute_snapshot, _restore_attribute, _stored_trait_value
 from world.rules.combat import Battlefield
 from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session.observations import discard_session_memory
@@ -308,7 +310,30 @@ def engage_group(
             "overwhelming_team": classify_overwhelm(battlefield),
             "settlement": settlement,
         }
-    _persist(actor, record)
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    activity_before = (
+        monster_activity.snapshot_activity_surfaces(wilderness)
+        if wilderness is not None
+        and monster_activity.activity_provisioned(wilderness)
+        else None
+    )
+    active_combat_before = _attribute_snapshot(actor, "active_combat")
+    try:
+        with transaction.atomic():
+            _persist(actor, record)
+            _own_mapped_combat_time(record)
+    except Exception:
+        # Admission may already have paid an idle prefix or opened room
+        # protection; the database rolled back, so restore the process-memory
+        # activity surfaces it left behind before the failure escapes.
+        if activity_before is not None:
+            monster_activity.restore_activity_surfaces(
+                activity_before, wilderness=wilderness
+            )
+        _restore_attribute(actor, "active_combat", active_combat_before)
+        raise
     register_active_battlefield(battlefield)
     # Hostility ends a conversation (webclient-align-07): the session is
     # retired in the same deterministic-core path that persisted the session,
@@ -320,3 +345,38 @@ def engage_group(
         "record": record,
         "overwhelming_team": classify_overwhelm(battlefield),
     }
+
+
+def _own_mapped_combat_time(record: CombatSessionRecord) -> None:
+    """Claim the session's mapped enemies' combat interval at admission.
+
+    Only a real hostile session over a provisioned world with a map-owned
+    group participates; a staged or abstract session owns no member cursor.
+    The authored-room protection
+    interval of a room-based session is opened here and closed by the terminal
+    settlement, through the activity owner's own record.
+    """
+    if record.mode != "hostile":
+        return
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return
+    for individual_id in record.enemy_ids:
+        monster_activity.begin_member_combat(
+            wilderness,
+            individual_id=int(individual_id),
+            session_id=record.session_id,
+            tick=int(record.started_tick),
+        )
+    if record.population_cell is None:
+        from world.rules.movement_edges import LocationRef
+
+        monster_activity.record_room_protection(
+            wilderness,
+            session_id=record.session_id,
+            location=LocationRef.room(int(record.room_id)),
+            start_tick=int(record.started_tick),
+            end_tick=None,
+        )

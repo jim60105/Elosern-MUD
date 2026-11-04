@@ -37,6 +37,8 @@ def spawn_monster(species, variant, room):
     )
     from world.rules.monster_individual import construct_species_individual
 
+    from world.maps.monster_activity import STAGED_STATIONARY_ACTIVITY
+
     destination = resolve_target(room, {"rooms"})
     text(species)
     text(variant)
@@ -60,6 +62,9 @@ def spawn_monster(species, variant, room):
                     monster,
                     coordinates,
                     tick=current_population_tick(),
+                    owner_kind="explicit",
+                    owner_key=f"gm:{monster.pk}",
+                    activity_key=STAGED_STATIONARY_ACTIVITY,
                 )
             elif not monster.move_to(destination, quiet=True, move_type="spawn"):
                 raise RuntimeError("monster placement refused")

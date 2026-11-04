@@ -175,7 +175,12 @@ def _spawn_occupants(
     if objective.kind is ObjectiveKind.DEFEAT and objective.monster_tier is not None:
         for _position in range(objective.quantity):
             occupants.append(
-                _spawn_monster(room, requirement.archetype, objective.monster_tier)
+                _spawn_monster(
+                    room,
+                    requirement.archetype,
+                    objective.monster_tier,
+                    owner_key=quest_key,
+                )
             )
     for occupant in occupants:
         register_owned_entity(room, occupant)

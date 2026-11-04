@@ -24,6 +24,7 @@ from world.rules.combat import (
     run_round,
 )
 from world.rules.disengage import FLEE_SKILL_KEY
+from world.rules.world_escape import AbstractEscapeContext
 from world.rules.overwhelm import (
     hit_rate_verdict,
     resolve_overwhelm,
@@ -75,15 +76,16 @@ class DisengageResolverIntegrationTests(EvenniaTestCase):
         )
 
     def request(self, *, event_context=True):
+        supplied = {"battlefield": self.field}
+        if event_context:
+            supplied["escape_context"] = AbstractEscapeContext()
         return ActionRequest(
             self.actor,
             FLEE_SKILL_KEY,
             [self.actor],
             BattlefieldActionContext(
                 self.field,
-                event_context=(
-                    {"battlefield": self.field} if event_context else {}
-                ),
+                event_context=supplied if event_context else {},
             ),
         )
 

@@ -54,6 +54,7 @@ import world.rules.cross_lineage_unlock  # noqa: F401
 import world.rules.defeat_aftermath  # noqa: F401
 from world.rules import monster_behaviour as behaviour
 from world.rules.action import ActionResolver, _stored_trait_value
+from world.rules.world_escape import AbstractEscapeContext
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     apply_buff,
@@ -1719,7 +1720,13 @@ class CampaignHarness:
     def _measure_mode(self, mode: str) -> reports.PolicyTiming:
         """Time one mode's complete policy call: cold, warm-ups and measurements."""
         decider, battlefield = self._performance_field(mode, enemies=8)
-        context = BattlefieldActionContext(battlefield)
+        context = BattlefieldActionContext(
+            battlefield,
+            event_context={
+                "battlefield": battlefield,
+                "escape_context": AbstractEscapeContext(),
+            },
+        )
         sink: list[Any] = []
         timing_kwargs = self._timing_callable(decider, battlefield, context, sink)
         queries = {"count": 0}
@@ -1771,7 +1778,13 @@ class CampaignHarness:
         if field is None:
             field = self._performance_field("utility", enemies=8)
         decider, battlefield = field
-        context = BattlefieldActionContext(battlefield)
+        context = BattlefieldActionContext(
+            battlefield,
+            event_context={
+                "battlefield": battlefield,
+                "escape_context": AbstractEscapeContext(),
+            },
+        )
         sink: list[Any] = []
         call = self._timing_callable(decider, battlefield, context, sink)
         # Every probe starts from cold caches -- the idmapper's instance cache

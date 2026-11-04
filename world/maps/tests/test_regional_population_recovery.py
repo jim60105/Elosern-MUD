@@ -1132,7 +1132,13 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.combatant.traits.hp.base = 100000
         self.combatant.traits.hp.current = 100000
         regional_population.register_explicit_individual(
-            self.wilderness, self.combatant, LOCAL[0], tick=100
+            self.wilderness,
+            self.combatant,
+            LOCAL[0],
+            tick=100,
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key="t_whisper_quail_solitary_activity",
         )
         engage(self.player, self.combatant)
         # One earlier loss leaves the zone deficient and due at 110.

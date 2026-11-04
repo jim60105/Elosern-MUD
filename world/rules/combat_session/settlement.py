@@ -418,6 +418,73 @@ def _record_terminal_population_protection(record: CombatSessionRecord) -> None:
     )
 
 
+def _record_terminal_room_protection(record: CombatSessionRecord) -> None:
+    """Close one authored-room session's protection interval in the owner."""
+    if record.population_cell is not None or record.mode != "hostile":
+        return
+    from world.maps import monster_activity, regional_population
+    from world.rules.movement_edges import LocationRef
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return
+    monster_activity.record_room_protection(
+        wilderness,
+        session_id=record.session_id,
+        location=LocationRef.room(int(record.room_id)),
+        start_tick=int(record.started_tick),
+        end_tick=int(record.started_tick) + int(record.rounds_elapsed) * _ROUND_SECONDS,
+    )
+
+
+def _settle_monster_combat_terminal(
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> None:
+    """Pay every still-combat-owned mapped enemy's remaining combat prefix once.
+
+    A fled enemy is skipped: its cursor already belongs to its journey and the
+    departure committed exactly its own prefix. A dead or absent enemy owns no
+    further physiology. The terminal boundary is the session's committed
+    elapsed combat time, not the wall clock.
+    """
+    if record.mode != "hostile":
+        return
+    from evennia.objects.models import ObjectDB
+
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return
+    from world.rules import world_escape
+
+    fled = set(record.fled_ids)
+    if battlefield is not None:
+        from world.rules.combat_identity import stable_actor_id
+
+        fled.update(
+            int(entity.pk)
+            for key, entity in battlefield.roster.items()
+            if key in battlefield.fled
+        )
+    terminal_tick = int(record.started_tick) + int(record.rounds_elapsed) * _ROUND_SECONDS
+    owned = set(
+        monster_activity.combat_owned_member_ids(wilderness, record.session_id)
+    )
+    for individual_id in record.enemy_ids:
+        if int(individual_id) in fled or int(individual_id) not in owned:
+            continue
+        entity = ObjectDB.objects.filter(id=int(individual_id)).first()
+        if entity is None or _stored_trait_value(entity.traits.hp) <= 0:
+            continue
+        world_escape.settle_monster_combat_through(
+            entity,
+            through_tick=terminal_tick,
+            operation_id=f"{record.engagement_id or record.session_id}:terminal",
+        )
+
+
 @checkpoint_owner
 @serialized_combat_write
 def settle_session(
@@ -492,6 +559,7 @@ def settle_session(
         # still owns its lawful protected interval: retain it idempotently.
         with transaction.atomic():
             _record_terminal_population_protection(record)
+            _record_terminal_room_protection(record)
         from world.narrative.models import NarrativeEvent
 
         committed_awards = get_committed_award_results(encounter_source_id)
@@ -594,6 +662,10 @@ def settle_session(
             # combat seconds. The clock's COMBAT source deliberately does not
             # settle mental time, so this is the sole terminal fatigue write.
             _settle_terminal_fatigue(record, battlefield, tuple(participants))
+            # Mapped enemies own their combat prefix through the map cursor:
+            # this is the one terminal writer that pays their unpaid rounds,
+            # and it runs before the clock's own combat settlement below.
+            _settle_monster_combat_terminal(record, battlefield)
             events = settle_combat_result(
                 SimpleNamespace(
                     total_seconds=record.rounds_elapsed * _ROUND_SECONDS
@@ -697,6 +769,7 @@ def settle_session(
             # The closed protection lands in the same transaction, before the
             # session clear (and before any later catch-up can observe it).
             _record_terminal_population_protection(settled_record)
+            _record_terminal_room_protection(settled_record)
             clear_session(actor, battlefield, record)
             if record.mode == "guild_exam":
                 # Simulated battle: restore the candidate and return the
@@ -787,6 +860,13 @@ def _restore_exam_participants(
 
     restore_gauges_to_full(actor)
     host = _find_exam_opponent(actor, record)
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is not None and record.exam_id:
+        # The staged examination's own opponent record is released with the
+        # rest of the exam cleanup; no other group or roster is touched.
+        monster_activity.release_group(wilderness, f"exam:{record.exam_id}")
     if host is None:
         log_warn(
             "guild_exam_host_missing",

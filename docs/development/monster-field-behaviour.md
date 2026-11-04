@@ -309,3 +309,136 @@ uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test
 uv run --locked python -m tools.contract_gate
 uv run --locked openspec validate monster-activity-authoring --strict
 ```
+
+## Mapped Monster Escape: Durable Departure and Journey
+
+`mapped-monster-escape` replaces the location-preserving mapped flee with an
+atomic legal departure and a durable journey. The owner is
+`world/maps/monster_activity.py` (strict group/journey/receipt codecs, the
+sole `wilderness.db.monster_activity` writer, chronological arrival and
+protected-arrival waiting), the pure planner is
+`world/rules/world_escape.py`, and the resolver seam is
+`world/rules/disengage.py::_handle_disengage` with
+`combat_session/battlefield.py::_context_for` supplying the explicit world or
+abstract escape context.
+
+Construction owners create the one initial group per occurrence:
+`commit_population_wave` (retained `composition_key`/`activity_key` on
+`PopulationPlacement`), `monster_sites._populate`, GM/quest explicit
+registration (`STAGED_STATIONARY_ACTIVITY`), and staged exams. Per-member
+`member_time` cursors mark admission, every completed round, departure and
+terminal settlement. `population_lifecycle` merges journey arrival/retry
+boundaries and snapshots the activity owner.
+
+The scenario-to-test map for this change, with the canonical requirement IDs
+the sync produced (`uv run --locked python -m tools.spec_traceability list`):
+
+| Requirement | Scenario | Test assertions |
+| --- | --- | --- |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Real resolver departure | `world.maps.tests.test_monster_journeys.MappedFleeIntegrationTests.test_a_two_enemy_rounds_flee_departs_and_reengages_the_same_identity` (only the chosen enemy leaves `itemcoordinates`/room, keeps group ownership, journey starts at the round offset, remainder continues); `test_departure_removes_presence_and_replays_from_the_receipt` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Route or reserve failure | `world.rules.tests.test_world_escape.WorldEscapeTests.test_no_lawful_route_returns_no_plan_even_without_a_pursuer`; `test_a_missing_escape_context_is_a_named_rejection`; `test_partial_physiology_is_a_named_rejection_not_a_skip` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Outside normal range | `WorldEscapeTests.test_an_out_of_bounds_refuge_is_still_a_legal_escape` |
+| `monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure` | Explicit abstract calculation | `WorldEscapeTests.test_an_abstract_context_changes_eligibility_only` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Unobserved partition and restart | `WorldEscapeTests.test_equal_partitions_and_a_reload_preserve_resources_and_progress`; `test_inactive_arrival_creates_no_room_and_preserves_identity` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Protected arrival | `WorldEscapeTests.test_a_protected_arrival_waits_without_a_second_travel_charge` |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Deferred combat physiology transfers once | `MappedFleeIntegrationTests...` (reserve equals one 12-second combat prediction) and `WorldEscapeTests.test_two_deferred_combat_rounds_pay_twelve_seconds_once` |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Retained binding / group ownership | `test_monster_journeys.GroupConstructionTests.test_identical_member_rows_keep_their_own_selected_binding`; `test_a_group_collision_refuses_instead_of_absorbing_identities`; `ActivityRecordTests.test_missing_and_malformed_state_refuse_without_reset` |
+| `wilderness-population-view::population-reads-report-actual-living-registrations` | Transit is not endpoint presence | `MappedPresenceConsumerTests.test_population_view_and_gm_inspection_never_show_transit_at_either_endpoint` (population view, hostile facts, room contents/name search, GM journey row; presence returns after arrival) |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Equal partitions and restart | `WorldEscapeTests.test_the_population_lifecycle_settles_a_journey_in_equal_partitions`; `test_equal_partitions_and_a_reload_preserve_resources_and_progress` |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Late failure restores the whole operation | `WorldEscapeTests.test_a_late_lifecycle_failure_restores_the_whole_journey` (clock failure after arrival restores activity state, body location and reserve) |
+
+Command docs (`docs/game/commands.md`,
+`docs/game/command-reference.md`) describe the real mapped enemy departure and
+its transit/arrival behaviour. GM inspection reports a travelling
+individual's journey separately (`web/gm/readers/monsters.py`).
+
+### Presence consumers
+
+`population_view`, `travel_interrupts.live_hostile_facts`, room contents and a
+room's name search are built from the actual coordinate registration and room
+attachment, so an in-transit individual is absent from both endpoints by
+construction. GM `placement_section` adds a separate `旅程` fact and omits
+`所在房間` while the journey is open. After arrival the coordinate fact returns
+and the journey row disappears. No quest consumer resolves an exact bound
+target ID to a position: site clear-out acceptance binds living owned IDs and
+defeat credit matches the same IDs, so departure and arrival change neither
+`objective_target_ids` nor kill credit.
+
+### Observability catalog
+
+Outer-commit named-facade events (all success rows are scheduled only when the
+enclosing durable transaction commits):
+
+| Event | Context |
+| --- | --- |
+| `monster_departed` | `operation`, `group`, `individual`, `source`, `destination`, `journey`, `tick` |
+| `monster_arrived` | `journey`, `group`, `individual`, `source`, `destination`, `tick` |
+| `monster_arrival_deferred` | `journey`, `individual`, `destination`, `tick`, `retry_tick` |
+| `monster_escape_resolved` | `operation`, `group`, `individual`, `source`, `destination`, `journey`, `tick` |
+| `monster_escape_failed` | `session`, `operation`, `individual`, `group`, `source`, `destination`, `tick` (warn; emitted before the enclosing commit restores every surface) |
+
+A rolled-back departure emits none of the success rows.
+
+### Review dispositions
+
+An independent rubber-duck review of the implementation produced these
+dispositions:
+
+- **Idle physiology discarded (blocking):** fixed. Admission now pays the
+  member's idle prefix through the canonical fatigue writer at the session
+  start before it becomes combat-owned (`begin_member_combat`). Regression:
+  `WorldEscapeTests.test_admission_pays_the_idle_prefix_before_combat_ownership`.
+- **Successful protected-arrival retry lost its waiting interval
+  (blocking):** fixed. Every due boundary pays newly elapsed travel and
+  ordinary waiting before it arrives or defers; the successful retry assertion
+  is now exact (`test_a_protected_arrival_waits_without_a_second_travel_charge`).
+- **Real authored-room battles used abstract escape (blocking):** fixed. A
+  hostile session carries a world context at its durable room locator, and
+  completed-round/terminal combat ownership now follows the real hostile mode
+  instead of the wilderness cell. Staged exams remain explicitly abstract.
+  Regression: `test_a_real_authored_room_session_has_world_escape_authority`.
+- **Arrival did not revalidate route access (blocking):** fixed. Arrival
+  re-resolves the committed edge read-only (topology, traverse access and
+  destination refusal) without repricing; a temporary obstruction defers with
+  the same positive retry, and a vanished authored source room raises.
+  Regression: `test_a_locked_room_exit_defers_arrival_and_retries_without_repricing`.
+- **Quest exact-destination scope (non-blocking):** the current quest read
+  surface uses authored site/habitat guidance and matches bound target IDs; no
+  supported objective family resolves an ID to a live position. That clause is
+  therefore position-independent in this tree: bound IDs and defeat credit are
+  unchanged by departure/arrival, and the actual view excludes transit. This is
+  recorded as an applicability disposition, not claimed as new wiring.
+- **Sleep-receipt rollback coverage (non-blocking, follow-up):** the activity
+  snapshot now includes `SLEEP_RECEIPT_SURFACES`, and both rollback tests
+  assert the pre-operation state of the member and journey. A behavioural
+  forced-sleep-threshold receipt mutation is not constructed here; the global
+  monster-activity slice introduces owner-settled idle physiology and owns that
+  deeper receipt transition test. This is a test-depth follow-up, not a
+  deferred correctness fix.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_disengage world.rules.tests.test_disengage_integration world.maps.tests.test_wilderness_population
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population world.maps.tests.test_monster_sites
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_combat_session_persistence world.rules.tests.test_disengage world.rules.tests.test_disengage_integration world.rules.tests.test_companion_field_opening
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_combat_initiation
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_combat_session_flow
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb tests.test_command_docs
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap_sync
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate mapped-monster-escape --strict
+```
+
+`world.maps.tests.test_monster_journeys` is registered exactly once in
+`.github/evennia-shards.json` (`maps-34`) and
+`world.rules.tests.test_world_escape` exactly once in `rules-12`. The
+bootstrap module's fixed-dbref assertion depends on a pristine test database;
+on a reused database its object sequence is advanced and the assertion fails
+identically on the untouched baseline, while a fresh test database passes all
+20. `world.rules.tests.test_guild_exams` retains its baseline-only
+`test_incoherent_cold_start_fails_once_and_restores_the_host` failure
+(identical on the untouched parent).

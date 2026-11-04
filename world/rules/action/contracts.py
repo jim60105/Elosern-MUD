@@ -183,6 +183,11 @@ SNAPSHOTTED_SURFACES = frozenset(
         "action_evidence",
         "church",
         "fatigue",
+        # A mapped escape writes the population timeline, the activity record,
+        # coordinate registrations, room contents and the member's physiology
+        # and location. One surface owns that complete set, because no subset
+        # of it is a lawful departure.
+        "monster_journey",
     }
 )
 _EFFECT_HANDLERS: dict[str, EffectHandler] = {}

@@ -286,8 +286,24 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         zone = self._use()
         self._seed()
         individual = self._individual()
-        register_explicit_individual(self.wilderness, individual, LOCAL[0], tick=0)
-        register_explicit_individual(self.wilderness, individual, LOCAL[1], tick=0)
+        register_explicit_individual(
+            self.wilderness,
+            individual,
+            LOCAL[0],
+            tick=0,
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key="t_fixture_group_activity",
+        )
+        register_explicit_individual(
+            self.wilderness,
+            individual,
+            LOCAL[1],
+            tick=0,
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key="t_fixture_group_activity",
+        )
 
         counts = population_counts(self.wilderness, zone.key)
         self.assertEqual(counts.local_ids, frozenset({individual.pk}))
@@ -586,7 +602,14 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             tick=0,
             expected_seed=plan.expected_seed,
             expected_generation_sequence=plan.expected_generation_sequence,
-            placements=(owner.PopulationPlacement(cell=ALL_CELLS[0], groups=((ORDINARY, 2),)),),
+            placements=(
+                owner.PopulationPlacement(
+                    cell=ALL_CELLS[0],
+                    groups=((ORDINARY, 2),),
+                    composition_key="t_trio",
+                    activity_key="t_fixture_group_activity",
+                ),
+            ),
             blocked_reason=None,
         )
         before = dict(self.wilderness.db.itemcoordinates)
@@ -651,7 +674,15 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         room = self.char1.location
         self.assertEqual(room.coordinates, cell)
         individual = Monster.objects.get(pk=created[0])
-        register_explicit_individual(self.wilderness, individual, cell, tick=1)
+        register_explicit_individual(
+            self.wilderness,
+            individual,
+            cell,
+            tick=1,
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key="t_fixture_group_activity",
+        )
         self.assertIs(individual.location, room)
         self.assertEqual(individual.pk, created[0])
         self.assertEqual(
@@ -816,7 +847,15 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         with patch.object(
             owner, "eligible_birth_cells", side_effect=AssertionError("geometry read")
         ):
-            register_explicit_individual(self.wilderness, individual, LOCAL[0], tick=0)
+            register_explicit_individual(
+                self.wilderness,
+                individual,
+                LOCAL[0],
+                tick=0,
+                owner_kind="explicit",
+                owner_key="test",
+                activity_key="t_fixture_group_activity",
+            )
 
         self.assertEqual(self.wilderness.db.itemcoordinates[individual], LOCAL[0])
         self.assertIsNone(individual.db.home_ecology_zone)
@@ -834,7 +873,15 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(cell, PROBE)
         self.assertRaises(
             ExplicitPlacementRefused,
-            lambda: register_explicit_individual(self.wilderness, self.obj1, (0, 0), tick=0),
+            lambda: register_explicit_individual(
+                self.wilderness,
+                self.obj1,
+                (0, 0),
+                tick=0,
+                owner_kind="explicit",
+                owner_key="test",
+                activity_key="t_fixture_group_activity",
+            ),
         )
 
     @covers_requirement(
@@ -851,6 +898,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 (owner.POPULATION_SEED_ATTRIBUTE, None),
                 (owner.POPULATION_TIMELINE_ATTRIBUTE, None),
                 ("itemcoordinates", None),
+                # The same construction/registration operations own the
+                # map-owned activity record, so a caller rollback covers it.
+                ("monster_activity", None),
             },
         )
         # Restoring the snapshot is a faithful no-op on unchanged state.
