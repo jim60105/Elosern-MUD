@@ -859,9 +859,20 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.clock.tick = 100
         self._kill(Monster.objects.get(pk=created[0]), 100)
         self.assertIsNone(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick)
-        self.assertEqual(
-            population_lifecycle.next_population_lifecycle_boundary(100, 130), 110
+        sequence_before = zone_state(self.wilderness, ZONE_KEY).generation_sequence
+        # The episode a loss starts is maintenance, not an interactive
+        # boundary: no party is contacted by a distant recovery, so an
+        # interruptible skip is never returned to the player for it.
+        self.assertIsNone(
+            population_lifecycle.next_population_lifecycle_boundary(100, 130)
         )
+        # The committed settlement still projects the same unpersisted episode
+        # and waves at exactly the authored delay.
+        rows_before = Monster.objects.count()
+        settle_population_lifecycle(100, 110)
+        recovered = zone_state(self.wilderness, ZONE_KEY)
+        self.assertEqual(recovered.generation_sequence, sequence_before + 1)
+        self.assertEqual(Monster.objects.count(), rows_before + 1)
 
     @covers_requirement(
         "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"

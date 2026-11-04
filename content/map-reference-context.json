@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "bf7d5f3faa6cc193b2a9924daaa6cdda54c5eb13876d2a16a174ec8ea981febd",
+  "fingerprint": "8e73fcbf81764ceb6a184b5357f7d9126171abf629984c58dd14526232f6ecab",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1065,7 +1065,7 @@
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
-    "world/rules/clock.py": "89b0c45bc3222775cdae0143ffe6239216b604870462a47427bfe6c2d928942f",
+    "world/rules/clock.py": "354b33043de6156223fe5b55874d34f4a51b21741bfae31ca2094566aa4f4217",
     "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
     "world/rules/combat/battlefield.py": "d76c5fca0046579e19362ba04ecde17a10d006ed831cec836ec6f0e7d6fbeab0",
     "world/rules/combat/damage.py": "ec953ec43ed0fab1adfabe5772a1100a379393637ae52a36a16838bbef4f3019",
@@ -1123,7 +1123,7 @@
     "world/rules/exam_schedule_holds.py": "d52a96c326f2289617147fbb3167b5442ad43922f4a893f7ef63f825b829f814",
     "world/rules/fatigue.py": "19cce36ee4734e07953fbc178eea770d6f4698759b3a594a0015f161c9d330b1",
     "world/rules/field_cast.py": "84a1f29179fda01db8948916b1031e1082caa0b0afa308b7a93e878830fed0bb",
-    "world/rules/field_contact.py": "2f93a38b4091d2a20a827e8f8bad6ceb04a1a4420584eb8a98df41a4e74b3324",
+    "world/rules/field_contact.py": "22b9e09fce0ec2de006ed957a964399afe2e38f5e6a4f5b4ebf61ef7f9a75355",
     "world/rules/gm.py": "6b513ed8872caccb2a9f1f1ec518427f88383c998b2d4f8029249e3200ee7da8",
     "world/rules/guild.py": "8346664c98b6271e5b2fb79a0d44efb5659aea06ebdf8799a85e73f401652f32",
     "world/rules/guild_config/__init__.py": "b7e8db471b5e5f64f8fa72915b11bc90606b28479366d8bb7c64707c39cda7c0",
@@ -1169,7 +1169,7 @@
     "world/rules/monster_individual.py": "aebffc963389222d028d121c9ee9d9bd7b13f88e3ffcc6a42f7939e0eeed0591",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_edges.py": "dc07fce13e91bee630557ce493bc1089855ffba5b28285ac32c51bdf1239006e",
-    "world/rules/movement_settlement.py": "8957ca7793adb08aecba64c7872e3c770362b7434076e1fbc04853b10f8e9233",
+    "world/rules/movement_settlement.py": "bc0557ca2fb1ba3c648e9d773fd163f9bff59fd6cd4030c9b8e67af5c963b761",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
@@ -1247,7 +1247,7 @@
     "world/rules/sexual_state/pleasure.py": "f557ded9b1f573de3c4a9b81e8e8a9f5db02b72773c4860aa390b858288a22cc",
     "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
     "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
-    "world/rules/shop_hours.py": "676d1dd1353d6758068c0b1c9d40e2f3db986cd97d1507a025982d124e04b366",
+    "world/rules/shop_hours.py": "b212e7e9507b609d6b0ce3ca82f39f72fda2083c8e822fed6f7a7a0bd7af0d71",
     "world/rules/sight.py": "4b660bda3f67de4c9e6420d8bf5ad81e87bbc38df540cbb32c87bc1278b55eef",
     "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
     "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
@@ -1278,7 +1278,7 @@
     "world/rules/surfaces.py": "0647111b374f045a4081ad6c4231370641db9faa3cd8a9d90b952aa0fe4f00fa",
     "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
     "world/rules/targeting.py": "de3600f8b834e19a1e47527723dc6d376258cfd943f8b049faebaecdb708aea8",
-    "world/rules/time_skip.py": "7fcdbdd7dc01018bd76d02926ad7cfc2271ba1739bc29ef702bd87a8b5531066",
+    "world/rules/time_skip.py": "d54d477f4ebe109a22a67fb4d9ce55c9f5d4d11d13fdbafc259edf01784c4113",
     "world/rules/title_view.py": "16fea08f0dcd76d16f1e76db98feefd6c53ca329cff2a29ca7cbdd28167b518e",
     "world/rules/titles/__init__.py": "762b43d83b88d7ec146ee013dafc60ee9c79bd0fa3ed737f8e4063c6dde41543",
     "world/rules/titles/awards.py": "afd05d152bffdda198e80a42d5226d54db93af6dd818dd6d797c9775178b9f2e",

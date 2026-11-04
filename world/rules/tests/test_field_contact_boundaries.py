@@ -27,6 +27,7 @@ from evennia.contrib.grid.wilderness.wilderness import (
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import Room
 from world.lore.monster_activity import (
     ActivityArea,
@@ -533,6 +534,9 @@ class ForecastPurityTests(_BoundaryBase):
 class WaitBoundaryTests(_BoundaryBase):
     """An ordinary wait stops at the projected contact, keeping its receipt."""
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
     def test_the_wait_stops_at_the_projected_contact(self):
         self._future_facts()
         enemy, seed = self._departing_group()
@@ -551,6 +555,31 @@ class WaitBoundaryTests(_BoundaryBase):
         self.assertLess(after.reserve_units, reserve_before)
         self.assertIs(after.posture, SleepPosture.AWAKE)
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
+    def test_the_interruption_boundary_is_logged_once_on_commit(self):
+        self._future_facts(contact_cleared_at=90)
+        contact_tick = 90 + self.contact_site.recover_after_ticks
+        with patch("world.rules.time_skip.log_info") as info, (
+            self.captureOnCommitCallbacks(execute=True)
+        ):
+            result = advance_wait(self.player, 2000)
+        rows = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "field_contact_interrupted"
+        ]
+        self.assertEqual(len(rows), 1)
+        context = rows[0].kwargs["context"]
+        self.assertEqual(context["char"], str(int(self.player.pk)))
+        self.assertEqual(context["operation"], result.operation_id)
+        self.assertEqual(context["sleep"], "")
+        self.assertEqual(context["requested_seconds"], 2000)
+        self.assertEqual(context["elapsed_seconds"], contact_tick - 100)
+        self.assertEqual(context["tick"], contact_tick)
+        self.assertTrue(context["session"])
+
     def test_a_distant_maintenance_fact_does_not_interrupt_the_wait(self):
         self._future_facts(due=105, site_cleared_at=1000)
         result = advance_wait(self.player, 300)
@@ -567,6 +596,9 @@ class WaitBoundaryTests(_BoundaryBase):
 class SleepBoundaryTests(_BoundaryBase):
     """Sleep stops at the projected contact and keeps its accepted receipt."""
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
     def test_continue_sleep_stops_at_the_projected_birth_contact(self):
         self._future_facts(contact_cleared_at=90)
         contact_tick = 90 + self.contact_site.recover_after_ticks
@@ -577,7 +609,17 @@ class SleepBoundaryTests(_BoundaryBase):
         from world.rules.sleep_receipt import read_sleep_receipt
 
         receipt = read_sleep_receipt(self.player)
-        result = continue_sleep(self.player)
+        with patch("world.rules.time_skip.log_info") as info, (
+            self.captureOnCommitCallbacks(execute=True)
+        ):
+            result = continue_sleep(self.player)
+        rows = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "field_contact_interrupted"
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].kwargs["context"]["sleep"], receipt.sleep_id)
         self.assertEqual(self._tick(), contact_tick)
         self.assertEqual(result.elapsed_seconds, contact_tick - 100)
         self.assertTrue(result.interrupted)
@@ -592,6 +634,9 @@ class SleepBoundaryTests(_BoundaryBase):
         self.assertFalse(updated.sleeping)
         self.assertNotEqual(updated.revision, receipt.revision)
 
+    @covers_requirement(
+        "time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary"
+    )
     def test_owner_continuation_is_revoked_by_the_contact(self):
         self._future_facts(contact_cleared_at=90)
         contact_tick = 90 + self.contact_site.recover_after_ticks
@@ -766,9 +811,20 @@ class FaultRestorationTests(_BoundaryBase):
         with patch(
             "world.rules.combat_session.rounds.continue_incapacitated_hostile_rounds",
             side_effect=RuntimeError("injected post-admission failure"),
+        ), patch("world.rules.time_skip.log_info") as info, (
+            self.captureOnCommitCallbacks(execute=True)
         ):
             with self.assertRaises(RuntimeError):
                 advance_wait(self.player, 2000)
+        # A rolled-back interval publishes no interruption boundary.
+        self.assertEqual(
+            [
+                call
+                for call in info.call_args_list
+                if call.args and call.args[0] == "field_contact_interrupted"
+            ],
+            [],
+        )
         self.assertEqual(int(self.clock.tick), tick_before)
         self.assertEqual(read_optional_fatigue_state(self.player), state_before)
         self.assertEqual(dict(self.wilderness.db.regional_population or {}), zones_before)

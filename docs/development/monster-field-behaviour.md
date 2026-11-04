@@ -777,20 +777,17 @@ ecology/wording reviewer should confirm the Traditional Chinese sentence
 rhythm and that no sentence promises a new ability or stricter player
 control.
 
-### Requirement traceability (delta not yet synced)
+### Requirement traceability (synced)
 
-The new `hostile-field-contact` requirements are defined only in
-`openspec/changes/hostile-field-admission/specs/`. Because the delta is not
-merged into `openspec/specs/` yet, `tools.spec_traceability list` on the
-current tree reports no canonical ID for them, so no `covers_requirement`
-annotation was added to the new tests (annotating an unsynced ID would fail
-the current traceability check). Running the same tool with `--repo-root`
-against an equivalent merged tree outside Git reports exactly
+`hostile-field-admission` is archived: its requirements now live in
+`openspec/specs/hostile-field-contact/spec.md`, and
+`tools.spec_traceability list` reports the canonical IDs
 `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat`
 and
 `hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state`.
-This table records the pending mapping; after archive sync the same test
-identities should annotate those two generated requirement IDs.
+The tests that previously carried only the pending mapping now annotate those
+two IDs directly. The table below keeps each test identity next to the
+neighbouring coverage it also exercises.
 
 | Test identity | Pending delta requirement | Current IDs that also cover it |
 | --- | --- | --- |
@@ -873,3 +870,162 @@ uv run --locked openspec validate hostile-field-admission --strict
 CI-owned and was not executed here; the text and browser surfaces share the
 same rules entry points (`settle_movement`, `cast_in_field`, `use_item`,
 `time_skip`), so no separate browser evidence is claimed.
+
+## Interruptible Field Contact: Read-Only Contact Forecast
+
+`interruptible-field-contact` makes wait, rest, sleep, study, camp and the
+owner-targeted continuation stop at the first tick that really contacts the
+party, instead of at every population maintenance tick. The owner is
+`world/maps/population_forecast.py`; the committed writer stays
+`world/maps/population_lifecycle.py`.
+
+### Projection contract
+
+`capture_activity_snapshot(start_tick=...)` reads every planning input at the
+interval start through the owners' existing pure readers: detached
+`ActivityGroupSnapshot`/`JourneySnapshot` records, the projected
+`PopulationPresence` at that tick, `ProjectedZone`/`ProjectedSite` selection
+state, protection intervals, sited room protection and the captured
+wilderness name.
+
+`project_activity_window(snapshot, *, start_tick, end_tick, observers)` replays
+the coordinator's documented order over those detached records: completed
+arrivals, zone boundary refresh, site decisions, zone recoveries, the contact
+check, then idle decisions, then the same-tick arrival pass. It returns a
+frozen `ContactForecast(first_tick, contact_sources)`.
+
+Purity: the projection constructs no individual, room or session, moves
+nothing, writes no attribute, consumes no draw or generation sequence, and
+uses no database rollback as simulation. A prospective individual token is
+`forecast:<owner-kind>:<owner-key>:<generation-sequence>:<ordinal>` and is
+internal to the call; it is never returned as an identity, presence or target.
+
+### Shared planning rules
+
+The forecast never copies a formula:
+
+| Decision | Shared pure rule |
+| --- | --- |
+| Regional birth wave | `regional_population.plan_population_wave_from` (the writer's own core; `plan_population_wave` is its committed-state adapter) |
+| Zone local/home counts | `regional_population.counts_from_presence` (the same rule as `population_counts`) |
+| Site occurrence | `monster_sites.site_occurrence_groups` (what `_populate` constructs) and `monster_sites.recovery_condition_matured` |
+| Group idle decision | `monster_activity.plan_group_decision`, priced with `monster_activity.projected_member_states` + `quote_edge` + `world_escape.build_journey_plan` |
+| Contact condition | `field_contact.contact_condition_admits` (dayparts and defended-area geometry), the committed evaluator's own rule |
+| Daypart boundary | `clock.next_daypart_boundary` |
+
+Both registered boundary queries —
+`world.rules.field_contact.next_field_contact_boundary` and
+`world.maps.population_lifecycle.next_population_lifecycle_boundary` — return
+the same forecast tick, so the endpoint admission and the population stage
+cannot disagree. `_next_population_boundary` still enumerates every
+maintenance tick for the committed settlement; only the public interactive
+query was narrowed.
+
+### Projection bounds (disclosed)
+
+1. Each existing group contributes at most its **next** idle decision, and a
+   group a projected birth creates contributes none: a second decision needs
+   committed selection state (sequence, settled member cursors) that a
+   read-only pass must not invent. A later departure of the same group is
+   therefore not projected.
+2. After `MAX_PROJECTION_STEPS` (2,048) projected boundaries the forecast
+   answers the next maintenance boundary, so a skip stops early rather than
+   running past a contact the projection did not reach.
+
+Both bounds can only make a skip stop *earlier* than the ideal forecast, never
+later than a real contact, so they cannot let a contact go unobserved.
+
+### Consumer integration
+
+`mental_time.next_skip_boundary` already composes the registered boundary
+query with each member's physiology; `time_skip.advance_wait` and
+`continue_sleep` now bind `clock.advance_scope` around the interval query and
+its advance, so the forecast discovers exactly the parties the skip settles
+for and the endpoint admission admits for the same ones.
+`continue_owner_sleep`, `continue_camp` and `sleep_control` inherit both
+through `continue_sleep`.
+
+Clock sources now declare interactivity explicitly
+(`register_event_source(..., interactive=...)`): `shop_hours` stays
+interactive, while the population coordinator settles many internal
+maintenance ticks and marks only its accepted contact event, so distant
+maintenance never reports `SkipResult.interrupted`.
+
+### Observability
+
+`field_contact_interrupted` (info, catalog section 4.2) is scheduled on
+commit from `time_skip._log_contact_interruption` with `char`, `operation`,
+`sleep`, `requested_seconds`, `elapsed_seconds`, `tick` and `session`. A
+rolled-back interval leaves no row; distant maintenance produces none.
+
+### Requirement traceability (delta not yet synced)
+
+This change modifies `hostile-field-contact`, `time-skip-commands` and
+`wilderness-travel-interrupts`.
+`time-skip-commands::interruptible-skips-stop-at-the-earliest-relevant-boundary`
+is already synced and its canonical ID is annotated on the wait, sleep,
+owner-continuation and interruption-log tests. The added requirements are
+defined only in `openspec/changes/interruptible-field-contact/specs/`, so no
+annotation is added yet; the equivalent merged tree reports:
+
+- `hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction`
+- `wilderness-travel-interrupts::arrival-combat-stops-walking-before-the-next-edge`
+
+| Test identity | Pending delta requirement |
+| --- | --- |
+| `test_field_contact_boundaries.ForecastPurityTests.test_the_first_contact_is_the_intermediate_arrivals_tick` | `hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction` |
+| `...ForecastPurityTests.test_the_registered_query_reports_the_same_contact` | same |
+| `...ForecastPurityTests.test_projection_preserves_every_owner_surface` | same |
+| `...ForecastPurityTests.test_a_distant_group_decision_never_interrupts` | same |
+| `...WaitBoundaryTests.test_a_distant_maintenance_fact_does_not_interrupt_the_wait` | same |
+| `test_regional_population_recovery.RecoveryLifecycleTests.test_the_pure_boundary_projects_an_unpersisted_episode` | same |
+| `...IndivisibleEdgeTests.test_an_edge_completes_once_and_admits_at_its_arrival` | `wilderness-travel-interrupts::arrival-combat-stops-walking-before-the-next-edge` |
+
+### Scenario evidence
+
+- **Intermediate journey contact:** a group at the neighbouring cell departs at
+  its 120 decision and arrives later; a distant zone recovery (105) and a
+  distant passive site birth (110) precede it. Repeated forecasts return the
+  arrival tick with source `birth_or_arrival`, and the registered query reports
+  the same tick while reporting nothing before it. Every owner surface
+  (activity record, zone map, site map, presence timeline, monster rows,
+  coordinate count) is identical after the forecast.
+- **Intermediate birth contact:** a site recoverable at 110 on the party's own
+  cell yields a forecast contact at 110; `continue_sleep` commits exactly ten
+  seconds, the receipt becomes interrupted at 110 and the encounter starts
+  there.
+- **Forecast/settlement agreement:** the real `advance_wait` accepts exactly
+  `arrival - 100` seconds and starts one session at the arrival tick with the
+  arrived individual in the roster.
+- **Distant maintenance is internal:** a wait that spans distant recoveries,
+  births and lawful stays commits its whole request with
+  `interrupted=False` and no session, while the zone's own generation sequence
+  still advances inside the interval.
+- **Receipt authority:** a voluntary sleeper keeps only the actual
+  sleep-rate recovery, its receipt is interrupted at the contact tick, and the
+  owner continuation ends without a resumable authorization. A forced receipt
+  keeps `FORCED`, `forced_threshold` and its accepted cap; separately paid
+  enemy rounds are outside the skip receipt.
+- **Indivisible edge:** a committed edge pays its whole cost once, the party is
+  in passage until the arrival tick, and the encounter is admitted at that
+  arrival with one session.
+- **Fault restoration:** a failure after the accepted interval and the
+  admission restores the clock tick, the physiology surfaces and the zone
+  state, and publishes no `field_contact_interrupted` row.
+
+### Focused verification run
+
+```text
+cd /var/home/jim60105/repos/MUD/.worktrees/interruptible-field-contact
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact_boundaries
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_time_skip
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_sleep_control world.rules.tests.test_sleep_receipt world.rules.tests.test_skip_safety world.rules.tests.test_skip_commands
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population_recovery.RecoveryLifecycleTests.test_the_pure_boundary_projects_an_unpersisted_episode
+```
+
+`world.rules.tests.test_field_contact_boundaries` is registered exactly once,
+in `.github/evennia-shards.json` (rules-2). The managed browser suite remains
+CI-owned; the browser walk stops on the same server-authoritative signal
+(`mode` no longer `exploration` after the arrival publication), so no separate
+browser evidence is claimed here.
