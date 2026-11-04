@@ -371,6 +371,43 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
             sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
         self.assertEqual(dict(script.db.regional_population), partial)
         self.assertIsNotNone(script.attributes.get(REGIONAL_POPULATION_ATTRIBUTE))
+        script.db.regional_population = saved_zones
+
+        # A malformed saved seed and a missing timeline are the same refusal.
+        saved_seed = script.attributes.get(POPULATION_SEED_ATTRIBUTE)
+        script.attributes.add(POPULATION_SEED_ATTRIBUTE, "not-an-integer")
+        with self.assertRaises(PopulationStateUninitialized):
+            sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        script.attributes.add(POPULATION_SEED_ATTRIBUTE, saved_seed)
+        from world.maps.regional_population import POPULATION_TIMELINE_ATTRIBUTE
+
+        saved_timeline = script.attributes.get(POPULATION_TIMELINE_ATTRIBUTE)
+        script.attributes.remove(POPULATION_TIMELINE_ATTRIBUTE)
+        with self.assertRaises(PopulationStateUninitialized):
+            sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        script.attributes.add(POPULATION_TIMELINE_ATTRIBUTE, saved_timeline)
+
+    def test_startup_preflight_refuses_before_restoration(self):
+        from server.conf.at_server_startstop import (
+            STARTUP_STEP_ORDER,
+            _verify_population_state,
+        )
+
+        self.assertLess(
+            STARTUP_STEP_ORDER.index("verify_population_state"),
+            STARTUP_STEP_ORDER.index("restore_persisted_sessions"),
+        )
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+        from world.maps.regional_population import PopulationStateUninitialized
+
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        states = dict(script.db.regional_population)
+        states.pop(sorted(states)[0])
+        script.db.regional_population = states
+        with self.assertRaises(PopulationStateUninitialized):
+            _verify_population_state()
 
     def test_a_later_zone_failure_rolls_back_the_fresh_provisioning(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript

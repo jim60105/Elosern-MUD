@@ -89,8 +89,8 @@ def _geometry_for(cell):
         1,
         2,
         1,
-        5,
-        5,
+        100,
+        100,
         1,
     )
     cells = eligible_birth_cells(
@@ -145,6 +145,9 @@ def run() -> dict:
     failure_region, failure_rectangle, _failure_cells = _geometry_for(candidates[-1])
 
     scopes = synthetic_registries(
+        "races",
+        "subraces",
+        "static_tiers",
         "monster_species",
         "monster_variants",
         "monster_tiers",
@@ -164,8 +167,8 @@ def run() -> dict:
             1,
             2,
             1,
-            5,
-            5,
+            100,
+            100,
             1,
         )
         failure_zone = EcologyZone(
@@ -212,26 +215,70 @@ def run() -> dict:
                     f"smoke: births/view mismatch {birth_pks!r} vs {view_birth_ids!r}"
                 )
 
-            # Kill one individual through the owner's loss evidence.
+            # Kill one individual through the real committed combat resolver.
             target = Monster.objects.get(pk=birth_pks[0])
-            before = owner.presence_of(script, target)
-            target.traits.hp.current = 0
-            owner.record_population_transition(
-                script,
-                owner.PopulationTransition(
-                    source_id=f"smoke-defeat:{target.pk}",
-                    individual_id=int(target.pk),
-                    occurred_tick=tick,
-                    before=before,
-                    after=owner.presence_of(script, target, alive=False),
-                ),
+            from world.rules.combat_session import (
+                BASIC_ATTACK_KEY,
+                engage_group,
+                read_session,
+                submit_player_action,
             )
-            population_lifecycle.settle_population_lifecycle(tick, tick)
+            from world.rules.tests._combat_session_helpers import (
+                _player,
+                complete_party_draft,
+            )
+
+            fighter = _player("smoke fighter")
+            fighter.traits.hp.base = 100000
+            fighter.traits.hp.current = 100000
+            enter_wilderness(fighter, coordinates=birth_cells[0], name=WILDERNESS_NAME)
+            target.location = fighter.location
+            fighter.location.contents_cache.add(target)
+            target.traits.hp.base = 1
+            target.traits.hp.current = 1
+            before = owner.presence_of(script, target)
+            from world.rules import monster_behaviour
+
+            rulebook = dict(monster_behaviour.MONSTER_BEHAVIOUR_YAML)
+            tier_defaults = dict(rulebook["tier_default_archetype"])
+            tier_defaults[target.threat_tier] = next(iter(tier_defaults.values()))
+            rulebook["tier_default_archetype"] = tier_defaults
+            with patch.object(
+                monster_behaviour, "MONSTER_BEHAVIOUR_YAML", rulebook
+            ):
+                engage_group(fighter, [target])
+                result = None
+                for _round in range(20):
+                    if read_session(fighter) is None:
+                        break
+                    admitted = submit_player_action(
+                        fighter, BASIC_ATTACK_KEY, [target]
+                    )
+                    result = complete_party_draft(fighter, target, admitted)
+                    if result.get("outcome") == "victory":
+                        break
+            if read_session(fighter) is not None:
+                raise RuntimeError(
+                    f"smoke: combat did not settle the target: {result!r}"
+                )
+            if target.traits.hp.current > 0:
+                raise RuntimeError("smoke: target survived the committed defeat")
+            clock = get_world_clock()
+            now = clock.tick
+            population_lifecycle.settle_population_lifecycle(now, now)
             due = owner.zone_state(script, zone.key).recovery_due_tick
             before_due_ids = _live_ids(script)
 
-            clock = get_world_clock()
-            clock.advance(zone.recovery_delay + 1, AdvanceSource.SKIP, [])
+            if due is None or due <= now:
+                raise RuntimeError(f"smoke: no future due tick after {now}")
+            clock.advance(due - now - 1, AdvanceSource.SKIP, [])
+            before_exact_due_ids = _live_ids(script)
+            if before_exact_due_ids != before_due_ids:
+                raise RuntimeError(
+                    "smoke: a birth happened before the due tick "
+                    f"{due!r}: {before_due_ids!r} -> {before_exact_due_ids!r}"
+                )
+            clock.advance(1, AdvanceSource.SKIP, [])
             after_due_ids = _live_ids(script)
             state_after_due = owner.zone_state(script, zone.key)
             new_ids = sorted(set(after_due_ids) - set(before_due_ids))
@@ -346,6 +393,7 @@ def run() -> dict:
                     "due_tick": due,
                 },
                 "before_due_living": before_due_ids,
+                "before_exact_due_living": before_exact_due_ids,
                 "at_due_living": after_due_ids,
                 "delayed_wave_pks": new_ids,
                 "state_after_due": {

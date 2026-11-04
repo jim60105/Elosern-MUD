@@ -1628,13 +1628,23 @@ MUD_SMOKE_DB=/tmp/mud-population-smoke.sqlite3 \
 Observed output on the disposable database:
 
 ```json
-{"seed": 0, "zone": "smoke_zone", "region": "western_hills_valleys", "birth_cells": 225, "coordinator_registered_once": true, "initial_pks": [2, 3, 4], "initial_state": {"generation_sequence": 3, "recovery_due_tick": null}, "view_initial_ids": [2, 3, 4], "defeat": {"pk": 2, "was_alive": true, "now_alive": false, "due_tick": 5}, "before_due_living": [3, 4], "at_due_living": [3, 4, 5], "delayed_wave_pks": [5], "state_after_due": {"generation_sequence": 4, "recovery_due_tick": null}, "view_due_ids": [3, 4, 5], "interrupt_hostile_ids": [3, 4, 5], "reload": {"id": 3, "hp": 40, "home_zone": "smoke_zone"}, "rollback": {"before_count": 4, "after_count": 4, "state": null, "retry_created": [16, 17, 18]}, "legacy_absent": {"ensure_population": true, "ambient_registry": true}, "species": "t_whisper_quail", "variant": "t_whisper_quail_ordinary"}
+{"seed": 0, "zone": "smoke_zone", "region": "western_hills_valleys", "birth_cells": 225, "coordinator_registered_once": true, "initial_pks": [2, 3, 4], "initial_state": {"generation_sequence": 3, "recovery_due_tick": null}, "view_initial_ids": [2, 3, 4], "defeat": {"pk": 2, "was_alive": true, "now_alive": false, "due_tick": 106}, "before_due_living": [3, 4], "before_exact_due_living": [3, 4], "at_due_living": [3, 4, 15], "delayed_wave_pks": [15], "state_after_due": {"generation_sequence": 4, "recovery_due_tick": null}, "view_due_ids": [3, 4, 15], "interrupt_hostile_ids": [3, 4, 15], "reload": {"id": 3, "hp": 40, "home_zone": "smoke_zone"}, "rollback": {"before_count": 4, "after_count": 4, "state": null, "retry_created": [17, 18, 19]}, "legacy_absent": {"ensure_population": true, "ambient_registry": true}, "species": "t_whisper_quail", "variant": "t_whisper_quail_ordinary"}
 ```
 
 This proves the coordinator is registered once, a configured zone initializes
 through the owner, births are actual registered individuals, one loss is
-recorded, the due tick produces a delayed wave, view and interrupt surfaces
-show only living IDs, a fresh-object reload keeps identity/resources/home, a
-post-construction fault leaves no state and a retry succeeds, and no legacy
-generation symbol is importable. Human review: the report names synthetic
+recorded by a real committed basic-attack combat round, no birth happens before
+the due tick, the exact due tick produces a delayed wave, view and interrupt
+surfaces show only living IDs, a fresh-object reload keeps
+identity/resources/home, a post-construction fault leaves no state and a retry
+succeeds, and no legacy generation symbol is importable. LLM and art services
+are disabled in the smoke settings. Human review: the report names synthetic
 species/content only; no shipped copy or balance value is asserted.
+
+Disposition of the wider smoke contract: undersupplied hunt acceptance, GM
+spawn/HP/delete, quest placement, manual excess, cleared one-shot sites and a
+protected-battle restart are covered by their owning focused suites
+(`test_regional_population*`, `test_monster_sites`, `test_site_clear_out_acceptance`,
+`test_permanent_occupants`, GM/movement tests) rather than duplicated in this
+runner. The runner deliberately exercises one real birth/defeat/recovery/reload
+path plus the construction-fault retry.

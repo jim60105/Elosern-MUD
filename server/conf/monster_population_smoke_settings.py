@@ -16,3 +16,10 @@ import os
 from server.conf.settings import *  # noqa: E402,F401,F403
 
 DATABASES["default"]["NAME"] = os.environ["MUD_SMOKE_DB"]
+
+# The deterministic smoke never reaches a model or image service.
+LLM_PROFILES = {
+    layer: {**values, "enabled": False} for layer, values in LLM_PROFILES.items()
+}
+ART_SCHEDULER_ENABLED = False
+ART_TRANSLATE_DOWNLOAD_ENABLED = False

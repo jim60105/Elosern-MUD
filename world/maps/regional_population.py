@@ -842,6 +842,18 @@ def require_initialized_population(wilderness: Any) -> None:
             f"{STATE_UNINITIALIZED}: no saved population state"
         )
     try:
+        read_population_seed(wilderness)
+    except (PopulationSeedUninitialized, MalformedPopulationState) as error:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: {error}"
+        ) from error
+    try:
+        read_population_timeline(wilderness)
+    except MalformedPopulationState as error:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: {error}"
+        ) from error
+    try:
         states = _state_map(wilderness)
     except MalformedPopulationState as error:
         raise PopulationStateUninitialized(
@@ -1960,21 +1972,19 @@ def restore_population_surfaces(snapshot: Mapping[int, SurfaceSnapshot]) -> None
         id(instance): instance
         for instance in (*ObjectDB.get_all_cached_instances(), *ScriptDB.get_all_cached_instances())
     }
-    for obj_id, surface in snapshot.items():
-        obj = candidates.get(obj_id)
-        if obj is None or getattr(obj, "_is_deleted", False):
-            continue
-        for (key, category), value in surface.attributes.items():
-            _restore_attribute(obj, key, category, value)
+    # Evict rolled-back instances before restoring any Attribute: an owner
+    # whose row the rollback removed (a freshly provisioned script) must not
+    # have cached snapshotted Attributes re-saved into an orphan row.
     flush_orphan_instances()
-    # The orphan sweep covers the objects this write created; the snapshot's own
-    # object is evicted here when the rollback removed its row too.
-    for obj_id in snapshot:
+    for obj_id, surface in snapshot.items():
         obj = candidates.get(obj_id)
         if obj is None or getattr(obj, "_is_deleted", False):
             continue
         if not type(obj).objects.filter(pk=obj.pk).exists():
             flush_instance(obj)
+            continue
+        for (key, category), value in surface.attributes.items():
+            _restore_attribute(obj, key, category, value)
 
 
 def snapshot_regional_population_surfaces(

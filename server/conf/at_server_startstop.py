@@ -61,6 +61,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_correspondence_delivery",
     "register_title_planner",
     "register_regional_population",
+    "verify_population_state",
     "restore_persisted_sessions",
     "sync_wilderness",
     "sync_connected_encounters",
@@ -407,6 +408,24 @@ def _validate_npc_roster_step() -> None:
     validate_npc_roster(quest_templates=QUEST_TEMPLATE_POOL)
 
 
+def _verify_population_state() -> None:
+    """Refuse an incomplete existing world before any restoring clock advance.
+
+    A fresh world has no script yet and is initialized later by
+    ``sync_wilderness``. An existing script must already carry the complete
+    runtime population state; checking it here guarantees the named refusal
+    happens before restoration can settle a recovery or site boundary.
+    """
+    from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+    from world.maps.regional_population import require_initialized_population
+    from world.maps.wilderness_provider import WILDERNESS_NAME
+
+    script = WildernessScript.objects.filter(db_key=WILDERNESS_NAME).first()
+    if script is not None:
+        require_initialized_population(script)
+
+
 def at_server_start():
     """
     This is called every time the server starts up, regardless of
@@ -541,6 +560,9 @@ def at_server_start():
             "world.maps.population_lifecycle", "register_regional_population"
         ),
     )
+    # Refuse an incompatible preexisting world before restoration advances the
+    # clock; fresh initialization remains after restoration.
+    _startup_step("verify_population_state", _verify_population_state)
     # Restore persisted combat sessions BEFORE wilderness provisioning: a
     # defeated population individual still referenced by a committed session
     # must not be replaced or discarded first (fix-startup-session-restore-
