@@ -310,17 +310,26 @@ def _escape_context_for(record: CombatSessionRecord) -> Any:
 
     from world.rules.world_escape import AbstractEscapeContext, WorldEscapeContext
 
-    if record.population_cell is None:
+    if record.mode != "hostile":
+        # Guild examinations and other staged simulations are explicitly
+        # abstract: their resolution claims no world relocation.
         return AbstractEscapeContext()
     from world.rules.movement_edges import LocationRef
 
-    cell = record.population_cell
     occurred_tick = int(record.started_tick) + (
         int(record.rounds_elapsed) + 1
     ) * int(COMBAT_YAML["round"]["seconds"])
-    source = LocationRef.wilderness(
-        cell.get("wilderness"), int(cell.get("x")), int(cell.get("y"))
-    )
+    if record.population_cell is not None:
+        cell = record.population_cell
+        source = LocationRef.wilderness(
+            cell.get("wilderness"), int(cell.get("x")), int(cell.get("y"))
+        )
+    else:
+        # A real hostile engagement in an authored room carries world
+        # authority at the durable room locator, so its monsters escape
+        # through real exits instead of silently falling back to abstract
+        # eligibility.
+        source = LocationRef.room(int(record.room_id))
     operation_id = (
         f"{record.engagement_id or record.session_id}:"
         f"round:{int(record.rounds_elapsed) + 1}:flee"

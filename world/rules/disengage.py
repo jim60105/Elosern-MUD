@@ -13,6 +13,7 @@ from world.rules.action import (
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.combat_identity import stable_actor_id
 from world.rules.dice import roll_d100
+from world.observability import log_warn
 from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import (
     FactionConstraint,
@@ -272,7 +273,26 @@ def _handle_disengage(
             wilderness = regional_population.live_wilderness()
             if wilderness is None:
                 raise RuntimeError("mapped escape lost its wilderness world")
-            monster_activity.commit_monster_departure(wilderness, plan)
+            try:
+                monster_activity.commit_monster_departure(wilderness, plan)
+            except Exception as error:
+                # The enclosing commit restores every touched surface after
+                # this raises; the operational failure is named before that
+                # restoration so no rolled-back success is ever logged.
+                log_warn(
+                    "monster_escape_failed",
+                    exc=error,
+                    context={
+                        "session": plan.session_id,
+                        "operation": plan.operation_id,
+                        "individual": plan.individual_id,
+                        "group": plan.group_id,
+                        "source": plan.edge.source.kind,
+                        "destination": plan.edge.destination.kind,
+                        "tick": plan.occurred_tick,
+                    },
+                )
+                raise
 
         return [
             PendingEffect(

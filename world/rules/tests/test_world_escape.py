@@ -364,7 +364,13 @@ class WorldEscapeTests(EvenniaTest):
         remaining = read_monster_activity(self.wilderness)
         self.assertNotIn(journey_id, remaining.journeys)
         arrived = read_optional_fatigue_state(individual)
-        self.assertLessEqual(arrived.reserve_units, arrived_state.reserve_units)
+        expected_wait = predict_interval(
+            arrived_state,
+            FatigueActivity.AWAKE,
+            deferred.retry_tick - deferred.arrival_tick,
+            completion=IntervalCompletion.INDIVISIBLE,
+        ).end
+        self.assertEqual(arrived.reserve_units, expected_wait.reserve_units)
         self.assertEqual(
             self.wilderness.db.itemcoordinates.get(individual),
             (destination.x, destination.y),
@@ -416,4 +422,271 @@ class WorldEscapeTests(EvenniaTest):
         self.assertEqual(
             self.wilderness.db.itemcoordinates.get(individual),
             (journey.destination.x, journey.destination.y),
+        )
+
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
+    def test_the_population_lifecycle_settles_a_journey_in_equal_partitions(self):
+        from types import MappingProxyType
+        from unittest.mock import patch
+
+        from world.maps import monster_sites, population_lifecycle
+
+        from world.rules.clock import get_world_clock
+
+        self.enterContext(
+            patch.object(monster_sites, "MONSTER_SITE_REGISTRY", MappingProxyType({}))
+        )
+        population_lifecycle.register_regional_population()
+        from world.rules import clock as clock_module
+
+        self.addCleanup(
+            clock_module._EVENT_SOURCES.pop, population_lifecycle.STAGE_KIND, None
+        )
+        individual = self._monster()
+        departure_state = read_optional_fatigue_state(individual)
+        plan = plan_individual_escape(individual, None, self._context(individual))
+        journey_id = commit_monster_departure(self.wilderness, plan)
+        journey = read_monster_activity(self.wilderness).journeys[journey_id]
+        self.assertGreater(journey.arrival_tick, journey.depart_tick)
+        clock = get_world_clock()
+        clock.tick = journey.depart_tick
+        midpoint = journey.depart_tick + (journey.arrival_tick - journey.depart_tick) // 2
+
+        population_lifecycle.settle_population_lifecycle(
+            journey.depart_tick, midpoint
+        )
+        self.assertIn(
+            journey_id,
+            read_monster_activity(self.wilderness).journeys,
+            "a partition without a boundary must not advance the passage",
+        )
+        population_lifecycle.settle_population_lifecycle(
+            midpoint, journey.arrival_tick
+        )
+        arrived = read_optional_fatigue_state(individual)
+        expected = self._expected_reserve(
+            departure_state,
+            FatigueActivity.FOOT_TRAVEL,
+            journey.arrival_tick - journey.depart_tick,
+        )
+        self.assertEqual(arrived.reserve_units, expected)
+        self.assertEqual(
+            self.wilderness.db.itemcoordinates.get(individual),
+            (journey.destination.x, journey.destination.y),
+        )
+        self.assertNotIn(
+            journey_id, read_monster_activity(self.wilderness).journeys
+        )
+
+    def test_a_late_lifecycle_failure_restores_the_whole_journey(self):
+        from unittest.mock import patch
+        from types import MappingProxyType
+
+        from world.maps import monster_sites, population_lifecycle
+
+        from world.rules.clock import AdvanceSource, get_world_clock
+
+        self.enterContext(
+            patch.object(monster_sites, "MONSTER_SITE_REGISTRY", MappingProxyType({}))
+        )
+        population_lifecycle.register_regional_population()
+        from world.rules import clock as clock_module
+
+        self.addCleanup(
+            clock_module._EVENT_SOURCES.pop, population_lifecycle.STAGE_KIND, None
+        )
+        individual = self._monster()
+        plan = plan_individual_escape(individual, None, self._context(individual))
+        journey_id = commit_monster_departure(self.wilderness, plan)
+        journey = read_monster_activity(self.wilderness).journeys[journey_id]
+        before_activity = monster_activity.state_to_dict(
+            read_monster_activity(self.wilderness)
+        )
+        before_reserve = read_optional_fatigue_state(individual).reserve_units
+        self.assertEqual(
+            self.wilderness.db.itemcoordinates.get(individual), None
+        )
+        from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
+
+        surface = monster_activity.snapshot_activity_surfaces(self.wilderness)[
+            id(individual)
+        ]
+        self.assertTrue(
+            all(
+                (key, category) in surface.attributes
+                for key, category in SLEEP_RECEIPT_SURFACES
+            )
+        )
+        clock = get_world_clock()
+        clock.tick = journey.depart_tick
+        real_settle = owner.settle_timeline_through
+
+        def fail_after_arrival(wilderness, tick, **kwargs):
+            if tick >= journey.arrival_tick:
+                raise RuntimeError("synthetic late lifecycle failure")
+            return real_settle(wilderness, tick, **kwargs)
+
+        with patch.object(
+            owner, "settle_timeline_through", side_effect=fail_after_arrival
+        ):
+            with self.assertRaises(RuntimeError):
+                clock.advance(
+                    journey.arrival_tick - journey.depart_tick,
+                    AdvanceSource.SKIP,
+                    [],
+                )
+        self.assertEqual(
+            monster_activity.state_to_dict(read_monster_activity(self.wilderness)),
+            before_activity,
+        )
+        self.assertEqual(
+            read_optional_fatigue_state(individual).reserve_units, before_reserve
+        )
+        self.assertIsNone(self.wilderness.db.itemcoordinates.get(individual))
+        self.assertIn(
+            journey_id, read_monster_activity(self.wilderness).journeys
+        )
+
+    def test_admission_pays_the_idle_prefix_before_combat_ownership(self):
+        from world.maps.monster_activity import begin_member_combat
+
+        individual = self._monster()
+        before = read_optional_fatigue_state(individual)
+        self.assertTrue(
+            begin_member_combat(
+                self.wilderness,
+                individual_id=individual.pk,
+                session_id="s",
+                tick=10,
+            )
+        )
+        expected = self._expected_reserve(before, FatigueActivity.AWAKE, 10)
+        self.assertEqual(read_optional_fatigue_state(individual).reserve_units, expected)
+        group = group_of_member(self.wilderness, individual.pk)
+        cursor = group.member_time[str(individual.pk)]
+        self.assertEqual((cursor.settled_through_tick, cursor.mode), (10, "combat"))
+
+    def test_a_real_authored_room_session_has_world_escape_authority(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        from world.rules.combat_session.battlefield import _escape_context_for
+        from world.rules.combat_session.records import CombatSessionRecord
+        from world.rules.world_escape import WorldEscapeContext
+
+        room = create_object(Room, key="t_escape_source")
+        other = create_object(Room, key="t_escape_destination")
+        create_object(
+            Exit, key="out", location=room, destination=other
+        )
+        individual = construct_species_individual(
+            next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key, ORDINARY
+        )
+        individual.location = room
+        write_fatigue_state(individual, RESERVE, SleepPosture.AWAKE)
+        create_group(
+            self.wilderness,
+            operation_id="room",
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key=monster_activity.STAGED_STATIONARY_ACTIVITY,
+            home=LocationRef.room(room.pk),
+            position=LocationRef.room(room.pk),
+            member_ids=(individual.pk,),
+            seed=SEED,
+            tick=0,
+        )
+        record = CombatSessionRecord(
+            session_id="hostile:1:0",
+            engagement_id="hostile:1:0:1",
+            mode="hostile",
+            room_id=int(room.pk),
+            player_ids=(int(self.char1.pk),),
+            enemy_ids=(int(individual.pk),),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=0,
+            exam_id=None,
+            started_tick=12,
+            population_cell=None,
+        )
+        context = _escape_context_for(record)
+        self.assertIsInstance(context, WorldEscapeContext)
+        self.assertEqual(context.source, LocationRef.room(room.pk))
+        plan = plan_individual_escape(individual, None, context)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.edge.destination, LocationRef.room(other.pk))
+
+    def test_a_locked_room_exit_defers_arrival_and_retries_without_repricing(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.exits import Exit
+        from typeclasses.rooms import Room
+
+        from world.rules.world_escape import EscapePlan
+
+        room = create_object(Room, key="t_room_source")
+        other = create_object(Room, key="t_room_destination")
+        exit_obj = create_object(
+            Exit, key="out", location=room, destination=other
+        )
+        individual = construct_species_individual(
+            next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key, ORDINARY
+        )
+        individual.location = room
+        write_fatigue_state(individual, RESERVE, SleepPosture.AWAKE)
+        create_group(
+            self.wilderness,
+            operation_id="room-lock",
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key="t_whisper_quail_solitary_activity",
+            home=LocationRef.room(room.pk),
+            position=LocationRef.room(room.pk),
+            member_ids=(individual.pk,),
+            seed=SEED,
+            tick=0,
+        )
+        context = WorldEscapeContext(
+            session_id="hostile:4:0",
+            occurred_tick=6,
+            source=LocationRef.room(room.pk),
+            operation_id="room-lock:escape",
+        )
+        plan = plan_individual_escape(individual, None, context)
+        self.assertIsInstance(plan, EscapePlan)
+        journey_id = commit_monster_departure(self.wilderness, plan)
+        journey = read_monster_activity(self.wilderness).journeys[journey_id]
+        exit_obj.locks.add("traverse:false()")
+        events = monster_activity.settle_monster_activity_at(
+            self.wilderness, journey.arrival_tick
+        )
+        self.assertEqual([event.kind for event in events], ["monster_arrival_deferred"])
+        deferred = read_monster_activity(self.wilderness).journeys[journey_id]
+        after_defer = read_optional_fatigue_state(individual)
+        self.assertIsNone(individual.location)
+        exit_obj.locks.add("traverse:all()")
+        arrived_events = monster_activity.settle_monster_activity_at(
+            self.wilderness, deferred.retry_tick
+        )
+        self.assertEqual([event.kind for event in arrived_events], ["monster_arrived"])
+        from world.rules.fatigue import predict_interval
+
+        waiting = predict_interval(
+            after_defer,
+            FatigueActivity.AWAKE,
+            deferred.retry_tick - deferred.arrival_tick,
+            completion=IntervalCompletion.INDIVISIBLE,
+        ).end
+        self.assertEqual(
+            read_optional_fatigue_state(individual).reserve_units,
+            waiting.reserve_units,
+        )
+        self.assertIs(individual.location, other)
+        self.assertNotIn(
+            journey_id, read_monster_activity(self.wilderness).journeys
         )

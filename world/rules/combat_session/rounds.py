@@ -1022,7 +1022,7 @@ def _record_monster_combat_intervals(
     The map owner rejects an unowned member, so this records nothing for an
     abstract or staged participant.
     """
-    if record.population_cell is None:
+    if record.mode != "hostile":
         return
     from world.maps import monster_activity, regional_population
     from world.rules.combat_session.records import recorded_sleep_state

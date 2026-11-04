@@ -776,9 +776,12 @@ def state_from_dict(value: Any) -> MonsterActivityState:
                 raise _invalid(
                     f"member {key!r} of group {group.group_id!r} is combat-owned without a session"
                 )
-    for key, member_id in _member_index(groups).items():
-        if key in groups:
-            raise _invalid(f"member {member_id} belongs to more than one group")
+    seen_members: set[int] = set()
+    for group in groups.values():
+        for member_id in group.member_ids:
+            if member_id in seen_members:
+                raise _invalid(f"member {member_id} belongs to more than one group")
+            seen_members.add(member_id)
     receipts = {
         key: _receipt_from_dict(key, value) for key, value in receipts_raw.items()
     }
@@ -1389,10 +1392,10 @@ def begin_member_combat(
 ) -> bool:
     """Make one member combat-owned at admission; ``False`` when ungrouped.
 
-    The prior idle prefix is closed at ``tick`` (this change owns no idle
-    writer; the journey/activity slice settles the elapsed posture there), and
-    the member's owner becomes exactly this session. A member already owned by
-    the same session is unchanged.
+    The prior idle prefix is paid through the canonical fatigue writer at
+    ``tick`` under the member's own posture, then the member's owner becomes
+    exactly this session. A member already owned by the same session is
+    unchanged.
     """
     if not activity_provisioned(wilderness):
         return False
@@ -1403,6 +1406,15 @@ def begin_member_combat(
         current = group.member_time[str(individual_id)]
         if current.mode == MODE_COMBAT and current.session_id == session_id:
             return True
+        from evennia.objects.models import ObjectDB
+
+        individual = ObjectDB.objects.filter(id=int(individual_id)).first()
+        if individual is not None and tick > current.settled_through_tick:
+            _idle_physiology(
+                individual,
+                seconds=tick - current.settled_through_tick,
+                context={"stage": "monster_idle_admission", "session": session_id},
+            )
         member_time_map = dict(group.member_time)
         member_time_map[str(individual_id)] = MemberTime(
             max(current.settled_through_tick, tick), MODE_COMBAT, session_id, ()
@@ -1602,6 +1614,27 @@ def _waiting_physiology(
     )
 
 
+def _idle_physiology(
+    individual: Any, *, seconds: int, context: Mapping[str, Any]
+) -> None:
+    """Pay one ordinary idle interval under the member's actual posture."""
+    from world.rules.fatigue import (
+        FatigueActivity,
+        SleepPosture,
+        read_optional_fatigue_state,
+    )
+
+    state = read_optional_fatigue_state(individual)
+    activity = (
+        FatigueActivity.SLEEP
+        if state is not None and state.posture is not SleepPosture.AWAKE
+        else FatigueActivity.AWAKE
+    )
+    _settle_interval(
+        individual, seconds=seconds, activity=activity, context=context
+    )
+
+
 def _destination_blocked(wilderness: Any, destination: LocationRef, tick: int) -> bool:
     from world.maps import regional_population
 
@@ -1609,6 +1642,32 @@ def _destination_blocked(wilderness: Any, destination: LocationRef, tick: int) -
         cell = (destination.x, destination.y)
         return cell in regional_population.protected_cells(wilderness, at_tick=tick)
     return room_protected(wilderness, destination, tick)
+
+
+def _route_lawful(wilderness: Any, journey: MonsterJourney, individual: Any) -> bool:
+    """Whether the committed edge is still a lawful read-only route now.
+
+    The committed price and duration are never repriced: this only re-resolves
+    discovery at the source. A vanished authored source room is corrupt route
+    state and raises; a now-locked, retargeted or refusing destination is a
+    temporary obstruction and contributes a positive retry, exactly like
+    encounter protection.
+    """
+    from world.rules.movement_edges import legal_edges, room_for_ref
+
+    del wilderness
+    if journey.source.kind == "room" and room_for_ref(journey.source) is None:
+        raise _invalid(
+            f"journey {journey.journey_id!r} lost its authored source room"
+        )
+    if journey.destination.kind == "room" and room_for_ref(
+        journey.destination
+    ) is None:
+        raise _invalid(
+            f"journey {journey.journey_id!r} lost its authored destination room"
+        )
+    edges = legal_edges(individual, journey.source, (individual,))
+    return journey.edge in edges
 
 
 def _arrive(
@@ -1721,24 +1780,31 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
         if individual is None:
             raise _invalid(f"journey {journey_id!r} names a missing individual")
         group = state.groups[journey.group_id]
-        if _destination_blocked(wilderness, journey.destination, tick):
+        # Pay exactly the newly elapsed passage and ordinary waiting at every
+        # due boundary, whether this boundary arrives or defers. A successful
+        # retry therefore never loses the wait that preceded it.
+        travelled = min(tick, journey.arrival_tick) - min(
+            journey.settled_through_tick, journey.arrival_tick
+        )
+        _journey_physiology(
+            individual,
+            seconds=max(0, travelled),
+            context={"stage": "monster_journey", "journey": journey_id},
+        )
+        waiting = max(
+            0, tick - max(journey.settled_through_tick, journey.arrival_tick)
+        )
+        _waiting_physiology(
+            individual,
+            seconds=waiting,
+            context={"stage": "monster_journey_wait", "journey": journey_id},
+        )
+        settled = max(journey.settled_through_tick, tick)
+        blocked = _destination_blocked(
+            wilderness, journey.destination, tick
+        ) or not _route_lawful(wilderness, journey, individual)
+        if blocked:
             interval = _activity_interval(group.activity_key)
-            travelled = min(tick, journey.arrival_tick) - min(
-                journey.settled_through_tick, journey.arrival_tick
-            )
-            _journey_physiology(
-                individual,
-                seconds=max(0, travelled),
-                context={"stage": "monster_journey", "journey": journey_id},
-            )
-            waiting = max(
-                0, tick - max(journey.settled_through_tick, journey.arrival_tick)
-            )
-            _waiting_physiology(
-                individual,
-                seconds=waiting,
-                context={"stage": "monster_journey_wait", "journey": journey_id},
-            )
             journeys = dict(state.journeys)
             journeys[journey_id] = MonsterJourney(
                 journey_id,
@@ -1748,7 +1814,7 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
                 journey.destination,
                 journey.depart_tick,
                 journey.arrival_tick,
-                max(journey.settled_through_tick, tick),
+                settled,
                 tick + interval,
                 journey.edge,
                 journey.plan,
@@ -1775,14 +1841,6 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
                 ScheduledEvent("monster_arrival_deferred", tick, dict(context))
             )
             continue
-        travelled = min(tick, journey.arrival_tick) - min(
-            journey.settled_through_tick, journey.arrival_tick
-        )
-        _journey_physiology(
-            individual,
-            seconds=max(0, travelled),
-            context={"stage": "monster_journey", "journey": journey_id},
-        )
         journey = MonsterJourney(
             journey_id,
             journey.group_id,
@@ -1791,7 +1849,7 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
             journey.destination,
             journey.depart_tick,
             journey.arrival_tick,
-            max(journey.settled_through_tick, tick),
+            settled,
             None,
             journey.edge,
             journey.plan,
@@ -1895,6 +1953,7 @@ def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
     from evennia.objects.models import ObjectDB
 
     from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
+    from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
 
     surfaces: dict[int, SurfaceSnapshot] = {
         id(wilderness): SurfaceSnapshot(
@@ -1917,7 +1976,7 @@ def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
         surfaces[id(individual)] = SurfaceSnapshot(
             attributes={
                 (key, category): _db_safe_attribute_snapshot(individual, key)
-                for key, category in FATIGUE_ATTRIBUTE_SURFACES
+                for key, category in (*FATIGUE_ATTRIBUTE_SURFACES, *SLEEP_RECEIPT_SURFACES)
             },
             location=(location is not None, getattr(location, "pk", None)),
         )

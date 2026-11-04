@@ -898,6 +898,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 (owner.POPULATION_SEED_ATTRIBUTE, None),
                 (owner.POPULATION_TIMELINE_ATTRIBUTE, None),
                 ("itemcoordinates", None),
+                # The same construction/registration operations own the
+                # map-owned activity record, so a caller rollback covers it.
+                ("monster_activity", None),
             },
         )
         # Restoring the snapshot is a faithful no-op on unchanged state.

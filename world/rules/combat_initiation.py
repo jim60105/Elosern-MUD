@@ -462,6 +462,15 @@ def initiate_field_combat(
     caster_dialogue_before: tuple[bool, Any] | None = None
     if actor is not commander:
         caster_dialogue_before = _attribute_snapshot(actor, "dialogue_session")
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    activity_before = (
+        monster_activity.snapshot_activity_surfaces(wilderness)
+        if wilderness is not None
+        and monster_activity.activity_provisioned(wilderness)
+        else None
+    )
     engaged_record: CombatSessionRecord | None = None
     rejection: dict[str, Any] | None = None
     try:
@@ -530,6 +539,8 @@ def initiate_field_combat(
             active_combat_before,
             dialogue_before,
             caster_dialogue_before,
+            activity_before,
+            wilderness,
         )
         raise
     if rejection is not None:
@@ -543,6 +554,8 @@ def initiate_field_combat(
             active_combat_before,
             dialogue_before,
             caster_dialogue_before,
+            activity_before,
+            wilderness,
         )
         return rejection
     return result
@@ -555,6 +568,8 @@ def _restore_initiation_state(
     active_combat_before: tuple[bool, Any],
     dialogue_before: tuple[bool, Any],
     caster_dialogue_before: tuple[bool, Any] | None = None,
+    activity_before: dict[int, Any] | None = None,
+    wilderness: Any | None = None,
 ) -> None:
     """Undo everything ``engage_group()`` left outside the rollback's reach.
 
@@ -573,3 +588,11 @@ def _restore_initiation_state(
         _restore_attribute(caster, "dialogue_session", caster_dialogue_before)
     if engaged_record is not None:
         unregister_participants((*engaged_record.player_ids, *engaged_record.enemy_ids))
+    if activity_before is not None:
+        from world.maps import monster_activity
+
+        # Admission paid idle physiology and possibly opened room protection;
+        # the rolled-back engagement owns none of it.
+        monster_activity.restore_activity_surfaces(
+            activity_before, wilderness=wilderness
+        )

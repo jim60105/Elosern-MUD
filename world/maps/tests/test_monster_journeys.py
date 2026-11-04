@@ -38,6 +38,7 @@ from world.maps.monster_activity import (
     MonsterActivityOperationInvalid,
     MonsterActivityStateInvalid,
     begin_monster_journey,
+    commit_monster_departure,
     create_group,
     group,
     group_of_member,
@@ -185,6 +186,38 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         broken["groups"][group_id]["member_time"]["999"] = broken["groups"][group_id][
             "member_time"
         ]["101"]
+        self.assertRaises(MonsterActivityStateInvalid, state_from_dict, broken)
+
+    def test_a_member_in_two_groups_is_rejected(self):
+        self._seed()
+        ref = LocationRef.wilderness(WILDERNESS_NAME, *LOCAL[0])
+        first = create_group(
+            self.wilderness,
+            operation_id="first",
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key=monster_activity.STAGED_STATIONARY_ACTIVITY,
+            home=ref,
+            position=ref,
+            member_ids=(101,),
+            seed=SEED,
+            tick=0,
+        )
+        second = create_group(
+            self.wilderness,
+            operation_id="second",
+            owner_kind="explicit",
+            owner_key="test",
+            activity_key=monster_activity.STAGED_STATIONARY_ACTIVITY,
+            home=ref,
+            position=ref,
+            member_ids=(102,),
+            seed=SEED,
+            tick=0,
+        )
+        broken = state_to_dict(read_monster_activity(self.wilderness))
+        broken["groups"][second]["member_ids"] = [101]
+        broken["groups"][second]["member_time"] = {"101": broken["groups"][first]["member_time"]["101"]}
         self.assertRaises(MonsterActivityStateInvalid, state_from_dict, broken)
 
 
@@ -562,3 +595,189 @@ class MappedFleeIntegrationTests(EvenniaTest):
         engaged = engage_group(actor, [fleeing])
         self.assertIn(int(fleeing.pk), engaged["record"].enemy_ids)
         self.assertTrue(ObjectDB.objects.filter(pk=fleeing.pk).exists())
+
+    def test_a_rejected_opening_restores_admission_activity_and_physiology(self):
+        from unittest.mock import patch
+
+        from world.rules import combat_initiation
+        from world.rules.combat_session import BASIC_ATTACK_KEY
+        from world.rules.fatigue import read_optional_fatigue_state
+        from world.rules.tests._combat_session_helpers import _player
+
+        actor = _player("rollback hunter")
+        actor.location = self.room
+        for key in ("atk_phys", "agility", "defense"):
+            getattr(actor.traits, key).base = 200
+        actor.traits.hp.base = 2000
+        actor.traits.hp.current = 2000
+        enemy = self._enemy("rollback")
+        from world.rules.clock import get_world_clock
+
+        get_world_clock().tick = 30
+        before = monster_activity.state_to_dict(
+            read_monster_activity(self.wilderness)
+        )
+        before_reserve = read_optional_fatigue_state(enemy).reserve_units
+        with patch.object(
+            combat_initiation,
+            "submit_opening_action",
+            return_value={"outcome": "rejected", "reason": "synthetic"},
+        ) as submit:
+            result = combat_initiation.initiate_field_combat(
+                actor, BASIC_ATTACK_KEY, enemy
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        submit.assert_called_once()
+        self.assertEqual(
+            monster_activity.state_to_dict(read_monster_activity(self.wilderness)),
+            before,
+        )
+        self.assertEqual(
+            read_optional_fatigue_state(enemy).reserve_units, before_reserve
+        )
+        self.assertIsNone(actor.db.active_combat)
+
+    def test_a_partial_admission_failure_restores_the_activity_record(self):
+        from unittest.mock import patch
+
+        from world.rules.combat_session import engage_group
+        from world.rules.tests._combat_session_helpers import _player
+
+        actor = _player("partial hunter")
+        actor.location = self.room
+        first = self._enemy("partial-a")
+        second = self._enemy("partial-b")
+        before = monster_activity.state_to_dict(
+            read_monster_activity(self.wilderness)
+        )
+        real = monster_activity.begin_member_combat
+        calls = {"count": 0}
+
+        def fail_second(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise RuntimeError("synthetic partial admission failure")
+            return real(*args, **kwargs)
+
+        with patch.object(
+            monster_activity, "begin_member_combat", side_effect=fail_second
+        ):
+            with self.assertRaises(RuntimeError):
+                engage_group(actor, [first, second])
+        self.assertEqual(
+            monster_activity.state_to_dict(read_monster_activity(self.wilderness)),
+            before,
+        )
+        self.assertIsNone(actor.db.active_combat)
+
+
+class MappedPresenceConsumerTests(EvenniaTest):
+    """Transit is absent from every actual-presence consumer."""
+
+    def setUp(self):
+        super().setUp()
+        publish_shipped_map_world()
+        self.enterContext(
+            synthetic_registries("monster_species", "monster_variants", "monster_tiers")
+        )
+        create_wilderness(
+            name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
+        )
+        self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        initialize_population_seed(self.wilderness, seed=SEED, tick=0)
+        self.assertTrue(
+            enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
+        )
+        self.room = self.char1.location
+        neighbours = (
+            (PROBE[0] + 1, PROBE[1]),
+            (PROBE[0] + 1, PROBE[1] + 1),
+            (PROBE[0], PROBE[1] + 1),
+            (PROBE[0] - 1, PROBE[1] + 1),
+            (PROBE[0] - 1, PROBE[1]),
+            (PROBE[0] - 1, PROBE[1] - 1),
+            (PROBE[0], PROBE[1] - 1),
+            (PROBE[0] + 1, PROBE[1] - 1),
+        )
+        for cell in neighbours:
+            enter_wilderness(self.char1, coordinates=cell, name=WILDERNESS_NAME)
+        enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
+        self.room = self.char1.location
+
+    def _departing_monster(self):
+        from world.rules.fatigue import write_fatigue_state
+        from world.rules.world_escape import (
+            WorldEscapeContext,
+            plan_individual_escape,
+        )
+
+        individual = construct_species_individual(
+            next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key, ORDINARY
+        )
+        individual.location = self.room
+        self.room.contents_cache.add(individual)
+        self.wilderness.db.itemcoordinates[individual] = PROBE
+        write_fatigue_state(individual, RESERVE, SleepPosture.AWAKE)
+        create_group(
+            self.wilderness,
+            operation_id="consumer",
+            owner_kind="zone",
+            owner_key="t_zone",
+            activity_key="t_whisper_quail_solitary_activity",
+            home=LocationRef.wilderness(WILDERNESS_NAME, *PROBE),
+            position=LocationRef.wilderness(WILDERNESS_NAME, *PROBE),
+            member_ids=(individual.pk,),
+            seed=SEED,
+            tick=0,
+        )
+        context = WorldEscapeContext(
+            session_id="hostile:3:0",
+            occurred_tick=6,
+            source=LocationRef.wilderness(WILDERNESS_NAME, *PROBE),
+            operation_id="consumer:escape",
+        )
+        plan = plan_individual_escape(individual, None, context)
+        journey_id = commit_monster_departure(self.wilderness, plan)
+        journey = read_monster_activity(self.wilderness).journeys[journey_id]
+        return individual, journey
+
+    def test_population_view_and_gm_inspection_never_show_transit_at_either_endpoint(self):
+        from world.maps.wilderness_population import population_view
+        from world.rules.travel_interrupts import live_hostile_facts
+        from web.gm.readers import monsters as reader
+
+        individual, journey = self._departing_monster()
+        destination = (journey.destination.x, journey.destination.y)
+        cells = [PROBE, destination]
+        facts = population_view(self.wilderness, cells)
+        self.assertNotIn(
+            f"object:{individual.pk}",
+            {fact.observation_key for fact in facts},
+        )
+        self.assertEqual(
+            [
+                fact
+                for fact in live_hostile_facts(self.room, cells)
+                if fact.observation_key == f"object:{individual.pk}"
+            ],
+            [],
+        )
+        section = reader.placement_section(individual)
+        labels = {entry["label"] for entry in section["rows"]}
+        self.assertIn("旅程", labels)
+        self.assertNotIn("所在房間", labels)
+        # A stale text or browser lookup by name/contents finds no present body.
+        self.assertFalse(self.room.search(individual.key))
+        self.assertNotIn(individual, self.room.contents)
+
+        monster_activity.settle_monster_activity_at(
+            self.wilderness, journey.arrival_tick
+        )
+        after = population_view(self.wilderness, [destination])
+        self.assertIn(
+            f"object:{individual.pk}",
+            {fact.observation_key for fact in after if fact.cell == destination},
+        )
+        section = reader.placement_section(individual)
+        labels = {entry["label"] for entry in section["rows"]}
+        self.assertNotIn("旅程", labels)

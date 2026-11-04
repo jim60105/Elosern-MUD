@@ -420,7 +420,7 @@ def _record_terminal_population_protection(record: CombatSessionRecord) -> None:
 
 def _record_terminal_room_protection(record: CombatSessionRecord) -> None:
     """Close one authored-room session's protection interval in the owner."""
-    if record.population_cell is not None:
+    if record.population_cell is not None or record.mode != "hostile":
         return
     from world.maps import monster_activity, regional_population
     from world.rules.movement_edges import LocationRef
@@ -448,7 +448,7 @@ def _settle_monster_combat_terminal(
     further physiology. The terminal boundary is the session's committed
     elapsed combat time, not the wall clock.
     """
-    if record.population_cell is None:
+    if record.mode != "hostile":
         return
     from evennia.objects.models import ObjectDB
 
