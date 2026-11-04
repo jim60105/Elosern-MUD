@@ -973,7 +973,8 @@
     "world.maps.tests.test_instance_reclamation",
     "world.maps.tests.test_instance_spawn",
     "world.maps.tests.test_instance_stage_wiring",
-    "world.maps.tests.test_interior_sources"
+    "world.maps.tests.test_interior_sources",
+    "world.maps.tests.test_population_geometry"
    ],
    "index": 32
   },

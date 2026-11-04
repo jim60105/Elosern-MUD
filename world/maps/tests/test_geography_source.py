@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import copy
 import unittest
-from dataclasses import FrozenInstanceError
+from contextlib import ExitStack
+from dataclasses import FrozenInstanceError, replace
 from types import MappingProxyType
+from unittest import mock
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
@@ -23,7 +25,15 @@ from elosern_map_core.terrain import region_for_coordinates as core_region_for
 import world.maps.geography as geography
 from world.lore.anchors import AnchorKind, anchor_geography, anchors
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.lore import monster_placement as placement
+from world.lore.monster_placement import (
+    CompositionMember,
+    EcologyZone,
+    EncounterComposition,
+    WeightedComposition,
+)
+from world.lore.monster_species import MonsterSpecies, MonsterVariant
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY, WildernessEntryPoint
 from world.lore.wilderness_regions import harbor_sites, regions
 from world.maps import map_data, wilderness_provider
 from world.tests.geography_fixture import (
@@ -56,6 +66,145 @@ def _continent_variant(**terrain_overrides):
     data = _plain(geography.current().continent.data)
     data["terrain"].update(terrain_overrides)
     return document_from_data(geography.CONTINENT_PATH, data)
+
+
+def _synthetic_composition(key: str) -> EncounterComposition:
+    return EncounterComposition(
+        key, (CompositionMember("t_fixture_variant", 1, 1),)
+    )
+
+
+def _synthetic_zone(
+    key: str, region_key: str, rectangle: tuple[int, int, int, int]
+) -> tuple[EcologyZone, EncounterComposition]:
+    composition = _synthetic_composition(f"{key}_group")
+    zone = EcologyZone(
+        key,
+        region_key,
+        (rectangle,),
+        (WeightedComposition(composition.key, 1),),
+        1,
+        50,
+        1,
+        3600,
+        600,
+        1,
+    )
+    return zone, composition
+
+
+def _synthetic_variants():
+    return {
+        "t_fixture_variant": MonsterVariant(
+            "t_fixture_variant",
+            "t_fixture_species",
+            "合成變體",
+            "合成變體敘述。",
+            "t_fixture_tier",
+            True,
+            None,
+            None,
+            False,
+        )
+    }
+
+
+def _synthetic_species(region_key: str):
+    return {
+        "t_fixture_species": MonsterSpecies(
+            "t_fixture_species",
+            "合成物種",
+            "合成描述",
+            "合成外觀",
+            "合成生態",
+            (region_key,),
+            "合成私有真相",
+            "合成私有解釋",
+            "合成私有猜想",
+            "t_fixture_variant",
+            True,
+        )
+    }
+
+
+def _ecology_patches(zones, compositions, region_key: str = "t_fixture_region"):
+    """Patch the authored ecology registries for one candidate publication.
+
+    The species/variant faces carry a synthetic pair whose habitat is the
+    tested region, so candidate publication runs the same complete declaration
+    validation the shipped module runs at import.
+    """
+    return (
+        mock.patch.object(
+            placement,
+            "ECOLOGY_ZONE" + "_REGISTRY",
+            MappingProxyType(dict(zones)),
+        ),
+        mock.patch.object(
+            placement,
+            "ENCOUNTER_COMPOSITION" + "_REGISTRY",
+            MappingProxyType(dict(compositions)),
+        ),
+        mock.patch.object(
+            placement,
+            "MONSTER_VARIANT" + "_REGISTRY",
+            MappingProxyType(_synthetic_variants()),
+        ),
+        mock.patch.object(
+            placement,
+            "MONSTER_SPECIES" + "_REGISTRY",
+            MappingProxyType(_synthetic_species(region_key)),
+        ),
+    )
+
+
+def _clear_of_settlements(cells) -> bool:
+    """Whether no inhabited settlement buffer reaches any of ``cells``."""
+    for entry in _settlements().wilderness_entries.values():
+        footprint = entry.footprint_cells or {entry.anchor_cell}
+        for cell in cells:
+            if any(
+                max(abs(cell[0] - source[0]), abs(cell[1] - source[1])) <= 1
+                for source in footprint
+            ):
+                return False
+    for key, anchor in anchors().items():
+        if anchor.kind is AnchorKind.DUNGEON:
+            continue
+        source = anchor_geography()[key].cell
+        if any(
+            max(abs(cell[0] - source[0]), abs(cell[1] - source[1])) <= 1
+            for cell in cells
+        ):
+            return False
+    return True
+
+
+def _birth_block() -> tuple[int, int, str]:
+    """One walkable 2x2 block in a single region, clear of every settlement.
+
+    The block is selected from the published terrain at test time; no shipped
+    coordinate is pinned, and the selection only proves the fixture is lawful
+    before the candidate assertions run.
+    """
+    for region_key, box in sorted(geography.current().region_search_boxes.items()):
+        x_min, x_max, y_min, y_max = box
+        for y in range(max(y_min, 0), min(y_max, geography.current().max_y) - 1, 4):
+            for x in range(max(x_min, 0), min(x_max, geography.current().max_x) - 1, 4):
+                cells = ((x, y), (x + 1, y), (x, y + 1), (x + 1, y + 1))
+                if not all(wilderness_provider.is_walkable_cell(cell) for cell in cells):
+                    continue
+                if len(
+                    {
+                        wilderness_provider.region_for_coordinates(*cell)
+                        for cell in cells
+                    }
+                ) != 1:
+                    continue
+                if not _clear_of_settlements(cells):
+                    continue
+                return x, y, wilderness_provider.region_for_coordinates(x, y)
+    raise AssertionError("no settlement-clear walkable block exists in this world")
 
 
 class ShippedGeographyPublicationTests(EvenniaTest):
@@ -172,6 +321,115 @@ class ShippedGeographyPublicationTests(EvenniaTest):
         self.assertEqual(geography.current().identity, identities)
 
 
+class EcologyCandidatePublicationTests(EvenniaTest):
+    """Bounded ecology zones are validated against the same candidate world."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        publish_shipped_geography()
+
+    def setUp(self):
+        self._shipped = geography.current()
+
+    def tearDown(self):
+        publish_geography(self._shipped)
+
+    def _build(self, settlements=None):
+        return geography.build_geography(
+            self._shipped.continent,
+            self._shipped.locations,
+            _settlements() if settlements is None else settlements,
+            fingerprints=dict(self._shipped.fingerprints),
+        )
+
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
+    def test_a_rejected_ecology_candidate_keeps_the_published_snapshot(self):
+        before = geography.current()
+        identity = before.identity
+        x, y, region_key = _birth_block()
+        zone, composition = _synthetic_zone(
+            "t_fixture_tight_zone", region_key, (x, x, y, y)
+        )
+        with ExitStack() as stack:
+            for patcher in _ecology_patches(
+                {zone.key: zone}, {composition.key: composition}, region_key
+            ):
+                stack.enter_context(patcher)
+            with self.assertRaises(geography.GeographyError) as captured:
+                self._build()
+        self.assertIn(zone.key, str(captured.exception))
+        self.assertIs(geography.current(), before)
+        self.assertEqual(geography.current().identity, identity)
+
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
+    def test_overlapping_synthetic_zones_are_rejected(self):
+        x, y, region_key = _birth_block()
+        rectangle = (x, x + 1, y, y + 1)
+        first, first_composition = _synthetic_zone(
+            "t_fixture_zone_a", region_key, rectangle
+        )
+        second, second_composition = _synthetic_zone(
+            "t_fixture_zone_b", region_key, rectangle
+        )
+        with ExitStack() as stack:
+            for patcher in _ecology_patches(
+                {first.key: first, second.key: second},
+                {
+                    first_composition.key: first_composition,
+                    second_composition.key: second_composition,
+                },
+                region_key,
+            ):
+                stack.enter_context(patcher)
+            with self.assertRaises(geography.GeographyError) as captured:
+                self._build()
+        self.assertIn(first.key, str(captured.exception))
+        self.assertIn(second.key, str(captured.exception))
+
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
+    def test_eligibility_reads_the_candidate_settlement_geometry(self):
+        x, y, region_key = _birth_block()
+        zone, composition = _synthetic_zone(
+            "t_fixture_candidate_zone", region_key, (x, x + 1, y, y + 1)
+        )
+        with ExitStack() as stack:
+            for patcher in _ecology_patches(
+                {zone.key: zone}, {composition.key: composition}, region_key
+            ):
+                stack.enter_context(patcher)
+            # The published settlements leave the block clear: the candidate
+            # publishes.
+            accepted = self._build()
+            self.assertTrue(accepted.identity)
+            before = geography.current()
+            # A candidate world whose own footprint masks the whole block
+            # changes the verdict for the very same zone, so eligibility read
+            # the candidate entries rather than stale published geometry.
+            entries = dict(_settlements().wilderness_entries)
+            anchor_key = next(iter(sorted(entries)))
+            entries[anchor_key] = WildernessEntryPoint(
+                anchor_key=anchor_key,
+                shape=("##", "##"),
+                origin_xy=(x, y),
+                gates=(),
+            )
+            masked = replace(
+                _settlements(),
+                wilderness_entries=MappingProxyType(entries),
+            )
+            with self.assertRaises(geography.GeographyError) as captured:
+                self._build(masked)
+        self.assertIn(zone.key, str(captured.exception))
+        self.assertIs(geography.current(), before)
+
+
 class SnapshotIsolationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -190,12 +448,19 @@ class SnapshotIsolationTests(unittest.TestCase):
 
     def _world(self, coastal_y_max: int):
         continent = _continent_variant(coastal_y_max=coastal_y_max)
-        return geography.build_geography(
-            continent,
-            self._locations,
-            _settlements(),
-            fingerprints=self._fingerprints,
-        )
+        # These candidates exist to prove derived terrain tables are
+        # snapshot-scoped. A deliberately different coastline re-partitions the
+        # regions, which lawfully invalidates the shipped ecology geometry, so
+        # the isolation worlds author no zones.
+        with ExitStack() as stack:
+            for patcher in _ecology_patches({}, {}):
+                stack.enter_context(patcher)
+            return geography.build_geography(
+                continent,
+                self._locations,
+                _settlements(),
+                fingerprints=self._fingerprints,
+            )
 
     def test_two_worlds_keep_independent_derived_tables(self):
         first = self._world(500)

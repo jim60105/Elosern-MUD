@@ -295,11 +295,15 @@ def _validate_game_joins(
 
     from world.lore.monster_placement import (
         AMBIENT_PLACEMENT_REGISTRY,
+        ECOLOGY_ZONE_REGISTRY,
+        ENCOUNTER_COMPOSITION_REGISTRY,
         MONSTER_SITE_REGISTRY,
+        SETTLEMENT_BIRTH_POLICY_REGISTRY,
     )
     from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
     from world.lore.nations import NATION_REGISTRY
     from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
+    from world.maps import population_geometry
     from world.rules.sight import validate_sight_region_coverage
     from world.rules.travel_cost import validate_wilderness_region_coverage
 
@@ -345,6 +349,36 @@ def _validate_game_joins(
             problems.append(
                 f"monster site {key!r} names unknown terrain region {site.region_key!r}"
             )
+    # The ecology declarations and the geometry they imply are validated
+    # together against this candidate world: the same candidate settlements
+    # supply the birth-exclusion footprints, so a republished settlement
+    # geometry can never validate against stale previously published cells.
+    # Declaration validation runs here as well as at lore import so a candidate
+    # is never judged by a registry that skips the complete check.
+    from world.lore.monster_placement import (
+        MonsterPlacementRegistryError,
+        validate_ecology_registries,
+    )
+
+    try:
+        validate_ecology_registries(
+            ECOLOGY_ZONE_REGISTRY,
+            ENCOUNTER_COMPOSITION_REGISTRY,
+            SETTLEMENT_BIRTH_POLICY_REGISTRY,
+            region_face=regions,
+        )
+    except MonsterPlacementRegistryError as error:
+        problems.append(str(error))
+    else:
+        problems.extend(
+            population_geometry.validate_ecology_geometry(
+                geography=snapshot,
+                entries=settlements.wilderness_entries,
+                zones=ECOLOGY_ZONE_REGISTRY,
+                compositions=ENCOUNTER_COMPOSITION_REGISTRY,
+                policies=SETTLEMENT_BIRTH_POLICY_REGISTRY,
+            )
+        )
     try:
         validate_wilderness_region_coverage(regions)
     except ValueError as error:
