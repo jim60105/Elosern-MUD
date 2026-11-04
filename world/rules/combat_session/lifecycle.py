@@ -261,6 +261,9 @@ def engage_group(
     counter = int(getattr(actor.db, "combat_encounter_seq", 0) or 0) + 1
     actor.db.combat_encounter_seq = counter
     session_id = session_id_for(actor, "hostile")
+    from world.maps.regional_population import mapped_population_cell
+    from world.rules.clock import get_world_clock
+
     record = CombatSessionRecord(
         session_id=session_id,
         engagement_id=f"{session_id}:{counter}",
@@ -274,6 +277,11 @@ def engage_group(
         exam_id=None,
         opening_first_actor=opening_first_actor,
         initial_sleep_ids=initial_sleep_ids,
+        # The engagement's own game-time occurrence and real battlefield cell:
+        # a later-round defeat is placed from these, never from the pre-combat
+        # tick, and the cell stays protected independently of room reuse.
+        started_tick=int(get_world_clock().tick),
+        population_cell=mapped_population_cell(actor),
     )
     battlefield = reconstruct_battlefield(actor, record)
     # A canonical engagement whose whole present allied party is already in

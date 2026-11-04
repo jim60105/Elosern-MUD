@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -79,7 +79,7 @@ from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.population_geometry import density_bounds, eligible_birth_cells
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
-from world.rules.clock import SurfaceSnapshot
+from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.monster_individual import construct_species_individual
 from world.rules.surfaces import persisted_hp
 
@@ -93,6 +93,9 @@ REGIONAL_POPULATION_ATTRIBUTE = "regional_population"
 
 #: The wilderness Attribute holding the one explicitly initialized shared seed.
 POPULATION_SEED_ATTRIBUTE = "regional_population_seed"
+
+#: The wilderness Attribute holding the chronological presence evidence.
+POPULATION_TIMELINE_ATTRIBUTE = "population_timeline"
 
 #: The individual Attribute carrying ordinary home ownership.
 HOME_ZONE_ATTRIBUTE = "home_ecology_zone"
@@ -239,6 +242,74 @@ class PopulationWavePlan:
         return self.blocked_reason is not None
 
 
+@dataclass(frozen=True, slots=True)
+class PopulationPosition:
+    """One actual wilderness coordinate (never a pooled room identity)."""
+
+    wilderness: str
+    x: int
+    y: int
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationPresence:
+    """One individual's complete presence fact at one game-time tick.
+
+    A dead or absent individual carries ``alive=False`` and no position: a
+    corpse or a removed row holds no birth headroom. ``home_zone`` and
+    ``site_key`` stay the durable ownership markers of the individual even when
+    it is no longer alive, so a historical projection can restore the home
+    ceiling it consumed without resurrecting it.
+    """
+
+    alive: bool
+    position: PopulationPosition | None
+    home_zone: str | None
+    site_key: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationTransition:
+    """One committed presence change, with the complete before/after facts.
+
+    ``source_id`` identifies the owning operation (engagement, placement,
+    operator mutation), so a committed replay of the same operation is
+    deduplicated while it is still pending.
+    """
+
+    source_id: str
+    individual_id: int
+    occurred_tick: int
+    before: PopulationPresence
+    after: PopulationPresence
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationProtection:
+    """One encounter's closed or open protected cell interval.
+
+    ``end_tick`` is ``None`` while the session is still active: an active
+    encounter protects its cell from ``start_tick`` onwards until it clears.
+    A closed interval is inclusive on both ends, so a wave due exactly at the
+    terminal endpoint stays blocked and the next positive retry can use the
+    cell once protection has been passed.
+    """
+
+    engagement_id: str
+    cell: PopulationPosition
+    start_tick: int
+    end_tick: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationTimeline:
+    """The durable chronological presence evidence of one wilderness world."""
+
+    settled_through_tick: int
+    transitions: tuple[PopulationTransition, ...]
+    protection: tuple[PopulationProtection, ...]
+
+
 # ---------------------------------------------------------------------------
 # Durable state
 # ---------------------------------------------------------------------------
@@ -277,6 +348,26 @@ def _wilderness() -> Any | None:
 def live_wilderness() -> Any | None:
     """The live wilderness script this owner reads, or ``None`` before it exists."""
     return _wilderness()
+
+
+def mapped_population_cell(entity: Any) -> dict | None:
+    """The exact wilderness cell an entity stands on, for a session record.
+
+    ``None`` for a nonwilderness or unregistered entity. The value is the
+    actual coordinate registration, never a pooled room identity, so a combat
+    record protects the cell the fight really happened on.
+    """
+    wilderness = _wilderness()
+    if wilderness is None or entity is None:
+        return None
+    coordinates = actual_cell(wilderness, entity)
+    if coordinates is None:
+        return None
+    return {
+        "wilderness": _wilderness_name(wilderness),
+        "x": coordinates[0],
+        "y": coordinates[1],
+    }
 
 
 def _zone(zone_key: str) -> EcologyZone:
@@ -394,6 +485,10 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
             raise PopulationSeedUninitialized(f"{SEED_UNINITIALIZED}: malformed saved seed")
         return saved
     wilderness.attributes.add(POPULATION_SEED_ATTRIBUTE, int(seed))
+    if not wilderness.attributes.has(POPULATION_TIMELINE_ATTRIBUTE):
+        # The explicit fresh provisioning operation is the only creator of the
+        # empty timeline. It carries no ordinary births and no recovery state.
+        _write_timeline(wilderness, PopulationTimeline(int(tick), (), ()))
     _emit(
         "monster_population_seed_initialized",
         {"seed": int(seed), "tick": int(tick)},
@@ -566,12 +661,73 @@ def _session_participant_ids() -> frozenset[int]:
     return frozenset(participants)
 
 
-def _protected_cells(wilderness: Any) -> frozenset[tuple[int, int]]:
-    """Cells an active combat session currently occupies (never birth space)."""
+def _active_session_protection(wilderness: Any) -> tuple[PopulationProtection, ...]:
+    """Every persisted active session's open cell protection (a pure read).
+
+    The durable record's ``population_cell`` is the authoritative battlefield
+    cell: it is independent of pooled-room reuse, and a record whose cell is
+    absent or names another wilderness protects nothing here.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.combat_session.records import read_session
+
+    name = _wilderness_name(wilderness)
+    protections: list[PopulationProtection] = []
+    for player in PlayerCharacter.objects.all_family():
+        if player.db.active_combat is None:
+            continue
+        try:
+            record = read_session(player)
+        except Exception:  # observability: ignore R2: planning is a pure read that must emit nothing; an unparseable persisted session protects nothing by name, and the combat owner reports its own unreadable records
+            continue
+        if record is None:
+            continue
+        cell = _protection_cell(record.population_cell)
+        if cell is None or cell[0] != name:
+            continue
+        protections.append(
+            PopulationProtection(
+                engagement_id=record.engagement_id or record.session_id,
+                cell=PopulationPosition(*cell),
+                start_tick=record.started_tick,
+                end_tick=None,
+            )
+        )
+    return tuple(protections)
+
+
+def _protected_cells(
+    wilderness: Any, at_tick: int | None = None
+) -> frozenset[tuple[int, int]]:
+    """Cells that hold no lawful birth space at the evaluated tick.
+
+    Protection comes from the durable timeline (closed historical intervals)
+    plus any currently active strict session (an open interval), never from a
+    mutable room identity. The actual-state read additionally scans the
+    participants' real coordinates, so a session this owner cannot attribute
+    to a recorded cell still shields the cell its participants occupy.
+    """
+    tick = current_population_tick() if at_tick is None else at_tick
+    timeline = read_population_timeline(wilderness) if population_provisioned(wilderness) else None
+    intervals = (
+        (() if timeline is None else timeline.protection)
+        + _active_session_protection(wilderness)
+    )
+    cells: set[tuple[int, int]] = set()
+    name = _wilderness_name(wilderness)
+    for protection in intervals:
+        if protection.cell.wilderness != name:
+            continue
+        if protection.start_tick > tick:
+            continue
+        if protection.end_tick is not None and protection.end_tick < tick:
+            continue
+        cells.add((protection.cell.x, protection.cell.y))
+    if at_tick is not None:
+        return frozenset(cells)
     participants = _session_participant_ids()
     if not participants:
-        return frozenset()
-    cells: set[tuple[int, int]] = set()
+        return frozenset(cells)
     for individual in _living_monsters():
         if individual.pk in participants:
             cell = actual_cell(wilderness, individual)
@@ -587,8 +743,16 @@ def _protected_cells(wilderness: Any) -> frozenset[tuple[int, int]]:
     return frozenset(cells)
 
 
-def population_counts(wilderness: Any, zone_key: str) -> PopulationCounts:
+def population_counts(
+    wilderness: Any, zone_key: str, *, at_tick: int | None = None
+) -> PopulationCounts:
     """The zone's local, home-owned and per-cell individual measures (pure read).
+
+    ``at_tick`` projects the measures at that game-time tick: the actual living
+    state is read first, then every still-pending transition committed later
+    than the tick is reversed through its own complete ``before`` facts, so a
+    deleted individual or a future arrival never borrows headroom it did not
+    have at the evaluated tick. ``None`` means the actual current state.
 
     Creates nothing, moves nothing, deletes nothing, and emits no event: an
     unchanged read must leave no trace beyond its own return value.
@@ -596,15 +760,20 @@ def population_counts(wilderness: Any, zone_key: str) -> PopulationCounts:
     _require_wilderness(wilderness)
     zone = _zone(zone_key)
     local_cells = _region_cells(zone)
+    name = _wilderness_name(wilderness)
     home: set[int] = set()
     cells: dict[tuple[int, int], set[int]] = {}
-    for individual in _living_monsters():
-        pk = individual.pk
-        if individual.db.home_ecology_zone == zone_key:
-            home.add(pk)
-        cell = actual_cell(wilderness, individual)
-        if cell is not None and cell in local_cells:
-            cells.setdefault(cell, set()).add(pk)
+    for individual_id, presence in presence_at(wilderness, at_tick=at_tick).items():
+        if not presence.alive:
+            continue
+        if presence.home_zone == zone_key:
+            home.add(individual_id)
+        position = presence.position
+        if position is None or position.wilderness != name:
+            continue
+        cell = (position.x, position.y)
+        if cell in local_cells:
+            cells.setdefault(cell, set()).add(individual_id)
     local = {pk for occupants in cells.values() for pk in occupants}
     return PopulationCounts(
         local_ids=frozenset(local),
@@ -613,6 +782,540 @@ def population_counts(wilderness: Any, zone_key: str) -> PopulationCounts:
             {cell: frozenset(occupants) for cell, occupants in cells.items()}
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Presence timeline
+# ---------------------------------------------------------------------------
+
+
+def _wilderness_name(wilderness: Any) -> str:
+    """The stable wilderness identity a position records."""
+    name = getattr(wilderness, "db_key", None)
+    if not isinstance(name, str) or not name:
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: wilderness has no stable key")
+    return name
+
+
+def population_provisioned(wilderness: Any) -> bool:
+    """Whether this world carries an explicitly initialized population seed.
+
+    The seed is the activation gate: a world provisioned before the population
+    system existed has no seed, so no presence evidence is recorded and no
+    lifecycle work runs there. A present but unusable seed is *not* "absent";
+    it stays the named refusal every reader answers with.
+    """
+    if wilderness is None:
+        return False
+    saved = _seed_attribute(wilderness)
+    return saved is not _SEED_ABSENT
+
+
+def _require_optional_name(value: object, what: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} must be a string or None")
+    return value
+
+
+def _is_sequence(value: object) -> bool:
+    """Whether ``value`` is a saved sequence (Evennia's wrapper included)."""
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+
+
+def _protection_cell(value: object) -> tuple[str, int, int] | None:
+    """A recorded protected cell, or ``None`` when it is not one."""
+    if not isinstance(value, Mapping):
+        return None
+    name = value.get("wilderness")
+    x, y = value.get("x"), value.get("y")
+    if not isinstance(name, str) or not name:
+        return None
+    if isinstance(x, bool) or not isinstance(x, int):
+        return None
+    if isinstance(y, bool) or not isinstance(y, int):
+        return None
+    return name, x, y
+
+
+def _position_to_dict(position: PopulationPosition | None) -> dict | None:
+    if position is None:
+        return None
+    return {"wilderness": position.wilderness, "x": position.x, "y": position.y}
+
+
+def _presence_to_dict(presence: PopulationPresence) -> dict:
+    return {
+        "alive": presence.alive,
+        "position": _position_to_dict(presence.position),
+        "home_zone": presence.home_zone,
+        "site_key": presence.site_key,
+    }
+
+
+def _presence_from_dict(value: object, what: str) -> PopulationPresence:
+    if not isinstance(value, Mapping):
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} is not a mapping")
+    alive = value.get("alive")
+    if not isinstance(alive, bool):
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.alive must be a boolean")
+    raw_position = value.get("position")
+    position = None
+    if raw_position is not None:
+        cell = _protection_cell(raw_position)
+        if cell is None:
+            raise MalformedPopulationState(
+                f"{MALFORMED_STATE}: {what}.position is not a wilderness cell"
+            )
+        position = PopulationPosition(*cell)
+    home_zone = _require_optional_name(value.get("home_zone"), f"{what}.home_zone")
+    site_key = _require_optional_name(value.get("site_key"), f"{what}.site_key")
+    return PopulationPresence(alive, position, home_zone, site_key)
+
+
+def _transition_to_dict(transition: PopulationTransition) -> dict:
+    return {
+        "source_id": transition.source_id,
+        "individual_id": transition.individual_id,
+        "occurred_tick": transition.occurred_tick,
+        "before": _presence_to_dict(transition.before),
+        "after": _presence_to_dict(transition.after),
+    }
+
+
+def _transition_from_dict(value: object, index: int) -> PopulationTransition:
+    what = f"transition {index}"
+    if not isinstance(value, Mapping):
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} is not a mapping")
+    source_id = value.get("source_id")
+    if not isinstance(source_id, str) or not source_id:
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.source_id is empty")
+    individual_id = _require_int(value.get("individual_id"), f"{what}.individual_id", 1)
+    occurred_tick = _require_int(value.get("occurred_tick"), f"{what}.occurred_tick")
+    return PopulationTransition(
+        source_id=source_id,
+        individual_id=individual_id,
+        occurred_tick=occurred_tick,
+        before=_presence_from_dict(value.get("before"), f"{what}.before"),
+        after=_presence_from_dict(value.get("after"), f"{what}.after"),
+    )
+
+
+def _protection_to_dict(protection: PopulationProtection) -> dict:
+    return {
+        "engagement_id": protection.engagement_id,
+        "cell": _position_to_dict(protection.cell),
+        "start_tick": protection.start_tick,
+        "end_tick": protection.end_tick,
+    }
+
+
+def _protection_from_dict(value: object, index: int) -> PopulationProtection:
+    what = f"protection {index}"
+    if not isinstance(value, Mapping):
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what} is not a mapping")
+    engagement_id = value.get("engagement_id")
+    if not isinstance(engagement_id, str) or not engagement_id:
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.engagement_id is empty")
+    cell = _protection_cell(value.get("cell"))
+    if cell is None:
+        raise MalformedPopulationState(f"{MALFORMED_STATE}: {what}.cell is not a cell")
+    start_tick = _require_int(value.get("start_tick"), f"{what}.start_tick")
+    raw_end = value.get("end_tick")
+    end_tick = None if raw_end is None else _require_int(raw_end, f"{what}.end_tick")
+    return PopulationProtection(engagement_id, PopulationPosition(*cell), start_tick, end_tick)
+
+
+def read_population_timeline(wilderness: Any) -> PopulationTimeline:
+    """The durable chronological presence evidence of this world.
+
+    A missing or malformed timeline is the named owner-state refusal: it is
+    never reconstructed from older records, and no implicit empty timeline is
+    substituted for saved owner state. The explicit seed initialization is the
+    only creator of the empty value.
+    """
+    _require_wilderness(wilderness)
+    raw = wilderness.db.population_timeline
+    if not isinstance(raw, Mapping):
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {POPULATION_TIMELINE_ATTRIBUTE!r} is missing or not a mapping"
+        )
+    unknown = set(raw) - {"settled_through_tick", "transitions", "protection"}
+    if unknown:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: timeline has unknown fields {sorted(unknown)}"
+        )
+    settled = _require_int(raw.get("settled_through_tick"), "settled_through_tick")
+    transitions_raw = raw.get("transitions")
+    protection_raw = raw.get("protection")
+    if not _is_sequence(transitions_raw) or not _is_sequence(protection_raw):
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: timeline transitions/protection must be lists"
+        )
+    transitions = tuple(
+        _transition_from_dict(value, index)
+        for index, value in enumerate(transitions_raw)
+    )
+    protection = tuple(
+        _protection_from_dict(value, index)
+        for index, value in enumerate(protection_raw)
+    )
+    return PopulationTimeline(settled, transitions, protection)
+
+
+def _write_timeline(wilderness: Any, timeline: PopulationTimeline) -> None:
+    wilderness.db.population_timeline = {
+        "settled_through_tick": timeline.settled_through_tick,
+        "transitions": [_transition_to_dict(t) for t in timeline.transitions],
+        "protection": [_protection_to_dict(p) for p in timeline.protection],
+    }
+
+
+def presence_of(
+    wilderness: Any,
+    individual: Any,
+    *,
+    alive: bool | None = None,
+    cell: tuple[int, int] | None = None,
+) -> PopulationPresence:
+    """One individual's complete presence fact, read without writing.
+
+    ``alive`` defaults to the stored HP; an explicit ``False`` describes the
+    post-mutation absence and carries no position. ``cell`` lets a caller that
+    already captured the pre-move registration describe that exact cell.
+    """
+    _require_wilderness(wilderness)
+    living = persisted_hp(individual) > 0 if alive is None else bool(alive)
+    position = None
+    if living:
+        coordinates = coordinate_pair(cell) if cell is not None else actual_cell(wilderness, individual)
+        if coordinates is not None:
+            position = PopulationPosition(
+                _wilderness_name(wilderness), coordinates[0], coordinates[1]
+            )
+    return PopulationPresence(
+        alive=living,
+        position=position,
+        home_zone=_require_optional_name(
+            getattr(individual.db, "home_ecology_zone", None), "home_ecology_zone"
+        ),
+        site_key=_require_optional_name(
+            getattr(individual.db, "site_key", None), "site_key"
+        ),
+    )
+
+
+def record_population_transition(
+    wilderness: Any, transition: PopulationTransition
+) -> None:
+    """Append one committed presence change to the durable timeline.
+
+    The caller has already performed its own owner mutation inside its
+    transaction; this records the complete before/after facts the chronological
+    coordinator replays. A world without an explicit population seed records
+    nothing (the population system is not provisioned there), while a
+    provisioned world with a missing or malformed timeline refuses by name. A
+    transition already pending with the same ``source_id`` and individual is a
+    duplicate commit and is not appended twice.
+    """
+    _require_wilderness(wilderness)
+    if not population_provisioned(wilderness):
+        return
+    if not isinstance(transition.source_id, str) or not transition.source_id:
+        raise ValueError("source_id must be a non-empty string")
+    _require_argument_int(transition.individual_id, "individual_id", 1)
+    _require_argument_int(transition.occurred_tick, "occurred_tick")
+    if not isinstance(transition.before, PopulationPresence) or not isinstance(
+        transition.after, PopulationPresence
+    ):
+        raise ValueError("before and after must be PopulationPresence facts")
+    timeline = read_population_timeline(wilderness)
+    for pending in timeline.transitions:
+        if (
+            pending.source_id == transition.source_id
+            and pending.individual_id == transition.individual_id
+        ):
+            return
+    transitions = sorted(
+        (*timeline.transitions, transition),
+        key=lambda item: (item.occurred_tick, item.source_id, item.individual_id),
+    )
+    _write_timeline(
+        wilderness,
+        PopulationTimeline(timeline.settled_through_tick, tuple(transitions), timeline.protection),
+    )
+
+
+def record_population_protection(
+    wilderness: Any,
+    *,
+    engagement_id: str,
+    cell: tuple[int, int],
+    start_tick: int,
+    end_tick: int | None,
+) -> None:
+    """Copy one encounter's exact cell and interval into the durable timeline.
+
+    A closed interval is recorded before the session clears, so a catch-up that
+    later passes those ticks still refuses to birth into the historical
+    battlefield. Repeated evidence for the same engagement and start is a
+    duplicate commit and is not appended twice.
+    """
+    _require_wilderness(wilderness)
+    if not population_provisioned(wilderness):
+        return
+    if not isinstance(engagement_id, str) or not engagement_id:
+        raise ValueError("engagement_id must be a non-empty string")
+    coordinates = coordinate_pair(cell)
+    if coordinates is None:
+        raise ValueError("cell must be one integer coordinate pair")
+    _require_argument_int(start_tick, "start_tick")
+    if end_tick is not None:
+        _require_argument_int(end_tick, "end_tick", start_tick)
+    position = PopulationPosition(
+        _wilderness_name(wilderness), coordinates[0], coordinates[1]
+    )
+    timeline = read_population_timeline(wilderness)
+    for pending in timeline.protection:
+        if (
+            pending.engagement_id == engagement_id
+            and pending.start_tick == start_tick
+        ):
+            if pending.end_tick == end_tick:
+                return
+            # The open active record is replaced by its closed terminal
+            # interval: the cell stays protected for the same start.
+            remaining = tuple(
+                item
+                for item in timeline.protection
+                if not (
+                    item.engagement_id == engagement_id
+                    and item.start_tick == start_tick
+                )
+            )
+            _write_timeline(
+                wilderness,
+                PopulationTimeline(
+                    timeline.settled_through_tick,
+                    timeline.transitions,
+                    (
+                        *remaining,
+                        PopulationProtection(
+                            engagement_id, position, start_tick, end_tick
+                        ),
+                    ),
+                ),
+            )
+            return
+    _write_timeline(
+        wilderness,
+        PopulationTimeline(
+            timeline.settled_through_tick,
+            timeline.transitions,
+            (
+                *timeline.protection,
+                PopulationProtection(engagement_id, position, start_tick, end_tick),
+            ),
+        ),
+    )
+
+
+def presence_at(
+    wilderness: Any, *, at_tick: int | None = None
+) -> dict[int, PopulationPresence]:
+    """Every known individual's presence at one tick, keyed by persistent ID.
+
+    The actual living state is the base; a pending transition committed later
+    than ``at_tick`` is reversed through its complete before facts in reverse
+    chronological, stable source/individual order. An individual whose row was
+    deleted is restored only for accounting: nothing is recreated and no
+    public presence is fabricated.
+    """
+    _require_wilderness(wilderness)
+    name = _wilderness_name(wilderness)
+    presence: dict[int, PopulationPresence] = {}
+    for individual in _living_monsters():
+        cell = actual_cell(wilderness, individual)
+        presence[individual.pk] = PopulationPresence(
+            True,
+            None if cell is None else PopulationPosition(name, cell[0], cell[1]),
+            _require_optional_name(
+                getattr(individual.db, "home_ecology_zone", None), "home_ecology_zone"
+            ),
+            _require_optional_name(
+                getattr(individual.db, "site_key", None), "site_key"
+            ),
+        )
+    if at_tick is None:
+        return presence
+    _require_argument_int(at_tick, "at_tick")
+    if not population_provisioned(wilderness):
+        return presence
+    timeline = read_population_timeline(wilderness)
+    pending = [
+        transition
+        for transition in timeline.transitions
+        if transition.occurred_tick > at_tick
+    ]
+    for transition in sorted(
+        pending,
+        key=lambda item: (item.occurred_tick, item.source_id, item.individual_id),
+        reverse=True,
+    ):
+        presence[transition.individual_id] = transition.before
+    return presence
+
+
+def settle_timeline_through(wilderness: Any, tick: int) -> None:
+    """Consume every fact at or before ``tick`` after its boundary was applied.
+
+    Pending transitions are dropped only once the coordinator has settled their
+    boundary, and a closed protection interval is retired only after progress
+    has passed its inclusive end. Repeating the same tick is a no-op.
+    """
+    _require_wilderness(wilderness)
+    if not population_provisioned(wilderness):
+        return
+    _require_argument_int(tick, "tick")
+    timeline = read_population_timeline(wilderness)
+    if tick <= timeline.settled_through_tick:
+        return
+    _write_timeline(
+        wilderness,
+        PopulationTimeline(
+            tick,
+            tuple(t for t in timeline.transitions if t.occurred_tick > tick),
+            tuple(
+                p for p in timeline.protection if p.end_tick is None or p.end_tick >= tick
+            ),
+        ),
+    )
+
+
+def _write_zone_fields(wilderness: Any, zone_key: str, **fields: object) -> None:
+    """Update named fields of one existing zone record, preserving the rest."""
+    states = _state_map(wilderness)
+    record = dict(states[zone_key])
+    record.update(fields)
+    states[zone_key] = record
+    _write_state(wilderness, states)
+
+
+def initialized_zone_keys(wilderness: Any) -> tuple[str, ...]:
+    """Every zone key with a committed record, in deterministic order."""
+    _require_wilderness(wilderness)
+    return tuple(sorted(_state_map(wilderness)))
+
+
+def density_lower_bound(wilderness: Any, zone_key: str) -> int:
+    """The zone's authored lower individual bound at its current geometry."""
+    zone = _zone(zone_key)
+    birth_cells = _birth_cells(zone)
+    if not birth_cells:
+        return 0
+    lower, _upper = density_bounds(
+        len(birth_cells), zone.lower_density, zone.upper_density
+    )
+    return lower
+
+
+def note_population_boundary(wilderness: Any, zone_key: str, *, tick: int) -> None:
+    """Establish or cancel a zone's recovery episode at one settled boundary.
+
+    A first below-bound state schedules one delayed due time; further losses
+    leave a pending due unchanged. Restored density (returning members, an
+    explicit placement or a completed wave) cancels the episode without a
+    birth, draw or generation-sequence change. This never waves: a due tick is
+    settled by :func:`settle_recovery_due`.
+    """
+    _require_wilderness(wilderness)
+    _require_argument_int(tick, "tick")
+    state = zone_state(wilderness, zone_key)
+    if state is None:
+        return
+    zone = _zone(zone_key)
+    lower = density_lower_bound(wilderness, zone_key)
+    below = len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) < lower
+    fields: dict[str, object] = {"settled_through_tick": max(state.settled_through_tick, tick)}
+    if not below:
+        if state.recovery_due_tick is not None:
+            fields["recovery_due_tick"] = None
+    elif state.recovery_due_tick is None:
+        fields["recovery_due_tick"] = tick + zone.recovery_delay
+    if fields != {
+        "settled_through_tick": state.settled_through_tick,
+        "recovery_due_tick": state.recovery_due_tick,
+    }:
+        _write_zone_fields(wilderness, zone_key, **fields)
+
+
+def settle_recovery_due(
+    wilderness: Any, zone_key: str, *, tick: int
+) -> list[ScheduledEvent]:
+    """Settle one due recovery episode: cancel, wave, or lawful blockage.
+
+    The living population is recomputed first. At or above the lower bound the
+    episode is cancelled with no birth, draw or sequence change. Otherwise one
+    complete composition is committed inside every ceiling and the wave
+    budget, then the remaining deficit schedules the next wave one positive
+    replenishment interval later. Temporary blockage creates nothing, leaves
+    the generation sequence untouched, emits one bounded reason event and
+    retries at that same interval.
+    """
+    _require_wilderness(wilderness)
+    _require_argument_int(tick, "tick")
+    state = zone_state(wilderness, zone_key)
+    if state is None:
+        return []
+    due = state.recovery_due_tick
+    if due is None or due > tick:
+        return []
+    zone = _zone(zone_key)
+    lower = density_lower_bound(wilderness, zone_key)
+    if len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) >= lower:
+        _write_zone_fields(
+            wilderness,
+            zone_key,
+            recovery_due_tick=None,
+            settled_through_tick=max(state.settled_through_tick, tick),
+        )
+        return []
+    plan = plan_population_wave(wilderness, zone_key, tick=tick)
+    if plan.is_blocked:
+        _write_zone_fields(
+            wilderness,
+            zone_key,
+            recovery_due_tick=tick + zone.replenishment_interval,
+            settled_through_tick=max(state.settled_through_tick, tick),
+        )
+        context = {
+            "zone": zone_key,
+            "tick": tick,
+            "reason": plan.blocked_reason,
+            "due_tick": tick + zone.replenishment_interval,
+        }
+        _emit("monster_population_recovery_blocked", context)
+        return [ScheduledEvent("monster_population_recovery_blocked", tick, context)]
+    created = commit_population_wave(wilderness, plan)
+    still_below = (
+        len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) < lower
+    )
+    _write_zone_fields(
+        wilderness,
+        zone_key,
+        recovery_due_tick=(
+            tick + zone.replenishment_interval if still_below else None
+        ),
+    )
+    context = {
+        "zone": zone_key,
+        "tick": tick,
+        "created": len(created),
+        "sequence": plan.expected_generation_sequence + 1,
+        "due_tick": None if not still_below else tick + zone.replenishment_interval,
+    }
+    return [ScheduledEvent("monster_population_wave", tick, context)]
 
 
 # ---------------------------------------------------------------------------
@@ -779,7 +1482,7 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
     lower, upper = density_bounds(
         len(birth_cells), zone.lower_density, zone.upper_density
     )
-    counts = population_counts(wilderness, zone_key)
+    counts = population_counts(wilderness, zone_key, at_tick=tick)
     if len(counts.local_ids) >= lower:
         return _blocked(zone_key, tick, state, BLOCKED_LOCAL_SATISFIED)
     if len(counts.home_ids) >= upper:
@@ -794,7 +1497,7 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
     smallest = min(
         sum(vector) for _weight, _composition, vectors in rows for vector in vectors
     )
-    protected = _protected_cells(wilderness)
+    protected = _protected_cells(wilderness, at_tick=tick)
     available = tuple(
         cell
         for cell in birth_cells
@@ -992,6 +1695,14 @@ def initialize_zone(wilderness: Any, zone_key: str, *, seed: int, tick: int) -> 
                 raise MalformedPopulationState(
                     f"{MALFORMED_STATE}: zone {zone_key!r} did not converge on initialization"
                 )
+            # An initialization blocked below the lower bound establishes its
+            # first delayed episode here; a converged zone keeps no due time.
+            if len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) < _lower:
+                _write_zone_fields(
+                    wilderness,
+                    zone_key,
+                    recovery_due_tick=tick + zone.recovery_delay,
+                )
     except Exception:
         restore_population_surfaces(surfaces)
         raise
@@ -1056,6 +1767,19 @@ def register_explicit_individual(
     room = (wilderness.db.rooms or {}).get(cell)
     if room is not None:
         _attach(individual, room)
+    # The arrival is presence evidence, not only a coordinate write: a later
+    # historical projection must know this individual did not stand here
+    # before this tick, so an earlier wave cannot borrow its headroom.
+    record_population_transition(
+        wilderness,
+        PopulationTransition(
+            source_id=f"explicit:{cell[0]}:{cell[1]}:{individual.pk}",
+            individual_id=individual.pk,
+            occurred_tick=tick,
+            before=PopulationPresence(False, None, None, None),
+            after=presence_of(wilderness, individual, alive=True, cell=cell),
+        ),
+    )
     _emit(
         "monster_population_individual_registered",
         {
@@ -1100,6 +1824,9 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
                 ),
                 (ITEMCOORDINATES_ATTRIBUTE, None): _db_safe_attribute_snapshot(
                     wilderness, ITEMCOORDINATES_ATTRIBUTE
+                ),
+                (POPULATION_TIMELINE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+                    wilderness, POPULATION_TIMELINE_ATTRIBUTE
                 ),
             }
         )
@@ -1201,11 +1928,17 @@ __all__ = [
     "INITIAL_POPULATION_SEED",
     "MalformedPopulationState",
     "POPULATION_SEED_ATTRIBUTE",
+    "POPULATION_TIMELINE_ATTRIBUTE",
     "PopulationCounts",
     "PopulationPlacement",
     "PopulationPlanStale",
+    "PopulationPosition",
+    "PopulationPresence",
+    "PopulationProtection",
     "PopulationSeedMismatch",
     "PopulationSeedUninitialized",
+    "PopulationTimeline",
+    "PopulationTransition",
     "PopulationWavePlan",
     "REGIONAL_POPULATION_ATTRIBUTE",
     "RegionalPopulationError",
@@ -1216,15 +1949,27 @@ __all__ = [
     "commit_population_wave",
     "coordinate_pair",
     "current_population_tick",
+    "density_lower_bound",
+    "initialized_zone_keys",
     "initialize_population_seed",
     "initialize_zone",
     "live_wilderness",
+    "mapped_population_cell",
+    "note_population_boundary",
     "plan_population_wave",
+    "population_provisioned",
     "population_counts",
+    "presence_at",
+    "presence_of",
     "read_population_seed",
+    "read_population_timeline",
+    "record_population_protection",
+    "record_population_transition",
     "register_explicit_individual",
     "restore_population_surfaces",
     "sample_composition_counts",
+    "settle_recovery_due",
+    "settle_timeline_through",
     "snapshot_population_surfaces",
     "snapshot_regional_population_surfaces",
     "wilderness_registration_target",

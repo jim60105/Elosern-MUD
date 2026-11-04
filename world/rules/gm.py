@@ -141,6 +141,53 @@ def _base_band(entity, key):
     return band
 
 
+def _population_guard(entity):
+    """The population context an HP write may change, or ``None``.
+
+    Only a parked ``Monster`` on a provisioned wilderness world carries
+    population evidence; every other entity (and every nonwilderness world)
+    needs no snapshot, no transition and no compensation.
+    """
+    from typeclasses.monsters import Monster
+    from world.maps import regional_population
+
+    if not isinstance(entity, Monster):
+        return None
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(wilderness):
+        return None
+    return (
+        regional_population,
+        wilderness,
+        regional_population.snapshot_population_surfaces(wilderness),
+    )
+
+
+def _record_hp_transition(guard, entity, was_alive: bool, is_alive: bool) -> None:
+    """Record one lawful Monster HP live/dead crossing, or nothing.
+
+    Only a real crossing is population evidence: HP moving up and down without
+    a death notifies nothing, and an explicit restoration is a lawful revival
+    that cancels a pending recovery episode at its own occurrence boundary.
+    The owner's timeline deduplicates by source, so an operator retry cannot
+    double-count the same crossing.
+    """
+    if guard is None or was_alive == is_alive:
+        return
+    population, wilderness, _surfaces = guard
+    tick = population.current_population_tick()
+    population.record_population_transition(
+        wilderness,
+        population.PopulationTransition(
+            source_id=f"operator-hp:{entity.pk}:{tick}:{int(is_alive)}",
+            individual_id=int(entity.pk),
+            occurred_tick=tick,
+            before=population.presence_of(wilderness, entity, alive=was_alive),
+            after=population.presence_of(wilderness, entity, alive=is_alive),
+        ),
+    )
+
+
 def set_trait_base(target, trait, value):
     from world.rules.traits import TRAIT_KEYS, GAUGE_KEYS, GAUGE_REGEN_RATE_PCT
 
@@ -150,6 +197,8 @@ def set_trait_base(target, trait, value):
     lower, upper = _base_band(entity, trait)
     integer(value, minimum=lower, maximum=upper)
     before = snapshot_traits(entity)
+    was_alive = selected.current > 0
+    guard = _population_guard(entity)
     try:
         with transaction.atomic():
             selected.base = value
@@ -157,8 +206,12 @@ def set_trait_base(target, trait, value):
                 selected.rate = value * GAUGE_REGEN_RATE_PCT
                 selected.current = min(selected.current, selected.max)
                 equipment.sync_equipment_gauge_limits(entity)
+            if trait == "hp":
+                _record_hp_transition(guard, entity, was_alive, selected.current > 0)
     except Exception:
         restore_traits(entity, before)
+        if guard is not None:
+            guard[0].restore_population_surfaces(guard[2])
         raise
     return _identity(entity)
 
@@ -171,11 +224,17 @@ def set_gauge(target, gauge, value):
         raise ConsoleError("registry_key_not_found")
     integer(value, minimum=int(selected.min), maximum=selected.max)
     before = snapshot_traits(entity)
+    was_alive = selected.current > 0
+    guard = _population_guard(entity)
     try:
         with transaction.atomic():
             selected.current = value
+            if gauge == "hp":
+                _record_hp_transition(guard, entity, was_alive, selected.current > 0)
     except Exception:
         restore_traits(entity, before)
+        if guard is not None:
+            guard[0].restore_population_surfaces(guard[2])
         raise
     return _identity(entity)
 

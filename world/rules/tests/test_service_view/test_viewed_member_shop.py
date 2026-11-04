@@ -445,6 +445,8 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTest):
             "rounds_elapsed": 0,
             "exam_id": None,
             "engagement_id": "hostile:1:0:1",
+            "started_tick": 0,
+            "population_cell": None,
             "round_revision": 0,
             "draft_version": 0,
             "draft_entries": {},

@@ -532,12 +532,14 @@ def at_server_start():
     )
     # Every world-event clock source is registered before any startup
     # operation can advance time (fix-startup-clock-source-order D1). The
-    # site-lifecycle source ships its advance-surface contract with it, and a
-    # startup advance in this window finds no wilderness script yet and
-    # settles nothing.
+    # merged population coordinator installs itself under the existing
+    # site-lifecycle stage kind and ships the combined advance-surface
+    # contract with it; a startup advance in this window finds no wilderness
+    # script yet and settles nothing. Regional recovery waves need an
+    # explicitly initialized zone, which no production path performs here.
     _startup_step(
-        "register_monster_sites",
-        lambda: _late("world.maps.monster_sites", "register_monster_site_lifecycle"),
+        "register_population_lifecycle",
+        lambda: _late("world.maps.population_lifecycle", "register_regional_population"),
     )
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a

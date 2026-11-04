@@ -40,7 +40,7 @@ _BODY_TARGETS = (
     "world.rules.guild_economy.sync_guild_economy",
     "world.rules.npc_schedules.sync_npc_schedules",
     "world.rules.titles.register_title_planner",
-    "world.maps.monster_sites.register_monster_site_lifecycle",
+    "world.maps.population_lifecycle.register_regional_population",
     "world.prompts.loader.load_prompt_library",
     "world.art.service.art_sync_all",
     "world.art.service.prune_gallery_orphans",

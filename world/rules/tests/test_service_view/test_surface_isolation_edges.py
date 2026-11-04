@@ -242,6 +242,8 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
             "rounds_elapsed": 0,
             "exam_id": None,
             "engagement_id": "hostile:1:0:1",
+            "started_tick": 0,
+            "population_cell": None,
             # The strict record parse requires the draft fields: a record
             # without them reads as no session at all.
             "round_revision": 0,

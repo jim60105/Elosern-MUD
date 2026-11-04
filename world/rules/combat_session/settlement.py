@@ -385,6 +385,39 @@ def _continue_or_settle(
     )
 
 
+def _record_terminal_population_protection(record: CombatSessionRecord) -> None:
+    """Copy one mapped session's exact cell and closed interval before clearing.
+
+    The interval is ``[started_tick, started_tick + rounds * round seconds]``,
+    inclusive, so a catch-up that later passes those ticks still refuses to
+    birth into the historical battlefield. Nothing is copied for an abstract or
+    staged session, and a missing world or a cell naming another wilderness
+    records nothing. The population owner deduplicates the evidence, so a
+    restart replay is harmless.
+    """
+    if record.population_cell is None:
+        return
+    from world.maps import regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None:
+        return
+    if wilderness.db_key != record.population_cell.get("wilderness"):
+        return
+    cell = regional_population.coordinate_pair(
+        (record.population_cell.get("x"), record.population_cell.get("y"))
+    )
+    if cell is None:
+        return
+    regional_population.record_population_protection(
+        wilderness,
+        engagement_id=record.engagement_id or record.session_id,
+        cell=cell,
+        start_tick=record.started_tick,
+        end_tick=record.started_tick + record.rounds_elapsed * _ROUND_SECONDS,
+    )
+
+
 @checkpoint_owner
 @serialized_combat_write
 def settle_session(
@@ -455,6 +488,10 @@ def settle_session(
     # must still run the settlement body: the aftermath, the wake state, the
     # session clear and the clock advance all rolled back with it.
     if record.settled_tick is not None:
+        # A committed terminal receipt that reloaded before its session cleared
+        # still owns its lawful protected interval: retain it idempotently.
+        with transaction.atomic():
+            _record_terminal_population_protection(record)
         from world.narrative.models import NarrativeEvent
 
         committed_awards = get_committed_award_results(encounter_source_id)
@@ -657,6 +694,9 @@ def settle_session(
                     settled_record, martyr_key=None
                 )
             _persist(actor, settled_record)
+            # The closed protection lands in the same transaction, before the
+            # session clear (and before any later catch-up can observe it).
+            _record_terminal_population_protection(settled_record)
             clear_session(actor, battlefield, record)
             if record.mode == "guild_exam":
                 # Simulated battle: restore the candidate and return the

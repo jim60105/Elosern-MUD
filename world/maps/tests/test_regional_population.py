@@ -856,6 +856,7 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             {
                 (owner.REGIONAL_POPULATION_ATTRIBUTE, None),
                 (owner.POPULATION_SEED_ATTRIBUTE, None),
+                (owner.POPULATION_TIMELINE_ATTRIBUTE, None),
                 ("itemcoordinates", None),
             },
         )

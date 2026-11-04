@@ -173,6 +173,8 @@ class CreationPanelPresenterTests(EvenniaTest):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+            "started_tick": 0,
+            "population_cell": None,
             # The strict record parse requires the draft fields: without them
             # the pending shell reads as out of session.
             "round_revision": 0,
