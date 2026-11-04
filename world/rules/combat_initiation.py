@@ -63,14 +63,24 @@ def field_combat_target(actor: Any, target: Any) -> Monster | None:
     return target if living else None
 
 
-def _room_monsters(actor: Any) -> list[Monster]:
-    """Every living Monster in the actor's room, deterministic (sorted-pk) order."""
+def field_enemy_roster(actor: Any) -> tuple[Monster, ...]:
+    """Every living, co-located Monster in deterministic sorted-pk order.
+
+    This is the encounter roster ordinary field engagement admits, separate
+    from any opening action's concrete recipients. It inspects no ownership,
+    species or group marker, excludes a dead or remote occupant through the
+    shared ``field_combat_target()`` predicate, and writes nothing. An
+    unlocated actor is in no cell, so it returns an empty tuple.
+    """
+    location = getattr(actor, "location", None)
+    if location is None:
+        return ()
     monsters = [
         occupant
-        for occupant in getattr(actor.location, "contents", ())
+        for occupant in getattr(location, "contents", ())
         if field_combat_target(actor, occupant) is not None
     ]
-    return sorted(monsters, key=lambda monster: int(monster.pk))
+    return tuple(sorted(monsters, key=lambda monster: int(monster.pk)))
 
 
 def _candidate_record(
@@ -122,10 +132,14 @@ class FieldOpeningPreview:
             pre-mutation gate right now.
         reason: The stable rejection reason when disabled, else ``None``.
         detail: The rejection detail when disabled, else ``None``.
-        targets: The concrete enemy line-up the opening would engage: the
-            anchor alone for a non-AREA skill, every living co-located
+        targets: The concrete recipients the opening action resolves against:
+            the anchor alone for a non-AREA skill, every living co-located
             monster (sorted pk) for an AREA skill. Filled even when a later
-            gate disables the opening, so a disclosure can name the line-up.
+            gate disables the opening, so a disclosure can name the action's
+            line-up.
+        enemies: The encounter roster this opening would admit, independent
+            of the recipients. It is every living co-located monster (sorted
+            pk) for an ordinary field opening.
         battlefield: The unpersisted candidate battlefield, when built.
         context: The candidate battlefield's action context, when built.
         session_reason: The stable ``SessionReason`` value when the
@@ -140,23 +154,26 @@ class FieldOpeningPreview:
     reason: RejectReason | None
     detail: str | None
     targets: tuple[Any, ...]
+    enemies: tuple[Any, ...]
     battlefield: Any = None
     context: Any = None
     session_reason: str | None = None
     party_reason: str | None = None
 
 
-def _opening_line_up(commander: Any, skill: Any, target: Any) -> list[Any]:
-    """The enemy line-up an opening cast engages (field-combat-initiation D-5).
+def _opening_recipients(commander: Any, skill: Any, target: Any) -> list[Any]:
+    """The concrete recipients an opening cast resolves against.
 
     AREA opens against the whole room as an explicit concrete list (never a
     shorthand — ``commanded_damage_reaches_enemy()`` reads concrete keys);
     anything else (SINGLE, and NONE/SELF which then reject on shape) opens
-    against the named monster alone. The room is the session owner's: the
-    caster is authorized into that same room before the line-up is chosen.
+    against the named monster alone. This list never decides encounter
+    membership: :func:`field_enemy_roster` owns that independently. The room
+    is the session owner's: the caster is authorized into that same room
+    before the recipients are chosen.
     """
     if skill is not None and skill.target_spec is TargetSpec.AREA:
-        return _room_monsters(commander)
+        return list(field_enemy_roster(commander))
     return [target]
 
 
@@ -198,10 +215,15 @@ def _prepare_opening(
     # the reason names the mistake a caller of THIS entry can make.)
     if field_combat_target(commander, target) is None:
         return FieldOpeningPreview(
-            False, RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, str(skill_key), ()
+            False,
+            RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET,
+            str(skill_key),
+            (),
+            (),
         )
     skill = SKILL_REGISTRY.get(skill_key)
-    targets = _opening_line_up(commander, skill, target)
+    enemies = field_enemy_roster(commander)
+    targets = _opening_recipients(commander, skill, target)
     # Explicit gate, first (D-4): validation deliberately supplies a
     # battlefield, so world/rules/action.py's own usable_out_of_combat gate
     # would pass. Checking here is what keeps the skill-field-availability
@@ -213,6 +235,7 @@ def _prepare_opening(
             RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT,
             skill_key,
             tuple(targets),
+            tuple(enemies),
         )
     # Party authority before any clock or candidate work: the caster must be
     # the commander or an effective companion present in the commander's room,
@@ -223,7 +246,7 @@ def _prepare_opening(
     caster = authorize_member(
         commander, getattr(actor, "pk", None), PURPOSE_ACT, anchor=actor
     )
-    record = _candidate_record(commander, targets, session_id=session_id)
+    record = _candidate_record(commander, list(enemies), session_id=session_id)
     battlefield = reconstruct_battlefield(commander, record)
     # The candidate already lists the commander's player side; this re-checks
     # the caster against it with the same guard the persisted submission uses,
@@ -233,7 +256,13 @@ def _prepare_opening(
     preview = revalidate_submission(caster, skill_key, context, targets, scale=scale)
     if not preview.enabled:
         return FieldOpeningPreview(
-            False, preview.reason, preview.detail, tuple(targets), battlefield, context
+            False,
+            preview.reason,
+            preview.detail,
+            tuple(targets),
+            tuple(enemies),
+            battlefield,
+            context,
         )
     preflight = ActionResolver.preflight(
         ActionRequest(
@@ -250,10 +279,19 @@ def _prepare_opening(
             preflight.reason,
             preflight.detail,
             tuple(targets),
+            tuple(enemies),
             battlefield,
             context,
         )
-    return FieldOpeningPreview(True, None, None, tuple(targets), battlefield, context)
+    return FieldOpeningPreview(
+        True,
+        None,
+        None,
+        tuple(targets),
+        tuple(enemies),
+        battlefield,
+        context,
+    )
 
 
 def preview_field_opening(
@@ -289,7 +327,12 @@ def preview_field_opening(
             commander = resolve_commander(actor)
         except PartyScopeError as error:  # observability: ignore R2: the party refusal is the reported disabled verdict, not a swallowed failure
             return FieldOpeningPreview(
-                False, None, None, (target,), party_reason=error.reason
+                False,
+                None,
+                None,
+                (target,),
+                tuple(field_enemy_roster(actor)) or (target,),
+                party_reason=error.reason,
             )
     clock = read_world_clock()
     session_id = format_session_id(
@@ -308,17 +351,29 @@ def preview_field_opening(
         # Party authority is a pre-mutation verdict like the candidate build:
         # report it as a disabled opening rather than blanking the preview.
         return FieldOpeningPreview(
-            False, None, None, (target,), party_reason=error.reason
+            False,
+            None,
+            None,
+            (target,),
+            tuple(field_enemy_roster(commander)) or (target,),
+            party_reason=error.reason,
         )
     except CombatSessionError as error:  # observability: ignore R2: a candidate battlefield that cannot be built is a read-only disabled verdict carrying the stable session reason; the preview surface reports it, and the real initiation path still raises
         skill = SKILL_REGISTRY.get(skill_key)
         try:
-            line_up = tuple(_opening_line_up(commander, skill, target))
+            recipients = tuple(_opening_recipients(commander, skill, target))
+            enemies = tuple(field_enemy_roster(commander))
         except Exception:  # observability: ignore R2: the line-up only decorates an already-disabled verdict; the CombatSessionError is the reported reason
-            line_up = (target,)
+            recipients = (target,)
+            enemies = (target,)
         session_reason = str(error.args[0]) if error.args else "malformed_session"
         return FieldOpeningPreview(
-            False, None, session_reason, line_up, session_reason=session_reason
+            False,
+            None,
+            session_reason,
+            recipients,
+            enemies,
+            session_reason=session_reason,
         )
 
 
@@ -368,6 +423,7 @@ def initiate_field_combat(
             "detail": preview.detail,
         }
     targets = list(preview.targets)
+    enemies = list(preview.enemies)
     clock = read_world_clock()
     boundary = {
         "char": str(commander.pk),
@@ -375,7 +431,7 @@ def initiate_field_combat(
         "room": str(commander.location.pk),
         "tick": clock.tick if clock is not None else None,
         "skill": skill_key,
-        "enemy_count": len(targets),
+        "enemy_count": len(enemies),
         # Filled in from the committed outcome below, before the callback is
         # staged: the seed either waits for remaining actors ("draft") or,
         # when it completed a solo draft, ran one ordinary round ("round").
@@ -408,7 +464,7 @@ def initiate_field_combat(
             # the session, so the initiating actor keeps the first action of
             # the first complete round while companions still have to choose.
             engaged = engage_group(
-                commander, targets, opening_first_actor=stable_actor_id(actor)
+                commander, enemies, opening_first_actor=stable_actor_id(actor)
             )
             engaged_record = engaged["record"]
             if actor is not commander:

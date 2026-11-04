@@ -12,7 +12,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.action import CmdCast
-from commands.combat import CmdCombatActions, CmdCombatCommand
+from commands.combat import CmdCombatActions, CmdCombatCommand, CmdEngage
 from commands.items import CmdUseItem
 from world.lore.elements import Element
 from world.rules.player_messages import rejection_message, session_reason_message
@@ -360,6 +360,25 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertEqual(self.char1.db.active_combat["rounds_elapsed"], 0)
         self.assertTrue(
             any("無法確認當前戰鬥。" in m for m in messages), messages
+        )
+
+    def test_engage_command_admits_the_whole_cell_of_same_label_monsters(self):
+        # The room's premade goblin stays out of this cell so the roster is
+        # exactly the players' named encounter.
+        self.monster.location = None
+        first = _monster("pack wolf")
+        second = _monster("pack wolf")
+        third = _monster("pack bear")
+        for monster in (first, second, third):
+            monster.location = self.room
+        messages = self._run(CmdEngage, f"#{second.pk}")
+        self.assertTrue(
+            any("戰鬥開始" in message for message in messages), messages
+        )
+        record = read_session(self.char1)
+        self.assertEqual(
+            record.enemy_ids,
+            tuple(sorted(int(monster.pk) for monster in (first, second, third))),
         )
 
 

@@ -723,6 +723,10 @@ class FieldCastActionTests(_SkillUseCase):
         grant_lineage(companion, [_T_DAMAGE])
         self._freeze_gauges(self.player, companion)
         wolf = self._wolf("companion opening wolf")
+        # Same-label and different-label bystanders are admitted by the same
+        # whole-cell roster, while the opening entry keeps its own recipient.
+        same_label = self._wolf("companion opening wolf")
+        other = self._wolf("companion opening bear")
         mp_before = companion.traits.mp.value
         commander_mp = self.player.traits.mp.value
         payload = {
@@ -746,6 +750,15 @@ class FieldCastActionTests(_SkillUseCase):
             self.assertEqual(
                 record.draft_entries[int(companion.pk)]["payload"]["skill_key"],
                 _T_DAMAGE,
+            )
+            self.assertEqual(
+                record.enemy_ids,
+                tuple(
+                    sorted(
+                        int(monster.pk)
+                        for monster in (wolf, same_label, other)
+                    )
+                ),
             )
             # The seed charges nothing yet; the entry pays once when it runs.
             self.assertEqual(companion.traits.mp.value, mp_before)

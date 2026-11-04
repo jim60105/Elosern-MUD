@@ -254,3 +254,38 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         )
         for key in ("journal_sink", "notifications_sink"):
             self.assertIsInstance(captured["round"][key], list, key)
+
+    def test_engage_admits_every_living_colocated_monster_in_persistent_id_order(self):
+        # A + A + B: two same-labeled individuals plus a different species.
+        # Display labels carry no membership or identity.
+        first = _monster("pack wolf", hp=100, atk=10)
+        second = _monster("pack wolf", hp=100, atk=10)
+        third = _monster("pack bear", hp=100, atk=10)
+        for monster in (first, second, third):
+            monster.location = self.room
+        result = engage(self.player, second)
+        self.assertEqual(
+            result["record"].enemy_ids,
+            tuple(sorted(int(monster.pk) for monster in (first, second, third))),
+        )
+        from world.rules.combat_session import is_in_active_session
+
+        self.assertTrue(is_in_active_session(self.player))
+
+    def test_explicit_group_roster_stays_exact(self):
+        first = _monster("staged wolf", hp=100, atk=10)
+        second = _monster("staged wolf", hp=100, atk=10)
+        first.location = self.room
+        second.location = self.room
+        result = engage_group(self.player, [first])
+        self.assertEqual(result["record"].enemy_ids, (int(first.pk),))
+
+    def test_engage_rejects_an_invalid_anchor_without_substituting_a_bystander(self):
+        dead = _monster("marked wolf", hp=0, atk=10)
+        living = _monster("marked wolf", hp=100, atk=10)
+        dead.location = self.room
+        living.location = self.room
+        with self.assertRaises(CombatSessionError) as ctx:
+            engage(self.player, dead)
+        self.assertEqual(ctx.exception.args[0], SessionReason.TARGET_DEAD)
+        self.assertIsNone(read_session(self.player))

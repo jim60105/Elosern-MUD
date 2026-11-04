@@ -378,6 +378,19 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
             ),
         )
 
+    def test_an_examination_roster_never_sweeps_a_co_located_monster(self):
+        # Explicitly staged non-field combat keeps its declared opponent set;
+        # whole-cell ordinary admission never applies to an examination.
+        self._give_merit(50)
+        bystander = _monster("hall bystander", hp=100, atk=1)
+        bystander.location = self.hall
+        start_guild_exam(self.player, self.host, "E")
+        session = read_session(self.player)
+        self.assertEqual(session.mode, "guild_exam")
+        self.assertEqual(session.enemy_ids, (int(self.host.pk),))
+        self.assertNotIn(int(bystander.pk), session.enemy_ids)
+        self.assertGreater(int(bystander.traits.hp.current), 0)
+
     @covers_requirement(
         "guild-rank-exams::start-guild-exam-is-the-sole-trigger-and-validates-authority-itself"
     )

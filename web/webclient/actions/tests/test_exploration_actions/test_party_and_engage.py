@@ -5,6 +5,7 @@ from world.rules.combat_session import (
     SessionReason,
     engage,
     is_in_active_session,
+    read_session,
 )
 from evennia.utils.test_resources import EvenniaTestCase
 from world.ai.fake_client import FakeLLMClient
@@ -447,6 +448,21 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(is_in_active_session(self.player))
 
+    def test_engage_adapter_admits_every_living_monster_in_the_cell(self):
+        first = create_object(Monster, key="狼", location=self.room1)
+        second = create_object(Monster, key="狼", location=self.room1)
+        third = create_object(Monster, key="熊", location=self.room1)
+        for monster in (first, second, third):
+            monster.threat_tier = "low"
+            monster.apply_monster_tier("floor")
+        result = _engage_adapter(self.player, {"monster_id": int(second.pk)})
+        self.assertEqual(result["outcome"], "success")
+        record = read_session(self.player)
+        self.assertEqual(
+            record.enemy_ids,
+            tuple(sorted(int(monster.pk) for monster in (first, second, third))),
+        )
+
 
     def test_engage_rejects_remote_or_dead_target_without_session(self):
         result = _engage_adapter(self.player, {"monster_id": 999999})
@@ -459,6 +475,8 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         monster.apply_monster_tier("floor")
         monster.traits.hp.current = 0
         monster.save()
+        # A living same-labeled bystander must not be substituted for it.
+        create_object(Monster, key="死掉的哥布林", location=self.room1)
         result = _engage_adapter(self.player, {"monster_id": int(monster.pk)})
         self.assertEqual(result["outcome"], "rejected")
         self.assertEqual(result["code"], "target_dead")
