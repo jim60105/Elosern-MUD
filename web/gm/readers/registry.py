@@ -121,7 +121,12 @@ def _object_rows(kind: str, model: Any, item_of: Callable[[Any], dict], filters:
 
 
 def _monster_matches(entity: Any, species: Any, region: Any) -> bool:
-    """Species/region are identity reads on the individual, not SQL columns."""
+    """Species/region are identity reads on the individual, not SQL columns.
+
+    The region filter selects by home ownership (the owning site's region or
+    the home ecology zone's region). Where an individual currently stands is a
+    separate read (``monsters.current_region_of``) and never inferred here.
+    """
     from web.gm.readers._entities import read_attr
 
     if species:

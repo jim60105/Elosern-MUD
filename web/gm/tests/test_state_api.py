@@ -24,7 +24,11 @@ from typeclasses.rooms import Room
 from world.art.store import ArtAssetRecord
 from world.narrative.models import NarrativeEvent
 from world.rules.monster_individual import construct_species_individual
-from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, SYNTH_MONSTER_VARIANTS
+from world.tests.synthetic_data import (
+    SYNTH_MONSTER_SITES,
+    SYNTH_MONSTER_SPECIES,
+    SYNTH_MONSTER_VARIANTS,
+)
 
 from tools.spec_traceability import covers_requirement
 from web.gm import pagination
@@ -401,6 +405,7 @@ class StateApiListFilterTests(StateApiTestCase):
 
     SPECIES = "t_whisper_quail"
     VARIANT = "t_whisper_quail_ordinary"
+    SITE = "t_breakwater_nest"
 
     def setUp(self):
         open_synthetic_scope(
@@ -438,8 +443,21 @@ class StateApiListFilterTests(StateApiTestCase):
             client.get(f"/gm/api/state/monsters?species={self.SPECIES}")
         )
         self.assertIn(str(self.monster.pk), [item["id"] for item in by_species["items"]])
+        # A variant's ambient placement membership is not home ownership.
+        self.assertIsNone(monsters.region_of(self.monster))
+        not_owned = self.assert_ok_envelope(
+            client.get(
+                f"/gm/api/state/monsters?region={SYNTH_MONSTER_SITES[self.SITE].region_key}"
+            )
+        )
+        self.assertNotIn(
+            str(self.monster.pk), [item["id"] for item in not_owned["items"]]
+        )
+
+        # The owning site's region is the home region the filter selects.
+        self.monster.db.site_key = self.SITE
         region = monsters.region_of(self.monster)
-        self.assertTrue(region)
+        self.assertEqual(region, SYNTH_MONSTER_SITES[self.SITE].region_key)
         by_region = self.assert_ok_envelope(
             client.get(f"/gm/api/state/monsters?region={region}")
         )
