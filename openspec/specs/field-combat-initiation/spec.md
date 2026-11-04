@@ -191,20 +191,15 @@ be relied on to undo engagement, because engagement leaves state the rollback ca
 - **THEN** the session and seed persist together, no action effects or round time have run, and later round failures preserve this committed draft
 
 ### Requirement: The opening cast charges combat time, never command time
-A field-combat initiation SHALL NOT charge `AdvanceSource.COMMAND` world time for the opening cast.
-The action's time cost SHALL be accumulated by the session and charged once as combat time by the
-terminal settlement, because the cast is the fight's first round and charging both sources would
-double-bill it.
+A field opening SHALL accumulate as a normal combat round with no command-time charge and SHALL settle once through the unpaid combat interval at terminal outcome or real incapacitated-hostile continuation.
 
 #### Scenario: An opening cast advances no command time
 - **WHEN** a field initiation resolves one opening round without ending the fight
-- **THEN** no `AdvanceSource.COMMAND` advance occurs for that cast, and the session's accumulated
-  round time is unsettled until the terminal outcome
+- **THEN** no `AdvanceSource.COMMAND` advance occurs for that cast, and the opening round remains unpaid until terminal settlement or an actual incapacitated-hostile continuation pays its prefix
 
 #### Scenario: Combat time settles once at the terminal outcome
 - **WHEN** a field initiation's fight concludes
-- **THEN** the world clock advances exactly once for the accumulated combat time, with no separate
-  command-time charge attributable to the opening cast
+- **THEN** the combat clock charges only the remaining unpaid interval, lifetime combat time totals all completed rounds once and no command-time charge is attributable to the opening cast
 
 ### Requirement: A committed field initiation emits one boundary event
 `initiate_field_combat()` SHALL emit one `field_combat_initiated` info event through the

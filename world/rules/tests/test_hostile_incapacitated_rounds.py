@@ -146,6 +146,9 @@ class PaidRoundTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
     )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
+    )
     @covers_requirement("mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped")
     def test_one_paid_round_reaches_the_threshold_and_returns_choice(self):
         from world.rules.fatigue import project_fatigue_status
@@ -230,6 +233,9 @@ class PaidRoundTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
     )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
+    )
     def test_sleep_alone_never_declares_defeat(self):
         _write(self.player, 0, SleepPosture.FORCED)
         self.monster.traits.atk_phys.base = 100000
@@ -268,6 +274,9 @@ class PaidRoundTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
     )
     def test_a_waking_companion_ends_automatic_play_under_normal_authority(self):
         from typeclasses.npcs import NPC
@@ -311,6 +320,9 @@ class PaidRoundTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
     )
     def test_the_existing_cap_still_terminates_an_all_sleep_party(self):
         from world.rules.combat_session.settlement import _ROUND_SECONDS
@@ -427,7 +439,7 @@ class BlockingContinuationTests(BattlefieldIsolation, EvenniaTestCase):
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
     )
     @covers_requirement(
-        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
     )
     def test_a_confirmed_round_applies_a_blocking_effect_then_continues(self):
         import world.rules.combat_session.rounds as session_rounds
@@ -519,6 +531,9 @@ class BlockingContinuationTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
     )
     def test_a_late_failure_restores_the_round_and_the_retry_pays_once(self):
         import world.rules.combat_session.rounds as session_rounds
@@ -741,6 +756,9 @@ class MappedPaidCursorTests(EvenniaTest):
 
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits"
+    )
+    @covers_requirement(
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds"
     )
     def test_the_paid_endpoint_advances_the_map_cursor_once(self):
         from world.rules.fatigue import project_fatigue_status

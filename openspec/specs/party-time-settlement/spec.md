@@ -93,7 +93,7 @@ Status inspection, inventory inspection, menus, handoff selection/cancel, inacti
 - **THEN** tick and all mental reserves remain identical
 
 ### Requirement: Every settled sleeper completes its own accepted wake plan
-Every applicable deterministic party advance SHALL reconcile each living sleeper's own declared wake target, independent of the controlled body. Voluntary recovery SHALL include HP/MP/SP and mental targets; duration SHALL wait until its deadline. Wake SHALL change that body's posture/projection once without changing possession or reviving defeat/death. Live-combat natural wake SHALL retain terminal-only policy.
+Party time SHALL reconcile each living sleeper’s accepted target independently of control, retain duration deadlines and actual recovery, and wake once without possession change or revival; ordinary interactive combat SHALL defer natural wake, while paid incapacitated-hostile rounds SHALL honor the forced threshold.
 
 #### Scenario: Owner wakes while companion waits
 - **WHEN** an awake possessed companion waits across its sleeping owner's recovery boundary

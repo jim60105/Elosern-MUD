@@ -2204,6 +2204,7 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
+        "player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds",
     )
     def test_opening_runs_real_rounds_until_the_existing_cap(self):
         from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
