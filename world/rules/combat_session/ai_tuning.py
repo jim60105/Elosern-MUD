@@ -56,9 +56,10 @@ def record_session_ai_tuning(
     resolution = resolve_monster_ai(monster, tuning=tuning)
     if resolution is None:
         return None
-    _SESSION_AI_TUNING.setdefault(session_id, {})[_actor_identity(monster)] = (
-        resolution
-    )
+    # Resolve the identity before creating the session bucket: a rejected
+    # identity must leave the recorded table byte-identical.
+    identity = _actor_identity(monster)
+    _SESSION_AI_TUNING.setdefault(session_id, {})[identity] = resolution
     return resolution
 
 

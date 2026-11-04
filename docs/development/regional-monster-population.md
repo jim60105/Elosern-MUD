@@ -614,7 +614,8 @@ Verified labels and results:
 
 - `world.rules.tests.test_combat_session_targeting` — 11 pass, including the
   same-label acceptance cases: independent HP/resources/flee/effects and a
-  saved selection that survives rename and roster reorder.
+  durable saved selection that survives rename, a reload through the session
+  owner, roster reorder and completion.
 - `world.rules.tests.test_combat_session_targeting world.rules.tests.test_combat_beats world.rules.tests.test_defend_dodge world.rules.tests.test_disengage` — 48 pass.
 - `world.rules.tests.test_disengage_integration world.rules.tests.test_upkeep_settlement` — 30 pass.
 - `world.rules.tests.test_taunt_constraints world.rules.tests.test_monster_behaviour_integration world.rules.tests.test_monster_flee_decision world.rules.tests.test_positional_marker` — 57 pass.
@@ -638,6 +639,16 @@ Verified labels and results:
 - `world.rules.tests.test_item_combat_turn world.maps.tests.test_gm` — 22 pass.
 - `web.webclient.actions.tests.test_skill_use_actions commands.tests.test_cast_member_suffix` — 47 pass; the former duplicate-label ambiguity case now asserts identity-addressed success.
 - `world.narrative.tests.test_narrative_events` — pass with the escort run.
+- `world.rules.tests.test_monster_ai_manual_reports.CampaignEncounterTests` — 9 pass,
+  including the named encounter, the same-label opponent selection and the
+  refusal batch.
+- `world.rules.tests.test_conferral_cast world.rules.tests.test_divine_mystery_progression.PartyAudienceConferralTests` — 22 pass, including same-label
+  sources and reconferral after rename.
+- `world.rules.tests.test_stateful_spells` — 11 pass (contact-policy identity).
+- `world.rules.tests.test_action_narrative_deeds` — 41 pass (committed-log
+  identity, same-label resolution, fixture occurrence identity).
+- `world.rules.tests.test_monster_ai_tuning.SessionAITuningTests` — 6 pass
+  (rejected identity leaves the session table empty).
 
 Assertion roles: the migrated assertions are synthetic-mechanism checks with
 independently known outcomes (fixed rolls, explicit fixtures) or registry-
@@ -666,6 +677,28 @@ step:
   the two quest-planner cases `test_a_redelivered_defeat_entry_advances_once`
   and `test_two_individuals_with_one_display_key_count_separately` supply the
   duplicate-delivery and same-label defeat-credit evidence.
+- `SessionItemMultiTargetRollbackTests.test_same_label_recipients_keep_distinct_event_log_identities`
+  → `player-combat-session` "Independent selected recipient" (item recipient
+  identity population feeding observation memory).
+- `CampaignEncounterTests.test_legal_opponent_addresses_same_label_monsters_by_identity`
+  → same identity contract at the manual-campaign boundary.
+- `ConferralCastPathTests.test_same_label_sources_keep_distinct_grants` and
+  `test_reconferral_after_rename_keeps_one_source_identity` → same identity
+  contract for grant sources.
+- `SettledResultNormalizationTests.test_shared_display_keys_resolve_by_identity_only`
+  and `test_fixture_occurrence_identity_is_not_the_display_label` → narrative
+  occurrence/recipient attribution; `SettledEffectVocabularyTests.test_committed_log_form_states_the_same_settled_results`
+  now supplies explicit identities and keeps the identity-less rejection.
+
+Rollback disposition: the identity cutover adds no new durable write path, so
+the existing verified rollback controls remain authoritative instead of a
+duplicated synthetic failure test — `test_commit_failed_after_prior_actor_aborts_entire_selected_round`
+(round HP/revision/draft), `test_receipt_failure_after_terminal_clock_and_clear_restores_round`
+(terminal clock/receipt/clear), the item journal rollback cases
+(`test_upkeep_fault_restores_actor_and_companion_surfaces`,
+`test_terminal_settlement_failure_after_item_use_restores_everything`) and the
+defeat-aftermath rollback/replay suite. They assert durable rows, live handler
+caches and draft state against the pre-call baseline.
 
 Nearest current anchors (from the design's generated list) whose scope these
 behaviours extend; after sync the archive step should attach the generated IDs

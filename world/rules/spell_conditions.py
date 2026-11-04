@@ -8,6 +8,7 @@ final resolution.
 from typing import TYPE_CHECKING, Any
 
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
+from world.rules.combat_identity import stable_actor_id
 from world.rules.rulebook.schema import evaluate_condition
 
 if TYPE_CHECKING:
@@ -130,8 +131,7 @@ def evaluate_interaction_policy(
             battlefield = getattr(context, "battlefield", None)
             if battlefield is not None:
                 fled = getattr(battlefield, "fled", ())
-                target_key = getattr(target, "key", "")
-                if target_key in fled or target in fled:
+                if stable_actor_id(target) in fled:
                     raise RejectedAction(
                         RejectReason.CAST_CONDITION_UNMET,
                         f"target {getattr(target, 'key', repr(target))} has fled",

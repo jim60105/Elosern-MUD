@@ -447,12 +447,19 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
     def test_rename_and_reorder_cannot_redirect_a_saved_selection(self):
         from dataclasses import replace
 
-        from world.rules.combat import Battlefield
-        from world.rules.combat_session import engage_group, reconstruct_battlefield
+        from world.rules.action import ActionResolver
+        from world.rules.combat import Battlefield, combat_provenance
+        from world.rules.combat_session import (
+            _persist,
+            engage_group,
+            reconstruct_battlefield,
+        )
+        from world.rules.combat_session.records import read_session_uncached
         from world.rules.combat_session.rounds import _draft_requests
+        from ._combat_session_helpers import engagement_provenance
 
         engage_group(self.player, [self.first, self.second])
-        record = replace(
+        saved = replace(
             read_session(self.player),
             draft_entries={
                 int(self.player.pk): {
@@ -460,24 +467,41 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
                     "payload": {
                         "skill_key": _T_ANY_SINGLE,
                         "targets_or_shorthand": [int(self.second.pk)],
+                        "scale": 1.0,
                     },
                 }
             },
         )
-        field = reconstruct_battlefield(self.player, record)
+        _persist(self.player, saved)
 
-        # Renaming both twins after the selection cannot redirect it, and
-        # reversing the roster's insertion order changes nothing: the saved
-        # pk resolves through the stable identity, not the label.
+        # Rename both twins after the durable selection, then reload from the
+        # owner's stored row: the saved pk still resolves to the same
+        # individual through its stable identity, not its label.
         self.first.key = "renamed first twin"
         self.second.key = "renamed second twin"
-        request = _draft_requests(record, field)[int(self.player.pk)]
+        reloaded = read_session_uncached(self.player)
+        field = reconstruct_battlefield(self.player, reloaded)
+        request = _draft_requests(reloaded, field)[int(self.player.pk)]
         self.assertEqual(request.targets, [self.second])
+
+        # Completing that reloaded selection resolves only the chosen twin.
+        first_hp = self.first.traits.hp.current
+        second_hp = self.second.traits.hp.current
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            combat_provenance(engagement_provenance().at_slot(0)),
+        ):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(self.second.traits.hp.current, second_hp)
+        self.assertEqual(self.first.traits.hp.current, first_hp)
+
+        # Reversing the roster insertion order changes nothing either.
         reordered = Battlefield(
             dict(field.teams), dict(reversed(list(field.roster.items())))
         )
         self.assertEqual(
-            _draft_requests(record, reordered)[int(self.player.pk)].targets,
+            _draft_requests(reloaded, reordered)[int(self.player.pk)].targets,
             [self.second],
         )
 

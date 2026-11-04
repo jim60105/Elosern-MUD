@@ -804,6 +804,15 @@ class SessionAITuningTests(unittest.TestCase):
             recorded["t_ai_first"] = recorded["fixture:t_ai_first"]
         self.assertEqual(len(session_ai_tuning(SESSION)), 2)
 
+    def test_rejected_identity_leaves_the_table_unchanged(self):
+        monster = FakeAIMonster(
+            "t_ai_no_identity", species_key=SPECIES, variant_key=ORDINARY
+        )
+        del monster.combat_identity
+        with self.assertRaises(ValueError):
+            record_session_ai_tuning(SESSION, monster, tuning=_tuning())
+        self.assertEqual(session_ai_tuning(SESSION), {})
+
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_an_active_session_keeps_the_tuning_the_process_loaded(self):
         startup = behaviour.MONSTER_AI_TUNING
