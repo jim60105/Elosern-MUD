@@ -10,6 +10,10 @@ Replace mapped individual flee with atomic legal departure, durable passage and 
 
 This is a bounded one-engineer-day slice. **BREAKING** where a current behavior is replaced, with every caller and substantive test migrated in that slice. No feature code is authorized by this proposal.
 
+## Sizing
+
+The slice pairs the durable map-owned records with their only production consumers, because either half alone cannot be verified as behaviour. The mechanism inventory is the strict group/journey/receipt codecs and constructor hooks (task1.1), the pure escape contract in `world_escape.py` (task2.1), the resolver departure commit with per-member physiology cursors (task3.1) and the chronological arrival and protection settlement (task4.1). Task3.1 is the only step that combines two owners, and it must, since a departure without a committed cursor would split the combat and journey intervals across writers. No step ships a scaffold whose consumer arrives in a sibling change. Estimation is therefore recorded per mechanism in the task checks rather than asserted by duration.
+
 ## Capabilities
 
 ### New Capabilities
@@ -23,7 +27,7 @@ This is a bounded one-engineer-day slice. **BREAKING** where a current behavior 
 
 ## Impact
 
-Consumes landed mechanisms: stable_actor_id and reconstruct_battlefield preserve identity; regional_population owns home/local counts and PopulationTransition history; site member_ids retain living absentees; population_lifecycle already registers the merged monster_site_lifecycle clock source. Whole-cell field_enemy_roster remains the admission roster.
+Consumes landed mechanisms. stable_actor_id and reconstruct_battlefield preserve identity; regional_population owns home/local counts and PopulationTransition history; site member_ids retain living absentees; population_lifecycle already registers the merged monster_site_lifecycle clock source. Whole-cell field_enemy_roster remains the admission roster.
 
 Attaches at world/rules/disengage.py::_handle_disengage, combat_session/battlefield.py::_context_for and combat_session/rounds.py::_finalize_resolved_round, new world/maps/monster_activity.py and existing population_lifecycle.py.
 
@@ -40,4 +44,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 depends-on: movement-edge-history
 depends-on: monster-activity-authoring
 
-Code conflicts: global-monster-activity extends the same activity/journey owner; hostile-field-admission later inserts contact between arrival and departure. Do not edit these concurrently. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts are global-monster-activity, which extends the same activity/journey owner, and hostile-field-admission, which later inserts contact between arrival and departure. Do not edit these concurrently. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
