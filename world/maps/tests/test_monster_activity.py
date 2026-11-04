@@ -31,6 +31,7 @@ from world.lore.monster_activity import (
     AggressionCondition,
     MonsterActivity,
 )
+from world.lore.monster_placement import EcologyZone
 from world.maps import (
     monster_activity,
     monster_sites,
@@ -50,6 +51,8 @@ from world.maps.monster_activity import (
 from world.maps.population_lifecycle import settle_population_lifecycle
 from world.maps.regional_population import (
     initialize_population_seed,
+    population_counts,
+    read_population_timeline,
     record_population_protection,
 )
 from world.maps.wilderness_provider import (
@@ -156,6 +159,28 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
                 monster_sites, "MONSTER_SITE_REGISTRY", MappingProxyType({})
             )
         )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "ECOLOGY_ZONE_REGISTRY",
+                MappingProxyType(
+                    {
+                        "t_activity_zone": EcologyZone(
+                            "t_activity_zone",
+                            self.region,
+                            ((500, 519, 700, 719),),
+                            (),
+                            1,
+                            100,
+                            100,
+                            3600,
+                            600,
+                            1,
+                        )
+                    }
+                ),
+            )
+        )
         self._ordinal = 0
         self._registered = False
 
@@ -206,12 +231,15 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
         *,
         reserve: int = RESERVE,
         posture: SleepPosture = SleepPosture.AWAKE,
+        home_zone: str | None = "t_activity_zone",
     ):
         individual = construct_species_individual(
             next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key, ORDINARY
         )
         individual.traits.hp.base = 100000
         individual.traits.hp.current = 100000
+        if home_zone is not None:
+            individual.db.home_ecology_zone = home_zone
         self.wilderness.db.itemcoordinates[individual] = cell
         room = (self.wilderness.db.rooms or {}).get(cell)
         if room is not None:
@@ -475,6 +503,47 @@ class SeededDecisionTests(ActivityFixture):
             decision.reason, monster_activity.STAY_MEMBER_SETTLED_AHEAD
         )
 
+    def test_active_combat_participant_never_wanders_even_when_released(self):
+        group_id, bodies = self._group(tick=0, members=1)
+        decision = plan_group_decision(self.wilderness, group_id, tick=90)
+        with patch.object(
+            regional_population,
+            "active_combat_participant_ids",
+            return_value=frozenset({int(bodies[0].pk)}),
+        ):
+            blocked = plan_group_decision(self.wilderness, group_id, tick=90)
+            self.assertIsNone(blocked.edge)
+            self.assertEqual(blocked.reason, monster_activity.STAY_MEMBER_ENGAGED)
+            if decision.edge is not None:
+                before = state_to_dict(read_monster_activity(self.wilderness))
+                with self.assertRaises(
+                    monster_activity.MonsterActivityOperationInvalid
+                ):
+                    commit_group_decision(self.wilderness, decision)
+                self.assertEqual(
+                    state_to_dict(read_monster_activity(self.wilderness)), before
+                )
+
+    def test_immediate_posture_transitions_are_committed(self):
+        depleted, depleted_bodies = self._group(
+            cell=(505, 705), tick=0, members=1, reserves=(0,)
+        )
+        waking, waking_bodies = self._group(
+            cell=(515, 715),
+            tick=0,
+            members=1,
+            reserves=(72000,),
+            postures=(SleepPosture.FORCED,),
+        )
+        activity_owner.settle_group_idle(self.wilderness, depleted, tick=10)
+        activity_owner.settle_group_idle(self.wilderness, waking, tick=10)
+        depleted_state = read_optional_fatigue_state(depleted_bodies[0])
+        self.assertIs(depleted_state.posture, SleepPosture.FORCED)
+        self.assertEqual(depleted_state.reserve_units, 120)
+        waking_state = read_optional_fatigue_state(waking_bodies[0])
+        self.assertIs(waking_state.posture, SleepPosture.AWAKE)
+        self.assertEqual(waking_state.reserve_units, 71960)
+
     def test_bounds_corner_and_locked_gates_hold(self):
         corner = (500, 700)
         self._seal_exits(corner, keep="w")
@@ -582,10 +651,23 @@ class SeededDecisionTests(ActivityFixture):
             self.assertIsNone(body.location)
         self.assertEqual(group.home_owner, ("zone", "t_activity_zone"))
         # Home ownership survives transit: the same group keeps its owner and
-        # no replacement identity is created.
+        # no replacement identity is created. An emigrant never frees its
+        # home-owned slot merely by leaving.
+        in_transit = population_counts(self.wilderness, "t_activity_zone")
         self.assertEqual(
-            {group.home_owner}, {read_monster_activity(self.wilderness).groups[group_id].home_owner}
+            set(in_transit.home_ids), {int(body.pk) for body in bodies}
         )
+        self.assertEqual(in_transit.local_ids, frozenset())
+        # A foreign visitor at a zone cell consumes local headroom without
+        # changing home ownership.
+        visitor = self._monster(cell=(510, 700), home_zone=None)
+        visitor_counts = population_counts(self.wilderness, "t_activity_zone")
+        self.assertIn(int(visitor.pk), visitor_counts.local_ids)
+        self.assertNotIn(int(visitor.pk), visitor_counts.home_ids)
+        coordinates = dict(self.wilderness.db.itemcoordinates)
+        coordinates.pop(visitor, None)
+        self.wilderness.db.itemcoordinates = coordinates
+        visitor.delete()
 
         events = activity_owner.settle_monster_activity_at(
             self.wilderness, journey.arrival_tick
@@ -602,6 +684,10 @@ class SeededDecisionTests(ActivityFixture):
         for body in bodies:
             body = ObjectDB.objects.get(pk=body.pk)
             self.assertEqual(self.wilderness.db.itemcoordinates[body], destination)
+        arrived_counts = population_counts(self.wilderness, "t_activity_zone")
+        self.assertEqual(
+            set(arrived_counts.home_ids), {int(body.pk) for body in bodies}
+        )
         # No unobserved cell grew a room, and the persisted shape reloads.
         self.assertEqual(dict(self.wilderness.db.rooms), rooms_before)
         self.wilderness.attributes.reset_cache()
@@ -613,6 +699,63 @@ class SeededDecisionTests(ActivityFixture):
 
 class ChokepointLifecycleTests(ActivityFixture):
     """Stationary bindings, return-after-escape and deterministic settlement."""
+
+    def test_combat_prefix_regenerates_gauges_before_ownership_release(self):
+        from world.rules import world_escape
+
+        group_id, bodies = self._group(tick=0, members=1)
+        body = ObjectDB.objects.get(pk=bodies[0].pk)
+        body.traits.hp.current = 1000
+        activity_owner.update_member_time(
+            self.wilderness,
+            group_id=group_id,
+            individual_id=body.pk,
+            member_time=MemberTime(
+                0, monster_activity.MODE_COMBAT, "session", ()
+            ),
+        )
+        world_escape.settle_monster_combat_through(
+            body, through_tick=60, operation_id="combat-gauge"
+        )
+        # hp rate is 0.4/s and no member is skipped for the combat prefix.
+        self.assertEqual(body.traits.hp.current, 1024)
+        released = read_monster_activity(self.wilderness).groups[group_id]
+        member = released.member_time[str(body.pk)]
+        self.assertEqual(member.mode, monster_activity.MODE_IDLE)
+        self.assertEqual(member.settled_through_tick, 60)
+        world_escape.settle_monster_combat_through(
+            body, through_tick=60, operation_id="combat-gauge"
+        )
+        self.assertEqual(body.traits.hp.current, 1024)
+
+    def test_a_member_killed_in_transit_is_not_resurrected(self):
+        group_id, bodies = self._group(
+            cell=(505, 705), tick=0, activity=SOLO_ACTIVITY, members=1
+        )
+        decision = plan_group_decision(self.wilderness, group_id, tick=60)
+        self.assertIsNotNone(decision.edge)
+        commit_group_decision(self.wilderness, decision)
+        state = read_monster_activity(self.wilderness)
+        journey = state.journeys[state.groups[group_id].journey_id]
+        body = ObjectDB.objects.get(pk=bodies[0].pk)
+        body.traits.hp.current = 0
+        activity_owner.settle_monster_activity_at(
+            self.wilderness, journey.arrival_tick
+        )
+        body = ObjectDB.objects.get(pk=bodies[0].pk)
+        body.attributes.reset_cache()
+        self.assertEqual(body.traits.hp.current, 0)
+        self.assertNotIn(body, self.wilderness.db.itemcoordinates)
+        timeline = regional_population.read_population_timeline(self.wilderness)
+        arrivals = [
+            transition
+            for transition in timeline.transitions
+            if transition.individual_id == int(body.pk)
+            and transition.source_id.startswith("arrival:")
+        ]
+        self.assertTrue(arrivals)
+        self.assertFalse(arrivals[-1].after.alive)
+        self.assertIsNone(read_monster_activity(self.wilderness).groups[group_id].journey_id)
 
     def test_stationary_group_never_moves_or_restores_identity(self):
         group_id, bodies = self._group(
@@ -651,20 +794,21 @@ class ChokepointLifecycleTests(ActivityFixture):
     )
     def test_equal_partitions_preserve_resources_and_schedule(self):
         self._register_lifecycle()
+        seed = self._departure_seed(
+            tick=160,
+            activity=SOLO_ACTIVITY,
+            cell=(505, 705),
+            members=1,
+            wilderness_only=True,
+        )
 
-        def run(parts: tuple[int, ...]):
-            self._reset_activity(tick=100)
-            first, first_bodies = self._group(
-                cell=(505, 705), tick=100, activity=SOLO_ACTIVITY, members=1
-            )
-            second, second_bodies = self._group(
-                cell=(515, 715), tick=100, activity=GROUP_ACTIVITY
-            )
-            tick = 100
-            for seconds in parts:
-                settle_population_lifecycle(tick, tick + seconds)
-                tick += seconds
+        def projection():
             state = read_monster_activity(self.wilderness)
+            bodies = tuple(
+                ObjectDB.objects.get(pk=member_id)
+                for group in state.groups.values()
+                for member_id in group.member_ids
+            )
             return {
                 "groups": sorted(
                     (
@@ -682,11 +826,10 @@ class ChokepointLifecycleTests(ActivityFixture):
                     for group in state.groups.values()
                 ),
                 "reserves": sorted(
-                    read_optional_fatigue_state(
-                        ObjectDB.objects.get(pk=body.pk)
-                    ).reserve_units
-                    for body in (*first_bodies, *second_bodies)
+                    read_optional_fatigue_state(body).reserve_units
+                    for body in bodies
                 ),
+                "gauges": sorted(body.traits.hp.current for body in bodies),
                 "cursors": sorted(
                     member.settled_through_tick
                     for group in state.groups.values()
@@ -694,11 +837,32 @@ class ChokepointLifecycleTests(ActivityFixture):
                 ),
             }
 
-        self.assertEqual(run((60,)), run((25, 35)))
-        # A repeated endpoint never recharges or reschedules.
-        snapshot = run((60,))
-        settle_population_lifecycle(160, 160)
-        self.assertEqual(run((60,)), snapshot)
+        def run(parts: tuple[int, ...]):
+            self._reset_activity(tick=100)
+            self._group(
+                cell=(505, 705),
+                seed=seed,
+                tick=100,
+                activity=SOLO_ACTIVITY,
+                members=1,
+            )
+            self._group(
+                cell=(515, 715), tick=100, activity=GROUP_ACTIVITY
+            )
+            tick = 100
+            for seconds in parts:
+                settle_population_lifecycle(tick, tick + seconds)
+                tick += seconds
+            return projection()
+
+        single = run((1500,))
+        halves = run((700, 800))
+        steps = run((61, 1439))
+        self.assertEqual(single, halves)
+        self.assertEqual(single, steps)
+        # A repeated endpoint on the same world never recharges or reschedules.
+        settle_population_lifecycle(1600, 1600)
+        self.assertEqual(projection(), steps)
 
     @covers_requirement(
         "world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities"
@@ -950,6 +1114,62 @@ class ChronologicalSettlementTests(ActivityFixture):
         self.assertEqual(self.wilderness.db.itemcoordinates[body], cell)
         self.assertEqual(dict(self.wilderness.db.rooms), rooms_before)
         self.assertIsNone(read_monster_activity(self.wilderness).groups[group_id].journey_id)
+
+    def test_a_birth_and_departure_in_one_advance_roll_back_completely(self):
+        self._register_lifecycle()
+        clock = get_world_clock()
+        clock.tick = 100
+        created: dict = {}
+
+        def birth_then_sites(tick):
+            if not created:
+                group_id, bodies = self._group(
+                    cell=(505, 705),
+                    tick=100,
+                    activity=SOLO_ACTIVITY,
+                    members=1,
+                )
+                created.update(group=group_id, body=int(bodies[0].pk))
+            return []
+
+        with (
+            patch.object(
+                monster_sites,
+                "settle_monster_sites_at",
+                side_effect=birth_then_sites,
+            ),
+            patch.object(
+                activity_owner,
+                "retire_room_protection",
+                side_effect=RuntimeError("late source fault"),
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                clock.advance(2000, AdvanceSource.SKIP, [])
+
+        # The rolled-back birth row and its group are gone, and the owner
+        # record is the pre-advance one.
+        self.assertFalse(
+            ObjectDB.objects.filter(pk=created["body"]).exists()
+        )
+        self.assertNotIn(
+            created["group"], read_monster_activity(self.wilderness).groups
+        )
+        self.assertEqual(clock.tick, 100)
+
+        # A deterministic retry creates the same identity and lets it move.
+        created.clear()
+        with patch.object(
+            monster_sites,
+            "settle_monster_sites_at",
+            side_effect=birth_then_sites,
+        ):
+            clock.advance(2000, AdvanceSource.SKIP, [])
+        group = read_monster_activity(self.wilderness).groups[created["group"]]
+        self.assertGreaterEqual(group.sequence, 1)
+        self.assertTrue(
+            ObjectDB.objects.filter(pk=created["body"]).exists()
+        )
 
     def test_zero_duration_departure_arrives_at_the_same_tick(self):
         self._register_lifecycle()
