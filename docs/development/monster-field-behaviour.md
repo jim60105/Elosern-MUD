@@ -1029,3 +1029,202 @@ in `.github/evennia-shards.json` (rules-2). The managed browser suite remains
 CI-owned; the browser walk stops on the same server-authoritative signal
 (`mode` no longer `exploration` after the arrival publication), so no separate
 browser evidence is claimed here.
+
+## Paid Party Retreat: One Real Edge and Two Paid Intervals
+
+`paid-party-retreat` makes a confirmed retreat execute a real adjacent
+affordable edge. Success departs the whole present party (knocked-out
+companions carried, remote companions untouched), pays the old encounter's
+unpaid prefix plus the attempt round once, then pays the ordinary movement
+traversal once through the shared movement settlement. No affordable legal
+destination keeps the existing failed-retreat branch: one ordinary enemy round
+at the source, no movement and no travel payment.
+
+### Human review of the player-facing wording
+
+`docs/game/commands.md` and `docs/game/command-reference.md` were read as a
+player would. Both now state that confirmation first checks an affordable
+adjacent route using the reserve left after the whole unpaid combat prefix and
+the attempt round; the prompt-captured reverse of the last completed edge is
+preferred when still legal and affordable, otherwise another lawful affordable
+neighbour is used without a monster-free/safe preference. They state that a
+successful party actually walks that edge with its knocked-out companions,
+pays one attempt round plus the normal travel time and physiology once, gains
+no exit heal or revival, and can be re-engaged immediately on arrival. They
+state that a party with no affordable route stays at the source, spends all
+allied actions and takes one ordinary enemy round without a movement charge.
+The wording is Traditional Chinese (zh-TW), keeps the existing `flee` aliases,
+and does not claim a client-chosen destination.
+
+### Route, projection and scope
+
+- `world_escape.plan_party_retreat` is read-only. It projects every present
+  team member's unpaid prefix from `settled_rounds` and the recorded posture
+  evidence, appends one six-second live-posture attempt, and prices the full
+  route through `movement_edges.quote_edge`. A paid prefix is never counted
+  again; `settled_rounds == rounds_elapsed` pays only the attempt.
+- Present allies are the commander's current source team from the battlefield
+  roster. Remote companions are outside `member_ids` and never price the
+  route. A knocked-out present companion is in `member_ids`/`carried_ids` but
+  never in `self_moving_ids`: it neither walks, prices speed nor triggers a
+  sleep refusal. A non-knocked-out sleeper keeps the ordinary restriction and
+  makes the route an ordinary unaffordable failure.
+- Ordinary blocked/unaffordable neighbours produce `None`. A malformed fatigue
+  pair, malformed saved history or broken authored geometry raises
+  `WorldEscapeError` by name. The prompt binds the server-captured previous
+  edge's identity fingerprint in the confirmation digest; execution revalidates
+  the live source and route, and a gate that locks after the prompt still
+  verifies the unchanged history and falls back to a lawful neighbour.
+
+### One atomic exit and paid edge
+
+- `rounds.resolve_party_retreat` establishes route viability before the
+  agility contest. No acting ally keeps the existing defeat/exam-FAIL branch.
+  No route runs `_failed_party_retreat` (empty allied provider, one ordinary
+  enemy round, fresh nonterminal draft).
+- On success the whole team is marked fled, and
+  `settlement.settle_fled_combat_prefix` pays the allied mental intervals and
+  advances the clock for exactly `[settled_rounds, rounds_elapsed + 1)` once.
+  The durable cursor commits with the finalized round; the terminal settlement
+  then pays zero remaining rounds and excludes the departed party from old
+  encounter gauge regeneration. No exit heal or revival occurs.
+- `movement_settlement.settle_party_retreat_traversal` executes the explicit
+  rules-owned carry plan through the ordinary `settle_movement` boundary with
+  the preflighted edge, charges the canonical traversal duration and
+  physiology once, records the completed history, and admits authored arrival
+  contact inside the same durable unit. It is not reachable from an exit, a
+  command or a client.
+- `confirm_party_exit` snapshots the full travel-window event surfaces, all
+  present party attributes (history, receipts, dialogue, encounter sequence,
+  sleep receipts) and the committed traversal handle; any late fault restores
+  the complete original party/session/draft/history/clock and population
+  surfaces. A committed old receipt replayed after arrival opened a new session
+  reaches the receipt-only answer or is refused as a foreign session; it never
+  mutates the new session.
+- `party_retreat_resolved` is scheduled on the outermost commit with the
+  outcome, reason, stable source/destination, member ids and attempt/arrival
+  tick. A rolled-back unit emits nothing.
+
+### Requirement traceability (delta not yet synced)
+
+The four modified requirements keep their existing canonical ids (checked with
+`uv run --locked python -m tools.spec_traceability list`); this change adds no
+new requirement id, so no new annotation is created before archive sync.
+
+| Requirement | Establishing tests |
+| --- | --- |
+| `player-combat-session::successful-retreat-carries-the-entire-present-party-and-counts-one-round` | `world.rules.tests.test_party_retreat_travel` (projection, carry scope, exact-zero, real edge, one combat plus one travel charge), `test_combat_party.PartyRetreatTests` (carried companion, replay) |
+| `player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer` | `test_party_retreat_travel` (unaffordable previous-edge fallback), unchanged `PartyRetreatTests` contest controls |
+| `player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round` | `test_party_retreat_travel` (post-attempt depletion, no movement/payment), `PartyRetreatTests` failed-round controls |
+| `player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation` | `test_confirmed_surrender` (malformed history by name, captured route, late lock fallback, new-session receipt replay) |
+| `player-combat-session::combat-time-settles-once-at-terminal-session-outcome` | `test_party_retreat_travel` (clock delta `2×6 + travel`), `PartyRetreatTests` terminal-once controls |
+| `guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate` | `test_guild_exams.ExamCombatTests.test_a_confirmed_retreat_fails_the_exam_over_a_real_edge` |
+
+### Scenario evidence
+
+- **Post-attempt affordability:** four unpaid awake-combat rounds project to
+  `rounds_elapsed - settled_rounds` plus the attempt; a cursor already at the
+  completed count projects only the attempt. Depleting before arrival is an
+  ordinary `None` route, including with no living pursuer.
+- **Exact zero:** the severe-band traveller is priced from 50% foot speed; the
+  exact reserve for a one-cell edge is accepted and `TravellerState.advance`
+  ends at zero with `FORCED` posture. One unit less after the attempt has no
+  route at all.
+- **Previous edge and fallback:** two adjacent edges with different canonical
+  prices are separated by a reserve where the captured expensive edge is
+  unaffordable; the planner returns a different lawful edge. In the authored
+  room test, a gate locked after the prompt keeps the token valid and execution
+  takes the other edge.
+- **Carry, scope and no heal:** a present knocked-out companion is carried to
+  the destination with its 1 HP unchanged; a remote companion is absent from
+  the member list; only the self-moving member's state prices the route.
+- **Exactly once:** the confirmed retreat advances the clock by one attempt
+  round plus the canonical traversal duration; the terminal settlement adds no
+  second combat charge. A committed receipt replay is idempotent; a replay
+  after a new arrival session is refused as `unknown_session_id` and leaves the
+  new session storage identical.
+- **Exam edge:** a confirmed retreat from the examination room records
+  `ExamState.FAILED`, restores the persistent host and moves the candidate over
+  the examination room's real exit.
+
+### Retained smoke
+
+`tools/monster_field_behaviour_smoke.py::run` was executed against a fresh
+disposable database. Because Evennia 6.1's `shell` has no `--plain` flag and a
+freshly migrated disposable database has no superuser, the exact invocation is:
+
+```text
+MUD_SMOKE_DB=/tmp/mud-field-smoke.sqlite3 \
+    uv run --locked evennia migrate \
+    --settings monster_field_behaviour_smoke_settings --noinput
+MUD_SMOKE_DB=/tmp/mud-field-smoke.sqlite3 \
+    DJANGO_SETTINGS_MODULE=server.conf.monster_field_behaviour_smoke_settings \
+    uv run --locked python -c "import django; django.setup(); from evennia.accounts.models import AccountDB; AccountDB.objects.create_superuser('smoke', '', 'smoke-pass')"
+MUD_SMOKE_DB=/tmp/mud-field-smoke.sqlite3 \
+    uv run --locked evennia shell \
+    --settings monster_field_behaviour_smoke_settings -i python \
+    -c "from tools.monster_field_behaviour_smoke import run; run()"
+```
+
+Observed report (real owners, no network/LLM, no mocked tested boundary):
+
+```json
+{
+  "probe": [500, 700],
+  "neighbour": [501, 700],
+  "clean_wait": {"requested": 60, "elapsed": 60},
+  "group_move": {"group": "smoke:move#0", "from": "501,700", "to": "500,700", "reason": "depart"},
+  "interrupted_wait": {"requested": 60, "elapsed": 0, "refusal": "SkipRefused", "session": "hostile:2:60"},
+  "failed_energy": {"route": null, "reserve": 10},
+  "paid_retreat": {"outcome": "fled", "from": "500,700", "to": "501,700", "travel_seconds": 1200, "clock_delta": 1206, "companion_at_destination": true},
+  "reengagement": {"session": "hostile:2:1266", "old_session": "hostile:2:60", "different": true, "enemies": [24]},
+  "enemy_journey": {"journey": "journey:smoke:flee", "arrived": "500,701", "tick": 1698},
+  "committed_reload": {"session": "hostile:2:1266", "enemies": [24]}
+}
+```
+
+The `clock_delta` of 1206 is exactly the six-second attempt plus the canonical
+1200-second traversal; the destination contact admitted a different session;
+the enemy flee journey committed and arrived; and a fresh object reload read
+the same committed session.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_party_retreat_travel world.rules.tests.test_combat_party world.rules.tests.test_confirmed_surrender
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_movement_settlement world.rules.tests.test_world_escape
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_guild_exams.ExamCombatTests web.webclient.actions.tests.test_combat_actions.CombatCommandAdapterTests world.rules.tests.test_rules_observability
+uv run --locked python -m unittest tests.test_evennia_test_optimization_contract
+uv run --locked python -m unittest tests.test_command_docs
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate paid-party-retreat --strict
+```
+
+`world.rules.tests.test_party_retreat_travel` is registered exactly once in
+`.github/evennia-shards.json` (rules-2, beside `test_combat_party`). The managed
+browser suite is CI-owned; the server-side browser adapter suite was extended
+and run, but no full browser run is claimed.
+
+Known pre-existing baseline failure, identical on the untouched parent
+`master` at `10a44481`: 
+`world.rules.tests.test_confirmed_surrender.AlliedFleeRemovalTests.test_enemy_disengagement_still_resolves_through_the_action_pipeline`
+reports `round != victory` because the kept test database has no provisioned
+wilderness world for a mapped individual escape. It is not attributed to this
+change.
+
+### Spec deviations
+
+None. The command documents' design invocation `--plain` is unsupported by
+Evennia 6.1's `shell`; the equivalent `-i python` invocation and the disposable
+settings module are recorded above.
+
+### Review dispositions
+
+The blocking plan review and the blocking final review were both requested
+through the available rubber-duck provider. Both invocations failed with the
+exact provider status `usage_limit_reached` (`Codex error event: The usage
+limit has been reached (code=usage_limit_reached)`), so no review finding is
+claimed as disposed and no review output is fabricated. The implementation
+evidence above and the focused/gate runs are the accepted substitute for this
+change, exactly as the assignment's provider-failure clause permits.
