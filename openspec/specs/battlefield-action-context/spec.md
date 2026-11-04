@@ -6,11 +6,7 @@ Provides Battlefield and BattlefieldActionContext conforming completely to chang
 ## Requirements
 
 ### Requirement: BattlefieldActionContext conforms to change 8's ActionContext protocol
-`world/rules/combat.py` SHALL provide `Battlefield` (holding a two-team roster, `teams: dict[str,
-frozenset[str]]`, and live entity references keyed by entity key) and `BattlefieldActionContext`,
-implementing the `ActionContext` protocol (`battlefield`, `is_present()`, `relation_to()`,
-`is_in_range()`) completely — closing the conformance target change 8 declared and left unbuilt.
-Conformance SHALL be evaluated against the protocol's current two-argument `is_in_range()` signature.
+The combat context SHALL expose a two-team roster keyed by stable individual identities and implement the complete action-context protocol without using display labels as identity.
 
 #### Scenario: BattlefieldActionContext satisfies the full protocol
 - **WHEN** `BattlefieldActionContext` is constructed with a populated `Battlefield` and queried via all
@@ -21,6 +17,10 @@ Conformance SHALL be evaluated against the protocol's current two-argument `is_i
 - **WHEN** `BattlefieldActionContext.battlefield` is inspected
 - **THEN** it is always a real `Battlefield` instance, never `None` — the opposite of
   `RoomActionContext`, where `battlefield` is always `None`
+
+#### Scenario: Repeated labels are independent
+- **WHEN** two persistent combatants share a label and one is renamed
+- **THEN** their distinct roster identities and team membership remain unchanged; explicit nonpersistent fixture identities use the same battlefield path
 
 ### Requirement: relation_to is derived from two-team membership, not a stored relation field
 `BattlefieldActionContext.relation_to(actor, target)` SHALL return `Relation.SELF` when actor and
@@ -40,8 +40,7 @@ when they belong to different teams. `Battlefield` SHALL support exactly two tea
 - **THEN** it returns `Relation.SELF`
 
 ### Requirement: is_present checks canonical battlefield roster membership
-`BattlefieldActionContext.is_present(actor, target)` SHALL return `True` only if the target's entity
-key is a member of `battlefield.roster`. Fled status belongs to the subsequent range check so the
+`BattlefieldActionContext.is_present(actor, target)` SHALL return `True` only if the target's stable individual identity is a member of `battlefield.roster`. Fled status belongs to the subsequent range check so the
 four validations retain distinct, reachable rejection reasons.
 
 #### Scenario: A roster member is present
@@ -49,17 +48,21 @@ four validations retain distinct, reachable rejection reasons.
 - **THEN** it returns `True`
 
 #### Scenario: A non-roster entity is not present
-- **WHEN** `is_present(actor, target)` is called for a target whose key is absent from
+- **WHEN** `is_present(actor, target)` is called for a target whose stable individual identity is absent from
   `battlefield.roster`
 - **THEN** it returns `False`, regardless of `battlefield.fled`
 
+#### Scenario: Same label grants no presence
+- **WHEN** a non-roster entity shares a label with a member
+- **THEN** presence is false and an action against it is rejected without effects
+
 ### Requirement: is_in_range checks fled status alone; melee-versus-ranged is structurally unreachable
 `BattlefieldActionContext.is_in_range(actor, target)` SHALL return `False` for any target whose
-key is in `battlefield.fled`, and `True` for every other roster member. The method SHALL NOT receive
+stable individual identity is in `battlefield.fled`, and `True` for every other roster member. The method SHALL NOT receive
 the definition being acted on: a full melee-versus-ranged distinction is explicitly out of scope.
 
 #### Scenario: A fled combatant is out of range for every skill
-- **WHEN** `is_in_range(actor, target)` is called for a target whose key is in `battlefield.fled`
+- **WHEN** `is_in_range(actor, target)` is called for a target whose stable individual identity is in `battlefield.fled`
 - **THEN** it returns `False`
 
 #### Scenario: An active roster member is in range regardless of skill identity

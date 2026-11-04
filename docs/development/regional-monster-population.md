@@ -658,25 +658,39 @@ unchanged.
 
 ## Requirement annotations
 
-No `covers_requirement` annotation was added or changed in this slice. The
-three ADDED/MODIFIED deltas have no canonical IDs before archival, so newly
-added acceptance tests stay unannotated and are recorded here for the archive
-step:
+The apply slice added no `covers_requirement` annotation: the three
+ADDED/MODIFIED deltas have no canonical IDs before archival. After the sync,
+the archive step attached the generated ID
+`player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels`
+(the only requirement the sync introduced) to the discoverable tests whose
+assertions establish its clauses:
 
 - `SameLabelIndividualTests.test_same_label_individuals_keep_independent_state`
-  → `player-combat-session` delta "Independent selected recipient" /
-  "Independent removal and credit" (independent HP, resources, effects, flee)
-  and `battlefield-action-context` "Repeated labels are independent".
+  — participant, effect and outcome state: distinct identities and team
+  membership, damage and resource loss on the selected twin only, and flee
+  state that removes only its own range while the twin stays targetable.
 - `SameLabelIndividualTests.test_rename_and_reorder_cannot_redirect_a_saved_selection`
-  → `player-combat-session` "Independent selected recipient" (rename/reorder
-  cannot redirect a selection; restoration preserves membership).
+  — selection and restoration: a saved pk selection survives rename, the
+  owner's reload and roster reorder, and resolves only the chosen individual.
 - `SameLabelIndividualTests.test_duplicate_identity_rejects_before_any_session_write`
-  → `player-combat-session` "Invalid duplicate identity".
+  — identity uniqueness: the same entity supplied twice rejects before any
+  session write.
 - `ObservationMemoryTests.test_same_label_sources_keep_independent_memory`
-  → `monster-ai-observation-memory` (same-label observability stays separate);
-  the two quest-planner cases `test_a_redelivered_defeat_entry_advances_once`
-  and `test_two_individuals_with_one_display_key_count_separately` supply the
-  duplicate-delivery and same-label defeat-credit evidence.
+  — AI state: two same-label sources keep independent observation memory.
+- `QuestPlannerTests.test_two_individuals_with_one_display_key_count_separately`
+  — outcome state: two same-label individuals each count their own defeat.
+
+The remaining acceptance tests cited in the apply slice establish the delta
+scenarios or extend requirements already covered by their own annotations, so
+they were left unannotated here:
+
+- `SameLabelIndividualTests.test_same_label_individuals_keep_independent_state`
+  and `test_rename_and_reorder_cannot_redirect_a_saved_selection` also carry
+  the delta scenarios "Independent removal and credit", "Repeated labels are
+  independent" and "Independent selected recipient" as behavior evidence.
+- `QuestPlannerTests.test_a_redelivered_defeat_entry_advances_once` supplies
+  the duplicate-delivery half of "Independent removal and credit" under its
+  own `monster-individual-construction` annotation.
 - `SessionItemMultiTargetRollbackTests.test_same_label_recipients_keep_distinct_event_log_identities`
   → `player-combat-session` "Independent selected recipient" (item recipient
   identity population feeding observation memory).
@@ -701,8 +715,8 @@ defeat-aftermath rollback/replay suite. They assert durable rows, live handler
 caches and draft state against the pre-call baseline.
 
 Nearest current anchors (from the design's generated list) whose scope these
-behaviours extend; after sync the archive step should attach the generated IDs
-rather than these provisional claims:
+behaviours extend; the existing annotations on them already cover those main
+requirements, so no additional claim was added:
 
 - `battlefield-action-context::is-present-checks-canonical-battlefield-roster-membership`
 - `player-combat-session::startup-restores-valid-sessions-and-terminates-invalid-references-safely`

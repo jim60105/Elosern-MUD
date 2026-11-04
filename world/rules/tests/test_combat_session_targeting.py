@@ -407,6 +407,9 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
         self.first.location = self.room
         self.second.location = self.room
 
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
     def test_same_label_individuals_keep_independent_state(self):
         from world.rules.combat import BattlefieldActionContext
         from world.rules.combat_session import engage_group, reconstruct_battlefield
@@ -444,6 +447,9 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(context.is_in_range(self.player, self.first))
         self.assertTrue(context.is_in_range(self.player, self.second))
 
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
     def test_rename_and_reorder_cannot_redirect_a_saved_selection(self):
         from dataclasses import replace
 
@@ -505,6 +511,9 @@ class SameLabelIndividualTests(BattlefieldIsolation, EvenniaTestCase):
             [self.second],
         )
 
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
     def test_duplicate_identity_rejects_before_any_session_write(self):
         from world.rules.combat_session import engage_group
 

@@ -129,6 +129,9 @@ class ObservationMemoryTests(EvenniaTestCase):
         )
         self.assertEqual(MAX_RETAINED_ROUNDS, 3)
 
+    @covers_requirement(
+        "player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels"
+    )
     def test_same_label_sources_keep_independent_memory(self):
         session = "hostile:1:0"
         first = FakeEntity("twin", combat_identity="twin-first")
