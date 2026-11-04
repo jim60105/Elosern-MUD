@@ -14,6 +14,7 @@ from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.exits import Exit, WildernessGateExit
 from typeclasses.npcs import NPC
 from typeclasses.rooms import GridRoom, Room
@@ -108,6 +109,9 @@ class _DummyBody:
 
 
 class EdgeCodecTests(unittest.TestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_locators_round_trip_and_reject_inexact_shapes(self):
         wilderness = LocationRef.wilderness(WILDERNESS_NAME, 3, 4)
         room = LocationRef.room(17)
@@ -131,6 +135,9 @@ class EdgeCodecTests(unittest.TestCase):
                 with self.assertRaises(MovementEdgeError):
                     decode_location_ref(malformed)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_edges_round_trip_and_route_depends_on_source_kind(self):
         edge = PhysicalEdge(
             LocationRef.wilderness(WILDERNESS_NAME, 1, 2),
@@ -206,6 +213,9 @@ class MovementEdgeTestCase(EvenniaTest):
 
 
 class LocationRefTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_pooled_terrain_room_locator_is_coordinates_not_room_id(self):
         self._enter_wilderness()
         location = self.char1.location
@@ -215,11 +225,17 @@ class LocationRefTests(MovementEdgeTestCase):
         self.assertEqual(ref, location_ref(location))
         self.assertEqual(self._script().db.itemcoordinates.get(self.char1), (ref.x, ref.y))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_authored_room_locator_is_the_durable_dbref(self):
         self.char1.location = self.room1
         self.assertEqual(location_ref(self.char1), LocationRef.room(self.room1.id))
         self.assertEqual(location_ref(self.east_gate), LocationRef.room(self.east_gate.id))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_unrepresentable_location_raises_named_error(self):
         from typeclasses.rooms import InstanceRoom
 
@@ -228,6 +244,9 @@ class LocationRefTests(MovementEdgeTestCase):
         with self.assertRaises(LocationRefError):
             location_ref(self.char1)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_limbo_receive_gate_is_consulted_read_only(self):
         from typeclasses.rooms import LimboRoom
 
@@ -251,6 +270,9 @@ class LocationRefTests(MovementEdgeTestCase):
 
 
 class LegalEdgeTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_gate_room_discovery_contains_the_registered_crossing(self):
         self.char1.location = self.east_gate
         edges = legal_edges(
@@ -265,6 +287,9 @@ class LegalEdgeTests(MovementEdgeTestCase):
         self.assertEqual(len(edges), len(set(edges)))
         self.assertTrue(all(edge.source == expected.source for edge in edges))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_locked_exit_is_not_a_legal_edge(self):
         locked = create_object(
             Exit, key="封閉", location=self.room1, destination=self.room2
@@ -277,6 +302,9 @@ class LegalEdgeTests(MovementEdgeTestCase):
         )
         self.assertIsNone(resolve_exit_edge(self.char1, locked))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_approach_cell_routes_the_registered_gateway_and_no_wall_entrance(self):
         source = LocationRef.wilderness(WILDERNESS_NAME, *ENTRY_XY)
         edges = legal_edges(self.char1, source, (self.char1,))
@@ -298,6 +326,9 @@ class LegalEdgeTests(MovementEdgeTestCase):
             # invented entrance through the footprint.
             self.assertEqual(edge.destination.kind, KIND_WILDERNESS)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_discovery_and_quote_are_read_only(self):
         from evennia.objects.models import ObjectDB
         from typeclasses.rooms import TerrainRoom
@@ -325,6 +356,9 @@ class LegalEdgeTests(MovementEdgeTestCase):
 
 
 class QuotedExecutionAgreementTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_quote_matches_the_committed_gate_and_reverse_costs(self):
         self.char1.location = self.east_gate
         forward = resolve_exit_edge(self.char1, self.gate)
@@ -351,6 +385,9 @@ class QuotedExecutionAgreementTests(MovementEdgeTestCase):
         self.assertEqual(get_world_clock().tick - before, reverse_quote.cost.seconds)
         self.assertEqual(self.char1.location, self.east_gate)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_quote_matches_the_committed_ordinary_step_cost(self):
         self._enter_wilderness()
         direction, edge = self._ordinary_step()
@@ -363,6 +400,9 @@ class QuotedExecutionAgreementTests(MovementEdgeTestCase):
         self.assertEqual(get_world_clock().tick - before, quote.cost.seconds)
         self.assertEqual(self._previous_edge(self.char1), edge)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_exact_zero_arrival_is_affordable_and_one_unit_less_refuses(self):
         from world.rules.clock import CLOCK_YAML
 
@@ -384,6 +424,9 @@ class QuotedExecutionAgreementTests(MovementEdgeTestCase):
             quote_edge(self.char1, edge, (self.char1,))
         self.assertEqual(refused.exception.reason, "pre_destination_depletion")
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_partial_physiology_refuses_instead_of_pricing(self):
         exit_obj = create_object(
             Exit, key="door", location=self.room1, destination=self.room2
@@ -396,6 +439,9 @@ class QuotedExecutionAgreementTests(MovementEdgeTestCase):
         with self.assertRaises(FatigueStateError):
             quote_edge(self.char1, edge, (partial,))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_flight_waived_step_quotes_zero_and_charges_zero(self):
         self._enter_wilderness()
         self.char1.db.skills = {"active": [], "passive": ["flight"]}
@@ -411,6 +457,9 @@ class QuotedExecutionAgreementTests(MovementEdgeTestCase):
 
 
 class MovementHistoryTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_relocated_falsy_plain_exit_records_no_completion(self):
         from typeclasses.rooms import Room
 
@@ -429,6 +478,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
         self.assertFalse(self.char1.attributes.has("previous_traversal"))
         logged.assert_not_called()
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_pooled_source_recycles_and_reload_preserves_locators(self):
         self._enter_wilderness()
         entry = self._previous_edge(self.char1)
@@ -446,6 +498,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
         self.char1.attributes.reset_cache()
         self.assertEqual(self._previous_edge(self.char1), recorded)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_failed_traversal_retains_the_previous_record(self):
         self._enter_wilderness()
         recorded = self._previous_edge(self.char1)
@@ -462,6 +517,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
         self.assertEqual(self._previous_edge(self.char1), recorded)
         self.assertEqual(location_ref(self.char1), recorded.destination)
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_teleport_invalidates_the_record(self):
         self._enter_wilderness()
         self.assertIsNotNone(self._previous_edge(self.char1))
@@ -498,6 +556,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
             ["movement_history_invalidated"],
         )
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_malformed_history_raises_and_stale_destination_is_none(self):
         edge = PhysicalEdge(
             LocationRef.room(self.room1.id),
@@ -522,6 +583,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
                 "direction:e\n",
             )
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_fault_after_history_write_restores_source_history_and_tick(self):
         self.char1.location = self.east_gate
         before_tick = get_world_clock().tick
@@ -562,6 +626,9 @@ class MovementHistoryTests(MovementEdgeTestCase):
 
 
 class PassageVisibilityTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_half_open_interval_has_no_idle_endpoint_presence(self):
         body = _DummyBody(11)
         scope = TraversalScope(
@@ -581,6 +648,9 @@ class PassageVisibilityTests(MovementEdgeTestCase):
         self.assertFalse(scope.present(149))
         self.assertTrue(scope.present(150))
 
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_committed_wilderness_step_interval_ends_at_the_accepted_tick(self):
         self._enter_wilderness()
         direction, _edge = self._ordinary_step()
@@ -618,6 +688,9 @@ class PassageVisibilityTests(MovementEdgeTestCase):
 
 
 class PossessedMovementHistoryTests(MovementEdgeTestCase):
+    @covers_requirement(
+        "movement-edge-history::completed-physical-edges-retain-stable-player-history"
+    )
     def test_transported_party_records_the_same_edge_and_remote_unchanged(self):
         self.char1.race = "human"
         self.char1.apply_race_baseline()

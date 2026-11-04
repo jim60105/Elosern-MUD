@@ -110,10 +110,11 @@ A rolled-back settlement emits neither success event.
 
 ### Evidence map
 
-Canonical proposed requirement ID (documented by `design.md`; the change is not
-yet archived into `openspec/specs/`, so tests deliberately carry no
-`covers_requirement` annotation until the archive sync):
+Canonical synced requirement ID (generated with
+`uv run --locked python -m tools.spec_traceability list` against the synced
+`openspec/specs/movement-edge-history/spec.md`):
 `movement-edge-history::completed-physical-edges-retain-stable-player-history`.
+The listed tests carry that literal ID through `covers_requirement`.
 
 | Scenario | Substantive test assertions |
 | --- | --- |
