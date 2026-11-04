@@ -2177,7 +2177,7 @@ class TerminalFatigueSettlementTests(BattlefieldIsolation, EvenniaTestCase):
 
 
 class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
-    """Delta: an all-forced-sleep opening enters ordinary zero-round defeat."""
+    """Delta: an all-forced-sleep opening resolves real paid enemy rounds."""
 
     def setUp(self):
         open_synthetic_scope(
@@ -2204,11 +2204,13 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
-        "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
-    def test_opening_defeat_runs_once_with_zero_combat_seconds(self):
+    def test_opening_runs_real_rounds_until_the_existing_cap(self):
         from world.rules.clock import AdvanceSource, WorldClock, get_world_clock
+        from world.rules.combat_session import _round_cap
 
+        self.player.traits.hp.base = 5000
+        self.player.traits.hp.current = 5000
         tick_before = get_world_clock().tick
         advances = []
         real_advance = WorldClock.advance
@@ -2222,14 +2224,16 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         ) as logged:
             with self.captureOnCommitCallbacks(execute=True):
                 result = engage(self.player, self.monster)
-        settlement = result["settlement"]
-        self.assertEqual(settlement["outcome"], "defeat")
-        self.assertEqual(settlement["rounds_elapsed"], 0)
+        continuation = result["continuation"]
+        self.assertEqual(continuation["outcome"], "cap")
+        self.assertEqual(continuation["rounds_elapsed"], _round_cap())
+        self.assertEqual(continuation["continued_rounds"], _round_cap())
         self.assertIsNone(read_session(self.player))
         combat_advances = [
             seconds for seconds, source in advances if source is AdvanceSource.COMBAT
         ]
-        self.assertEqual(combat_advances, [0])
+        # Every automatic round paid exactly its own six seconds.
+        self.assertEqual(combat_advances, [6] * _round_cap())
         events = [call.args[0] for call in logged.call_args_list]
         self.assertEqual(events.count("settlement_done"), 1)
 
@@ -2243,9 +2247,8 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement(
         "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
-        "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
-    def test_invalid_target_rejects_before_any_defeat_or_time(self):
+    def test_invalid_target_rejects_before_any_round_or_time(self):
         from world.rules.clock import get_world_clock
         from world.rules.fatigue import read_fatigue_state
 
@@ -2274,7 +2277,7 @@ class ForcedSleepOpeningTests(BattlefieldIsolation, EvenniaTestCase):
         tick_before = get_world_clock().tick
         state_before = read_fatigue_state(self.player)
         with patch(
-            "world.rules.combat_session.settlement.settle_combat_result",
+            "world.rules.combat_session.rounds.settle_combat_result",
             side_effect=RuntimeError("opening settlement failed"),
         ):
             with self.assertRaises(RuntimeError):

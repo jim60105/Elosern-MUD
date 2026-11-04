@@ -1483,16 +1483,21 @@ def _engage_adapter(actor: Any, payload: dict[str, Any], session: Any = None) ->
         if reason is SessionReason.NOT_PRESENT:
             return _rejected("no_monster", "這裡沒有這個對象。")
         return _rejected("engage_failed", "無法開始戰鬥。")
-    settlement = engaged.get("settlement")
-    if settlement is not None:
-        # The all-forced-sleep opening already settled through the ordinary
-        # terminal writer; present its outcome and republish the full state
-        # instead of advertising an active combat session.
-        from world.rules.combat_result import settle_to_messages
+    continuation = engaged.get("continuation")
+    if continuation is not None and continuation.get("continued_rounds"):
+        # The engagement's party could not act, so real enemy-only rounds
+        # already resolved through the ordinary writer. Deliver their logs and
+        # publish the terminal outcome or the resumed interactive session.
+        from world.rules.combat_result import (
+            emit_narrative,
+            settle_to_messages,
+        )
 
-        _, terminal = settle_to_messages(settlement)
-        actor.msg(terminal)
-        return _success("engaged", terminal, AFFECTED_FULL)
+        emit_narrative(actor, continuation)
+        _, message = settle_to_messages(continuation)
+        if continuation.get("outcome") not in ("round", "continue"):
+            actor.msg(message)
+            return _success("engaged", message, AFFECTED_FULL)
     from world.skills.narration import engagement_opening_line
 
     try:

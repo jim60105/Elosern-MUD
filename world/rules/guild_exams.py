@@ -677,10 +677,12 @@ def start_guild_exam(
 
             apply_affinity_change(host, actor, AffinitySource.GUILD, 1)
             from world.rules.combat_session.settlement import (
-                settle_forced_sleep_opening,
+                settle_exam_forced_sleep_opening,
             )
 
-            opening = settle_forced_sleep_opening(actor, session, battlefield)
+            opening = settle_exam_forced_sleep_opening(
+                actor, session, battlefield
+            )
             if opening is not None:
                 # The canonical all-forced-sleep opening failed the
                 # examination immediately through the ordinary exam policy;

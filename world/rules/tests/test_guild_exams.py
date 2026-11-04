@@ -986,6 +986,10 @@ class ExamSettlementRecoveryTests(ExamHostFixture, EvenniaTestCase):
     @covers_requirement(
         "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
         "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits",
+        # The delta removes this requirement at archive; its examination FAIL
+        # clause is still the surviving behavior this control establishes, and
+        # it remains a main-spec requirement until the sync lands.
         "player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat",
     )
     def test_all_forced_sleep_candidate_enters_exam_fail_without_a_round(self):

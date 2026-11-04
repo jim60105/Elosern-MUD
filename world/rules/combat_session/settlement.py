@@ -8,6 +8,7 @@ settlement-recovery D1/D2, guild-economy D-6).
 
 import time
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
@@ -19,7 +20,10 @@ from world.rules.action import _stored_trait_value
 from world.rules.clock import get_world_clock, settle_combat_result
 from world.rules.combat import COMBAT_YAML, Battlefield
 from world.rules.combat_identity import stable_actor_id
-from world.rules.combat_session.battlefield import reconstruct_battlefield
+from world.rules.combat_session.battlefield import (
+    get_required_combat_actors,
+    reconstruct_battlefield,
+)
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.writer import serialized_combat_write
 from world.rules.overwhelm import classify_overwhelm
@@ -33,6 +37,14 @@ from world.rules.settlement_alignment import (
 from world.rules.skip_safety import register_active_battlefield
 
 _ROUND_SECONDS = int(COMBAT_YAML["round"]["seconds"])
+
+
+#: Writer-local reentrancy guard for automatic enemy-only rounds. While one
+#: automatic iteration finalizes, the continuation disposition it produces is
+#: consumed by the owning loop itself and can never re-enter an outer hook.
+_AUTOMATIC_HOSTILE_ROUNDS: ContextVar[bool] = ContextVar(
+    "combat_automatic_hostile_rounds", default=False
+)
 
 
 def _team_living(
@@ -92,6 +104,36 @@ def _terminal_outcome(
     return None
 
 
+def settlement_participants(
+    actor: Any,
+    battlefield: Battlefield | None,
+) -> list[Any]:
+    """Return the entities whose gauges one combat interval regenerates.
+
+    Every living, non-fled roster member (fix-combat-session-roster-and-
+    overwhelm D1): companions and any non-defeated foe still present recover
+    for the interval, so a knocked-out companion can rise above the nonlethal
+    HP floor and rejoin a later engagement. A member at 0 HP is dead and
+    excluded (kill semantics). The actor alone keeps the historical scope only
+    when no roster participant is living and the actor is (a solo flee whose
+    actor is alive); a dead actor is never passed, so settlement can never
+    revive a defeated player.
+    """
+    participants = (
+        [
+            entity
+            for key, entity in battlefield.roster.items()
+            if key not in battlefield.fled
+            and _stored_trait_value(entity.traits.hp) > 0
+        ]
+        if battlefield is not None
+        else []
+    )
+    if not participants and _stored_trait_value(actor.traits.hp) > 0:
+        participants = [actor]
+    return participants
+
+
 def _round_cap() -> int:
     return int(COMBAT_YAML.get("max_rounds", 100))
 
@@ -109,6 +151,35 @@ def terminal_posture_segments(
     sleep. A zero-length tail keeps a transition observed at the final
     boundary, so it still determines the terminal posture.
     """
+    return posture_segments(record, actor_id)
+
+
+def posture_segments(
+    record: CombatSessionRecord,
+    actor_id: int,
+    *,
+    from_round: int = 0,
+    through_round: int | None = None,
+) -> tuple[tuple[bool, int], ...]:
+    """Return the recorded posture intervals clipped to a completed-round range.
+
+    ``from_round``/``through_round`` are completed-round ordinals, so the
+    returned seconds are the actual awake/sleep durations inside
+    ``[from_round, through_round)``. The engagement timeline is replayed from
+    round zero because a transition is only meaningful relative to its
+    predecessors, but only the requested slice is returned. A zero-length tail
+    after the requested range keeps the posture observed at its final boundary
+    so a caller can still determine the starting posture.
+    """
+    through = (
+        record.rounds_elapsed if through_round is None else int(through_round)
+    )
+    start = int(from_round)
+    if start < 0 or through < start or through > record.rounds_elapsed:
+        raise ValueError(
+            "posture segments require 0 <= from_round <= through_round "
+            "<= rounds_elapsed"
+        )
     transitions = sorted(
         (transition.round_index, transition.asleep)
         for transition in record.sleep_transitions
@@ -116,12 +187,21 @@ def terminal_posture_segments(
     )
     asleep = actor_id in record.initial_sleep_ids
     segments: list[tuple[bool, int]] = []
+
+    def emit(flag: bool, begin: int, end: int, *, keep_empty: bool = False) -> None:
+        low = max(begin, start)
+        high = min(end, through)
+        if high > low:
+            segments.append((flag, (high - low) * _ROUND_SECONDS))
+        elif keep_empty and low == high == through:
+            segments.append((flag, 0))
+
     cursor = 0
     for round_index, next_asleep in transitions:
-        segments.append((asleep, (round_index - cursor) * _ROUND_SECONDS))
+        emit(asleep, cursor, round_index)
         cursor = round_index
         asleep = next_asleep
-    segments.append((asleep, (record.rounds_elapsed - cursor) * _ROUND_SECONDS))
+    emit(asleep, cursor, record.rounds_elapsed, keep_empty=True)
     return tuple(segments)
 
 
@@ -156,6 +236,11 @@ def _settle_terminal_fatigue(
     zero latches forced sleep only at the terminal boundary, and natural wake
     is evaluated afterwards from the committed reserve — never inside the
     fight and never for an already defeated body.
+
+    Only the still-unpaid suffix of the recorded timeline settles here: a
+    member whose earlier rounds were already paid by the paid hostile-round
+    writer starts at ``record.settled_rounds``, so the terminal call never
+    charges an interval twice.
     """
     from world.rules.fatigue import (
         FatigueActivity,
@@ -184,14 +269,19 @@ def _settle_terminal_fatigue(
             transition.actor_id == int(pk) for transition in record.sleep_transitions
         )
         if has_evidence:
-            segments = terminal_posture_segments(record, int(pk))
+            segments = posture_segments(
+                record,
+                int(pk),
+                from_round=record.settled_rounds,
+            )
         else:
             # No engagement evidence: only the live posture is authoritative,
-            # and the record still contributes the elapsed combat time.
+            # and the record still contributes the unpaid combat time.
             segments = (
                 (
                     state.posture is not SleepPosture.AWAKE,
-                    record.rounds_elapsed * _ROUND_SECONDS,
+                    (record.rounds_elapsed - record.settled_rounds)
+                    * _ROUND_SECONDS,
                 ),
             )
         sleeping_posture = (
@@ -298,23 +388,27 @@ def _all_present_allies_forced_asleep(
     return True
 
 
-def settle_forced_sleep_opening(
+def settle_exam_forced_sleep_opening(
     actor: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield,
 ) -> dict[str, Any] | None:
-    """Enter ordinary zero-round terminal settlement for an all-sleep opening.
+    """Enter the examination's zero-round FAIL for an all-sleep opening.
 
-    Returns ``None`` for every other engagement. The ordinary terminal writer
-    supplies hostile defeat or exam FAIL, existing aftermath and diagnostics,
-    and the durable settled marker; no combat round, enemy action or spectator
-    loop runs. Invalid targets are rejected by engagement validation before
-    this seam is reached.
+    Only a designated guild examination keeps the zero-round policy: its
+    simulated battle has no hostile combat consequence to resolve, so the
+    candidate fails immediately through the ordinary examination terminal
+    writer. A hostile engagement returns ``None`` here and resolves real
+    enemy-only rounds through
+    :func:`~world.rules.combat_session.rounds.continue_incapacitated_hostile_rounds`.
+    Invalid targets are rejected by engagement validation before this seam is
+    reached.
     """
+    if record.mode != "guild_exam":
+        return None
     if not _all_present_allies_forced_asleep(actor, battlefield):
         return None
-    outcome = "defeat" if record.mode == "hostile" else "exam_failed"
-    return _settle_with_restore(actor, record, battlefield, outcome)
+    return _settle_with_restore(actor, record, battlefield, "exam_failed")
 
 
 def _emit_terminal_sleep_handoff(actor: Any, session_id: str) -> None:
@@ -376,6 +470,15 @@ def _continue_or_settle(
             "rounds_elapsed": record.rounds_elapsed,
             "logs": tuple(logs),
             "overwhelming_team": classify_overwhelm(battlefield),
+            # The ordinary-round orchestrator (and hostile engagement) reads
+            # this disposition after its round savepoint and pays/resolves the
+            # enemy-only continuation. An automatic iteration is guarded so it
+            # can only ever consume its own disposition in its owning loop.
+            "continuation_required": (
+                record.mode == "hostile"
+                and not _AUTOMATIC_HOSTILE_ROUNDS.get()
+                and not get_required_combat_actors(record, battlefield)
+            ),
         }
     # nested_round: this settlement runs inside _submit_request's round
     # transaction, so the aftermath arms its undo for that transaction's
@@ -636,27 +739,7 @@ def settle_session(
                         exc=error,
                         context={"char": str(actor.pk), "session": record.session_id},
                     )
-            # Settlement regenerates every living, non-fled roster member
-            # (fix-combat-session-roster-and-overwhelm D1): companions and any
-            # non-defeated foe still present recover for the accumulated combat
-            # seconds, so a knocked-out companion can rise above the nonlethal
-            # HP floor and rejoin a later engagement. A member at 0 HP is dead
-            # and excluded (kill semantics). The actor alone keeps the historical
-            # scope only when the actor is still living (recovery fallback with a
-            # live actor, or a solo flee whose actor is alive); a dead actor is
-            # never passed, so settlement can never revive a defeated player.
-            participants = (
-                [
-                    entity
-                    for key, entity in battlefield.roster.items()
-                    if key not in battlefield.fled
-                    and _stored_trait_value(entity.traits.hp) > 0
-                ]
-                if battlefield is not None
-                else []
-            )
-            if not participants and _stored_trait_value(actor.traits.hp) > 0:
-                participants = [actor]
+            participants = settlement_participants(actor, battlefield)
             # Physiology settles from the recorded round-boundary posture
             # evidence inside this same transaction, once for the accumulated
             # combat seconds. The clock's COMBAT source deliberately does not
@@ -666,9 +749,10 @@ def settle_session(
             # this is the one terminal writer that pays their unpaid rounds,
             # and it runs before the clock's own combat settlement below.
             _settle_monster_combat_terminal(record, battlefield)
+            unpaid_rounds = int(record.rounds_elapsed) - int(record.settled_rounds)
             events = settle_combat_result(
                 SimpleNamespace(
-                    total_seconds=record.rounds_elapsed * _ROUND_SECONDS
+                    total_seconds=unpaid_rounds * _ROUND_SECONDS
                 ),
                 participants,
             )
@@ -704,7 +788,12 @@ def settle_session(
             # the marked fight ended in the clergy's favour, so the stamp is
             # spent and a later defeat in another session can never fire it.
             settled_record = replace(
-                record, settled_tick=get_world_clock().tick
+                record,
+                settled_tick=get_world_clock().tick,
+                # The terminal call has now paid every recorded round, so the
+                # cursor closes at the completed count. A later replay branch
+                # pays nothing either way; this keeps the invariant truthful.
+                settled_rounds=int(record.rounds_elapsed),
             )
             # Record durable narrative event for covered protection encounters inside this same atomic unit
             from world.narrative.projector import select_and_record_protection_event
@@ -1022,7 +1111,8 @@ def _snapshot_settlement_restore(
         advance_registry = (
             build_advance_snapshot_registry(
                 clock if clock is not None else WorldClock(),
-                record.rounds_elapsed * _ROUND_SECONDS,
+                (record.rounds_elapsed - record.settled_rounds)
+                * _ROUND_SECONDS,
                 AdvanceSource.COMBAT,
                 scope,
             ),

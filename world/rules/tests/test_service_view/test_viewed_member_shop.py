@@ -443,6 +443,7 @@ class ViewedMemberShopTests(BattlefieldIsolation, EvenniaTest):
             "fled_ids": [],
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
+            "settled_rounds": 0,
             "exam_id": None,
             "engagement_id": "hostile:1:0:1",
             "started_tick": 0,

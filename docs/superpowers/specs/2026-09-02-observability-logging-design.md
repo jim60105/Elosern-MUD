@@ -185,6 +185,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 |---|---|
 | `action_commit` | `char`、`action`、`ms` |
 | `combat_round_settled` | `char`、`opponent`、`tick`、`hp_before`、`hp_after` |
+| `combat_incapacitated_continued` | `session`、`revision`、`from_round`、`to_round`、`members`（付費敵方專屬續戰邊界，僅於耐用提交時發出；`from_round`/`to_round` 為已結算回合範圍，`members` 為參與成員 dbref） |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |
 | `quest_auto_settlement` | `char`、`quest`（quest_id，即領取憑證）、`issuer`、`copper`、`items`（item keys）；自動結算的付款邊界，與櫃檯交回（`settlement_done`）可區辨 |

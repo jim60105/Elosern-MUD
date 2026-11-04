@@ -77,6 +77,7 @@
     "world.rules.tests.test_combat_session_recovery",
     "world.rules.tests.test_combat_session_sexual_coercion",
     "world.rules.tests.test_combat_session_targeting",
+    "world.rules.tests.test_hostile_incapacitated_rounds",
     "world.rules.tests.test_combat_view"
    ],
    "index": 2
