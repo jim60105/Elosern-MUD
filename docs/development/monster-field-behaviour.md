@@ -760,3 +760,115 @@ errors, `world.rules.tests.test_guild_exams.ExamSettlementRecoveryTests` keeps
 its three `examiner_engaged`/collision errors, and
 `world.rules.tests.test_combat_session_recovery.OverwhelmDirectionTests.test_player_overwhelming_in_session_submission_never_dispatches`
 keeps its `None != 'party'` classification failure.
+
+## Hostile Field Admission: Authored Contact at Real Boundaries
+
+### Human review of the player-facing wording
+
+Both command documents state the actual contract: authored aggressive
+monsters admit one ordinary whole-cell encounter at a real arrival, birth or
+condition boundary with no grace round and no free opening attack. They also
+state that look/preview/reconnect never admits, that a monster in passage is
+not present, that re-co-location after an escape admits again with no
+immunity, that voluntary sleep is interrupted with only its actual recovered
+reserve while forced sleep keeps its posture and threshold, and that the
+examination and staged-encounter policies are unchanged. An
+ecology/wording reviewer should confirm the Traditional Chinese sentence
+rhythm and that no sentence promises a new ability or stricter player
+control.
+
+### Requirement traceability (delta not yet synced)
+
+The new `hostile-field-contact` requirements are defined only in
+`openspec/changes/hostile-field-admission/specs/`. Because the delta is not
+merged into `openspec/specs/` yet, `tools.spec_traceability list` on the
+current tree reports no canonical ID for them, so no `covers_requirement`
+annotation was added to the new tests (annotating an unsynced ID would fail
+the current traceability check). Running the same tool with `--repo-root`
+against an equivalent merged tree outside Git reports exactly
+`hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat`
+and
+`hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state`.
+This table records the pending mapping; after archive sync the same test
+identities should annotate those two generated requirement IDs.
+
+| Test identity | Pending delta requirement | Current IDs that also cover it |
+| --- | --- | --- |
+| `world.rules.tests.test_field_contact.WholeCellArrivalTests.test_an_arrival_admits_a_a_b_once_with_no_free_opening_attack` | `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat` | `player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets`, `player-combat-session::combat-state-preserves-individual-identity-across-repeated-labels` |
+| `...ConditionAuthorityTests.test_daypart_gated_contact_admits_only_in_its_declared_region` | same | `monster-field-activity::activity-declarations-publish-complete-validated-bindings` |
+| `...ConditionAuthorityTests.test_defended_area_admits_only_inside_its_geometry` | same | same |
+| `...WholeCellArrivalTests.test_a_read_preview_never_admits` | same | `field-combat-initiation::validation-runs-against-a-candidate-battlefield-that-is-never-persisted-under-a-combat-context` |
+| `...ClockSourceAdmissionTests.test_source_admits_at_the_endpoint_and_returns_an_event` | same | `player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds` (delta, pending) |
+| `...PreActionBoundaryTests.test_wait_admits_and_spends_no_time` | same | `skip-safety-gate::evaluate_skip_safety-rejects-a-skip-when-a-living-monster-shares-the-actor-s-location` |
+| `...PreActionBoundaryTests.test_ordinary_cast_reports_the_admitted_encounter` | same | `field-combat-initiation::the-command-routes-an-exploration-cast-by-target-and-its-documentation-says-so` |
+| `...SleepInterruptionTests.test_voluntary_receipt_interrupts_without_refill_or_resume` | `hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state` | `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped` |
+| `...SleepInterruptionTests.test_forced_receipt_keeps_its_posture_and_threshold` | same | same |
+| `world.rules.tests.test_sleep_receipt.ContactSleepInterruptionTests.test_voluntary_receipt_pays_actual_sleep_then_interrupts_once` | same | `party-time-settlement::every-settled-sleeper-completes-its-own-accepted-wake-plan` |
+| `...ContactSleepInterruptionTests.test_forced_receipt_keeps_posture_target_and_threshold` | same | `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped` |
+| `...ForcedWakeThroughAdmissionTests.test_forced_71928_reaches_72000_after_one_real_enemy_round` | `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat` | `player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds` (delta, pending), `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped` |
+| `...ProtectionTests.test_active_session_protects_the_cell_and_history_blocks_catch_up` | `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat` | `wilderness-monster-population::encounter-protection-blocks-birth-space` |
+| `...FaultRestorationTests.test_session_write_failure_restores_the_interrupted_receipt` | same | `player-combat-session::combat-time-settles-once-at-terminal-session-outcome` |
+| `...FaultRestorationTests.test_a_continuation_failure_rolls_back_the_whole_encounter` | same | `player-combat-session::combat-time-settles-once-at-terminal-session-outcome` |
+| `...PreActionBoundaryTests.test_all_party_sleep_admits_before_its_safety_refusal` | same | `party-system::any-present-sleeper-makes-party-travel-stationary` |
+
+These current IDs are recorded as neighbouring coverage only; the substantive
+assertions are the new behavior above, and no ID is claimed to be a new
+requirement before archive synchronization.
+
+### Scenario evidence
+
+- **A+A+B arrival:** a real `settle_movement` relocation into a cell with two
+  same-named contact monsters and one passive monster admits one session whose
+  `enemy_ids` are all three living locals in persistent-ID order, with one
+  draft and no round, no enemy HP loss and no clock advance.
+- **Birth/condition source:** a registered clock source admits at the accepted
+  interval endpoint, returns an interactive `field_contact_admitted` event and
+  leaves the clock unchanged; the owning action drains the predecessor
+  continuation once the advance returned. Declared dayparts and defended
+  areas admit only inside their authored condition; passive members never
+  trigger.
+- **Transit and reads:** an in-passage party and a read-only preview create no
+  session.
+- **Forced wake:** a forced sleeper at 71928 admits normally, receives exactly
+  one real six-second enemy round and reaches 72000/AWAKE with the paid cursor
+  at 1/1; the session survives and choice returns.
+- **Voluntary receipt:** a real contact interrupts voluntary sleep, the
+  receipt becomes `interrupted` at the occurrence tick, the reserve equals
+  only the actual sleep-rate recovery (never a refill) and a repeated contact
+  cannot advance it. A forced receipt keeps its posture, target and threshold.
+- **Pre-action:** a co-located contact admits before wait/rest/sleep/camp,
+  item use or an ordinary cast; the action spends no time, resource or effect
+  and the existing safety refusal reports the encounter.
+- **Protection and re-co-location:** an active mapped session protects its
+  cell; the real terminal settlement leaves the historical interval blocking
+  a catch-up birth, and a later co-location admits a fresh session with a new
+  identity (no immunity).
+- **Fault restoration:** a failure in the session write after the interruption
+  restores the receipt, physiology and session surfaces, emits
+  `field_contact_failed` and no success event.
+
+### Spec deviations
+
+None. The removal of hostile `settle_forced_sleep_opening` was already
+completed by `incapacitated-hostile-rounds`, which left only the examination
+helper; this slice verified that no hostile caller remains. The conservative
+registered boundary query deliberately stops interruptible skips at every
+next activity/arrival/birth/condition/daypart tick until the forecast
+successor replaces it, as design.md requires.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_sleep_receipt
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_hostile_incapacitated_rounds
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate hostile-field-admission --strict
+```
+
+`world.rules.tests.test_field_contact` is registered exactly once in
+`.github/evennia-shards.json` (evennia shard 2). The managed browser suite is
+CI-owned and was not executed here; the text and browser surfaces share the
+same rules entry points (`settle_movement`, `cast_in_field`, `use_item`,
+`time_skip`), so no separate browser evidence is claimed.
