@@ -488,6 +488,9 @@ requirement/scenario it establishes.
 | `RegionalPopulationTests.test_initialization_runs_once_and_never_refills_on_reload_or_preparation` | synthetic mechanism | …individual state — initialization once |
 | `RegionalPopulationTests.test_initialization_on_an_inactive_cell_creates_no_room` | synthetic mechanism | …individual state — no materialized room |
 | `RegionalPopulationTests.test_named_refusals_are_distinct_from_blocked_space` | synthetic mechanism | …atomic — protection and refusals; Shared population seed — no implicit seed default |
+| `RegionalPopulationTests.test_a_malformed_persisted_seed_refuses_instead_of_being_replaced` | synthetic mechanism | Shared population seed — no implicit seed default (a present unusable value is never replaced) |
+| `RegionalPopulationTests.test_a_negative_world_seed_still_initializes_and_replays` | synthetic mechanism | …no implicit seed default and …individual state — initialization once (any integer seed) |
+| `RegionalPopulationTests.test_a_malformed_state_envelope_refuses_before_any_write` | synthetic mechanism | …atomic — protection and refusals (malformed saved state refuses instead of reading as unset) |
 | `RegionalPopulationTests.test_reads_create_nothing_and_emit_nothing` | synthetic mechanism | …atomic — commit observability (reads emit nothing) |
 | `RegionalPopulationTests.test_explicit_registration_never_reads_birth_geometry_or_stamps_ownership` | synthetic mechanism | Shared population seed and explicit registrations are owner supplied — manual and quest actual registration |
 | `RegionalPopulationTests.test_registration_target_reads_only_a_real_wilderness_room` | synthetic mechanism | …explicit registrations — manual and quest actual registration (valid surface only) |
@@ -514,7 +517,7 @@ Run from the worktree root with the single-token environment file
 
 | Command | Result |
 | --- | --- |
-| `uv run --locked --env-file=/tmp/mud-population-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | `Ran 22 tests ... OK` |
+| `uv run --locked --env-file=/tmp/mud-population-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | `Ran 25 tests ... OK` |
 | `… world.maps.tests.test_gm` | `Ran 8 tests ... OK` |
 | `… world.maps.tests.test_bootstrap.WildernessBootstrapTests` | `Ran 15 tests ... OK` |
 | `… world.quests.tests.test_permanent_occupants.WildernessSceneMonsterPlacementTests` | `Ran 2 tests ... OK` |

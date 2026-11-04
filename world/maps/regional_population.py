@@ -288,6 +288,15 @@ def _require_int(value: object, what: str, minimum: int = 0) -> int:
     return value
 
 
+def _require_seed(value: object, what: str) -> int:
+    """Reject a non-integer seed (bools included); any integer is a seed."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {what} must be an integer, got {value!r}"
+        )
+    return value
+
+
 def _require_argument_int(value: object, what: str, minimum: int = 0) -> int:
     """Reject a bad argument integer (bools included), as a plain value error."""
     if isinstance(value, bool) or not isinstance(value, int):
@@ -298,11 +307,28 @@ def _require_argument_int(value: object, what: str, minimum: int = 0) -> int:
 
 
 def _state_map(wilderness: Any) -> dict[str, dict]:
-    """The durable per-zone state map, copied out for a whole-value write."""
-    return {
-        str(key): dict(value)
-        for key, value in (wilderness.db.regional_population or {}).items()
-    }
+    """The durable per-zone state map, copied out for a whole-value write.
+
+    An absent Attribute is the only empty state. A present value that is not a
+    mapping of zone keys to mappings is malformed and refuses: it is never
+    normalized into "nothing was initialized", which would let a later
+    initialization overwrite saved owner state.
+    """
+    raw = wilderness.db.regional_population
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {REGIONAL_POPULATION_ATTRIBUTE!r} is not a mapping"
+        )
+    states: dict[str, dict] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not isinstance(value, Mapping):
+            raise MalformedPopulationState(
+                f"{MALFORMED_STATE}: zone record {key!r} is not a mapping"
+            )
+        states[key] = dict(value)
+    return states
 
 
 def _write_state(wilderness: Any, states: Mapping[str, Mapping]) -> None:
@@ -310,11 +336,18 @@ def _write_state(wilderness: Any, states: Mapping[str, Mapping]) -> None:
     wilderness.db.regional_population = {key: dict(value) for key, value in states.items()}
 
 
-def _saved_seed(wilderness: Any) -> int | None:
-    """The saved world seed, or ``None`` when the Attribute was never written."""
+_SEED_ABSENT = object()
+
+
+def _seed_attribute(wilderness: Any) -> object:
+    """The raw saved seed value, or ``_SEED_ABSENT`` when it was never written.
+
+    Absence and a present-but-unusable value are distinct answers: only an
+    absent Attribute may receive the first write.
+    """
     handler = wilderness.attributes
     if not handler.has(POPULATION_SEED_ATTRIBUTE):
-        return None
+        return _SEED_ABSENT
     return handler.get(POPULATION_SEED_ATTRIBUTE)
 
 
@@ -326,8 +359,8 @@ def read_population_seed(wilderness: Any) -> int:
     save. An incompatible development world needs an explicit GM repair.
     """
     _require_wilderness(wilderness)
-    seed = _saved_seed(wilderness)
-    if seed is None or isinstance(seed, bool) or not isinstance(seed, int):
+    seed = _seed_attribute(wilderness)
+    if seed is _SEED_ABSENT or isinstance(seed, bool) or not isinstance(seed, int):
         raise PopulationSeedUninitialized(f"{SEED_UNINITIALIZED}: {PERSISTED_SEED_HINT}")
     return seed
 
@@ -343,8 +376,10 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
     _require_argument_int(tick, "tick")
     if isinstance(seed, bool) or not isinstance(seed, int):
         raise ValueError(f"seed must be an integer, got {seed!r}")
-    saved = _saved_seed(wilderness)
-    if saved is not None:
+    saved = _seed_attribute(wilderness)
+    if saved is not _SEED_ABSENT:
+        # An existing value is never replaced, however unusable it is: malformed
+        # owner state needs an explicit repair, not an implicit reseed.
         if isinstance(saved, bool) or not isinstance(saved, int):
             raise PopulationSeedUninitialized(f"{SEED_UNINITIALIZED}: malformed saved seed")
         return saved
@@ -367,9 +402,21 @@ def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
     record = _state_map(wilderness).get(zone_key)
     if record is None:
         return None
+    required = (
+        "initialized",
+        "seed",
+        "generation_sequence",
+        "recovery_due_tick",
+        "settled_through_tick",
+    )
+    missing = [field for field in required if field not in record]
+    if missing:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: zone {zone_key!r} record lacks {missing}"
+        )
     if record.get("initialized") is not True:
         raise MalformedPopulationState(f"{MALFORMED_STATE}: zone {zone_key!r} is not initialized")
-    seed = _require_int(record.get("seed"), "seed")
+    seed = _require_seed(record.get("seed"), "seed")
     sequence = _require_int(record.get("generation_sequence"), "generation_sequence")
     settled = _require_int(record.get("settled_through_tick"), "settled_through_tick")
     due = record.get("recovery_due_tick")
@@ -500,12 +547,7 @@ def _session_participant_ids() -> frozenset[int]:
             continue
         try:
             record = read_session(player)
-        except Exception as error:
-            log_warn(
-                "monster_population_session_unreadable",
-                exc=error,
-                context={"char": player.key or str(player.pk)},
-            )
+        except Exception:  # observability: ignore R2: planning is a pure read that must emit nothing; an unparseable persisted session protects nothing by name, and the combat owner reports its own unreadable records
             continue
         if record is None:
             continue

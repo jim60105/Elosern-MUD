@@ -465,12 +465,25 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         baseline_coordinates = dict(self.wilderness.db.itemcoordinates)
         plan = plan_population_wave(self.wilderness, zone.key, tick=0)
 
-        with patch.object(
-            owner, "_state_map", side_effect=RuntimeError("injected state write failure")
+        created: list[Monster] = []
+        real_construct = construct_species_individual
+
+        def recording(species_key, variant_key, **kwargs):
+            individual = real_construct(species_key, variant_key, **kwargs)
+            created.append(individual)
+            return individual
+
+        # The fault follows real construction and real coordinate/room writes.
+        with (
+            patch.object(owner, "construct_species_individual", side_effect=recording),
+            patch.object(
+                owner, "_write_state", side_effect=RuntimeError("injected state write failure")
+            ),
         ):
             with self.assertRaises(RuntimeError):
                 commit_population_wave(self.wilderness, plan)
 
+        self.assertEqual(len(created), plan.placements[0].total)
         self.assertEqual(
             {
                 key: dict(value)
@@ -479,6 +492,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             baseline_state,
         )
         self.assertEqual(dict(self.wilderness.db.itemcoordinates), baseline_coordinates)
+        for individual in created:
+            self.assertFalse(ObjectDB.objects.filter(pk=individual.pk).exists())
+            self.assertNotIn(individual.pk, ObjectDB.__instance_cache__)
         self.assertEqual(zone_state(self.wilderness, zone.key).generation_sequence, 0)
 
     def test_a_failure_after_the_state_write_publishes_no_wave_event(self):
@@ -630,6 +646,64 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         }
         with self.assertRaises(MalformedPopulationState):
             zone_state(self.wilderness, zone.key)
+
+    def test_a_malformed_persisted_seed_refuses_instead_of_being_replaced(self):
+        self.wilderness.attributes.add(owner.POPULATION_SEED_ATTRIBUTE, None)
+
+        with self.assertRaises(PopulationSeedUninitialized):
+            read_population_seed(self.wilderness)
+        # A present but unusable value is never replaced by the first write.
+        with self.assertRaises(PopulationSeedUninitialized):
+            initialize_population_seed(self.wilderness, seed=3, tick=0)
+        self.assertIsNone(
+            self.wilderness.attributes.get(owner.POPULATION_SEED_ATTRIBUTE)
+        )
+
+        self.wilderness.attributes.add(owner.POPULATION_SEED_ATTRIBUTE, True)
+        with self.assertRaises(PopulationSeedUninitialized):
+            read_population_seed(self.wilderness)
+        with self.assertRaises(PopulationSeedUninitialized):
+            initialize_population_seed(self.wilderness, seed=3, tick=0)
+
+    def test_a_negative_world_seed_still_initializes_and_replays(self):
+        zone = self._use(
+            zone=_zone(lower=60, upper=90, capacity=3, budget=3, pool=(("t_trio", 1),))
+        )
+        initialize_population_seed(self.wilderness, seed=-1, tick=0)
+
+        created = initialize_zone(self.wilderness, zone.key, seed=-1, tick=0)
+        self.assertTrue(created)
+        self.assertEqual(zone_state(self.wilderness, zone.key).seed, -1)
+        self.assertEqual(initialize_zone(self.wilderness, zone.key, seed=-1, tick=0), ())
+
+    def test_a_malformed_state_envelope_refuses_before_any_write(self):
+        zone = self._use()
+        self._seed()
+
+        for malformed in (False, [], "not-a-map"):
+            with self.subTest(malformed=malformed):
+                self.wilderness.db.regional_population = malformed
+                with self.assertRaises(MalformedPopulationState):
+                    plan_population_wave(self.wilderness, zone.key, tick=0)
+                with self.assertRaises(MalformedPopulationState):
+                    initialize_zone(self.wilderness, zone.key, seed=SEED, tick=0)
+                # The malformed saved value is neither normalized nor replaced.
+                self.assertEqual(
+                    self.wilderness.db.regional_population, malformed
+                )
+
+        # A record missing a required field is malformed too, not "unset".
+        self.wilderness.db.regional_population = {
+            zone.key: {
+                "initialized": True,
+                "seed": SEED,
+                "generation_sequence": 0,
+                "settled_through_tick": 0,
+            }
+        }
+        with self.assertRaises(MalformedPopulationState):
+            zone_state(self.wilderness, zone.key)
+        # An incomplete or uninitialized record is malformed, not unset.
         self.wilderness.db.regional_population = {
             zone.key: {"initialized": "yes", "seed": SEED}
         }
@@ -637,9 +711,15 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
             zone_state(self.wilderness, zone.key)
 
     def test_reads_create_nothing_and_emit_nothing(self):
-        zone = self._use()
+        zone = self._use(
+            zone=_zone(lower=60, upper=90, capacity=3, budget=3, pool=(("t_trio", 1),))
+        )
         self._seed()
+        self._initialize_state(zone)
         individuals = [self._individual(home=zone.key, cell=cell) for cell in LOCAL]
+        # A corrupt persisted session must not make a pure read emit anything
+        # either: planning discovers sessions on the way to a decision.
+        self.char1.db.active_combat = {"not": "a session"}
         monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
         state_before = {
             key: dict(value)
@@ -647,11 +727,15 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         }
         coordinates_before = dict(self.wilderness.db.itemcoordinates)
 
-        with patch.object(owner, "log_info") as info:
+        with (
+            patch.object(owner, "log_info") as info,
+            patch.object(owner, "log_warn") as warn,
+        ):
             population_counts(self.wilderness, zone.key)
             plan_population_wave(self.wilderness, zone.key, tick=0)
             snapshot_regional_population_surfaces(0, 0)
             info.assert_not_called()
+            warn.assert_not_called()
 
         self.assertEqual(sorted(Monster.objects.values_list("pk", flat=True)), monsters_before)
         self.assertEqual(
