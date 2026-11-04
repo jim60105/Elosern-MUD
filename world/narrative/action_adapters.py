@@ -1208,8 +1208,21 @@ def record_action_settlement_evidence(
         for eff in pending_effects:
             desc = str(getattr(eff, "description", ""))
             eff_entity = getattr(eff, "entity", None)
-            eff_pk = _durable_pk(eff_entity) if eff_entity is not None else actor_pk
-            eff_name = str(getattr(eff_entity, "key", ""))
+            # A battlefield-shaped pending mutation (disengage) describes the
+            # acting entity, never the battlefield as a participant.
+            battlefield_shaped = eff_entity is not None and hasattr(
+                eff_entity, "fled"
+            ) and hasattr(eff_entity, "roster")
+            eff_pk = (
+                actor_pk
+                if eff_entity is None or battlefield_shaped
+                else _durable_pk(eff_entity)
+            )
+            eff_name = (
+                ""
+                if battlefield_shaped
+                else str(getattr(eff_entity, "key", ""))
+            )
             parts = desc.split("|")
             kind = parts[0] if parts else ""
             values = parts[2:]
