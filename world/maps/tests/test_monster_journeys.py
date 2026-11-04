@@ -122,9 +122,6 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
     def _seed(self, seed: int = SEED) -> None:
         initialize_population_seed(self.wilderness, seed=seed, tick=0)
 
-    @covers_requirement(
-        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
-    )
     def test_initialization_writes_one_empty_record_and_never_replaces_it(self):
         self.assertFalse(monster_activity.activity_provisioned(self.wilderness))
         self.assertRaises(
@@ -141,9 +138,6 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         initialize_monster_activity(self.wilderness, tick=9)
         self.assertEqual(dict(self.wilderness.db.monster_activity), saved)
 
-    @covers_requirement(
-        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
-    )
     def test_missing_and_malformed_state_refuse_without_reset(self):
         self._seed()
         self.assertTrue(monster_activity.activity_provisioned(self.wilderness))
@@ -164,9 +158,6 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         self.wilderness.db.monster_activity = saved
         self.assertEqual(state_to_dict(read_monster_activity(self.wilderness)), saved)
 
-    @covers_requirement(
-        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"
-    )
     def test_codec_roundtrip_is_exact_and_rejects_unknown_shape(self):
         self._seed()
         cell = LOCAL[0]
@@ -278,9 +269,6 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
         }
         self.wilderness.db.regional_population = states
 
-    @covers_requirement(
-        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
-    )
     def test_identical_member_rows_keep_their_own_selected_binding(self):
         zone = self._use(
             _zone(
@@ -331,9 +319,6 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
             },
         )
 
-    @covers_requirement(
-        "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure"
-    )
     def test_a_replayed_commit_cannot_replace_a_foreign_group(self):
         zone = self._use(_zone("t_zone", pool=(("t_three_a", 1),)))
         self._seed()
@@ -353,9 +338,6 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
             state_to_dict(read_monster_activity(self.wilderness)), before
         )
 
-    @covers_requirement(
-        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"
-    )
     def test_a_group_collision_refuses_instead_of_absorbing_identities(self):
         self._seed()
         ref = LocationRef.wilderness(WILDERNESS_NAME, *LOCAL[0])
@@ -389,9 +371,6 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(group_record.member_ids, (1,))
         self.assertEqual(group_record.home_owner, ("explicit", "gm:1"))
 
-    @covers_requirement(
-        "monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay"
-    )
     def test_membership_survives_a_member_standing_away_until_it_moves_group(self):
         zone = self._use(_zone("t_zone", pool=(("t_three_a", 1),)))
         self._seed()
