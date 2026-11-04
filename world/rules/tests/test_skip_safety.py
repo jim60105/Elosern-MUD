@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from world.rules.combat import Battlefield
+from world.rules.combat_identity import stable_actor_id
 from world.rules.skip_safety import (
     SkipRejectReason,
     _BATTLEFIELDS,
@@ -32,13 +33,14 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     @covers_requirement("skip-safety-gate::the-safety-gate-rejects-outright-it-does-not-compute-a-partial-safety-shortened")
     def test_active_battlefield_rejects_but_fled_actor_does_not(self):
         first, second = actor("first", 1), actor("second", 2)
+        first_id, second_id = stable_actor_id(first), stable_actor_id(second)
         field = Battlefield(
-            {'a': frozenset({"fixture:first"}), 'b': frozenset({"fixture:second"})},
-            {"fixture:first": first, "fixture:second": second},
+            {'a': frozenset({first_id}), 'b': frozenset({second_id})},
+            {first_id: first, second_id: second},
         )
         register_active_battlefield(field)
         self.assertEqual(evaluate_skip_safety(first), SkipRejectReason.IN_COMBAT)
-        field.fled.add("first")
+        field.fled.add(first_id)
         self.assertIsNone(evaluate_skip_safety(first))
 
     @covers_requirement("skip-safety-gate::evaluate-skip-safety-rejects-a-skip-when-a-living-monster-shares-the-actor-s-location")
@@ -61,13 +63,16 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     )
     def test_same_key_entities_in_separate_battlefields_do_not_cross_evict(self):
         first, second = actor("shared", 1), actor("shared", 2)
+        other_a, other_b = actor("other-a", 3), actor("other-b", 4)
+        first_id, second_id = stable_actor_id(first), stable_actor_id(second)
+        other_a_id, other_b_id = stable_actor_id(other_a), stable_actor_id(other_b)
         field_a = Battlefield(
-            {'a': frozenset({"fixture:shared"}), 'b': frozenset({"fixture:other-a"})},
-            {"fixture:shared": first, "fixture:other-a": actor("other-a", 3)},
+            {'a': frozenset({first_id}), 'b': frozenset({other_a_id})},
+            {first_id: first, other_a_id: other_a},
         )
         field_b = Battlefield(
-            {'a': frozenset({"fixture:shared"}), 'b': frozenset({"fixture:other-b"})},
-            {"fixture:shared": second, "fixture:other-b": actor("other-b", 4)},
+            {'a': frozenset({second_id}), 'b': frozenset({other_b_id})},
+            {second_id: second, other_b_id: other_b},
         )
         register_active_battlefield(field_a)
         register_active_battlefield(field_b)
@@ -82,9 +87,11 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
     @covers_requirement("skip-safety-gate::skip-safety-registers-battlefields-by-participant-dbref")
     def test_in_combat_lookup_resolves_by_actor_dbref(self):
         fighter, bystander = actor("fighter", 10), actor("bystander", 11)
+        foe = actor("foe", 12)
+        fighter_id, foe_id = stable_actor_id(fighter), stable_actor_id(foe)
         field = Battlefield(
-            {'a': frozenset({"fixture:fighter"}), 'b': frozenset({"fixture:foe"})},
-            {"fixture:fighter": fighter, "fixture:foe": actor("foe", 12)},
+            {'a': frozenset({fighter_id}), 'b': frozenset({foe_id})},
+            {fighter_id: fighter, foe_id: foe},
         )
         register_active_battlefield(field)
         self.assertEqual(
@@ -94,3 +101,50 @@ class SkipSafetyTests(BattlefieldIsolation, unittest.TestCase):
         # A different entity sharing the fighter's display key is not in combat.
         clone = actor("fighter", 13)
         self.assertIsNone(evaluate_skip_safety(clone))
+
+    @covers_requirement(
+        "battlefield-action-context::battlefieldactioncontext-conforms-to-change-8-s-actioncontext-protocol"
+    )
+    def test_battlefield_construction_preserves_explicit_identity_domains(self):
+        """Persisted doubles keep dbref identity; pure doubles use explicit ones."""
+        first, second = actor("shared", 1), actor("shared", 2)
+        first.combat_identity = "first"
+        second.combat_identity = "second"
+        first_id, second_id = stable_actor_id(first), stable_actor_id(second)
+        self.assertEqual(first_id, "dbref:1")
+        self.assertEqual(second_id, "dbref:2")
+
+        field = Battlefield(
+            {'a': frozenset({first_id}), 'b': frozenset({second_id})},
+            {first_id: first, second_id: second},
+        )
+        self.assertIs(field.roster[first_id], first)
+        self.assertIs(field.roster[second_id], second)
+        self.assertEqual(field.team_of(first_id), 'a')
+        self.assertEqual(field.team_of(second_id), 'b')
+
+        snapshot = dict(_BATTLEFIELDS)
+        with self.assertRaisesRegex(ValueError, "does not match combatant identity"):
+            Battlefield(
+                {'a': frozenset({"fixture:first"}), 'b': frozenset({second_id})},
+                {"fixture:first": first, second_id: second},
+            )
+        self.assertEqual(dict(_BATTLEFIELDS), snapshot)
+
+        pure_first = SimpleNamespace(key="shared", combat_identity="alpha")
+        pure_second = SimpleNamespace(key="shared", combat_identity="beta")
+        pure_first_id, pure_second_id = (
+            stable_actor_id(pure_first),
+            stable_actor_id(pure_second),
+        )
+        pure_field = Battlefield(
+            {'a': frozenset({pure_first_id}), 'b': frozenset({pure_second_id})},
+            {pure_first_id: pure_first, pure_second_id: pure_second},
+        )
+        self.assertEqual(set(pure_field.roster), {"fixture:alpha", "fixture:beta"})
+
+        with self.assertRaisesRegex(ValueError, "multiple teams"):
+            Battlefield(
+                {'a': frozenset({first_id, second_id}), 'b': frozenset({first_id})},
+                {first_id: first, second_id: second},
+            )
