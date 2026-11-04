@@ -752,3 +752,75 @@ class PartySleepEntryTests(EvenniaTest):
         )
         self.assertIsNone(read_sleep_receipt(companion))
         self.assertIsNone(read_sleep_receipt(self.player))
+
+
+class ContactSleepInterruptionTests(EvenniaTest):
+    """The contact owner interrupts voluntary sleep without refilling it."""
+
+    def setUp(self):
+        super().setUp()
+        self.player = self.char1
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room1
+        _full_gauges(self.player)
+        write_fatigue_state(self.player, 100000, SleepPosture.AWAKE)
+        _RESULT_LEDGER.clear()
+
+    def test_voluntary_receipt_pays_actual_sleep_then_interrupts_once(self):
+        entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
+        self.assertIsNotNone(entry.receipt)
+        tick = int(get_world_clock().tick) + 120
+        from world.rules.time_skip import interrupt_sleep_for_contact
+
+        interrupt_sleep_for_contact(
+            self.player, tick=tick, operation_id="test:contact:1"
+        )
+        state = read_fatigue_state(self.player)
+        self.assertIs(state.posture, SleepPosture.AWAKE)
+        # Actual recovery at the authored sleep rate (12 units/s) for 120 s,
+        # never a refill.
+        self.assertEqual(state.reserve_units, 100000 + 120 * 12)
+        receipt = read_sleep_receipt(self.player)
+        self.assertEqual(receipt.state, "interrupted")
+        self.assertEqual(receipt.settled_through_tick, tick)
+        self.assertTrue(receipt.partial)
+        # A repeated contact cannot advance or complete the interrupted record.
+        interrupt_sleep_for_contact(
+            self.player, tick=tick + 60, operation_id="test:contact:1"
+        )
+        self.assertEqual(read_sleep_receipt(self.player), receipt)
+
+    def test_forced_receipt_keeps_posture_target_and_threshold(self):
+        from world.rules.sleep_receipt import (
+            KIND_FORCED,
+            MODE_FORCED_THRESHOLD,
+            STATE_SLEEPING,
+        )
+        from world.rules.time_skip import interrupt_sleep_for_contact
+
+        receipt = SleepReceipt(
+            sleep_id="forced:test",
+            body_id=int(self.player.pk),
+            owner_id=None,
+            kind=KIND_FORCED,
+            mode=MODE_FORCED_THRESHOLD,
+            entry_tick=0,
+            target_tick=10000,
+            limit_tick=10000,
+            settled_through_tick=0,
+            revision=0,
+            state=STATE_SLEEPING,
+            accepted_seconds=10000,
+            partial=False,
+        )
+        write_fatigue_state(self.player, 50000, SleepPosture.FORCED)
+        write_sleep_receipt(self.player, receipt)
+        interrupt_sleep_for_contact(
+            self.player, tick=60, operation_id="test:forced"
+        )
+        self.assertIs(
+            read_fatigue_state(self.player).posture, SleepPosture.FORCED
+        )
+        self.assertEqual(read_fatigue_state(self.player).reserve_units, 50000)
+        self.assertEqual(read_sleep_receipt(self.player), receipt)
