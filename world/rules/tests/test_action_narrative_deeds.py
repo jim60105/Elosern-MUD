@@ -1361,6 +1361,8 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
                     kind="pleasure_gain",
                     actor=str(self.actor.pk),
                     target=self.target.key,
+                    actor_id=stable_actor_id(self.actor),
+                    target_id=stable_actor_id(self.target),
                     data={"amount": 40},
                     text_template="{done}",
                 ),
@@ -1368,6 +1370,8 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
                     kind="pleasure_gain",
                     actor=str(self.actor.pk),
                     target=self.target.key,
+                    actor_id=stable_actor_id(self.actor),
+                    target_id=stable_actor_id(self.target),
                     data={"amount": 10},
                     text_template="{done}",
                 ),
@@ -1375,6 +1379,8 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
                     kind="sexual_counter",
                     actor=str(self.actor.pk),
                     target=self.target.key,
+                    actor_id=stable_actor_id(self.actor),
+                    target_id=stable_actor_id(self.target),
                     data={"counter": "duo_act_count"},
                     text_template="{done}",
                 ),
@@ -1382,11 +1388,15 @@ class SettledEffectVocabularyTests(EvenniaTestCase):
                     kind="sexual_resist",
                     actor=str(self.actor.pk),
                     target=self.target.key,
+                    actor_id=stable_actor_id(self.actor),
+                    target_id=stable_actor_id(self.target),
                     data={"resisted": False, "auto_comply": True, "roll": None},
                     text_template="{done}",
                 ),
             ),
             time_cost_seconds=0,
+            actor_id=stable_actor_id(self.actor),
+            target_ids=(stable_actor_id(self.target),),
         )
         request = ActionRequest(
             self.actor,
@@ -1890,12 +1900,12 @@ class SettledResultNormalizationTests(unittest.TestCase):
     @covers_requirement(
         "narrative-events::settled-skill-and-adult-actions-retain-deterministic-roles-and-results"
     )
-    def test_shared_display_keys_never_resolve_to_a_guessed_recipient(self):
+    def test_shared_display_keys_resolve_by_identity_only(self):
         """Scenario: Untouched recipient is excluded.
 
-        WHEN two candidates share one display key, or a committed entry names an
-        unknown target
-        THEN identity resolution refuses rather than attributing a recipient.
+        WHEN two candidates share one display key
+        THEN a committed entry resolves through its stable identity, and an
+        entry that names no identity is refused rather than guessed by label.
         """
         import types
 
@@ -1903,27 +1913,47 @@ class SettledResultNormalizationTests(unittest.TestCase):
 
         first = types.SimpleNamespace(pk=1, key="Twin")
         second = types.SimpleNamespace(pk=2, key="Twin")
-        self.assertEqual(adapter_module._unique_key_index([first, second]), {})
+        index = {
+            stable_actor_id(first): "1",
+            stable_actor_id(second): "2",
+        }
+        resolved, raw = adapter_module._entry_target(
+            types.SimpleNamespace(
+                target="Twin", target_id=stable_actor_id(second)
+            ),
+            "damage",
+            index,
+            "3",
+            "Actor",
+            source="same-label",
+        )
+        self.assertEqual((resolved, raw), ("2", "Twin"))
+        with self.assertRaises(ValueError):
+            adapter_module._entry_target(
+                types.SimpleNamespace(target="Twin"),
+                "damage",
+                index,
+                "3",
+                "Actor",
+                source="identity-less",
+            )
 
-        entry = types.SimpleNamespace(target="Twin")
+    def test_fixture_occurrence_identity_is_not_the_display_label(self):
+        import types
+
+        import world.narrative.action_adapters as adapter_module
+
+        first = types.SimpleNamespace(key="Twin", combat_identity="twin-a")
+        second = types.SimpleNamespace(key="Twin", combat_identity="twin-b")
+        self.assertEqual(adapter_module._durable_pk(first), "fixture:twin-a")
+        self.assertEqual(adapter_module._durable_pk(second), "fixture:twin-b")
+        self.assertNotEqual(
+            adapter_module._durable_pk(first),
+            adapter_module._durable_pk(second),
+        )
+        # Neither a pk nor an explicit identity: refused, never label-inferred.
         with self.assertRaises(ValueError):
-            adapter_module._entry_target(
-                entry,
-                "damage",
-                adapter_module._unique_key_index([first, second]),
-                "3",
-                "Actor",
-                source="ambiguous",
-            )
-        with self.assertRaises(ValueError):
-            adapter_module._entry_target(
-                entry,
-                "damage",
-                {},
-                "3",
-                "Actor",
-                source="unknown",
-            )
+            adapter_module._durable_pk(types.SimpleNamespace(key="Twin"))
 
 
 class SettledEffectVocabularyDocumentationTests(unittest.TestCase):

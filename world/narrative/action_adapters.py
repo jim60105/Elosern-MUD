@@ -183,17 +183,17 @@ class RecordedAdultMilestones:
 
 
 def _durable_pk(entity: Any) -> str:
-    """Return the stable, persistent primary key for an entity."""
+    """Return one entity's stable narrative identity.
+
+    A validated persistent actor keeps its bare primary key; a supported
+    nonpersistent actor uses its canonical combat fixture identity. There is
+    no display-label or ``repr`` fallback: an entity that supplies neither is
+    malformed evidence and fails closed.
+    """
     pk = getattr(entity, "pk", None)
     if pk is not None:
         return str(pk)
-    entity_id = getattr(entity, "id", None)
-    if entity_id is not None:
-        return str(entity_id)
-    key = getattr(entity, "key", None)
-    if key is not None and str(key).strip():
-        return str(key).strip()
-    return str(entity).strip()
+    return stable_actor_id(entity)
 
 
 def capture_milestone_snapshot(entity: Any) -> MilestoneSnapshot | None:
@@ -870,7 +870,7 @@ def _entry_target(
     raw = str(getattr(entry, "target", "") or "")
     if kind in _SELF_BOUND_EFFECT_KINDS or not raw:
         return actor_pk, actor_key
-    resolved = identity_index.get(entry.target_id)
+    resolved = identity_index.get(getattr(entry, "target_id", None))
     if resolved is None:
         raise ValueError(f"unresolvable settled evidence target in {source}")
     return resolved, raw
