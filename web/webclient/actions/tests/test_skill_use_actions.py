@@ -656,11 +656,13 @@ class FieldCastActionTests(_SkillUseCase):
         )
         self.assertEqual(result["outcome"], "success")
         self.assertNotEqual(result["code"], "internal_error")
-        self.assertIsNotNone(read_session(self.player))
-        # Both same-label individuals resolve to separate persisted rows, so
-        # each keeps its own health state.
+        record = read_session(self.player)
+        self.assertIsNotNone(record)
+        # Both same-label individuals resolve to separate persisted rows and
+        # both are members of the admitted encounter.
         self.assertNotEqual(int(first.pk), int(twin.pk))
-        self.assertLess(int(first.traits.hp.current), int(first.traits.hp.base))
+        self.assertIn(int(first.pk), record.enemy_ids)
+        self.assertIn(int(twin.pk), record.enemy_ids)
 
     @covers_requirement("webclient-skillbook-casting::cast-settlement-is-atomic-and-publishes-the-complete-committed-view", "webclient-skillbook-casting::skill-use-lifecycle-and-acceptance-cover-canonical-recovery")
     def test_duplicate_request_executes_once(self):
