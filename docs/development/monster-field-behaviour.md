@@ -408,6 +408,13 @@ dispositions:
   therefore position-independent in this tree: bound IDs and defeat credit are
   unchanged by departure/arrival, and the actual view excludes transit. This is
   recorded as an applicability disposition, not claimed as new wiring.
+- **Sleep-receipt rollback coverage (non-blocking, follow-up):** the activity
+  snapshot now includes `SLEEP_RECEIPT_SURFACES`, and both rollback tests
+  assert the pre-operation state of the member and journey. A behavioural
+  forced-sleep-threshold receipt mutation is not constructed here; the global
+  monster-activity slice introduces owner-settled idle physiology and owns that
+  deeper receipt transition test. This is a test-depth follow-up, not a
+  deferred correctness fix.
 
 ### Focused verification run
 
