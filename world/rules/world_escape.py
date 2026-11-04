@@ -241,6 +241,17 @@ def settle_monster_combat_through(
             },
         )
         current = settlement.commits[0].end
+    # Gauge regeneration for the combat prefix belongs to this owner too: the
+    # member is released to idle at ``through_tick``, after which the generic
+    # clock stage deliberately skips it. Paid only after every fatigue
+    # segment succeeded, and never for a dead body.
+    gauge = getattr(getattr(individual, "traits", None), "hp", None)
+    if gauge is not None and float(getattr(gauge, "current", 0)) > 0:
+        elapsed = int(through_tick) - member_time.settled_through_tick
+        if elapsed > 0:
+            from world.rules.clock import settle_gauge_regeneration
+
+            settle_gauge_regeneration((individual,), elapsed)
     monster_activity.update_member_time(
         wilderness,
         group_id=group_id,

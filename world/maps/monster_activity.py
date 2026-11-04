@@ -1102,6 +1102,13 @@ def _alive(body: Any) -> bool:
         return False
 
 
+def _active_participant_ids() -> frozenset[int]:
+    """Non-fled participants of every persisted active hostile session."""
+    from world.maps import regional_population
+
+    return regional_population.active_combat_participant_ids()
+
+
 def _member_bodies(group: MonsterGroup) -> tuple[Any, ...]:
     """Every living member row of one group, in member-id order."""
     from evennia.objects.models import ObjectDB
@@ -1367,9 +1374,13 @@ def plan_group_decision(
         return ActivityDecision(
             group_id, tick, group.sequence, None, STAY_NO_LIVING_MEMBERS
         )
+    active_participants = _active_participant_ids()
     for body in bodies:
         member_time = group.member_time[str(body.pk)]
-        if member_time.mode == MODE_COMBAT:
+        if (
+            member_time.mode == MODE_COMBAT
+            or int(body.pk) in active_participants
+        ):
             return ActivityDecision(
                 group_id, tick, group.sequence, None, STAY_MEMBER_ENGAGED
             )
@@ -1558,9 +1569,13 @@ def _commit_departure(
             "monster_activity_members_invalid",
             f"group {plan.group_id!r} has no living member",
         )
+    active_participants = _active_participant_ids()
     for body in bodies:
         member_time = group.member_time[str(body.pk)]
-        if member_time.mode == MODE_COMBAT:
+        if (
+            member_time.mode == MODE_COMBAT
+            or int(body.pk) in active_participants
+        ):
             raise MonsterActivityOperationInvalid(
                 "monster_activity_member_engaged",
                 f"member {body.pk} is combat-owned",
@@ -1618,7 +1633,13 @@ def _commit_departure(
                     "monster_activity_members_invalid",
                     f"group {plan.group_id!r} has no living member",
                 )
+            active_participants = _active_participant_ids()
             for body in bodies:
+                if int(body.pk) in active_participants:
+                    raise MonsterActivityOperationInvalid(
+                        "monster_activity_member_engaged",
+                        f"member {body.pk} is an active combat participant",
+                    )
                 if not _body_at_position(wilderness, body, current.position):
                     raise MonsterActivityOperationInvalid(
                         "monster_activity_member_displaced",
@@ -2154,12 +2175,14 @@ def begin_member_combat(
 
         individual = ObjectDB.objects.filter(id=int(individual_id)).first()
         if individual is not None and tick > current.settled_through_tick:
+            prefix = tick - current.settled_through_tick
             _idle_physiology(
                 individual,
-                seconds=tick - current.settled_through_tick,
+                seconds=prefix,
                 context={"stage": "monster_idle_admission", "session": session_id},
                 start_tick=current.settled_through_tick,
             )
+            _settle_gauge(individual, seconds=prefix)
         member_time_map = dict(group.member_time)
         member_time_map[str(individual_id)] = MemberTime(
             max(current.settled_through_tick, tick), MODE_COMBAT, session_id, ()
@@ -2338,7 +2361,23 @@ def _settle_posture(
                     "monster_activity_physiology_no_progress",
                     f"member {getattr(body, 'pk', '?')} cannot advance its posture",
                 )
-            state = advanced
+            # An immediate depletion/wake is a real committed transition: pay
+            # a zero-second interval through the sole writer so the persisted
+            # state matches the projection before the next segment.
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        body,
+                        activity,
+                        0,
+                        state,
+                        IntervalCompletion.INTERRUPTIBLE,
+                    ),
+                ),
+                context=dict(context),
+                start_tick=cursor,
+            )
+            state = settlement.commits[0].end
             continue
         settlement = settle_fatigue_intervals(
             (
@@ -2675,7 +2714,7 @@ def _arrive(
     destination = journey.destination
     group = state.groups[journey.group_id]
     befores = {
-        body.pk: regional_population.presence_of(wilderness, body, alive=True)
+        body.pk: regional_population.presence_of(wilderness, body)
         for body in bodies
     }
     if destination.kind == "wilderness":
@@ -2684,13 +2723,19 @@ def _arrive(
             raise _invalid(f"journey {journey.journey_id!r} names an invalid destination cell")
         coordinates = dict(wilderness.db.itemcoordinates)
         for body in bodies:
-            coordinates[body] = cell
+            if _alive(body):
+                coordinates[body] = cell
+            else:
+                coordinates.pop(body, None)
         wilderness.db.itemcoordinates = coordinates
         room = (wilderness.db.rooms or {}).get(cell)
         if room is not None:
             for body in bodies:
-                body.location = room
-                room.contents_cache.add(body)
+                if _alive(body):
+                    body.location = room
+                    room.contents_cache.add(body)
+                else:
+                    body.location = None
         else:
             for body in bodies:
                 body.location = None
@@ -2699,8 +2744,11 @@ def _arrive(
         if room is None:
             raise _invalid(f"journey {journey.journey_id!r} names a vanished authored room")
         for body in bodies:
-            body.location = room
-            room.contents_cache.add(body)
+            if _alive(body):
+                body.location = room
+                room.contents_cache.add(body)
+            else:
+                body.location = None
     for body in bodies:
         regional_population.record_population_transition(
             wilderness,
@@ -2712,7 +2760,6 @@ def _arrive(
                 after=regional_population.presence_of(
                     wilderness,
                     body,
-                    alive=True,
                 ),
             ),
         )
@@ -2788,23 +2835,24 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
         for body in bodies:
             member_time = group.member_time[str(body.pk)]
             cursor = member_time.settled_through_tick
-            travelled = min(tick, journey.arrival_tick) - min(
-                cursor, journey.arrival_tick
-            )
-            _journey_physiology(
-                body,
-                seconds=max(0, travelled),
-                context={"stage": "monster_journey", "journey": journey_id},
-                start_tick=cursor,
-            )
-            waiting = max(0, tick - max(cursor, journey.arrival_tick))
-            _waiting_physiology(
-                body,
-                seconds=waiting,
-                context={"stage": "monster_journey_wait", "journey": journey_id},
-                start_tick=max(cursor, journey.arrival_tick),
-            )
-            _settle_gauge(body, seconds=max(0, tick - cursor))
+            if _alive(body):
+                travelled = min(tick, journey.arrival_tick) - min(
+                    cursor, journey.arrival_tick
+                )
+                _journey_physiology(
+                    body,
+                    seconds=max(0, travelled),
+                    context={"stage": "monster_journey", "journey": journey_id},
+                    start_tick=cursor,
+                )
+                waiting = max(0, tick - max(cursor, journey.arrival_tick))
+                _waiting_physiology(
+                    body,
+                    seconds=waiting,
+                    context={"stage": "monster_journey_wait", "journey": journey_id},
+                    start_tick=max(cursor, journey.arrival_tick),
+                )
+                _settle_gauge(body, seconds=max(0, tick - cursor))
             group = _replace_group(
                 group,
                 member_time={
@@ -2824,7 +2872,8 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
         blocked = _destination_blocked(
             wilderness, journey.destination, tick
         ) or any(
-            not _route_lawful(wilderness, journey, body) for body in bodies
+            _alive(body) and not _route_lawful(wilderness, journey, body)
+            for body in bodies
         )
         if blocked:
             interval = _activity_interval(group.activity_key)

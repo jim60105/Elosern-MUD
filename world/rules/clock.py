@@ -917,15 +917,15 @@ def _run_stages(
     practice_eligible = _awake_practice_seconds(
         mental, seconds, clock.tick, sleep_offsets
     )
-    # Idle/journey bodies owned by the registered monster-activity source have
-    # their whole interval settled by that owner through this same closed-form
-    # writer; skipping them here is what keeps a supplied body equal to an
-    # unobserved one instead of regenerating twice.
+    # Every map-owned group member's gauge interval belongs to its owner: the
+    # activity source pays idle/journey, and the combat owner pays the combat
+    # prefix before it releases the member. Skipping them here is what keeps a
+    # supplied body equal to an unobserved one instead of regenerating twice.
     _settle_gauge_regen(
         (
             entity
             for entity in entities
-            if _activity_member_mode(entity) not in ("idle", "journey")
+            if _activity_member_mode(entity) is None
         ),
         seconds,
     )

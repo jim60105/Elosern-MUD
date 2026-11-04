@@ -678,6 +678,38 @@ def _session_participant_ids() -> frozenset[int]:
     return frozenset(participants)
 
 
+def active_combat_participant_ids() -> frozenset[int]:
+    """Enemy IDs of persisted active hostile sessions that have not fled.
+
+    This is the participant fact ordinary monster activity consults: a
+    surviving, non-fled participant must not wander while its session is
+    still active, even at a tick where terminal settlement has already paid
+    its combat prefix and released the physiology cursor. A legitimately
+    escaped (fled) identity is not an active participant and may continue its
+    journey.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.combat_session.records import read_session
+
+    participants: set[int] = set()
+    for player in PlayerCharacter.objects.all_family():
+        if player.db.active_combat is None:
+            continue
+        try:
+            record = read_session(player)
+        except Exception:  # observability: ignore R2: an unparseable persisted session protects nobody by name; the combat owner reports its own records
+            continue
+        if record is None:
+            continue
+        fled = {int(member_id) for member_id in record.fled_ids}
+        participants.update(
+            int(member_id)
+            for member_id in record.enemy_ids
+            if int(member_id) not in fled
+        )
+    return frozenset(participants)
+
+
 def _active_session_protection(wilderness: Any) -> tuple[PopulationProtection, ...]:
     """Every persisted active session's open cell protection (a pure read).
 
@@ -2138,6 +2170,7 @@ __all__ = [
     "RegionalPopulationWorldUnavailable",
     "UnknownEcologyZone",
     "ZonePopulationState",
+    "active_combat_participant_ids",
     "actual_cell",
     "commit_population_wave",
     "coordinate_pair",
