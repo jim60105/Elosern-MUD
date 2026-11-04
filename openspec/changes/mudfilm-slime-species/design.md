@@ -83,7 +83,7 @@ Re-fingerprint, following commit `1a141247`:
 ### D6. Bestiary and ledger
 
 `docs/lore/bestiary.md`:
-- Header: after the 2026-10-05 approval paragraph add 「**第三批核准：**2026-11-03 起，[魔物內容擴充設計](/superpowers/specs/2026-11-03-monster-content-expansion-design) 另行核准三種低階物種、吞潮鱷的高階變體與一種高階物種；各物種逐一收錄於下方現行小節。」 This note is added once here; later changes do not edit it.
+- Header: after the 2026-10-05 approval paragraph add 「**第三批核准：**2026-11-03 起，[魔物內容擴充設計](/superpowers/specs/2026-11-03-monster-content-expansion-design) 另行核准三種低階物種、吞潮鱷的高階變體與一種高階物種；各物種逐一收錄於下方現行小節。」 This note is added once here; later changes do not edit it. In the same edit, reword line 3 (「本篇收錄首批核准的低階與中階魔物…」) so it no longer states that the document covers only the first low/mid batch, keeping the 2026-10-05 approval paragraph as history.
 - Overview table row: `| 低階 | 泥膜史萊姆 | 潮濕溝岸、舊灌溉支渠與滲水洞口 | 細泥收縮成可摺疊的護膜 | 濕岸型 |`.
 - New `### 泥膜史萊姆` section at the end of `## 低階魔物` (before `## 中階魔物`) with:
 
@@ -132,7 +132,7 @@ else:
 
 ### D8. Roster-free wording and review document
 
-In `world/lore/monster_species.py`, rewrite the module docstring phrase 「six frozen `MonsterSpecies` rows and twelve frozen `MonsterVariant` rows」 and the authoring comment's 「all twelve」 claims into count-free statements. Create `docs/development/monster-content-expansion.md` ("Monster Content Expansion: Developer Review and Evidence") with a section "泥膜史萊姆" recording: the role constraints of D2 and how the chosen literals satisfy them (relations, not a value table), intelligence rationale, the flee trade-off, focused commands and results, and the human-review status of the prose.
+In `world/lore/monster_species.py`, rewrite the module docstring phrase 「six frozen `MonsterSpecies` rows and twelve frozen `MonsterVariant` rows」 and the authoring comment's 「all twelve」 claims into count-free statements. Create `docs/development/monster-content-expansion.md` ("Monster Content Expansion: Developer Review and Evidence") with a section "泥膜史萊姆" recording: the role constraints of D2 and how the chosen literals satisfy them (relations, not a value table), intelligence rationale, the flee trade-off (utility never voluntarily flees, a known deviation from design §5/§7.1 retreat orientation, expressed instead through passive field aggression), non-gating observations (the activated variant's trace candidate count, exclusions and whether the guard was selected over a short seeded run; one low-tier role observation from the existing `world.rules.tests.test_human_combat_calibration` harness or the representative smoke encounter), an evidence-map line stating that payment/effect fault rollback for the new kit is owned by the shared generic suites (design §10 "Failure"), a note that `activation.json` intelligence entries are the existing release-record mirror rather than a new approval table, focused commands and results, and the human-review status of the prose.
 
 ## Risks / Trade-offs
 

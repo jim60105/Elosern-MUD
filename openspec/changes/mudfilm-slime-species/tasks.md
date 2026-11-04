@@ -12,7 +12,8 @@ Future implementation only. Begin after `owned-kit-decision-coverage` and `affir
 
 - [ ] 2.1 Add `world/rules/tests/test_mudfilm_slime_resource_skill.py` with its shard and freeze-ledger entries (design D7 item 3). Check: the module passes and `world.rules.tests.test_monster_composition_coverage` passes with `mudbank_dweller` as the new group's committed representative.
 - [ ] 2.2 Add the bestiary header note, overview row and current section, and the ledger entry (design D6). Check: `world.lore.tests.test_bestiary_documentation` passes; the section names no skill key, buff id or resource field.
-- [ ] 2.3 Create `docs/development/monster-content-expansion.md` with the slime section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
+- [ ] 2.3 Record the non-gating expansion and role observations listed in design D8. Check: the review section lists them with the command used.
+- [ ] 2.4 Create `docs/development/monster-content-expansion.md` with the slime section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
 
 ## 3. Handoff
 
