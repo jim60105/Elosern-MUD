@@ -738,6 +738,12 @@ def settle_relocation(entity: Any, destination: Any) -> None:
                 )
                 if population_guard is not None:
                     wilderness, before_presence, _surfaces = population_guard
+                    if getattr(destination, "wilderness", None) is None:
+                        # A hook-free operator move leaves the wilderness
+                        # registration behind: the coordinate registry is the
+                        # authoritative presence, so the departure is only
+                        # honest once the old registration is gone.
+                        wilderness.db.itemcoordinates.pop(entity, None)
                     after_presence = regional_population.presence_of(
                         wilderness, entity, alive=True
                     )

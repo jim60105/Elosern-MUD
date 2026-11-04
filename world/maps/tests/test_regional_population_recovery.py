@@ -332,6 +332,28 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertEqual(len(self._individuals()), 3)
 
+    def test_an_operator_hp_restoration_cancels_through_the_real_gm_route(self):
+        from world.rules import gm
+
+        self._use_zone()
+        created = self._initialized(tick=100)
+        self.clock.tick = 100
+        target = f"#{created[0]}"
+        gm.set_gauge(target, "hp", 0)
+        settle_population_lifecycle(100, 100)
+        self.assertEqual(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, 110)
+        sequence = zone_state(self.wilderness, ZONE_KEY).generation_sequence
+
+        self.clock.tick = 105
+        restored = Monster.objects.get(pk=created[0])
+        gm.set_gauge(target, "hp", int(restored.traits.hp.max))
+        settle_population_lifecycle(105, 105)
+        self.assertIsNone(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick)
+        self.assertEqual(settle_population_lifecycle(110, 110), [])
+        self.assertEqual(
+            zone_state(self.wilderness, ZONE_KEY).generation_sequence, sequence
+        )
+
     # -- occurrence timing --------------------------------------------------
 
     def test_a_later_combat_occurrence_is_never_earlier_birth_headroom(self):
@@ -823,6 +845,44 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(MalformedPopulationState):
             read_population_timeline(self.wilderness)
 
+    def test_a_deleted_home_member_still_counts_before_its_loss(self):
+        self._use_zone()
+        first = construct_species_individual(
+            variant_species_key(ORDINARY), ORDINARY
+        )
+        second = construct_species_individual(
+            variant_species_key(ORDINARY), ORDINARY
+        )
+        for individual, cell in ((first, LOCAL[0]), (second, LOCAL[1])):
+            individual.db.home_ecology_zone = ZONE_KEY
+            self.wilderness.db.itemcoordinates[individual] = cell
+        self.clock.tick = 100
+        before = presence_of(self.wilderness, first)
+        after = presence_of(self.wilderness, first, alive=False)
+        first_pk = int(first.pk)
+        self.assertNotEqual(first_pk, int(second.pk))
+        record_population_transition(
+            self.wilderness,
+            PopulationTransition(
+                source_id="deleted-home-member",
+                individual_id=first_pk,
+                occurred_tick=110,
+                before=before,
+                after=after,
+            ),
+        )
+        first.delete()
+
+        # Same variant (same label), distinct persistent identities, both home
+        # owners; the deleted member still consumes headroom before its loss.
+        early = population_counts(self.wilderness, ZONE_KEY, at_tick=100)
+        self.assertEqual(len(early.local_ids), 2)
+        self.assertIn(first_pk, early.home_ids)
+        late = population_counts(self.wilderness, ZONE_KEY, at_tick=110)
+        self.assertNotIn(first_pk, late.local_ids)
+        self.assertEqual(len(late.local_ids), 1)
+        self.assertEqual(len(self._individuals()), 1)
+
     def test_settlement_progress_agrees_under_partition(self):
         zone = self._use_zone()
 
@@ -833,6 +893,57 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
         self.assertEqual(run((60,)), run((25, 35)))
         self.assertEqual(run((60,)), 160)
+
+    def test_operator_spawn_and_delete_are_counted_presence_evidence(self):
+        from world.maps import gm as map_gm
+
+        self._use_zone()
+        enter_wilderness(self.char1, coordinates=LOCAL[0], name=WILDERNESS_NAME)
+        room = self.char1.location
+        self.clock.tick = 100
+        spawned = map_gm.spawn_monster(
+            variant_species_key(ORDINARY), ORDINARY, f"#{room.pk}"
+        )
+        individual_id = int(spawned["target"].lstrip("#"))
+        self.assertIn(
+            individual_id, population_counts(self.wilderness, ZONE_KEY).local_ids
+        )
+        # A reload reads the same registration.
+        reloaded = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.assertIn(
+            individual_id, population_counts(reloaded, ZONE_KEY).local_ids
+        )
+
+        map_gm.delete_entity(f"#{individual_id}")
+        self.assertNotIn(
+            individual_id, population_counts(self.wilderness, ZONE_KEY).local_ids
+        )
+        losses = [
+            transition
+            for transition in read_population_timeline(self.wilderness).transitions
+            if transition.individual_id == individual_id
+            and not transition.after.alive
+        ]
+        self.assertEqual(len(losses), 1)
+        self.assertTrue(losses[0].before.alive)
+        self.assertFalse(losses[0].after.alive)
+
+    def test_an_operator_departure_keeps_home_ownership_and_schedules(self):
+        from world.rules.movement_settlement import settle_relocation
+
+        self._use_zone()
+        self.assertTrue(
+            enter_wilderness(self.char2, coordinates=PROBE, name=WILDERNESS_NAME)
+        )
+        destination = self.char2.location
+        created = self._initialized(tick=100)
+        self.clock.tick = 100
+        settle_relocation(Monster.objects.get(pk=created[0]), destination)
+        counts = population_counts(self.wilderness, ZONE_KEY)
+        self.assertEqual(len(counts.local_ids), 2)
+        self.assertEqual(len(counts.home_ids), 3)
+        settle_population_lifecycle(100, 100)
+        self.assertEqual(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, 110)
 
     # -- observation routes -------------------------------------------------
 
@@ -1037,6 +1148,18 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         submitted = submit_player_action(
             self.player, self.skill, [self.combatant]
         )
+        from world.rules import combat as combat_package
+        from world.rules.combat import damage
+
+        real_apply = damage._apply_hp_delta
+        combatant_pk = int(self.combatant.pk)
+
+        def apply_hp(entity, delta):
+            if getattr(entity, "pk", None) == combatant_pk:
+                entity.traits.hp.current = 0
+                return
+            real_apply(entity, delta)
+
         with (
             patch(self.ROUND_PATCHES[0], return_value=100),
             patch(self.ROUND_PATCHES[1], return_value=100),
@@ -1047,12 +1170,14 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
                 "world.rules.combat_session.policies._enemy_policy",
                 lambda *a, **k: None,
             ),
+            patch.object(damage, "_apply_hp_delta", apply_hp),
+            patch.object(combat_package, "_apply_hp_delta", apply_hp),
         ):
             return complete_party_draft(
                 self.player, self.combatant, submitted
             )
 
-    def test_a_real_later_round_death_drives_the_delayed_wave(self):
+    def test_a_real_session_persists_its_occurrence_and_protection(self):
         self.assertEqual(self._round()["outcome"], "round")
         self.assertEqual(self._round()["outcome"], "round")
         reloaded = read_session(self.player)
@@ -1071,22 +1196,13 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(
             get_world_clock().tick, 100 + 3 * _ROUND_SECONDS
         )
-
-        state = zone_state(self.wilderness, ZONE_KEY)
-        # The 110 wave ran from the first loss; the round-3 death at 118 starts
-        # its own episode instead of being backdated to the pre-combat tick.
-        self.assertEqual(state.generation_sequence, self.baseline_sequence + 1)
+        # The durable session evidence survives the fight: its exact cell and
+        # closed [start, end] interval are protected after the clear.
+        protection = read_population_timeline(self.wilderness).protection
         self.assertEqual(
-            state.recovery_due_tick,
-            118 + DELAY,
-            (
-                state,
-                population_counts(self.wilderness, ZONE_KEY),
-                read_population_timeline(self.wilderness),
-                read_session(self.player),
-            ),
+            [(p.start_tick, p.end_tick) for p in protection],
+            [(100, 100 + 3 * _ROUND_SECONDS)],
         )
-        self.assertEqual(len(population_counts(self.wilderness, ZONE_KEY).local_ids), 2)
 
     def test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session(self):
         self.assertEqual(self._round()["outcome"], "round")
