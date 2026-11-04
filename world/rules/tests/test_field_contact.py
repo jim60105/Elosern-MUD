@@ -21,6 +21,7 @@ from evennia.contrib.grid.wilderness.wilderness import (
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import Room
 from world.maps import regional_population
 from world.maps.monster_activity import create_group
@@ -157,6 +158,9 @@ class _ContactBase(BattlefieldIsolation, EvenniaTestCase):
 class WholeCellArrivalTests(_ContactBase):
     """A real relocation admits one session with every living local monster."""
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_an_arrival_admits_a_a_b_once_with_no_free_opening_attack(self):
         first = self._enemy("A", _CONTACT)
         second = self._enemy("A", _CONTACT)
@@ -208,6 +212,9 @@ class WholeCellArrivalTests(_ContactBase):
         self.assertEqual(record.started_tick, tick_before)
         self.assertEqual(record.session_id, f"hostile:{self.player.pk}:{tick_before}")
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_passive_and_defended_conditions_do_not_admit(self):
         passive = self._enemy("passive", _PASSIVE)
         self.assertIsNone(evaluate_field_contact(self.player, tick=0))
@@ -216,6 +223,9 @@ class WholeCellArrivalTests(_ContactBase):
         self.assertIsNone(read_session(self.player))
         self.assertTrue(passive.pk)
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_a_read_preview_never_admits(self):
         self._enemy("A", _CONTACT)
         from world.rules.combat_initiation import preview_field_opening
@@ -228,6 +238,9 @@ class WholeCellArrivalTests(_ContactBase):
 class ForcedWakeThroughAdmissionTests(_ContactBase):
     """The predecessor continuation runs after the owning admission returns."""
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_forced_71928_reaches_72000_after_one_real_enemy_round(self):
         from world.rules.combat_session import policies as session_policies
 
@@ -264,6 +277,9 @@ class ForcedWakeThroughAdmissionTests(_ContactBase):
 class ConditionAuthorityTests(_ContactBase):
     """Declared dayparts and defended areas decide admission, not rarity."""
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_daypart_gated_contact_admits_only_in_its_declared_region(self):
         from world.lore.monster_activity import (
             ActivityArea,
@@ -299,6 +315,9 @@ class ConditionAuthorityTests(_ContactBase):
             self.assertIsNotNone(contact)
             self.assertEqual(contact.source_id, "field")
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_defended_area_admits_only_inside_its_geometry(self):
         from world.lore.monster_activity import (
             ActivityArea,
@@ -344,6 +363,9 @@ class SleepInterruptionTests(_ContactBase):
         self.assertIs(read_optional_fatigue_state(self.player).posture,
                       SleepPosture.VOLUNTARY)
 
+    @covers_requirement(
+        "hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state"
+    )
     def test_voluntary_receipt_interrupts_without_refill_or_resume(self):
         _write(self.player, 100000, SleepPosture.AWAKE)
         self._voluntary()
@@ -381,6 +403,9 @@ class SleepInterruptionTests(_ContactBase):
         self.assertEqual(receipt.settled_through_tick, tick)
         self.assertIsNotNone(read_session(self.player))
 
+    @covers_requirement(
+        "hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state"
+    )
     def test_forced_receipt_keeps_its_posture_and_threshold(self):
         receipt = SleepReceipt(
             sleep_id="forced:test:0",
@@ -435,6 +460,9 @@ class SleepInterruptionTests(_ContactBase):
 class PreActionBoundaryTests(_ContactBase):
     """A co-located authored contact admits before any exploration spend."""
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_wait_admits_and_spends_no_time(self):
         self._enemy("A", _CONTACT)
         self.player.location = self.destination
@@ -448,6 +476,9 @@ class PreActionBoundaryTests(_ContactBase):
         )
         self.assertIsNotNone(read_session(self.player))
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_ordinary_cast_reports_the_admitted_encounter(self):
         from world.tests.synthetic_data import make_skill
         from world.skills.registry import SkillCategory, TargetSpec
@@ -472,6 +503,9 @@ class PreActionBoundaryTests(_ContactBase):
         self.assertEqual(get_world_clock().tick, tick_before)
         self.assertIsNotNone(read_session(self.player))
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_all_party_sleep_admits_before_its_safety_refusal(self):
         from world.rules.sleep_control import begin_all_party_sleep
         from world.rules.time_skip import SleepRefused
@@ -488,6 +522,9 @@ class PreActionBoundaryTests(_ContactBase):
 class ClockSourceAdmissionTests(_ContactBase):
     """The registered source persists; the owning action drains continuation."""
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_source_admits_at_the_endpoint_and_returns_an_event(self):
         self._enemy("A", _CONTACT)
         self.player.location = self.destination
@@ -507,6 +544,9 @@ class ClockSourceAdmissionTests(_ContactBase):
         continue_admitted_contacts(self.player, events)
         self.assertEqual(int(clock.tick), start + 60)
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_transit_is_not_contact(self):
         from world.rules.movement_settlement import TraversalScope, traversal_scope
 
@@ -536,6 +576,9 @@ class ProtectionTests(_ContactBase):
         _write(player, 360000, SleepPosture.AWAKE)
         return player
 
+    @covers_requirement(
+        "hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat"
+    )
     def test_active_session_protects_the_cell_and_history_blocks_catch_up(self):
         player = self._enter_wilderness_player()
         room = player.location

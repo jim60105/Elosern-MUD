@@ -767,6 +767,9 @@ class ContactSleepInterruptionTests(EvenniaTest):
         write_fatigue_state(self.player, 100000, SleepPosture.AWAKE)
         _RESULT_LEDGER.clear()
 
+    @covers_requirement(
+        "hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state"
+    )
     def test_voluntary_receipt_pays_actual_sleep_then_interrupts_once(self):
         entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
         self.assertIsNotNone(entry.receipt)
@@ -791,6 +794,9 @@ class ContactSleepInterruptionTests(EvenniaTest):
         )
         self.assertEqual(read_sleep_receipt(self.player), receipt)
 
+    @covers_requirement(
+        "hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state"
+    )
     def test_forced_receipt_keeps_posture_target_and_threshold(self):
         from world.rules.sleep_receipt import (
             KIND_FORCED,
@@ -825,6 +831,9 @@ class ContactSleepInterruptionTests(EvenniaTest):
         self.assertEqual(read_fatigue_state(self.player).reserve_units, 50000)
         self.assertEqual(read_sleep_receipt(self.player), receipt)
 
+    @covers_requirement(
+        "hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state"
+    )
     def test_a_pending_owner_continuation_becomes_unresumable(self):
         from world.rules.sleep_receipt import (
             CONTINUATION_PAUSED,
