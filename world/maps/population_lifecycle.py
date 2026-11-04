@@ -181,30 +181,37 @@ def settle_population_lifecycle(
 def next_population_lifecycle_boundary(
     start_tick: int, end_tick: int
 ) -> int | None:
-    """The next population boundary without executing any writer (pure read)."""
+    """The next interactive authored contact without executing any writer.
+
+    The public query is deliberately narrower than :func:`_next_population_boundary`:
+    it answers only ticks at which a present scope party would really be
+    contacted, using the read-only chronological projection
+    (:mod:`world.maps.population_forecast`) that shares this coordinator's
+    planners. Distant arrivals, births, recoveries and idle decisions stay
+    internal maintenance: the committed settlement still runs every one of
+    them, but an interruptible skip is not returned to the player for them.
+    """
+    from world.maps.population_forecast import (
+        capture_activity_snapshot,
+        project_activity_window,
+    )
+    from world.rules.field_contact import forecast_observers
+
     wilderness = _wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return None
-    earliest = _next_population_boundary(wilderness, start_tick, end_tick)
-    candidates = [] if earliest is None else [earliest]
-    # A loss already recorded at the interval start has no persisted due time
-    # until settlement runs: project the episode the first boundary would
-    # establish, so a wait stops before that wave instead of running past it.
-    for zone_key in _zone_keys(wilderness):
-        state = regional_population.zone_state(wilderness, zone_key)
-        if state is not None and state.recovery_due_tick is not None:
-            continue
-        lower = regional_population.density_lower_bound(wilderness, zone_key)
-        local = regional_population.population_counts(
-            wilderness, zone_key, at_tick=start_tick
-        )
-        if len(local.local_ids) >= lower:
-            continue
-        zone = regional_population.ECOLOGY_ZONE_REGISTRY[zone_key]
-        candidate = start_tick + zone.recovery_delay
-        if start_tick < candidate <= end_tick:
-            candidates.append(candidate)
-    return min(candidates) if candidates else None
+    observers = forecast_observers()
+    if not observers:
+        return None
+    snapshot = capture_activity_snapshot(start_tick=int(start_tick))
+    forecast = project_activity_window(
+        snapshot,
+        start_tick=int(start_tick),
+        end_tick=int(end_tick),
+        observers=observers,
+        wilderness=getattr(wilderness, "db_key", None),
+    )
+    return forecast.first_tick
 
 
 def snapshot_population_lifecycle_surfaces(

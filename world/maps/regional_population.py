@@ -1367,6 +1367,65 @@ def density_lower_bound(wilderness: Any, zone_key: str) -> int:
     return lower
 
 
+def zone_region_cells(zone_key: str) -> frozenset[tuple[int, int]]:
+    """Every published cell of one authored zone's parent region (pure read).
+
+    The projected read needs the same local-cell geometry the committed reader
+    counts, so a forecast wave fits the identical ceilings.
+    """
+    return _region_cells(_zone(zone_key))
+
+
+def zone_birth_cells(zone_key: str) -> tuple[tuple[int, int], ...]:
+    """Every eligible ordinary birth cell of one zone (pure read)."""
+    return _birth_cells(_zone(zone_key))
+
+
+def zone_lower_bound(zone_key: str) -> int:
+    """The zone's authored lower individual bound at its current geometry."""
+    zone = _zone(zone_key)
+    birth_cells = _birth_cells(zone)
+    if not birth_cells:
+        return 0
+    lower, _upper = density_bounds(
+        len(birth_cells), zone.lower_density, zone.upper_density
+    )
+    return lower
+
+
+def counts_from_presence(
+    zone_key: str, presence: Mapping[object, PopulationPresence], *, wilderness: str
+) -> PopulationCounts:
+    """The zone's three individual measures from detached presence facts.
+
+    The projection's own reader: it applies exactly the committed rule
+    (living individuals whose recorded home zone is this zone, and living
+    individuals physically inside its published region cells) to projected
+    presence instead of live rows.
+    """
+    local_cells = _region_cells(_zone(zone_key))
+    home: set[int] = set()
+    cells: dict[tuple[int, int], set[int]] = {}
+    for individual_id, fact in presence.items():
+        if not fact.alive:
+            continue
+        if fact.home_zone == zone_key:
+            home.add(individual_id)
+        position = fact.position
+        if position is None or position.wilderness != wilderness:
+            continue
+        cell = (position.x, position.y)
+        if cell in local_cells:
+            cells.setdefault(cell, set()).add(individual_id)
+    return PopulationCounts(
+        local_ids=frozenset(pk for occupants in cells.values() for pk in occupants),
+        home_ids=frozenset(home),
+        cell_ids=MappingProxyType(
+            {cell: frozenset(occupants) for cell, occupants in cells.items()}
+        ),
+    )
+
+
 def note_population_boundary(wilderness: Any, zone_key: str, *, tick: int) -> None:
     """Establish or cancel a zone's recovery episode at one settled boundary.
 
@@ -1629,17 +1688,23 @@ def _blocked(zone_key: str, tick: int, state: ZonePopulationState | None, reason
     )
 
 
-def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> PopulationWavePlan:
-    """Plan one deterministic birth wave for a zone (a pure read).
+def plan_population_wave_from(
+    zone_key: str,
+    *,
+    state: ZonePopulationState | None,
+    counts: PopulationCounts,
+    protected: frozenset[tuple[int, int]],
+    tick: int,
+) -> PopulationWavePlan:
+    """Plan one birth wave from detached selection state (pure).
 
-    A successful plan is exactly one complete composition that fits both
-    individual ceilings, the zone's wave budget and the chosen cell's
-    remaining capacity. A blocked plan names why no lawful complete birth
-    exists right now; it writes nothing and never splits a group.
+    The shared decision core: the committed writer supplies the durable zone
+    state, the actual counts at ``tick`` and that tick's protected cells; the
+    read-only forecast supplies the same values projected from detached
+    presence. Identity, ceilings, the saved occurrence seed and the sampling
+    order are therefore identical on both paths.
     """
-    _require_wilderness(wilderness)
     zone = _zone(zone_key)
-    state = zone_state(wilderness, zone_key)
     if state is None:
         return _blocked(zone_key, tick, None, BLOCKED_UNINITIALIZED)
 
@@ -1649,7 +1714,6 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
     lower, upper = density_bounds(
         len(birth_cells), zone.lower_density, zone.upper_density
     )
-    counts = population_counts(wilderness, zone_key, at_tick=tick)
     if len(counts.local_ids) >= lower:
         return _blocked(zone_key, tick, state, BLOCKED_LOCAL_SATISFIED)
     if len(counts.home_ids) >= upper:
@@ -1664,7 +1728,6 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
     smallest = min(
         sum(vector) for _weight, _composition, vectors in rows for vector in vectors
     )
-    protected = _protected_cells(wilderness, at_tick=tick)
     available = tuple(
         cell
         for cell in birth_cells
@@ -1715,6 +1778,29 @@ def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> Popula
             ),
         ),
         blocked_reason=None,
+    )
+
+
+def plan_population_wave(wilderness: Any, zone_key: str, *, tick: int) -> PopulationWavePlan:
+    """Plan one deterministic birth wave for a zone (a pure read).
+
+    A successful plan is exactly one complete composition that fits both
+    individual ceilings, the zone's wave budget and the chosen cell's
+    remaining capacity. A blocked plan names why no lawful complete birth
+    exists right now; it writes nothing and never splits a group. The decision
+    itself is :func:`plan_population_wave_from`, shared with the read-only
+    forecast.
+    """
+    _require_wilderness(wilderness)
+    state = zone_state(wilderness, zone_key)
+    if state is None:
+        return _blocked(zone_key, tick, None, BLOCKED_UNINITIALIZED)
+    return plan_population_wave_from(
+        zone_key,
+        state=state,
+        counts=population_counts(wilderness, zone_key, at_tick=tick),
+        protected=_protected_cells(wilderness, at_tick=tick),
+        tick=tick,
     )
 
 
@@ -2174,6 +2260,7 @@ __all__ = [
     "actual_cell",
     "commit_population_wave",
     "coordinate_pair",
+    "counts_from_presence",
     "current_population_tick",
     "density_lower_bound",
     "draw_index",
@@ -2184,6 +2271,7 @@ __all__ = [
     "mapped_population_cell",
     "note_population_boundary",
     "plan_population_wave",
+    "plan_population_wave_from",
     "population_provisioned",
     "population_counts",
     "presence_at",
@@ -2202,5 +2290,8 @@ __all__ = [
     "snapshot_population_surfaces",
     "snapshot_regional_population_surfaces",
     "wilderness_registration_target",
+    "zone_birth_cells",
+    "zone_lower_bound",
+    "zone_region_cells",
     "zone_state",
 ]

@@ -457,6 +457,49 @@ def admit_contact_before_action(actor: Any) -> None:
     admit_field_contact_at(commander, source_id=SOURCE_PRE_ACTION)
 
 
+def _log_contact_interruption(
+    actor: Any,
+    *,
+    operation_id: str,
+    requested: int,
+    elapsed: int,
+    events: Any,
+    sleep_id: str | None = None,
+) -> None:
+    """Schedule the accepted-interval interruption boundary on commit.
+
+    One row per accepted skip whose own event list carries an authored
+    contact. It records the operation/receipt identity, the requested and
+    actually accepted seconds, the contact tick and the admitted session, so a
+    rolled-back interval leaves no row while a committed one can be
+    reconstructed. Distant maintenance never matches.
+    """
+    from world.rules.field_contact import CONTACT_EVENT
+
+    admitted = [
+        event
+        for event in events
+        if getattr(event, "kind", None) == CONTACT_EVENT
+    ]
+    if not admitted:
+        return
+    payload = getattr(admitted[0], "payload", None) or {}
+    context = {
+        "char": str(getattr(actor, "pk", "")),
+        "operation": str(operation_id),
+        "sleep": "" if sleep_id is None else str(sleep_id),
+        "requested_seconds": int(requested),
+        "elapsed_seconds": int(elapsed),
+        "tick": int(getattr(admitted[0], "due_tick", 0)),
+        "session": str(payload.get("session", "")),
+    }
+    transaction.on_commit(
+        lambda context=context: log_info(
+            "field_contact_interrupted", context=context
+        )
+    )
+
+
 @checkpoint_owner
 def advance_wait(
     actor: Any,
@@ -498,7 +541,12 @@ def advance_wait(
         raise SkipRefused(reason)
     entities = present_party_scope(actor)
     clock = get_world_clock()
-    elapsed = planned_seconds(entities, limit, tick=clock.tick)
+    # The accepted interval's own query runs under the same settled-body scope
+    # the advance uses, so the contact forecast discovers exactly the parties
+    # this skip settles for.
+    with advance_scope(entities):
+        elapsed = planned_seconds(entities, limit, tick=clock.tick)
+    resolved_operation = operation_id or uuid4().hex
     from world.rules.travel_events import capture_travel_facts, on_wilderness, record_position_change
 
     travel_scope = elapsed > 0 and on_wilderness(actor)
@@ -525,7 +573,7 @@ def advance_wait(
         )
     tick_snapshot = _snapshot_clock_tick(clock)
     try:
-        with transaction.atomic():
+        with advance_scope(entities), transaction.atomic():
             events = clock.advance(
                 elapsed,
                 AdvanceSource.SKIP,
@@ -536,6 +584,13 @@ def advance_wait(
             from world.rules.field_contact import continue_admitted_contacts
 
             continue_admitted_contacts(actor, events)
+            _log_contact_interruption(
+                actor,
+                operation_id=resolved_operation,
+                requested=limit,
+                elapsed=elapsed,
+                events=events,
+            )
     except Exception:
         # Clock rollback already restored its entry snapshot, which contains
         # this declaration; restoring the previous booking here keeps a failed
@@ -546,7 +601,7 @@ def advance_wait(
             actor.db.practice_booking = previous_booking
         raise
     result = SkipResult(
-        operation_id=operation_id or uuid4().hex,
+        operation_id=resolved_operation,
         requested_seconds=limit,
         elapsed_seconds=elapsed,
         events=tuple(events),
@@ -979,7 +1034,10 @@ def continue_sleep(
     travel_scope = on_wilderness(actor)
     travel_before = None
     try:
-        with transaction.atomic():
+        # The interval query, its accepted advance and the endpoint contact
+        # admission share the settled-body scope, so the forecast discovers
+        # exactly the parties this sleep settles for.
+        with advance_scope(entities), transaction.atomic():
             _lock_members(entities)
             if travel_scope:
                 # Read under the member locks the interval settles with.
@@ -1030,6 +1088,14 @@ def continue_sleep(
             from world.rules.field_contact import continue_admitted_contacts
 
             continue_admitted_contacts(actor, events)
+            _log_contact_interruption(
+                actor,
+                operation_id=interval_operation,
+                requested=remaining,
+                elapsed=elapsed,
+                events=events,
+                sleep_id=receipt.sleep_id,
+            )
             updated = read_sleep_receipt(member)
             summary = render_skip_summary(elapsed, list(events))
             if updated is not None and updated.sleeping and updated.target_tick >= updated.limit_tick:
