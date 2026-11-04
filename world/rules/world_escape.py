@@ -11,6 +11,15 @@ Nothing here writes: ``plan_individual_escape`` and
 pays exactly the unpaid combat prefix through the sole fatigue writer and
 advances the map-owned cursor in the same call, so departure can seed the
 journey from a committed state without a second settlement.
+
+``plan_party_retreat`` is the player party's counterpart. It projects the whole
+present team's unpaid combat prefix plus the retreat attempt round from the
+durable settled-round cursor and the recorded posture evidence, prices only the
+actually self-moving members through ``movement_edges.quote_edge``, and treats
+knocked-out companions as carried bodies: they are part of the plan's member
+list but never a traveller, a speed term or a sleep refusal. Remote companions
+are outside the plan entirely. Ordinary blocked/unaffordable neighbours yield
+``None``; corrupt physiology or history raises by name.
 """
 
 from __future__ import annotations
@@ -32,8 +41,10 @@ from world.rules.fatigue import (
 )
 from world.rules.movement_edges import (
     LocationRef,
+    MovementEdgeError,
     PhysicalEdge,
     legal_edges,
+    location_ref,
     quote_edge,
 )
 from world.rules.travel_cost import (
@@ -452,14 +463,250 @@ def _edge_key(edge: PhysicalEdge) -> str:
     return f"{edge.route}:{edge.destination.kind}:{edge.destination.id}"
 
 
+@dataclass(frozen=True, slots=True)
+class PartyRetreatPlan:
+    """One immutable, replayable whole-party retreat route.
+
+    ``member_ids`` is every present body of the commander's source team (the
+    complete physical party, knocked-out companions included).
+    ``self_moving_ids`` is the subset that actually walks: alive present members
+    that are not knocked out. Only those members price the route and determine
+    its speed; ``carried_ids`` are transported without walking, without a
+    sleep refusal and without inventing physiology. ``states_after_attempt`` is
+    parallel to ``self_moving_ids`` and is the detached physiology the canonical
+    movement quote was priced from.
+    """
+
+    edge: PhysicalEdge
+    member_ids: tuple[int, ...]
+    self_moving_ids: tuple[int, ...]
+    carried_ids: tuple[int, ...]
+    states_after_attempt: tuple[TravellerState, ...]
+    traversal: TraversalResolution
+    depart_tick: int
+    operation_id: str
+
+
+def _present_team_bodies(battlefield: Any, commander: Any) -> tuple[Any, ...]:
+    """The commander's present, non-fled source team bodies in roster order."""
+    from world.rules.combat_identity import stable_actor_id
+
+    team = battlefield.team_of(stable_actor_id(commander))
+    if team is None:
+        return ()
+    bodies = []
+    for key in sorted(battlefield.teams.get(team, frozenset())):
+        entity = battlefield.roster.get(key)
+        if entity is None or key in battlefield.fled:
+            continue
+        bodies.append(entity)
+    return tuple(bodies)
+
+
+def _stored_hp(entity: Any) -> float:
+    try:
+        return float(getattr(entity.traits.hp, "current", 0))
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: a body without a readable gauge is not self-moving; carried planning never fabricates health
+        return 0.0
+
+
+def _project_retreat_state(record: Any, body: Any) -> TravellerState:
+    """The member's physiology after its unpaid combat prefix and the attempt.
+
+    The completed unpaid prefix replays the durable recorded posture evidence
+    from ``settled_rounds``; the attempt is one live-posture six-second round,
+    exactly the interval the confirmed retreat pays. Nothing is written.
+    """
+    from world.rules.combat import COMBAT_YAML
+    from world.rules.combat_session.settlement import posture_segments
+
+    member_id = int(body.pk)
+    current = read_optional_fatigue_state(body)
+    if current is None:
+        return TravellerState(None, None, member_id)
+    try:
+        segments = posture_segments(
+            record,
+            member_id,
+            from_round=int(record.settled_rounds),
+            through_round=int(record.rounds_elapsed),
+        )
+    except ValueError as error:
+        raise WorldEscapeError("combat_prefix_invalid", str(error)) from error
+    segments = (*segments, (current.posture is not SleepPosture.AWAKE, int(COMBAT_YAML["round"]["seconds"])))
+    sleeping_posture = (
+        current.posture if current.posture is not SleepPosture.AWAKE else SleepPosture.FORCED
+    )
+    first_asleep = segments[0][0]
+    from world.rules.fatigue import FatigueState
+
+    if first_asleep and current.posture is SleepPosture.AWAKE:
+        current = FatigueState(current.reserve_units, sleeping_posture)
+    elif not first_asleep and current.posture is not SleepPosture.AWAKE:
+        current = FatigueState(current.reserve_units, SleepPosture.AWAKE)
+    for asleep, seconds in segments:
+        target = sleeping_posture if asleep else SleepPosture.AWAKE
+        if current.posture is not target:
+            current = FatigueState(current.reserve_units, target)
+        if seconds <= 0:
+            continue
+        current = predict_interval(
+            current,
+            FatigueActivity.SLEEP if asleep else FatigueActivity.AWAKE_COMBAT,
+            seconds,
+            completion=IntervalCompletion.INDIVISIBLE,
+        ).end
+    return TravellerState.from_state(current, member_id=member_id)
+
+
+def _preferred_index(
+    candidates: tuple[tuple[PhysicalEdge, TraversalResolution], ...],
+    preferred: PhysicalEdge | None,
+) -> int | None:
+    """The preferred route's index inside the legal affordable candidates."""
+    if preferred is None:
+        return None
+    for index, (edge, _resolution) in enumerate(candidates):
+        if edge == preferred:
+            return index
+    return None
+
+
+def plan_party_retreat(
+    commander: Any,
+    record: Any,
+    battlefield: Any,
+    *,
+    operation_id: str,
+    preferred: PhysicalEdge | None,
+) -> PartyRetreatPlan | None:
+    """Plan one confirmed whole-party retreat, or ``None`` when no route exists.
+
+    The plan is read-only and exact: it projects every present member's unpaid
+    combat prefix plus the attempt round, prices the full route for every
+    actually self-moving member through the canonical ``quote_edge`` calculator
+    (so fatigue speed changes, exact-zero arrival and authorized waivers are
+    execution arithmetic), and lets a broken path be an ordinary gameplay
+    failure. A malformed fatigue pair, an unreadable history record or broken
+    authored geometry raises :class:`WorldEscapeError` instead.
+
+    ``preferred`` is the server-captured reverse of the party's last completed
+    edge; when it is still legal and affordable it is taken, otherwise the
+    deterministic operation-scoped commitment among every other lawful
+    affordable neighbour decides. No safe/monster-free preference is applied.
+    """
+    if battlefield is None:
+        return None
+    from world.rules.combat_identity import stable_actor_id
+    from world.rules.player_control import is_player_driven
+
+    if not is_player_driven(commander):
+        return None
+    try:
+        source = location_ref(commander)
+    except MovementEdgeError as error:
+        raise WorldEscapeError("location_unavailable", str(error)) from error
+    bodies = _present_team_bodies(battlefield, commander)
+    if not bodies:
+        return None
+    knocked = set(int(pk) for pk in record.knocked_out_ids)
+    for key, entity in battlefield.roster.items():
+        if key in battlefield.knocked_out:
+            pk = getattr(entity, "pk", None)
+            if isinstance(pk, int) and not isinstance(pk, bool):
+                knocked.add(pk)
+    self_moving = tuple(
+        body
+        for body in bodies
+        if int(body.pk) not in knocked and _stored_hp(body) > 0
+    )
+    carried = tuple(body for body in bodies if body not in self_moving)
+    if not self_moving:
+        return None
+    try:
+        projected = tuple(_project_retreat_state(record, body) for body in self_moving)
+    except FatigueStateError as error:
+        raise WorldEscapeError(error.reason, str(error)) from error
+    if any(
+        state.posture is not None and state.posture is not SleepPosture.AWAKE
+        for state in projected
+    ):
+        # A non-knocked-out sleeper keeps the ordinary sleep movement
+        # restriction; the whole route is an ordinary unaffordable failure.
+        return None
+    try:
+        edges = legal_edges(commander, source, self_moving)
+    except MovementEdgeError as error:
+        raise WorldEscapeError("movement_edge_invalid", str(error)) from error
+    candidates: list[tuple[PhysicalEdge, TraversalResolution]] = []
+    for edge in edges:
+        try:
+            resolution = quote_edge(
+                commander, edge, self_moving, states=projected
+            )
+        except MovementPreflightRefused as error:
+            if error.reason in _PHYSIOLOGY_REFUSALS:
+                raise WorldEscapeError(error.reason, str(error)) from error
+            continue
+        except MovementEdgeError as error:
+            raise WorldEscapeError("movement_edge_invalid", str(error)) from error
+        if resolution.status is TraversalStatus.UNRESOLVED:
+            continue
+        if resolution.status is TraversalStatus.RESOLVED and (
+            resolution.cost is None or resolution.cost.seconds < 0
+        ):
+            continue
+        candidates.append((edge, resolution))
+    if not candidates:
+        return None
+    ordered = tuple(sorted(candidates, key=lambda item: _edge_key(item[0])))
+    index = _preferred_index(ordered, preferred)
+    if index is None:
+        seed = (
+            f"{operation_id}:{stable_actor_id(commander)}:"
+            f"{record.session_id}:{int(record.rounds_elapsed)}"
+        )
+        index = int.from_bytes(
+            hashlib.sha256(seed.encode("utf-8")).digest()[:8], "big"
+        ) % len(ordered)
+    edge, resolution = ordered[index]
+    clock = None
+    try:
+        from world.rules.clock import read_world_clock
+
+        clock = read_world_clock()
+    except Exception:  # observability: ignore R2: the departure tick is telemetry; a missing clock degrades to the session's own elapsed boundary
+        clock = None
+    if clock is not None:
+        depart_tick = int(clock.tick) + (
+            int(record.rounds_elapsed) + 1 - int(record.settled_rounds)
+        ) * 6
+    else:
+        depart_tick = int(record.started_tick) + (
+            int(record.rounds_elapsed) + 1
+        ) * 6
+    return PartyRetreatPlan(
+        edge=edge,
+        member_ids=tuple(sorted(int(body.pk) for body in bodies)),
+        self_moving_ids=tuple(int(body.pk) for body in self_moving),
+        carried_ids=tuple(sorted(int(body.pk) for body in carried)),
+        states_after_attempt=projected,
+        traversal=resolution,
+        depart_tick=depart_tick,
+        operation_id=operation_id,
+    )
+
+
 __all__ = [
     "ESCAPE_CONTEXT_KEY",
     "AbstractEscapeContext",
     "EscapePlan",
+    "PartyRetreatPlan",
     "WorldEscapeContext",
     "WorldEscapeError",
     "build_journey_plan",
     "plan_individual_escape",
+    "plan_party_retreat",
     "project_monster_combat_state",
     "settle_monster_combat_through",
 ]

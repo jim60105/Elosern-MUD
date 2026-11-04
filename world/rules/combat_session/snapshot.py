@@ -197,6 +197,7 @@ def _snapshot_round_clock(
     battlefield: Battlefield,
     *,
     horizon_rounds: int | None = None,
+    command_seconds: int | None = None,
 ):
     """Capture clock stage surfaces before any round or terminal write.
 
@@ -205,6 +206,12 @@ def _snapshot_round_clock(
     the unpaid prefix and then every automatic enemy-only round up to the
     session cap. The window is counted from the current tick, so a larger
     horizon only ever adds surfaces to the rollback contract.
+
+    ``command_seconds`` adds the same contract for a committed physical
+    traversal the exit may execute after its combat settlement (a confirmed
+    party retreat): the movement owner builds its own full-window registry, so
+    this outer owner must cover the identical surfaces for a later receipt or
+    commit failure.
     """
     from world.rules.clock import (
         AdvanceSource, WorldClock, _snapshot_clock_tick,
@@ -224,6 +231,23 @@ def _snapshot_round_clock(
         rounds * _ROUND_SECONDS,
         AdvanceSource.COMBAT, scope,
     )
+    if command_seconds and command_seconds > 0:
+        from world.rules.clock import MAX_ADVANCE_SECONDS
+
+        traversal = build_advance_snapshot_registry(
+            clock if clock is not None else WorldClock(),
+            max(int(command_seconds), MAX_ADVANCE_SECONDS),
+            AdvanceSource.COMMAND,
+            scope,
+        )
+        for key, surface in traversal.items():
+            existing = registry.get(key)
+            if existing is None:
+                registry[key] = surface
+            else:
+                existing.attributes.update(surface.attributes)
+                if surface.location is not None:
+                    existing.location = surface.location
     return clock, _snapshot_clock_tick(clock) if clock is not None else None, registry, scope
 
 

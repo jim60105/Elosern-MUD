@@ -189,6 +189,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `field_contact_admitted` | `char`、`source_id`、`session`、`engagement`、`tick`、`room`、`triggers`、`enemies`、`location`（具名敵意接觸的耐用提交邊界；`triggers` 為使條件成立的個體，`enemies` 為整格實際名冊，`source_id` 為 `movement`／`birth_or_arrival`／`source`／`pre_action`） |
 | `field_contact_failed` | `char`、`source_id`、`tick`、`room`、`triggers`＋`exc`（error 級；入場或睡眠打斷失敗後已還原現場，未留下任何成功事件） |
 | `field_contact_interrupted` | `char`、`operation`、`sleep`、`requested_seconds`、`elapsed_seconds`、`tick`、`session`（可中斷跳過被真實接觸截斷的耐用提交邊界；`operation` 為該次跳過的操作識別，`sleep` 為睡眠 receipt 識別（非睡眠跳過為空字串），`requested_seconds` 與 `elapsed_seconds` 分別為要求與實際接受秒數，僅於耐用提交時發出；遠處維護不產生此列） |
+| `party_retreat_resolved` | `char`、`session`、`outcome`、`reason`、`source`、`destination`、`members`、`attempt_tick`、`arrival_tick`（confirmed 隊伍撤退的外層提交邊界；`outcome` 為 `escaped`／`failed`，`reason` 為 `contest_failed`／`no_affordable_route` 或成功時的空字串，`source`／`destination` 為實際路線的穩定 locator 字串，`members` 為該次實際離開的成員 dbref 清單；僅於最外層耐用提交時發出，回滾或重複確認不產生） |
 | `sleep_interrupt_receipt_unusable` | `char`、`reason`（warn 級；接觸打斷讀到不可用的睡眠紀錄時不改寫、不補發） |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |

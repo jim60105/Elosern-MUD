@@ -1108,6 +1108,181 @@ def settle_movement(
         return result
 
 
+@dataclass(frozen=True, slots=True)
+class RetreatTraversal:
+    """One settled retreat edge plus the handle its outer owner may undo."""
+
+    snapshot: MovementSnapshot
+    seconds: int
+    source: LocationRef | None
+    destination: LocationRef | None
+
+
+class RetreatTraversalError(ValueError):
+    """A confirmed retreat's physical edge could not be settled (named)."""
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(reason if not detail else f"{reason}: {detail}")
+        self.reason = reason
+        self.detail = detail
+
+
+def settle_party_retreat_traversal(
+    traversing_object: Any,
+    source_location: Any,
+    *,
+    destination: Any | None,
+    destination_coordinates: tuple[int, int] | None,
+    wilderness_source_coordinates: tuple[int, int] | None,
+    route: str,
+    cost_key: str,
+    members: tuple[Any, ...],
+    movers: tuple[Any, ...],
+    expected_seconds: int | None = None,
+) -> RetreatTraversal:
+    """Execute one preflighted whole-party retreat edge as a normal traversal.
+
+    ``members`` are the actually self-moving bodies the route was priced for;
+    ``movers`` is the complete explicit carry plan the retreat's rules owner
+    selected (every present party body, knocked-out companions included). The
+    ordinary movement settlement owns the relocation, the clock charge, the
+    destination map knowledge, the retained edge and the arrival contact; this
+    function only supplies the rules-owned traversal body. It is deliberately
+    not reachable from an exit, a command or a client: a caller must already
+    hold the confirmed-retreat plan.
+
+    The returned snapshot is the pre-move compensation handle: if a later step
+    of the enclosing confirmed-exit unit fails after the rollback,
+    :func:`restore_failed_retreat_traversal` puts every body, registration,
+    surface and clock back.
+    """
+    from world.rules.travel_cost import (
+        MovementPreflightRefused,
+        TraversalStatus,
+        preflight_movement_cost,
+    )
+
+    if not movers:
+        raise RetreatTraversalError("no_party_members")
+    if traversing_object not in movers:
+        raise RetreatTraversalError("traverser_missing")
+    try:
+        source = location_ref(traversing_object)
+    except (LocationRefError, MovementEdgeError) as error:
+        raise RetreatTraversalError("location_unavailable", str(error)) from error
+    try:
+        with preflight_movement_cost(
+            traversing_object,
+            cost_key,
+            source_location=source_location,
+            destination=destination,
+            wilderness_source_coordinates=wilderness_source_coordinates,
+            wilderness_destination_coordinates=destination_coordinates,
+            members=members,
+        ) as resolution:
+            if resolution.status is TraversalStatus.UNRESOLVED:
+                raise RetreatTraversalError("unresolved_retreat_edge")
+            seconds = (
+                int(resolution.cost.seconds)
+                if resolution.cost is not None
+                else None
+            )
+            if (
+                expected_seconds is not None
+                and seconds is not None
+                and seconds != int(expected_seconds)
+            ):
+                raise RetreatTraversalError(
+                    "retreat_edge_repriced",
+                    f"planned {expected_seconds}s, executed {seconds}s",
+                )
+            snapshot = _snapshot_movement_state(
+                traversing_object,
+                source_location,
+                destination=destination,
+                wilderness_coordinates=destination_coordinates,
+                wilderness_source_coordinates=wilderness_source_coordinates,
+                window_seconds=seconds,
+            )
+
+            def traverse() -> bool:
+                from typeclasses.exits import after_successful_movement
+
+                for body in movers:
+                    if destination is not None:
+                        moved = body.move_to(
+                            destination,
+                            quiet=body is not traversing_object,
+                            move_hooks=body is traversing_object,
+                        )
+                    else:
+                        from evennia.contrib.grid.wilderness.wilderness import (
+                            enter_wilderness,
+                        )
+
+                        moved = enter_wilderness(
+                            body,
+                            coordinates=destination_coordinates,
+                            name=WILDERNESS_NAME,
+                        )
+                    if not moved:
+                        raise RetreatTraversalError(
+                            "retreat_move_failed",
+                            f"{getattr(body, 'key', body)} did not relocate",
+                        )
+                if destination is not None and traversing_object.ndb.wilderness is not None:
+                    # Leaving the wilderness through an authored destination:
+                    # clear the registration the hook-free companion move
+                    # cannot pop.
+                    traversing_object.ndb.wilderness.at_post_object_leave(
+                        traversing_object
+                    )
+                after_successful_movement(
+                    traversing_object,
+                    source_location,
+                    cost_key=cost_key,
+                    destination=destination,
+                    wilderness_coordinates=destination_coordinates,
+                    wilderness_source_coordinates=wilderness_source_coordinates,
+                )
+                return True
+
+            settle_movement(
+                traversing_object,
+                source_location,
+                destination=destination,
+                wilderness_coordinates=destination_coordinates,
+                wilderness_source_coordinates=wilderness_source_coordinates,
+                destination_coordinates=destination_coordinates,
+                traverse=traverse,
+                route=route,
+                cost_key=cost_key,
+                narrate_traversal=True,
+                window_seconds=seconds,
+            )
+    except MovementPreflightRefused as error:
+        raise RetreatTraversalError(error.reason, str(error)) from error
+    try:
+        destination_ref = location_ref(traversing_object)
+    except (LocationRefError, MovementEdgeError):  # observability: ignore R2: an unrepresentable arrival is telemetry only; the traversal itself already committed
+        destination_ref = None
+    return RetreatTraversal(
+        snapshot=snapshot,
+        seconds=0 if seconds is None else seconds,
+        source=source,
+        destination=destination_ref,
+    )
+
+
+def restore_failed_retreat_traversal(snapshot: MovementSnapshot) -> None:
+    """Undo one successfully settled retreat edge after its outer unit failed.
+
+    Runs after the enclosing durable rollback, exactly like the settlement's own
+    compensation; best-effort steps never mask the original failure.
+    """
+    _compensate_after_rollback(snapshot)
+
+
 def settle_relocation(entity: Any, destination: Any) -> None:
     """Relocate one operator-selected entity with its arrival bookkeeping.
 

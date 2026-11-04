@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "8e73fcbf81764ceb6a184b5357f7d9126171abf629984c58dd14526232f6ecab",
+  "fingerprint": "53579fab5e5866fe5a15f82e9c7aece2e321efe6846057866da6b89fb84455d9",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1081,16 +1081,16 @@
     "world/rules/combat_session/__init__.py": "cc925fae7ff4592e574a012b9462ad7ec8bf14ce05e755c7fb27e868d7da8b52",
     "world/rules/combat_session/ai_tuning.py": "8ebd6a25d57758ed34e31ee07c7eb33d8bf756641532a042a12385e72a5fd256",
     "world/rules/combat_session/battlefield.py": "57f3ce9277f9496a9d9dddb9f497a338075dab97e4d41756aedd635fae9b6ad0",
-    "world/rules/combat_session/errors.py": "5b7bdca13f2e68fc6608b97ae9a2d650cc3213f1cad267419ac75e409b2fad0e",
-    "world/rules/combat_session/exit.py": "2201050d4c919fba3d94d077f26bd3c964f42e312654dc376450c06883f0b611",
+    "world/rules/combat_session/errors.py": "152eaff66f2c457a367fb5f135a44e7745de95612110d5ee7216b9e8c2e4bf27",
+    "world/rules/combat_session/exit.py": "36838901ef8959246c96400ad74a056e35dfa015b62716f3abddea8de8b1a392",
     "world/rules/combat_session/lifecycle.py": "6ad5d63a7c128df4376b069c294022dd506dd1b37db78e356148761279559e7a",
     "world/rules/combat_session/observations.py": "519997b958ac35208dbf8407550de5de7d7075e6d7bda48a2a0e408a5300cbb7",
     "world/rules/combat_session/policies.py": "fb06ff301d4b72df6d616f2a6e4dd27114df338d68de78ba0e09c770a8f82e24",
     "world/rules/combat_session/records.py": "fe04ecf1853e5332e3f968856b99a49b688cd16bc3a8dbcf6feb1d2f2f7407eb",
-    "world/rules/combat_session/rounds.py": "5a92ba1bf939231097d408cfe1d358efca0e82aa84a62cb1f523a523c4bf8e01",
+    "world/rules/combat_session/rounds.py": "21e21680fa6a97a5814c06ec7e1fa622864393224f21f6acb83d94ddd4c1860a",
     "world/rules/combat_session/scans.py": "a151939a6e9aae8cca57618bd10ec98535975d051f78ddc6a9afa89d3d13cfde",
-    "world/rules/combat_session/settlement.py": "867369b826720e00443c63dfe9738a17637481b73e7ce5bea96ce63b2407eb05",
-    "world/rules/combat_session/snapshot.py": "87f80ec5d6cb107d84cf10ca03c151d64e5c880428bab1744d445f1930ad49e8",
+    "world/rules/combat_session/settlement.py": "13393c047f9e91881b9f2a0ab7f31c2d2da6ca52c59198febda7a51f3a4c676f",
+    "world/rules/combat_session/snapshot.py": "25a360b3fdbce4c469e84f8bfde68af4c56442133b7ee44d8b87baf272dee51a",
     "world/rules/combat_session/targeting.py": "14762c5d774e027c4453a291b4d05dbb316df4db410cc70a51330f1d67c2e0cb",
     "world/rules/combat_session/writer.py": "37459aaf3af537ffba58a786e4238e7b5d09785edab989fef8fd209f20b4bf18",
     "world/rules/combat_view.py": "c291c6f6adeaacfd56d5664cad7fffbfec43b1bd2c0c925e774bb78c245cdfc3",
@@ -1169,7 +1169,7 @@
     "world/rules/monster_individual.py": "aebffc963389222d028d121c9ee9d9bd7b13f88e3ffcc6a42f7939e0eeed0591",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_edges.py": "dc07fce13e91bee630557ce493bc1089855ffba5b28285ac32c51bdf1239006e",
-    "world/rules/movement_settlement.py": "bc0557ca2fb1ba3c648e9d773fd163f9bff59fd6cd4030c9b8e67af5c963b761",
+    "world/rules/movement_settlement.py": "60b5f5c19dea147d82025c411e591297a67f49991a5be4044152a8369e87f3fc",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "f22a06725ebb3ce1553cf5b568f13ffcedcef3e63b97089dc9c72c9f05b26c71",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
@@ -1187,7 +1187,7 @@
     "world/rules/persona_edit.py": "5428ff71124b5f08c9619a11bd84e14300eed2aba5bb080b47353c7fb2156611",
     "world/rules/phase_hooks.py": "7625f75ccc45b769f893b315fa5fb0b41323dd32761f146d808cb76ab00dc54a",
     "world/rules/player_control.py": "e4488afe9b22179a52f615098b82feebb261dc8018f8aa177eac093983785116",
-    "world/rules/player_messages.py": "18c69d6daf73cce4cf385c57abf26a2cbb48bc5bcaf9c91a029faacd01de99a2",
+    "world/rules/player_messages.py": "b6020c28561d50e49ea3aa6d39c22e913678b635d6c599e12fcae206d78b5456",
     "world/rules/pleasure.py": "09d5fdf11f720c6d0be2349542684b532d61f4a2a52cce84b81d6ab2204c02ab",
     "world/rules/possession.py": "bcf4f398e8195424bc0c950f49270bf0e70f0b71dd83df3a2a899432cbe7db8c",
     "world/rules/presentation_events.py": "b784ea1e940767300a6abe4ec723e81802664ace5176244b2af88b4dc9d9ae89",
@@ -1296,6 +1296,6 @@
     "world/rules/upkeep.py": "7c18b388c1e6562067ac0cf0746a20738efebeb798baad5f8fef79c4ec24a324",
     "world/rules/wallet.py": "db5b03079ce2f905a411c1fe553a5ecedaa9eedb9dc4ef9cd961c8facb6e9c9a",
     "world/rules/wilderness_disclosure.py": "9576720c74ef41e48fe216c3637a3d5033210317aaf4be43c3b49a290be0fa82",
-    "world/rules/world_escape.py": "cf723b4909e63d72ecfcce29ed8af6a2926cf346a84fcbf9edba7c9ac8272d9e"
+    "world/rules/world_escape.py": "bd668c4296eb168de4e494b3f5a231aab8126a380a85e5a60982811abd521033"
   }
 }

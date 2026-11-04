@@ -75,6 +75,7 @@ from world.rules.combat_session.snapshot import (
 from world.rules.disengage import FLEE_SKILL_KEY, party_retreat_attempt
 from world.rules.event_log import EventEntry, EventLog
 from django.db import transaction
+from world.rules.movement_edges import encode_location_ref, location_ref
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
@@ -924,6 +925,7 @@ def _finalize_resolved_round(
     round_identities: Any,
     round_hp_before: Any,
     grants: Sequence[str | UnlockNotice] = (),
+    paid_through: int | None = None,
 ) -> tuple[dict[str, Any], tuple[str | UnlockNotice, ...]]:
     """Persist one resolved round's outcome and settle it exactly once.
 
@@ -990,6 +992,15 @@ def _finalize_resolved_round(
         confirmed_actors=(),
         opening_first_actor=None,
     )
+    if paid_through is not None:
+        # A confirmed retreat's old-encounter writer already paid the allied
+        # physiology and the clock for ``[settled_rounds, paid_through)``; the
+        # durable cursor commits with this round so the terminal settlement
+        # pays only what is still unpaid.
+        new_record = replace(
+            new_record,
+            settled_rounds=max(int(base.settled_rounds), int(paid_through)),
+        )
     _persist(actor, new_record)
     _record_monster_combat_intervals(new_record, battlefield, completed_round)
     _record_round_defeats(
@@ -1882,30 +1893,6 @@ def _eligible_allied_actors(
     ]
 
 
-def _party_retreat_outcome(
-    commander: Any,
-    record: CombatSessionRecord,
-    battlefield: Battlefield,
-) -> tuple[bool | None, dict[str, float | int | None]]:
-    """Roll the confirmed retreat once, or report that no allied member can act.
-
-    A commander absent from the battlefield's teams can be shown no
-    able-bodied party either, so it takes the same no-acting-ally branch as an
-    empty eligible set.
-    """
-    commander_id = stable_actor_id(commander)
-    party_team = battlefield.team_of(commander_id)
-    if party_team is None:
-        return None, {
-            "roll": None,
-            "allied_agility": None,
-            "pursuer_agility": None,
-        }
-    return party_retreat_attempt(
-        battlefield, party_team, _eligible_allied_actors(record, battlefield)
-    )
-
-
 def _party_retreat_event_log(
     commander: Any, verdict: str, detail: dict[str, float | int | None]
 ) -> EventLog:
@@ -2008,23 +1995,35 @@ def _escaped_party_retreat(
     record: CombatSessionRecord,
     battlefield: Battlefield,
     detail: dict[str, float | int | None],
+    plan: Any,
 ) -> dict[str, Any]:
-    """Remove the whole present party and settle the one elapsed round once.
+    """Depart the whole present party over the preflighted edge, once.
 
     Every present member of the commander's team leaves, knocked-out
-    companions included, and no entity is moved to an invented destination.
-    No enemy action runs: the round is only counted, so its one added six
-    seconds settle through the ordinary terminal boundary, where the departed
-    party — now fled — is outside the regeneration scope and therefore gains
-    no healing or revival. Because the commander itself is among the fled,
-    :func:`_continue_or_settle` derives the terminal ``fled`` outcome rather
-    than a further round, so no subset of the party can be left in combat.
+    companions included. The old encounter's unpaid prefix plus this attempt
+    round settle exactly once through the durable cursor, while the departed
+    party — now fled — stays outside the old encounter's regeneration scope and
+    gains no healing or revival. The uploaded traversal then runs through the
+    ordinary movement settlement, which pays the canonical terrain cost and
+    physiology once and admits real arrival contact at the destination.
     """
+    from world.rules.combat_session.settlement import settle_fled_combat_prefix
+
     round_identities, round_hp_before = capture_round_hp(battlefield)
     party_team = battlefield.team_of(stable_actor_id(commander))
     for key in battlefield.teams.get(party_team, frozenset()):
         if key in battlefield.roster:
             battlefield.fled.add(key)
+    # Pay the old encounter's unpaid prefix and the attempt exactly once. The
+    # party is already fled, so this pays only allied physiology and the clock;
+    # the terminal settlement then pays no remaining round and never heals the
+    # departed bodies.
+    paid = settle_fled_combat_prefix(
+        commander,
+        record,
+        battlefield,
+        through_round=int(record.rounds_elapsed) + 1,
+    )
     logs = [_party_retreat_event_log(commander, "escaped", detail)]
     result, notifications = _finalize_resolved_round(
         commander,
@@ -2034,9 +2033,164 @@ def _escaped_party_retreat(
         hp_before=_stored_trait_value(commander.traits.hp),
         round_identities=round_identities,
         round_hp_before=round_hp_before,
+        paid_through=paid.settled_rounds,
     )
+    travel = _execute_retreat_traversal(commander, battlefield, plan)
+    try:
+        result["travel"] = {
+            "source": (
+                None if travel.source is None else encode_location_ref(travel.source)
+            ),
+            "destination": (
+                None
+                if travel.destination is None
+                else encode_location_ref(travel.destination)
+            ),
+            "seconds": travel.seconds,
+            "member_ids": tuple(plan.member_ids),
+        }
+        # The exit unit's outer rollback owner consumes this handle after a
+        # later failure (the receipt write or the unit's commit) and puts the
+        # whole original party and world state back.
+        result["_retreat_traversal"] = travel.snapshot
+        _log_party_retreat_resolved(
+            commander,
+            record,
+            outcome="escaped",
+            reason="",
+            source=plan.edge.source,
+            destination=plan.edge.destination,
+            member_ids=plan.member_ids,
+            attempt_tick=plan.depart_tick,
+            arrival_tick=_current_tick(),
+        )
+    except Exception:
+        from world.rules.movement_settlement import (
+            restore_failed_retreat_traversal,
+        )
+
+        restore_failed_retreat_traversal(travel.snapshot)
+        raise
     _deliver_after_commit(commander, notifications)
     return result
+
+
+def _retreat_edge_targets(
+    commander: Any, plan: Any
+) -> tuple[Any, Any | None, tuple[int, int] | None, tuple[int, int] | None]:
+    """Resolve the plan's stable edge into the live movement arguments."""
+    from world.rules import world_escape
+    from world.rules.movement_edges import KIND_ROOM, KIND_WILDERNESS, room_for_ref
+
+    source = plan.edge.source
+    destination_room = None
+    destination_coordinates = None
+    wilderness_source = None
+    if source.kind == KIND_WILDERNESS:
+        wilderness_source = (source.x, source.y)
+    try:
+        current = location_ref(commander)
+    except Exception as error:  # observability: ignore R2: an unrepresentable retreat source is the named operational refusal below
+        raise world_escape.WorldEscapeError(
+            "retreat_source_unavailable", str(error)
+        ) from error
+    if current != source:
+        raise world_escape.WorldEscapeError(
+            "retreat_source_changed", f"planned {source}, current {current}"
+        )
+    if source.kind == KIND_ROOM:
+        source_location = room_for_ref(source)
+        if source_location is None:
+            raise world_escape.WorldEscapeError("retreat_source_missing")
+    else:
+        source_location = commander.location
+    if plan.edge.destination.kind == KIND_ROOM:
+        destination_room = room_for_ref(plan.edge.destination)
+        if destination_room is None:
+            raise world_escape.WorldEscapeError("retreat_destination_missing")
+    else:
+        destination_coordinates = (
+            plan.edge.destination.x,
+            plan.edge.destination.y,
+        )
+    return source_location, destination_room, destination_coordinates, wilderness_source
+
+
+def _execute_retreat_traversal(
+    commander: Any, battlefield: Battlefield, plan: Any
+) -> Any:
+    """Run the planned edge through the ordinary movement settlement."""
+    from world.rules import world_escape
+    from world.rules.movement_settlement import settle_party_retreat_traversal
+
+    entities = {
+        int(entity.pk): entity
+        for entity in battlefield.roster.values()
+        if isinstance(getattr(entity, "pk", None), int)
+    }
+    movers = tuple(entities[pk] for pk in plan.member_ids if pk in entities)
+    self_moving = tuple(
+        entities[pk] for pk in plan.self_moving_ids if pk in entities
+    )
+    if len(movers) != len(plan.member_ids) or len(self_moving) != len(
+        plan.self_moving_ids
+    ):
+        raise world_escape.WorldEscapeError("retreat_party_changed")
+    (
+        source_location,
+        destination_room,
+        destination_coordinates,
+        wilderness_source,
+    ) = _retreat_edge_targets(commander, plan)
+    cost_key = plan.traversal.cost_key or (
+        "wilderness_move" if plan.edge.source.kind == "wilderness" else "move"
+    )
+    expected = (
+        int(plan.traversal.cost.seconds)
+        if plan.traversal.cost is not None
+        else None
+    )
+    return settle_party_retreat_traversal(
+        commander,
+        source_location,
+        destination=destination_room,
+        destination_coordinates=destination_coordinates,
+        wilderness_source_coordinates=wilderness_source,
+        route=plan.edge.route,
+        cost_key=cost_key,
+        members=self_moving,
+        movers=movers,
+        expected_seconds=expected,
+    )
+
+
+def _log_party_retreat_resolved(
+    commander: Any,
+    record: CombatSessionRecord,
+    *,
+    outcome: str,
+    reason: str,
+    source: Any,
+    destination: Any,
+    member_ids: tuple[int, ...],
+    attempt_tick: int | None,
+    arrival_tick: int | None,
+) -> None:
+    """Schedule one committed retreat outcome (outer-commit only)."""
+    context = {
+        "char": str(getattr(commander, "pk", "")),
+        "session": record.session_id,
+        "outcome": outcome,
+        "reason": reason,
+        "source": "" if source is None else str(source),
+        "destination": "" if destination is None else str(destination),
+        "members": ",".join(str(pk) for pk in member_ids),
+        "attempt_tick": "" if attempt_tick is None else int(attempt_tick),
+        "arrival_tick": "" if arrival_tick is None else int(arrival_tick),
+    }
+    transaction.on_commit(
+        lambda context=context: log_info("party_retreat_resolved", context=context)
+    )
 
 
 def _failed_party_retreat(
@@ -2044,6 +2198,9 @@ def _failed_party_retreat(
     record: CombatSessionRecord,
     battlefield: Battlefield,
     detail: dict[str, float | int | None],
+    *,
+    reason: str = "contest_failed",
+    plan: Any = None,
 ) -> dict[str, Any]:
     """Consume every allied opportunity and run one ordinary enemy round.
 
@@ -2098,6 +2255,17 @@ def _failed_party_retreat(
         for journal in item_journals:
             journal.restore()
         raise
+    _log_party_retreat_resolved(
+        commander,
+        record,
+        outcome="failed",
+        reason=reason,
+        source=None if plan is None else plan.edge.source,
+        destination=None if plan is None else plan.edge.destination,
+        member_ids=() if plan is None else plan.member_ids,
+        attempt_tick=_current_tick(),
+        arrival_tick=None,
+    )
     _deliver_after_commit(commander, notifications)
     return result
 
@@ -2106,6 +2274,9 @@ def resolve_party_retreat(
     commander: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
+    *,
+    preferred: Any = None,
+    plan: Any = None,
 ) -> dict[str, Any]:
     """Resolve one confirmed party retreat at the round boundary (§6.1).
 
@@ -2125,10 +2296,47 @@ def resolve_party_retreat(
     examination settlement records as a FAIL — the party left the simulated
     battle without passing it.
     """
-    if battlefield is not None:
-        success, detail = _party_retreat_outcome(commander, record, battlefield)
-        if success is True:
-            return _escaped_party_retreat(commander, record, battlefield, detail)
-        if success is False:
-            return _failed_party_retreat(commander, record, battlefield, detail)
-    return _ordinary_party_defeat(commander, record, battlefield)
+    if battlefield is None:
+        return _ordinary_party_defeat(commander, record, battlefield)
+    commander_id = stable_actor_id(commander)
+    party_team = battlefield.team_of(commander_id)
+    if party_team is None:
+        return _ordinary_party_defeat(commander, record, battlefield)
+    eligible = _eligible_allied_actors(record, battlefield)
+    if not eligible:
+        # No acting ally retains the existing requested-retreat defeat/FAIL
+        # branch; a route would be meaningless because nobody can attempt it.
+        return _ordinary_party_defeat(commander, record, battlefield)
+    from world.rules import world_escape
+
+    if plan is None:
+        operation_id = (
+            f"{record.engagement_id or record.session_id}:retreat:"
+            f"{int(record.rounds_elapsed)}"
+        )
+        plan = world_escape.plan_party_retreat(
+            commander,
+            record,
+            battlefield,
+            operation_id=operation_id,
+            preferred=preferred,
+        )
+    if plan is None:
+        # Insufficient post-attempt reserve and no legal exit are ordinary
+        # failed attempts: one enemy round at the source, no movement, no
+        # traversal payment.
+        return _failed_party_retreat(
+            commander,
+            record,
+            battlefield,
+            {"roll": None, "allied_agility": None, "pursuer_agility": None},
+            reason="no_affordable_route",
+        )
+    success, detail = party_retreat_attempt(battlefield, party_team, eligible)
+    if success is True:
+        return _escaped_party_retreat(
+            commander, record, battlefield, detail, plan
+        )
+    return _failed_party_retreat(
+        commander, record, battlefield, detail, plan=plan
+    )

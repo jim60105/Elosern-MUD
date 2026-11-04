@@ -24,6 +24,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest, EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.exits import Exit
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -1111,6 +1112,13 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
 
         register_catalog()
         self.room = create_object(Room, key="retreat arena")
+        # A real adjacent authored edge: a confirmed retreat must execute a
+        # lawful affordable route, never relocate to an invented destination.
+        self.escape_room = create_object(Room, key="retreat escape")
+        create_object(Exit, key="out", location=self.room, destination=self.escape_room)
+        create_object(
+            Exit, key="back", location=self.escape_room, destination=self.room
+        )
         self.player = _player(key="retreat player")
         self.player.location = self.room
         self.monster = _monster("retreat goblin", hp=500, atk=10, agility=15)
@@ -1270,11 +1278,17 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
             entry.kind for log in result["logs"] for entry in log.entries
         ]
         self.assertIn("party_retreat", kinds)
-        # The whole party left, and the carried companion gained nothing: no
-        # healing, no revival, and nobody was relocated.
+        # The whole party left over the real adjacent edge, and the carried
+        # companion gained nothing: no healing and no revival.
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_active_session(self.player))
         self.assertFalse(is_active_session(companion))
+        self.assertEqual(self.player.location, self.escape_room)
+        self.assertEqual(companion.location, self.escape_room)
+        self.assertEqual(
+            result["travel"]["destination"],
+            {"kind": "room", "id": self.escape_room.pk},
+        )
         # No subset stayed in combat, and every participant was released from
         # the registration that blocks time skips.
         self.assertNotEqual(
@@ -1282,12 +1296,16 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         )
         for entity in (self.player, companion, self.monster):
             self.assertNotIn(str(entity.pk), _BATTLEFIELDS)
-        self.assertEqual(self.player.traits.hp.current, 50)
+        # The old combat settlement never healed the party: the small increase
+        # is the ordinary physical traversal's own gauge regeneration, exactly
+        # like any other walk.
+        self.assertGreaterEqual(self.player.traits.hp.current, 50)
+        self.assertLess(self.player.traits.hp.current, self.player.traits.hp.base)
         # Carried, not regenerated: the settlement's scope excludes the whole
         # departed party, so the companion stays on the nonlethal floor.
         self.assertEqual(companion.traits.hp.current, 1)
         self.assertGreater(self.monster.traits.hp.current, 0)
-        self.assertEqual(self.player.location, self.room)
+        self.assertIs(self.monster.location, self.room)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     @covers_requirement("player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round")
@@ -1453,6 +1471,10 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         # fled marks were rolled back, and the clock did not move.
         self.assertTrue(is_active_session(self.player))
         self.assertEqual(get_world_clock().tick, tick_before)
+        # The committed traversal was undone with the failed unit: both bodies
+        # are back at the source, not stranded at the destination.
+        self.assertIs(self.player.location, self.room)
+        self.assertIs(companion.location, self.room)
         self.assertEqual(
             evaluate_skip_safety(self.player), SkipRejectReason.IN_COMBAT
         )

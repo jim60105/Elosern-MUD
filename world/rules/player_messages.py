@@ -70,6 +70,7 @@ SESSION_REASON_MESSAGES: dict[str, str] = {
     "invalid_confirmation_token": "這項確認已經失效，請重新取得確認提示。",
     "party_exit_unavailable": "這項隊伍行動目前無法執行。",
     "personal_flee_forbidden": "個別逃跑已經取消，整隊的行動需要明確確認。",
+    "movement_history_invalid": "無法讀取隊伍先前的移動路線，請重新確認撤退。",
     "combat_item_command_required": "戰鬥中請從戰鬥指令面板選擇要使用的道具。",
 }
 

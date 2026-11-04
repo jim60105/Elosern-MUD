@@ -70,6 +70,10 @@ Interactive rounds SHALL defer combat time until terminal settlement except for 
 - **WHEN** enemy-only continuation pays prior unpaid rounds and its next real round, then ordinary play later terminates
 - **THEN** the clock, gauges and physiology pay that prefix once and terminal settlement pays only remaining rounds; restart replay cannot pay it again
 
+#### Scenario: Retreat has two distinct paid intervals
+- **WHEN** a confirmed party retreat succeeds after prior paid or unpaid rounds
+- **THEN** old combat pays only the unpaid prefix plus its attempt once, and the subsequent normal physical traversal is charged once; arrival contact never duplicates terminal billing
+
 ### Requirement: The knocked-out player settles the session as defeat
 If the player is in the battlefield's knocked-out set at the round cap or
 when the round otherwise ends without a side eliminated, the session SHALL
@@ -498,6 +502,10 @@ Retreat and surrender SHALL be session-level operations available independently 
 - **WHEN** an allied personal flee skill or text alias requests exit
 - **THEN** it reaches the same party confirmation boundary and cannot perform individual allied escape
 
+#### Scenario: Captured route is scoped and revalidated
+- **WHEN** retreat confirmation captures the actual previous edge and its gate/access or affordability changes before execution
+- **THEN** the operation-bound server capture is revalidated and lawful fallback is evaluated; no client route, recycled room or invalidated teleport history can redirect the exit
+
 ### Requirement: Confirmed surrender enters existing defeat or exam FAIL without an extra round
 Confirmed surrender SHALL atomically discard draft selections and enter ordinary hostile-defeat or guild-exam FAIL settlement. It SHALL roll no success check, run no extra enemy attack and add no artificial round. Already accumulated time SHALL settle once. Existing defeat aftermath and exam policy SHALL remain unchanged.
 
@@ -514,7 +522,7 @@ Confirmed surrender SHALL atomically discard draft selections and enter ordinary
 - **THEN** the draft and all touched durable/cache state restore and a later valid retry may complete
 
 ### Requirement: Retreat contests the slowest acting ally against the fastest pursuer
-Confirmed retreat SHALL replace all personal commands and attempt before ordinary actions. With pursuers it SHALL use one d100 plus minimum adjusted agility of allies able to act against 51 plus maximum adjusted agility of living present nonfled pursuers, reusing the existing flee constant. Accuracy and Dodge SHALL NOT modify this check.
+Confirmed retreat SHALL first require a legal adjacent route affordable after its attempt round, then retain the existing one-roll slowest-acting-ally versus fastest-pursuer agility contest; no pursuer SHALL skip only the roll and no acting ally SHALL retain ordinary defeat policy.
 
 #### Scenario: Slowest member
 - **WHEN** allied adjusted agilities are 10 and 20, pursuer maximum is 15, and d100 is 56
@@ -522,10 +530,14 @@ Confirmed retreat SHALL replace all personal commands and attempt before ordinar
 
 #### Scenario: No pursuers or no acting allies
 - **WHEN** no pursuers remain or no allied member can act
-- **THEN** no pursuers gives automatic escape without a roll; no acting ally uses ordinary defeat
+- **THEN** no pursuers skips the roll only when a legal affordable route exists; no acting ally uses ordinary defeat
+
+#### Scenario: Previous edge and lawful fallback
+- **WHEN** the actual completed previous reverse edge is blocked/unaffordable or no valid history exists
+- **THEN** choose reproducibly among other legal affordable neighbors without preferring monster-free/safe cells, consulting birth exclusions or blacklisting opponents
 
 ### Requirement: Successful retreat carries the entire present party and counts one round
-A successful retreat SHALL remove the whole present party from combat, carrying knocked-out companions without including them in the agility minimum. Enemies SHALL take no action and exactly one elapsed combat round SHALL be added and settled. The operation SHALL add no healing, revival or invented relocation.
+Successful confirmed retreat SHALL atomically depart the whole present party, carry existing knocked-out companions, settle one attempt round and complete a real legal affordable traversal with normal travel time and physiology once, preserving old-encounter regeneration exclusions.
 
 #### Scenario: Carried companion
 - **WHEN** an acting ally retreats with a present knocked-out companion
@@ -534,6 +546,26 @@ A successful retreat SHALL remove the whole present party from combat, carrying 
 #### Scenario: Exactly once
 - **WHEN** a successful retreat confirmation is duplicated across reconnect or restart
 - **THEN** the party outcome and added round/time settle once, never leaving a subset in combat
+
+#### Scenario: Post-round reserve and real travel
+- **WHEN** the preferred previous reverse edge is legal and affordable using the reserve projected after the complete unpaid combat prefix and attempt
+- **THEN** the party arrives there after one attempt round plus normal terrain/fatigue traversal; old-session exit and arrival history commit once, and actual travel retains ordinary physiology without an exit heal
+
+#### Scenario: Exact arrival depletion
+- **WHEN** the canonical movement plan reaches exactly zero reserve at arrival
+- **THEN** the edge succeeds and applies real forced posture plus any immediate destination contact, without a grace flag
+
+#### Scenario: Carry and remote members
+- **WHEN** a present knocked-out companion and a remote companion accompany actual self-moving retreat actors
+- **THEN** only present bodies arrive, carried bodies retain condition/applicable physiology without walking costs, and only actual self-moving members determine full-route speed/admission
+
+#### Scenario: Examination edge
+- **WHEN** a guild examination retreat succeeds
+- **THEN** existing FAIL/opponent cleanup and confirmation authority remain, and the party travels a real legal edge from the actual exam room
+
+#### Scenario: Late failure and fresh encounter replay
+- **WHEN** movement, physiology, arrival admission or receipt writing fails, or a committed old receipt is retried after arrival opened a new session
+- **THEN** failure restores the complete old session/source party and live caches, while committed replay neither repeats travel/payment nor mutates the new session
 
 ### Requirement: Failed retreat consumes all allied actions and runs one ordinary enemy upkeep round
 A failed retreat SHALL keep the entire party in combat, consume every allied action opportunity, allow eligible enemies their normal initiative actions and run ordinary upkeep once. It SHALL cost no MP/SP, activate no Defend/Dodge/Taunt and execute no old draft command. A nonterminal failure SHALL create a fresh next-round draft.
@@ -545,6 +577,10 @@ A failed retreat SHALL keep the entire party in combat, consume every allied act
 #### Scenario: Failure rollback
 - **WHEN** a technical failure occurs after enemy, upkeep or retreat metadata writes
 - **THEN** all round state and caches restore together and the accepted operation remains safe to retry without double time
+
+#### Scenario: No route or insufficient post-attempt energy
+- **WHEN** every legal adjacent edge would deplete reserve before arrival, or none exists, even without pursuers
+- **THEN** one ordinary failed attempt/enemy round occurs at the source, with no traversal time, movement charge or partial party move; malformed state instead refuses by name
 
 ### Requirement: Text clients can complete and revise every party command kind
 Text clients SHALL offer actor-scoped skill including scale/targets, usable own item and Defend/Dodge/Taunt choices with the same server validation as browser commands. Each command SHALL confirm one draft entry, allow earlier-entry replacement and automatically resolve only the final valid selection. Progress and member-specific reasons SHALL remain discoverable.

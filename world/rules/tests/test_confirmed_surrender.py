@@ -19,6 +19,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 from world.rules.clock import WorldClock, get_world_clock
 from world.rules.combat_session import (
@@ -41,6 +42,12 @@ from world.rules.combat_session import (
 from world.rules.combat_session.lifecycle import _persist
 from world.rules.combat_session.records import read_last_combat_receipt
 from world.rules.combat_session.rounds import _draft_requests
+from world.rules.movement_edges import (
+    PhysicalEdge,
+    encode_physical_edge,
+    location_ref,
+    record_completed_edge,
+)
 from world.rules.skip_safety import SkipRejectReason, evaluate_skip_safety
 
 from ._combat_session_helpers import (
@@ -144,6 +151,29 @@ class PartyExitRequestTests(PartyExitFixture):
             )
         self.assertEqual(ctx.exception.args[0], SessionReason.STALE_ROUND_REVISION)
 
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    def test_a_malformed_previous_route_refuses_the_retreat_by_name(self):
+        _companion, record = self._engaged_with_pending_draft()
+        self.player.attributes.add("previous_traversal", {"unexpected": True})
+        with self.assertRaises(CombatSessionError) as ctx:
+            request_party_exit(
+                self.player,
+                record.session_id,
+                record.round_revision,
+                PARTY_EXIT_RETREAT,
+            )
+        self.assertEqual(
+            ctx.exception.args[0], SessionReason.MOVEMENT_HISTORY_INVALID
+        )
+        # Surrender never consults route history, so it still works.
+        prompt = request_party_exit(
+            self.player,
+            record.session_id,
+            record.round_revision,
+            PARTY_EXIT_SURRENDER,
+        )
+        self.assertEqual(prompt["operation"], PARTY_EXIT_SURRENDER)
+
 
 class PartyExitConfirmationTests(PartyExitFixture):
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
@@ -237,6 +267,72 @@ class PartyExitConfirmationTests(PartyExitFixture):
                 )
                 self.assertTrue(is_in_active_session(self.player))
                 self.assertEqual(read_session(self.player).round_revision, 1)
+
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    @covers_requirement("player-combat-session::successful-retreat-carries-the-entire-present-party-and-counts-one-round")
+    def test_the_prompt_binds_the_captured_route_and_a_late_lock_falls_back(self):
+        self._engaged_with_pending_draft()
+        other = create_object(Room, key="route other")
+        out = create_object(
+            Exit, key="out", location=self.room, destination=other
+        )
+        back = create_object(
+            Exit, key="back", location=other, destination=self.room
+        )
+        record_completed_edge(
+            self.player,
+            PhysicalEdge(
+                source=location_ref(other),
+                destination=location_ref(self.room),
+                route=f"exit:{int(back.pk)}",
+            ),
+        )
+        record = read_session(self.player)
+        prompt = request_party_exit(
+            self.player,
+            record.session_id,
+            record.round_revision,
+            PARTY_EXIT_RETREAT,
+        )
+        self.assertEqual(
+            prompt["route"],
+            encode_physical_edge(
+                PhysicalEdge(
+                    source=location_ref(self.room),
+                    destination=location_ref(other),
+                    route=f"exit:{int(out.pk)}",
+                )
+            ),
+        )
+        # The captured gate locks after the prompt: the token still binds the
+        # unchanged history and execution takes the lawful fallback edge.
+        back.locks.add("traverse:false()")
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            result = confirm_party_exit(
+                self.player,
+                prompt["session_id"],
+                prompt["round_revision"],
+                prompt["operation"],
+                prompt["confirmation_token"],
+            )
+        self.assertEqual(result["outcome"], "fled")
+        self.assertIs(self.player.location, other)
+        # A committed receipt replayed after a new arrival session can never
+        # mutate that new session.
+        arrival = _monster("arrival goblin")
+        arrival.location = other
+        engage(self.player, arrival)
+        current = to_storage(read_session(self.player))
+        with self.assertRaises(CombatSessionError) as ctx:
+            confirm_party_exit(
+                self.player,
+                prompt["session_id"],
+                prompt["round_revision"],
+                prompt["operation"],
+                prompt["confirmation_token"],
+            )
+        self.assertEqual(ctx.exception.args[0], SessionReason.UNKNOWN_SESSION_ID)
+        self.assertEqual(to_storage(read_session(self.player)), current)
 
 
 class ConfirmedSurrenderTests(PartyExitFixture):
