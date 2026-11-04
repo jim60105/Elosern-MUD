@@ -252,7 +252,8 @@ class HuntAcceptanceTests(
     # -- sparse acceptance --------------------------------------------------
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_an_undersupplied_hunt_accepts_without_creating_a_target(self):
         before = self._population_state()
@@ -265,7 +266,8 @@ class HuntAcceptanceTests(
         self.assertEqual(self._population_state(), before)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_a_hunt_wider_than_one_cell_accepts_without_generating_members(self):
         self.assertGreater(WIDE_QUANTITY, self.zone.cell_capacity)
@@ -279,6 +281,9 @@ class HuntAcceptanceTests(
         )
         self.assertEqual(self._population_state(), before)
 
+    @covers_requirement(
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
+    )
     def test_an_undersupplied_hunt_still_resolves_habitat_guidance(self):
         # Owner-backed integration: the real source resolver and the real birth
         # geometry decide the habitat cell, not a patched projection.
@@ -307,6 +312,9 @@ class HuntAcceptanceTests(
         # Guidance created no individual and wrote no population state.
         self.assertEqual(self._population_state(), before)
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources"
+    )
     def test_a_species_with_no_authored_source_is_rejected_at_publication(self):
         before = dict(QUEST_DEFINITION_REGISTRY)
         with self.assertRaises(QuestDefinitionError):
@@ -374,7 +382,7 @@ class HuntAcceptanceTests(
     # -- accepted-record atomicity -----------------------------------------
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_failure_after_the_record_write_restores_the_cached_log(self):
         # Acceptance owns an outer transaction, so it also owns the in-process
@@ -405,6 +413,9 @@ class HuntAcceptanceTests(
 
     # -- removed provisioning ----------------------------------------------
 
+    @covers_requirement(
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
+    )
     def test_no_provisioning_module_or_helper_survives(self):
         self.assertIsNone(
             importlib.util.find_spec("world.maps.monster_provisioning")

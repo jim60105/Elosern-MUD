@@ -1232,8 +1232,16 @@ gains no field.
 | `…test_a_post_provisioning_write_failure_rolls_back_everything` | rollback of provisioned individuals | `test_the_board_rolls_back_the_record_when_the_affinity_write_fails` and the retained cached-log restore test; no population surface is written to roll back |
 | `world.maps.tests.test_monster_provisioning.*` | owner-level provisioning guarantee | acceptance/population-state assertions in `test_species_hunt_acceptance`; the module is deleted |
 
-Delta requirements are unarchived, so the tests below carry **no**
-`covers_requirement` annotation. Hand-off for the archive step:
+Delta requirements carry no canonical identifier until the archive sync puts
+them into `openspec/specs/`; the tests below therefore ran unannotated during
+the slice. The archive step attached the tool-generated post-sync identifiers
+recorded here. Two judgments went beyond the hand-off list:
+`test_each_region_species_pair_is_advertised_once` was left unannotated because
+its single assertion (distinct region/species pairs) establishes no clause of
+either replacement requirement, and `test_a_definition_that_is_not_a_clear_out_is_always_available`
+lost its retired identifier without a replacement because it exercises only the
+availability predicate and accepts nothing. Every other site was re-mounted
+one by one onto the scenario its assertions establish:
 
 | Test | Delta requirement and scenario |
 | --- | --- |

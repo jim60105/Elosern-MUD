@@ -302,6 +302,9 @@ class RegionalHuntSupplySourceTests(_ShippedCatalogTestCase):
     twice.
     """
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources"
+    )
     def test_every_published_hunt_names_a_lawful_authored_source(self):
         hunts = _regional_hunts()
         self.assertTrue(hunts)
@@ -319,6 +322,9 @@ class RegionalHuntSupplySourceTests(_ShippedCatalogTestCase):
                     {_region_key(definition)},
                 )
 
+    @covers_requirement(
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources"
+    )
     def test_selected_variants_come_from_the_hunts_own_sources(self):
         for key, definition in _regional_hunts().items():
             objective = definition.stages[0].objective

@@ -657,7 +657,8 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
         self.assertNotIn("hunt-stronger-only", QUEST_DEFINITION_REGISTRY)
 
     @covers_requirement(
-        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_hunt_supply_sources_resolve_authored_zone_and_site_sources(self):
         sources = hunt_supply_sources(
@@ -678,7 +679,8 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
             self.assertEqual(source.variant_keys, expected_variants)
 
     @covers_requirement(
-        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector"
+        "quest-blueprint::species-hunt-objectives-carry-a-validated-region-species-variant-selector",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_hunt_supply_sources_require_a_matching_region_and_ordinary_variant(self):
         variants = (_HUNT_ORDINARY, _HUNT_STRONGER)
@@ -694,7 +696,8 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
         )
 
     @covers_requirement(
-        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_a_hunt_whose_species_has_no_authored_source_is_rejected(self):
         before = dict(QUEST_DEFINITION_REGISTRY)
@@ -716,7 +719,8 @@ class SpeciesHuntDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
         self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), before)
 
     @covers_requirement(
-        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field",
+        "quest-blueprint::published-regional-hunts-require-lawful-authored-sources",
     )
     def test_a_hunt_wider_than_one_cell_still_registers(self):
         zone = next(iter(SYNTH_ECOLOGY_ZONES.values()))

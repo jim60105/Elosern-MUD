@@ -314,7 +314,7 @@ class SiteClearOutAcceptanceTests(
     # -- the guarantee and the stage-zero binding ---------------------------
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     @covers_requirement(
         "monster-site-placement::a-site-s-living-individuals-are-the-quest-layer-s-binding-source-and-no-quest-may-create-or-recover-a-site"
@@ -343,7 +343,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(len(self._living(NEST)), self.sites[NEST].capacity)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_the_returned_record_is_the_persisted_bound_record(self):
         # The binder performs the acceptance's second full quest-log write, so a
@@ -363,7 +363,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(stored["stage_room_id"], None)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_binding_survives_the_site_clearing_without_generating_members(self):
         self._settle()
@@ -389,7 +389,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(self._monster_pks(), monsters_before)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_cleared_one_shot_site_refuses_permanently(self):
         self._settle()
@@ -410,7 +410,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(self._monster_pks(), monsters_before)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_cleared_recoverable_site_refuses_until_the_clock_recovers_it(self):
         self._settle()
@@ -443,7 +443,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(set(record.objective_target_ids), fresh)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_never_populated_site_refuses_and_stays_unpopulated(self):
         self.assertIsNone(site_state(NEST, wilderness=self.wilderness))
@@ -458,7 +458,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(self._living(NEST), [])
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_site_holding_fewer_living_individuals_refuses_as_short(self):
         self._settle()
@@ -475,7 +475,7 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(self._occupancy(), occupancy_before)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_a_failure_after_the_record_write_leaves_no_record_and_no_binding(self):
         from world.quests import transitions
@@ -513,7 +513,7 @@ class SiteClearOutAcceptanceTests(
         self.assertTrue(later.objective_target_ids)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     @covers_requirement(
         "quest-blueprint::a-site-clear-out-names-an-authored-site-and-binds-that-site-s-own-living-individuals"
@@ -551,7 +551,7 @@ class SiteClearOutAcceptanceTests(
     # -- the shared predicate ----------------------------------------------
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_the_binding_and_the_refusal_are_boundary_observable(self):
         prose = r"[\u4e00-\u9fff]"
@@ -628,7 +628,7 @@ class SiteClearOutAcceptanceTests(
                 self.assertNotRegex(str(text), prose)
 
     @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+        "quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning"
     )
     def test_the_predicate_and_the_refusal_agree_for_every_reason(self):
         definition = self._definition(self.nest_key)
@@ -687,9 +687,6 @@ class SiteClearOutAcceptanceTests(
             {member.pk for member in self._living(BOSS)},
         )
 
-    @covers_requirement(
-        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
-    )
     def test_a_definition_that_is_not_a_clear_out_is_always_available(self):
         self.assertTrue(site_clear_out_available(self._definition(self.plain_key)))
         self.assertIsNone(site_clear_out_refusal(self._definition(self.plain_key)))

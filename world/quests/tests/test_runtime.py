@@ -238,7 +238,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             accept(self.player, registered.key)
         self.assertEqual(self.player.db.quest_log, before)
 
-    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    @covers_requirement("quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning")
     def test_terminal_quest_may_be_retried_deterministically(self):
         registered = register(quest("retryable"))
         record = accept(self.player, registered.key)
@@ -251,7 +251,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(states["retryable:1"]["state"], "failed")
         self.assertEqual(states["retryable:2"]["state"], "in_progress")
 
-    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    @covers_requirement("quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning")
     def test_acceptance_under_a_registered_issuance_stores_the_key(self):
         registered = register(quest("issued_accept"))
         record = accept(self.player, registered.key)
@@ -260,7 +260,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             read_records(self.player)[0].issuer_key, TEST_ISSUER_KEY
         )
 
-    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    @covers_requirement("quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning")
     def test_acceptance_under_an_unregistered_issuance_is_rejected(self):
         registered = register(quest("unregistered_issuer"))
         before = list(self.player.db.quest_log)
@@ -273,7 +273,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
             accept_quest(self.player, registered.key, "bogus")
         self.assertEqual(self.player.db.quest_log, before)
 
-    @covers_requirement("quest-lifecycle::accept-quest-creates-one-deterministic-active-record")
+    @covers_requirement("quest-lifecycle::quest-acceptance-persists-validated-records-without-ordinary-provisioning")
     def test_same_definition_held_twice_under_different_issuers(self):
         registered = register(quest("two_issuers"))
         # QuestRegistryIsolation does not cover the offer registry; this test
