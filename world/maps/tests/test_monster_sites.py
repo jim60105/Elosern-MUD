@@ -292,7 +292,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 },
             )
         )
-        monster_sites.register_monster_site_lifecycle()
+        from world.maps.population_lifecycle import register_regional_population
+
+        register_regional_population()
         self.addCleanup(clock_module._EVENT_SOURCES.pop, SITE_STAGE_KIND, None)
 
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
@@ -311,10 +313,29 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             return settle_monster_sites(0, end_tick)
 
     def _defeat(self, site: MonsterSite) -> tuple[int, ...]:
+        """Defeat every member and record each committed loss occurrence."""
+        from world.maps import regional_population
+        from world.rules.clock import read_world_clock
+
+        clock = read_world_clock()
+        tick = 0 if clock is None else clock.tick
         defeated = []
         for member in _members(self.wilderness, site):
+            before = regional_population.presence_of(self.wilderness, member)
             member.traits.hp.current = 0
             defeated.append(member.pk)
+            regional_population.record_population_transition(
+                self.wilderness,
+                regional_population.PopulationTransition(
+                    source_id=f"test-defeat:{member.pk}",
+                    individual_id=int(member.pk),
+                    occurred_tick=tick,
+                    before=before,
+                    after=regional_population.presence_of(
+                        self.wilderness, member, alive=False
+                    ),
+                ),
+            )
         return tuple(defeated)
 
     # -- population ---------------------------------------------------------
@@ -811,7 +832,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.clock.advance(60, AdvanceSource.SKIP, [])
         state = site_state(NEST_KEY, wilderness=self.wilderness)
         self.assertEqual(state.state, SITE_STATE_CLEARED)
-        self.assertEqual(state.cleared_at_tick, 60)
+        # The clearing boundary is the committed loss occurrence, never the
+        # interval end the advance happened to stop at.
+        self.assertEqual(state.cleared_at_tick, 0)
 
         # A full game day later, on re-entry, and on the startup sync path the
         # one-shot site creates nothing: the defeated rows stay dead in place.
@@ -881,7 +904,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.clock.advance(60, AdvanceSource.SKIP, [])
         state = site_state(NEST_KEY, wilderness=self.wilderness)
         self.assertEqual(state.state, SITE_STATE_CLEARED)
-        self.assertEqual(state.cleared_at_tick, 120)
+        self.assertEqual(state.cleared_at_tick, 60)
 
     @covers_requirement("monster-site-placement::one-shot-sites-stay-cleared-and-recoverable-sites-recover-only-on-approved-conditions")
     @covers_requirement("monster-site-placement::placement-decisions-are-boundary-observable-through-the-facade")
@@ -909,7 +932,10 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             SITE_STATE_CLEARED,
         )
 
-        tick = self.clock.tick + 1800
+        tick = (
+            site_state(CAMP_KEY, wilderness=self.wilderness).cleared_at_tick
+            + self.sites[CAMP_KEY].recover_after_ticks
+        )
         with (
             patch("world.maps.monster_sites.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
@@ -945,7 +971,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(context["site"], CAMP_KEY)
         self.assertEqual(context["variant"], tuple(camp_variants))
         self.assertEqual(context["tick"], tick)
-        self.assertEqual(context["cleared_at_tick"], 60)
+        self.assertEqual(context["cleared_at_tick"], 0)
 
     def test_rejected_recovery_attempts_emit_one_warn_event(self):
         self._settle()
@@ -1513,7 +1539,9 @@ class MonsterSiteStageWithoutWorldTests(EvenniaTest):
     """The stage is silent while no wilderness script exists."""
 
     def test_settlement_and_contract_are_absent_tolerant(self):
-        monster_sites.register_monster_site_lifecycle()
+        from world.maps.population_lifecycle import register_regional_population
+
+        register_regional_population()
         self.addCleanup(clock_module._EVENT_SOURCES.pop, SITE_STAGE_KIND, None)
         self.assertFalse(search_script(WILDERNESS_NAME))
         with (

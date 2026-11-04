@@ -179,7 +179,9 @@ class SiteClearOutAcceptanceTests(
                 },
             )
         )
-        monster_sites.register_monster_site_lifecycle()
+        from world.maps.population_lifecycle import register_regional_population
+
+        register_regional_population()
         self.addCleanup(clock_module._EVENT_SOURCES.pop, monster_sites.SITE_STAGE_KIND, None)
 
         self.char1.race = "human"

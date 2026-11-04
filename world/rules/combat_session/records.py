@@ -7,6 +7,7 @@ serialization, session identity, and the active-session read predicates.
 """
 
 import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +28,14 @@ _RECORD_FIELDS = frozenset(
         "draft_version",
         "draft_entries",
         "confirmed_actors",
+        # The combat occurrence and battlefield evidence: the game-time tick
+        # the encounter began, and the exact wilderness cell the party stood
+        # on (``None`` for abstract or staged nonwilderness combat). A
+        # later-round loss is placed at ``started_tick + completed_round *
+        # round seconds`` and the cell stays protected independently of any
+        # pooled room identity.
+        "started_tick",
+        "population_cell",
         # The encounter's authoritative occurrence identity. Every committed
         # combat action, upkeep milestone and terminal outcome is keyed by it,
         # so a persisted session without one is not a valid session: it is
@@ -81,6 +90,8 @@ class CombatSessionRecord:
     # no round reads them back as a gate and none of them mutates physiology.
     initial_sleep_ids: tuple[int, ...] = ()
     sleep_transitions: tuple["SleepTransition", ...] = ()
+    started_tick: int = 0
+    population_cell: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -277,6 +288,36 @@ def _parse_sleep_transitions(raw: Any) -> tuple[SleepTransition, ...]:
     return tuple(transitions)
 
 
+def _parse_population_cell(raw: Any) -> dict[str, Any] | None:
+    """Strictly parse the battlefield cell: ``None`` or one wilderness cell.
+
+    No current-tick or current-room fallback exists: a record either carries
+    the exact cell its engagement happened on, or carries none at all.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION, "population_cell must be a dict or None"
+        )
+    unknown = set(raw) - {"wilderness", "x", "y"}
+    missing = {"wilderness", "x", "y"} - set(raw)
+    if unknown or missing:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "population_cell must carry exactly wilderness, x and y",
+        )
+    wilderness = raw["wilderness"]
+    if not isinstance(wilderness, str) or not wilderness:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "population_cell.wilderness must be a non-empty string",
+        )
+    x = _require_int(raw["x"], "population_cell.x")
+    y = _require_int(raw["y"], "population_cell.y")
+    return {"wilderness": wilderness, "x": x, "y": y}
+
+
 def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
     """Strictly parse one storage dict, raising ``CombatSessionError`` on violations."""
     if not isinstance(data, dict):
@@ -348,6 +389,12 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         data.get("initial_sleep_ids", []), "initial_sleep_ids"
     )
     sleep_transitions = _parse_sleep_transitions(data.get("sleep_transitions"))
+    started_tick = _require_int(data["started_tick"], "started_tick")
+    if started_tick < 0:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION, "started_tick must be non-negative"
+        )
+    population_cell = _parse_population_cell(data["population_cell"])
     engagement_id = data["engagement_id"]
     if not isinstance(engagement_id, str) or not engagement_id:
         raise CombatSessionError(
@@ -374,6 +421,8 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         engagement_id=engagement_id,
         initial_sleep_ids=initial_sleep_ids,
         sleep_transitions=sleep_transitions,
+        started_tick=started_tick,
+        population_cell=population_cell,
     )
     _validate_participant_shape(record)
     return record
@@ -461,6 +510,10 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         ),
         "opening_first_actor": record.opening_first_actor,
         "initial_sleep_ids": list(record.initial_sleep_ids),
+        "started_tick": record.started_tick,
+        "population_cell": (
+            None if record.population_cell is None else dict(record.population_cell)
+        ),
         "sleep_transitions": [
             {
                 "round": transition.round_index,

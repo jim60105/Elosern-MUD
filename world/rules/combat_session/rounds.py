@@ -51,6 +51,7 @@ from world.rules.combat_session.scans import (
 )
 from world.rules.combat_session.settlement import (
     _continue_or_settle,
+    _ROUND_SECONDS,
     _settle_with_restore,
 )
 from world.rules.combat_session.snapshot import (
@@ -978,6 +979,13 @@ def _finalize_resolved_round(
         opening_first_actor=None,
     )
     _persist(actor, new_record)
+    _record_round_defeats(
+        new_record,
+        battlefield,
+        round_hp_before,
+        round_hp_after,
+        completed_round,
+    )
     _sweep_removed_markers(record, battlefield, new_fled_ids, new_knocked_out_ids)
     result = _continue_or_settle(
         actor, new_record, battlefield, logs, notification_count=len(notifications)
@@ -1000,6 +1008,64 @@ def _finalize_resolved_round(
 
     reconcile_session_memory(record.session_id)
     return result, notifications
+
+
+def _record_round_defeats(
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    hp_before: Any,
+    hp_after: Any,
+    completed_round: int,
+) -> None:
+    """Record one complete transition per newly defeated mapped opponent.
+
+    Only a real live-to-dead crossing of an enemy ``Monster`` in a mapped
+    wilderness session is a loss: a simulated exam, a knockout, a flee or a
+    participant that was already dead notifies nothing, and no participant is
+    replaced or appended. The occurrence tick is the session's own start plus
+    the completed-round offset, so a later-round defeat never borrows the
+    pre-combat tick as recovery headroom.
+    """
+    if record.population_cell is None:
+        return
+    from typeclasses.monsters import Monster
+    from world.maps import regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None:
+        return
+    cell = regional_population.coordinate_pair(
+        (record.population_cell.get("x"), record.population_cell.get("y"))
+    )
+    if cell is None or wilderness.db_key != record.population_cell.get("wilderness"):
+        return
+    enemies = set(record.enemy_ids)
+    occurred_tick = record.started_tick + completed_round * _ROUND_SECONDS
+    engagement_id = record.engagement_id or record.session_id
+    for entity in battlefield.roster.values():
+        if not isinstance(entity, Monster):
+            continue
+        individual_id = int(entity.pk)
+        if individual_id not in enemies:
+            continue
+        if hp_before.get(individual_id, 0) <= 0:
+            continue
+        if hp_after.get(individual_id, 0) > 0:
+            continue
+        regional_population.record_population_transition(
+            wilderness,
+            regional_population.PopulationTransition(
+                source_id=f"{engagement_id}:round:{completed_round}:{individual_id}",
+                individual_id=individual_id,
+                occurred_tick=occurred_tick,
+                before=regional_population.presence_of(
+                    wilderness, entity, alive=True, cell=cell
+                ),
+                after=regional_population.presence_of(
+                    wilderness, entity, alive=False
+                ),
+            ),
+        )
 
 
 @checkpoint_owner

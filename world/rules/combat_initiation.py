@@ -106,6 +106,15 @@ def _candidate_record(
     from world.rules.party import combat_companions
 
     companions = [int(companion.pk) for companion in combat_companions(commander)]
+    # The candidate carries the same occurrence evidence a persisted engagement
+    # would: the actual current tick (read without creating the clock) and the
+    # commander's real wilderness cell, so a preview never invents a later
+    # defeat time or protects a pooled room.
+    from world.maps.regional_population import (
+        current_population_tick,
+        mapped_population_cell,
+    )
+
     return CombatSessionRecord(
         session_id=(
             session_id
@@ -120,6 +129,8 @@ def _candidate_record(
         knocked_out_ids=(),
         rounds_elapsed=0,
         exam_id=None,
+        started_tick=current_population_tick(),
+        population_cell=mapped_population_cell(commander),
     )
 
 

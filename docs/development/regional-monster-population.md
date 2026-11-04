@@ -1291,3 +1291,235 @@ Its traceability step reports exactly one uncovered identifier with 0 errors —
 `quest-blueprint::published-regional-species-hunts-are-legally-provisionable-in-their-authored-region`, which this delta removes — and stays red until the archive
 sync, following the archived `manual-monster-compositions` precedent. No retired
 or unrelated annotation was re-pointed.
+
+# Delayed regional recovery and the merged population lifecycle
+
+Developer document for the `regional-population-recovery` change. It extends the
+persistent owner with the chronological presence evidence, delayed recovery
+episodes, encounter protection and one merged clock coordinator. Zone and site
+authored rows remain the balance authority; nothing here duplicates their
+numbers, and tests use file-local synthetic zones.
+
+## Durable shapes
+
+`wilderness.db.population_timeline` is a whole-value JSON-safe mapping with
+exactly `settled_through_tick`, `transitions` and `protection`. The explicit
+seed initialization (`initialize_population_seed`) is the only creator of the
+empty value; any other missing, unknown-keyed, or structurally incomplete value
+is the owner's named `malformed_state` refusal, never a best-effort
+reconstruction.
+
+- `PopulationPosition(wilderness, x, y)` is the actual coordinate registration,
+  never a pooled room identity.
+- `PopulationPresence(alive, position, home_zone, site_key)` carries the
+  complete fact. A dead individual has no position; a living unregistered one
+  may have none. All four keys are required on read.
+- `PopulationTransition(source_id, individual_id, occurred_tick, before,
+  after)` is one committed presence change. `record_population_transition`
+  deduplicates by `(source_id, individual_id)` while pending.
+- `PopulationProtection(engagement_id, cell, start_tick, end_tick)` is an
+  inclusive closed interval, or an open interval (`end_tick = None`) while the
+  session is active. An end before its start refuses.
+
+`record_population_transition` does nothing when the world has no explicit
+population seed (the population system is not provisioned there); a seeded
+world with a missing or malformed timeline refuses by name.
+
+## Projection and accounting
+
+`presence_at(wilderness, at_tick=…)` starts from the actual living state and
+reverses every still-pending transition whose occurrence is later than `tick`,
+in reverse chronological, stable source/individual order, using the complete
+before facts. A deleted individual is restored for accounting only: no row is
+recreated and no public presence is fabricated. `population_counts(…,
+at_tick=…)` derives the local, home-owned and per-cell measures from that
+projection, so a future loss never borrows headroom and a home-owned member
+lost outside its zone still consumes its home ceiling.
+
+`initialize_zone` already starts one wave loop; when it stops below the lower
+bound it now establishes the zone's first delayed episode at its initialization
+tick.
+
+## Recovery episodes
+
+`note_population_boundary(wilderness, zone, tick)` is the episode edge:
+
+- below the lower bound with no due time → `due = tick + recovery_delay`;
+- below with a pending due → unchanged (a further loss never restarts it);
+- at or above the lower bound → the episode is cleared with no birth, draw or
+  generation-sequence change.
+
+`settle_recovery_due(wilderness, zone, tick)` acts only at or after the due
+tick. It recomputes the living population first and cancels when the lower
+bound is reached. Otherwise it commits exactly one planned complete composition
+(the existing plan model: one composition, limited by local upper bound, home
+upper bound, cell capacity and wave budget) and sets the next due to
+`tick + replenishment_interval` while still deficient, or clears it. A lawful
+blockage (no legal space, protected cells, home saturation) creates nothing,
+leaves the generation sequence untouched, emits one bounded
+`monster_population_recovery_blocked` reason event on the outer commit, and
+retries at the next interval. Over-shooting the lower bound is lawful.
+
+## Merged chronological coordinator
+
+`world/maps/population_lifecycle.py` installs one coordinator under the existing
+`monster_site_lifecycle` stage kind. Per selected boundary it:
+
+1. establishes or cancels each zone's episode (zone-key order);
+2. settles the site owner's create/clear/recover decisions (site-key order), so
+   same-tick explicit site births precede ordinary births;
+3. re-evaluates every zone's episode from the post-site counts, so a same-tick
+   site birth cancels a pending due instead of leaving it to fire later;
+4. settles each due regional wave (zone-key order);
+5. consumes the applied transitions (`retain` keeps a deferred site clear's
+   loss evidence) and retires passed protection.
+
+Selected boundaries merge pending transitions, site boundaries, recovery due
+times and closed-protection end ticks. The interval is processed through
+`end_tick` (inclusive) and progress is persisted at the endpoint whether or not
+a boundary fell there, so equal elapsed time leaves equal due/sequence state and
+equal retirement. The pure `next_population_lifecycle_boundary` shares this
+planning and also projects an episode the settlement would establish from a
+loss already recorded at the interval start; it writes nothing and consumes no
+randomness. Any transitions or boundaries created inside settlement are picked
+up by the next boundary selection.
+
+`next_site_boundary` / `settle_monster_sites_at` are the site owner's pure and
+at-tick operations. A populated site's clear boundary is the committed loss
+occurrence of its last own member (never the interval end and never mere
+absence); while a persisted session still references the dead members the clear
+is deferred and the loss evidence is retained so the later clear keeps the true
+tick. An uninitialized site's creation boundary and a passed recovery due are
+re-evaluated at the interval start. Site creation and recovery are deferred
+while their coordinate is protected at the evaluated tick and retry on the
+first unprotected tick. `settle_monster_sites(start, end)` remains only as the
+site owner's chronological interval composition for its own tests; it is not
+registered as a stage and has no production caller.
+
+## Combat occurrence and protection
+
+`CombatSessionRecord` stores required `started_tick` and `population_cell`
+(`{wilderness, x, y}`, or `None` for staged nonwilderness combat); strict
+storage refuses a record without them and there is no current-tick or
+current-room fallback. Builders set them from the actual engagement: hostile
+engagements from the player's real wilderness cell, guild exams from their own
+start tick with no cell. Candidate previews carry the same fields and write
+nothing else.
+
+`_finalize_resolved_round` records each newly defeated enemy `Monster` inside
+the round transaction at `started_tick + completed_round * round_seconds`
+(six seconds per round from the combat rulebook), once per
+engagement/round/individual. Knockouts, flees, absent members, simulated exams
+and a replayed committed round record nothing.
+
+Every lawful session clear — terminal settlement, operator deletion of a
+participant, or startup restoration of a committed receipt — retains the
+session's exact cell and closed interval before the record disappears
+(`clear_session` owns the copy; the settlement's own call is deduplicated).
+Map births consult the durable timeline plus currently active strict sessions;
+an active session protects its cell from `started_tick`, and a closed interval
+blocks births through its inclusive endpoint.
+
+## Caller integrations
+
+`world/maps/gm.py::delete_entity` captures the complete pre-removal presence
+before deletion and records the removal with the actual tick, with the
+population surfaces in its compensation. `world/rules/gm.py` records only a
+real live/dead Monster HP crossing (explicit restoration included) and restores
+the owner surfaces on failure. `world/rules/movement_settlement.py::
+settle_relocation` records the exact old/new presence of a relocated Monster,
+retaining its home ownership. Quest scene and site placements arrive through
+`register_explicit_individual`, which records the arrival. An out-of-round
+action/upkeep commit records a real crossing once at its current tick; a round
+provenance owns its own occurrence and abstract encounters notify nothing.
+
+## Deviations recorded for review
+
+- A site's clear boundary uses the committed loss tick, not the interval end;
+  existing tests were updated to that contract, and a raw HP edit without
+  recorded evidence clears at the interval start it was observed at.
+- Site births are recorded as timeline arrivals through the explicit-placement
+  operation, so historical projection can tell that they did not stand earlier.
+- The coordinator is implemented and exercised but its **production
+  registration is intentionally deferred** to `regional-population-runtime-
+  cutover`, per design.md. Startup therefore registers no population stage in
+  this slice.
+
+## Assertion roles and requirement hand-off
+
+The archive sync assigned these canonical IDs. Every behavioural test below
+carries `covers_requirement` for the requirement its own assertions establish;
+the annotations were verified against the assertions, not the scenario names.
+
+| Requirement | Canonical ID |
+| --- | --- |
+| Deficits recover only through delayed game-time episodes | `regional-population::deficits-recover-only-through-delayed-game-time-episodes` |
+| Loss timing and encounter protection survive deferred combat settlement | `regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement` |
+| Population lifecycle replays loss and site boundaries chronologically | `regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically` |
+| Historical population evidence preserves removed ownership and cell protection | `regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection` |
+
+All tests live in `world/maps/tests/test_regional_population_recovery.py`.
+`D` = delayed episodes, `L` = loss timing and protection, `C` = chronological
+lifecycle, `H` = historical evidence.
+
+| Test | Requirement | Asserted mechanism |
+| --- | --- | --- |
+| `RecoveryLifecycleTests.test_a_loss_only_schedules_one_delayed_due_and_never_births_early` | D | one due at T+delay; no birth before it; the wave restores the band |
+| `…test_consecutive_waves_keep_the_budget_and_recover_eventually` | D | budgeted waves at positive authored intervals until recovered |
+| `…test_a_manual_restoration_cancels_without_a_birth_or_sequence_change` | D | cancellation leaves no birth, draw or sequence change |
+| `…test_an_operator_hp_restoration_cancels_through_the_real_gm_route` | D | the real GM HP route restores density and clears the episode |
+| `…test_equal_clock_advances_agree_under_any_partition` | D | equal elapsed time gives identical plans, sequence and due |
+| `…test_settlement_progress_agrees_under_partition` | D | settled-through progress agrees under partition |
+| `…test_the_pure_boundary_projects_an_unpersisted_episode` | D | the pending episode is projected without executing a writer |
+| `…test_reads_re_entry_and_acceptance_never_birth` | D | reads, room preparation and hunt acceptance neither birth nor reset the due |
+| `…test_a_later_combat_occurrence_is_never_earlier_birth_headroom` | L, H | the future loss is not headroom at 110; the 118 boundary starts due 128 and the removed member is still accounted |
+| `…test_a_round_defeat_is_recorded_at_its_round_offset` | L | occurrence tick is start + completed rounds; replay adds nothing |
+| `RealSessionRecoveryTests.test_a_real_session_persists_its_occurrence_and_protection` | L | a real session persists start/cell and protects its closed interval after the clear |
+| `…test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session` | L | a later-stage failure rolls back clock, wave, due and session together |
+| `…test_a_terminal_mapped_session_protects_its_closed_interval` | L, H | the closed interval is protected and survives a reload |
+| `…test_a_lawful_clear_still_retains_the_closed_protection` | L | a lawful clear keeps the closed protection |
+| `…test_a_protected_cell_blocks_the_due_wave_and_retries_next_interval` | L | a protected due births nothing and retries one positive interval later |
+| `…test_a_protected_cell_defers_site_births_until_it_passes` | L | the site route honours the same protection |
+| `…test_a_later_loss_after_a_restored_wave_starts_a_new_due` | C | a later loss after a restored wave creates its own due |
+| `…test_a_same_tick_site_birth_cancels_the_pending_episode` | C | the same-tick site birth cancels the pending episode under any partition |
+| `…test_a_later_site_recovery_never_consumes_the_earlier_wave` | C | the later site recovery cannot consume the earlier wave's headroom |
+| `…test_a_deferred_site_clear_keeps_the_loss_occurrence` | H | the committed loss tick survives the deferred clear |
+| `…test_a_deleted_home_member_still_counts_before_its_loss` | H | deleted home ownership still counts before its loss; distinct IDs stay separate |
+| `…test_operator_spawn_and_delete_are_counted_presence_evidence` | H | a GM spawn/delete commits actual registration and a complete transition |
+| `…test_an_operator_departure_keeps_home_ownership_and_schedules` | H | a lawful departure keeps home ownership and schedules the deficit |
+| `…test_incomplete_timeline_evidence_refuses` | H | incomplete or inverted serialized evidence refuses |
+
+Two dispositions from that audit:
+
+- `…test_reads_re_entry_and_acceptance_never_birth` is annotated for `D` only.
+  Its assertions establish "no read, view, re-entry or acceptance trigger";
+  they say nothing about evidence retention, so the earlier draft hand-off that
+  also named `H` there was dropped rather than kept for the gate.
+- Loss timing's nondeath half (a flee, absence or knockout is not a defeat) is
+  enforced by `_record_round_defeats`'s live-to-dead crossing test but has no
+  dedicated assertion; the same apply-run gap covers the mapped action-commit
+  route in `world/rules/action/transaction.py`, which no focused test drives.
+
+## Verification evidence (this change)
+
+Focused runs, each independently, from the worktree root with the single-token
+environment file `/tmp/mud-population-test.env` (`MUD_TEST_SETTINGS=1`):
+
+| Label | Result |
+| --- | --- |
+| `world.maps.tests.test_regional_population_recovery` | 24 tests, OK |
+| `world.maps.tests.test_regional_population` | 25 tests, OK |
+| `world.maps.tests.test_monster_sites` | 35 tests, OK |
+| `world.maps.tests.test_monster_provisioning` | 15 tests, OK |
+| `world.maps.tests.test_wilderness_population` | 33 tests, OK |
+| `world.maps.tests.test_gm` | 8 tests, OK |
+| `world.quests.tests.test_site_clear_out_acceptance` | 20 tests, OK |
+| `world.rules.tests.test_movement_settlement` | 18 tests, OK |
+| `world.rules.tests.test_combat_session_persistence` | 37 tests, OK |
+| `world.rules.tests.test_art_view` | 15 tests, OK |
+| `web.webclient.presentation.tests.test_creation_panel.test_presenter` | 14 tests, OK |
+
+`python -m tools.observability_lint check` → `violations=0`. Three
+`world.rules.tests.test_clock` errors/failure (unloaded settlement maps) and two
+`test_action_pipeline_atomicity` errors reproduce identically on master and are
+not caused by this change.

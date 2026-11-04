@@ -629,6 +629,11 @@ def start_guild_exam(
                 knocked_out_ids=(),
                 rounds_elapsed=0,
                 exam_id=exam_id,
+                # A staged guild exam is abstract nonwilderness combat: its
+                # occurrence tick is the exam's own start and it protects no
+                # wilderness cell.
+                started_tick=start_tick,
+                population_cell=None,
                 initial_sleep_ids=tuple(
                     sorted(
                         int(entity.pk)

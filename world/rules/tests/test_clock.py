@@ -978,7 +978,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
     @covers_requirement("world-clock::every-registered-boundary-stage-source-declares-the-durable-surfaces-it-may-write")
     def test_completeness_guard_writing_sources_declare_contracts(self):
         from world.maps.instance import register_instance_reclamation
-        from world.maps.monster_sites import register_monster_site_lifecycle
+        from world.maps.population_lifecycle import register_regional_population
         from world.narrative.correspondence import register_correspondence_delivery
         from world.quests.bootstrap import sync_quest_runtime
         from world.rules.caravan_arrivals import register_caravan_arrivals
@@ -989,7 +989,7 @@ class AdvanceSurfaceContractTests(EvenniaTest):
         register_caravan_arrivals()
         register_npc_schedules()
         register_instance_reclamation()
-        register_monster_site_lifecycle()
+        register_regional_population()
         register_correspondence_delivery()
         register_shop_hours()
         for kind in (

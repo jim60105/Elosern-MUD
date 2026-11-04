@@ -530,15 +530,11 @@ def at_server_start():
         "register_title_planner",
         lambda: _late("world.rules.titles", "register_title_planner"),
     )
-    # Every world-event clock source is registered before any startup
-    # operation can advance time (fix-startup-clock-source-order D1). The
-    # site-lifecycle source ships its advance-surface contract with it, and a
-    # startup advance in this window finds no wilderness script yet and
-    # settles nothing.
-    _startup_step(
-        "register_monster_sites",
-        lambda: _late("world.maps.monster_sites", "register_monster_site_lifecycle"),
-    )
+    # The merged population coordinator (sites + regional recovery) is
+    # implemented by regional-population-recovery but NOT registered here:
+    # design.md activates that registration only in the final runtime cutover,
+    # before restoration. Until then the coordinator is exercised by the
+    # owners' explicit registration in tests and by the cutover change.
     # Restore persisted combat sessions BEFORE wilderness population
     # reconciliation: a defeated population monster still referenced by a
     # committed session must not be deleted or respawned first

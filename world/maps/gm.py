@@ -73,6 +73,7 @@ def spawn_monster(species, variant, room):
 
 def delete_entity(target):
     from typeclasses.characters import PlayerCharacter
+    from world.maps import regional_population
     from world.rules import skip_safety
     from world.rules.combat_session.lifecycle import clear_session
     from world.rules.combat_session.records import read_session
@@ -80,6 +81,21 @@ def delete_entity(target):
     entity = resolve_target(target, {"monsters"})
     pk = entity.pk
     location = entity.location
+    # Capture the complete pre-removal presence before deletion destroys the
+    # object: a deleted away-home member must still consume its historical
+    # home headroom, and the local cell it occupied stays a truthful fact.
+    wilderness = regional_population.live_wilderness()
+    before_presence = (
+        regional_population.presence_of(wilderness, entity)
+        if wilderness is not None
+        else None
+    )
+    population_surfaces = (
+        regional_population.snapshot_population_surfaces(wilderness)
+        if wilderness is not None
+        else {}
+    )
+    removal_tick = regional_population.current_population_tick()
     registrations = dict(skip_safety._BATTLEFIELDS)
     battlefields = {id(field): (field, {key: obj.pk for key, obj in field.roster.items()}) for field in registrations.values()}
     sessions = []
@@ -100,6 +116,22 @@ def delete_entity(target):
             skip_safety.unregister_active_battlefield(entity)
             if not entity.delete():
                 raise RuntimeError("entity deletion refused")
+            if wilderness is not None and before_presence is not None:
+                regional_population.record_population_transition(
+                    wilderness,
+                    regional_population.PopulationTransition(
+                        source_id=f"operator-delete:{pk}:{removal_tick}",
+                        individual_id=pk,
+                        occurred_tick=removal_tick,
+                        before=before_presence,
+                        after=regional_population.PopulationPresence(
+                            alive=False,
+                            position=None,
+                            home_zone=before_presence.home_zone,
+                            site_key=before_presence.site_key,
+                        ),
+                    ),
+                )
     except Exception:
         _flush_deleted_instance(entity)
         # Restore the registration map before touching rosters: neither a stale
@@ -115,6 +147,8 @@ def delete_entity(target):
             actor.ndb.action_context = context
         if location is not None:
             location.contents_cache.init()
+        if wilderness is not None:
+            regional_population.restore_population_surfaces(population_surfaces)
         raise
     return {"target": target, "deleted": True, "room": f"#{location.pk}" if location is not None else None}
 

@@ -66,6 +66,10 @@ state SHALL then clear. A durable settled marker SHALL keep settlement idempoten
   roster (player, companions, and any non-defeated foe still present), so all participants receive
   gauge regen for the accumulated combat time
 
+#### Scenario: Population loss carries actual round offset
+- **WHEN** a mapped session records a defeat in a later round before terminal-only clock settlement
+- **THEN** the persisted start tick and completed-round offset identify its occurrence for delayed population settlement, without advancing the live clock early or double-settling rounds
+
 ### Requirement: The knocked-out player settles the session as defeat
 If the player is in the battlefield's knocked-out set at the round cap or
 when the round otherwise ends without a side eliminated, the session SHALL

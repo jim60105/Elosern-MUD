@@ -668,6 +668,23 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     # The committed identity of the position being left, copied before any
     # write (the same reason the coordinates above are captured here).
     source_identity = read_alignment_identity(entity)
+    # A relocated individual is population presence evidence too: the cell it
+    # leaves can lose local density and the cell it enters can restore it. The
+    # owner's own surfaces are captured before the move so a failed relocation
+    # restores the timeline with every other surface.
+    from typeclasses.monsters import Monster
+    from world.maps import regional_population
+
+    population_wilderness = source_wilderness or getattr(destination, "wilderness", None)
+    population_guard = None
+    if isinstance(entity, Monster) and population_wilderness is not None:
+        population_guard = (
+            population_wilderness,
+            regional_population.presence_of(
+                population_wilderness, entity, alive=True, cell=source_coordinates
+            ),
+            regional_population.snapshot_population_surfaces(population_wilderness),
+        )
     with publication_group(), settlement_scope(entity):
         snapshot = _snapshot_movement_state(
             entity,
@@ -719,9 +736,36 @@ def settle_relocation(entity: Any, destination: Any) -> None:
                     source_identity,
                     read_alignment_identity(entity),
                 )
+                if population_guard is not None:
+                    wilderness, before_presence, _surfaces = population_guard
+                    if getattr(destination, "wilderness", None) is None:
+                        # A hook-free operator move leaves the wilderness
+                        # registration behind: the coordinate registry is the
+                        # authoritative presence, so the departure is only
+                        # honest once the old registration is gone.
+                        wilderness.db.itemcoordinates.pop(entity, None)
+                    after_presence = regional_population.presence_of(
+                        wilderness, entity, alive=True
+                    )
+                    if after_presence != before_presence:
+                        tick = regional_population.current_population_tick()
+                        regional_population.record_population_transition(
+                            wilderness,
+                            regional_population.PopulationTransition(
+                                source_id=f"relocation:{entity.pk}:{tick}",
+                                individual_id=int(entity.pk),
+                                occurred_tick=tick,
+                                before=before_presence,
+                                after=after_presence,
+                            ),
+                        )
         except Exception:
             _compensate(snapshot)
             restore_attributes(entity, attrs)
+            if population_guard is not None:
+                regional_population.restore_population_surfaces(
+                    population_guard[2]
+                )
             raise
 
 
