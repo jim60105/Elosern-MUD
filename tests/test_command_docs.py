@@ -850,7 +850,12 @@ class CommandDocsContractTests(unittest.TestCase):
         combat_section = self.reference.split("## 戰鬥", 1)[1].split("### engage", 1)[0]
         self.assertIn("6 秒", combat_section)
         self.assertIn("不推進世界時間", combat_section)
-        self.assertIn("不會因回合流逝而自然醒來", combat_section)
+        # Interactive rounds still defer physiology; only the rules-owned
+        # enemy-only continuation pays real per-round time and may wake a
+        # forced sleeper at its threshold.
+        self.assertIn("互動回合", combat_section)
+        self.assertIn("敵方專屬回合", combat_section)
+        self.assertIn("六秒計費", combat_section)
         self.assertIn("沉睡中，無法行動", combat_section)
         overview = self.overview.split("## 戰鬥", 1)[1].split("## 技能施放", 1)[0]
         self.assertIn("終局結算", overview)
