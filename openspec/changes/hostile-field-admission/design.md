@@ -1,0 +1,75 @@
+# Design
+
+## Context
+
+`field_enemy_roster` already collects every living local Monster in numeric-ID order. `engage_group` is the staged opponent API and gates voluntary sleeping actors. `settle_forced_sleep_opening` is called by engagement and exams and currently declares zero-round defeat. Natural fatigue/wake is deferred until terminal settlement. These current contracts need explicit amendments.
+
+## Goals / Non-Goals
+
+Deliver immediate contact admission and real enemy turns for incapacitated allies. Forecasting a long skip belongs to the next change; admission at every accepted boundary already works here. Preserve voluntary sleep/movement gates and designated exams.
+
+## Decisions
+
+### Rules-only contact authority
+
+Create `world/rules/field_contact.py` with frozen `FieldContact(commander_id: int, location: LocationRef, tick: int, trigger_ids: tuple[int,...], source_id: str)`, pure `evaluate_field_contact(commander: Any, *, tick: int) -> FieldContact | None` and writer `admit_field_contact(commander: Any, contact: FieldContact) -> dict[str,Any] | None`. Conditions use explicit activity declarations: passive, contact, defended area and declared dayparts. A trigger selects admission, never roster membership. Revalidate actual location/time/condition under the existing serialized combat writer; an active session deduplicates admission.
+
+Factor validated session creation out of engage_group into an internal helper with explicit authority `voluntary` or `hostile_contact`. Only the rules owner may request hostile authority; client payloads cannot. Skip only the initiating voluntary sleep-action gate; retain party ownership/eligibility and collect field_enemy_roster independently of triggering IDs. Add no opening action, damage or initiative slot. Awake actors get normal editable draft choices. Exams retain their declared roster and FAIL policy.
+
+Invoke after player physical arrival, monster arrival and committed birth in an occupied idle cell, at relevant daypart/territory boundaries, and before authoritative time-consuming exploration mutations. Cover movement, field cast/item/use, wait/rest/sleep, study/camp and conversation-time owners; inventory shared entry points with CodeGraph so text/browser cannot bypass. Present contact admits before exploration effects/costs. Presentation/look/preview never admits combat. Traverse scope from movement-edge-history prevents early pooled-room relocation from admitting contact in passage. Walking continuation stops before another edge.
+
+At each lifecycle tick completed lawful arrivals and site/regional births precede contact; contact precedes idle departures. Equal facts sort owner/group/individual order. New protection prevents departure/reinforcement. Historical protection survives session close/catch-up; an escaped individual's protection ends at its real departure occurrence. No grace, cooldown or last-opponent flag.
+
+### Accepted sleep transitions
+
+Before interruptible-field-contact lands, include every next journey/decision/birth/condition boundary in the registered upcoming query. Existing interruptible callers therefore stop conservatively at the next maintenance tick and cannot pass a hostile contact. The next change replaces these conservative returns with the first relevant contact forecast, removing distant-maintenance interruptions. Never admit a past contact after settling physiology through a later requested endpoint.
+
+Add `interrupt_sleep_for_contact(body: Any, *, tick: int, operation_id: str) -> None` in existing sleep owner `time_skip.py`. Validate read_sleep_receipt, retain actual recovered reserve, change voluntary posture through write_fatigue_state, persist STATE_INTERRUPTED with progress through tick, and revoke owner/camp continuation through the current writers. Forced posture and receipt remain unchanged. Field_contact and presentation never write fatigue/receipts directly. No refill or defeated-body revival.
+
+Remove the hostile zero-defeat branch of settle_forced_sleep_opening and migrate callers/tests. Retain a narrowly named examination-only helper for existing exam FAIL. Voluntary engage and movement still reject sleeping initiation. Hostile admission does not grant the sleeping body action authority.
+
+### Real enemy-only rounds and paid-prefix cursor
+
+Add `continue_incapacitated_hostile_rounds(commander: Any) -> dict[str,Any]` to combat_session/rounds.py. For a nonterminal hostile session with no get_required_combat_actors, invoke existing run_round with empty allied selection, ordinary enemy policy/initiative/ActionResolver/upkeep and _finalize_resolved_round. Temporary action-blocking buffs also qualify. Stop immediately on an actionable ally, terminal result or existing cap. Never synthesize allied commands or convert sleep into defeat/knockout.
+
+Add strict serialized `settled_rounds: int`, 0 <= settled_rounds <= rounds_elapsed, to CombatSessionRecord, all builders and fixtures. Before automatic continuation, settle the unpaid accumulated combat prefix once at its logical endpoint. Each automatic round settles its next six seconds through sanctioned settle_combat_result and current population/protection source. Ordinary interactive rounds remain deferred. Terminal settlement pays only (rounds_elapsed-settled_rounds)*6; mental/posture accounting uses that same unsettled prefix. Retain historical round evidence for attribution. Cursor, clock and round revision commit atomically; restart/replay cannot bill twice.
+
+Extend canonical fatigue interval context with `allow_hostile_round_wake: bool = False`, true only for forced sleepers in these actual hostile enemy-only rounds. Preserve the authored 72000 threshold and receipt identity while narrowly allowing natural wake in this context. No new wake skill or refill. Apply gauge/physiology/upkeep exactly once to each paid prefix; terminal regen must not repeat it. An awake companion ends continuation under existing control rules, even while commander sleeps. Unused original skip duration supplies no automatic-round budget.
+
+### Publication and observability
+
+Clock sources admit the session and return its interactive event; they never recursively run enemy-only clock advances. The owning rules action invokes continue_incapacitated_hostile_rounds after the accepted WorldClock.advance has returned and persisted its endpoint, within the same outer durable/publication operation. A source invoked during a paid combat prefix cannot admit another session for that already engaged party.
+
+One outer publication group/transaction joins location arrivals, interrupted receipts, admission and automatic rounds to final actionable/terminal state. No actionable exploration frame between arrival and combat. Snapshot initiation/dialogue/skip-safety, full clock-source registry, room/coordinate, roster, physiology and receipt surfaces before earliest mutation. Restore on any later failure and re-raise with field_contact_failed. Add catalog commit event field_contact_admitted with source_id, commander, triggering/full enemy IDs, session, location and tick. Existing round/clock events identify paid rounds; reads emit none.
+
+## Risks / Trade-offs
+
+The zero-round defeat and live-wake prohibitions conflict with the approved target; deltas explicitly replace hostile incapacitation behavior. Requested retreat with no acting ally and examinations retain their own outcomes. A paid-prefix cursor avoids an engine-wide conversion of ordinary rounds to live fatigue.
+
+## Verification
+
+Register new `world.rules.tests.test_field_contact` and `world.rules.tests.test_hostile_incapacitated_rounds` in evennia-shards. Real A+A+B player/monster/birth contact admits all IDs once with no extra attack; passive/defended-area/daypart/read controls remain. Forced reserve71928 reaches72000 after one real six-second enemy round and becomes actionable. Test awake companion, all temporarily blocked party, defeat/cap, unpaid prefix, terminal replay and post-reserve/session fault restoration. Voluntary receipt interrupts without refill, forced receipt persists. Exams retain FAIL and voluntary sleep gates. Text/browser and both command docs expose identical authority and mode.
+
+## Implementation evidence contract
+
+Canonical IDs copied from traceability list output for the equivalent merged tree:
+
+- `hostile-field-contact::authored-hostile-contact-admits-immediate-ordinary-combat`, tasks1.1/4.1, test_field_contact.
+- `hostile-field-contact::hostile-sleep-interruption-preserves-accepted-body-state`, task2.1, sleep-receipt and contact tests.
+- `player-combat-session::incapacitated-hostile-parties-receive-normal-enemy-rounds`, task3.1, test_hostile_incapacitated_rounds.
+- `player-combat-session::combat-time-settles-once-at-terminal-session-outcome`, task3.1, paid-prefix and terminal replay controls.
+- `player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits`, tasks1.1/3.1, actual writer versus read controls.
+- `player-combat-session::live-rounds-do-not-simulate-natural-fatigue-or-awakening`, task3.1, ordinary-interactive versus paid-hostile intervals.
+- `player-combat-session::terminal-mental-accounting-records-actual-round-boundary-posture-intervals`, task3.1, exact interval accounting.
+- `player-combat-session::terminal-physiology-cannot-reverse-defeat-and-prompts-follow-aftermath`, task3.1, survivor/defeat controls.
+- `mental-reserve::posture-and-forced-sleep-hysteresis-are-body-scoped`, tasks2.1-3.1, threshold/receipt controls.
+
+Retire `player-combat-session::all-forced-sleep-engagement-enters-ordinary-zero-round-defeat`, obtained from the current-tree list output. Its hostile tests become substantive enemy-round tests; preserve exam FAIL assertions. Existing names remain for modified requirements, with their explicit new hostile-continuation exceptions.
+
+Create `/tmp/mud-field-tests.env` containing `MUD_TEST_SETTINGS=1` outside tracked source. Run one focused method/class at a time using the guarded command shown below; never concatenate the inventory or exceed 100 discovered tests. Register every new Python test module exactly once in `.github/evennia-shards.json`; new managed browser modules/methods belong exactly once in `.github/browser-shards.json`. Full managed-browser and complete traceability evidence remain CI-owned.
+
+`uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb <named-label>`
+
+Use canonical identifiers generated by `uv run --locked python -m tools.spec_traceability list`, never by concatenating names. For added/removed requirements, generate the equivalent merged specification tree outside Git and run the same tool with `--repo-root`; use its output before updating annotations. Preserve substantive assertion roles; delete retired claims without forwarding decorators, copy/data pin tests or waivers. Record requirement/scenario-to-test assertions and exercised evidence in `docs/development/monster-field-behaviour.md`. Human ecology/wording/visual judgment is reviewed there rather than asserted by shipped strings or counts.
+
+At implementation handoff run focused tests, `uv run --locked python -m tools.observability_lint check` alongside changed-logging tests, the existing command-doc contract whenever command docs change, `openspec validate <change> --strict` and `uv run --locked python -m tools.contract_gate`. These are future worker checks, not feature verification during proposal creation. Failure restores every owning durable/live surface and emits no committed success. No compatibility readers, migrations, hidden initialization of an existing save or reset-on-load.
