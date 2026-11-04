@@ -785,9 +785,27 @@ entity annotation or an exact target.
 The delta removes
 `wilderness-population-view::population-reads-share-materialization-decisions`
 and `wilderness-population-view::observation-identities-survive-materialization`
-and adds requirements that have no canonical ID until the archive sync, so the
-new and reshaped tests carry **no** `covers_requirement` annotation. This table
-is the hand-off: each test, its role, and the delta requirement/scenario it
+and adds two requirements that have no canonical ID in the checked-out main
+spec yet. Following `docs/development/spec-test-traceability.md`, the IDs were
+generated from an equivalent spec tree (the main specs with this delta applied)
+and the new tests are mounted to them **at the archive sync**, never before:
+
+- `wilderness-population-view::population-reads-report-actual-living-registrations`
+  ← `test_a_configured_cell_reports_nothing_until_an_individual_exists`,
+  `test_a_habitat_without_a_living_individual_reports_nothing`,
+  `test_every_actual_living_owner_is_reported_once_with_canonical_facts`,
+  `test_a_moved_individual_is_absent_from_its_former_cell`,
+  `test_repeated_reads_change_nothing`,
+  `test_population_view_does_not_construct_traits`,
+  `test_a_species_cell_reports_exactly_its_living_members`,
+  `test_a_protected_branch_migration_monster_stays_visible`.
+- `wilderness-population-view::observation-identity-belongs-to-persistent-individuals`
+  ← `test_identity_survives_activation_rename_and_reload`,
+  `test_a_same_label_birth_gets_a_fresh_identity`,
+  `test_a_same_label_replacement_gets_a_fresh_identity`.
+
+The retired IDs are not re-pointed to any live requirement. This table is the
+hand-off: each test, its role, and the delta requirement/scenario it
 establishes.
 
 | Test | Role | Delta requirement and scenario |
@@ -838,9 +856,14 @@ a different requirement to keep the local traceability gate green.
 | `… web.webclient.presentation.tests.test_area_map.WildernessAreaTests` | `Ran 15 tests ... OK` |
 | `… web.gm.tests.test_reader_monsters` | `Ran 12 tests ... OK` |
 | `… web.gm.tests.test_state_api.StateApiListFilterTests` | `Ran 2 tests ... OK` |
+| `uv run --locked python -m tools.spec_traceability --repo-root /tmp/omp-equiv-np8f_k9m list --json-output …/reqs.json` (equivalent tree outside Git: main specs + this delta, all test sources copied, new tests mounted to the generated IDs) | produced the two IDs quoted above |
+| `uv run --locked python -m tools.spec_traceability --repo-root /tmp/omp-equiv-np8f_k9m check` | `2702 requirements, 12332 associations, 2702 covered, 0 uncovered, 0 errors` |
 | `uv run --locked python -m tools.map_reference_context` | regenerated the source fingerprint after the `travel_interrupts` docstring change |
 | `uv run --locked python -m tools.observability_lint check` | `scanned=823 frozen=0 violations=0 exemptions=376` |
-| `uv run --locked python -m tools.contract_gate` | reference-context, observability, test-data, manifests and contracts pass; traceability reports the two requirements this delta REMOVES as uncovered with 0 errors until the archive sync replaces them |
+| `uv run --locked python -m tools.contract_gate` | reference-context, observability, test-data, manifests and contracts pass; in the checkout, traceability reports the two requirements this delta REMOVES as uncovered with 0 errors until the archive sync replaces them — the expected pre-sync state, superseded by the equivalent-tree evidence above |
+
+The temporary equivalent tree is a disposable directory outside the checkout,
+not a branch or a worktree; it is deleted after the check and never committed.
 
 No logging path changed (the touched modules only had docstrings updated); the
 observability lint ran because they are facade-adopter files. CI shards, the

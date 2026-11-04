@@ -956,11 +956,37 @@ class WildernessPopulationViewTests(EvenniaTest):
             member.traits.hp.current = 0
         settle_monster_sites(100, 200)
         self.assertEqual(site_state(site_key, wilderness=self.script).state, "cleared")
-        # A cleared and a due-but-unscheduled recovery are both absent.
+        # A cleared habitat is absent.
         self.assertEqual(
             [f for f in population_view(self.script, [cell]) if f.kind == "monster"], []
         )
-        self.assertEqual(site_state(site_key, wilderness=self.script).state, "cleared")
+
+        # A due recovery whose clock stage has not settled is still only a
+        # schedule: it stays a cleared, empty habitat. The recovery delay is
+        # synthetic because the site's authored lifecycle is not this test's
+        # subject.
+        site = sites[site_key]
+        states = {key: dict(value) for key, value in self.script.db.monster_sites.items()}
+        cleared_at = 199
+        states[site_key]["cleared_at_tick"] = cleared_at
+        self.script.db.monster_sites = states
+        import world.maps.monster_sites as monster_sites_module
+
+        with patch.object(
+            monster_sites_module,
+            "MONSTER_SITE_REGISTRY",
+            {**sites, site_key: replace(site, recover_after_ticks=1)},
+        ):
+            due = site_state(site_key, wilderness=self.script)
+            self.assertEqual((due.state, due.cleared_at_tick), ("cleared", cleared_at))
+            self.assertEqual(
+                [f for f in population_view(self.script, [cell]) if f.kind == "monster"],
+                [],
+            )
+            unchanged = site_state(site_key, wilderness=self.script)
+            self.assertEqual(
+                (unchanged.state, unchanged.cleared_at_tick), ("cleared", cleared_at)
+            )
 
     def test_population_view_does_not_construct_traits(self):
         # Create a Monster object with stored HP attributes but NO constructed trait handler

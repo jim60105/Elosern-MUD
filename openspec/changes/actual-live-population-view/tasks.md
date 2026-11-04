@@ -12,6 +12,23 @@ All tasks are future implementation work. Follow design.md verbatim for signatur
 
 ## 3. Slice handoff
 
-- [ ] 3.1 Run the focused labels in design.md, changed-logging observability lint, command documentation contract when applicable, `openspec validate actual-live-population-view --strict` and `uv run --locked python -m tools.contract_gate`; record actual evidence and the assertion-role/requirement mapping in the named developer document. Check: all required commands exit zero, new test ownership is exact, no retired annotations remain, and no unexecuted check is reported as passed. Do not run CI shard/full-browser or complete evidence verification locally.
+- [x] 3.1 Run the focused labels in design.md, changed-logging observability lint, command documentation contract when applicable, `openspec validate actual-live-population-view --strict` and `uv run --locked python -m tools.contract_gate`; record actual evidence and the assertion-role/requirement mapping in the named developer document. Check: all required commands exit zero, new test ownership is exact, no retired annotations remain, and no unexecuted check is reported as passed. Do not run CI shard/full-browser or complete evidence verification locally.
 
-  Blocked on the archive sync only: every focused label, `openspec validate --strict` and the observability lint pass, and `contract_gate` passes reference-context, test-data, manifests and contracts, but its traceability step reports exactly the two `wilderness-population-view` requirements this delta REMOVES as uncovered (`0 errors`) because the main spec still lists them until the delta is synced. No retired annotation was re-pointed to keep the gate green.
+  Evidence is recorded in `docs/development/regional-monster-population.md`
+  ("Actual live population view"): the focused labels (`WildernessPopulationViewTests`
+  10, `AmbientSpeciesReconciliationTests` 12, `HuntProvisioningTests` 11,
+  `test_travel_events` 35, `WildernessAreaTests` 15 with 1 skip,
+  `test_reader_monsters` 12, `StateApiListFilterTests` 2), the observability
+  lint (`violations=0`) and `openspec validate --strict` all pass. Because this
+  delta uses `## REMOVED Requirements`, the checkout's traceability gate
+  necessarily reports the two removed requirements as uncovered (`0 errors`)
+  until the archive sync; per `docs/development/spec-test-traceability.md` and
+  the `2026-10-31-retire-light-sword-style` precedent, the pre-sync evidence is
+  the equivalent spec tree outside Git (main specs + this delta, all test
+  sources copied, new tests mounted to the tool-generated IDs):
+  `uv run --locked python -m tools.spec_traceability --repo-root <equivalent-tree> check`
+  → `2702 requirements, 12332 associations, 2702 covered, 0 uncovered, 0 errors`.
+  The generated IDs (`wilderness-population-view::population-reads-report-actual-living-registrations`,
+  `…::observation-identity-belongs-to-persistent-individuals`) are mounted at
+  sync, not in the checkout; no retired annotation was re-pointed. The temporary
+  tree was deleted and never committed.
