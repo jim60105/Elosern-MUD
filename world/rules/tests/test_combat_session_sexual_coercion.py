@@ -158,10 +158,20 @@ def _resist_log(actor, target, *, resisted, auto_comply, roll):
         kind="sexual_resist",
         actor=str(actor.key),
         target=str(target.key),
+        actor_id=stable_actor_id(actor),
+        target_id=stable_actor_id(target),
         data={"resisted": resisted, "auto_comply": auto_comply, "roll": roll},
         text_template="{actor} 對 {target} 施加了強制行為。",
     )
-    return EventLog(str(actor.key), _T_LOG_SKILL, (str(target.key),), (entry,), 0)
+    return EventLog(
+        str(actor.key),
+        _T_LOG_SKILL,
+        (str(target.key),),
+        (entry,),
+        0,
+        actor_id=stable_actor_id(actor),
+        target_ids=(stable_actor_id(target),),
+    )
 
 
 class SexualCoercionBase(BattlefieldIsolation, EvenniaTest):

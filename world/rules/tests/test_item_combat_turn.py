@@ -91,7 +91,12 @@ _MANA_VIAL_PROFILE = ItemEffectProfile(
 )
 
 
-def _item_used_log(actor_key: str, item_key: str) -> EventLog:
+def _item_used_log(
+    actor_key: str,
+    item_key: str,
+    *,
+    actor_id: str | None = None,
+) -> EventLog:
     return EventLog(
         actor_key,
         item_key,
@@ -108,13 +113,24 @@ def _item_used_log(actor_key: str, item_key: str) -> EventLog:
                     "amount": 40,
                 },
                 "你使用了測試物品。",
+                actor_id=actor_id,
+                target_id=actor_id,
             ),
         ),
         6,
+        actor_id=actor_id,
+        target_ids=(actor_id,) if actor_id is not None else (),
     )
 
 
-def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
+def _attack_log(
+    actor_key: str,
+    target_key: str,
+    amount: int,
+    *,
+    actor_id: str | None = None,
+    target_id: str | None = None,
+) -> EventLog:
     return EventLog(
         actor_key,
         _ATTACK_SKILL_KEY,
@@ -126,9 +142,13 @@ def _attack_log(actor_key: str, target_key: str, amount: int) -> EventLog:
                 target_key,
                 {"amount": amount},
                 "{actor} 對 {target} 造成 {data[amount]} 點傷害。",
+                actor_id=actor_id,
+                target_id=target_id,
             ),
         ),
         6,
+        actor_id=actor_id,
+        target_ids=(target_id,) if target_id is not None else (),
     )
 
 
@@ -783,7 +803,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             item_calls.append((request, context))
             return ItemUseResult(
                 outcome="success",
-                event_log=_item_used_log("elf", _TONIC_KEY),
+                event_log=_item_used_log("elf", _TONIC_KEY, actor_id="fixture:elf"),
                 journal=sentinel,
             )
 
@@ -792,7 +812,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             self.defender.traits.hp.current = 0
             return SimpleNamespace(
                 outcome="success",
-                event_log=_attack_log("elf", "human", 120),
+                event_log=_attack_log("elf", "human", 120, actor_id="fixture:elf", target_id="fixture:human"),
             )
 
         used_item = {"done": False}
@@ -832,7 +852,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
                 self.field,
                 provider,
                 max_rounds=12,
-                commanded_actor="elf",
+                commanded_actor="fixture:elf",
                 commanded_action_kind="item",
                 commanded_action_key=_TONIC_KEY,
                 journal_sink=journals,
@@ -892,7 +912,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
             "elves",
             "humans",
             1,
-            commanded_actor="elf",
+            commanded_actor="fixture:elf",
             commanded_action_kind="item",
             commanded_action_key=_TONIC_KEY,
             commanded_window=logs,

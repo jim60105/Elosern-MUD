@@ -79,7 +79,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, record)
         self.assertEqual(
             sorted(str(k) for k in battlefield.teams["foes"]),
-            sorted([m1.key, m2.key]),
+            sorted([stable_actor_id(m1), stable_actor_id(m2)]),
         )
         # The player dominates both floor-tier foes, and still plays one
         # ordinary round: the opening seed resolved the named monster's

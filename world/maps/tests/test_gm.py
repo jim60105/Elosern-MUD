@@ -155,14 +155,17 @@ class MapConsoleTests(ConsoleOwnerTest):
         # unregister_participants' dbref guard anticipates).
         ghost=create_object('typeclasses.monsters.Monster',key='t_console_ghost',location=self.room1)
         ally=create_object('typeclasses.monsters.Monster',key='t_console_ally',location=self.room1)
-        stale=Battlefield(teams={'enemies':frozenset({stable_actor_id(ghost)}),'allies':frozenset({stable_actor_id(ally)})},roster={stable_actor_id(ghost):ghost,stable_actor_id(ally):ally})
+        ghost_id=stable_actor_id(ghost)
+        ally_id=stable_actor_id(ally)
+        stale=Battlefield(teams={'enemies':frozenset({ghost_id}),'allies':frozenset({ally_id})},roster={ghost_id:ghost,ally_id:ally})
         skip_safety.register_active_battlefield(stale)
         ghost.delete()
         self.assertIsNone(ghost.pk)
-        self.assertIn(str(ghost.key),stale.roster)
+        self.assertIn(ghost_id,stale.roster)
         engage(self.player,self.monster)
         field=skip_safety._BATTLEFIELDS[str(self.player.pk)]
         monster_pk=self.monster.pk
+        monster_id=stable_actor_id(self.monster)
         registrations=dict(skip_safety._BATTLEFIELDS)
         before=dict(self.player.db.active_combat)
         original=self.monster.delete
@@ -175,9 +178,9 @@ class MapConsoleTests(ConsoleOwnerTest):
         self.assertTrue(ObjectDB.objects.filter(pk=monster_pk).exists())
         self.assertEqual(skip_safety._BATTLEFIELDS,registrations)
         self.assertEqual(dict(self.player.db.active_combat),before)
-        self.assertIn(str(self.monster.key),field.roster)
-        self.assertNotIn(str(ghost.key),stale.roster)
-        self.assertIn(str(ally.key),stale.roster)
+        self.assertIn(monster_id,field.roster)
+        self.assertNotIn(ghost_id,stale.roster)
+        self.assertIn(ally_id,stale.roster)
 
 
 class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
