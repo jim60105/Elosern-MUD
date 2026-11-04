@@ -34,4 +34,4 @@ No proactive admission, contact forecast, new species, new abilities, compatibil
 
 depends-on: global-monster-activity
 
-Code conflicts: hostile-field-admission consumes this paid-prefix/continuation API and lands afterwards. Session/clock/physiology, test shard manifests and both command docs must serialize with later retreat. Existing archived regional owner, identity and whole-cell mechanisms are already satisfied prerequisites.
+Code conflicts begin with hostile-field-admission, which consumes this paid-prefix/continuation API and lands afterwards. Session/clock/physiology, test shard manifests and both command docs must serialize with later retreat. Existing archived regional owner, identity and whole-cell mechanisms are already satisfied prerequisites.

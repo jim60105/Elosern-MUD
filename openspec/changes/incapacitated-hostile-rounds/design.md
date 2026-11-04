@@ -20,7 +20,7 @@ Mapped monster participants use the preceding rules settle_monster_combat_throug
 
 Expose `continue_incapacitated_hostile_rounds(commander: Any) -> dict[str,Any]` in combat_session/rounds.py. Run only for a valid nonterminal hostile encounter with get_required_combat_actors empty. Use normal run_round with an empty allied provider, enemy deterministic policy/initiative/ActionResolver/upkeep and _finalize_resolved_round. Stop immediately when an ally can act, on ordinary terminal result or cap. No synthetic allied action and no defeat caused solely by sleep.
 
-Invoke from two writer paths. First, hostile canonical engagement replaces settle_forced_sleep_opening with continuation after session creation. Second, after every successfully confirmed ordinary round, _finalize_resolved_round/_continue_or_settle returns to the owning round orchestrator; that orchestrator re-reads current eligibility and invokes continuation before final publication if it lost the last actionable ally. This includes ordinary engage/cast-opened encounters. Implement a writer-local reentrancy guard: each automatic iteration finalizes once without recursively invoking the outer continuation hook. A finalizer returns a continuation-needed disposition; the outer serialized writer consumes it after the round savepoint, never a view/edit/reconnect read. Requested retreat's explicit no-acting-ally terminal branch remains separate.
+Invoke from two writer paths. First, hostile canonical engagement replaces settle_forced_sleep_opening with continuation after session creation. Second, after every successfully confirmed ordinary round, _finalize_resolved_round/_continue_or_settle returns to the owning round orchestrator; that orchestrator re-reads current eligibility and invokes continuation before final publication if it lost the last actionable ally. This includes ordinary engage/cast-opened encounters. Implement a writer-local reentrancy guard so each automatic iteration finalizes once without recursively invoking the outer continuation hook. A finalizer returns a continuation-needed disposition; the outer serialized writer consumes it after the round savepoint, never a view/edit/reconnect read. Requested retreat's explicit no-acting-ally terminal branch remains separate.
 
 Never advance recursively from a clock event source. Future hostile field admission returns an interactive event/session; its rules owner calls continuation after the accepted WorldClock.advance has returned and persisted its endpoint, inside the same outer durable/publication operation. Already engaged parties cannot admit another session during prefix settlement.
 
@@ -34,7 +34,7 @@ Round effects, unpaid-prefix clock/physiology, settled_rounds, session/draft, sk
 
 ## Risks / Trade-offs
 
-This separate slice reduces hostile-field-admission to contact authority and hooks. It must amend all terminal-only contracts together: player-combat-session, mental-reserve, world-clock CmdCast scenarios, party-time-settlement wake policy and field-combat-initiation opening-time scenarios. Terminal remainder means unpaid seconds, never accumulated seconds already paid.
+This separate slice reduces hostile-field-admission to contact authority and hooks. It must amend all terminal-only contracts together, which are player-combat-session, mental-reserve, world-clock CmdCast scenarios, party-time-settlement wake policy and field-combat-initiation opening-time scenarios. Terminal remainder means unpaid seconds, never accumulated seconds already paid.
 
 ## Verification
 
