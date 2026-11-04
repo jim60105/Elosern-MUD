@@ -824,3 +824,33 @@ class ContactSleepInterruptionTests(EvenniaTest):
         )
         self.assertEqual(read_fatigue_state(self.player).reserve_units, 50000)
         self.assertEqual(read_sleep_receipt(self.player), receipt)
+
+    def test_a_pending_owner_continuation_becomes_unresumable(self):
+        from world.rules.sleep_receipt import (
+            CONTINUATION_PAUSED,
+            CONTINUATION_PENDING,
+            read_sleep_view_decision,
+            read_sleep_view_generation,
+            write_sleep_view_decision,
+        )
+        from world.rules.time_skip import interrupt_sleep_for_contact
+
+        entry = enter_sleep(self.player, mode=MODE_DURATION, seconds=600)
+        write_sleep_view_decision(
+            self.player,
+            {
+                "generation": read_sleep_view_generation(self.player),
+                "sleep_id": entry.receipt.sleep_id,
+                "decision": "declined",
+                "continuation": CONTINUATION_PENDING,
+                "last_operation_id": None,
+            },
+        )
+        interrupt_sleep_for_contact(
+            self.player,
+            tick=int(get_world_clock().tick) + 60,
+            operation_id="test:revoke",
+        )
+        decision = read_sleep_view_decision(self.player)
+        self.assertEqual(decision["continuation"], CONTINUATION_PAUSED)
+        self.assertTrue(decision["interrupted"])
