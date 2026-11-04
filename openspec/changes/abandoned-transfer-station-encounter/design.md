@@ -48,7 +48,7 @@ Place the composition in the manual-site block of `_ENCOUNTER_COMPOSITION_DECLAR
 
 New `world/maps/tests/test_content_expansion_sites.py`, first line `"""Data-contract test: content-expansion manual sites production smoke over the generic site, grouping, engagement and one-shot contracts`. Fixture: real wilderness with `ElosernWildernessMapProvider` and an initialized population seed, following `world/maps/tests/test_monster_sites.py::MonsterSiteLifecycleTests.setUp` but using the shipped registries (no registry patching); the site key is read once into a module constant `SITE_KEY` from the shipped registry by its key. Class `TransferStationEncounterTests`, observations naming their defects:
 - Settling the site lifecycle at a tick populates the site's complete composition: three persisted individuals with distinct ids; the variants are the composition's rows (detects cycling/truncation).
-- The activity record holds exactly two site-owned groups: one with both goblin-row members bound to the row's cohesive activity and one with the rat bound to its solitary activity (detects whole-site grouping).
+- The site-owned groups in the activity record equal the shapes derived from the shipped declarations, `movement_units(<sampled rows>, composition_row_bindings(composition, site=site))`: same count, same member counts and same activity keys (detects whole-site grouping), without hard-coding member counts or variant keys in the test.
 - `engage_group` from a player in that cell opens one session whose enemy roster holds all three ids (detects partial admission); each enemy is a distinct target.
 - Defeating all three through the session settles one defeat per id in the kill accounting used by quest progress, a redelivered event adds nothing, and the site state becomes cleared (detects double credit or a lingering site).
 - After a committed reload, a later clock settlement, a site-state read and a clear-out quest acceptance attempt, the site stays cleared and no individual is created (detects one-shot restoration).
@@ -56,9 +56,11 @@ Register the module once in a `maps-*` shard of `.github/evennia-shards.json` (n
 
 ### D4. Review documentation
 
-Add "Content expansion sites" to `docs/development/regional-monster-population.md` (after the habitats subsection): why the cell reads as an abandoned transfer station on a hill transport route, co-location versus grouping, defended sub-areas, one-shot lifecycle, a note that future repeatable content declares its own lifecycle and is never restored by quest acceptance or map observation, and the smoke commands/results. No coordinate repetition.
+Add "Content expansion sites" to `docs/development/regional-monster-population.md` (after the habitats subsection): why the cell reads as an abandoned transfer station on a hill transport route, co-location versus grouping, defended sub-areas, one-shot lifecycle, that all three share one cell only until their first independent decisions, a note that future repeatable content declares its own lifecycle and is never restored by quest acceptance or map observation, and the smoke commands/results. No coordinate repetition.
 
 ## Risks / Trade-offs
+
+- [The groups roam independently once their first decisions fall due (60/90 ticks), and the site cell lies in the nest area but outside the rat's cache area] → whole-cell admission of all three is a property of the freshly populated site; the smoke engages before any decision is due, and D4 records this.
 
 - [No quest commission names the site yet] → the quest-acceptance observation uses the existing clear-out binding read (`site_living_members`) to show nothing restores the site.
 
