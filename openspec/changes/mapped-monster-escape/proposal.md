@@ -25,7 +25,7 @@ This is a bounded one-engineer-day slice. **BREAKING** where a current behavior 
 
 Consumes landed mechanisms: stable_actor_id and reconstruct_battlefield preserve identity; regional_population owns home/local counts and PopulationTransition history; site member_ids retain living absentees; population_lifecycle already registers the merged monster_site_lifecycle clock source. Whole-cell field_enemy_roster remains the admission roster.
 
-Attaches at world/rules/disengage.py::_handle_disengage, combat_session/rounds.py::_context_for and _finalize_resolved_round, new world/maps/monster_activity.py and existing population_lifecycle.py.
+Attaches at world/rules/disengage.py::_handle_disengage, combat_session/battlefield.py::_context_for and combat_session/rounds.py::_finalize_resolved_round, new world/maps/monster_activity.py and existing population_lifecycle.py.
 
 Baseline is current code and synced main specs, including the archived 2026-11-04 regional-population owner/recovery/runtime, manual compositions, actual-live views, combat identity and whole-cell admission changes. Historical design descriptions of coordinate slots and provisioning are superseded. `world/maps/monster_provisioning.py` and `world/clock/` do not exist; the active clock is `world/rules/clock.py`. Do not recreate removed paths.
 
