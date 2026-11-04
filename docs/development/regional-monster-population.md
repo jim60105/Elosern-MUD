@@ -196,10 +196,18 @@ Human reviewers should judge, in the declarations themselves:
 
 ## Assertion roles and requirement mapping
 
-Delta requirements live in `openspec/changes/regional-ecology-authoring/specs/regional-ecology/spec.md`
-and have no canonical IDs yet. The table below is the hand-off ledger; the
-tests are intentionally unannotated until the archive sync supplies IDs, and
-none of them pins shipped coordinates, densities, counts or prose.
+The delta requirements were synced into
+`openspec/specs/regional-ecology/spec.md` when this change was archived, which
+assigned the canonical IDs below. The table is the hand-off ledger, and every
+listed behavior test now carries `covers_requirement` annotations for the
+requirement it establishes; none of them pins shipped coordinates, densities,
+counts or prose.
+
+| Requirement | Canonical ID |
+| --- | --- |
+| Ecology declarations publish only complete valid bounded habitats | `regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats` |
+| Eligible birth area excludes inhabited settlement surroundings | `regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings` |
+| Density intervals permit complete unobstructed recovery | `regional-ecology::density-intervals-permit-complete-unobstructed-recovery` |
 
 ### Requirement: ecology declarations publish only complete valid bounded habitats
 
@@ -291,6 +299,8 @@ Run from the worktree root with the single-token environment file
 | `uv run --locked python -m tools.observability_lint check` | `scanned=822 frozen=0 violations=0 exemptions=374` |
 | `uv run --locked python -m tools.contract_gate` | `contract gate passed: reference-context, traceability, observability, test-data, manifests, contracts` |
 | `openspec validate regional-ecology-authoring --strict` | `Change 'regional-ecology-authoring' is valid` |
+| `scripts/openspec-gates.sh archive regional-ecology-authoring` (pre-archive) | traceability `2695 covered, 0 uncovered, 0 errors`; `openspec validate --all --strict` `444 passed, 0 failed` |
+| `scripts/openspec-gates.sh post-archive regional-ecology-authoring` (after the CLI sync and annotation repair) | traceability `2698 covered, 0 uncovered, 0 errors`; `openspec validate --all --strict` `444 passed, 0 failed` |
 
 No logging path changed in this slice; the observability lint was run because
 the changed map composition root participates in the facade-adopter set. CI

@@ -343,6 +343,9 @@ class EcologyCandidatePublicationTests(EvenniaTest):
             fingerprints=dict(self._shipped.fingerprints),
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_a_rejected_ecology_candidate_keeps_the_published_snapshot(self):
         before = geography.current()
         identity = before.identity
@@ -361,6 +364,9 @@ class EcologyCandidatePublicationTests(EvenniaTest):
         self.assertIs(geography.current(), before)
         self.assertEqual(geography.current().identity, identity)
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_overlapping_synthetic_zones_are_rejected(self):
         x, y, region_key = _birth_block()
         rectangle = (x, x + 1, y, y + 1)
@@ -385,6 +391,9 @@ class EcologyCandidatePublicationTests(EvenniaTest):
         self.assertIn(first.key, str(captured.exception))
         self.assertIn(second.key, str(captured.exception))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_eligibility_reads_the_candidate_settlement_geometry(self):
         x, y, region_key = _birth_block()
         zone, composition = _synthetic_zone(

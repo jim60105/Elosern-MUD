@@ -21,6 +21,8 @@ from unittest import mock
 
 from elosern_map_core.terrain import REGION_KEYS, TerrainDefinition, region_for_coordinates
 
+from tools.spec_traceability import covers_requirement
+
 from world.lore.anchors import Anchor, AnchorKind, GeographicAnchor
 from world.lore.monster_placement import (
     CompositionMember,
@@ -152,6 +154,9 @@ def _eligible(zone=None, *, anchors=(), entries=None, policies=None):
 class DensityBoundsTests(unittest.TestCase):
     """Requirement: density intervals permit complete unobstructed recovery."""
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_sparse_densities_round_the_interval_outward(self):
         # Independently known: ceil(25*5/100)=2 and floor(25*12/100)=3.
         self.assertEqual(density_bounds(25, 5, 12), (2, 3))
@@ -160,6 +165,9 @@ class DensityBoundsTests(unittest.TestCase):
         # ceil(2*50/100)=1 and floor(2*99/100)=1.
         self.assertEqual(density_bounds(2, 50, 99), (1, 1))
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_invalid_densities_and_empty_domains_are_rejected(self):
         cases = (
             (0, 1, 10),
@@ -182,6 +190,10 @@ class DensityBoundsTests(unittest.TestCase):
 class BirthGeometryTests(unittest.TestCase):
     """Requirement: eligible birth area excludes inhabited settlement surroundings."""
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings",
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats",
+    )
     def test_zone_geometry_is_exactly_its_bounded_rectangle(self):
         cells = _eligible()
         # Every cell of the rectangle is walkable land inside its region, and
@@ -190,6 +202,9 @@ class BirthGeometryTests(unittest.TestCase):
         self.assertNotIn((RECTANGLE[0] - 1, RECTANGLE[2]), cells)
         self.assertNotIn((RECTANGLE[1] + 1, RECTANGLE[3]), cells)
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_intersecting_rectangles_are_deduplicated_within_a_zone(self):
         overlapping = (11, 12, 11, 12)
         zone = _zone(rectangles=(RECTANGLE, overlapping))
@@ -197,6 +212,9 @@ class BirthGeometryTests(unittest.TestCase):
             _eligible(zone), tuple(sorted(_rectangle_cells(RECTANGLE)))
         )
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_rectangle_crossing_region_and_water_rules_keeps_only_its_region(self):
         # Row 15 is the invented river (water, still western_hills_valleys);
         # rows 16-17 lie in the next region. Only row 14 is both the zone's
@@ -206,6 +224,9 @@ class BirthGeometryTests(unittest.TestCase):
             _eligible(zone), ((10, 14), (11, 14), (12, 14), (13, 14))
         )
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_footprint_settlement_excludes_its_exterior_ring(self):
         # The town's two-cell footprint is (10,10)-(11,10); the one-cell
         # Chebyshev ring removes the six rectangle cells around it.
@@ -232,6 +253,9 @@ class BirthGeometryTests(unittest.TestCase):
         for excluded in ((10, 10), (11, 10), (12, 10), (10, 11), (11, 11), (12, 11)):
             self.assertNotIn(excluded, cells)
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_noncapital_and_a_capital_settlement_exclude_identically(self):
         entry = _entry(TOWN, ("##",), (10, 10))
         noncapital = _eligible(
@@ -245,6 +269,9 @@ class BirthGeometryTests(unittest.TestCase):
         self.assertEqual(noncapital, capital)
         self.assertNotIn((12, 10), noncapital)
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_point_settlement_uses_its_published_anchor_cell(self):
         # A point-shaped village at (14,12): distance is measured from the
         # anchor cell alone, excluding (13,11)-(13,13) inside the rectangle.
@@ -256,6 +283,9 @@ class BirthGeometryTests(unittest.TestCase):
         expected = _rectangle_cells() - {(13, 11), (13, 12), (13, 13)}
         self.assertEqual(cells, tuple(sorted(expected)))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_dungeon_anchor_receives_no_settlement_buffer(self):
         # A point-shaped dungeon straddling the rectangle would still be an
         # anchor-footprint-free point: no exclusion at all.
@@ -266,6 +296,9 @@ class BirthGeometryTests(unittest.TestCase):
         )
         self.assertEqual(cells, tuple(sorted(_rectangle_cells())))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_dungeon_footprint_is_removed_by_shared_validity_only(self):
         # An anchor footprint cell is never wilderness ground, so the shared
         # rule removes the two footprint cells; the neighbours stay eligible
@@ -278,6 +311,9 @@ class BirthGeometryTests(unittest.TestCase):
         expected = _rectangle_cells() - {(10, 10), (11, 10)}
         self.assertEqual(cells, tuple(sorted(expected)))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_an_explicit_policy_enlarges_the_buffer(self):
         entry = _entry(TOWN, ("##",), (10, 10))
         anchors = [(TOWN, AnchorKind.TOWN, (10, 10))]
@@ -294,6 +330,9 @@ class BirthGeometryTests(unittest.TestCase):
         )
         self.assertNotIn((12, 12), cells)
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_policy_below_the_generic_ring_is_rejected(self):
         entry = _entry(TOWN, ("##",), (10, 10))
         for buffer in (0, -3, True):
@@ -307,6 +346,9 @@ class BirthGeometryTests(unittest.TestCase):
                         },
                     )
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_the_candidate_entries_decide_the_footprint(self):
         # The same anchor and rectangle: only the candidate's own wilderness
         # entry can turn a distant anchor cell into an overlapping footprint.
@@ -318,6 +360,9 @@ class BirthGeometryTests(unittest.TestCase):
         self.assertEqual(without_entry, tuple(sorted(_rectangle_cells())))
         self.assertNotEqual(with_entry, without_entry)
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_map_less_settlement_uses_its_candidate_anchor_cell(self):
         near = _candidate([(TOWN, AnchorKind.TOWN, (14, 12))])
         far = _candidate([(TOWN, AnchorKind.TOWN, (0, 0))])
@@ -333,6 +378,9 @@ class BirthGeometryTests(unittest.TestCase):
         )
         self.assertEqual(far_cells, tuple(sorted(_rectangle_cells())))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_the_live_wilderness_registry_is_never_consulted(self):
         # A footprint over the whole rectangle in the published registry must
         # not change a candidate-denominated answer.
@@ -344,6 +392,9 @@ class BirthGeometryTests(unittest.TestCase):
             cells = _eligible()
         self.assertEqual(cells, tuple(sorted(_rectangle_cells())))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_a_policy_naming_a_nonsettlement_anchor_is_rejected(self):
         entry = _entry(DUNGEON, (".#.",), (11, 12))
         for anchor_key, kind in ((DUNGEON, AnchorKind.DUNGEON), ("t_unknown", None)):
@@ -376,6 +427,9 @@ class CandidatePublicationTests(unittest.TestCase):
     def test_a_complete_candidate_has_no_problem(self):
         self.assertEqual(self._problems({ZONE: _zone()}), ())
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_overlapping_zones_are_rejected_even_before_exclusions(self):
         first = _zone()
         second = _zone(key="t_fixture_other_zone", rectangles=((12, 15, 12, 15),))
@@ -384,11 +438,17 @@ class CandidatePublicationTests(unittest.TestCase):
         self.assertIn(ZONE, problems[0])
         self.assertIn(second.key, problems[0])
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_a_zone_outside_its_parent_region_is_rejected(self):
         other_region = next(key for key in REGION_KEYS if key != REGION)
         problems = self._problems({ZONE: _zone(region_key=other_region)})
         self.assertTrue(problems)
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_a_zone_with_no_eligible_cell_is_rejected(self):
         # The whole rectangle lies inside the town's one-cell ring.
         entry = _entry(TOWN, ("##",), (10, 10))
@@ -400,6 +460,9 @@ class CandidatePublicationTests(unittest.TestCase):
         )
         self.assertTrue(any("no eligible birth cell" in problem for problem in problems))
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_a_pool_with_no_complete_recovery_path_is_rejected(self):
         # E=16, densities 50/60 -> lower 8, upper 9. A three-individual group
         # cannot fit the two remaining headroom from seven living individuals,
@@ -413,6 +476,9 @@ class CandidatePublicationTests(unittest.TestCase):
         # One-individual compositions can always climb from seven to nine.
         self.assertEqual(self._problems({ZONE: zone}), ())
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_a_composition_above_the_upper_bound_is_rejected(self):
         # E=16, densities 1/10 -> lower 1, upper 1; a two-individual group can
         # never fit the only allowed total.
@@ -427,6 +493,9 @@ class CandidatePublicationTests(unittest.TestCase):
         problems = self._problems({ZONE: zone}, compositions={COMPOSITION: pair})
         self.assertTrue(any("above its upper bound" in problem for problem in problems))
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_a_pool_recovers_over_repeated_waves_and_may_overshoot_the_lower_bound(self):
         # E=20, densities 25/35 -> lower 5, upper 7. A three-individual group
         # recovers 0 -> 3 -> 6, which crosses the lower bound without landing
@@ -443,6 +512,9 @@ class CandidatePublicationTests(unittest.TestCase):
             self._problems({ZONE: zone}, compositions={COMPOSITION: group}), ()
         )
 
+    @covers_requirement(
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery"
+    )
     def test_headroom_is_proven_by_fitting_compositions_not_by_one_fixed_size(self):
         # The same E=20 at 25/30 gives lower 5, upper 6. Recovering from four
         # living individuals needs a one-individual increment, which the

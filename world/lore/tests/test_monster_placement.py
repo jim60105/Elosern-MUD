@@ -330,6 +330,9 @@ class EcologyDeclarationTests(unittest.TestCase):
                 **_ecology_faces(**faces),
             )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_composition_forms_resolve_their_explicit_ranges(self):
         # Solitary, repeated-variant and mixed compositions: the range totals
         # come from the declared member ranges alone, never from prose.
@@ -362,6 +365,9 @@ class EcologyDeclarationTests(unittest.TestCase):
         )
         self.assertEqual([row.weight for row in zone.pool], [1, 2, 3])
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_unknown_and_non_variant_references_are_rejected(self):
         self._reject(
             compositions={
@@ -373,6 +379,9 @@ class EcologyDeclarationTests(unittest.TestCase):
             compositions={COMPOSITION: _composition(members=(_member(SPECIES),))}
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_habitat_mismatch_is_rejected_for_a_pooled_member(self):
         mismatched = {SPECIES: _species_row(habitat_tags=(SPARE_REGION,))}
         self._reject(species_face=mismatched)
@@ -383,6 +392,9 @@ class EcologyDeclarationTests(unittest.TestCase):
             species_face={SPECIES: _species_row(habitat_tags=(REGION,))},
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_duplicate_keys_are_rejected(self):
         builders = (
             (
@@ -422,6 +434,9 @@ class EcologyDeclarationTests(unittest.TestCase):
             }
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_inverted_or_non_positive_counts_and_timings_are_rejected(self):
         zone_cases = (
             {"lower_density": True},
@@ -450,6 +465,9 @@ class EcologyDeclarationTests(unittest.TestCase):
                     compositions={COMPOSITION: _composition(members=(member,))}
                 )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_pool_weights_must_be_positive_and_reference_known_compositions(self):
         self._reject(
             zones={
@@ -466,6 +484,9 @@ class EcologyDeclarationTests(unittest.TestCase):
                     }
                 )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_bounded_geometry_must_be_inclusive_integer_rectangles(self):
         rectangles = (
             (),
@@ -479,6 +500,10 @@ class EcologyDeclarationTests(unittest.TestCase):
             with self.subTest(rectangles=geometry):
                 self._reject(zones={ZONE: _zone(rectangles=geometry)})
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats",
+        "regional-ecology::density-intervals-permit-complete-unobstructed-recovery",
+    )
     def test_a_complete_group_must_fit_cell_capacity_and_wave_budget(self):
         group = _composition(COMPOSITION, (_member(ORDINARY, 1, 4),))
         self._reject(
@@ -497,6 +522,9 @@ class EcologyDeclarationTests(unittest.TestCase):
             **_ecology_faces(),
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_policy_buffers_are_positive_and_keyed_by_their_anchor(self):
         for buffer in (0, -1, True, 1.0):
             with self.subTest(buffer=buffer):
@@ -517,6 +545,9 @@ class EcologyDeclarationTests(unittest.TestCase):
             **_ecology_faces(),
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_validation_is_pure_and_publishes_nothing(self):
         names = ("ENCOUNTER_COMPOSITION", "ECOLOGY_ZONE", "SETTLEMENT_BIRTH_POLICY")
         zones = {ZONE: _zone()}
@@ -578,6 +609,9 @@ class PublishedRegistryTests(unittest.TestCase):
         }
         self.assertEqual(public_callables, set(EXPECTED_PUBLIC_CALLABLES))
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_the_published_ecology_registries_are_read_only_proxies(self):
         # The birth-policy registry ships empty (every inhabited settlement
         # already gets the generic minimum ring), so only a populated registry
@@ -627,6 +661,9 @@ class PublishedRegistryTests(unittest.TestCase):
 class ShippedPlacementContentTests(unittest.TestCase):
     """The authored placement layer is coherent without naming a shipped key."""
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_every_shipped_row_validates_against_the_shipped_vocabularies(self):
         # The module-level call already ran at import; this re-runs the same
         # validation over the published rows, so a registry that ever ships an
@@ -666,6 +703,9 @@ class ShippedEcologyContentTests(unittest.TestCase):
             dict(_published("SETTLEMENT_BIRTH_POLICY")),
         )
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_every_shipped_zone_is_keyed_sparse_and_bounded(self):
         published = _published("ECOLOGY_ZONE")
         self.assertTrue(published)
@@ -679,6 +719,9 @@ class ShippedEcologyContentTests(unittest.TestCase):
                 # Automatic population can never occupy every eligible cell.
                 self.assertLess(zone.upper_density, 100)
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_every_shipped_composition_declares_complete_positive_ranges(self):
         for key, composition in _published("ENCOUNTER_COMPOSITION").items():
             with self.subTest(composition=key):
@@ -688,6 +731,9 @@ class ShippedEcologyContentTests(unittest.TestCase):
                 self.assertGreaterEqual(smallest, len(composition.members))
                 self.assertGreaterEqual(largest, smallest)
 
+    @covers_requirement(
+        "regional-ecology::ecology-declarations-publish-only-complete-valid-bounded-habitats"
+    )
     def test_every_shipped_pooled_member_belongs_to_its_zone_habitat(self):
         species = getattr(species_registry, "MONSTER_SPECIES" + "_REGISTRY")
         variants = getattr(species_registry, "MONSTER_VARIANT" + "_REGISTRY")
@@ -711,6 +757,9 @@ class ShippedEcologyContentTests(unittest.TestCase):
         }
         self.assertEqual(pooled, set(_published("ENCOUNTER_COMPOSITION")))
 
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
     def test_explicit_site_placement_never_reads_automatic_birth_geometry(self):
         # The design keeps explicit manual/quest placement outside automatic
         # birth exclusions and density while shared placement validity still
