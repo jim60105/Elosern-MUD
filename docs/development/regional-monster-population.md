@@ -785,10 +785,11 @@ entity annotation or an exact target.
 The delta removes
 `wilderness-population-view::population-reads-share-materialization-decisions`
 and `wilderness-population-view::observation-identities-survive-materialization`
-and adds two requirements that have no canonical ID in the checked-out main
-spec yet. Following `docs/development/spec-test-traceability.md`, the IDs were
-generated from an equivalent spec tree (the main specs with this delta applied)
-and the new tests are mounted to them **at the archive sync**, never before:
+and adds two requirements. Following
+`docs/development/spec-test-traceability.md`, the IDs were generated from an
+equivalent spec tree (the main specs with this delta applied) before archiving,
+and the new tests were annotated with them **at the archive sync**, once the
+CLI had written the requirements into the main spec:
 
 - `wilderness-population-view::population-reads-report-actual-living-registrations`
   ← `test_a_configured_cell_reports_nothing_until_an_individual_exists`,
@@ -798,7 +799,8 @@ and the new tests are mounted to them **at the archive sync**, never before:
   `test_repeated_reads_change_nothing`,
   `test_population_view_does_not_construct_traits`,
   `test_a_species_cell_reports_exactly_its_living_members`,
-  `test_a_protected_branch_migration_monster_stays_visible`.
+  `test_a_protected_branch_migration_monster_stays_visible`,
+  `test_supplementary_individuals_take_unique_slots_and_keep_them`.
 - `wilderness-population-view::observation-identity-belongs-to-persistent-individuals`
   ← `test_identity_survives_activation_rename_and_reload`,
   `test_a_same_label_birth_gets_a_fresh_identity`,

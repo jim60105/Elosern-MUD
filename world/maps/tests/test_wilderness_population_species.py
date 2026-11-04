@@ -364,6 +364,9 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
             Monster.objects.filter(pk=victim.pk).exists()
         )
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_a_species_cell_reports_exactly_its_living_members(self):
         # Cell PROBE has 2 living species monsters placed in setUp.
         members = _species_members(self.wilderness, PROBE)
@@ -393,6 +396,9 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
         ]
         self.assertEqual(projected, [(f"object:{survivor.pk}", survivor.key)])
 
+    @covers_requirement(
+        "wilderness-population-view::observation-identity-belongs-to-persistent-individuals"
+    )
     def test_a_same_label_replacement_gets_a_fresh_identity(self):
         # One variant fills both slots, so a replacement shares its label with
         # the survivor; identity is the persistent individual, never the slot.
@@ -454,6 +460,9 @@ class AmbientSpeciesReconciliationTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement(
         "wilderness-monster-population::population-reconciliation-never-destroys-an-active-session-participant",
+    )
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
     )
     def test_a_protected_branch_migration_monster_stays_visible(self):
         # A tier-example monster left at a coordinate an authored species rule

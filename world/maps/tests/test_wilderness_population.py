@@ -790,6 +790,9 @@ class WildernessPopulationViewTests(EvenniaTest):
         enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
         self.room = self.char1.location
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_a_configured_cell_reports_nothing_until_an_individual_exists(self):
         # The tier-example model still predicts a population here; a prediction
         # is not a living entity and must never surface as a fact.
@@ -808,6 +811,9 @@ class WildernessPopulationViewTests(EvenniaTest):
             [f"object:{materialized.pk}"],
         )
 
+    @covers_requirement(
+        "wilderness-population-view::observation-identity-belongs-to-persistent-individuals"
+    )
     def test_identity_survives_activation_rename_and_reload(self):
         cell = _empty_baseline_cell()
         monster = create_object(Monster, key="t_registered_beast")
@@ -854,6 +860,9 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.assertEqual(facts[0].label, "t_renamed_beast")
         self.assertEqual(facts[0].cell, cell)
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_repeated_reads_change_nothing(self):
         from django.db import connection
         from django.test.utils import CaptureQueriesContext
@@ -927,6 +936,9 @@ class WildernessPopulationViewTests(EvenniaTest):
             {"hp": {"base": 10, "current": 10}},
         )
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_a_habitat_without_a_living_individual_reports_nothing(self):
         sites = live_monster_site_registry()
         site_key = next(iter(sites))
@@ -988,6 +1000,9 @@ class WildernessPopulationViewTests(EvenniaTest):
                 (unchanged.state, unchanged.cleared_at_tick), ("cleared", cleared_at)
             )
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_population_view_does_not_construct_traits(self):
         # Create a Monster object with stored HP attributes but NO constructed trait handler
         monster = create_object(Monster, key="dormant_guardian")
@@ -1059,6 +1074,9 @@ class WildernessPopulationViewTests(EvenniaTest):
         monster.apply_monster_tier("floor")
         return monster
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_every_actual_living_owner_is_reported_once_with_canonical_facts(self):
         from typeclasses.characters import PlayerCharacter
         from world.rules.monster_individual import construct_species_individual
@@ -1139,6 +1157,9 @@ class WildernessPopulationViewTests(EvenniaTest):
         for absent in (dead, unregistered, elsewhere):
             self.assertNotIn(f"object:{absent.pk}", by_key)
 
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_a_moved_individual_is_absent_from_its_former_cell(self):
         from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
@@ -1174,6 +1195,9 @@ class WildernessPopulationViewTests(EvenniaTest):
             {second: key},
         )
 
+    @covers_requirement(
+        "wilderness-population-view::observation-identity-belongs-to-persistent-individuals"
+    )
     def test_a_same_label_birth_gets_a_fresh_identity(self):
         cell = _empty_baseline_cell()
         first = create_object(Monster, key="t_repeated_beast")

@@ -269,6 +269,9 @@ class HuntProvisioningTests(ProvisioningWorldFixture, EvenniaTest):
     @covers_requirement(
         "wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate"
     )
+    @covers_requirement(
+        "wilderness-population-view::population-reads-report-actual-living-registrations"
+    )
     def test_supplementary_individuals_take_unique_slots_and_keep_them(self):
         result = ensure_hunt_targets(
             self.region,
