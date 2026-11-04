@@ -46,6 +46,7 @@ from ._support import (
 )
 
 
+from world.rules.combat_identity import stable_actor_id
 class CompanionPoolTests(ViolationBase):
     """The full violation pool: companion victims, exclusion, and wakes."""
 
@@ -213,7 +214,7 @@ class CompanionPoolTests(ViolationBase):
             result = forfeit(self.player)
         # Both attempts drew slot 0 (the player): the companion is absent
         # from the outcome mapping (D-P3) and gets no wake observation.
-        self.assertEqual(set(captured["outcomes"]), {str(self.player.key)})
+        self.assertEqual(set(captured["outcomes"]), {stable_actor_id(self.player)})
         self.assertNotIn("companion_wake", _kinds(_aftermath_entries(result)))
         self.assertEqual(companion.sexual.pleasure.value, 0)
         self.assertEqual(companion.sexual.hostile_act_count, 0)

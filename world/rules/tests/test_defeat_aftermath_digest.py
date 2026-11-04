@@ -41,6 +41,7 @@ from .test_defeat_aftermath_violation._support import (
 # The shipped digest table in its minimal valid shape: two conditioned rows
 # and the trailing empty-when fallback. Loader fixtures below mutate this
 # text so a single malformation is the only reason a load can fail.
+from world.rules.combat_identity import stable_actor_id
 _DIGEST_SECTION = (
     "digest:\n"
     "  rows:\n"
@@ -307,7 +308,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         result, captured = self._defeat_capturing([1, 1], [1, 1])
         self.assertEqual(
             self._digest_rows(captured),
-            [(str(companion.key), "residue", "aftermath_residue")],
+            [(stable_actor_id(companion), "residue", "aftermath_residue")],
         )
         self.assertIn("aftermath_residue", entity_active_buffs(companion))
         wakes = [
@@ -346,7 +347,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         )
         self.assertEqual(
             self._digest_rows(captured),
-            [(str(companion.key), "humiliated", "aftermath_humiliated")],
+            [(stable_actor_id(companion), "humiliated", "aftermath_humiliated")],
         )
         self.assertIn("aftermath_humiliated", entity_active_buffs(companion))
         wakes = [
@@ -371,7 +372,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         result, captured = self._defeat_capturing([1, 1], [1, 1])
         self.assertEqual(
             self._digest_rows(captured),
-            [(str(companion.key), "none", None)],
+            [(stable_actor_id(companion), "none", None)],
         )
         self.assertNotIn("aftermath_residue", entity_active_buffs(companion))
         self.assertNotIn("aftermath_humiliated", entity_active_buffs(companion))
@@ -413,7 +414,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
                     result, captured = self._defeat_capturing([1, 1], [100, 100])
                 self.assertEqual(
                     self._digest_rows(captured),
-                    [(str(companion.key), expected[0], expected[1])],
+                    [(stable_actor_id(companion), expected[0], expected[1])],
                 )
 
     @covers_requirement(
@@ -428,13 +429,13 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         engage(self.player, self.monster)
         self._knock_out(victim)
         result, captured = self._defeat_capturing([1, 1], [1, 1])
-        self.assertEqual(set(captured["outcomes"]), {str(victim.key)})
+        self.assertEqual(set(captured["outcomes"]), {stable_actor_id(victim)})
         self.assertEqual(
             [row.participant for row in captured["observations"]],
-            [str(witness.key)],
+            [stable_actor_id(witness)],
         )
         self.assertNotIn(
-            str(witness.key), [row.participant for row in captured["digests"]]
+            stable_actor_id(witness), [row.participant for row in captured["digests"]]
         )
         observations = [
             entry
@@ -495,10 +496,10 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
             if entry.kind == "companion_wake"
         )
         self.assertEqual(
-            humiliated_row, (str(companion.key), "humiliated", "aftermath_humiliated")
+            humiliated_row, (stable_actor_id(companion), "humiliated", "aftermath_humiliated")
         )
         self.assertEqual(
-            residue_row, (str(companion.key), "residue", "aftermath_residue")
+            residue_row, (stable_actor_id(companion), "residue", "aftermath_residue")
         )
         self.assertEqual(
             humiliated_wake.text_template,
@@ -525,7 +526,7 @@ class DigestPhaseTests(ViolationBase, EvenniaTestCase):
         result, captured = self._defeat_capturing([1], [1])
         self.assertEqual(
             self._digest_rows(captured),
-            [(str(self.player.key), "residue", "aftermath_residue")],
+            [(stable_actor_id(self.player), "residue", "aftermath_residue")],
         )
         self.assertIn("aftermath_residue", entity_active_buffs(self.player))
         settle = next(

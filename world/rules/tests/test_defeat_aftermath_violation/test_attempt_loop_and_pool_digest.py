@@ -49,6 +49,7 @@ from ._support import (
 )
 
 
+from world.rules.combat_identity import stable_actor_id
 class AttemptLoopTests(ViolationBase):
     """The attempt loop: caps, deltas, counters, clock, and the stop rule."""
 
@@ -444,8 +445,8 @@ class PoolAndDigestTests(ViolationBase):
         entries = _aftermath_entries(result)
         # The handoff is the per-participant mapping (companion-victims
         # D-P3); a solo pool carries exactly the player's outcome.
-        self.assertEqual(set(captured["outcomes"]), {str(self.player.key)})
-        outcome = captured["outcomes"][str(self.player.key)]
+        self.assertEqual(set(captured["outcomes"]), {stable_actor_id(self.player)})
+        outcome = captured["outcomes"][stable_actor_id(self.player)]
         self.assertIsInstance(outcome, defeat_aftermath_module.ViolationOutcome)
         self.assertEqual(
             outcome.selected,
