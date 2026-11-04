@@ -22,7 +22,6 @@ from world.tests.synthetic_data.data_monster_species import (
     SYNTH_MONSTER_VARIANTS,
 )
 from world.tests.synthetic_data.data_monster_placement import (
-    SYNTH_AMBIENT_PLACEMENTS,
     SYNTH_ECOLOGY_ZONES,
     SYNTH_ENCOUNTER_COMPOSITIONS,
     SYNTH_MONSTER_SITES,
@@ -72,7 +71,6 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "monster_tiers": lambda: SYNTH_MONSTER_TIERS,
         "monster_species": lambda: SYNTH_MONSTER_SPECIES,
         "monster_variants": lambda: SYNTH_MONSTER_VARIANTS,
-        "ambient_placements": lambda: SYNTH_AMBIENT_PLACEMENTS,
         "encounter_compositions": lambda: SYNTH_ENCOUNTER_COMPOSITIONS,
         "ecology_zones": lambda: SYNTH_ECOLOGY_ZONES,
         "monster_sites": lambda: SYNTH_MONSTER_SITES,
@@ -123,7 +121,6 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "monster_tiers": content["monster_tiers"](),
         "monster_species": content["monster_species"](),
         "monster_variants": content["monster_variants"](),
-        "ambient_placements": content["ambient_placements"](),
         "monster_sites": content["monster_sites"](),
         "anchor_placements": content["anchor_placements"](),
         "settlements": content["settlements"](),
@@ -149,10 +146,6 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "monster_tiers": ("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"),
     "monster_species": ("world.lore.monster_species", "MONSTER_SPECIES" + "_REGISTRY"),
     "monster_variants": ("world.lore.monster_species", "MONSTER_VARIANT" + "_REGISTRY"),
-    "ambient_placements": (
-        "world.lore.monster_placement",
-        "AMBIENT_PLACEMENT" + "_REGISTRY",
-    ),
     "encounter_compositions": (
         "world.lore.monster_placement",
         "ENCOUNTER_COMPOSITION" + "_REGISTRY",

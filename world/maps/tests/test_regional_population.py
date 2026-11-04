@@ -134,14 +134,6 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
         )
-        # The retired ambient owner is not this change's subject and is never
-        # activated here; the world owner under test is the only birth source.
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
-        )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
@@ -931,12 +923,6 @@ class ShippedZonePlanningTests(EvenniaTest):
         publish_shipped_map_world()
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
-        )
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
         )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()

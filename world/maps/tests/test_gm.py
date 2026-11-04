@@ -205,13 +205,6 @@ class MapConsoleWildernessSpawnTests(ConsoleOwnerTest):
         from world.tests.geography_fixture import publish_shipped_map_world
 
         publish_shipped_map_world()
-        # The retired ambient owner is a different change's subject.
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
-        )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )

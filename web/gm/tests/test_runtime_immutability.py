@@ -95,7 +95,6 @@ class RuntimeImmutabilityTest(EvenniaTest):
             "monster_species",
             "monster_variants",
             "monster_tiers",
-            "ambient_placements",
             "monster_sites",
             "quest_definitions",
             "quest_issuances",

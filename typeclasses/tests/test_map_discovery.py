@@ -246,7 +246,6 @@ class LandmarkArrivalTests(EvenniaTest):
         with patch("world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",{"t_gate":entry}), \
              patch("typeclasses.exits.WILDERNESS_ENTRY_REGISTRY",{"t_gate":entry}), \
              patch("world.rules.travel_cost.preflight_movement_cost",preflight), \
-             patch("world.maps.wilderness_population.ensure_population"), \
              patch.object(self.char1,"msg") as msg,self.captureOnCommitCallbacks(execute=True):
             gate.at_traverse(self.char1,self.source)
         self.assertEqual(self.char1.location.coordinates,cell)
@@ -256,7 +255,6 @@ class LandmarkArrivalTests(EvenniaTest):
         self.district.landmark_node=encode_wild(WILDERNESS_NAME,*destination)
         step=next(exit for exit in self.char1.location.exits if exit.key == "east")
         with patch("world.rules.travel_cost.preflight_movement_cost",preflight), \
-             patch("world.maps.wilderness_population.ensure_population"), \
              patch.object(self.char1,"msg") as msg,self.captureOnCommitCallbacks(execute=True):
             step.at_traverse(self.char1,self.char1.location)
         self.assertEqual(self.char1.location.coordinates,destination)

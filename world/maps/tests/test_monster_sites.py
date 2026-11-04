@@ -23,7 +23,6 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import (
     RECOVERY_CONDITION_FIELDS,
-    AmbientPlacementRule,
     CompositionMember,
     EcologyZone,
     EncounterComposition,
@@ -35,7 +34,6 @@ from world.lore.monster_placement import (
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps import monster_sites
 from world.maps import regional_population
-from world.tests.geography_fixture import sync_test_wilderness
 from world.maps.geography import current as current_geography
 from world.maps.population_geometry import (
     INHABITED_SETTLEMENT_KINDS,
@@ -50,17 +48,13 @@ from world.maps.monster_sites import (
     SITE_READ_UNKNOWN_SITE,
     SITE_READ_UNPOPULATED,
     SITE_READ_WORLD_UNAVAILABLE,
-    settle_monster_sites,
     settle_site_recovery,
     site_living_members,
     site_state,
     snapshot_monster_site_surfaces,
 )
-from world.maps.wilderness_population import (
-    _population_key,
-    _stored_hp,
-    ensure_population,
-)
+from world.maps.population_lifecycle import settle_population_lifecycle
+from world.maps.wilderness_population import _stored_hp
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -130,28 +124,6 @@ COMPOSITIONS = {
     SOLO: EncounterComposition(SOLO, (CompositionMember(STRONGER, 1, 1),)),
     FLOCK: EncounterComposition(FLOCK, (CompositionMember(ORDINARY, 1, 2),)),
 }
-
-
-def _declared_map_id():
-    """One live registry map id; these tests never need grid gate provisioning."""
-
-    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-
-    entry = next(iter(WILDERNESS_ENTRY_REGISTRY.values()))
-    return entry.gates[0].destination.map_id
-
-
-def _local_row(ordinary, habitat: str, **overrides) -> AmbientPlacementRule:
-    """One synthetic ambient rule for the probe's region."""
-    fields = {
-        "region_key": habitat,
-        "variant_keys": (ordinary,),
-        "quantity": 1,
-        "capacity": 1,
-        "selection_salt": 0,
-    }
-    fields.update(overrides)
-    return AmbientPlacementRule(**fields)
 
 
 def _members(wilderness, site: MonsterSite) -> tuple[Monster, ...]:
@@ -238,7 +210,6 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         )
 
         self.region = region_for_coordinates(*PROBE)
-        self.rule = _local_row(ORDINARY, self.region)
         self.sites = {
             NEST_KEY: MonsterSite(
                 NEST_KEY,
@@ -283,10 +254,8 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 "monster_species",
                 "monster_variants",
                 "monster_tiers",
-                "ambient_placements",
                 "monster_sites",
                 extra={
-                    "ambient_placements": {self.region: self.rule},
                     "encounter_compositions": COMPOSITIONS,
                     "monster_sites": self.sites,
                 },
@@ -310,7 +279,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     def _settle(self, end_tick: int = 0):
         with self.captureOnCommitCallbacks(execute=True):
-            return settle_monster_sites(0, end_tick)
+            return settle_population_lifecycle(0, end_tick)
 
     def _defeat(self, site: MonsterSite) -> tuple[int, ...]:
         """Defeat every member and record each committed loss occurrence."""
@@ -347,7 +316,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             patch("world.maps.monster_sites.log_info") as info,
             self.captureOnCommitCallbacks(execute=True),
         ):
-            events = settle_monster_sites(0, 0)
+            events = settle_population_lifecycle(0, 0)
         self.assertEqual(events, [])
         for key, site in self.sites.items():
             with self.subTest(site=key):
@@ -685,7 +654,13 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
         # Ordinary maintenance never removes or moves the explicit placement,
         # although automatic birth geometry can reach none of those cells.
-        ensure_population(self.wilderness, cell)
+        from evennia.utils.create import create_object
+
+        ordinary = create_object(Monster, key="t_ordinary_witness")
+        ordinary.threat_tier = _WITNESS_TIER
+        ordinary.apply_monster_tier("floor")
+        ordinary.traits.hp.current = 5
+        self.wilderness.db.itemcoordinates[ordinary] = cell
         self._settle(end_tick=HOUR)
 
         self.assertEqual(
@@ -836,11 +811,10 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         # interval end the advance happened to stop at.
         self.assertEqual(state.cleared_at_tick, 0)
 
-        # A full game day later, on re-entry, and on the startup sync path the
-        # one-shot site creates nothing: the defeated rows stay dead in place.
+        # A full game day later and on re-entry the one-shot site creates
+        # nothing: the defeated rows stay dead in place.
         self.clock.advance(86400, AdvanceSource.SKIP, [])
         self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
-        sync_test_wilderness((_declared_map_id(),))
         self.assertEqual(
             site_state(NEST_KEY, wilderness=self.wilderness).state,
             SITE_STATE_CLEARED,
@@ -925,7 +899,6 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
         # Re-entering the room before the condition matures recovers nothing.
         self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
-        sync_test_wilderness((_declared_map_id(),))
         self.assertEqual(_living(self.wilderness, self.sites[CAMP_KEY]), ())
         self.assertEqual(
             site_state(CAMP_KEY, wilderness=self.wilderness).state,
@@ -1151,53 +1124,27 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
     # -- ownership domains --------------------------------------------------
 
     @covers_requirement("monster-site-placement::every-placed-individual-carries-its-owner-marker-and-reconciliation-stays-inside-the-owner-domain")
-    def test_the_two_owners_never_cross_domains(self):
+    def test_site_settlement_never_touches_a_foreign_individual(self):
+        from evennia.utils.create import create_object
+
         self._settle()
-        marker = _population_key(*PROBE)
-        ambient = [
-            member
-            for member in self.wilderness.get_objs_at_coordinates(PROBE)
-            if isinstance(member, Monster) and member.db.population_key == marker
-        ]
-        self.assertTrue(ambient)
-        site_members = _members(self.wilderness, self.sites[NEST_KEY])
-        site_before = {
-            member.pk: (member.traits.hp.current, member.db.site_key)
-            for member in site_members
-        }
+        foreign = create_object(Monster, key="t_foreign_owner_witness")
+        foreign.threat_tier = _WITNESS_TIER
+        foreign.apply_monster_tier("floor")
+        foreign.db.home_ecology_zone = "t_other_owner"
+        foreign.traits.hp.current = 3
+        self.wilderness.db.itemcoordinates[foreign] = PROBE
 
-        # Ambient reconciliation at the site's own coordinate leaves the site's
-        # individuals exactly as they were.
-        ensure_population(self.wilderness, PROBE)
-        self.assertEqual(
-            {
-                member.pk: (member.traits.hp.current, member.db.site_key)
-                for member in _members(self.wilderness, self.sites[NEST_KEY])
-            },
-            site_before,
-        )
-
-        # ... and site settlement leaves the ambient individuals untouched.
-        ambient_before = sorted(
-            (
-                member.pk,
-                member.traits.hp.current,
-                member.variant_key,
-            )
-            for member in ambient
-        )
+        # Site settlement leaves the foreign individual untouched.
         self._defeat(self.sites[NEST_KEY])
         self.clock.advance(60, AdvanceSource.SKIP, [])
-        ambient_after = sorted(
-            (
-                member.pk,
-                member.traits.hp.current,
-                member.variant_key,
-            )
-            for member in self.wilderness.get_objs_at_coordinates(PROBE)
-            if isinstance(member, Monster) and member.db.population_key == marker
+        self.assertTrue(ObjectDB.objects.filter(pk=foreign.pk).exists())
+        self.assertEqual(self.wilderness.db.itemcoordinates[foreign], PROBE)
+        self.assertEqual(foreign.traits.hp.current, 3)
+        self.assertEqual(
+            site_state(NEST_KEY, wilderness=self.wilderness).state,
+            SITE_STATE_CLEARED,
         )
-        self.assertEqual(ambient_after, ambient_before)
 
     def test_foreign_and_other_owner_monsters_are_never_touched(self):
         from evennia.utils.create import create_object
@@ -1221,14 +1168,13 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         elsewhere = create_object(Monster, key="t_other_coordinate_witness")
         elsewhere.threat_tier = _WITNESS_TIER
         elsewhere.apply_monster_tier("floor")
-        elsewhere.db.population_key = _population_key(PROBE[0] + 1, PROBE[1])
+        elsewhere.db.home_ecology_zone = "t_other_zone"
         elsewhere.traits.hp.current = 3
         self.wilderness.db.itemcoordinates[elsewhere] = PROBE
         probes.append(elsewhere)
 
         self._defeat(self.sites[NEST_KEY])
         self.clock.advance(60, AdvanceSource.SKIP, [])
-        ensure_population(self.wilderness, PROBE)
 
         for probe in probes:
             with self.subTest(monster=probe.key):
@@ -1271,7 +1217,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         ambient = create_object(Monster, key="t_read_ambient_witness")
         ambient.threat_tier = _WITNESS_TIER
         ambient.apply_monster_tier("floor")
-        ambient.db.population_key = _population_key(*PROBE)
+        ambient.db.home_ecology_zone = "t_read_other_owner"
         self.wilderness.db.itemcoordinates[ambient] = PROBE
         foreign = create_object(Monster, key="t_read_foreign_site_witness")
         foreign.threat_tier = _WITNESS_TIER
@@ -1550,7 +1496,7 @@ class MonsterSiteStageWithoutWorldTests(EvenniaTest):
             self.captureOnCommitCallbacks(execute=True),
         ):
             events = get_world_clock().advance(60, AdvanceSource.SKIP, [])
-            self.assertEqual(settle_monster_sites(0, 1000), [])
+            self.assertEqual(settle_population_lifecycle(0, 1000), [])
             self.assertEqual(snapshot_monster_site_surfaces(0, 1000), {})
         info.assert_not_called()
         warn.assert_not_called()
@@ -1610,7 +1556,7 @@ class MonsterSiteWithoutWorldSeedTests(EvenniaTest):
 
         with self.assertRaises(PopulationSeedUninitialized):
             with self.captureOnCommitCallbacks(execute=True):
-                settle_monster_sites(0, 0)
+                monster_sites.settle_monster_sites_at(0)
 
         self.assertIsNone(site_state(site.key, wilderness=wilderness))
         self.assertEqual(
@@ -1653,7 +1599,7 @@ class SiteRowVocabularyTests(EvenniaTest):
         wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(wilderness, seed=SEED, tick=0)
         with self.captureOnCommitCallbacks(execute=True):
-            settle_monster_sites(0, 0)
+            settle_population_lifecycle(0, 0)
         members = _members(wilderness, site)
         self.assertEqual(len(members), site.capacity)
         self.assertEqual(RECOVERY_CONDITION_FIELDS, ("recover_after_ticks",))

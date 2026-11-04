@@ -73,7 +73,7 @@ from world.maps.regional_population import (
     sample_composition_counts,
     snapshot_population_surfaces,
 )
-from world.maps.wilderness_population import _session_participant_ids
+from world.maps.regional_population import _session_participant_ids
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
@@ -931,25 +931,6 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
         )
     if changed:
         _write_state(wilderness, states)
-    return events
-
-
-def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]:
-    """Replay this owner's boundaries chronologically across one interval.
-
-    A composition of the two pure/at-tick operations above, used by the site
-    owner's own tests and by callers that need the site-only interval answer.
-    The registered clock stage is the merged population coordinator, not this
-    helper.
-    """
-    events: list[ScheduledEvent] = []
-    tick = start_tick
-    while tick <= end_tick:
-        events.extend(settle_monster_sites_at(tick))
-        following = next_site_boundary(tick, end_tick)
-        if following is None or following <= tick:
-            break
-        tick = following
     return events
 
 

@@ -302,37 +302,100 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
     @covers_requirement(
         "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
     )
-    def test_fresh_wilderness_provisioning_saves_the_population_seed_once(self):
+    def test_fresh_wilderness_provisioning_initializes_population_once(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from typeclasses.monsters import Monster
 
+        from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY
         from world.maps.regional_population import (
             INITIAL_POPULATION_SEED,
-            POPULATION_SEED_ATTRIBUTE,
-            PopulationSeedUninitialized,
-            initialize_population_seed,
+            initialized_zone_keys,
             read_population_seed,
         )
 
         sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
-        # A genuinely new script is seeded before any reader (such as the
-        # manual-site source) can ask for it.
+        # A genuinely new script is seeded and every authored zone is
+        # initialized before any reader or boundary can observe it.
         self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED)
-
-        # A rerun never reseeds, rerolls or converts an existing script.
-        script.attributes.add(POPULATION_SEED_ATTRIBUTE, INITIAL_POPULATION_SEED + 5)
-        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
-        self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED + 5)
-
-        # A script provisioned before this operation refuses rather than
-        # selecting an implicit default, and an explicit write fixes it once.
-        script.attributes.remove(POPULATION_SEED_ATTRIBUTE)
-        self.assertRaises(
-            PopulationSeedUninitialized, lambda: read_population_seed(script)
+        self.assertEqual(
+            initialized_zone_keys(script), tuple(sorted(ECOLOGY_ZONE_REGISTRY))
         )
-        self.assertEqual(initialize_population_seed(script, seed=7, tick=0), 7)
-        self.assertEqual(read_population_seed(script), 7)
-        self.assertEqual(initialize_population_seed(script, seed=9, tick=0), 7)
+        living = {
+            obj.pk: obj.traits.hp.current
+            for obj in script.db.itemcoordinates
+            if isinstance(obj, Monster)
+        }
+        self.assertTrue(living)
+
+        # A rerun never reseeds, rerolls, refills or replaces a living ID.
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED)
+        self.assertEqual(
+            {
+                obj.pk: obj.traits.hp.current
+                for obj in script.db.itemcoordinates
+                if isinstance(obj, Monster)
+            },
+            living,
+        )
+
+    def test_preexisting_world_without_population_state_refuses(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+        from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY
+        from world.maps.regional_population import (
+            POPULATION_SEED_ATTRIBUTE,
+            PopulationStateUninitialized,
+            REGIONAL_POPULATION_ATTRIBUTE,
+        )
+
+        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.assertTrue(ECOLOGY_ZONE_REGISTRY)
+
+        # Missing seed: the named operator refusal, never an implicit reset.
+        saved_seed = script.attributes.get(POPULATION_SEED_ATTRIBUTE)
+        script.attributes.remove(POPULATION_SEED_ATTRIBUTE)
+        with self.assertRaises(PopulationStateUninitialized):
+            sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        script.attributes.add(POPULATION_SEED_ATTRIBUTE, saved_seed)
+
+        # Missing zone state: the same refusal, and the surviving state is
+        # neither filled in nor converted.
+        saved_zones = dict(script.db.regional_population)
+        partial = dict(saved_zones)
+        partial.pop(sorted(partial)[0])
+        script.db.regional_population = partial
+        with self.assertRaises(PopulationStateUninitialized):
+            sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        self.assertEqual(dict(script.db.regional_population), partial)
+        self.assertIsNotNone(script.attributes.get(REGIONAL_POPULATION_ATTRIBUTE))
+
+    def test_a_later_zone_failure_rolls_back_the_fresh_provisioning(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+        from typeclasses.monsters import Monster
+
+        from world.maps import bootstrap
+        from world.maps import regional_population
+
+        real_initialize = regional_population.initialize_zone
+        calls: list[str] = []
+
+        def initialize_once(wilderness, zone_key, *, seed, tick):
+            calls.append(zone_key)
+            if len(calls) == 2:
+                raise RuntimeError("injected later-zone failure")
+            return real_initialize(wilderness, zone_key, seed=seed, tick=tick)
+
+        with patch.object(regional_population, "initialize_zone", initialize_once):
+            with self.assertRaises(RuntimeError):
+                bootstrap._provision_wilderness_script()
+
+        self.assertEqual(len(calls), 2)
+        self.assertNotEqual(calls[0], calls[1])
+        self.assertFalse(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists())
+        self.assertEqual(Monster.objects.count(), 0)
 
     def test_sync_grid_body_is_unmodified(self):
         source = inspect.getsource(sync_grid)

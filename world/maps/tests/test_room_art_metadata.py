@@ -285,10 +285,8 @@ class PooledWildernessRoomArtTests(EvenniaTest):
         # collapse two logical places onto one identity.
         room = create_object(TerrainRoom, key="t_named_wilderness")
         stub = SimpleNamespace(key="t_other_wilderness")
-        with patch("world.maps.wilderness_population.ensure_population") as ensure:
-            with patch.object(TerrainRoom, "wilderness", property(lambda self: stub)):
-                self.provider.at_prepare_room((10, 10), None, room)
-            ensure.assert_called_once()
+        with patch.object(TerrainRoom, "wilderness", property(lambda self: stub)):
+            self.provider.at_prepare_room((10, 10), None, room)
         self.assertEqual(
             room.scene_identity,
             wilderness_scene_identity("t_other_wilderness", 10, 10),

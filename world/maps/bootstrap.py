@@ -1433,6 +1433,10 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
     and with them any gate-face exit locks the provider hook owns on active
     approach cells. Grid-side gate-exit provisioning is independent of that
     refresh pass.
+
+    The first call on a genuinely new script also initializes the shared
+    population seed and every authored zone once; later calls only verify the
+    complete runtime state and never refill, reroll or reseed it.
     """
 
     from world.maps import runtime
@@ -1462,31 +1466,37 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
 
 
 def _provision_wilderness_script() -> None:
-    """Create the wilderness script once, seeding its shared population seed.
+    """Provision the wilderness script and initialize its population once.
 
-    A genuinely new script receives the explicit configured initial seed in the
-    same transaction that creates it, before any manual-site source can read
-    it, so a failed fresh provisioning never leaves a script whose seed can
-    never be written (the next run treats it as existing). An existing script
-    is left completely untouched: there is no implicit seed default and no
-    reroll, so an older development world refuses a seed read by name instead
-    of being silently converted.
+    A genuinely new script receives the explicit configured initial seed and
+    every authored zone's constrained actual population in one compensated
+    transaction after the map world is published, before any manual-site or
+    boundary source can read it. A failure in a later zone restores the
+    earlier created individuals and every owner/cache surface, so a partial
+    world is never left behind.
+
+    A preexisting script is never re-seeded, converted or reset: it must
+    already carry the complete runtime population state, and missing or
+    malformed state is the named ``population_state_uninitialized`` operator
+    refusal. Explicit GM save/repair/reset procedures are the only path for an
+    incompatible development world.
     """
     from django.db import transaction
 
+    from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY
     from world.maps.regional_population import (
         INITIAL_POPULATION_SEED,
         current_population_tick,
         initialize_population_seed,
+        initialize_zone,
+        require_initialized_population,
         restore_population_surfaces,
         snapshot_population_surfaces,
     )
 
     if WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists():
-        # The contrib's own no-op branch, kept as the single creation surface.
-        create_wilderness(
-            name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
-        )
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        require_initialized_population(script)
         return
 
     surfaces: dict = {}
@@ -1497,11 +1507,19 @@ def _provision_wilderness_script() -> None:
             )
             script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
             surfaces = snapshot_population_surfaces(script)
+            tick = current_population_tick()
             initialize_population_seed(
                 script,
                 seed=INITIAL_POPULATION_SEED,
-                tick=current_population_tick(),
+                tick=tick,
             )
+            for zone_key in sorted(ECOLOGY_ZONE_REGISTRY):
+                initialize_zone(
+                    script,
+                    zone_key,
+                    seed=INITIAL_POPULATION_SEED,
+                    tick=tick,
+                )
     except Exception:
         restore_population_surfaces(surfaces)
         raise

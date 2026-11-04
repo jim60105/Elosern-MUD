@@ -22,7 +22,6 @@ from world.imports.loader import load_batch
 from world.imports.schema import CHARACTER_SCHEMA_V1
 from world.imports.tests.helpers import example_record
 from world.imports.validate import _check_combat_traits, validate_character
-from world.maps.wilderness_population import MonsterPopulation, _matches_expected, _spawn
 from world.quests.compile import (
     QuestCompileError,
     _characterization_from_payload,
@@ -935,22 +934,3 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         with self.assertRaises(QuestCompileError):
             _compile_characterization(dict(char_req, combat_traits=["invalid_trait"]))
 
-    def test_wilderness_population_supports_combat_traits(self):
-        pop = MonsterPopulation(tier="low", art_species_key="undead", name_zh="腐爛行屍", combat_traits=("undead",))
-        self.assertEqual(pop.combat_traits, ("undead",))
-
-        # Test spawn helper assigns trait
-        wilderness = create_object(NPC, key="wild_anchor")  # Mock wilderness script
-        wilderness.db.itemcoordinates = {}
-        wilderness.db.rooms = {}
-
-        _spawn(wilderness, (10, 20), pop)
-        spawned = list(wilderness.db.itemcoordinates.keys())[0]
-        self.assertEqual(get_combat_traits(spawned), frozenset({"undead"}))
-
-        # Test _matches_expected verifies combat_traits
-        self.assertTrue(_matches_expected(spawned, pop))
-
-        # Mismatched trait fails matching
-        diff_pop = MonsterPopulation(tier="low", art_species_key="undead", name_zh="腐爛行屍", combat_traits=())
-        self.assertFalse(_matches_expected(spawned, diff_pop))

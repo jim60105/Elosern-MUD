@@ -60,7 +60,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "sync_npc_schedules",
     "register_correspondence_delivery",
     "register_title_planner",
-    "register_monster_sites",
+    "register_regional_population",
     "restore_persisted_sessions",
     "sync_wilderness",
     "sync_connected_encounters",
@@ -530,15 +530,22 @@ def at_server_start():
         "register_title_planner",
         lambda: _late("world.rules.titles", "register_title_planner"),
     )
-    # The merged population coordinator (sites + regional recovery) is
-    # implemented by regional-population-recovery but NOT registered here:
-    # design.md activates that registration only in the final runtime cutover,
-    # before restoration. Until then the coordinator is exercised by the
-    # owners' explicit registration in tests and by the cutover change.
-    # Restore persisted combat sessions BEFORE wilderness population
-    # reconciliation: a defeated population monster still referenced by a
-    # committed session must not be deleted or respawned first
-    # (fix-startup-session-restore-order D1).
+    # The merged population coordinator (exact site lifecycle, pending
+    # presence transitions and regional recovery due times) installs itself
+    # under the existing lifecycle stage before any restoring clock advance.
+    # A recovery inside restoration therefore runs the complete registered
+    # stage set, and no wall timer owns a population boundary.
+    _startup_step(
+        "register_regional_population",
+        lambda: _late(
+            "world.maps.population_lifecycle", "register_regional_population"
+        ),
+    )
+    # Restore persisted combat sessions BEFORE wilderness provisioning: a
+    # defeated population individual still referenced by a committed session
+    # must not be replaced or discarded first (fix-startup-session-restore-
+    # order D1), and fresh zone initialization must never precede protected
+    # session restoration.
     _startup_step("restore_persisted_sessions", restore_persisted_sessions)
     _startup_step("sync_wilderness", sync_wilderness)
     # Connected owners' published encounters are synchronized at their actual

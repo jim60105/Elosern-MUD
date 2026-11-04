@@ -554,7 +554,7 @@ class MapProviderTests(EvenniaTest):
         self.assertFalse(self._locks_allow(north, "view"))
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
-    def test_enter_wilderness_populates_the_entry_coordinate(self):
+    def test_enter_wilderness_creates_no_population(self):
         from evennia.contrib.grid.wilderness.wilderness import (
             WildernessScript,
             create_wilderness,
@@ -568,10 +568,7 @@ class MapProviderTests(EvenniaTest):
         monsters = [
             obj for obj in script.get_objs_at_coordinates(EAST_APPROACH) if isinstance(obj, Monster)
         ]
-        self.assertEqual(len(monsters), 1)
-        nx, ny = EAST_APPROACH
-        self.assertEqual(monsters[0].db.population_key, f"wilderness:{nx}:{ny}")
-        self.assertIs(monsters[0].location, self.char1.location)
+        self.assertEqual(monsters, [])
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_recycled_room_gets_fresh_scene_archetype(self):

@@ -24,7 +24,6 @@ from typeclasses.components import GuildStaff
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.lore.monster_placement import (
-    AmbientPlacementRule,
     CompositionMember,
     EncounterComposition,
     MonsterSite,
@@ -152,7 +151,6 @@ class SiteClearOutAcceptanceTests(
         # can be built inside the scope (it reads the cached catalog).
         load_catalog_into_cache()
         self.region = region_for_coordinates(*PROBE)
-        self.rule = AmbientPlacementRule(self.region, (ORDINARY,), 1, 1, 0)
         self.sites = {
             NEST: MonsterSite(
                 NEST, "nest", self.region, PROBE, _PAIR, 2, True
@@ -169,11 +167,9 @@ class SiteClearOutAcceptanceTests(
                 "monster_species",
                 "monster_variants",
                 "monster_tiers",
-                "ambient_placements",
                 "monster_sites",
                 "guild_branches",
                 extra={
-                    "ambient_placements": {self.region: self.rule},
                     "encounter_compositions": COMPOSITIONS,
                     "monster_sites": self.sites,
                 },
@@ -255,8 +251,10 @@ class SiteClearOutAcceptanceTests(
         ).key
 
     def _settle(self, end_tick: int = 0) -> None:
+        from world.maps.population_lifecycle import settle_population_lifecycle
+
         with self.captureOnCommitCallbacks(execute=True):
-            monster_sites.settle_monster_sites(0, end_tick)
+            settle_population_lifecycle(0, end_tick)
 
     def _living(self, site_key: str) -> list[Monster]:
         site = self.sites[site_key]

@@ -108,6 +108,7 @@ ITEMCOORDINATES_ATTRIBUTE = "itemcoordinates"
 WORLD_UNAVAILABLE = "world_unavailable"
 UNKNOWN_ZONE = "unknown_zone"
 MALFORMED_STATE = "malformed_state"
+STATE_UNINITIALIZED = "population_state_uninitialized"
 SEED_UNINITIALIZED = "population_seed_uninitialized"
 SEED_MISMATCH = "population_seed_mismatch"
 STALE_PLAN = "stale_plan"
@@ -156,6 +157,10 @@ class UnknownEcologyZone(RegionalPopulationError):
 
 class MalformedPopulationState(RegionalPopulationError):
     """The durable population state is present but unusable."""
+
+
+class PopulationStateUninitialized(RegionalPopulationError):
+    """A preexisting world lacks the required initialized population state."""
 
 
 class PopulationSeedUninitialized(RegionalPopulationError):
@@ -821,6 +826,41 @@ def population_provisioned(wilderness: Any) -> bool:
         return False
     saved = _seed_attribute(wilderness)
     return saved is not _SEED_ABSENT
+
+
+def require_initialized_population(wilderness: Any) -> None:
+    """Refuse a preexisting world that lacks the complete runtime state.
+
+    Fresh provisioning initializes the shared seed and every authored zone.
+    A world that already exists must carry exactly that state; missing,
+    malformed or extra zone records are the named operator refusal, with no
+    automatic filling, conversion or reset from old coordinate slots.
+    """
+    _require_wilderness(wilderness)
+    if not population_provisioned(wilderness):
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: no saved population state"
+        )
+    try:
+        states = _state_map(wilderness)
+    except MalformedPopulationState as error:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: {error}"
+        ) from error
+    missing = sorted(set(ECOLOGY_ZONE_REGISTRY) - set(states))
+    extra = sorted(set(states) - set(ECOLOGY_ZONE_REGISTRY))
+    if missing or extra:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: missing zones {missing!r}, "
+            f"unknown zones {extra!r}"
+        )
+    for zone_key in sorted(states):
+        try:
+            zone_state(wilderness, zone_key)
+        except MalformedPopulationState as error:
+            raise PopulationStateUninitialized(
+                f"{STATE_UNINITIALIZED}: {error}"
+            ) from error
 
 
 def _require_optional_name(value: object, what: str) -> str | None:
@@ -1975,6 +2015,7 @@ __all__ = [
     "PopulationProtection",
     "PopulationSeedMismatch",
     "PopulationSeedUninitialized",
+    "PopulationStateUninitialized",
     "PopulationTimeline",
     "PopulationTransition",
     "PopulationWavePlan",
@@ -2005,6 +2046,7 @@ __all__ = [
     "record_population_protection",
     "record_population_transition",
     "register_explicit_individual",
+    "require_initialized_population",
     "restore_population_surfaces",
     "sample_composition_counts",
     "settle_recovery_due",

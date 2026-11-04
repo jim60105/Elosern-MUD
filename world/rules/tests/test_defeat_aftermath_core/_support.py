@@ -21,15 +21,16 @@ from typeclasses.npcs import NPC
 from typeclasses.components import Merchant
 from typeclasses.rooms import InstanceRoom, Room
 from world.quests.bootstrap import sync_quest_runtime
+from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
 )
-import world.maps.wilderness_population as wilderness_population_module
 from world.tests.geography_fixture import publish_shipped_geography
 
 publish_shipped_geography()
-CAPITAL_ENTRY_XY = wilderness_population_module.capital_entry_xy()
+_CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
+CAPITAL_ENTRY_XY = _CAPITAL_ENTRY.approach_cell(_CAPITAL_ENTRY.gate_for("w"))
 
 from world.rules.caravan_arrivals import register_caravan_arrivals
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY

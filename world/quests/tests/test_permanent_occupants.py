@@ -211,12 +211,6 @@ class WildernessSceneMonsterPlacementTests(EvenniaTest):
         scope = synthetic_registries("monster_tiers")
         scope.__enter__()
         self.addCleanup(scope.__exit__, None, None, None)
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
-        )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )

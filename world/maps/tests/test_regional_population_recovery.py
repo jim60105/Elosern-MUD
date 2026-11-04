@@ -114,12 +114,6 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
         )
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
-        )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
@@ -1077,12 +1071,6 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         publish_shipped_map_world()
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
-        )
-        self.enterContext(
-            patch(
-                "world.maps.wilderness_population.ensure_population",
-                lambda *arguments, **keywords: None,
-            )
         )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()

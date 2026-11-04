@@ -413,7 +413,6 @@ class StateApiListFilterTests(StateApiTestCase):
             "monster_species",
             "monster_variants",
             "monster_tiers",
-            "ambient_placements",
             "monster_sites",
         )
         super().setUp()
