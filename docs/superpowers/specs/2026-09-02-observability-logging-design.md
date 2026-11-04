@@ -200,6 +200,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `monster_site_recovery_rejected` | `site`、`region`、`coordinate`、`species`、`variant`、`tick`、`reason`（`one_shot`／`condition_unmet`／`not_cleared`／`capacity_reached`／`state_unreadable`／`unknown_site`，warn 級；未改變任何持久狀態） |
 | `hunt_site_targets_bound` | `site`、`region`、`species`、`variant`、`required`、`available`（站點清剿委託綁定站點自有的存活個體為目標的邊界，僅於耐用提交時發出） |
 | `hunt_site_targets_unavailable` | `site`、`region`、`species`、`variant`、`required`、`available`、`reason`（`world_unavailable`／`unknown_site`／`site_unpopulated`／`site_cleared`／`site_short`，warn 級；站點無法供應綁定目標而拒絕接受，未改變任何持久狀態） |
+| `movement_edge_completed` | `body`、`commander`、`source`、`destination`、`route`（僅於耐用提交時發出；一次已完成的實際移動邊界） |
+| `movement_history_invalidated` | `body`、`commander`、`tick`（僅於耐用提交時發出；非移動傳送或直接移動移除了保留的前一移動邊界） |
 | `rollback_restore_failed` | `key`、`obj`＋`exc`（warn 級，取代現有裸 `pass`） |
 | `npc_persona_initialized` | `npc`、`source`（provenance kind）、`profile`（若有）、`version` |
 | `npc_persona_updated` | `npc`、`char`（acting character）、`version_from`、`version_to` |

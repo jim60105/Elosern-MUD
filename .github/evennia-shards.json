@@ -325,6 +325,7 @@
    "name": "rules-12",
    "workers": 4,
    "labels": [
+    "world.rules.tests.test_movement_edges",
     "world.rules.tests.test_movement_settlement",
     "world.rules.tests.test_mp_flow",
     "world.rules.tests.test_namegen",

@@ -76,12 +76,21 @@ class LimboRoom(Room):
 
     LIMBO_REFUSAL_MSG = "虛境的霧氣在你面前凝結成一道無聲的牆——返回門檻之路已經關閉。"
 
-    def at_pre_object_receive(self, arriving_object, source_location=None, **kwargs):
+    def refuses_arrival(self, arriving_object) -> bool:
+        """The read-only half of the hard gate (no message, no marker).
+
+        Movement discovery and quoting consume this predicate so a legal-edge
+        query can refuse an arrival exactly as execution does without mutating
+        the actor's NAttributes or sending prose.
+        """
         from typeclasses.characters import Character
 
-        if isinstance(arriving_object, Character) and not self._is_superuser_governed(
+        return isinstance(arriving_object, Character) and not self._is_superuser_governed(
             arriving_object
-        ):
+        )
+
+    def at_pre_object_receive(self, arriving_object, source_location=None, **kwargs):
+        if self.refuses_arrival(arriving_object):
             arriving_object.msg(self.LIMBO_REFUSAL_MSG)
             # Mark the shared exit seam so the stock English failure line is
             # suppressed for this refusal only (typeclasses/exits.py).

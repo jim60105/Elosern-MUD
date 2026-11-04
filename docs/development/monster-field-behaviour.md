@@ -1,11 +1,212 @@
-# Monster Field Activity: Authoring Schema and Review
+# Monster Field Behaviour: Developer Review and Evidence
+
+This document is the human review and evidence surface for the monster
+field-behaviour proposal set. Tests establish state, identity, legality and
+timing rather than shipped copy, balance tables or coordinates.
+
+## Movement Edge History
+
+`movement-edge-history` owns the last completed player physical edge, its
+read-only legality/pricing discovery, and the committed passage interval. The
+implementation is `world/rules/movement_edges.py` plus integration seams in
+`world/rules/movement_settlement.py`, `world/rules/travel_cost.py` and
+`typeclasses/exits.py`.
+
+### Stable locator contract
+
+- `LocationRef` is a frozen tagged value and its strict JSON shape is exactly
+  `{"kind": "wilderness", "map": str, "x": int, "y": int}` or
+  `{"kind": "room", "id": int}`. Integers exclude `bool`; extra or missing keys
+  are rejected. `encode_location_ref` / `decode_location_ref` are the codecs.
+- `PhysicalEdge(source, destination, route)` serializes as exactly
+  `{"source": LocationRef, "destination": LocationRef, "route": str}`. A
+  wilderness source uses `direction:<normalized direction>`; an authored-room
+  source uses `exit:<positive dbref>`. A gate stays its actual registered
+  crossing.
+- A room locator is legal only for a persistent authored room (`Room` or
+  `GridRoom`). A pooled `TerrainRoom` is named by map + cell coordinates and is
+  never a room locator; ephemeral `InstanceRoom`s and a body with no stable
+  position raise `LocationRefError`.
+- Discovery sorts edges by canonical serialized source/destination/route.
+  `legal_edges` for a wilderness cell enumerates the eight canonical
+  directions through the shared `find_gateway`/`wilderness_neighbor` rule; for
+  an authored room it enumerates the room's real exits through their
+  `traverse` access.
+
+### Discovery, quoting and execution
+
+`quote_edge` delegates to the canonical `travel_cost.resolve_traversal_cost`
+(and therefore `plan_traversal` / `wilderness_step_cost` /
+`gate_approach_cost` / `settlement_edge_cost`) and returns the existing
+`TraversalResolution`. A recycled wilderness source is represented by a
+read-only locator adapter (`movement_layer == "wilderness"`) so no pooled room
+is fabricated. Detached `TravellerState` values price projected physiology via
+their existing `detached()` adapters.
+
+A stale edge (changed destination, locked exit, vanished room) is
+`UNRESOLVED`. A legitimate refusal (sleeping party, pre-destination depletion)
+raises `MovementPreflightRefused`. A named topology/physiology error (for
+example half-written fatigue state) propagates rather than becoming an
+unroutable edge. Discovery and quoting create no rooms, tick no gauge, advance
+no clock and write no attribute.
+
+`typeclasses/exits.py` no longer duplicates the gateway/neighbour rule: the
+gate entry and both wilderness-return branches consume `resolve_exit_edge` /
+`resolve_direction_edge`, keep the existing `preflight_movement_cost` record so
+`charge_movement` still consumes exactly the preflight price, and pass the
+completed `route`, `cost_key` and (for an ordinary step) the target cell into
+the settlement.
+
+### Retained history and invalidation
+
+The only retained record is `body.db.previous_traversal` (attribute
+`previous_traversal`), written by
+`world.rules.movement_edges.record_completed_edge`:
+
+- `settle_movement` captures the source locator before any relocation and, for
+  a settled player-driven traversal, records the completed edge inside the
+  owning transaction after the whole edge, its costs and following succeed. A
+  non-traversal player-driven settlement (a direct `NPC.move_to`, including a
+  possessed control body) invalidates instead.
+- Every physically transported source-present party body that ended at the
+  destination records the same edge (the traverser plus the follow set,
+  including the commander's body under possession). A remote party body keeps
+  its unchanged record. A follower left behind keeps its old record.
+- `settle_relocation` (operator teleport) invalidates the moved body and every
+  present party body that arrived with it.
+- `PlayerCharacter.at_post_move` -> `note_direct_move_end` invalidates a
+  successful direct move no settlement owns.
+- `read_previous_edge` returns `None` for absent history and for a record whose
+  destination no longer equals the body's current logical position; malformed
+  history raises `MovementHistoryError` rather than silently resetting.
+
+`previous_traversal` is part of `_TRAVERSER_SURFACES`, so the movement
+settlement's full-window registry restores the old record on a rollback
+together with contents, attributes, clock tick and wilderness bookkeeping.
+
+### Passage visibility
+
+`world.rules.movement_settlement.TraversalScope` is the immutable
+`(member_ids, source, destination, departure_tick, arrival_tick)` bound before
+the stock relocation, inside the causal publication group. `field_presence(body,
+tick)` is `False` for a member during the half-open interval
+`[departure_tick, arrival_tick)` and `True` at and after `arrival_tick`; a body
+with no active scope is present at its actual location. The arrival tick is the
+exact committed clock interval `charge_movement` advances (the preflight cost,
+the authored non-distance default, or zero under the authorized flight waiver).
+No browser timer authors this scope.
+
+### Observability
+
+Named facade imports only (`from world.observability import log_info, log_warn`).
+Both catalog rows were added to the approved observability design:
+
+- `movement_edge_completed` (`body`, `commander`, `source`, `destination`,
+  `route`, `tick`) is deferred until the owning transaction commits.
+- `movement_history_invalidated` (`body`, `commander`, `tick`, `reason`) is
+  emitted only when a stored record was actually removed, also on commit.
+
+A rolled-back settlement emits neither success event.
+
+### Evidence map
+
+Canonical proposed requirement ID (documented by `design.md`; the change is not
+yet archived into `openspec/specs/`, so tests deliberately carry no
+`covers_requirement` annotation until the archive sync):
+`movement-edge-history::completed-physical-edges-retain-stable-player-history`.
+
+| Scenario | Substantive test assertions |
+| --- | --- |
+| Recycled wilderness source | `world.rules.tests.test_movement_edges.MovementHistoryTests.test_pooled_source_recycles_and_reload_preserves_locators` (source cell frozen before the pooled room moves; cold attribute re-read returns the same locators); `LocationRefTests.test_pooled_terrain_room_locator_is_coordinates_not_room_id` |
+| Failure and teleport | `MovementHistoryTests.test_failed_traversal_retains_the_previous_record` (clock failure restores source and keeps the old edge); `test_teleport_invalidates_the_record`; `test_fault_after_history_write_restores_source_history_and_tick` (injected post-history fault restores source, history, contents, Attribute cache and tick with no success event); `test_malformed_history_raises_and_stale_destination_is_none` |
+| Possessed party | `PossessedMovementHistoryTests.test_transported_party_records_the_same_edge_and_remote_unchanged` (puppet, commander body and present companion share the edge; remote companion unchanged); `LegalEdgeTests.test_locked_exit_is_not_a_legal_edge` (reverse candidates consult current access) |
+| Shared quote and passage | `QuotedExecutionAgreementTests.test_quote_matches_the_committed_gate_and_reverse_costs` and `test_quote_matches_the_committed_ordinary_step_cost` (quote seconds equal the actual charged tick delta both ways); `test_exact_zero_arrival_is_affordable_and_one_unit_less_refuses`; `test_partial_physiology_refuses_instead_of_pricing`; `LegalEdgeTests.test_approach_cell_routes_the_registered_gateway_and_no_wall_entrance` and `test_discovery_and_quote_are_read_only`; `PassageVisibilityTests.test_half_open_interval_has_no_idle_endpoint_presence` and `test_committed_wilderness_step_interval_ends_at_the_accepted_tick` |
+| Serialization | `EdgeCodecTests` (exact tagged shapes, bool rejection, route/source-kind consistency, exact edge keys) |
+
+Existing modules extended for the new baseline behaviors:
+`world.rules.tests.test_movement_settlement` (blocked-corner patch now targets
+the shared discovery; refused/failed gate entry compares bookkeeping with the
+pre-traversal baseline because the landed regional population seeds the
+wilderness script), `world.rules.tests.test_party_follow_possession`,
+`typeclasses.tests.test_exit_movement_cost`, `world.rules.tests.test_movement`
+and `web.webclient.presentation.tests.test_movement_alignment`.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_movement_edges
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_movement_settlement
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_party_follow_possession
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb typeclasses.tests.test_exit_movement_cost
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_movement
+uv run --locked --env-file=.test.env evennia test --settings test_settings.py --keepdb web.webclient.presentation.tests.test_movement_alignment
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate movement-edge-history --strict
+```
+
+`world.rules.tests.test_movement_edges` is registered exactly once in
+`.github/evennia-shards.json` (`rules-12`, beside the movement-settlement
+module). Full managed-browser and complete traceability evidence remain
+CI-owned.
+
+### Spec deviations
+
+None. Presentation/copy/balance judgments are not asserted by shipped strings
+or counts.
+
+### Review dispositions
+
+An independent rubber-duck review of the implementation produced these
+dispositions:
+
+- **Relocation mistaken for completion (blocking):** fixed. The success tail
+  (`after_successful_movement`) now emits an explicit completion marker
+  (`note_traversal_completed`), and history is written only when the settlement
+  consumes that marker and observed a settled relocation. A stock `move_to`
+  that relocates and then swallows a failing receive/post hook returns falsy
+  without running the tail, so it records nothing. Regression:
+  `MovementHistoryTests.test_relocated_falsy_plain_exit_records_no_completion`.
+- **Discovery/quoting omitted receive and direction access (blocking):** fixed
+  for the authored hard gate and materialized direction exits.
+  `LimboRoom.refuses_arrival` is the pure read-only half of the hard gate used
+  by discovery/quoting (no message, no NAttribute), and a materialized
+  wilderness direction exit's real `traverse` lock is consulted. The generic
+  `at_pre_move` combat veto is deliberately not applied: later escape/retreat
+  consumers need lawful edges while a player is in combat, and the design
+  treats that veto as execution admission, not physical topology. Regression:
+  `LocationRefTests.test_limbo_receive_gate_is_consulted_read_only`.
+- **Flight-waived quote was positive (blocking):** fixed. `quote_edge` applies
+  the canonical `flight_waives_wilderness_charge` decision to the committed
+  duration, matching `charge_movement` and the passage interval. Regression:
+  `QuotedExecutionAgreementTests.test_flight_waived_step_quotes_zero_and_charges_zero`.
+- **Unsupported endpoints left transported followers stale (blocking):** fixed.
+  The settlement identifies actually moved party bodies from the pre-move
+  location/registration and invalidates exactly that set when no edge can be
+  retained; teleport invalidation likewise only touches moved bodies (a refused
+  follower keeps its record).
+- **Follower passage visibility (non-blocking, deferred):** the contract binds
+  the source-present following set before the clock advance, which necessarily
+  precedes the follow step; a follower later refused at the destination is
+  hidden during passage as the design's committed interval requires. Later
+  field-contact integration reads actual room contents at arrival, so this is
+  not a defect in this change.
+- **Event provenance (non-blocking):** fixed. Completion/invalidation resolve
+  the bound commander for transported companions, and invalidation records the
+  removed edge's source/destination/route when decodable.
+- **Strict history validation (non-blocking):** fixed. Route patterns use
+  full-string matching (a trailing newline is malformed), and a present null
+  `previous_traversal` raises `MovementHistoryError` instead of reading as
+  absence.
+
+## Monster Field Activity: Authoring Schema and Review
 
 This document records the authored field-activity layer published by the
 `monster-activity-authoring` change. It is the human review surface for the
 authored bindings; tests establish state, identity, legality and timing rather
 than shipped wording, coordinates or counts.
 
-## Declaration schema
+### Declaration schema
 
 `world/lore/monster_activity.py` publishes three frozen slotted row types and
 two immutable registries:
@@ -42,7 +243,7 @@ publication for the composition binding and again for a site override. A
 sampled singleton never authorizes a wider possible outcome. A
 `cohesive_group` declaration is legal only as a complete composition binding.
 
-## Candidate publication
+### Candidate publication
 
 The lore import validates the shipped declarations before publishing the
 read-only registries. `world.maps.geography.build_geography` (reached from the
@@ -55,7 +256,7 @@ Activity geometry is independent of birth geometry. Settlement birth buffers
 are never consulted as movement barriers, and no birth exclusion participates
 in `resolve_activity_area`.
 
-## Authored binding review
+### Authored binding review
 
 Each ecology zone has one region extent matching its authored birth rectangle.
 The three manual sites keep a region extent for their complete composition and
@@ -76,7 +277,7 @@ explicit activity input at the consuming runtime changes' deterministic
 placement boundaries; this slice validates published quest/site references and
 does not add runtime writers.
 
-## Evidence map
+### Evidence map
 
 Canonical requirement ID (generated with
 `uv run --locked python -m tools.spec_traceability list` against the synced
@@ -91,7 +292,7 @@ The listed tests carry that literal ID through `covers_requirement`.
 | Separate topology | `GeometryResolutionTests.test_settlement_buffers_never_participate_in_activity_geometry`; `PublishedActivityRegistryTests.test_the_module_offers_no_execution_callable` |
 | Every solitary outcome is valid | `BindingValidationTests.test_solitary_binding_rejects_any_multi_individual_outcome`; `world.lore.tests.test_monster_placement` site-override tests |
 
-## Focused verification run
+### Focused verification run
 
 ```text
 uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity
