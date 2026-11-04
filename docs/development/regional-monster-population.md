@@ -1447,59 +1447,58 @@ provenance owns its own occurrence and abstract encounters notify nothing.
 
 ## Assertion roles and requirement hand-off
 
-The delta requirements have no canonical IDs before the archive sync, so the
-new tests carry no `covers_requirement` annotation. Hand-off
-(test → delta requirement/scenario):
+The archive sync assigned these canonical IDs. Every behavioural test below
+carries `covers_requirement` for the requirement its own assertions establish;
+the annotations were verified against the assertions, not the scenario names.
 
-- `RecoveryLifecycleTests.test_a_loss_only_schedules_one_delayed_due_and_never_births_early`
-  → "Deficits recover only through delayed game-time episodes" / Loss and delay,
-  Wave and blockage.
-- `…test_consecutive_waves_keep_the_budget_and_recover_eventually` → same /
-  Wave and blockage (budget and interval).
-- `…test_a_manual_restoration_cancels_without_a_birth_or_sequence_change` and
-  `…test_an_operator_hp_restoration_cancels_through_the_real_gm_route` → same /
-  Obsolete episode.
-- `…test_equal_clock_advances_agree_under_any_partition` and
-  `…test_settlement_progress_agrees_under_partition` → same / Clock partition.
-- `…test_a_later_combat_occurrence_is_never_earlier_birth_headroom` → "Loss
-  timing and encounter protection survive deferred combat settlement" /
-  Late-round defeat, and "Historical population evidence…" / Deleted away-home
-  member (accounting half).
-- `…test_a_round_defeat_is_recorded_at_its_round_offset` → loss-timing /
-  Late-round defeat (occurrence offset and duplicate-round dedupe).
-- `RealSessionRecoveryTests.test_a_real_session_persists_its_occurrence_and_protection`
-  and `…test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session`
-  → loss-timing / Late-round defeat (persisted start/cell and closed protection
-  through a real session) and / Outer failure.
-- `…test_a_terminal_mapped_session_protects_its_closed_interval`,
-  `…test_a_lawful_clear_still_retains_the_closed_protection`,
-  `…test_a_protected_cell_blocks_the_due_wave_and_retries_next_interval` →
-  loss-timing / No reinforcements; the first also covers historical evidence /
-  Restart during protected combat (reload read).
-- `RealSessionRecoveryTests.test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session`
-  → loss-timing / Outer failure.
-- `…test_a_later_loss_after_a_restored_wave_starts_a_new_due` and
-  `…test_a_same_tick_site_birth_cancels_the_pending_episode` → "Population
-  lifecycle replays loss and site boundaries chronologically" / Later loss
-  starts a new episode.
-- `…test_a_later_site_recovery_never_consumes_the_earlier_wave` → same / Site
-  recovery cannot affect earlier waves.
-- `…test_a_deferred_site_clear_keeps_the_loss_occurrence` → historical
-  evidence / Deleted away-home member (occurrence retention).
-- `…test_a_deleted_home_member_still_counts_before_its_loss` → historical
-  evidence / Deleted away-home member (projection and distinct identities).
-- `…test_operator_spawn_and_delete_are_counted_presence_evidence` and
-  `…test_an_operator_departure_keeps_home_ownership_and_schedules` → historical
-  evidence / Explicit mutation routes join the owner.
-- `…test_the_pure_boundary_projects_an_unpersisted_episode` → delayed episodes /
-  Clock partition (wait boundary).
-- `…test_incomplete_timeline_evidence_refuses` → historical evidence /
-  atomic restart-safe serialization (refusal half).
-- `…test_reads_re_entry_and_acceptance_never_birth` → delayed episodes / Loss
-  and delay (no view/re-entry/acceptance trigger) and historical evidence /
-  Explicit mutation routes (negative control).
-- `…test_a_protected_cell_defers_site_births_until_it_passes` → loss-timing /
-  No reinforcements (site route).
+| Requirement | Canonical ID |
+| --- | --- |
+| Deficits recover only through delayed game-time episodes | `regional-population::deficits-recover-only-through-delayed-game-time-episodes` |
+| Loss timing and encounter protection survive deferred combat settlement | `regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement` |
+| Population lifecycle replays loss and site boundaries chronologically | `regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically` |
+| Historical population evidence preserves removed ownership and cell protection | `regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection` |
+
+All tests live in `world/maps/tests/test_regional_population_recovery.py`.
+`D` = delayed episodes, `L` = loss timing and protection, `C` = chronological
+lifecycle, `H` = historical evidence.
+
+| Test | Requirement | Asserted mechanism |
+| --- | --- | --- |
+| `RecoveryLifecycleTests.test_a_loss_only_schedules_one_delayed_due_and_never_births_early` | D | one due at T+delay; no birth before it; the wave restores the band |
+| `…test_consecutive_waves_keep_the_budget_and_recover_eventually` | D | budgeted waves at positive authored intervals until recovered |
+| `…test_a_manual_restoration_cancels_without_a_birth_or_sequence_change` | D | cancellation leaves no birth, draw or sequence change |
+| `…test_an_operator_hp_restoration_cancels_through_the_real_gm_route` | D | the real GM HP route restores density and clears the episode |
+| `…test_equal_clock_advances_agree_under_any_partition` | D | equal elapsed time gives identical plans, sequence and due |
+| `…test_settlement_progress_agrees_under_partition` | D | settled-through progress agrees under partition |
+| `…test_the_pure_boundary_projects_an_unpersisted_episode` | D | the pending episode is projected without executing a writer |
+| `…test_reads_re_entry_and_acceptance_never_birth` | D | reads, room preparation and hunt acceptance neither birth nor reset the due |
+| `…test_a_later_combat_occurrence_is_never_earlier_birth_headroom` | L, H | the future loss is not headroom at 110; the 118 boundary starts due 128 and the removed member is still accounted |
+| `…test_a_round_defeat_is_recorded_at_its_round_offset` | L | occurrence tick is start + completed rounds; replay adds nothing |
+| `RealSessionRecoveryTests.test_a_real_session_persists_its_occurrence_and_protection` | L | a real session persists start/cell and protects its closed interval after the clear |
+| `…test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session` | L | a later-stage failure rolls back clock, wave, due and session together |
+| `…test_a_terminal_mapped_session_protects_its_closed_interval` | L, H | the closed interval is protected and survives a reload |
+| `…test_a_lawful_clear_still_retains_the_closed_protection` | L | a lawful clear keeps the closed protection |
+| `…test_a_protected_cell_blocks_the_due_wave_and_retries_next_interval` | L | a protected due births nothing and retries one positive interval later |
+| `…test_a_protected_cell_defers_site_births_until_it_passes` | L | the site route honours the same protection |
+| `…test_a_later_loss_after_a_restored_wave_starts_a_new_due` | C | a later loss after a restored wave creates its own due |
+| `…test_a_same_tick_site_birth_cancels_the_pending_episode` | C | the same-tick site birth cancels the pending episode under any partition |
+| `…test_a_later_site_recovery_never_consumes_the_earlier_wave` | C | the later site recovery cannot consume the earlier wave's headroom |
+| `…test_a_deferred_site_clear_keeps_the_loss_occurrence` | H | the committed loss tick survives the deferred clear |
+| `…test_a_deleted_home_member_still_counts_before_its_loss` | H | deleted home ownership still counts before its loss; distinct IDs stay separate |
+| `…test_operator_spawn_and_delete_are_counted_presence_evidence` | H | a GM spawn/delete commits actual registration and a complete transition |
+| `…test_an_operator_departure_keeps_home_ownership_and_schedules` | H | a lawful departure keeps home ownership and schedules the deficit |
+| `…test_incomplete_timeline_evidence_refuses` | H | incomplete or inverted serialized evidence refuses |
+
+Two dispositions from that audit:
+
+- `…test_reads_re_entry_and_acceptance_never_birth` is annotated for `D` only.
+  Its assertions establish "no read, view, re-entry or acceptance trigger";
+  they say nothing about evidence retention, so the earlier draft hand-off that
+  also named `H` there was dropped rather than kept for the gate.
+- Loss timing's nondeath half (a flee, absence or knockout is not a defeat) is
+  enforced by `_record_round_defeats`'s live-to-dead crossing test but has no
+  dedicated assertion; the same apply-run gap covers the mapped action-commit
+  route in `world/rules/action/transaction.py`, which no focused test drives.
 
 ## Verification evidence (this change)
 

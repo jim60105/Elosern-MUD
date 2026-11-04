@@ -26,6 +26,7 @@ from evennia.contrib.grid.wilderness.wilderness import (
 )
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import (
     CompositionMember,
@@ -249,6 +250,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- delayed episode ----------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_a_loss_only_schedules_one_delayed_due_and_never_births_early(self):
         self._use_zone(wave_budget=3)
         created = self._initialized(tick=100)
@@ -279,6 +283,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(len(self._local()), 3)
         self.assertNotIn(lost.pk, self._local())
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_consecutive_waves_keep_the_budget_and_recover_eventually(self):
         self._use_zone(wave_budget=1)
         created = self._initialized(tick=100)
@@ -310,6 +317,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         # No wave ever created more individuals than the authored budget.
         self.assertEqual(len(self._local()), 3)
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_a_manual_restoration_cancels_without_a_birth_or_sequence_change(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -332,6 +342,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.assertEqual(len(self._individuals()), 3)
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_an_operator_hp_restoration_cancels_through_the_real_gm_route(self):
         from world.rules import gm
 
@@ -356,6 +369,12 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- occurrence timing --------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_later_combat_occurrence_is_never_earlier_birth_headroom(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -379,6 +398,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIsNone(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick)
         self.assertEqual(len(self._local()), 3)
 
+    @covers_requirement(
+        "regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically"
+    )
     def test_a_later_loss_after_a_restored_wave_starts_a_new_due(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -408,6 +430,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- protection ---------------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_protected_cell_blocks_the_due_wave_and_retries_next_interval(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -441,6 +466,12 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIsNone(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick)
         self.assertEqual(len(self._local()), 3)
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_terminal_mapped_session_protects_its_closed_interval(self):
         cell = LOCAL[0]
         monster = construct_species_individual(
@@ -483,6 +514,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- combat occurrence evidence ----------------------------------------
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_round_defeat_is_recorded_at_its_round_offset(self):
         cell = LOCAL[0]
         monster = construct_species_individual(
@@ -551,6 +585,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         )
         return state.generation_sequence, state.recovery_due_tick, len(counts.local_ids), positions
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_equal_clock_advances_agree_under_any_partition(self):
         zone = self._use_zone(wave_budget=1)
 
@@ -597,6 +634,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         }
         return site
 
+    @covers_requirement(
+        "regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically"
+    )
     def test_a_later_site_recovery_never_consumes_the_earlier_wave(self):
         site = self._use_site()
         zone = self._use_zone(wave_budget=1, site=site)
@@ -636,6 +676,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(single[2], "populated")
         self.assertEqual(single[3], 1)
 
+    @covers_requirement(
+        "regional-population::population-lifecycle-replays-loss-and-site-boundaries-chronologically"
+    )
     def test_a_same_tick_site_birth_cancels_the_pending_episode(self):
         site = self._use_site(cleared_at_tick=95, recover_after_ticks=25)
         zone = self._use_zone(
@@ -667,6 +710,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIsNone(single[2])
         self.assertEqual(single[3], 3)
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_protected_cell_defers_site_births_until_it_passes(self):
         site = self._use_site(cleared_at_tick=100, recover_after_ticks=10)
         self._use_zone(site=site)
@@ -709,6 +755,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             1,
         )
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_lawful_clear_still_retains_the_closed_protection(self):
         from world.rules.combat_session.lifecycle import clear_session
         from world.rules.combat_session.records import to_storage
@@ -745,6 +794,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         protection = read_population_timeline(self.wilderness).protection
         self.assertEqual([(p.start_tick, p.end_tick) for p in protection], [(100, 118)])
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
     def test_a_deferred_site_clear_keeps_the_loss_occurrence(self):
         from world.rules.combat_session.records import to_storage
 
@@ -795,6 +847,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(cleared.state, "cleared")
         self.assertEqual(cleared.cleared_at_tick, 106)
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_the_pure_boundary_projects_an_unpersisted_episode(self):
         self._use_zone()
         created = self._initialized(tick=100)
@@ -805,6 +860,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             population_lifecycle.next_population_lifecycle_boundary(100, 130), 110
         )
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
     def test_incomplete_timeline_evidence_refuses(self):
         from world.maps.regional_population import MalformedPopulationState
 
@@ -845,6 +903,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         with self.assertRaises(MalformedPopulationState):
             read_population_timeline(self.wilderness)
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
     def test_a_deleted_home_member_still_counts_before_its_loss(self):
         self._use_zone()
         first = construct_species_individual(
@@ -883,6 +944,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(len(late.local_ids), 1)
         self.assertEqual(len(self._individuals()), 1)
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_settlement_progress_agrees_under_partition(self):
         zone = self._use_zone()
 
@@ -894,6 +958,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(run((60,)), run((25, 35)))
         self.assertEqual(run((60,)), 160)
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
     def test_operator_spawn_and_delete_are_counted_presence_evidence(self):
         from world.maps import gm as map_gm
 
@@ -928,6 +995,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.assertTrue(losses[0].before.alive)
         self.assertFalse(losses[0].after.alive)
 
+    @covers_requirement(
+        "regional-population::historical-population-evidence-preserves-removed-ownership-and-cell-protection"
+    )
     def test_an_operator_departure_keeps_home_ownership_and_schedules(self):
         from world.rules.movement_settlement import settle_relocation
 
@@ -947,6 +1017,9 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
 
     # -- observation routes -------------------------------------------------
 
+    @covers_requirement(
+        "regional-population::deficits-recover-only-through-delayed-game-time-episodes"
+    )
     def test_reads_re_entry_and_acceptance_never_birth(self):
         from world.quests.definitions import QuestStage
         from world.quests.tests._fixtures import accept, defeat, quest, register
@@ -1177,6 +1250,9 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
                 self.player, self.combatant, submitted
             )
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_real_session_persists_its_occurrence_and_protection(self):
         self.assertEqual(self._round()["outcome"], "round")
         self.assertEqual(self._round()["outcome"], "round")
@@ -1204,6 +1280,9 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
             [(100, 100 + 3 * _ROUND_SECONDS)],
         )
 
+    @covers_requirement(
+        "regional-population::loss-timing-and-encounter-protection-survive-deferred-combat-settlement"
+    )
     def test_a_late_terminal_failure_rolls_back_the_wave_and_keeps_the_session(self):
         self.assertEqual(self._round()["outcome"], "round")
         self.assertEqual(self._round()["outcome"], "round")
