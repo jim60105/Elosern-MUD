@@ -1035,14 +1035,6 @@
    "index": 37
   },
   {
-   "name": "maps-38",
-   "workers": 4,
-   "labels": [
-    "world.maps.tests.test_wilderness_population_species"
-   ],
-   "index": 38
-  },
-  {
    "name": "maps-39",
    "workers": 4,
    "labels": [

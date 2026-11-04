@@ -263,15 +263,9 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         room.scene_identity = wilderness_scene_identity(wilderness_name, *coordinates)
         room.room_art_key = None
         room.ndb.active_desc = terrain_description(*coordinates)
-        # wilderness-monster-population D-4: ensure the deterministic monster
-        # population for this coordinate whenever a wilderness script is
-        # attached. Deferred import breaks the load-time cycle: this module is
-        # imported by wilderness_population, which reads region_for_coordinates
-        # from here.
-        if wilderness is not None:
-            from world.maps.wilderness_population import ensure_population
-
-            ensure_population(wilderness, coordinates)
+        # Population is never reconciled here: ordinary births belong to the
+        # regional owner at its game-time boundaries, and the wilderness
+        # contrib re-attaches already registered individuals by coordinate.
         # Gate-face lock re-application (design D3): runs after the stock lock
         # pass of the same set_active_coordinates activation, so it overrides
         # exactly one activation's lock state and stock recomputes everything

@@ -80,6 +80,14 @@ and this is a stated, not silent, limitation
   transaction, and no earlier stage's settlement can observe the site's post-advance state, because this
   stage is the last entry of the fixed sequence
 
+#### Scenario: The final seam is the merged population coordinator
+- **WHEN** the `monster_site_lifecycle` registration is inspected at startup
+- **THEN** it settles exact-tick site lifecycle, pending presence transitions and due regional recovery
+  waves chronologically through `world/maps/population_lifecycle.py::settle_population_lifecycle`,
+  applying same-tick site births before regional births, and neither the retired
+  `settle_monster_sites(start, end)` site-only interval replay nor a second whole-interval regional stage
+  exists
+
 #### Scenario: The fixed sequence matches design doc §6.5's composition
 - **WHEN** the sequence's provenance is inspected
 - **THEN** it is design doc §6.5's four built stages plus
@@ -87,7 +95,8 @@ and this is a stated, not silent, limitation
   `world/rules/clock.py`, inserted between `sexual_decay` and
   `daily_resets`) plus `correspondence_delivery` (identity-addressed letter settlement),
   `instance_reclamation` (change 14's `reclaim_due_instances()`), and `monster_site_lifecycle`
-  (monster-site-placement's `settle_monster_sites()` in `world/maps/monster_sites.py`, appended after
+  (the merged population coordinator registered by
+  `world/maps/population_lifecycle.py::register_regional_population`, appended after
   `instance_reclamation` as the final stage)
 
 ### Requirement: buff_ticks, sexual_decay, and practice settlement are skipped for combat-sourced advances

@@ -1,21 +1,20 @@
 """Authored monster placement registries (monster-site-placement design D-P1).
 
-Design §5 splits monster placement in two: deterministic regional ambient
-species rules, and explicitly authored camps, nests, and boss sites with their
-own lifecycle. Both kinds reference the same variant keys and validate against
-the same species/habitat data, so they live in one module and share one
-construction-time validation.
+Explicitly authored camps, nests, and boss sites, the complete encounter
+compositions they name, the bounded regional ecology zones that own automatic
+births, and the settlement birth-exclusion policies. All kinds reference the
+same variant keys and validate against the same species/habitat data, so they
+live in one module and share one construction-time validation.
 
 This module is data and validation only (requirement R1 of the change's
 `lore-registries` delta). Placement *execution* belongs to ``world/maps/``:
-``wilderness_population.ensure_population`` reconciles the ambient half and
-``monster_sites`` owns the site half, both reading these registries. Nothing
-here spawns, places, reconciles, recovers, or mutates any game state — the
-public surface is the frozen registries, the builder/validator, and pure read
-helpers.
+``regional_population`` owns ordinary births and recovery, ``monster_sites``
+owns the site half, and both read these registries. Nothing here spawns,
+places, reconciles, recovers, or mutates any game state — the public surface
+is the frozen registries, the builder/validator, and pure read helpers.
 
 Habitat tags constrain what an author MAY place, never what spawns: the
-``region_key`` of every rule and site is checked against every referenced
+``region_key`` of every zone and site is checked against every referenced
 variant's species ``habitat_tags`` at construction time, and no runtime spawn
 decision anywhere reads a habitat tag.
 """
@@ -26,7 +25,7 @@ from types import MappingProxyType
 from typing import Callable, TypeVar
 
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
-from .registry_refs import ref, ref_many
+from .registry_refs import ref
 # Read the variant registry as a MODULE attribute at call time (never a
 # from-import binding captured once): the synthetic test-data kit patches the
 # owner module's attribute, so a scoped behavior test observes its stand-in
@@ -54,29 +53,6 @@ MONSTER_SITE_KINDS: tuple[str, ...] = (
 # text and never wall-clock time. Validation reads the vocabulary from here, so
 # a condition no reader understands cannot be authored.
 RECOVERY_CONDITION_FIELDS: tuple[str, ...] = ("recover_after_ticks",)
-
-
-@dataclass(frozen=True, slots=True)
-class AmbientPlacementRule:
-    """One region's deterministic ambient species placement.
-
-    ``region_key`` doubles as the rule's registry key and as the habitat the
-    authoring check runs against. ``variant_keys`` is the eligible set the
-    ambient selection chooses from; ``quantity`` is how many living
-    species-bearing individuals reconciliation maintains per covered
-    coordinate and ``capacity`` is the ceiling it never exceeds there.
-    ``selection_salt`` is the determinism parameter: a fixed integer mixed into
-    the shared coordinate hash so an author can vary which eligible variant a
-    cell selects, with no RNG, database read, or wall-clock input.
-    """
-
-    region_key: str = field(metadata=ref("wilderness_regions", inverse="ambient_placements"))
-    variant_keys: tuple[str, ...] = field(
-        metadata=ref_many("monster_variants", inverse="ambient_placements")
-    )
-    quantity: int
-    capacity: int
-    selection_salt: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -590,7 +566,6 @@ def validate_ecology_registries(
 
 
 def validate_monster_placement_registry(
-    ambient: Mapping[str, AmbientPlacementRule],
     sites: Mapping[str, MonsterSite],
     *,
     region_face: Iterable[str] | None = None,
@@ -624,20 +599,6 @@ def validate_monster_placement_registry(
     composition_rows = (
         ENCOUNTER_COMPOSITION_REGISTRY if compositions is None else compositions
     )
-
-    for mapping_key, rule in ambient.items():
-        what = f"ambient placement rule {mapping_key!r}"
-        if mapping_key != rule.region_key:
-            raise MonsterPlacementRegistryError(
-                f"{what} has region key {rule.region_key!r}; a rule is keyed by "
-                "the region it covers"
-            )
-        if regions is not None:
-            _check_region(rule.region_key, regions, what)
-        _check_variant_keys(rule.variant_keys, rule.region_key, variants, species, what)
-        _require_int(rule.quantity, f"{what} quantity", 1)
-        _require_int(rule.capacity, f"{what} capacity", rule.quantity)
-        _require_int(rule.selection_salt, f"{what} selection salt", 0)
 
     for mapping_key, site in sites.items():
         what = f"monster site {mapping_key!r}"
@@ -688,16 +649,6 @@ def validate_monster_placement_registry(
         )
 
 
-def ambient_rule(region_key: str) -> AmbientPlacementRule | None:
-    """The authored ambient rule covering a region, or ``None``.
-
-    A read helper only: the caller decides whether a coordinate is covered
-    (``world/maps/wilderness_population.py`` keeps the hunting band and the
-    coordinate hash), because placement execution is not lore's business.
-    """
-    return AMBIENT_PLACEMENT_REGISTRY.get(region_key)
-
-
 def variant_species_key(variant_key: str) -> str:
     """The species a registered variant belongs to.
 
@@ -716,44 +667,6 @@ def variant_species_key(variant_key: str) -> str:
 # approved balance profile for a placed individual comes from the construction
 # owner's balance-gated rule, so nothing here carries a number.
 #
-# Content boundary (declared, not a shim): the pre-existing tier-example
-# ambient branch stays the ambient source for every region without an authored
-# rule — `north_deep_forest` and `central_mountains` have no habitat-compatible
-# approved species yet, and `southeast_coast` stays with the tier-example
-# branch so the introductory curated content keeps its pinned behaviour. The
-# hunting band around the capital is excluded from species coverage in code
-# (wilderness_population), because its cells are contract-pinned to the
-# tier-example branch.
-# ---------------------------------------------------------------------------
-
-_AMBIENT_PLACEMENT_DECLARATIONS: tuple[AmbientPlacementRule, ...] = (
-    AmbientPlacementRule(
-        "eastern_plains",
-        ("grain_pecker", "flock_leader", "burrow_maker", "nest_guard"),
-        2,
-        3,
-        1,
-    ),
-    AmbientPlacementRule(
-        "northwest_highland_forest",
-        ("wood_stalker", "trail_hunter"),
-        1,
-        2,
-    ),
-    AmbientPlacementRule(
-        "southwest_coast",
-        ("shore_walker", "reef_warden"),
-        1,
-        2,
-    ),
-    AmbientPlacementRule(
-        "western_hills_valleys",
-        ("burrow_maker", "nest_guard", "cliff_stepper", "pass_warden"),
-        1,
-        2,
-    ),
-)
-
 _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
     # A hare nest: one-shot, so clearing it is a durable authored victory until
     # an author re-issues it. Its complete composition pairs the stronger
@@ -801,10 +714,9 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
 # Each zone is one bounded rectangle inside an approved habitat, with one
 # composition per eligible variant plus the two approved mixed groups. The
 # declarations carry the balance values; no documentation or test keeps a
-# second approval table. The ambient rows above stay the live ambient source
-# until their explicit final cutover, and no alias translates an old row into a
-# zone. Ground outside these rectangles stays outside automatic birth geometry:
-# it simply has no zone, never an implicit species source.
+# second approval table. Ground outside these rectangles stays outside
+# automatic birth geometry: it simply has no zone, never an implicit species
+# source.
 # ---------------------------------------------------------------------------
 
 _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
@@ -967,9 +879,6 @@ _ECOLOGY_ZONE_DECLARATIONS: tuple[EcologyZone, ...] = (
 # minimum one-cell buffer from the geometry rule.
 _SETTLEMENT_BIRTH_POLICY_DECLARATIONS: tuple[SettlementBirthPolicy, ...] = ()
 
-_AMBIENT_PLACEMENT_ROWS: dict[str, AmbientPlacementRule] = {
-    rule.region_key: rule for rule in _AMBIENT_PLACEMENT_DECLARATIONS
-}
 _MONSTER_SITE_ROWS: dict[str, MonsterSite] = build_monster_site_registry(
     _SITE_DECLARATIONS
 )
@@ -987,7 +896,6 @@ _SETTLEMENT_BIRTH_POLICY_ROWS: dict[str, SettlementBirthPolicy] = (
 # precedent): validation runs here, before either registry is published, so an
 # authored typo cannot produce a partially valid registry.
 validate_monster_placement_registry(
-    _AMBIENT_PLACEMENT_ROWS,
     _MONSTER_SITE_ROWS,
     compositions=_ENCOUNTER_COMPOSITION_ROWS,
 )
@@ -998,7 +906,6 @@ validate_ecology_registries(
 # The published registries are read-only proxies: every consumer reads through
 # `.get` / `values()` / `[key]` / `in`, and no subsystem may mutate lore data
 # in place.
-AMBIENT_PLACEMENT_REGISTRY: MappingProxyType = MappingProxyType(_AMBIENT_PLACEMENT_ROWS)
 MONSTER_SITE_REGISTRY: MappingProxyType = MappingProxyType(_MONSTER_SITE_ROWS)
 ENCOUNTER_COMPOSITION_REGISTRY: MappingProxyType = MappingProxyType(
     _ENCOUNTER_COMPOSITION_ROWS

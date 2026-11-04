@@ -173,7 +173,6 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("monster_tiers", "魔物階級", "生物", _attr("world.lore.monsters", "MONSTER_TIER_REGISTRY"), f"{_LORE}/monsters.py", "display_name_zh"),
     _spec("monster_species", "魔物物種", "生物", _attr("world.lore.monster_species", "MONSTER_SPECIES_REGISTRY"), f"{_LORE}/monster_species.py", "display_name_zh", "default_variant_key"),
     _spec("monster_variants", "魔物變體", "生物", _attr("world.lore.monster_species", "MONSTER_VARIANT_REGISTRY"), f"{_LORE}/monster_species.py", "display_name_zh", "species_key", "threat_tier"),
-    _spec("ambient_placements", "環境配置", "生物", _attr("world.lore.monster_placement", "AMBIENT_PLACEMENT_REGISTRY"), f"{_LORE}/monster_placement.py", "region_key", "quantity", "capacity"),
     _spec("monster_sites", "魔物據點", "生物", _attr("world.lore.monster_placement", "MONSTER_SITE_REGISTRY"), f"{_LORE}/monster_placement.py", "kind", "region_key", "composition_key"),
     _spec("encounter_compositions", "遭遇組合", "生物", _attr("world.lore.monster_placement", "ENCOUNTER_COMPOSITION_REGISTRY"), f"{_LORE}/monster_placement.py", "members"),
     _spec("ecology_zones", "生態區帶", "生物", _attr("world.lore.monster_placement", "ECOLOGY_ZONE_REGISTRY"), f"{_LORE}/monster_placement.py", "region_key", "cell_capacity"),

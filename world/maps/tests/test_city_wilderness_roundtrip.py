@@ -159,11 +159,9 @@ class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
         self.assertEqual(advances[0], advances[3])
         self.assertChargedFor(advances[0], _gate_approach_metres())
         self.assertEqual(get_world_clock().tick, before + sum(advances))
-        # The player's own bookkeeping is cleaned up on the return exit, but a
-        # persistent population monster stays registered at the entry
-        # coordinate -- the wilderness is no longer empty (wilderness-
-        # monster-population). This preserves the original leak-check intent:
-        # nothing belonging to the round trip is left behind.
+        # The player's own bookkeeping is cleaned up on the return exit, and
+        # entering the wilderness no longer creates population on the spot:
+        # ordinary births belong to the regional owner's game-time boundaries.
         coordinates = dict(script.db.itemcoordinates)
         self.assertNotIn(self.char1, coordinates)
         from typeclasses.monsters import Monster
@@ -173,9 +171,7 @@ class CityWildernessRoundTripTests(_ChargeAssertions, EvenniaTest):
             for obj, coords in coordinates.items()
             if isinstance(obj, Monster) and coords == EAST_APPROACH
         ]
-        self.assertEqual(len(entry_monsters), 1)
-        ax, ay = EAST_APPROACH
-        self.assertEqual(entry_monsters[0].db.population_key, f"wilderness:{ax}:{ay}")
+        self.assertEqual(entry_monsters, [])
         retained = list(script.db.rooms.values())
         self.assertIn(entry_room, retained or script.db.unused_rooms)
 

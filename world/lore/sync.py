@@ -16,10 +16,7 @@ from .elements import ELEMENT_REGISTRY
 from .guild import GUILD_RANK_REGISTRY
 from .magic import MAGIC_TIER_REGISTRY
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
-from .monster_placement import (
-    AMBIENT_PLACEMENT_REGISTRY,
-    MONSTER_SITE_REGISTRY,
-)
+from .monster_placement import MONSTER_SITE_REGISTRY
 from .names import NAME_PACK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
@@ -51,7 +48,6 @@ MONSTER_SPECIES_CATEGORIES: tuple[str, ...] = tuple(MONSTER_SPECIES_REGISTRIES)
 # This is the single declaration both the mirror table below and that step
 # read, so the skip set and the step can never disagree.
 MONSTER_PLACEMENT_REGISTRIES: dict[str, Mapping[str, Any]] = {
-    "ambient_placements": AMBIENT_PLACEMENT_REGISTRY,
     "monster_sites": MONSTER_SITE_REGISTRY,
 }
 MONSTER_PLACEMENT_CATEGORIES: tuple[str, ...] = tuple(MONSTER_PLACEMENT_REGISTRIES)
@@ -154,8 +150,8 @@ def sync_all() -> None:
     The species/variant categories are mirrored by
     :func:`sync_monster_species` (the named species synchronization step), so
     each of their entries is still mirrored exactly once per startup.
-    The ambient-placement and monster-site categories are mirrored by
-    :func:`sync_monster_placement` for the same reason.
+    The monster-site category is mirrored by :func:`sync_monster_placement`
+    for the same reason.
     """
 
     # This is a world composition root: adopt the complete map world (a

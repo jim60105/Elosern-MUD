@@ -12,10 +12,8 @@ from .elements import ELEMENT_REGISTRY, Element
 from .guild import GUILD_RANK_REGISTRY, GuildRank
 from .magic import MAGIC_TIER_REGISTRY, MagicTier
 from .monster_placement import (
-    AMBIENT_PLACEMENT_REGISTRY,
     MONSTER_SITE_KINDS,
     MONSTER_SITE_REGISTRY,
-    AmbientPlacementRule,
     MonsterPlacementRegistryError,
     MonsterSite,
     validate_monster_placement_registry,
@@ -65,7 +63,6 @@ from .titles import (
 )
 
 __all__ = [
-    "AMBIENT_PLACEMENT_REGISTRY",
     "ANCHOR_LORE",
     "AROUSAL_LEVELS",
     "CLIMAX_PHASE_LEVELS",
@@ -89,7 +86,6 @@ __all__ = [
     "STARTER_EPITHET",
     "STATIC_TIER_REGISTRY",
     "SUBRACE_REGISTRY",
-    "AmbientPlacementRule",
     "Anchor",
     "AnchorKind",
     "AnchorLore",

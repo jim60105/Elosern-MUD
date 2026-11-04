@@ -13,7 +13,6 @@ from tools.spec_traceability import covers_requirement
 import math
 import unittest
 from collections import deque
-from collections.abc import Iterator
 
 from elosern_map_core.terrain import rasterize_routes, ridge_center_x, ridge_span, ridge_spans
 
@@ -44,22 +43,6 @@ def setUpModule():
     from world.tests.geography_fixture import publish_shipped_geography
 
     publish_shipped_geography()
-
-
-def _rule_cells(region_key: str, rule: object) -> Iterator[tuple[int, int]]:
-    """The region's walkable cells one ambient rule's authored window covers."""
-    from world.maps.wilderness_population import species_rule_for_coordinates
-
-    x_min, x_max, y_min, y_max = wilderness_provider.region_search_boxes()[region_key]
-    for x in range(x_min, x_max + 1):
-        for y in range(y_min, y_max + 1):
-            if wilderness_provider.region_for_coordinates(x, y) != region_key:
-                continue
-            if not is_valid_wilderness_cell((x, y)):
-                continue
-            if species_rule_for_coordinates(x, y) != rule:
-                continue
-            yield (x, y)
 
 
 class AuthoredTerrainContractTests(unittest.TestCase):
@@ -469,13 +452,8 @@ class BorderRiverContractTests(unittest.TestCase):
 
     @covers_requirement("wilderness-terrain::the-border-river-controls-western-crossing-and-classification")
     def test_region_consumers_follow_the_amended_boundaries(self):
-        # Monster placement and species-hunt region scoping consume cells on
-        # both banks of the river and both sides of the forest edge.
-        from world.lore.monster_placement import AMBIENT_PLACEMENT_REGISTRY
-        from world.maps.wilderness_population import (
-            population_for_coordinates,
-            species_rule_for_coordinates,
-        )
+        # Quest room observation and species-hunt region scoping consume cells
+        # on both banks of the river and both sides of the forest edge.
         from world.quests.room_observation import resolve_room_region
 
         probes = []
@@ -488,23 +466,6 @@ class BorderRiverContractTests(unittest.TestCase):
             region = region_for_coordinates(*cell)
             self.assertIn(region, regions(), cell)
             self.assertEqual(resolve_room_region(None, coordinates=cell), region, cell)
-            self.assertEqual(
-                species_rule_for_coordinates(*cell), AMBIENT_PLACEMENT_REGISTRY.get(region), cell
-            )
-            population_for_coordinates(*cell)  # every region has a tier row
-        # Species placement windows enumerate only their amended region: the
-        # highland forest lies north of the river and south of the forest edge.
-        rule = AMBIENT_PLACEMENT_REGISTRY["northwest_highland_forest"]
-        cells = _rule_cells("northwest_highland_forest", rule)
-        for _ in range(200):
-            x, y = next(cells)
-            self.assertGreater(y, border_river_row(x))
-            self.assertLess(y, forest_edge_row(x))
-        hills = AMBIENT_PLACEMENT_REGISTRY["western_hills_valleys"]
-        cells = _rule_cells("western_hills_valleys", hills)
-        for _ in range(200):
-            x, y = next(cells)
-            self.assertLessEqual(y, border_river_row(x))
 
 
 class ForestEdgeAndClaimContractTests(unittest.TestCase):

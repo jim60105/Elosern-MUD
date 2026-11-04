@@ -43,11 +43,6 @@ _IMPORT_BEFORE_INSTALL = (
     # the terrain graft then widens the same table with the kit's own rows.
     "world.rules.travel_cost",
     "world.quests.bootstrap",
-    # The monster-population model binds the shipped capital entry and its
-    # immutable shipped-key region tables at import; importing it here keeps
-    # the module loadable under the install, and the terrain graft rebinds
-    # those tables to live kit rows afterwards.
-    "world.maps.wilderness_population",
     # The cross-lineage rulebook validates its shipped YAML at import and is
     # only reached lazily from the practice-award path
     # (world.rules.progression._run_cross_lineage_eval). Its catalog source is

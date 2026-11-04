@@ -25,7 +25,6 @@ from world.lore import monster_placement as registry
 from world.lore import monster_species as species_registry
 from world.lore.monster_placement import (
     RECOVERY_CONDITION_FIELDS,
-    AmbientPlacementRule,
     CompositionMember,
     EcologyZone,
     EncounterComposition,
@@ -63,7 +62,6 @@ POLICY_ANCHOR = "t_fixture_policy_anchor"
 # appear here to exist, and the module must never offer one.
 EXPECTED_PUBLIC_CALLABLES = frozenset(
     {
-        "ambient_rule",
         "build_encounter_composition_registry",
         "build_ecology_zone_registry",
         "build_monster_site_registry",
@@ -138,18 +136,6 @@ def _faces(**overrides):
     return faces
 
 
-def _rule(**overrides) -> AmbientPlacementRule:
-    fields = {
-        "region_key": REGION,
-        "variant_keys": (ORDINARY,),
-        "quantity": 1,
-        "capacity": 2,
-        "selection_salt": 0,
-    }
-    fields.update(overrides)
-    return AmbientPlacementRule(**fields)
-
-
 def _site(**overrides) -> MonsterSite:
     fields = {
         "key": SITE,
@@ -213,22 +199,19 @@ def _ecology_faces(**overrides):
 class PlacementValidationTests(unittest.TestCase):
     """Requirement: placements are validated at construction, before publication."""
 
-    def _reject(self, ambient=None, sites=None, **faces):
+    def _reject(self, sites=None, **faces):
         with self.assertRaises(MonsterPlacementRegistryError):
             registry.validate_monster_placement_registry(
-                {REGION: _rule()} if ambient is None else ambient,
                 {SITE: _site()} if sites is None else sites,
                 **_faces(**faces),
             )
 
     @covers_requirement("lore-registries::placement-registries-follow-the-frozen-keyed-lore-data-contract")
     @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
-    def test_an_unknown_region_is_rejected_for_rules_and_sites(self):
-        self._reject(ambient={ABSENT_REGION: _rule(region_key=ABSENT_REGION)})
+    def test_an_unknown_region_is_rejected_for_sites(self):
         self._reject(sites={SITE: _site(region_key=ABSENT_REGION)})
 
     def test_an_unknown_variant_reference_is_rejected(self):
-        self._reject(ambient={REGION: _rule(variant_keys=(ABSENT_VARIANT,))})
         self._reject(
             sites={SITE: _site()},
             compositions={
@@ -241,7 +224,6 @@ class PlacementValidationTests(unittest.TestCase):
     def test_a_placement_may_not_name_a_non_variant_reference(self):
         # A species key is not a variant key: the pair's variant half is the
         # only reference placement authors.
-        self._reject(ambient={REGION: _rule(variant_keys=(SPECIES,))})
         self._reject(
             sites={SITE: _site()},
             compositions={COMPOSITION: _composition(members=(_member(SPECIES),))},
@@ -252,12 +234,6 @@ class PlacementValidationTests(unittest.TestCase):
         mismatched = {SPECIES: _species_row(habitat_tags=(SPARE_REGION,))}
         self._reject(species_face=mismatched)
         self._reject(sites={SITE: _site()}, species_face=mismatched)
-        # The mirror case: a spare-region placement against a species that
-        # only declares the primary habitat.
-        self._reject(
-            ambient={SPARE_REGION: _rule(region_key=SPARE_REGION)},
-            species_face={SPECIES: _species_row(habitat_tags=(REGION,))},
-        )
 
     def test_a_variant_of_an_unregistered_species_is_rejected(self):
         orphan = {ORDINARY: _variant_row(ORDINARY, species_key="t_fixture_absent_species")}
@@ -283,10 +259,7 @@ class PlacementValidationTests(unittest.TestCase):
     def test_a_site_kind_outside_the_closed_vocabulary_is_rejected(self):
         self._reject(sites={SITE: _site(kind="lair")})
 
-    def test_capacity_is_a_ceiling_never_below_the_quantity(self):
-        self._reject(ambient={REGION: _rule(quantity=3, capacity=2)})
-        self._reject(ambient={REGION: _rule(quantity=0)})
-        self._reject(ambient={REGION: _rule(quantity=1, capacity=True)})
+    def test_site_capacity_must_be_a_positive_integer(self):
         self._reject(sites={SITE: _site(capacity=0)})
 
     @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
@@ -307,7 +280,6 @@ class PlacementValidationTests(unittest.TestCase):
             compositions={COMPOSITION: varying},
         )
         registry.validate_monster_placement_registry(
-            {REGION: _rule()},
             {SITE: _site(capacity=3)},
             **_faces(compositions={COMPOSITION: varying}),
         )
@@ -317,16 +289,9 @@ class PlacementValidationTests(unittest.TestCase):
         for kind in ("stray", "encounter"):
             with self.subTest(kind=kind):
                 registry.validate_monster_placement_registry(
-                    {REGION: _rule()},
                     {SITE: _site(kind=kind)},
                     **_faces(),
                 )
-
-    def test_an_empty_variant_set_is_rejected(self):
-        self._reject(ambient={REGION: _rule(variant_keys=())})
-
-    def test_a_rule_is_keyed_by_the_region_it_covers(self):
-        self._reject(ambient={SPARE_REGION: _rule()})
 
     def test_a_site_is_keyed_by_its_ownership_marker(self):
         self._reject(sites={OTHER_SITE: _site()})
@@ -340,25 +305,19 @@ class PlacementValidationTests(unittest.TestCase):
             registry.build_monster_site_registry((_site(), _site()))
 
     def test_valid_rows_are_accepted_and_unchanged(self):
-        ambient = {REGION: _rule(), SPARE_REGION: _rule(region_key=SPARE_REGION)}
         sites = {SITE: _recovered_site(), OTHER_SITE: _site(key=OTHER_SITE)}
-        before = (dict(ambient), dict(sites))
-        registry.validate_monster_placement_registry(ambient, sites, **_faces())
-        self.assertEqual((ambient, sites), before)
+        before = dict(sites)
+        registry.validate_monster_placement_registry(sites, **_faces())
+        self.assertEqual(sites, before)
 
     @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
     def test_validation_is_pure_and_publishes_nothing(self):
-        ambient = {REGION: _rule()}
         sites = {SITE: _site(one_shot=False)}
-        published_before = [dict(_published(name)) for name in ("AMBIENT_PLACEMENT", "MONSTER_SITE")]
+        published_before = dict(_published("MONSTER_SITE"))
         with self.assertRaises(MonsterPlacementRegistryError):
-            registry.validate_monster_placement_registry(ambient, sites, **_faces())
-        self.assertEqual(ambient, {REGION: _rule()})
+            registry.validate_monster_placement_registry(sites, **_faces())
         self.assertEqual(sites, {SITE: _site(one_shot=False)})
-        self.assertEqual(
-            [dict(_published(name)) for name in ("AMBIENT_PLACEMENT", "MONSTER_SITE")],
-            published_before,
-        )
+        self.assertEqual(dict(_published("MONSTER_SITE")), published_before)
 
 
 class EcologyDeclarationTests(unittest.TestCase):
@@ -623,7 +582,7 @@ class PublishedRegistryTests(unittest.TestCase):
     """Requirement: the published registries are frozen and execution-free."""
 
     def test_the_published_registries_are_read_only_proxies(self):
-        for name in ("AMBIENT_PLACEMENT", "MONSTER_SITE"):
+        for name in ("MONSTER_SITE",):
             with self.subTest(registry=name):
                 published = _published(name)
                 self.assertIsInstance(published, MappingProxyType)
@@ -683,15 +642,6 @@ class PublishedRegistryTests(unittest.TestCase):
         )
         self.assertTrue(set(RECOVERY_CONDITION_FIELDS) <= site_fields)
 
-    def test_ambient_rule_reads_the_published_registry(self):
-        with patch.object(
-            registry,
-            "AMBIENT_PLACEMENT" + "_REGISTRY",
-            MappingProxyType({REGION: _rule()}),
-        ):
-            self.assertEqual(registry.ambient_rule(REGION).region_key, REGION)
-            self.assertIsNone(registry.ambient_rule(SPARE_REGION))
-
     def test_variant_species_key_reads_the_variant_registry(self):
         with patch.object(
             species_registry,
@@ -714,7 +664,7 @@ class ShippedPlacementContentTests(unittest.TestCase):
         # validation over the published rows, so a registry that ever ships an
         # invalid row fails here as well as at import.
         registry.validate_monster_placement_registry(
-            dict(_published("AMBIENT_PLACEMENT")), dict(_published("MONSTER_SITE"))
+            dict(_published("MONSTER_SITE"))
         )
 
     def test_every_shipped_site_habitat_is_the_region_of_its_coordinates(self):
@@ -735,14 +685,6 @@ class ShippedPlacementContentTests(unittest.TestCase):
                 _smallest, largest = registry.composition_bounds(composition)
                 self.assertGreaterEqual(largest, 1)
                 self.assertLessEqual(largest, site.capacity)
-
-    def test_every_shipped_ambient_rule_covers_an_authored_capability(self):
-        published = _published("AMBIENT_PLACEMENT")
-        self.assertTrue(published)
-        for key, rule in published.items():
-            with self.subTest(region=key):
-                self.assertEqual(key, rule.region_key)
-                self.assertTrue(rule.variant_keys)
 
 
 class ShippedEcologyContentTests(unittest.TestCase):
@@ -932,7 +874,7 @@ class MonsterPlacementSyncTests(EvenniaTestCase):
 
     def test_the_mirrored_payload_is_primitive_data(self):
         sync_monster_placement()
-        category = MONSTER_PLACEMENT_CATEGORIES[1]
+        category = MONSTER_PLACEMENT_CATEGORIES[0]
         key = next(iter(_ALL_REGISTRIES[category]))
         fields = search_script(f"lore:{category}:{key}")[0].db.fields
         for value in fields.values():

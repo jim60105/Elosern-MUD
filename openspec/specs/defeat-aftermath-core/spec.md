@@ -38,7 +38,7 @@ wilderness script's `itemcoordinates`.
 
 #### Scenario: Population winner despawns at defeat settlement
 - **WHEN** a player loses to a wilderness population monster carrying `population_key`
-- **THEN** the monster is absent from `itemcoordinates` as part of the committed settlement and, after the post-commit departure callback completes, its object is deleted; the next coordinate activation reconciles a fresh monster as today
+- **THEN** the monster is absent from `itemcoordinates` as part of the committed settlement and, after the post-commit departure callback completes, its object is deleted; no coordinate activation reconciles a fresh monster, because later ordinary births belong only to the regional owner's game-time recovery contract
 
 #### Scenario: Post-commit deletion failure reverts the departure
 - **WHEN** the physical object deletion fails after the settlement committed

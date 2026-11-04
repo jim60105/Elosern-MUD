@@ -294,7 +294,6 @@ def _validate_game_joins(
     """
 
     from world.lore.monster_placement import (
-        AMBIENT_PLACEMENT_REGISTRY,
         ECOLOGY_ZONE_REGISTRY,
         ENCOUNTER_COMPOSITION_REGISTRY,
         MONSTER_SITE_REGISTRY,
@@ -343,11 +342,6 @@ def _validate_game_joins(
                 problems.append(
                     f"monster species {key!r} habitat tag {tag!r} is not a terrain region"
                 )
-    for key, rule in sorted(AMBIENT_PLACEMENT_REGISTRY.items()):
-        if getattr(rule, "region_key", None) not in regions:
-            problems.append(
-                f"ambient placement {key!r} names unknown terrain region {rule.region_key!r}"
-            )
     # Explicit manual placement is a lawful exception to the automatic birth
     # buffer and density rules, but it still needs a valid shared placement
     # surface: a walkable wilderness cell inside the region the site declares.

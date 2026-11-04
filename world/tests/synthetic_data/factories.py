@@ -22,7 +22,7 @@ from world.lore.items import (
     ItemUseMechanics,
 )
 from world.lore.magic import MagicTier
-from world.lore.monster_placement import AmbientPlacementRule, MonsterSite
+from world.lore.monster_placement import MonsterSite
 from world.lore.monster_species import MonsterSpecies, MonsterVariant
 from world.lore.monsters import MonsterTier
 from world.lore.names import FrozenDict, NamePack, NamePart
@@ -92,7 +92,6 @@ from world.tests.synthetic_data.data_monster_species import (
     SYNTH_MONSTER_VARIANTS,
 )
 from world.tests.synthetic_data.data_monster_placement import (
-    SYNTH_AMBIENT_PLACEMENTS,
     SYNTH_MONSTER_SITES,
 )
 from world.tests.synthetic_data.data_world import (
@@ -382,21 +381,6 @@ def make_objective(**overrides: object) -> QuestObjective:
 def make_stage(index: int = 0, objective: QuestObjective | None = None) -> QuestStage:
     """One synthetic quest stage."""
     return QuestStage(index=index, objective=objective or make_objective())
-
-
-def make_ambient_placement_rule(
-    region_key: str = "t_bramble_wold", **overrides: object
-) -> AmbientPlacementRule:
-    """One synthetic ambient rule: a rule is keyed by the region it covers."""
-    if not region_key.startswith(SYNTH_PREFIX):
-        raise ValueError(
-            f"synthetic keys must start with {SYNTH_PREFIX!r}, got {region_key!r}"
-        )
-    return _derive(
-        SYNTH_AMBIENT_PLACEMENTS["t_bramble_wold"],
-        region_key=region_key,
-        **overrides,
-    )
 
 
 def make_monster_site(key: str = "t_made_site", **overrides: object) -> MonsterSite:

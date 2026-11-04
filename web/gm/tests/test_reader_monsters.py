@@ -60,16 +60,11 @@ EXPECTED_SECTIONS = [
 
 class MonsterReaderTests(EvenniaTest):
     def setUp(self):
-        # ``ambient_placements`` is part of the scope: an individual without a
-        # site key resolves its region through the ambient placement registry,
-        # so the absence of that catalog would make the placement section
-        # report a missing region instead of the kit's own rule.
         open_synthetic_scope(
             self,
             "monster_species",
             "monster_variants",
             "monster_tiers",
-            "ambient_placements",
             "monster_sites",
         )
         super().setUp()
