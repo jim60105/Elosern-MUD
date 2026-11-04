@@ -21,3 +21,7 @@ Activity publication SHALL atomically validate explicit bounded policy, positive
 - **WHEN** activity bounds include lawful settlement surroundings or a stationary exam/site
 - **THEN** birth buffers do not become movement barriers and explicit stationary bindings grant no automatic movement or new combat ability
 
+#### Scenario: Every possible solitary outcome is valid
+- **WHEN** a solitary binding references a composition whose inclusive ranges permit more than one total member, including through a site override
+- **THEN** publication rejects before sampling; a sampled singleton cannot authorize an incompatible possible outcome
+

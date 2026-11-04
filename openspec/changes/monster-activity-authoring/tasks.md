@@ -4,7 +4,7 @@ Future implementation only. Begin after proposal.md Batch prerequisites land. Us
 
 ## 1. Pure declarations and bindings
 
-- [ ] 1.1 Add world/lore/monster_activity.py with the exact frozen ActivityArea/AggressionCondition/MonsterActivity shapes, closed policy/condition vocabulary and registries in design.md. Add required composition/site activity_key bindings in monster_placement.py and migrate every constructor/reference in that authoring subsystem, retaining existing compositions. Do not add runtime group writes or infer species behavior. Register new world.lore.tests.test_monster_activity once; extend test_monster_placement. Document complete schema and human review in the developer document. Check: solitary versus cohesive compatibility, bool/nonpositive timing and unknown references reject while valid frozen declarations resolve.
+- [ ] 1.1 Add world/lore/monster_activity.py with the exact frozen ActivityArea/AggressionCondition/MonsterActivity shapes, closed policy/condition vocabulary and registries in design.md. Add required composition/site activity_key bindings in monster_placement.py and migrate every constructor/reference in that authoring subsystem, retaining existing compositions. Do not add runtime group writes or infer species behavior. Register new world.lore.tests.test_monster_activity once; extend test_monster_placement. Document complete schema and human review in the developer document. Check: a count1..2 solitary declaration rejects before sampling, site overrides validate every composition outcome, and bool/nonpositive timing or unknown references reject while valid frozen declarations resolve.
 
 ## 2. Atomic candidate publication
 
