@@ -14,6 +14,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, Room
+from world.lore.monster_placement import EcologyZone, WeightedComposition
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -958,9 +959,26 @@ _HUNT_RATIONALE = "合成評價理由：合成強勢型護巢時會成群衝撞�
 _HUNT_FLAVOR = "合成背景：合成村落的糧倉連年受擾，合成獵人因此發出委託。"
 
 #: The scope this module's hunt tests run under: the kit's synthetic species,
-#: variants, and threat tiers (species-backed construction reads all three).
+#: variants, and threat tiers (species-backed construction reads all three),
+#: plus one authored habitat in the live region the hunt selector names.
+_HUNT_ZONE = EcologyZone(
+    "t_live_region_hunt_habitat",
+    _HUNT_REGION,
+    ((0, 0, 0, 0),),
+    (WeightedComposition("t_whisper_quail_pair", 1),),
+    1,
+    3,
+    2,
+    3600,
+    600,
+    2,
+)
 _HUNT_MATCH_SCOPE = synthetic_registries(
-    "monster_species", "monster_variants", "monster_tiers"
+    "monster_species",
+    "monster_variants",
+    "monster_tiers",
+    "ecology_zones",
+    extra={"ecology_zones": {_HUNT_ZONE.key: _HUNT_ZONE}},
 )
 
 

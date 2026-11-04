@@ -577,7 +577,9 @@ class SpeciesHuntBoardCommandTests(
         # ``register_catalog()`` above runs before the monster scope replaces
         # them; this class's own hunt rows below are kit rows.
         self.enterContext(
-            synthetic_registries("regions", "monster_species", "monster_variants")
+            synthetic_registries(
+                "regions", "monster_species", "monster_variants", "ecology_zones"
+            )
         )
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall

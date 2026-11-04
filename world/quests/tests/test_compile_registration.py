@@ -568,7 +568,11 @@ def _compiled_hunt() -> CompiledQuest:
 
 
 @synthetic_registries(
-    "regions", "monster_species", "monster_variants", "monster_tiers"
+    "regions",
+    "monster_species",
+    "monster_variants",
+    "monster_tiers",
+    "ecology_zones",
 )
 class SpeciesHuntPayloadTests(CompileRegistryIsolation, unittest.TestCase):
     """The stored payload codec carries the hunt selector and the prose fields."""
