@@ -36,6 +36,12 @@ from world.rules.movement_edges import (
     decode_physical_edge,
     encode_location_ref,
     encode_physical_edge,
+    legal_edges,
+    quote_edge,
+)
+from world.rules.travel_cost import (
+    MovementPreflightRefused,
+    TraversalStatus,
 )
 
 #: The wilderness Attribute this owner writes and reads.
@@ -73,6 +79,29 @@ DEFAULT_DECISION_INTERVAL = 60
 
 #: The departure receipt kind this owner writes.
 RECEIPT_DEPARTURE = "departure"
+
+#: The one draw purpose an ordinary activity decision consumes.
+DECISION_PURPOSE = "activity"
+
+#: The outcome reason of a committed departure (or a stay chosen by the saved
+#: selection). Every other stay reason names why no lawful group route exists.
+DECISION_DEPART = "depart"
+DECISION_STAY = "stay"
+STAY_STATIONARY = "stationary"
+STAY_IN_JOURNEY = "in_journey"
+STAY_UNPUBLISHED_BINDING = "unpublished_binding"
+STAY_NO_LIVING_MEMBERS = "no_living_members"
+STAY_MEMBER_ENGAGED = "member_engaged"
+STAY_MEMBER_DISPLACED = "member_displaced"
+STAY_MEMBER_SETTLED_AHEAD = "member_settled_ahead"
+STAY_NO_LEGAL_ROUTE = "no_legal_route"
+STAY_MEMBER_SLEEPING = "member_sleeping"
+STAY_MEMBER_UNAFFORDABLE = "member_unaffordable"
+STAY_MEMBER_BLOCKED = "member_blocked"
+STAY_OUTSIDE_BOUNDS_WAITING = "outside_bounds_waiting"
+
+#: The bounded number of posture segments one idle interval may commit.
+_MAX_POSTURE_SEGMENTS = 64
 
 _STATE_FIELDS = frozenset(
     {"groups", "journeys", "receipts", "room_protection", "settled_through_tick"}
@@ -325,6 +354,23 @@ class ActivityReceipt:
     journey_id: str | None
     individual_id: int | None
     occurred_tick: int
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityDecision:
+    """One scheduled ordinary group decision.
+
+    ``edge`` is ``None`` for a committed stay (the saved selection or a
+    lawful refusal); otherwise it names the one route the whole group takes.
+    ``expected_sequence`` binds the plan to the group state it was read from,
+    so a stale decision can never displace a newer one.
+    """
+
+    group_id: str
+    tick: int
+    expected_sequence: int
+    edge: PhysicalEdge | None
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -1046,6 +1092,613 @@ def group_fingerprint(group: MonsterGroup, individual: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Ordinary activity decisions
+
+
+def _alive(body: Any) -> bool:
+    try:
+        return float(getattr(body.traits.hp, "current", 0)) > 0
+    except (AttributeError, TypeError, ValueError):  # observability: ignore R2: a body without a readable gauge is simply not self-moving; it is never silently moved
+        return False
+
+
+def _active_participant_ids() -> frozenset[int]:
+    """Non-fled participants of every persisted active hostile session."""
+    from world.maps import regional_population
+
+    return regional_population.active_combat_participant_ids()
+
+
+def _member_bodies(group: MonsterGroup) -> tuple[Any, ...]:
+    """Every living member row of one group, in member-id order."""
+    from evennia.objects.models import ObjectDB
+
+    bodies: list[Any] = []
+    for member_id in group.member_ids:
+        body = ObjectDB.objects.filter(id=int(member_id)).first()
+        if body is not None and _alive(body):
+            bodies.append(body)
+    return tuple(bodies)
+
+
+def _declaration(activity_key: str) -> Any | None:
+    """The published ordinary-activity declaration, or ``None``."""
+    from world.lore.monster_activity import MONSTER_ACTIVITY_REGISTRY
+
+    return MONSTER_ACTIVITY_REGISTRY.get(activity_key)
+
+
+def _group_area(group: MonsterGroup) -> tuple[Mapping[str, object], ...]:
+    """The bounded legal cells of one group's committed activity binding."""
+    from world.lore.monster_activity import (
+        ACTIVITY_AREA_REGISTRY,
+        resolve_activity_area,
+    )
+    from world.maps.geography import current as current_geography
+
+    declaration = _declaration(group.activity_key)
+    if declaration is None:
+        raise _invalid(
+            f"group {group.group_id!r} names no published activity binding"
+        )
+    area = ACTIVITY_AREA_REGISTRY.get(declaration.area_key)
+    if area is None:
+        raise _invalid(
+            f"activity {declaration.key!r} names a missing activity area"
+        )
+    return tuple(
+        resolve_activity_area(
+            area,
+            home=encode_location_ref(group.home),
+            candidate_world=current_geography(),
+        )
+    )
+
+
+def _locator_key(locator: Mapping[str, object]) -> str:
+    import json
+
+    return json.dumps(dict(locator), sort_keys=True, separators=(",", ":"))
+
+
+def _body_at_position(wilderness: Any, body: Any, position: LocationRef) -> bool:
+    from world.maps import regional_population
+
+    if position.kind == "wilderness":
+        cell = regional_population.actual_cell(wilderness, body)
+        return cell == (position.x, position.y)
+    return getattr(getattr(body, "location", None), "pk", None) == position.id
+
+
+def _edge_key(edge: PhysicalEdge) -> str:
+    return _locator_key(encode_physical_edge(edge))
+
+
+def _legal_group_edges(
+    group: MonsterGroup, bodies: tuple[Any, ...]
+) -> tuple[PhysicalEdge, ...]:
+    """Edges every living member currently discovers, in canonical order."""
+    per_member: list[dict[str, PhysicalEdge]] = []
+    for body in bodies:
+        try:
+            edges = legal_edges(body, group.position, (body,))
+        except MovementEdgeError:  # observability: ignore R2: an unrepresentable position contributes no lawful edge and keeps the group in place
+            edges = ()
+        per_member.append({_edge_key(edge): edge for edge in edges})
+    if not per_member:
+        return ()
+    common = set(per_member[0])
+    for discovered in per_member[1:]:
+        common &= set(discovered)
+    return tuple(per_member[0][key] for key in sorted(common))
+
+
+def _project_idle_state(
+    body: Any, member_time: MemberTime, *, through_tick: int
+) -> Any:
+    """The member's posture after its unpaid idle prefix (pure projection).
+
+    Uses exactly the interruptible segmentation the owner's committed idle
+    settlement uses, so a read-only plan prices the same state a commit will
+    settle without writing. A wholly absent physiology state stays absent.
+    """
+    from world.rules.fatigue import (
+        FatigueActivity,
+        IntervalCompletion,
+        SleepPosture,
+        predict_interval,
+        read_optional_fatigue_state,
+    )
+
+    state = read_optional_fatigue_state(body)
+    if state is None:
+        return None
+    remaining = int(through_tick) - member_time.settled_through_tick
+    for _ in range(_MAX_POSTURE_SEGMENTS):
+        if remaining <= 0:
+            return state
+        activity = (
+            FatigueActivity.SLEEP
+            if state.posture is not SleepPosture.AWAKE
+            else FatigueActivity.AWAKE
+        )
+        prediction = predict_interval(
+            state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
+        )
+        step = prediction.applicable_seconds
+        if step <= 0:
+            advanced = predict_interval(
+                state, activity, 0, completion=IntervalCompletion.INTERRUPTIBLE
+            ).end
+            if advanced == state:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_physiology_no_progress",
+                    f"member {getattr(body, 'pk', '?')} cannot advance its posture",
+                )
+            state = advanced
+            continue
+        state = predict_interval(
+            state, activity, step, completion=IntervalCompletion.INTERRUPTIBLE
+        ).end
+        remaining -= step
+    raise MonsterActivityOperationInvalid(
+        "monster_activity_physiology_segments",
+        "an idle interval exceeded its bounded posture segmentation",
+    )
+
+
+def _projected_member_states(
+    group: MonsterGroup, bodies: tuple[Any, ...], *, tick: int
+) -> tuple[Any, ...]:
+    """Detached physiology for every member at the decision occurrence."""
+    from world.rules.fatigue import read_optional_fatigue_state
+    from world.rules.travel_plan import TravellerState
+
+    states: list[Any] = []
+    for body in bodies:
+        member_time = group.member_time[str(body.pk)]
+        if member_time.mode == MODE_IDLE and member_time.settled_through_tick < tick:
+            state = _project_idle_state(body, member_time, through_tick=tick)
+        else:
+            state = read_optional_fatigue_state(body)
+        states.append(TravellerState.from_state(state, member_id=int(body.pk)))
+    return tuple(states)
+
+
+def _bounded_candidates(
+    wilderness: Any,
+    group: MonsterGroup,
+    bodies: tuple[Any, ...],
+    *,
+    tick: int,
+    area_keys: frozenset[str],
+) -> tuple[PhysicalEdge, ...]:
+    """Every lawful, unprotected edge landing inside the activity area."""
+    candidates: list[PhysicalEdge] = []
+    for edge in _legal_group_edges(group, bodies):
+        if _locator_key(encode_location_ref(edge.destination)) not in area_keys:
+            continue
+        if _destination_blocked(wilderness, edge.destination, tick):
+            continue
+        candidates.append(edge)
+    return tuple(candidates)
+
+
+def _resolved_area_keys(group: MonsterGroup) -> frozenset[str] | None:
+    """The canonical inside-area locator keys, or ``None`` when unresolvable."""
+    from world.lore.monster_activity import MonsterActivityRegistryError
+
+    try:
+        return frozenset(
+            _locator_key(locator) for locator in _group_area(group)
+        )
+    except (MonsterActivityRegistryError, MovementEdgeError):  # observability: ignore R2: an authored area the published candidate cannot resolve is a lawful scheduled stay; the publisher rejects it before production use
+        return None
+
+
+def _price_candidates(
+    bodies: tuple[Any, ...],
+    states: tuple[Any, ...],
+    candidates: tuple[PhysicalEdge, ...],
+) -> tuple[tuple[PhysicalEdge, ...], set[str]]:
+    """The canonically priced group routes plus the refusal reasons seen."""
+    priced: list[PhysicalEdge] = []
+    refusals: set[str] = set()
+    for edge in candidates:
+        try:
+            resolution = quote_edge(bodies[0], edge, bodies, states=states)
+        except MovementPreflightRefused as error:  # observability: ignore R2: an ordinary sleeping/depleted refusal selects a stay, not an operational failure
+            refusals.add(error.reason)
+            continue
+        if resolution.status is TraversalStatus.UNRESOLVED:
+            refusals.add(STAY_MEMBER_BLOCKED)
+            continue
+        if (
+            resolution.status is TraversalStatus.RESOLVED
+            and (resolution.cost is None or resolution.cost.seconds < 0)
+        ):
+            refusals.add(STAY_MEMBER_BLOCKED)
+            continue
+        priced.append(edge)
+    return tuple(priced), refusals
+
+
+def _stay_reason(
+    candidates: tuple[PhysicalEdge, ...], refusals: set[str]
+) -> str:
+    if not candidates:
+        return STAY_NO_LEGAL_ROUTE
+    if "party_sleeping" in refusals:
+        return STAY_MEMBER_SLEEPING
+    if "pre_destination_depletion" in refusals:
+        return STAY_MEMBER_UNAFFORDABLE
+    return STAY_MEMBER_BLOCKED
+
+
+def plan_group_decision(
+    wilderness: Any, group_id: str, *, tick: int
+) -> ActivityDecision:
+    """Plan one saved ordinary decision without writing anything.
+
+    The saved seed, group identity, sequence and tick select deterministically
+    through the population owner's single sampling discipline. Staying is a
+    scheduled candidate; a lawful departure is the one route the whole living
+    group can physically take inside its authored bounds.
+    """
+    _require_wilderness(wilderness)
+    _require_int(tick, "tick")
+    state = read_monster_activity(wilderness)
+    group = state.groups.get(group_id)
+    if group is None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_unknown", f"no group {group_id!r}"
+        )
+    if group.journey_id is not None:
+        return ActivityDecision(
+            group_id, tick, group.sequence, None, STAY_IN_JOURNEY
+        )
+    declaration = _declaration(group.activity_key)
+    if declaration is None:
+        reason = (
+            STAY_STATIONARY
+            if group.activity_key == STAGED_STATIONARY_ACTIVITY
+            else STAY_UNPUBLISHED_BINDING
+        )
+        return ActivityDecision(group_id, tick, group.sequence, None, reason)
+    if declaration.policy == "stationary":
+        return ActivityDecision(
+            group_id, tick, group.sequence, None, STAY_STATIONARY
+        )
+    bodies = _member_bodies(group)
+    if not bodies:
+        return ActivityDecision(
+            group_id, tick, group.sequence, None, STAY_NO_LIVING_MEMBERS
+        )
+    active_participants = _active_participant_ids()
+    for body in bodies:
+        member_time = group.member_time[str(body.pk)]
+        if (
+            member_time.mode == MODE_COMBAT
+            or int(body.pk) in active_participants
+        ):
+            return ActivityDecision(
+                group_id, tick, group.sequence, None, STAY_MEMBER_ENGAGED
+            )
+        if member_time.settled_through_tick > tick:
+            return ActivityDecision(
+                group_id, tick, group.sequence, None, STAY_MEMBER_SETTLED_AHEAD
+            )
+        if not _body_at_position(wilderness, body, group.position):
+            return ActivityDecision(
+                group_id, tick, group.sequence, None, STAY_MEMBER_DISPLACED
+            )
+    area_keys = _resolved_area_keys(group)
+    if area_keys is None:
+        return ActivityDecision(
+            group_id, tick, group.sequence, None, STAY_UNPUBLISHED_BINDING
+        )
+    outside = _locator_key(encode_location_ref(group.position)) not in area_keys
+    candidates = _bounded_candidates(
+        wilderness, group, bodies, tick=tick, area_keys=area_keys
+    )
+    states = _projected_member_states(group, bodies, tick=tick)
+    priced, refusals = _price_candidates(bodies, states, candidates)
+    if not priced:
+        reason = (
+            STAY_OUTSIDE_BOUNDS_WAITING
+            if outside
+            else _stay_reason(candidates, refusals)
+        )
+        return ActivityDecision(group_id, tick, group.sequence, None, reason)
+    choices: tuple[PhysicalEdge | None, ...] = (
+        priced if outside else (None, *priced)
+    )
+    from world.maps import regional_population
+
+    index = regional_population.draw_index(
+        seed=group.seed,
+        stream_key=group.group_id,
+        sequence=group.sequence,
+        tick=tick,
+        ordinal=0,
+        purpose=DECISION_PURPOSE,
+        upper=len(choices),
+    )
+    chosen = choices[index]
+    return ActivityDecision(
+        group_id,
+        tick,
+        group.sequence,
+        chosen,
+        DECISION_DEPART if chosen is not None else DECISION_STAY,
+    )
+
+
+def commit_group_decision(wilderness: Any, plan: ActivityDecision) -> None:
+    """Commit one planned stay or whole-group departure atomically.
+
+    The plan is revalidated against the committed group before any write:
+    sequence, idle position, living membership, per-member access and the
+    canonical execution price must all still hold. A departure moves every
+    living member in one group journey, never a subset; a stay advances the
+    sequence exactly once and schedules the next positive decision.
+    """
+    if not isinstance(plan, ActivityDecision):
+        raise TypeError(f"expected an ActivityDecision, got {plan!r}")
+    _require_wilderness(wilderness)
+    _require_int(plan.tick, "tick")
+    operation_id = f"activity:{plan.group_id}:{plan.tick}"
+    state = read_monster_activity(wilderness)
+    existing = state.receipts.get(operation_id)
+    if existing is not None:
+        if existing.journey_id is None:
+            raise MonsterActivityOperationInvalid(
+                "monster_activity_receipt_conflict",
+                f"operation {operation_id!r} is not a departure receipt",
+            )
+        return
+    group = state.groups.get(plan.group_id)
+    if group is None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_unknown", f"no group {plan.group_id!r}"
+        )
+    if group.journey_id is not None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_in_journey",
+            f"group {plan.group_id!r} is already travelling",
+        )
+    if plan.tick < group.next_decision_tick:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_decision_early",
+            f"group {plan.group_id!r} is not due until {group.next_decision_tick}",
+        )
+    if plan.edge is None:
+        _commit_stay(wilderness, group, plan)
+        return
+    _commit_departure(wilderness, group, plan, operation_id=operation_id)
+
+
+def _decision_interval(group: MonsterGroup) -> int:
+    return _activity_interval(group.activity_key)
+
+
+def _emit_decided(plan: ActivityDecision) -> None:
+    context = {
+        "group": plan.group_id,
+        "sequence": plan.expected_sequence,
+        "tick": plan.tick,
+        "reason": plan.reason,
+    }
+    transaction.on_commit(
+        lambda context=context: log_info("monster_activity_decided", context=context)
+    )
+
+
+def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -> None:
+    del group  # the group is re-read inside the owning transaction
+    snapshot = snapshot_departure_surfaces(wilderness)
+    try:
+        with transaction.atomic():
+            settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
+            state = read_monster_activity(wilderness)
+            current = state.groups.get(plan.group_id)
+            if current is None or current.journey_id is not None:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_sequence_stale",
+                    f"group {plan.group_id!r} changed before its stay committed",
+                )
+            if current.sequence != plan.expected_sequence:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_sequence_stale",
+                    f"group {plan.group_id!r} sequence changed before its stay",
+                )
+            groups = dict(state.groups)
+            groups[plan.group_id] = _replace_group(
+                current,
+                sequence=current.sequence + 1,
+                next_decision_tick=int(plan.tick) + _decision_interval(current),
+            )
+            _write_state(
+                wilderness,
+                _copy_state(
+                    state,
+                    groups=groups,
+                    settled_through_tick=max(state.settled_through_tick, plan.tick),
+                ),
+            )
+            _emit_decided(plan)
+    except Exception:
+        restore_activity_surfaces(snapshot, wilderness=wilderness)
+        raise
+
+
+def _commit_departure(
+    wilderness: Any,
+    group: MonsterGroup,
+    plan: ActivityDecision,
+    *,
+    operation_id: str,
+) -> None:
+    from world.rules.world_escape import build_journey_plan
+    from world.rules.fatigue import read_optional_fatigue_state
+    from world.rules.travel_plan import TravellerState
+
+    if plan.edge is None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_decision_invalid", "a departure needs one edge"
+        )
+    if group.sequence != plan.expected_sequence:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_sequence_stale",
+            f"group {plan.group_id!r} sequence changed before commit",
+        )
+    if group.position != plan.edge.source:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_source_moved",
+            f"group {plan.group_id!r} no longer stands at the selected source",
+        )
+    declaration = _declaration(group.activity_key)
+    if declaration is None or declaration.policy == "stationary":
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_binding_unpublished",
+            f"group {plan.group_id!r} has no movable activity binding",
+        )
+    bodies = _member_bodies(group)
+    if not bodies:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_members_invalid",
+            f"group {plan.group_id!r} has no living member",
+        )
+    active_participants = _active_participant_ids()
+    for body in bodies:
+        member_time = group.member_time[str(body.pk)]
+        if (
+            member_time.mode == MODE_COMBAT
+            or int(body.pk) in active_participants
+        ):
+            raise MonsterActivityOperationInvalid(
+                "monster_activity_member_engaged",
+                f"member {body.pk} is combat-owned",
+            )
+        if member_time.settled_through_tick > plan.tick:
+            raise MonsterActivityOperationInvalid(
+                "monster_activity_member_settled_ahead",
+                f"member {body.pk} already settled past the decision tick",
+            )
+        if not _body_at_position(wilderness, body, group.position):
+            raise MonsterActivityOperationInvalid(
+                "monster_activity_member_displaced",
+                f"member {body.pk} is not at the group position",
+            )
+    area_keys = {_locator_key(locator) for locator in _group_area(group)}
+    if _locator_key(encode_location_ref(plan.edge.destination)) not in area_keys:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_destination_outside",
+            "the selected edge leaves the authored activity area",
+        )
+    if _destination_blocked(wilderness, plan.edge.destination, plan.tick):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_destination_protected",
+            "the selected destination is protected at the decision tick",
+        )
+    if plan.edge not in _legal_group_edges(group, bodies):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_route_stale",
+            "at least one living member can no longer take the selected edge",
+        )
+    snapshot = snapshot_departure_surfaces(wilderness)
+    try:
+        with transaction.atomic():
+            settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
+            state = read_monster_activity(wilderness)
+            current = state.groups.get(plan.group_id)
+            if current is None or current.journey_id is not None:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_sequence_stale",
+                    f"group {plan.group_id!r} changed before its departure",
+                )
+            if current.sequence != plan.expected_sequence:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_sequence_stale",
+                    f"group {plan.group_id!r} sequence changed before its departure",
+                )
+            if current.position != plan.edge.source:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_source_moved",
+                    f"group {plan.group_id!r} no longer stands at the selected source",
+                )
+            bodies = _member_bodies(current)
+            if not bodies:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_members_invalid",
+                    f"group {plan.group_id!r} has no living member",
+                )
+            active_participants = _active_participant_ids()
+            for body in bodies:
+                if int(body.pk) in active_participants:
+                    raise MonsterActivityOperationInvalid(
+                        "monster_activity_member_engaged",
+                        f"member {body.pk} is an active combat participant",
+                    )
+                if not _body_at_position(wilderness, body, current.position):
+                    raise MonsterActivityOperationInvalid(
+                        "monster_activity_member_displaced",
+                        f"member {body.pk} is not at the group position",
+                    )
+            if plan.edge not in _legal_group_edges(current, bodies):
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_route_stale",
+                    "at least one living member can no longer take the selected edge",
+                )
+            states = tuple(
+                TravellerState.from_state(
+                    read_optional_fatigue_state(body), member_id=int(body.pk)
+                )
+                for body in bodies
+            )
+            try:
+                resolution = quote_edge(
+                    bodies[0], plan.edge, bodies, states=states
+                )
+            except MovementPreflightRefused as error:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_route_refused", str(error)
+                ) from error
+            if resolution.status is TraversalStatus.UNRESOLVED or (
+                resolution.status is TraversalStatus.RESOLVED
+                and resolution.cost is None
+            ):
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_route_unresolved",
+                    "the canonical resolver priced no lawful route",
+                )
+            committed = build_journey_plan(bodies, resolution, states)
+            member_times = {
+                str(body.pk): MemberTime(plan.tick, MODE_JOURNEY, None, ())
+                for body in bodies
+            }
+            _begin_group_journey(
+                wilderness,
+                operation_id=operation_id,
+                group=current,
+                moving_ids=tuple(int(body.pk) for body in bodies),
+                expected_sequence=current.sequence,
+                source=group.position,
+                destination=plan.edge.destination,
+                edge=plan.edge,
+                plan=plan_from_dict(committed),
+                depart_tick=int(plan.tick),
+                member_times=member_times,
+                carry_sequence_when_whole=True,
+                emit_escape=False,
+            )
+            _emit_decided(plan)
+    except Exception:
+        restore_activity_surfaces(snapshot, wilderness=wilderness)
+        raise
+
+
+# ---------------------------------------------------------------------------
 # Departure and arrival
 
 
@@ -1101,38 +1754,16 @@ def begin_monster_journey(
         raise MonsterActivityOperationInvalid(
             "monster_activity_group_unknown", f"no group {group_id!r}"
         )
-    if group.journey_id is not None:
-        raise MonsterActivityOperationInvalid(
-            "monster_activity_group_in_journey", f"group {group_id!r} is already travelling"
-        )
     if individual_id not in group.member_ids:
         raise MonsterActivityOperationInvalid(
             "monster_activity_member_unknown",
             f"member {individual_id} does not belong to group {group_id!r}",
         )
-    if group.sequence != expected_sequence:
-        raise MonsterActivityOperationInvalid(
-            "monster_activity_sequence_stale",
-            f"group {group_id!r} sequence is {group.sequence}, expected {expected_sequence}",
-        )
-    if group.position != source:
-        raise MonsterActivityOperationInvalid(
-            "monster_activity_source_moved",
-            f"group {group_id!r} no longer stands at {source}",
-        )
-    if edge.source != source or edge.destination != destination:
-        raise MonsterActivityOperationInvalid(
-            "monster_activity_edge_mismatch", "the edge endpoints differ from the selected route"
-        )
-    if plan.seconds < 0:
-        raise MonsterActivityOperationInvalid("the committed plan duration is invalid")
     if {member.individual_id for member in plan.members} != {individual_id}:
         raise MonsterActivityOperationInvalid(
             "monster_activity_plan_members", "the plan must name exactly the departing member"
         )
     from evennia.objects.models import ObjectDB
-
-    from world.maps import regional_population
 
     individual = ObjectDB.objects.filter(id=individual_id).first()
     if individual is None:
@@ -1149,45 +1780,170 @@ def begin_monster_journey(
         raise MonsterActivityOperationInvalid(
             "monster_activity_member_time", "the departing member must own a journey cursor"
         )
-    remaining = tuple(
-        member_id for member_id in group.member_ids if member_id != individual_id
+    return _begin_group_journey(
+        wilderness,
+        operation_id=operation_id,
+        group=group,
+        moving_ids=(individual_id,),
+        expected_sequence=expected_sequence,
+        source=source,
+        destination=destination,
+        edge=edge,
+        plan=plan,
+        depart_tick=depart_tick,
+        member_times={str(individual_id): member_time},
+        carry_sequence_when_whole=False,
+        emit_escape=True,
     )
-    new_group_id = group_id if not remaining else f"{group_id}~{individual_id}"
-    if not remaining:
-        groups = dict(state.groups)
-        groups.pop(group_id, None)
-    else:
-        groups = dict(state.groups)
-    member_time_map = dict(group.member_time)
-    member_time_map.pop(str(individual_id), None)
-    if remaining:
-        groups[group_id] = _replace_group(
-            group,
-            member_ids=remaining,
-            sequence=group.sequence + 1,
-            member_time=member_time_map,
+
+
+def _begin_group_journey(
+    wilderness: Any,
+    *,
+    operation_id: str,
+    group: MonsterGroup,
+    moving_ids: tuple[int, ...],
+    expected_sequence: int,
+    source: LocationRef,
+    destination: LocationRef,
+    edge: PhysicalEdge,
+    plan: JourneyPlan,
+    depart_tick: int,
+    member_times: Mapping[str, MemberTime],
+    carry_sequence_when_whole: bool,
+    emit_escape: bool,
+) -> str:
+    """Detach exactly ``moving_ids`` from one group into one durable journey.
+
+    Every departed body leaves its source presence and gets its own cursor in
+    the same atomic owner write; a residual group (members that are not
+    self-moving, such as dead identities) keeps its original id and schedules
+    its own next decision. The journey's id is derived from the operation, so
+    a committed replay is a no-op.
+    """
+    from evennia.objects.models import ObjectDB
+
+    from world.maps import regional_population
+
+    _require_wilderness(wilderness)
+    _require_name(operation_id, "operation_id")
+    _require_int(depart_tick, "depart_tick")
+    state = read_monster_activity(wilderness)
+    existing = state.receipts.get(operation_id)
+    if existing is not None:
+        if existing.journey_id is None:
+            raise MonsterActivityOperationInvalid(
+                "monster_activity_receipt_conflict",
+                f"operation {operation_id!r} does not name a journey",
+            )
+        return existing.journey_id
+    if group.group_id not in state.groups:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_unknown", f"no group {group.group_id!r}"
         )
-    arriving_member_time = {str(individual_id): member_time}
+    if group.journey_id is not None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_in_journey",
+            f"group {group.group_id!r} is already travelling",
+        )
+    moving = tuple(int(member_id) for member_id in moving_ids)
+    if not moving or len(set(moving)) != len(moving):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_members_invalid",
+            "a journey needs distinct moving identities",
+        )
+    if any(member_id not in group.member_ids for member_id in moving):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_member_unknown",
+            f"a moving member does not belong to group {group.group_id!r}",
+        )
+    if group.sequence != expected_sequence:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_sequence_stale",
+            f"group {group.group_id!r} sequence is {group.sequence}, "
+            f"expected {expected_sequence}",
+        )
+    if group.position != source:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_source_moved",
+            f"group {group.group_id!r} no longer stands at {source}",
+        )
+    if edge.source != source or edge.destination != destination:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_edge_mismatch",
+            "the edge endpoints differ from the selected route",
+        )
+    if plan.seconds < 0:
+        raise MonsterActivityOperationInvalid("the committed plan duration is invalid")
+    if {member.individual_id for member in plan.members} != set(moving):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_plan_members",
+            "the plan must name exactly the departing members",
+        )
+    if set(member_times) != {str(member_id) for member_id in moving}:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_member_time",
+            "every departing member needs its own journey cursor",
+        )
+    if any(value.mode != MODE_JOURNEY for value in member_times.values()):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_member_time",
+            "the departing members must own journey cursors",
+        )
+    bodies = tuple(
+        ObjectDB.objects.filter(id=member_id).first() for member_id in moving
+    )
+    if any(body is None for body in bodies):
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_member_missing",
+            "a departing member no longer exists",
+        )
+    residual = tuple(
+        member_id for member_id in group.member_ids if member_id not in moving
+    )
+    groups = dict(state.groups)
+    groups.pop(group.group_id, None)
+    if residual:
+        residual_time = {
+            key: value
+            for key, value in group.member_time.items()
+            if key not in member_times
+        }
+        groups[group.group_id] = _replace_group(
+            group,
+            member_ids=residual,
+            sequence=group.sequence + 1,
+            member_time=residual_time,
+            next_decision_tick=depart_tick + _activity_interval(group.activity_key),
+        )
+        travelling_id = (
+            f"{group.group_id}~" + "+".join(str(member_id) for member_id in moving)
+        )
+    else:
+        travelling_id = group.group_id
     journey_id = f"journey:{operation_id}"
     arrival_tick = depart_tick + plan.seconds
-    new_group = MonsterGroup(
-        group_id=new_group_id,
-        member_ids=(individual_id,),
+    travelling_sequence = (
+        group.sequence + 1 if carry_sequence_when_whole and not residual else 0
+    )
+    groups[travelling_id] = MonsterGroup(
+        group_id=travelling_id,
+        member_ids=moving,
         home_owner=group.home_owner,
         activity_key=group.activity_key,
         home=group.home,
         position=None,
         journey_id=journey_id,
         next_decision_tick=arrival_tick + _activity_interval(group.activity_key),
-        sequence=0,
+        sequence=travelling_sequence,
         seed=group.seed,
-        member_time=arriving_member_time,
+        member_time=dict(member_times),
     )
-    groups[new_group_id] = new_group
-    journey = MonsterJourney(
+    journeys = dict(state.journeys)
+    journeys[journey_id] = MonsterJourney(
         journey_id=journey_id,
-        group_id=new_group_id,
-        member_ids=(individual_id,),
+        group_id=travelling_id,
+        member_ids=moving,
         source=source,
         destination=destination,
         depart_tick=depart_tick,
@@ -1197,60 +1953,69 @@ def begin_monster_journey(
         edge=edge,
         plan=plan,
     )
-    journeys = dict(state.journeys)
-    journeys[journey_id] = journey
     receipts = dict(state.receipts)
     receipts[operation_id] = ActivityReceipt(
         operation_id,
         RECEIPT_DEPARTURE,
-        new_group_id,
+        travelling_id,
         journey_id,
-        individual_id,
+        moving[0] if len(moving) == 1 else None,
         depart_tick,
     )
-
-    before = regional_population.presence_of(
-        wilderness,
-        individual,
-        alive=True,
-        cell=(source.x, source.y) if source.kind == "wilderness" else None,
-    )
+    befores = {
+        body.pk: regional_population.presence_of(
+            wilderness,
+            body,
+            alive=True,
+            cell=(source.x, source.y) if source.kind == "wilderness" else None,
+        )
+        for body in bodies
+    }
     if source.kind == "wilderness":
         coordinates = dict(wilderness.db.itemcoordinates)
-        coordinates.pop(individual, None)
+        for body in bodies:
+            coordinates.pop(body, None)
         wilderness.db.itemcoordinates = coordinates
+    for body in bodies:
+        body.location = None
+    if source.kind == "wilderness":
         room = _source_room(wilderness, (source.x, source.y))
         if room is not None:
             room.contents_cache.init()
-    individual.location = None
-    after = regional_population.presence_of(wilderness, individual, alive=True)
-    regional_population.record_population_transition(
-        wilderness,
-        regional_population.PopulationTransition(
-            source_id=operation_id,
-            individual_id=individual_id,
-            occurred_tick=depart_tick,
-            before=before,
-            after=after,
-        ),
-    )
+    for body in bodies:
+        regional_population.record_population_transition(
+            wilderness,
+            regional_population.PopulationTransition(
+                source_id=operation_id,
+                individual_id=int(body.pk),
+                occurred_tick=depart_tick,
+                before=befores[body.pk],
+                after=regional_population.presence_of(wilderness, body, alive=True),
+            ),
+        )
     _write_state(
         wilderness,
         _copy_state(state, groups=groups, journeys=journeys, receipts=receipts),
     )
-    context = {
-        "operation": operation_id,
-        "group": new_group_id,
-        "individual": individual_id,
-        "source": encode_location_ref(source),
-        "destination": encode_location_ref(destination),
-        "journey": journey_id,
-        "tick": depart_tick,
-    }
-    transaction.on_commit(lambda context=context: log_info("monster_departed", context=context))
-    transaction.on_commit(
-        lambda context=context: log_info("monster_escape_resolved", context=context)
-    )
+    for body in bodies:
+        context = {
+            "operation": operation_id,
+            "group": travelling_id,
+            "individual": int(body.pk),
+            "source": encode_location_ref(source),
+            "destination": encode_location_ref(destination),
+            "journey": journey_id,
+            "tick": depart_tick,
+        }
+        transaction.on_commit(
+            lambda context=context: log_info("monster_departed", context=context)
+        )
+        if emit_escape:
+            transaction.on_commit(
+                lambda context=context: log_info(
+                    "monster_escape_resolved", context=context
+                )
+            )
     return journey_id
 
 
@@ -1410,11 +2175,14 @@ def begin_member_combat(
 
         individual = ObjectDB.objects.filter(id=int(individual_id)).first()
         if individual is not None and tick > current.settled_through_tick:
+            prefix = tick - current.settled_through_tick
             _idle_physiology(
                 individual,
-                seconds=tick - current.settled_through_tick,
+                seconds=prefix,
                 context={"stage": "monster_idle_admission", "session": session_id},
+                start_tick=current.settled_through_tick,
             )
+            _settle_gauge(individual, seconds=prefix)
         member_time_map = dict(group.member_time)
         member_time_map[str(individual_id)] = MemberTime(
             max(current.settled_through_tick, tick), MODE_COMBAT, session_id, ()
@@ -1539,12 +2307,251 @@ def room_protected(wilderness: Any, location: LocationRef, tick: int) -> bool:
 # Chronological settlement
 
 
+def _settle_gauge(body: Any, *, seconds: int) -> None:
+    """Regenerate the member's gauges through the canonical clock writer."""
+    if seconds <= 0:
+        return
+    from world.rules.clock import settle_gauge_regeneration
+
+    settle_gauge_regeneration((body,), int(seconds))
+
+
+def _settle_posture(
+    body: Any, *, start_tick: int, seconds: int, context: Mapping[str, Any]
+) -> None:
+    """Pay one idle prefix in deterministic posture segments.
+
+    Segmentation happens exactly at the fatigue owner's own boundaries, so an
+    arbitrary split of the same elapsed interval commits the identical
+    sequence of segments: equal partitions always leave equal physiology.
+    """
+    from world.rules.fatigue import (
+        FatigueActivity,
+        FatigueInterval,
+        IntervalCompletion,
+        SleepPosture,
+        predict_interval,
+        read_optional_fatigue_state,
+        settle_fatigue_intervals,
+    )
+
+    state = read_optional_fatigue_state(body)
+    if state is None:
+        return
+    remaining = int(seconds)
+    cursor = int(start_tick)
+    for _ in range(_MAX_POSTURE_SEGMENTS):
+        if remaining <= 0:
+            return
+        activity = (
+            FatigueActivity.SLEEP
+            if state.posture is not SleepPosture.AWAKE
+            else FatigueActivity.AWAKE
+        )
+        prediction = predict_interval(
+            state, activity, remaining, completion=IntervalCompletion.INTERRUPTIBLE
+        )
+        step = prediction.applicable_seconds
+        if step <= 0:
+            advanced = predict_interval(
+                state, activity, 0, completion=IntervalCompletion.INTERRUPTIBLE
+            ).end
+            if advanced == state:
+                raise MonsterActivityOperationInvalid(
+                    "monster_activity_physiology_no_progress",
+                    f"member {getattr(body, 'pk', '?')} cannot advance its posture",
+                )
+            # An immediate depletion/wake is a real committed transition: pay
+            # a zero-second interval through the sole writer so the persisted
+            # state matches the projection before the next segment.
+            settlement = settle_fatigue_intervals(
+                (
+                    FatigueInterval(
+                        body,
+                        activity,
+                        0,
+                        state,
+                        IntervalCompletion.INTERRUPTIBLE,
+                    ),
+                ),
+                context=dict(context),
+                start_tick=cursor,
+            )
+            state = settlement.commits[0].end
+            continue
+        settlement = settle_fatigue_intervals(
+            (
+                FatigueInterval(
+                    body,
+                    activity,
+                    step,
+                    state,
+                    IntervalCompletion.INTERRUPTIBLE,
+                ),
+            ),
+            context=dict(context),
+            start_tick=cursor,
+        )
+        state = settlement.commits[0].end
+        cursor += step
+        remaining -= step
+    raise MonsterActivityOperationInvalid(
+        "monster_activity_physiology_segments",
+        "an idle interval exceeded its bounded posture segmentation",
+    )
+
+
+def _settled_group_idle(
+    group: MonsterGroup, *, tick: int
+) -> MonsterGroup:
+    """Return the group with every living idle member paid through ``tick``."""
+    from evennia.objects.models import ObjectDB
+
+    member_time = dict(group.member_time)
+    changed = False
+    for member_id in group.member_ids:
+        current = member_time.get(str(member_id))
+        if current is None or current.mode != MODE_IDLE:
+            continue
+        if tick <= current.settled_through_tick:
+            continue
+        body = ObjectDB.objects.filter(id=int(member_id)).first()
+        if body is None or not _alive(body):
+            continue
+        seconds = tick - current.settled_through_tick
+        _settle_posture(
+            body,
+            start_tick=current.settled_through_tick,
+            seconds=seconds,
+            context={"stage": "monster_activity_idle", "group": group.group_id},
+        )
+        _settle_gauge(body, seconds=seconds)
+        member_time[str(member_id)] = MemberTime(
+            tick, MODE_IDLE, None, ()
+        )
+        changed = True
+    if not changed:
+        return group
+    return _replace_group(group, member_time=member_time)
+
+
+def settle_group_idle(wilderness: Any, group_id: str, *, tick: int) -> None:
+    """Settle one group's idle physiology through ``tick`` exactly once."""
+    _require_wilderness(wilderness)
+    _require_int(tick, "tick")
+    state = read_monster_activity(wilderness)
+    group = state.groups.get(group_id)
+    if group is None:
+        raise MonsterActivityOperationInvalid(
+            "monster_activity_group_unknown", f"no group {group_id!r}"
+        )
+    if group.journey_id is not None:
+        return
+    updated = _settled_group_idle(group, tick=tick)
+    if updated is group:
+        return
+    groups = dict(state.groups)
+    groups[group_id] = updated
+    _write_state(
+        wilderness,
+        _copy_state(
+            state,
+            groups=groups,
+            settled_through_tick=max(state.settled_through_tick, tick),
+        ),
+    )
+
+
+def settle_idle_physiology(wilderness: Any, tick: int) -> None:
+    """Settle every idle group globally through ``tick`` in one owner write.
+
+    Groups in a journey settle their passage and waiting at their own due
+    boundaries; combat-owned members are paid by the combat owner. This is the
+    one bulk idle pass, so an arbitrary clock-advance partition leaves equal
+    resources and cursors.
+    """
+    if not activity_provisioned(wilderness):
+        return
+    _require_int(tick, "tick")
+    state = read_monster_activity(wilderness)
+    groups = dict(state.groups)
+    changed = False
+    for group_id in sorted(groups):
+        group = groups[group_id]
+        if group.journey_id is not None:
+            continue
+        updated = _settled_group_idle(group, tick=tick)
+        if updated is not group:
+            groups[group_id] = updated
+            changed = True
+    if not changed:
+        return
+    _write_state(
+        wilderness,
+        _copy_state(
+            state,
+            groups=groups,
+            settled_through_tick=max(state.settled_through_tick, tick),
+        ),
+    )
+
+
+def settle_group_decisions_at(
+    wilderness: Any, tick: int
+) -> list[ScheduledEvent]:
+    """Plan and commit every due idle group decision at one boundary tick.
+
+    Decisions are observed through the committed logging event, not returned
+    as clock boundary events: a distant scheduled stay is internal
+    maintenance and must not surface as an interactive boundary.
+    """
+    _require_wilderness(wilderness)
+    _require_int(tick, "tick")
+    if not activity_provisioned(wilderness):
+        return []
+    for group_id in sorted(read_monster_activity(wilderness).groups):
+        state = read_monster_activity(wilderness)
+        group = state.groups.get(group_id)
+        if group is None or group.journey_id is not None:
+            continue
+        if group.next_decision_tick > tick:
+            continue
+        settle_group_idle(wilderness, group_id, tick=tick)
+        decision = plan_group_decision(wilderness, group_id, tick=tick)
+        commit_group_decision(wilderness, decision)
+    return []
+
+
+def activity_member_mode(individual: Any) -> str | None:
+    """The activity-record mode owning ``individual``, or ``None``.
+
+    Pure read. A provisioned world whose record cannot be interpreted answers
+    ``None`` here so a caller-scoped clock stage simply keeps its ordinary
+    semantics; the owner's own settlement still fails closed on that record.
+    """
+    from world.maps import regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not activity_provisioned(wilderness):
+        return None
+    try:
+        state = read_monster_activity(wilderness)
+    except MonsterActivityError:  # observability: ignore R2: an unreadable owner record is not an activity-owned body here; the owner's own settlement still fails closed
+        return None
+    pk = int(getattr(individual, "pk", 0) or 0)
+    for group in state.groups.values():
+        if pk in group.member_ids:
+            return group.member_time[str(pk)].mode
+    return None
+
+
 def _settle_interval(
     entity: Any,
     *,
     seconds: int,
     activity: Any,
     context: Mapping[str, Any],
+    start_tick: int | None = None,
 ) -> None:
     """Pay one interval through the sole fatigue writer, or nothing."""
     if seconds <= 0:
@@ -1571,6 +2578,7 @@ def _settle_interval(
                 ),
             ),
             context=dict(context),
+            start_tick=start_tick,
         )
     except Exception as error:  # observability: R1 reported below; corrupt physiology refuses the whole boundary
         log_warn(
@@ -1582,7 +2590,11 @@ def _settle_interval(
 
 
 def _journey_physiology(
-    individual: Any, *, seconds: int, context: Mapping[str, Any]
+    individual: Any,
+    *,
+    seconds: int,
+    context: Mapping[str, Any],
+    start_tick: int | None = None,
 ) -> None:
     from world.rules.fatigue import FatigueActivity
 
@@ -1591,11 +2603,16 @@ def _journey_physiology(
         seconds=seconds,
         activity=FatigueActivity.FOOT_TRAVEL,
         context=context,
+        start_tick=start_tick,
     )
 
 
 def _waiting_physiology(
-    individual: Any, *, seconds: int, context: Mapping[str, Any]
+    individual: Any,
+    *,
+    seconds: int,
+    context: Mapping[str, Any],
+    start_tick: int | None = None,
 ) -> None:
     from world.rules.fatigue import (
         FatigueActivity,
@@ -1610,12 +2627,20 @@ def _waiting_physiology(
         else FatigueActivity.AWAKE
     )
     _settle_interval(
-        individual, seconds=seconds, activity=activity, context=context
+        individual,
+        seconds=seconds,
+        activity=activity,
+        context=context,
+        start_tick=start_tick,
     )
 
 
 def _idle_physiology(
-    individual: Any, *, seconds: int, context: Mapping[str, Any]
+    individual: Any,
+    *,
+    seconds: int,
+    context: Mapping[str, Any],
+    start_tick: int | None = None,
 ) -> None:
     """Pay one ordinary idle interval under the member's actual posture."""
     from world.rules.fatigue import (
@@ -1631,7 +2656,11 @@ def _idle_physiology(
         else FatigueActivity.AWAKE
     )
     _settle_interval(
-        individual, seconds=seconds, activity=activity, context=context
+        individual,
+        seconds=seconds,
+        activity=activity,
+        context=context,
+        start_tick=start_tick,
     )
 
 
@@ -1673,7 +2702,7 @@ def _route_lawful(wilderness: Any, journey: MonsterJourney, individual: Any) -> 
 def _arrive(
     wilderness: Any,
     journey: MonsterJourney,
-    individual: Any,
+    bodies: tuple[Any, ...],
     *,
     tick: int,
     state: MonsterActivityState,
@@ -1684,51 +2713,66 @@ def _arrive(
 
     destination = journey.destination
     group = state.groups[journey.group_id]
-    member_time = group.member_time[str(journey.member_ids[0])]
-    before = regional_population.presence_of(wilderness, individual, alive=True)
+    befores = {
+        body.pk: regional_population.presence_of(wilderness, body)
+        for body in bodies
+    }
     if destination.kind == "wilderness":
         cell = (destination.x, destination.y)
         if not wilderness.is_valid_coordinates(cell):
             raise _invalid(f"journey {journey.journey_id!r} names an invalid destination cell")
         coordinates = dict(wilderness.db.itemcoordinates)
-        coordinates[individual] = cell
+        for body in bodies:
+            if _alive(body):
+                coordinates[body] = cell
+            else:
+                coordinates.pop(body, None)
         wilderness.db.itemcoordinates = coordinates
         room = (wilderness.db.rooms or {}).get(cell)
         if room is not None:
-            room.contents_cache.add(individual)
-            individual.location = room
+            for body in bodies:
+                if _alive(body):
+                    body.location = room
+                    room.contents_cache.add(body)
+                else:
+                    body.location = None
         else:
-            individual.location = None
-        after = regional_population.presence_of(
-            wilderness, individual, alive=True, cell=cell
-        )
+            for body in bodies:
+                body.location = None
     else:
         room = room_for_ref(destination)
         if room is None:
             raise _invalid(f"journey {journey.journey_id!r} names a vanished authored room")
-        individual.location = room
-        room.contents_cache.add(individual)
-        after = regional_population.presence_of(wilderness, individual, alive=True)
-    regional_population.record_population_transition(
-        wilderness,
-        regional_population.PopulationTransition(
-            source_id=f"arrival:{journey.journey_id}",
-            individual_id=journey.member_ids[0],
-            occurred_tick=tick,
-            before=before,
-            after=after,
-        ),
-    )
-    member_time_map = {
-        key: member_time if key == str(journey.member_ids[0]) else value
-        for key, value in group.member_time.items()
-    }
-    member_time_map[str(journey.member_ids[0])] = MemberTime(
-        max(journey.settled_through_tick, journey.arrival_tick),
-        MODE_IDLE,
-        None,
-        (),
-    )
+        for body in bodies:
+            if _alive(body):
+                body.location = room
+                room.contents_cache.add(body)
+            else:
+                body.location = None
+    for body in bodies:
+        regional_population.record_population_transition(
+            wilderness,
+            regional_population.PopulationTransition(
+                source_id=f"arrival:{journey.journey_id}",
+                individual_id=int(body.pk),
+                occurred_tick=tick,
+                before=befores[body.pk],
+                after=regional_population.presence_of(
+                    wilderness,
+                    body,
+                ),
+            ),
+        )
+    member_time_map = dict(group.member_time)
+    for member_id in journey.member_ids:
+        current = member_time_map.get(str(member_id))
+        floor = 0 if current is None else current.settled_through_tick
+        member_time_map[str(member_id)] = MemberTime(
+            max(floor, tick),
+            MODE_IDLE,
+            None,
+            (),
+        )
     groups = dict(state.groups)
     groups[journey.group_id] = _replace_group(
         group,
@@ -1740,16 +2784,19 @@ def _arrive(
     journeys = dict(state.journeys)
     journeys.pop(journey.journey_id, None)
     _write_state(wilderness, _copy_state(state, groups=groups, journeys=journeys))
-    context = {
-        "journey": journey.journey_id,
-        "group": journey.group_id,
-        "individual": journey.member_ids[0],
-        "source": encode_location_ref(journey.source),
-        "destination": encode_location_ref(destination),
-        "tick": tick,
-    }
-    transaction.on_commit(lambda context=context: log_info("monster_arrived", context=context))
-    log_events.append(ScheduledEvent("monster_arrived", tick, dict(context)))
+    for member_id in journey.member_ids:
+        context = {
+            "journey": journey.journey_id,
+            "group": journey.group_id,
+            "individual": member_id,
+            "source": encode_location_ref(journey.source),
+            "destination": encode_location_ref(destination),
+            "tick": tick,
+        }
+        transaction.on_commit(
+            lambda context=context: log_info("monster_arrived", context=context)
+        )
+        log_events.append(ScheduledEvent("monster_arrived", tick, dict(context)))
 
 
 def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
@@ -1775,34 +2822,59 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
         due = journey.retry_tick if journey.retry_tick is not None else journey.arrival_tick
         if due != tick:
             continue
-        individual_id = journey.member_ids[0]
-        individual = ObjectDB.objects.filter(id=individual_id).first()
-        if individual is None:
+        bodies = tuple(
+            ObjectDB.objects.filter(id=int(member_id)).first()
+            for member_id in journey.member_ids
+        )
+        if any(body is None for body in bodies):
             raise _invalid(f"journey {journey_id!r} names a missing individual")
         group = state.groups[journey.group_id]
         # Pay exactly the newly elapsed passage and ordinary waiting at every
         # due boundary, whether this boundary arrives or defers. A successful
         # retry therefore never loses the wait that preceded it.
-        travelled = min(tick, journey.arrival_tick) - min(
-            journey.settled_through_tick, journey.arrival_tick
-        )
-        _journey_physiology(
-            individual,
-            seconds=max(0, travelled),
-            context={"stage": "monster_journey", "journey": journey_id},
-        )
-        waiting = max(
-            0, tick - max(journey.settled_through_tick, journey.arrival_tick)
-        )
-        _waiting_physiology(
-            individual,
-            seconds=waiting,
-            context={"stage": "monster_journey_wait", "journey": journey_id},
-        )
+        for body in bodies:
+            member_time = group.member_time[str(body.pk)]
+            cursor = member_time.settled_through_tick
+            if _alive(body):
+                travelled = min(tick, journey.arrival_tick) - min(
+                    cursor, journey.arrival_tick
+                )
+                _journey_physiology(
+                    body,
+                    seconds=max(0, travelled),
+                    context={"stage": "monster_journey", "journey": journey_id},
+                    start_tick=cursor,
+                )
+                waiting = max(0, tick - max(cursor, journey.arrival_tick))
+                _waiting_physiology(
+                    body,
+                    seconds=waiting,
+                    context={"stage": "monster_journey_wait", "journey": journey_id},
+                    start_tick=max(cursor, journey.arrival_tick),
+                )
+                _settle_gauge(body, seconds=max(0, tick - cursor))
+            group = _replace_group(
+                group,
+                member_time={
+                    **group.member_time,
+                    str(body.pk): MemberTime(
+                        max(cursor, tick),
+                        MODE_JOURNEY,
+                        member_time.session_id,
+                        (),
+                    ),
+                },
+            )
+            state = _copy_state(
+                state, groups={**state.groups, journey.group_id: group}
+            )
         settled = max(journey.settled_through_tick, tick)
         blocked = _destination_blocked(
             wilderness, journey.destination, tick
-        ) or not _route_lawful(wilderness, journey, individual)
+        ) or any(
+            _alive(body) and not _route_lawful(wilderness, journey, body)
+            for body in bodies
+        )
         if blocked:
             interval = _activity_interval(group.activity_key)
             journeys = dict(state.journeys)
@@ -1827,7 +2899,11 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
             _write_state(wilderness, state)
             context = {
                 "journey": journey_id,
-                "individual": individual_id,
+                "individual": (
+                    int(bodies[0].pk)
+                    if len(bodies) == 1
+                    else tuple(int(body.pk) for body in bodies)
+                ),
                 "destination": encode_location_ref(journey.destination),
                 "tick": tick,
                 "retry_tick": tick + interval,
@@ -1861,7 +2937,7 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
         _arrive(
             wilderness,
             journey,
-            individual,
+            bodies,
             tick=tick,
             state=state,
             log_events=events,
@@ -1885,13 +2961,19 @@ def _retry_group(
 def next_monster_activity_boundary(
     wilderness: Any, after: int, end: int
 ) -> int | None:
-    """The earliest due arrival or retry strictly after ``after`` up to ``end``."""
+    """The earliest due journey or idle-decision boundary after ``after``."""
     if wilderness is None or not activity_provisioned(wilderness):
         return None
     state = read_monster_activity(wilderness)
     candidates: list[int] = []
     for journey in state.journeys.values():
         due = journey.retry_tick if journey.retry_tick is not None else journey.arrival_tick
+        if after < due <= end:
+            candidates.append(due)
+    for group in state.groups.values():
+        if group.journey_id is not None:
+            continue
+        due = group.next_decision_tick
         if after < due <= end:
             candidates.append(due)
     return min(candidates) if candidates else None
@@ -1915,12 +2997,16 @@ def retire_room_protection(wilderness: Any, tick: int) -> None:
 # Surfaces for a caller-owned rollback
 
 
-def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
+def _db_safe_attribute_snapshot(
+    obj: Any, key: str, category: str | None = None
+) -> tuple[bool, Any]:
     from evennia.utils import dbserialize
 
-    exists = obj.attributes.has(key)
+    exists = obj.attributes.has(key, category=category)
     value = (
-        dbserialize.from_pickle(dbserialize.to_pickle(obj.attributes.get(key)))
+        dbserialize.from_pickle(
+            dbserialize.to_pickle(obj.attributes.get(key, category=category))
+        )
         if exists
         else None
     )
@@ -1975,8 +3061,17 @@ def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
         location = getattr(individual, "location", None)
         surfaces[id(individual)] = SurfaceSnapshot(
             attributes={
-                (key, category): _db_safe_attribute_snapshot(individual, key)
-                for key, category in (*FATIGUE_ATTRIBUTE_SURFACES, *SLEEP_RECEIPT_SURFACES)
+                (key, category): _db_safe_attribute_snapshot(
+                    individual, key, category
+                )
+                for key, category in (
+                    # Gauge regeneration is settled by this owner for its
+                    # bodies, so the durable trait store belongs to the same
+                    # rollback contract as fatigue and receipts.
+                    ("traits", "traits"),
+                    *FATIGUE_ATTRIBUTE_SURFACES,
+                    *SLEEP_RECEIPT_SURFACES,
+                )
             },
             location=(location is not None, getattr(location, "pk", None)),
         )
@@ -2043,6 +3138,25 @@ def restore_activity_surfaces(
                     exc=error,
                     context={"stage": "monster_activity_location", "obj": str(obj)},
                 )
+    from world.rules.clock import _refresh_advance_entity_caches
+
+    for object_id in snapshot:
+        obj = candidates.get(object_id)
+        if obj is None or getattr(obj, "_is_deleted", False):
+            continue
+        if hasattr(obj, "attributes"):
+            try:
+                obj.attributes.reset_cache()
+            except Exception as error:  # observability: ignore R2: the warn below reports the failed cache refresh
+                log_warn(
+                    "rollback_restore_failed",
+                    exc=error,
+                    context={
+                        "stage": "monster_activity_attribute_cache",
+                        "obj": str(obj),
+                    },
+                )
+            _refresh_advance_entity_caches(obj)
     regional_population.restore_population_surfaces(snapshot)
 
 
@@ -2050,7 +3164,23 @@ __all__ = [
     "ACTIVITY_AWAKE_COMBAT",
     "ACTIVITY_SLEEP",
     "COMBAT_ACTIVITIES",
+    "DECISION_DEPART",
+    "DECISION_PURPOSE",
+    "DECISION_STAY",
     "DEFAULT_DECISION_INTERVAL",
+    "STAY_IN_JOURNEY",
+    "STAY_MEMBER_BLOCKED",
+    "STAY_MEMBER_DISPLACED",
+    "STAY_MEMBER_ENGAGED",
+    "STAY_MEMBER_SETTLED_AHEAD",
+    "STAY_MEMBER_SLEEPING",
+    "STAY_MEMBER_UNAFFORDABLE",
+    "STAY_NO_LEGAL_ROUTE",
+    "STAY_NO_LIVING_MEMBERS",
+    "STAY_OUTSIDE_BOUNDS_WAITING",
+    "STAY_STATIONARY",
+    "STAY_UNPUBLISHED_BINDING",
+    "ActivityDecision",
     "ActivityReceipt",
     "CombatInterval",
     "JourneyPlan",
@@ -2074,8 +3204,10 @@ __all__ = [
     "STAGED_DECISION_INTERVAL",
     "STAGED_STATIONARY_ACTIVITY",
     "STATE_INVALID",
+    "activity_member_mode",
     "activity_provisioned",
     "begin_monster_journey",
+    "commit_group_decision",
     "create_group",
     "decision_interval",
     "decode_fraction",
@@ -2092,6 +3224,7 @@ __all__ = [
     "journey_to_dict",
     "mark_member_combat",
     "next_monster_activity_boundary",
+    "plan_group_decision",
     "plan_from_dict",
     "plan_to_dict",
     "read_monster_activity",
@@ -2102,6 +3235,9 @@ __all__ = [
     "restore_activity_surfaces",
     "retire_room_protection",
     "room_protected",
+    "settle_group_decisions_at",
+    "settle_group_idle",
+    "settle_idle_physiology",
     "settle_monster_activity_at",
     "snapshot_activity_surfaces",
     "snapshot_departure_surfaces",

@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "bdcedb8f771a41394d82bad8ce60582276a589459b9412370046a7d3522a18a8",
+  "fingerprint": "1b2227b027357cebfce72144f7cc15d1bfc290d57a561a172d8cb99062256d11",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1065,7 +1065,7 @@
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
-    "world/rules/clock.py": "8b95b5d9397dc5aea0197e5ca526e2ceef1d6405405d5f2e85ee2da82e69c95c",
+    "world/rules/clock.py": "504c968a1232308947d9b87fd93349093302b5f85bb61ec19837fc6f4065f100",
     "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
     "world/rules/combat/battlefield.py": "d76c5fca0046579e19362ba04ecde17a10d006ed831cec836ec6f0e7d6fbeab0",
     "world/rules/combat/damage.py": "ec953ec43ed0fab1adfabe5772a1100a379393637ae52a36a16838bbef4f3019",
@@ -1295,6 +1295,6 @@
     "world/rules/upkeep.py": "7c18b388c1e6562067ac0cf0746a20738efebeb798baad5f8fef79c4ec24a324",
     "world/rules/wallet.py": "db5b03079ce2f905a411c1fe553a5ecedaa9eedb9dc4ef9cd961c8facb6e9c9a",
     "world/rules/wilderness_disclosure.py": "9576720c74ef41e48fe216c3637a3d5033210317aaf4be43c3b49a290be0fa82",
-    "world/rules/world_escape.py": "51bcf05a88533e1b78082e6035c18bd133dcb83f8f02052413280c84bdccb003"
+    "world/rules/world_escape.py": "cf723b4909e63d72ecfcce29ed8af6a2926cf346a84fcbf9edba7c9ac8272d9e"
   }
 }

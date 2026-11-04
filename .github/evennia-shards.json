@@ -995,6 +995,7 @@
    "name": "maps-34",
    "workers": 4,
    "labels": [
+    "world.maps.tests.test_monster_activity",
     "world.maps.tests.test_monster_journeys",
     "world.maps.tests.test_monster_sites",
     "world.maps.tests.test_movement_roundtrip",

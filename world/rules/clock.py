@@ -270,6 +270,26 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
                 gauge.regen_remainder = continuous - whole
 
 
+def settle_gauge_regeneration(
+    entities: Iterable[Any], elapsed_seconds: int
+) -> None:
+    """Reuse the canonical closed-form gauge writer for an owning source.
+
+    The registered monster-activity owner settles its own idle/journey
+    intervals globally; using this exact writer keeps a supplied body's
+    regeneration equal to an unobserved one. The caller owns the enclosing
+    transaction and surface snapshot.
+    """
+    _settle_gauge_regen(entities, elapsed_seconds)
+
+
+def _activity_member_mode(entity: Any) -> str | None:
+    """The monster-activity mode owning ``entity``, or ``None`` when unowned."""
+    from world.maps.monster_activity import activity_member_mode
+
+    return activity_member_mode(entity)
+
+
 def _has_settlement_work(entity: Any) -> bool:
     buffs = getattr(entity, "buffs", None)
     if buffs is not None and getattr(buffs, "all", None) and buffs.all:
@@ -795,6 +815,10 @@ def _settle_mental(
     for entity in plan.scope:
         if getattr(entity, "_is_deleted", False):
             continue
+        if _activity_member_mode(entity) is not None:
+            # A map-owned group member's physiology belongs to its registered
+            # activity source (idle/journey) or the combat owner, exactly once.
+            continue
         state = _mental_state_or_none(entity)
         if state is None or _is_dead(entity):
             continue
@@ -893,7 +917,18 @@ def _run_stages(
     practice_eligible = _awake_practice_seconds(
         mental, seconds, clock.tick, sleep_offsets
     )
-    _settle_gauge_regen(entities, seconds)
+    # Every map-owned group member's gauge interval belongs to its owner: the
+    # activity source pays idle/journey, and the combat owner pays the combat
+    # prefix before it releases the member. Skipping them here is what keeps a
+    # supplied body equal to an unobserved one instead of regenerating twice.
+    _settle_gauge_regen(
+        (
+            entity
+            for entity in entities
+            if _activity_member_mode(entity) is None
+        ),
+        seconds,
+    )
     events: list[ScheduledEvent] = []
     if source is not AdvanceSource.COMBAT:
         _settle_mental(seconds, mental, clock.tick, sleep_offsets)
@@ -1225,6 +1260,7 @@ def _restore_advance_registry(
     objects.update(
         {id(obj): obj for obj in ScriptDB.get_all_cached_instances()}
     )
+    restored: list[Any] = []
     for obj_id, snapshot in registry.items():
         obj = objects.get(obj_id)
         if obj is None:
@@ -1232,6 +1268,7 @@ def _restore_advance_registry(
         if getattr(obj, "_is_deleted", False):
             _flush_deleted_instance(obj)
             continue
+        restored.append(obj)
         for key, category in snapshot.attributes:
             _restore_registry_attribute(
                 obj,
@@ -1257,9 +1294,19 @@ def _restore_advance_registry(
                         "key": "location",
                     },
                 )
-    for entity in entities:
+    refreshed: dict[int, Any] = {id(entity): entity for entity in entities}
+    refreshed.update({id(obj): obj for obj in restored})
+    for entity in refreshed.values():
         if not hasattr(entity, "attributes"):
             continue
+        try:
+            entity.attributes.reset_cache()
+        except Exception as error:
+            log_warn(
+                "rollback_restore_failed",
+                exc=error,
+                context={"stage": "advance_attribute_cache", "obj": str(entity)},
+            )
         _refresh_advance_entity_caches(entity)
     flush_orphan_instances()
 

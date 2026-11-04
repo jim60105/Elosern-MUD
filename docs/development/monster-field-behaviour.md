@@ -442,3 +442,200 @@ identically on the untouched baseline, while a fresh test database passes all
 20. `world.rules.tests.test_guild_exams` retains its baseline-only
 `test_incoherent_cold_start_fails_once_and_restores_the_host` failure
 (identical on the untouched parent).
+
+## Global Monster Activity: Seeded Global Decisions
+
+`global-monster-activity` lets every real group take saved bounded decisions on
+game time through the existing population clock source, including groups in
+unobserved cells. The owner remains `world/maps/monster_activity.py` (strict
+`ActivityDecision` plans, atomic group departures/arrivals, per-member
+`member_time` cursors, and the one activity draw); the coordinator remains
+`world/maps/population_lifecycle.py`. There is no second scheduler and no
+monster action ever calls `WorldClock.advance`.
+
+### Decision contract
+
+`ActivityDecision(group_id, tick, expected_sequence, edge, reason)` is the
+immutable plan. `plan_group_decision` is a pure read: it resolves the group's
+published activity area, intersects every living member's real
+`legal_edges` discovery, keeps only unprotected destinations directly inside
+that area, prices each surviving edge through the canonical `quote_edge`
+resolver at the whole group's slowest actual speed, and samples from
+`[stay] + edges` through `regional_population.draw_index` with the saved
+`seed/group/sequence/tick/purpose`. A group outside its bounds has no stay
+candidate and may only step directly back inside; with no such edge it waits.
+Reads, reconnects and reloads recompute the same decision and consume nothing.
+
+`commit_group_decision` revalidates sequence, idle position, living membership,
+per-member access, area membership, destination protection and canonical
+pricing before any write. A stay increments the sequence once and schedules a
+positive interval. A departure moves every living member in one atomic group
+journey; a residual group of non-moving (dead) identities keeps the original
+id. Closing the owning one whole-group departure carries `old sequence + 1`;
+a split child starts at sequence `0`, exactly like the predecessor's
+single-member escape. Both the departure and its physiology settle inside the
+owner's snapshot/restore boundary.
+
+Physiology uses the existing cursors and the canonical fatigue and gauge
+writers: idle posture is paid in interruptible segments at the fatigue
+owner's own boundaries (so arbitrary advance partitions agree), journey
+traffic pays foot travel, waiting pays the member's posture, and each cursor
+advances monotonically. `activity_member_mode` lets the clock's caller-scoped
+mental/gauge stages skip an activity-owned body, so a supplied body and an
+unobserved one settle the identical interval under their owner exactly once.
+
+### Same-tick ordering and recovery
+
+`_settle_population_at` now runs lawful arrivals/retries, then zone boundary
+refresh, site births, regional births, idle departures, the same-tick
+zero-duration arrival, and a final boundary refresh before consuming the
+timeline. A departure that creates a local deficit therefore starts its
+recovery episode at the departure tick rather than a later unrelated one.
+Historical combat participants whose cursor is already ahead of a decision
+tick stay, and protected destinations are never entered.
+
+### Observability catalog
+
+| Event | Context |
+| --- | --- |
+| `monster_activity_decided` | `group`, `sequence`, `tick`, `reason` (outer commit only; reads emit no mutation event) |
+
+### Evidence map
+
+Canonical IDs below are generated with
+`uv run --locked python -m tools.spec_traceability --repo-root /tmp/os-merged
+list` against an equivalent merged specification tree built outside Git by
+running `openspec archive global-monster-activity --yes` on a copy. Those two
+delta IDs are **not yet synced**, so no test carries them; tests use only
+already-synced IDs, and the mapping is recorded here until archive.
+
+New (not yet synced) requirement IDs:
+
+- `monster-field-activity::due-activity-moves-bounded-complete-groups-globally`
+- `monster-journeys::activity-ordering-protects-encounters-across-deferred-time`
+
+| Requirement | Scenario | Substantive test assertions |
+| --- | --- | --- |
+| `monster-field-activity::due-activity-moves-bounded-complete-groups-globally` | Unobserved and restart | `world.maps.tests.test_monster_activity.SeededDecisionTests.test_saved_decision_is_stable_across_reads_and_reload` (a stay seed and a departure seed reproduce after an attribute-cache reload; a replay is stale; departure removes source registration); `test_departure_is_atomic_and_arrival_is_one_unit` (all three identities leave and arrive together, no room is created, the full persisted record reloads) |
+| `monster-field-activity::due-activity-moves-bounded-complete-groups-globally` | Slowest member and topology | `test_mixed_group_travels_at_the_slowest_member_price` (committed seconds equal the canonical all-member quote and are never faster than the fast member alone); `test_sleeping_member_keeps_the_whole_group`; `test_unaffordable_member_keeps_the_whole_group`; `test_commit_revalidates_every_members_access`; `test_bounds_corner_and_locked_gates_hold`; `test_birth_exclusions_never_block_lawful_travel` |
+| `monster-field-activity::due-activity-moves-bounded-complete-groups-globally` | Stationary bindings | `test_stationary_group_never_moves_or_restores_identity` (position, member IDs and home owner unchanged across a long advance; the sequence still advances as scheduled stays) |
+| `monster-field-activity::due-activity-moves-bounded-complete-groups-globally` | Return after escape | `test_outside_bounds_member_returns_or_waits` (only an inside destination is chosen; a sealed outside cell waits) |
+| `monster-journeys::activity-ordering-protects-encounters-across-deferred-time` | Same tick contact precedence | `world.maps.tests.test_monster_activity.ChronologicalSettlementTests.test_same_tick_phases_run_arrivals_births_then_departures` (phase order arrival → site → regional → departure) |
+| `monster-journeys::activity-ordering-protects-encounters-across-deferred-time` | Historical protection | `test_combat_owned_and_historical_members_never_wander` (combat ownership and a cursor already settled past the tick both stay); `test_protected_destination_prevents_departure` (a protected neighbour is never entered) |
+| `monster-journeys::activity-ordering-protects-encounters-across-deferred-time` | Newly due facts | `test_advance_processes_decision_arrival_then_next_decision` (one advance processes the 60-tick decision, the later arrival and a strictly later decision); `test_newly_created_group_is_due_within_one_advance`; `test_equal_partitions_preserve_resources_and_schedule` (equal partitions produce identical positions, sequences, schedules, reserves and cursors, and a repeated endpoint is a no-op) |
+| `world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry` | Explicit activity-owned interval | `test_supplied_activity_member_settles_once_under_its_owner` (a supplied member and an unobserved twin end with equal reserve, gauge and cursor after one advance) |
+| `world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities` | Forced-sleep receipt depth (carried follow-up) | `test_forced_sleep_receipt_rolls_back_with_a_late_source_fault` (the owner's idle settlement crosses the forced-sleep threshold and creates a threshold receipt; a late source fault restores the activity record, reserve, cursor, trait store and receipt cache; a retry then commits the same receipt and 12 seconds of sleep recovery) |
+| `world-clock::a-rolled-back-advance-restores-every-callback-owned-surface-not-just-caller-entities` | Newly born group inside a failed advance | `test_a_birth_and_departure_in_one_advance_roll_back_completely` (a group created at a boundary departs inside the advance; a late fault removes the row and its group, restores the tick, and a deterministic retry recreates and moves it) |
+| `monster-journeys::journey-passage-preserves-elapsed-resources-and-actual-presence` | Unobserved partition and restart | `test_unobserved_wandering_waits_for_a_live_encounter_then_reloads` (a real unobserved group departs, waits outside the live protected destination, reloads its journey, then arrives with no room created at either cell); `test_equal_partitions_preserve_resources_and_schedule` (departure, arrival and a later decision across one advance versus two partitions, including gauges) |
+| `monster-journeys::journey-operations-restore-complete-state-on-failure-and-replay` | Death in transit | `test_a_member_killed_in_transit_is_not_resurrected` (no physiology or gauge is paid for a dead member; the recorded arrival fact is `alive=False` and no destination registration is minted) |
+| `world-clock::advance-settles-exactly-the-entities-its-caller-supplies-never-a-global-registry` | Combat prefix gauge ownership | `test_combat_prefix_regenerates_gauges_before_ownership_release` (the combat owner pays the exact gauge interval once, then releases the cursor; a replay is a no-op) |
+
+### Changed-logging evidence
+
+`monster_activity_decided` is scheduled only inside the owning transaction via
+`transaction.on_commit`; a rolled-back advance emits no success row. The
+forced-sleep rollback test exercises that path along with the restored
+receipt. Reads (`plan_group_decision`, read-model inspection) emit nothing.
+
+### Review dispositions
+
+An independent plan review produced these blocking findings and their
+resolutions before implementation:
+
+- **Historical participants could depart before their battle ended:** fixed.
+  A member whose `member_time` cursor is already ahead of the decision tick
+  stays with `member_settled_ahead`; idle settlement never regresses a cursor.
+  Regression: `test_combat_owned_and_historical_members_never_wander`.
+- **A departure-created deficit missed the same-tick recovery episode:** fixed.
+  The coordinator refreshes each zone's boundary dates after departures and
+  before consuming the timeline; no second birth phase runs.
+- **A zero-duration departure scheduled an unreachable same-tick arrival:**
+  fixed. The coordinator settles due journeys again after departures, inside
+  the same clock advance and without recursion.
+  Regression: `test_zero_duration_departure_arrives_at_the_same_tick`.
+- **A departing group reset its sequence:** fixed for a complete ordinary
+  departure (`old sequence + 1`); only a split child starts at zero, matching
+  the predecessor's escape contract.
+- **Commit did not revalidate every member's access:** fixed. Commit repeats
+  the per-member legal-edge intersection. Regression:
+  `test_commit_revalidates_every_members_access`.
+- **Gauge physiology stayed caller-scoped:** fixed. The owner settles gauges
+  through the canonical `settle_gauge_regeneration` writer for idle and
+  journey intervals, and the clock skips exactly those bodies; the activity
+  snapshot now includes the durable `traits` surface.
+- **The public commit had no explicit transaction/restore boundary:** fixed.
+  Both stay and departure commits snapshot the activity, timeline and member
+  surfaces and restore them when the enclosing savepoint fails.
+- **Planner and lifecycle could evaluate different physiology:** fixed. The
+  pure planner projects the unpaid idle prefix with the same interruptible
+  segmentation the commit later settles, so the read-only decision agrees with
+  the committed one.
+- **Coverage gaps:** the unobserved/live-encounter, partition, same-tick
+  ordering and forced-sleep receipt tests above close them.
+
+The final independent review of the complete diff added these dispositions:
+
+- **Combat survivors lost their gauge interval (blocking):** fixed. The
+  combat owner now pays the combat prefix's gauge regeneration through
+  `settle_gauge_regeneration` before releasing the cursor, and admission pays
+  the idle prefix's gauge; the clock skips every activity-owned body for
+  gauges so the owner is the only payer. Regression:
+  `ChokepointLifecycleTests.test_combat_prefix_regenerates_gauges_before_ownership_release`.
+- **A released participant could wander at the terminal boundary
+  (blocking):** fixed. Planning and commit consult the persisted active
+  hostile session's non-fled enemy IDs and keep such a member in place, even
+  when terminal settlement has already paid its prefix and released it to
+  idle. Regression:
+  `SeededDecisionTests.test_active_combat_participant_never_wanders_even_when_released`.
+- **Immediate posture transitions were projected but not committed
+  (blocking):** fixed. A zero-length depletion/wake is now committed through
+  the sole fatigue writer before the next segment, so the persisted state and
+  the projection cannot disagree. Regression:
+  `test_immediate_posture_transitions_are_committed` (both immediate depletion
+  and immediate wake).
+- **A dead journey member could be regenerated into life (blocking):** fixed.
+  Journey settlement pays nothing for a dead member, arrival records its
+  truthful `alive=False` presence, and it is never registered or attached at
+  the destination. Regression:
+  `test_a_member_killed_in_transit_is_not_resurrected`.
+- **Partition evidence was too shallow (non-blocking):** fixed. The test now
+  runs a departure, arrival and later decision across one advance versus two
+  partitions, compares positions, sequences, schedules, cursors, reserves and
+  gauges, and checks a repeated endpoint on the same world.
+- **Newly born group rollback and the two population budgets were untested
+  (non-blocking):** fixed. `test_a_birth_and_departure_in_one_advance_roll_back_completely`
+  creates a group inside the failed advance and verifies the row, owner record
+  and tick are restored before a deterministic retry; the departure test now
+  asserts retained home ceiling for emigrants and a foreign visitor consuming
+  local headroom.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_activity
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population_recovery
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_clock
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb web.gm.tests.test_reader_monsters
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb tests.test_command_docs
+uv run --locked python -m tools.observability_lint check
+uv run --locked python -m tools.contract_gate
+uv run --locked openspec validate global-monster-activity --strict
+```
+
+`world.maps.tests.test_monster_activity` is registered exactly once in
+`.github/evennia-shards.json` (`maps-34`). The predecessor's recorded
+baseline-only failures remain identical on the untouched parent and are not
+claimed as this change's evidence:
+`world.maps.tests.test_regional_population_recovery` keeps six pre-existing
+errors (duplicate explicit registration of a zone-born member, and
+`_reset`'s replayed `wave:` group id), and `world.rules.tests.test_clock`
+keeps four pre-existing settlement-map/quest-registration errors.
+
+### Spec deviations
+
+None. The synced `wilderness-monster-population` Purpose was amended in this
+slice to include explicitly bound activity as required by task 3.1; its
+requirement text is updated by the delta at archive.

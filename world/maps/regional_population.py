@@ -678,6 +678,38 @@ def _session_participant_ids() -> frozenset[int]:
     return frozenset(participants)
 
 
+def active_combat_participant_ids() -> frozenset[int]:
+    """Enemy IDs of persisted active hostile sessions that have not fled.
+
+    This is the participant fact ordinary monster activity consults: a
+    surviving, non-fled participant must not wander while its session is
+    still active, even at a tick where terminal settlement has already paid
+    its combat prefix and released the physiology cursor. A legitimately
+    escaped (fled) identity is not an active participant and may continue its
+    journey.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.combat_session.records import read_session
+
+    participants: set[int] = set()
+    for player in PlayerCharacter.objects.all_family():
+        if player.db.active_combat is None:
+            continue
+        try:
+            record = read_session(player)
+        except Exception:  # observability: ignore R2: an unparseable persisted session protects nobody by name; the combat owner reports its own records
+            continue
+        if record is None:
+            continue
+        fled = {int(member_id) for member_id in record.fled_ids}
+        participants.update(
+            int(member_id)
+            for member_id in record.enemy_ids
+            if int(member_id) not in fled
+        )
+    return frozenset(participants)
+
+
 def _active_session_protection(wilderness: Any) -> tuple[PopulationProtection, ...]:
     """Every persisted active session's open cell protection (a pure read).
 
@@ -1464,6 +1496,26 @@ def _draw(
     return sample
 
 
+def draw_index(
+    *,
+    seed: int,
+    stream_key: str,
+    sequence: int,
+    tick: int,
+    ordinal: int,
+    purpose: str,
+    upper: int,
+) -> int:
+    """One deterministic index from this owner's rejection-sampling stream.
+
+    The single sampling discipline shared by the wave/count selectors and the
+    map owner's ordinary activity decisions: the same saved seed, stream key,
+    sequence, tick, ordinal and purpose always select the same index. Pure:
+    no draw state is persisted or consumed.
+    """
+    return _draw(seed, stream_key, sequence, tick, ordinal, purpose)(upper)
+
+
 def _weighted_pick(sample, rows: list[tuple[int, Any]]) -> Any:
     """Pick one row by its positive authored weight, in the given row order."""
     total = sum(weight for weight, _row in rows)
@@ -2118,11 +2170,13 @@ __all__ = [
     "RegionalPopulationWorldUnavailable",
     "UnknownEcologyZone",
     "ZonePopulationState",
+    "active_combat_participant_ids",
     "actual_cell",
     "commit_population_wave",
     "coordinate_pair",
     "current_population_tick",
     "density_lower_bound",
+    "draw_index",
     "initialized_zone_keys",
     "initialize_population_seed",
     "initialize_zone",

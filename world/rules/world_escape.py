@@ -241,6 +241,17 @@ def settle_monster_combat_through(
             },
         )
         current = settlement.commits[0].end
+    # Gauge regeneration for the combat prefix belongs to this owner too: the
+    # member is released to idle at ``through_tick``, after which the generic
+    # clock stage deliberately skips it. Paid only after every fatigue
+    # segment succeeded, and never for a dead body.
+    gauge = getattr(getattr(individual, "traits", None), "hp", None)
+    if gauge is not None and float(getattr(gauge, "current", 0)) > 0:
+        elapsed = int(through_tick) - member_time.settled_through_tick
+        if elapsed > 0:
+            from world.rules.clock import settle_gauge_regeneration
+
+            settle_gauge_regeneration((individual,), elapsed)
     monster_activity.update_member_time(
         wilderness,
         group_id=group_id,
@@ -259,20 +270,30 @@ def _commitment(candidates: tuple[PhysicalEdge, ...], seed_hex: str) -> Physical
     return candidates[index]
 
 
-def _journey_plan(
-    actor: Any,
+def build_journey_plan(
+    actors: Any,
     traversal: TraversalResolution,
-    state: TravellerState,
+    states: Any,
 ) -> dict[str, Any]:
-    """Build the persisted plan from the canonical traversal calculator."""
+    """Build the persisted plan from the canonical traversal calculator.
+
+    ``actors`` and ``states`` are parallel sequences: one live body and its
+    detached physiology per committed traveller. The whole group is priced by
+    the same integrated calculator execution uses, so a cohesive departure
+    travels at the slowest actual member rather than an averaged speed.
+    """
     from world.maps import monster_activity
 
+    actors = tuple(actors)
+    states = tuple(states)
+    if not actors or len(actors) != len(states):
+        raise ValueError("a journey plan needs one state per actor")
     waived = bool(traversal.cost_key) and flight_waives_wilderness_charge(
-        actor, traversal.cost_key
+        actors[0], traversal.cost_key
     )
     if traversal.status is TraversalStatus.RESOLVED and traversal.cost is not None:
         legs = ((traversal.cost.distance_m, traversal.cost.terrain),)
-        integrated = plan_traversal(legs, (state.detached(),))
+        integrated = plan_traversal(legs, tuple(state.detached() for state in states))
         seconds = int(traversal.cost.seconds)
         plan = monster_activity.JourneyPlan(
             seconds=seconds,
@@ -304,27 +325,39 @@ def _journey_plan(
             segments=(),
             members=(),
         )
-    activity = (
-        monster_activity.ACTIVITY_SLEEP
-        if state.posture is not None and state.posture is not SleepPosture.AWAKE
-        else monster_activity.ACTIVITY_AWAKE_COMBAT
-    )
-    plan = monster_activity.JourneyPlan(
-        seconds=plan.seconds,
-        distance_m=plan.distance_m,
-        terrain_legs=plan.terrain_legs,
-        segments=plan.segments,
-        members=(
+    members = []
+    for actor, state in zip(actors, states):
+        activity = (
+            monster_activity.ACTIVITY_SLEEP
+            if state.posture is not None and state.posture is not SleepPosture.AWAKE
+            else monster_activity.ACTIVITY_AWAKE_COMBAT
+        )
+        members.append(
             monster_activity.PlanMember(
                 individual_id=int(actor.pk),
                 reserve_units=state.reserve_units,
                 posture=None if state.posture is None else str(state.posture),
                 activity=activity,
                 waived=waived,
-            ),
-        ),
+            )
+        )
+    plan = monster_activity.JourneyPlan(
+        seconds=plan.seconds,
+        distance_m=plan.distance_m,
+        terrain_legs=plan.terrain_legs,
+        segments=plan.segments,
+        members=tuple(members),
     )
     return monster_activity.plan_to_dict(plan)
+
+
+def _journey_plan(
+    actor: Any,
+    traversal: TraversalResolution,
+    state: TravellerState,
+) -> dict[str, Any]:
+    """The single-member escape plan (the shared builder's one-traveller form)."""
+    return build_journey_plan((actor,), traversal, (state,))
 
 
 def plan_individual_escape(
@@ -425,6 +458,7 @@ __all__ = [
     "EscapePlan",
     "WorldEscapeContext",
     "WorldEscapeError",
+    "build_journey_plan",
     "plan_individual_escape",
     "project_monster_combat_state",
     "settle_monster_combat_through",
