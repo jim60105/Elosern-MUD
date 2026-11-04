@@ -744,7 +744,12 @@ def gate_approach_cost(
 def _is_wilderness_room(room: Any) -> bool:
     from typeclasses.rooms import TerrainRoom
 
-    return isinstance(room, TerrainRoom)
+    # ``movement_edges`` prices a historical edge whose pooled source room may
+    # already be recycled; its read-only cell adapter marks itself with the
+    # same wilderness layer instead of fabricating a TerrainRoom.
+    return isinstance(room, TerrainRoom) or getattr(
+        room, "movement_layer", None
+    ) == "wilderness"
 
 
 def _is_grid_room(room: Any) -> bool:

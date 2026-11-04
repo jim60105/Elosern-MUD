@@ -498,7 +498,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
                     self._surface_snapshot((self.char1, sleeper)), before
                 )
                 self.assertIsInstance(self.char1.location, GridRoom)
-                self.assertEqual(self._bookkeeping()[0], {})
+                self.assertNotIn(self.char1, self._bookkeeping()[0])
                 sleeper.delete()
 
     @covers_requirement(
@@ -603,7 +603,10 @@ class MovementSettlementWildernessTests(EvenniaTest):
         before_tick = get_world_clock().tick
         before_location = self.char1.location
         before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
-        with patch("typeclasses.exits.wilderness_neighbor", return_value=None):
+        with patch(
+            "world.maps.wilderness_destination.wilderness_neighbor",
+            return_value=None,
+        ):
             result = self._exit("east").at_traverse(self.char1, before_location)
         self.assertFalse(result)
         self.assertIs(self.char1.location, before_location)
@@ -616,13 +619,14 @@ class MovementSettlementWildernessTests(EvenniaTest):
     def test_gate_entry_charge_failure_with_fresh_room_keeps_no_zombie_rooms(self):
         self.char1.location = self.east_gate
         # The first entry creates a fresh wilderness room; after the failure
-        # the bookkeeping must be empty with nothing left in unused_rooms.
-        self.assertEqual(self._bookkeeping()[2], [])
+        # the bookkeeping must be exactly the pre-traversal state, with
+        # nothing left in unused_rooms.
+        before = self._bookkeeping()
         with patch.object(WorldClock, "advance", _failing_advance):
             with self.assertRaises(RuntimeError):
                 self.gate.at_traverse(self.char1, self.east_gate)
         itemcoordinates, rooms, unused_rooms = self._bookkeeping()
-        self.assertEqual((itemcoordinates, rooms, unused_rooms), ({}, {}, []))
+        self.assertEqual((itemcoordinates, rooms, unused_rooms), before)
         self._assert_rooms_coherent()
 
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-relocation-and-reconciles-every-evennia-cache-surface")

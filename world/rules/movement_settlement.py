@@ -57,6 +57,15 @@ from world.rules.clock import (
     get_world_clock,
 )
 from world.rules.party import follow_scope
+from world.rules.movement_edges import (
+    LocationRef,
+    LocationRefError,
+    MovementEdgeError,
+    PhysicalEdge,
+    invalidate_previous_edge,
+    location_ref,
+    record_completed_edge,
+)
 from world.rules.presentation_events import (
     AlignmentIdentity,
     PresentationAlignmentFact,
@@ -85,6 +94,10 @@ _TRAVERSER_SURFACES: tuple[str, ...] = (
     # return those caches with every other surface.
     "title_collection",
     "title_equipped",
+    # The retained previous physical edge this settlement writes on success
+    # (movement-edge-history). A later failure must restore the old record
+    # together with every other attribute surface.
+    "previous_traversal",
 )
 
 
@@ -156,6 +169,102 @@ _settlement_owners: contextvars.ContextVar[tuple[int, ...]] = contextvars.Contex
 _direct_move_sources: contextvars.ContextVar[
     tuple[tuple[int, AlignmentIdentity | None], ...]
 ] = contextvars.ContextVar("elosern_direct_move_sources", default=())
+
+#: Committed traversals in passage inside the current synchronous call.
+_traversal_scopes: contextvars.ContextVar[tuple["TraversalScope", ...]] = (
+    contextvars.ContextVar("elosern_traversal_scopes", default=())
+)
+
+#: Traversers whose success-path tail (`after_successful_movement`) completed
+#: in the current synchronous settlement. A plain exit whose stock `move_to`
+#: relocated but then swallowed a receive/post hook returns falsy without ever
+#: running that tail, so a bare location change is not completion evidence.
+_traversal_completions: contextvars.ContextVar[tuple[int, ...]] = (
+    contextvars.ContextVar("elosern_traversal_completions", default=())
+)
+
+
+def note_traversal_completed(actor: Any) -> None:
+    """Mark that ``actor``'s edge completed every success-path tail step."""
+    actor_id = int(actor.pk)
+    _traversal_completions.set(_traversal_completions.get() + (actor_id,))
+
+
+def consume_traversal_completion(actor: Any) -> bool:
+    """Consume ``actor``'s completion marker, if the success tail ran."""
+    actor_id = int(actor.pk)
+    current = _traversal_completions.get()
+    if actor_id not in current:
+        return False
+    _traversal_completions.set(tuple(key for key in current if key != actor_id))
+    return True
+
+
+def _clear_traversal_completion(actor: Any) -> None:
+    """Drop a stale marker left by a direct success-tail call."""
+    actor_id = int(actor.pk)
+    current = _traversal_completions.get()
+    if actor_id in current:
+        _traversal_completions.set(tuple(key for key in current if key != actor_id))
+
+
+@dataclass(frozen=True, slots=True)
+class TraversalScope:
+    """One committed movement's half-open passage interval.
+
+    ``member_ids`` names every body the settlement physically transports
+    (traverser plus the source-present following set). During
+    ``departure_tick <= tick < arrival_tick`` none of those bodies occupies
+    either endpoint as idle-cell presence: the pooled room may already have
+    relocated, but passage is not presence. At ``arrival_tick`` the party is
+    present at the destination. The interval is immutable and written only by
+    the movement owner; no browser timer may author it.
+    """
+
+    member_ids: tuple[int, ...]
+    source: LocationRef
+    destination: LocationRef
+    departure_tick: int
+    arrival_tick: int
+
+    def covers(self, member_id: int) -> bool:
+        return member_id in self.member_ids
+
+    def present(self, tick: int) -> bool:
+        """Whether the party is ordinary idle-cell presence at ``tick``."""
+        return not (self.departure_tick <= tick < self.arrival_tick)
+
+
+@contextmanager
+def traversal_scope(scope: TraversalScope | None) -> Iterator[None]:
+    """Bind one committed passage interval for the synchronous settlement."""
+    if scope is None:
+        yield
+        return
+    token = _traversal_scopes.set(_traversal_scopes.get() + (scope,))
+    try:
+        yield
+    finally:
+        _traversal_scopes.reset(token)
+
+
+def field_presence(body: Any, tick: int) -> bool:
+    """Whether ``body`` is ordinary field presence at game ``tick``.
+
+    During a committed traversal's half-open passage interval the body is in
+    neither endpoint's idle-cell population, even if implementation relocated
+    a pooled room early. Arrival becomes present only at the accepted arrival
+    tick. A body with no passage scope is present (its actual location is the
+    authority).
+    """
+    body_id = getattr(body, "id", None)
+    if not isinstance(body_id, int):
+        return True
+    scopes = _traversal_scopes.get()
+    for scope in reversed(scopes):
+        if scope.covers(body_id):
+            return scope.present(tick)
+    return True
 
 
 @contextmanager
@@ -236,6 +345,10 @@ def note_direct_move_end(actor: Any) -> None:
             continue
         _direct_move_sources.set(sources[:index] + sources[index + 1 :])
         publish_movement_boundary(actor, identity, read_alignment_identity(actor))
+        # A direct move is a non-traversal relocation: the old completed edge
+        # no longer names the current logical position and must not survive as
+        # a retreat route.
+        invalidate_previous_edge(actor)
         return
 
 
@@ -440,6 +553,238 @@ def _observation_for(actor: Any) -> MovementObservation | None:
     return observation
 
 
+def _source_locator(traversing_object: Any, source_location: Any) -> LocationRef | None:
+    """The stable locator of the position being left, read before any write."""
+    for candidate in (source_location, traversing_object):
+        try:
+            return location_ref(candidate)
+        except (LocationRefError, MovementEdgeError):  # observability: ignore R2: an unrepresentable candidate is skipped; the next candidate or an absent locator is the documented outcome
+            continue
+    return None
+
+
+def _destination_locator(
+    destination: Any | None,
+    wilderness_coordinates: tuple[int, int] | None,
+    destination_coordinates: tuple[int, int] | None,
+) -> LocationRef | None:
+    """The stable locator of the planned landing position, before relocation."""
+    if destination_coordinates is not None:
+        return LocationRef.wilderness(WILDERNESS_NAME, *destination_coordinates)
+    if destination is not None:
+        try:
+            return location_ref(destination)
+        except (LocationRefError, MovementEdgeError):  # observability: ignore R2: an ephemeral landing room has no stable locator and therefore no retained edge or scope
+            return None
+    if wilderness_coordinates is not None:
+        return LocationRef.wilderness(WILDERNESS_NAME, *wilderness_coordinates)
+    return None
+
+
+def _committed_traversal_seconds(
+    traversing_object: Any, cost_key: str | None, window_seconds: int | None
+) -> int:
+    """The exact clock interval ``charge_movement`` will advance for this edge."""
+    if cost_key is None:
+        return 0
+    from world.rules.player_control import is_player_driven
+    from world.rules.travel_cost import flight_waives_wilderness_charge
+
+    if not is_player_driven(traversing_object):
+        return 0
+    if flight_waives_wilderness_charge(traversing_object, cost_key):
+        return 0
+    if window_seconds is not None:
+        return int(window_seconds)
+    from world.rules.clock import CLOCK_YAML
+
+    authored = CLOCK_YAML.get("command_defaults", {}).get(cost_key)
+    if isinstance(authored, int) and not isinstance(authored, bool) and authored > 0:
+        return authored
+    return 0
+
+
+def _build_traversal_scope(
+    traversing_object: Any,
+    source_location: Any,
+    source_ref: LocationRef | None,
+    *,
+    destination: Any | None,
+    wilderness_coordinates: tuple[int, int] | None,
+    wilderness_source_coordinates: tuple[int, int] | None,
+    destination_coordinates: tuple[int, int] | None,
+    route: str | None,
+    cost_key: str | None,
+    window_seconds: int | None,
+) -> TraversalScope | None:
+    """Bind one immutable committed passage interval for a player-driven edge."""
+    if route is None or source_ref is None:
+        return None
+    from world.rules.player_control import is_player_driven
+    from world.rules.party import travel_scope
+
+    if not is_player_driven(traversing_object):
+        return None
+    destination_ref = _destination_locator(
+        destination, wilderness_coordinates, destination_coordinates
+    )
+    if destination_ref is None:
+        return None
+    departure_tick = int(get_world_clock().tick)
+    arrival_tick = departure_tick + _committed_traversal_seconds(
+        traversing_object, cost_key, window_seconds
+    )
+    try:
+        members = travel_scope(
+            traversing_object, source_location, wilderness_source_coordinates
+        )
+    except Exception:  # observability: ignore R2: travel_scope itself never raises; a resolution failure degrades to the traverser-only scope
+        members = (traversing_object,)
+    member_ids = tuple(
+        int(entity.pk) for entity in members if getattr(entity, "pk", None) is not None
+    )
+    if not member_ids:
+        member_ids = (int(traversing_object.pk),)
+    return TraversalScope(
+        member_ids=member_ids,
+        source=source_ref,
+        destination=destination_ref,
+        departure_tick=departure_tick,
+        arrival_tick=arrival_tick,
+    )
+
+
+def _record_completed_history(
+    traversing_object: Any,
+    snapshot: MovementSnapshot,
+    *,
+    source_ref: LocationRef | None,
+    route: str | None,
+) -> None:
+    """Retain one completed edge on the traverser and its transported party.
+
+    A player-driven non-traversal settlement (a direct move with no route)
+    invalidates the traverser's old record instead. On a completed traversal,
+    only bodies that physically moved and ended at the destination retain the
+    edge; a follower left behind keeps its unchanged record. When the arrival
+    or the edge cannot be represented, every body that actually moved
+    invalidates its record so an obsolete earlier position can never be read
+    again after a later round trip.
+    """
+    from world.rules.player_control import is_player_driven
+
+    if not is_player_driven(traversing_object):
+        return
+    if route is None:
+        invalidate_previous_edge(traversing_object)
+        return
+    if source_ref is None:
+        invalidate_previous_edge(traversing_object)
+        for state in snapshot.companions:
+            if _body_moved(state):
+                invalidate_previous_edge(state.entity)
+        return
+    try:
+        destination_ref = location_ref(traversing_object)
+    except (LocationRefError, MovementEdgeError):  # observability: ignore R2: an unrepresentable arrival cannot retain an edge; the old record is invalidated instead
+        invalidate_previous_edge(traversing_object)
+        for state in snapshot.companions:
+            if _body_moved(state):
+                invalidate_previous_edge(state.entity)
+        return
+    try:
+        edge = PhysicalEdge(
+            source=source_ref, destination=destination_ref, route=route
+        )
+    except MovementEdgeError as error:
+        log_warn(
+            "movement_edge_record_unavailable",
+            exc=error,
+            context={
+                "obj": str(traversing_object),
+                "route": route,
+                "source": str(source_ref),
+                "destination": str(destination_ref),
+            },
+        )
+        invalidate_previous_edge(traversing_object)
+        for state in snapshot.companions:
+            if _body_moved(state):
+                invalidate_previous_edge(state.entity)
+        return
+    record_completed_edge(traversing_object, edge)
+    for state in snapshot.companions:
+        body = state.entity
+        if not _body_moved(state) or _body_ref_or_none(body) != destination_ref:
+            continue
+        try:
+            record_completed_edge(body, edge)
+        except MovementEdgeError as error:
+            log_warn(
+                "movement_edge_record_unavailable",
+                exc=error,
+                context={"obj": str(body), "route": route},
+            )
+
+
+def _body_ref_or_none(body: Any) -> LocationRef | None:
+    try:
+        return location_ref(body)
+    except (LocationRefError, MovementEdgeError):  # observability: ignore R2: an unrepresentable body position is the documented "not transported to this destination" answer
+        return None
+
+
+def _registration_of(body: Any) -> tuple[int, int] | None:
+    """The body's live wilderness registration, without materializing a room."""
+    try:
+        script = getattr(getattr(body, "ndb", None), "wilderness", None)
+        coordinates = getattr(script, "itemcoordinates", None)
+        get = getattr(coordinates, "get", None)
+        value = get(body) if callable(get) else None
+    except Exception:  # observability: ignore R2: an absent registration is the documented "not moved in the wilderness" answer
+        return None
+    if (
+        isinstance(value, tuple)
+        and len(value) == 2
+        and all(isinstance(item, int) and not isinstance(item, bool) for item in value)
+    ):
+        return (value[0], value[1])
+    return None
+
+
+def _body_moved(state: CompanionState) -> bool:
+    """Whether a snapshotted party body physically left its source position."""
+    body = state.entity
+    if getattr(body, "location", None) is not state.location:
+        return True
+    current = _registration_of(body)
+    if state.registration is None and current is None:
+        return False
+    return current != state.registration
+
+
+def _settled_for_history(
+    result: Any,
+    *,
+    wilderness_lineage: bool,
+    traversing_object: Any,
+    source_location: Any,
+) -> bool:
+    """Whether this traversal completed an edge worth retaining.
+
+    A wilderness lineage must report success (a falsy return after a relocation
+    is compensated as a failure); its pooled room may be the same object while
+    the logical cell changed. Every other lineage identifies settlement by the
+    location change.
+    """
+    relocated = traversing_object.location is not source_location
+    if wilderness_lineage:
+        # Its pooled room may be the same object while the logical cell
+        # changed, so the lineage's own boolean is the success signal.
+        return bool(result)
+    return relocated
+
+
 def settle_movement(
     traversing_object: Any,
     source_location: Any,
@@ -448,7 +793,10 @@ def settle_movement(
     destination: Any | None = None,
     wilderness_coordinates: tuple[int, int] | None = None,
     wilderness_source_coordinates: tuple[int, int] | None = None,
+    destination_coordinates: tuple[int, int] | None = None,
     window_seconds: int | None = None,
+    route: str | None = None,
+    cost_key: str | None = None,
     narrate_traversal: bool = False,
 ) -> Any:
     """Run one traversal as an all-or-nothing movement settlement.
@@ -479,6 +827,15 @@ def settle_movement(
     in any internal advance restores every surface the whole traversal may have
     written.
 
+    ``route`` (with ``cost_key``) is the stable physical-edge route the exit
+    lineage completed (``direction:<d>`` or ``exit:<dbref>``). A player-driven
+    settled edge records its completed locator pair on the traverser and every
+    physically transported present party body; a call without a route is a
+    non-traversal relocation and invalidates the old record instead.
+    ``destination_coordinates`` names an unmaterialized wilderness landing cell
+    (an ordinary step's target) so passage visibility does not have to wait for
+    the pooled room to relocate.
+
     On an exception the boundary compensates after the outer rollback and
     re-raises; on a falsy relocated return it compensates and returns the
     falsy result, so the WebClient ``move_failed`` / Telnet error paths report
@@ -493,10 +850,29 @@ def settle_movement(
     # read before the traversal, so a pooled room the move recycles or mutates
     # cannot rewrite which area the traverser left.
     source_identity = read_alignment_identity(traversing_object)
+    # The stable physical locator of the position being left, copied before the
+    # traversal for the same reason (a recycled pooled room must not rewrite
+    # which cell the party departed from).
+    source_ref = _source_locator(traversing_object, source_location)
+    _clear_traversal_completion(traversing_object)
+    # The committed passage interval must be bound before the stock relocation:
+    # a pooled room may relocate early, but passage is not idle-cell presence.
+    scope = _build_traversal_scope(
+        traversing_object,
+        source_location,
+        source_ref,
+        destination=destination,
+        wilderness_coordinates=wilderness_coordinates,
+        wilderness_source_coordinates=wilderness_source_coordinates,
+        destination_coordinates=destination_coordinates,
+        route=route,
+        cost_key=cost_key,
+        window_seconds=window_seconds,
+    )
     # Every panel push, checkpoint fact and settlement callback of this
     # traversal shares one causal publication group, so each watcher receives
     # one final publication for the commit (webclient-publication-settlements).
-    with publication_group(), settlement_scope(traversing_object):
+    with publication_group(), settlement_scope(traversing_object), traversal_scope(scope):
         snapshot = _snapshot_movement_state(
             traversing_object,
             source_location,
@@ -533,6 +909,10 @@ def settle_movement(
                 location=source_location,
                 knowledge_owner=snapshot.commander or traversing_object,
             )
+        wilderness_lineage = (
+            wilderness_coordinates is not None
+            or wilderness_source_coordinates is not None
+        )
         try:
             from world.quests.escort_events import escort_event_boundary
 
@@ -554,12 +934,35 @@ def settle_movement(
                     room=getattr(traversing_object, "location", None),
                     tick=int(get_world_clock().tick),
                 )
+                # The retained edge is written inside the owning transaction,
+                # after the whole edge, its costs and following succeeded; an
+                # outer rollback or a later fault therefore keeps the old
+                # record. A falsy relocated wilderness return is not a
+                # completed edge and never records success.
+                if route is None:
+                    # A direct/non-traversal player move never runs the exit
+                    # success tail; its relocation invalidates the old edge.
+                    _record_completed_history(
+                        traversing_object,
+                        snapshot,
+                        source_ref=source_ref,
+                        route=route,
+                    )
+                elif _settled_for_history(
+                    result,
+                    wilderness_lineage=wilderness_lineage,
+                    traversing_object=traversing_object,
+                    source_location=source_location,
+                ) and consume_traversal_completion(traversing_object):
+                    _record_completed_history(
+                        traversing_object,
+                        snapshot,
+                        source_ref=source_ref,
+                        route=route,
+                    )
         except Exception:
             _compensate_after_rollback(snapshot)
             raise
-        wilderness_lineage = (
-            wilderness_coordinates is not None or wilderness_source_coordinates is not None
-        )
         if (
             not result
             and wilderness_lineage
@@ -728,6 +1131,14 @@ def settle_relocation(entity: Any, destination: Any) -> None:
                 reanchor_home_on_gate_arrival(entity, destination)
                 if source is not destination:
                     clear_dialogue_session(entity)
+                # A teleport is a non-traversal relocation: the retained
+                # previous edge would otherwise become a cross-world retreat
+                # route. Invalidate the moved body and every present party body
+                # that actually arrived with it.
+                invalidate_previous_edge(entity)
+                for state in snapshot.companions:
+                    if _body_moved(state):
+                        invalidate_previous_edge(state.entity)
                 # Registered last inside the owning transaction: any later
                 # failure rolls the relocation back together with this
                 # checkpoint, so a refused or failed teleport publishes nothing.

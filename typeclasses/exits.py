@@ -16,14 +16,16 @@ from evennia.objects.objects import DefaultExit
 from world.observability import log_warn
 
 from .objects import ObjectParent
-from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.wilderness_destination import (
-    find_gateway,
-    grid_room_for_gate,
-    normalize_wilderness_direction,
-    wilderness_neighbor,
-)
+from world.maps.wilderness_destination import normalize_wilderness_direction
 from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules.movement_edges import (
+    KIND_ROOM,
+    KIND_WILDERNESS,
+    location_ref,
+    resolve_direction_edge,
+    resolve_exit_edge,
+    room_for_ref,
+)
 from world.rules.movement_settlement import settle_movement
 
 
@@ -100,6 +102,12 @@ def after_successful_movement(
         traversing_object,
         destination if destination is not None else traversing_object.location,
     )
+    from world.rules.movement_settlement import note_traversal_completed
+
+    # The movement owner's history writer requires this explicit completion
+    # signal: a stock `move_to` can relocate and still return falsy after a
+    # receive/post hook failed, and that is not a completed edge.
+    note_traversal_completed(traversing_object)
 
 
 class MovementCostMixin:
@@ -282,6 +290,8 @@ class MovementCostMixin:
                     source_location,
                     destination=target_location,
                     traverse=traverse_stock,
+                    route=f"exit:{self.id}",
+                    cost_key=self.movement_cost_key,
                     narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
@@ -342,10 +352,8 @@ class WildernessGateExit(Exit):
             source_present_members,
         )
 
-        entry = WILDERNESS_ENTRY_REGISTRY.get(self.db.anchor_key)
-        gate = entry.gate_for(self.db.gate_direction) if entry is not None else None
-        landing_cell = entry.approach_cell(gate) if gate is not None else None
-        if landing_cell is None:
+        edge = resolve_exit_edge(traversing_object, self)
+        if edge is None or edge.destination.kind != KIND_WILDERNESS:
             # Misconfigured gate (unset/unknown anchor_key or gate_direction):
             # resolve fails closed BEFORE the settlement boundary opens, so no
             # move, charge, or knowledge write happens.
@@ -358,6 +366,7 @@ class WildernessGateExit(Exit):
                 },
             )
             return False
+        landing_cell = (edge.destination.x, edge.destination.y)
         source_location = traversing_object.location
 
         def gate_traversal():
@@ -417,6 +426,8 @@ class WildernessGateExit(Exit):
                     source_location,
                     wilderness_coordinates=landing_cell,
                     traverse=gate_traversal,
+                    route=edge.route,
+                    cost_key="wilderness_move",
                     narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
@@ -449,10 +460,14 @@ class WildernessReturnExit(WildernessExit):
         itemcoordinates = self.location.wilderness.db.itemcoordinates
         current = itemcoordinates[traversing_object]
         direction = normalize_wilderness_direction(self.key)
-        hit = find_gateway(current, direction) if direction is not None else None
-        if hit is not None:
-            _, gate = hit
-            grid_room = grid_room_for_gate(gate)
+        source = location_ref(self.location)
+        edge = (
+            resolve_direction_edge(source, current, direction)
+            if direction is not None
+            else None
+        )
+        if edge is not None and edge.destination.kind == KIND_ROOM:
+            grid_room = room_for_ref(edge.destination)
             if grid_room is None:
                 # Misconfiguration (registered destination room missing):
                 # do not report success or charge time for a move that
@@ -477,18 +492,18 @@ class WildernessReturnExit(WildernessExit):
                 destination=grid_room,
                 wilderness_source_coordinates=current,
                 traverse=return_traversal,
+                route=edge.route,
                 require_resolved=True,
             )
-        if direction is None:
+        if direction is None or edge is None:
             # Only the contrib's eight canonical direction exits are wired
-            # here; anything else cannot name an arrival cell.
+            # here; anything else cannot name an arrival cell. A refused
+            # neighbour (out of bounds, a footprint cell, or a corner cut past
+            # an impassable orthogonal neighbour) was rejected by the shared
+            # discovery before any write, using the same rule the canonical
+            # resolver and the local map read.
             return False
-        # Reject a blocked step (out of bounds, a footprint cell, or a corner
-        # cut past an impassable orthogonal neighbour) BEFORE any write, using
-        # the same rule the canonical resolver and the local map read.
-        destination_coordinates = wilderness_neighbor(current[0], current[1], direction)
-        if destination_coordinates is None:
-            return False
+        destination_coordinates = (edge.destination.x, edge.destination.y)
         # ORDINARY wilderness movement -- every coordinate/direction that is not
         # a registered gateway (or whose gateway landing is refused). Not free:
         # a successful step still pays
@@ -514,6 +529,7 @@ class WildernessReturnExit(WildernessExit):
             # pre-move coordinates of the (pooled) wilderness room.
             wilderness_coordinates=self.location.coordinates,
             wilderness_source_coordinates=current,
+            route=edge.route,
             traverse=step_traversal,
         )
 
@@ -526,6 +542,7 @@ class WildernessReturnExit(WildernessExit):
         destination=None,
         wilderness_coordinates: tuple[int, int] | None = None,
         destination_coordinates: tuple[int, int] | None = None,
+        route: str | None = None,
         require_resolved: bool = False,
     ):
         """Resolve the physical step before relocation, then run the boundary."""
@@ -567,7 +584,10 @@ class WildernessReturnExit(WildernessExit):
                     destination=destination,
                     wilderness_coordinates=wilderness_coordinates,
                     wilderness_source_coordinates=wilderness_source_coordinates,
+                    destination_coordinates=destination_coordinates,
                     traverse=traverse,
+                    route=route,
+                    cost_key="wilderness_move",
                     narrate_traversal=True,
                     window_seconds=(
                         resolution.cost.seconds if resolution.cost is not None else None
