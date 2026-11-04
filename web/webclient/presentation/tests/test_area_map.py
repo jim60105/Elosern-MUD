@@ -1065,18 +1065,64 @@ class WildernessAreaTests(EvenniaTest):
         self.assertIsNone(threat_label("t_unknown_tier", "D"))
         self.assertTrue(_js_accepts(payload))
 
-    def test_a_slot_and_its_materialized_monster_state_one_threat(self):
-        from world.maps import wilderness_population as population
+    def test_entity_annotations_are_actual_living_individuals_only(self):
+        from world.maps.wilderness_population import threat_label
         from world.rules.monster_individual import construct_species_individual
 
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 6})
         variants = _live("world.lore.monster_species", "MONSTER_VARIANT_REGISTRY")
-        key, variant = next((key, row) for key, row in sorted(variants.items()) if row.danger_grade is not None)
-        slot = population.ExpectedSlot(
-            slot=0, observation_key="t", name_zh="t", tier=variant.threat_tier,
-            species_key=variant.species_key, variant_key=key,
+        key, variant = next(
+            (key, row)
+            for key, row in sorted(variants.items())
+            if row.danger_grade is not None
         )
+
+        # A configured, revealed cell without a registered individual carries
+        # no entity annotation; no commission marker is fabricated into one.
+        target = (start[0] + 1, start[1])
+        before = _render(self.char1)
+        self.assertNotIn(
+            {"x": target[0], "y": target[1]},
+            [entity["cell"] for entity in before["entities"]],
+        )
+        self.assertEqual(before["quest_markers"], [])
+
         monster = construct_species_individual(variant.species_key, key)
-        self.assertEqual(population._slot_threat(slot), population._monster_threat(monster))
+        wilderness = self.char1.location.wilderness
+        wilderness.db.itemcoordinates[monster] = target
+        token = area_map_module.entity_token(f"object:{monster.pk}")
+        payload = _render(self.char1)
+        self.assertEqual(
+            [
+                (entity["cell"], entity["label"], entity["count"], entity["threat"])
+                for entity in payload["entities"]
+                if entity["id"] == token
+            ],
+            [
+                (
+                    {"x": target[0], "y": target[1]},
+                    monster.key,
+                    1,
+                    threat_label(variant.threat_tier, variant.danger_grade),
+                )
+            ],
+        )
+        self.assertEqual(payload["quest_markers"], [])
+
+        # The annotation follows the actual registration, not the old cell.
+        moved_target = (start[0], start[1] + 1)
+        wilderness.db.itemcoordinates[monster] = moved_target
+        moved = _render(self.char1)
+        self.assertEqual(
+            [
+                entity["cell"]
+                for entity in moved["entities"]
+                if entity["id"] == token
+            ],
+            [{"x": moved_target[0], "y": moved_target[1]}],
+        )
 
     def test_dense_real_windows_stay_inside_the_byte_ceiling(self):
         """Measured, not pinned: fully revealed windows at spread positions

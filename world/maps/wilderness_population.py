@@ -233,12 +233,14 @@ def _stored_hp(monster: Monster) -> float:
 
 @dataclass(frozen=True, slots=True)
 class PopulationFact:
-    """One entity visible in the wilderness population view.
+    """One actually present entity in the wilderness population view.
 
     ``threat_tier`` and ``danger_grade`` are the canonical threat facts of a
-    monster observation (wilderness-travel-window-ui): a prospective ambient
-    slot carries its expected variant's tier and grade, a materialized monster
-    its resolved ones; every other observation carries ``None``.
+    living monster observation, read from its registry-derived individual
+    identity (wilderness-travel-window-ui); every other observation carries
+    ``None``. ``observation_key`` names the persistent dbref of the object
+    (``object:<pk>``), never a predicted coordinate slot: a scheduled future
+    birth is not an entity, so it has no fact, and a fresh birth is a new ID.
     """
 
     observation_key: str
@@ -261,17 +263,6 @@ def threat_label(tier: str | None, grade: str | None) -> str | None:
     if row is None:
         return None
     return f"{row.display_name_zh} {grade} 級" if isinstance(grade, str) and grade else row.display_name_zh
-
-
-def _slot_threat(slot: "ExpectedSlot") -> dict[str, str | None]:
-    """A prospective slot's expected tier and its variant's danger grade."""
-    grade = None
-    if slot.variant_key is not None:
-        from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-
-        variant = MONSTER_VARIANT_REGISTRY.get(slot.variant_key)
-        grade = None if variant is None else variant.danger_grade
-    return {"threat_tier": slot.tier, "danger_grade": grade}
 
 
 def _monster_threat(monster: Any) -> dict[str, str | None]:
@@ -799,162 +790,73 @@ def population_view(
     wilderness,
     cells: Iterable[tuple[int, int]],
 ) -> tuple[PopulationFact, ...]:
-    """Project visible population facts across requested cells without mutating state.
+    """Project the actually present population of the requested cells.
 
-    Consumes the shared ``ambient_population_decision`` for ambient slots and
-    ``site_living_members`` for monster sites. Foreign registered entities keep
-    their stable ``object:<dbid>`` identities, and so does every ambient
-    monster that cannot occupy an expected slot -- a retained member of a
-    frozen (session-protected) pass, a drifted survivor, or an individually
-    provisioned extra -- because those objects are what materialization keeps.
+    The wilderness script's ``itemcoordinates`` is the single authoritative
+    position surface, so this is one index over actual registrations: every
+    living ``Monster`` standing on a requested valid cell is projected exactly
+    once under its persistent ``object:<dbid>`` identity, with its current
+    coordinate and its registry-derived threat facts. Characters and NPCs keep
+    their existing observations.
+
+    Presence is evidence only of an actual object. An uninitialized, empty,
+    blocked or due habitat, a scheduled future birth, a site's authored state
+    and an ecology zone's home ownership are never population facts, and a
+    dead (zero stored HP) individual is absent. The read creates nothing,
+    reconciles nothing and ticks no gauge.
     """
     from typeclasses.characters import PlayerCharacter
     from typeclasses.npcs import LLMNPC, NPC
-    from world.maps.monster_sites import site_living_members
+    from world.maps.regional_population import coordinate_pair
 
     target_cells = set(cells)
     if not target_cells:
         return ()
 
-    wilderness_name = WILDERNESS_NAME
-
-    # 1. Single pass over itemcoordinates to index registrations by cell for requested cells
-    items_by_cell: dict[tuple[int, int], list[Any]] = {c: [] for c in target_cells}
-    for obj, coords in (wilderness.db.itemcoordinates or {}).items():
-        if obj is not None and coords in target_cells:
-            items_by_cell[coords].append(obj)
-
-    # 2. Cache session participants and capital entry once for the view pass
-    session_participants = _session_participant_ids()
-    cap_entry = capital_entry_xy()
-
-    # Cache site living members per site encountered
-    site_members_cache: dict[str, set[int]] = {}
-
-    facts: list[PopulationFact] = []
-
-    for cell in sorted(target_cells):
+    present: list[tuple[tuple[int, int], int, PopulationFact]] = []
+    for obj, registered in (wilderness.db.itemcoordinates or {}).items():
+        if obj is None:
+            continue
+        cell = coordinate_pair(registered)
+        if cell is None or cell not in target_cells:
+            continue
         if not is_valid_wilderness_cell(cell):
-            # Materialization never happens on impassable or invalid wilderness cells
+            # Registration never stands on an impassable or invalid cell.
+            continue
+        pk = getattr(obj, "pk", None)
+        if pk is None:
             continue
 
-        cell_objs = items_by_cell[cell]
-
-        # A. Ambient decision for this cell
-        decision = ambient_population_decision(
-            wilderness,
-            cell,
-            session_participants=session_participants,
-            existing_objs=cell_objs,
-            capital_entry=cap_entry,
-        )
-
-        # Map living ambient monsters to their slots/keys. A prospective slot is
-        # reported only when reconciliation may materialize it, which a frozen
-        # (session-protected) decision never allows.
-        assigned_living: set[int] = set()
-        for slot_entry, monster in decision.assigned:
-            if monster is not None:
-                assigned_living.add(monster.pk)
-                facts.append(
-                    PopulationFact(
-                        observation_key=slot_entry.observation_key,
-                        cell=cell,
-                        kind="monster",
-                        hostile=True,
-                        label=monster.key,
-                        **_monster_threat(monster),
-                    )
-                )
-            elif slot_entry in decision.spawns_needed:
-                # Prospective slot
-                facts.append(
-                    PopulationFact(
-                        observation_key=slot_entry.observation_key,
-                        cell=cell,
-                        kind="monster",
-                        hostile=True,
-                        label=slot_entry.name_zh,
-                        **_slot_threat(slot_entry),
-                    )
-                )
-
-        # Retained living ambient monsters outside every assigned slot keep a
-        # distinct stable object identity, so no living enemy is ever omitted.
-        for m in decision.living_ambient:
-            if m.pk not in assigned_living and m.pk is not None:
-                facts.append(
-                    PopulationFact(
-                        observation_key=f"object:{m.pk}",
-                        cell=cell,
-                        kind="monster",
-                        hostile=True,
-                        label=m.key,
-                        **_monster_threat(m),
-                    )
-                )
-
-        # B. Registered non-ambient entities (site monsters, foreign monsters, characters, npcs)
-        ambient_marker = _population_key(*cell)
-        for obj in cell_objs:
-            pk = getattr(obj, "pk", None)
-            if pk is None:
+        if isinstance(obj, Monster):
+            if _stored_hp(obj) <= 0:
                 continue
+            fact = PopulationFact(
+                observation_key=f"object:{pk}",
+                cell=cell,
+                kind="monster",
+                hostile=True,
+                label=obj.key,
+                **_monster_threat(obj),
+            )
+        elif isinstance(obj, PlayerCharacter):
+            fact = PopulationFact(
+                observation_key=f"object:{pk}",
+                cell=cell,
+                kind="character",
+                hostile=False,
+                label=obj.key,
+            )
+        elif isinstance(obj, (NPC, LLMNPC)):
+            fact = PopulationFact(
+                observation_key=f"object:{pk}",
+                cell=cell,
+                kind="npc",
+                hostile=False,
+                label=obj.key,
+            )
+        else:
+            continue
+        present.append((cell, int(pk), fact))
 
-            if isinstance(obj, Monster):
-                if obj.db.population_key == ambient_marker:
-                    # Already handled by ambient decision
-                    continue
-
-                site_key = obj.db.site_key
-                if site_key is not None:
-                    if site_key not in site_members_cache:
-                        res = site_living_members(site_key, wilderness=wilderness)
-                        site_members_cache[site_key] = {m.pk for m in res.members}
-                    if pk in site_members_cache[site_key]:
-                        facts.append(
-                            PopulationFact(
-                                observation_key=f"object:{pk}",
-                                cell=cell,
-                                kind="monster",
-                                hostile=True,
-                                label=obj.key,
-                                **_monster_threat(obj),
-                            )
-                        )
-                    continue
-
-                # Foreign monster
-                if _persisted_hp(obj) > 0:
-                    facts.append(
-                        PopulationFact(
-                            observation_key=f"object:{pk}",
-                            cell=cell,
-                            kind="monster",
-                            hostile=True,
-                            label=obj.key,
-                            **_monster_threat(obj),
-                        )
-                    )
-            elif isinstance(obj, PlayerCharacter):
-                facts.append(
-                    PopulationFact(
-                        observation_key=f"object:{pk}",
-                        cell=cell,
-                        kind="character",
-                        hostile=False,
-                        label=obj.key,
-                    )
-                )
-            elif isinstance(obj, (NPC, LLMNPC)):
-                facts.append(
-                    PopulationFact(
-                        observation_key=f"object:{pk}",
-                        cell=cell,
-                        kind="npc",
-                        hostile=False,
-                        label=obj.key,
-                    )
-                )
-
-    return tuple(facts)
+    present.sort(key=lambda entry: (entry[0], entry[1]))
+    return tuple(fact for _cell, _pk, fact in present)

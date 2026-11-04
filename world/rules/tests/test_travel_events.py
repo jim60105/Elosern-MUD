@@ -122,14 +122,23 @@ class BuildTravelEventsTests(unittest.TestCase):
         back = _capture(cell=(11, 10), hostiles=(wolf,))
         self.assertEqual(_kinds(build_travel_events(gone, back, "move")), ["hostile_sighted"])
 
-    @covers_requirement("webclient-travel-window::travel-observations-follow-canonical-sight-and-phase-facts")
-    def test_a_prospective_slot_that_materializes_is_not_resighted(self):
-        """A prospective ambient slot and the monster that materializes in it
-        share the slot's observation key: the arrival brings no extra notice,
-        even when the materialized label or threat reads differently."""
-        prospective = _capture(hostiles=(("ambient:t:7", "灰狼", "甲"),))
-        materialized = _capture(cell=(11, 10), hostiles=(("ambient:t:7", "灰狼王", "乙"),))
-        self.assertEqual(build_travel_events(prospective, materialized, "move"), ())
+    def test_a_recycled_room_keeps_the_same_identity_and_raises_no_notice(self):
+        """Room recycling keeps the existing individual, so its persistent key
+        is unchanged across the step and no synthetic sighting is produced."""
+        beast = ("object:7", "灰狼", None)
+        self.assertEqual(
+            build_travel_events(_capture(hostiles=(beast,)), _capture(cell=(11, 10), hostiles=(beast,)), "move"),
+            (),
+        )
+
+    def test_a_new_live_identity_raises_the_hostile_notice(self):
+        before = _capture(hostiles=(("object:7", "灰狼", None),))
+        after = _capture(
+            cell=(11, 10),
+            hostiles=(("object:7", "灰狼", None), ("object:8", "灰狼", None)),
+        )
+        drafts = build_travel_events(before, after, "move")
+        self.assertEqual([(draft.kind, draft.params["count"]) for draft in drafts], [("hostile_sighted", 1)])
 
     def test_an_unchanged_read_emits_nothing(self):
         view = _capture(
