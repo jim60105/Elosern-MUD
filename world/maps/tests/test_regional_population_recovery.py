@@ -102,7 +102,9 @@ REPLENISH = 5
 
 def _solo_composition(key: str = "t_recovery_solo") -> EncounterComposition:
     """One complete one-member composition (a lawful wave of one)."""
-    return EncounterComposition(key, (CompositionMember(ORDINARY, 1, 1),))
+    return EncounterComposition(
+        key, "t_fixture_solo_activity", (CompositionMember(ORDINARY, 1, 1),)
+    )
 
 
 class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
@@ -619,6 +621,7 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             region_key=self.region,
             coordinates=LOCAL[0],
             composition_key="t_recovery_solo",
+            activity_key="t_fixture_site_activity",
             capacity=1,
             one_shot=False,
             recover_after_ticks=recover_after_ticks,

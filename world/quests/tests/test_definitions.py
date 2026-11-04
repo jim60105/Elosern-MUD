@@ -929,6 +929,7 @@ _CLEAR_OUT_SITES = {
         _HUNT_REGION,
         (4, 4),
         _CLEAR_OUT_PAIR,
+        "t_whisper_quail_stationary",
         _CLEAR_OUT_SITE_CAPACITY,
         True,
     ),
@@ -938,6 +939,7 @@ _CLEAR_OUT_SITES = {
         _HUNT_REGION,
         (5, 5),
         _CLEAR_OUT_SOLO,
+        "t_whisper_quail_stationary",
         1,
         False,
         3600,
@@ -947,6 +949,7 @@ _CLEAR_OUT_EXTRA = {
     "encounter_compositions": {
         _CLEAR_OUT_PAIR: EncounterComposition(
             _CLEAR_OUT_PAIR,
+            "t_whisper_quail_group_activity",
             (
                 CompositionMember(_HUNT_ORDINARY, 1, 1),
                 CompositionMember(_HUNT_STRONGER, 1, 1),
@@ -954,6 +957,7 @@ _CLEAR_OUT_EXTRA = {
         ),
         _CLEAR_OUT_SOLO: EncounterComposition(
             _CLEAR_OUT_SOLO,
+            "t_whisper_quail_solitary_activity",
             (CompositionMember(_HUNT_ORDINARY, 1, 1),),
         ),
     },

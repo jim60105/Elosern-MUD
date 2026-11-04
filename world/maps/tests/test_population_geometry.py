@@ -48,6 +48,7 @@ TOWN = "t_fixture_town"
 CAPITAL = "t_fixture_capital"
 DUNGEON = "t_fixture_dungeon"
 COMPOSITION = "t_fixture_composition"
+ACTIVITY = "t_fixture_activity"
 
 
 def _terrain() -> TerrainDefinition:
@@ -110,6 +111,7 @@ def _entry(anchor_key: str, shape: tuple[str, ...], origin: tuple[int, int]):
 def _composition(key: str = COMPOSITION, members=None) -> EncounterComposition:
     return EncounterComposition(
         key,
+        ACTIVITY,
         (CompositionMember("t_fixture_variant", 1, 1),)
         if members is None
         else tuple(members),

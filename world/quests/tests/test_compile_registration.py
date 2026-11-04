@@ -654,6 +654,7 @@ _CLEAR_OUT_SITES = {
         _HUNT_REGION,
         (4, 4),
         _CLEAR_OUT_COMPOSITION,
+        "t_whisper_quail_stationary",
         1,
         True,
     )
@@ -662,6 +663,7 @@ _CLEAR_OUT_EXTRA = {
     "encounter_compositions": {
         _CLEAR_OUT_COMPOSITION: EncounterComposition(
             _CLEAR_OUT_COMPOSITION,
+            "t_whisper_quail_solitary_activity",
             (CompositionMember(_HUNT_ORDINARY, 1, 1),),
         )
     },

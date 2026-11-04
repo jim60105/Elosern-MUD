@@ -176,6 +176,8 @@ REGISTRY_INDEX: tuple[RegistrySpec, ...] = (
     _spec("monster_sites", "魔物據點", "生物", _attr("world.lore.monster_placement", "MONSTER_SITE_REGISTRY"), f"{_LORE}/monster_placement.py", "kind", "region_key", "composition_key"),
     _spec("encounter_compositions", "遭遇組合", "生物", _attr("world.lore.monster_placement", "ENCOUNTER_COMPOSITION_REGISTRY"), f"{_LORE}/monster_placement.py", "members"),
     _spec("ecology_zones", "生態區帶", "生物", _attr("world.lore.monster_placement", "ECOLOGY_ZONE_REGISTRY"), f"{_LORE}/monster_placement.py", "region_key", "cell_capacity"),
+    _spec("activity_areas", "活動範圍", "生物", _attr("world.lore.monster_activity", "ACTIVITY_AREA_REGISTRY"), f"{_LORE}/monster_activity.py", "region_key", "home_radius"),
+    _spec("monster_activities", "魔物活動", "生物", _attr("world.lore.monster_activity", "MONSTER_ACTIVITY_REGISTRY"), f"{_LORE}/monster_activity.py", "policy", "area_key", "decision_interval"),
     # 物品與經濟
     _spec("items", "物品", "物品與經濟", _attr("world.lore.items", "ITEM_REGISTRY"), f"{_LORE}/items", "display_name_zh", "price_table_key"),
     _spec("prices", "價格表", "物品與經濟", _attr("world.lore.economy", "PRICE_TABLE"), f"{_LORE}/economy.py", "display_name_zh", "min_copper", "max_copper"),

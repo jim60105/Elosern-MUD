@@ -25,6 +25,12 @@ from types import MappingProxyType
 from typing import Callable, TypeVar
 
 from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+from .monster_activity import (
+    MONSTER_ACTIVITY_REGISTRY,
+    MonsterActivity,
+    MonsterActivityRegistryError,
+    validate_activity_binding,
+)
 from .registry_refs import ref
 # Read the variant registry as a MODULE attribute at call time (never a
 # from-import binding captured once): the synthetic test-data kit patches the
@@ -79,6 +85,9 @@ class MonsterSite:
     composition_key: str = field(
         metadata=ref("encounter_compositions", inverse="monster_sites")
     )
+    activity_key: str = field(
+        metadata=ref("monster_activities", inverse="monster_sites")
+    )
     capacity: int
     one_shot: bool
     recover_after_ticks: int | None = None
@@ -105,6 +114,9 @@ class EncounterComposition:
     """One complete authored encounter: every member group is placed together."""
 
     key: str
+    activity_key: str = field(
+        metadata=ref("monster_activities", inverse="encounter_compositions")
+    )
     members: tuple[CompositionMember, ...]
 
 
@@ -258,7 +270,7 @@ def _check_site_composition(
     variants: Mapping[str, object],
     species: Mapping[str, object],
     what: str,
-) -> None:
+) -> EncounterComposition:
     """Reject a site whose complete composition is unnamed, unknown, or too large.
 
     A site holds exactly one authored complete composition, so the reference
@@ -289,6 +301,60 @@ def _check_site_composition(
             f"{what} composition {composition_key!r} can place {largest} "
             f"individuals, above its capacity {site.capacity}"
         )
+    return composition
+
+
+def _check_composition_activity(
+    composition: EncounterComposition,
+    activities: Mapping[str, MonsterActivity],
+    what: str,
+) -> MonsterActivity:
+    """Reject a composition whose activity reference or policy is unusable."""
+    activity_key = composition.activity_key
+    if not isinstance(activity_key, str) or not activity_key:
+        raise MonsterPlacementRegistryError(
+            f"{what} declares no activity binding"
+        )
+    activity = activities.get(activity_key)
+    if activity is None:
+        raise MonsterPlacementRegistryError(
+            f"{what} references unknown monster activity {activity_key!r}"
+        )
+    _, largest = composition_bounds(composition)
+    try:
+        validate_activity_binding(
+            activity, largest, f"{what} activity {activity_key!r}"
+        )
+    except MonsterActivityRegistryError as error:
+        raise MonsterPlacementRegistryError(str(error)) from error
+    return activity
+
+
+def _check_site_activity(
+    site: MonsterSite,
+    composition: EncounterComposition,
+    activities: Mapping[str, MonsterActivity],
+    what: str,
+) -> MonsterActivity:
+    """Reject a site override that cannot carry its complete composition."""
+    activity_key = site.activity_key
+    if not isinstance(activity_key, str) or not activity_key:
+        raise MonsterPlacementRegistryError(
+            f"{what} declares no activity binding"
+        )
+    activity = activities.get(activity_key)
+    if activity is None:
+        raise MonsterPlacementRegistryError(
+            f"{what} references unknown monster activity {activity_key!r}"
+        )
+    _, largest = composition_bounds(composition)
+    try:
+        validate_activity_binding(
+            activity, largest, f"{what} activity {activity_key!r}"
+        )
+    except MonsterActivityRegistryError as error:
+        raise MonsterPlacementRegistryError(str(error)) from error
+    return activity
 
 
 def build_monster_site_registry(
@@ -447,6 +513,7 @@ def validate_ecology_registries(
     region_face: Iterable[str] | None = None,
     variant_face: Mapping[str, object] | None = None,
     species_face: Mapping[str, object] | None = None,
+    activities: Mapping[str, MonsterActivity] | None = None,
 ) -> None:
     """Raise unless every authored ecology declaration is complete and legal.
 
@@ -467,6 +534,9 @@ def validate_ecology_registries(
     regions = None if region_face is None else frozenset(region_face)
     variants = MONSTER_VARIANT_REGISTRY if variant_face is None else variant_face
     species = MONSTER_SPECIES_REGISTRY if species_face is None else species_face
+    activity_rows = (
+        MONSTER_ACTIVITY_REGISTRY if activities is None else activities
+    )
 
     for mapping_key, composition in compositions.items():
         what = f"encounter composition {mapping_key!r}"
@@ -476,6 +546,7 @@ def validate_ecology_registries(
                 "by its own key"
             )
         _check_composition(composition, variants, species, what)
+        _check_composition_activity(composition, activity_rows, what)
 
     for mapping_key, zone in zones.items():
         what = f"ecology zone {mapping_key!r}"
@@ -573,6 +644,7 @@ def validate_monster_placement_registry(
     species_face: Mapping[str, object] | None = None,
     kind_face: Iterable[str] | None = None,
     compositions: Mapping[str, EncounterComposition] | None = None,
+    activities: Mapping[str, MonsterActivity] | None = None,
 ) -> None:
     """Raise :class:`MonsterPlacementRegistryError` unless every row is valid.
 
@@ -599,6 +671,9 @@ def validate_monster_placement_registry(
     composition_rows = (
         ENCOUNTER_COMPOSITION_REGISTRY if compositions is None else compositions
     )
+    activity_rows = (
+        MONSTER_ACTIVITY_REGISTRY if activities is None else activities
+    )
 
     for mapping_key, site in sites.items():
         what = f"monster site {mapping_key!r}"
@@ -617,9 +692,11 @@ def validate_monster_placement_registry(
             _check_region(site.region_key, regions, what)
         _check_coordinates(site.coordinates, what)
         _require_int(site.capacity, f"{what} capacity", 1)
-        _check_site_composition(
+        composition = _check_site_composition(
             site, composition_rows, variants, species, what
         )
+        _check_composition_activity(composition, activity_rows, what)
+        _check_site_activity(site, composition, activity_rows, what)
         if not isinstance(site.one_shot, bool):
             raise MonsterPlacementRegistryError(
                 f"{what} must author its one-shot/recoverable life cycle as a "
@@ -677,6 +754,7 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         "western_hills_valleys",
         (700, 1000),
         "ridge_burrow_nest_group",
+        "ridge_burrow_nest_stationary",
         2,
         True,
     ),
@@ -689,6 +767,7 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         "western_hills_valleys",
         (760, 1150),
         "cliff_echo_camp_group",
+        "cliff_echo_camp_stationary",
         2,
         False,
         86400,
@@ -703,6 +782,7 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         "southeast_coast",
         (2100, 300),
         "tide_mouth_boss",
+        "tide_mouth_boss_stationary",
         1,
         True,
     ),
@@ -722,22 +802,27 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
 _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
     EncounterComposition(
         "eastern_field_grain_pecker",
+        "eastern_field_grain_pecker_activity",
         (CompositionMember("grain_pecker", 1, 1),),
     ),
     EncounterComposition(
         "eastern_field_flock_leader",
+        "eastern_field_flock_leader_activity",
         (CompositionMember("flock_leader", 1, 1),),
     ),
     EncounterComposition(
         "eastern_field_burrow_maker",
+        "eastern_field_burrow_maker_activity",
         (CompositionMember("burrow_maker", 1, 1),),
     ),
     EncounterComposition(
         "eastern_field_nest_guard",
+        "eastern_field_nest_guard_activity",
         (CompositionMember("nest_guard", 1, 1),),
     ),
     EncounterComposition(
         "eastern_field_grain_and_burrow",
+        "eastern_field_grain_and_burrow_activity",
         (
             CompositionMember("grain_pecker", 1, 1),
             CompositionMember("burrow_maker", 1, 1),
@@ -745,38 +830,47 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
     ),
     EncounterComposition(
         "highland_wood_stalker",
+        "highland_wood_stalker_activity",
         (CompositionMember("wood_stalker", 1, 1),),
     ),
     EncounterComposition(
         "highland_trail_hunter",
+        "highland_trail_hunter_activity",
         (CompositionMember("trail_hunter", 1, 1),),
     ),
     EncounterComposition(
         "southwest_shore_walker",
+        "southwest_shore_walker_activity",
         (CompositionMember("shore_walker", 1, 1),),
     ),
     EncounterComposition(
         "southwest_reef_warden",
+        "southwest_reef_warden_activity",
         (CompositionMember("reef_warden", 1, 1),),
     ),
     EncounterComposition(
         "western_rockland_burrow_maker",
+        "western_rockland_burrow_maker_activity",
         (CompositionMember("burrow_maker", 1, 1),),
     ),
     EncounterComposition(
         "western_rockland_nest_guard",
+        "western_rockland_nest_guard_activity",
         (CompositionMember("nest_guard", 1, 1),),
     ),
     EncounterComposition(
         "western_rockland_cliff_stepper",
+        "western_rockland_cliff_stepper_activity",
         (CompositionMember("cliff_stepper", 1, 1),),
     ),
     EncounterComposition(
         "western_rockland_pass_warden",
+        "western_rockland_pass_warden_activity",
         (CompositionMember("pass_warden", 1, 1),),
     ),
     EncounterComposition(
         "western_rockland_burrow_and_cliff",
+        "western_rockland_burrow_and_cliff_activity",
         (
             CompositionMember("burrow_maker", 1, 1),
             CompositionMember("cliff_stepper", 1, 1),
@@ -787,6 +881,7 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
     # so its membership never depends on automatic birth selection.
     EncounterComposition(
         "ridge_burrow_nest_group",
+        "ridge_burrow_nest_group_activity",
         (
             CompositionMember("burrow_maker", 1, 1),
             CompositionMember("nest_guard", 1, 1),
@@ -794,6 +889,7 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
     ),
     EncounterComposition(
         "cliff_echo_camp_group",
+        "cliff_echo_camp_group_activity",
         (
             CompositionMember("cliff_stepper", 1, 1),
             CompositionMember("pass_warden", 1, 1),
@@ -801,6 +897,7 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
     ),
     EncounterComposition(
         "tide_mouth_boss",
+        "tide_mouth_boss_activity",
         (CompositionMember("bay_warden", 1, 1),),
     ),
 )

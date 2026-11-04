@@ -685,6 +685,7 @@
     "world.lore.tests.test_magic",
     "world.lore.tests.test_map_district_content",
     "world.lore.tests.test_map_districts",
+    "world.lore.tests.test_monster_activity",
     "world.lore.tests.test_monster_placement",
     "world.lore.tests.test_monster_species_band_invariant",
     "world.lore.tests.test_monster_species_content",

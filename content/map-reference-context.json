@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "7105fefc82c09c1f8793e7e3284396bf0c035368c5d50ada2334a8c78ca0d201",
+  "fingerprint": "a6eac680d4244f9810ad4da99ee93acaed5bc71e8c21a4c8cffed9403b37d73d",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -904,7 +904,7 @@
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
     "tools/map_reference_context.py": "c379dde7cef91d8f8cb2bc48cd1074ca867124109cb937f8327ab5bc436c7cfc",
-    "world/lore/__init__.py": "f6b4982d95c10bce2761caf13fc80a183e67108de344516a5abf804164568a42",
+    "world/lore/__init__.py": "7fb8ceb1f6bd963e0f574afdfa86b79e34c57d7d30cfc56ad6330d2f536bf28b",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
     "world/lore/anchors.py": "0cf084637bb61f1569b69f3aa5dbe397fc11611e3c85e31d251b8f77a40558ba",
@@ -935,7 +935,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_placement.py": "241024bc7bec5b20b4213a97e49a4822face7274618265578b8e0693ef4047ab",
+    "world/lore/monster_activity.py": "eb54b0ec874b2b44df31d87722e1fa7e094482f86178c254134a3b8f6150e139",
+    "world/lore/monster_placement.py": "ff72f10821037ce688537a456a8193e7c0174cea600a3824e7ee902401212f6f",
     "world/lore/monster_species.py": "95997e3dd88cfd96ef5974a52f73e568f59088439050254bfbda5064159b075a",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
@@ -960,7 +961,7 @@
     "world/lore/player_presets/validation.py": "084c3ff9755e870076bf84f4a0b617968fe5967285519e988eccd120edb3bca9",
     "world/lore/player_presets/vocab.py": "a9563a1af1e464e4f018de4a1b1158cae7aeed2573ca42a13244893d2f1bfc71",
     "world/lore/races.py": "d1d3672182c64eae1dfb17f1fe16962c9db5f51fb5a0b7404e70d88b20887ae4",
-    "world/lore/registry_index.py": "6a156f7b710a172afef92968952e2394b7dc7f158ba818c0070e79ee8cfba070",
+    "world/lore/registry_index.py": "3d087f6ef42b1ebf3d0ce16ce695674269d4c07525b8b6d31df16970de9b33ee",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/scene_archetypes.py": "737c650a1a5223defef655520242cc162301181b63f1f783e451def3f19b4388",
     "world/lore/scenes.py": "ba525c31108b5abcd3c487df9578d6e38e5dc2504b6cf4cf5711313e2dd97898",
@@ -979,7 +980,7 @@
     "world/lore/sexual_vocab.py": "a67052bc4741ea037f4209977c618486b5870c439a0d84c1e8575f06146d922b",
     "world/lore/social_identities.py": "d51416b9f27807211f96754514e25c83fb7291f7b68eb88011bc9f5a4050d034",
     "world/lore/starting_kits.py": "7a030a0bc4cdf985868f6cdb5dd6bf7362afdbba3e4194f2316431fc84571fa8",
-    "world/lore/sync.py": "b3c0b1c18b5ead2356291c0b83b10e4f500cc880a56ca19ac0c395ee24b443e3",
+    "world/lore/sync.py": "045d594a1f3eb873eef1567fb7a2a9c62332b50dc76eb59b1e0b18554796bf66",
     "world/lore/titles.py": "5878ad1e457a6a644a0ad9b93035c55d6f7a7649e266049b2bfd66d4dc860793",
     "world/lore/wilderness_entry.py": "68eb52bcdc05a965e95f5f42d61a273354cec01c0de18eb4babe5da6645031be",
     "world/lore/wilderness_regions.py": "78e42745940b8be25119259399ed92f25a8af67dc02af030c4828dc53f5af37f",

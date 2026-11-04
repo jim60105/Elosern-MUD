@@ -15,8 +15,9 @@ from .economy import PRICE_TABLE
 from .elements import ELEMENT_REGISTRY
 from .guild import GUILD_RANK_REGISTRY
 from .magic import MAGIC_TIER_REGISTRY
-from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+from .monster_activity import ACTIVITY_AREA_REGISTRY, MONSTER_ACTIVITY_REGISTRY
 from .monster_placement import MONSTER_SITE_REGISTRY
+from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
 from .names import NAME_PACK_REGISTRY
 from .monsters import MONSTER_TIER_REGISTRY
 from .nations import NATION_REGISTRY
@@ -69,6 +70,8 @@ _ALL_REGISTRIES: dict[str, Mapping[str, Any]] = {
     "monster_tiers": MONSTER_TIER_REGISTRY,
     **MONSTER_SPECIES_REGISTRIES,
     **MONSTER_PLACEMENT_REGISTRIES,
+    "activity_areas": ACTIVITY_AREA_REGISTRY,
+    "monster_activities": MONSTER_ACTIVITY_REGISTRY,
     "anchor_placements": ANCHOR_PLACEMENT_REGISTRY,
     "name_packs": NAME_PACK_REGISTRY,
     "wilderness_entries": WILDERNESS_ENTRY_REGISTRY,
