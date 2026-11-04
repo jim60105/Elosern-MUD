@@ -269,3 +269,43 @@ Register every new test module/method in its required shard and trace substantiv
 ## 11. Written review and planning gate
 
 All seven content sections and the affirmative-prose instruction were approved in conversation. Commit this document, perform inline self-review for completeness and consistency, and ask the user to review the written specification. Resolve that review and the three-document approval state before entering `writing-plans`. Feature implementation requires the separate project workflow and is not authorized by content or plan approval.
+
+## 12. Proposal set and implementation batches (2026-11-05)
+
+Twelve OpenSpec changes implement this design under `openspec/changes/`. All twelve are in phase `proposed`, hold no branch or worktree, and pass `openspec validate --all --strict`. Every prerequisite from the two earlier designs is archived and merged on `master`: all nine regional-population changes and all eight field-behaviour changes, ending with `paid-party-retreat` (merge `1b1be7b8`). No change below waits on unlanded earlier work. This section records scope and order; it authorizes no implementation.
+
+| Order | Change | Design sections | Scope | Depends on | Batch |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `activity-group-formation` | 4.1, 7.1, 9 | Form movement groups from each binding's policy in zone births, manual sites and the forecast; a solitary binding may cover several members | none | 1 |
+| 2 | `owned-kit-decision-coverage` | 5, 6, 9 | Report any shipped variant whose owned support active its effective legacy mode can never select, without blocking rollback | none | 1 |
+| 3 | `affirmative-monster-prose-guidelines` | 2, 8 | Affirmative public-prose rule, third-batch approval scope and roster-free kit wording in the creation guide (docs only) | none | 1 |
+| 4 | `site-member-activity-bindings` | 3, 7.2, 7.3 | Per-row activity bindings, optional site override with precedence, designated single-individual display label | 1 | 2 |
+| 5 | `mudfilm-slime-species` | 3, 4.1, 5, 6, 8 | 泥膜史萊姆・濕岸型, self film guard, utility binding, bestiary and ledger, first support-only representative | 2, 3 | 2 |
+| 6 | `wax-pouch-rat-species` | 3, 4.3, 5, 6, 8 | 蠟囊鼠・藏穀型, self agility slip, utility binding, bestiary and ledger | 5 | 3 |
+| 7 | `sticky-palm-goblin-species` | 3, 4.2, 5, 6, 8 | 膠掌小鬼・懸巢型, elementless grab with landed-hit agility penalty, legacy binding, bestiary and ledger | 6 | 4 |
+| 8 | `reservoir-warden-variant` | 3, 4.4, 5, 6, 8 | 吞潮鱷・蓄潮型 high A, existing drain plus MP-funded self guard, utility binding, affirmative crocodile rewrite, new representative | 7, 2 | 5 |
+| 9 | `weak-species-habitats` | 7.1 | Five sparse bounded zones, compositions and activities for the three weak species | 1, 5, 6, 7 | 5 |
+| 10 | `ember-bristle-boar-species` | 3, 4.5, 5, 6, 8 | 焙鬃野豬・焙窩型 high B, fire physical strike and sweep, legacy `pack_hunter`, new representative | 8 | 6 |
+| 11 | `abandoned-transfer-station-encounter` | 7.2, 10 | One-shot mixed site (two cohesive goblins, one independent rat) and its production smoke | 4, 9, 6, 7 | 6 |
+| 12 | `high-tier-boss-sites` | 3, 7.3, 10 | Two one-shot labelled territorial boss sites and their smoke | 8, 10, 11, 4 | 7 |
+
+Changes 3 and 5–12 declare `skip_specs: true`: they are content data, documentation or production smoke executed by existing contracts. Changes 1, 2 and 4 carry delta specs for `monster-field-activity`, `monster-behaviour-profile` and `monster-site-placement`.
+
+### 12.1 Batch structure
+
+Batches run serially; the changes inside one batch run in parallel.
+
+- **Batch 1: changes 1, 2, 3.** No prerequisite. Change 1 owns `world/lore/monster_activity.py`, `world/maps/regional_population.py`, `world/maps/monster_sites.py` and `world/maps/population_forecast.py`; change 2 owns `world/rules/monster_behaviour.py`; change 3 owns only `docs/lore/monster-creation-guidelines.md`.
+- **Batch 2: changes 4 and 5.** Change 4 extends change 1's helper and writers; change 5 needs change 2's support-kit check and change 3's prose rule. Change 4 edits placement and map owners, change 5 edits species, skill, rulebook, narration, bestiary and AI-evidence files, so their files are disjoint.
+- **Batches 3 and 4: changes 6 and 7, one each.** Every species or variant change appends to `world/lore/monster_species.py`, `world/skills/registry/data_monster_abilities.py`, the buff, modifier and status rulebooks, the bestiary, the editorial ledger and `docs/development/monster-content-expansion.md`. Every new buff, modifier rule or mode override also moves the AI tuning fingerprint that `docs/development/monster-ai-activation-evidence/activation.json` records, and the regenerated selector evidence cannot be merged textually. The content chain 5 → 6 → 7 → 8 → 10 is therefore strictly serial.
+- **Batch 5: changes 8 and 9.** Change 9 needs the three weak species and change 1. It edits only placement and activity declarations and `docs/development/regional-monster-population.md`, which are disjoint from change 8's content files.
+- **Batch 6: changes 10 and 11.** Change 11 needs changes 4 and 9 and both low-tier group species. Its declarations, smoke module and review subsection are disjoint from change 10's content files. Both add entries to `.github/evennia-shards.json` and `tools/test_data_freeze.json` at different positions, and a textual conflict there keeps both entries.
+- **Batch 7: change 12.** It needs both high-tier contents (8, 10) and extends the declaration tuples, smoke module and review subsection that change 11 creates.
+
+### 12.2 Shared-file rules
+
+`content/map-reference-context.json` hashes every module under `world/lore` and `world/rules`, so it conflicts mechanically between any two parallel changes. Resolve it by rerunning `uv run --locked python -m tools.map_reference_context` after rebase, never by hand-merging. `.github/evennia-shards.json` and `tools/test_data_freeze.json` gain one entry per new data-contract module (changes 5, 8, 10, 11). No change edits command documentation or browser shards.
+
+### 12.3 Requirement-level ordering
+
+Change 1 modifies `monster-field-activity::activity-declarations-publish-complete-validated-bindings` and adds the group-formation requirement. Change 4 adds two `monster-site-placement` requirements that rely on change 1's formation rule, so change 4 archives after change 1. Change 2 adds one `monster-behaviour-profile` requirement that no other change touches.
