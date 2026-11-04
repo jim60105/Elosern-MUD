@@ -1395,7 +1395,7 @@ class CampaignHarness:
         #: One entry per recorded decision: the encounter-local role of the
         #: deciding monster, as the decision's ``actor_id`` documents it.
         decision_roles: list[str] = []
-        monster_keys = {monster.key for monster in encounter.monsters}
+        monster_ids = {stable_identity(monster) for monster in encounter.monsters}
         rounds = 0
         last_outcome = "round"
         with self._recording(
@@ -1403,7 +1403,7 @@ class CampaignHarness:
             traces,
             engine_scopes,
             decision_roles,
-            monster_keys,
+            monster_ids,
             roles,
             facts,
         ):
@@ -1417,7 +1417,7 @@ class CampaignHarness:
                 record = read_session(initiator)
                 if record is None:
                     break
-                target = self._legal_opponent(initiator, record, monster_keys)
+                target = self._legal_opponent(initiator, record, monster_ids)
                 if target is None:
                     raise CampaignFailure(
                         f"{initiator.key} has no legal living opponent left while its "
@@ -1455,7 +1455,7 @@ class CampaignHarness:
         return samples, rounds, outcome
 
     @staticmethod
-    def _legal_opponent(initiator: Any, record: Any, monster_keys: set[str]) -> Any:
+    def _legal_opponent(initiator: Any, record: Any, monster_ids: set[str]) -> Any:
         """Return one currently legal, living opponent of the live session.
 
         The target is read from the session's own reconstructed battlefield
@@ -1463,7 +1463,7 @@ class CampaignHarness:
         knocked-out monster is never submitted against.
         """
         battlefield = reconstruct_battlefield(initiator, record)
-        for key in sorted(monster_keys):
+        for key in sorted(monster_ids):
             entity = battlefield.roster.get(key)
             if (
                 entity is not None
@@ -1556,7 +1556,7 @@ class CampaignHarness:
         traces: list[Any],
         engine_scopes: list[tuple[Any, ...]],
         decision_roles: list[str],
-        monster_keys: set[str],
+        monster_ids: set[str],
         roles: Mapping[str, str],
         facts: list[dict[str, Any]],
     ) -> Iterator[None]:
@@ -1617,7 +1617,7 @@ class CampaignHarness:
         def resolve(request, *args, **kwargs):
             result = original_resolve(request, *args, **kwargs)
             actor = getattr(request, "actor", None)
-            if actor is not None and getattr(actor, "key", None) in monster_keys:
+            if actor is not None and stable_identity(actor) in monster_ids:
                 if getattr(result, "outcome", None) != "success":
                     raise RefusedMonsterAction(
                         self._refusal_message(request, result, traces)

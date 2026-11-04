@@ -658,6 +658,43 @@ class CampaignEncounterTests(EvenniaTestCase):
             {outcome.session_id},
         )
 
+    def test_legal_opponent_addresses_same_label_monsters_by_identity(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.rooms import Room
+        from world.rules.combat_session import engage_group
+        from world.rules.tests._combat_session_helpers import (
+            _monster,
+            _player,
+            open_synthetic_scope,
+        )
+
+        open_synthetic_scope(self, "skills", "elements")
+        room = create_object(Room, key="campaign twin arena")
+        player = _player("campaign twin player")
+        player.location = room
+        first = _monster("campaign-twin", hp=100)
+        second = _monster("campaign-twin", hp=100)
+        first.location = room
+        second.location = room
+        engage_group(player, [first, second])
+        record = read_session(player)
+        monster_ids = {stable_actor_id(first), stable_actor_id(second)}
+        opponent = manual_campaign.CampaignHarness._legal_opponent(
+            player, record, monster_ids
+        )
+        self.assertIn(opponent, (first, second))
+        # Fleeing one individual removes only its eligibility.
+        survivor = manual_campaign.CampaignHarness._legal_opponent(
+            player,
+            manual_campaign.replace(
+                record,
+                fled_ids=(int(first.pk),),
+            ),
+            monster_ids,
+        )
+        self.assertIs(survivor, second)
+
     @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
     def test_paired_variants_decide_under_one_shared_identity(self):
         harness = manual_campaign.CampaignHarness(
@@ -788,7 +825,9 @@ class CampaignEncounterTests(EvenniaTestCase):
             return rejected
 
         with patch.object(ActionResolver, "resolve", refuse):
-            with harness._recording(encounter, [], [], [], {monster.key}, {}, []):
+            with harness._recording(
+                encounter, [], [], [], {stable_actor_id(monster)}, {}, []
+            ):
                 with self.assertRaises(manual_campaign.RefusedMonsterAction) as raised:
                     # The resolver itself is replaced here: this asserts the
                     # refusal aborts the batch, not an occurrence identity.
