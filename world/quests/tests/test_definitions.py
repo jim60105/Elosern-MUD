@@ -6,7 +6,11 @@ from tools.spec_traceability import covers_requirement
 import unittest
 
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
-from world.lore.monster_placement import MonsterSite
+from world.lore.monster_placement import (
+    CompositionMember,
+    EncounterComposition,
+    MonsterSite,
+)
 from world.tests.synthetic_data import (
     SYNTH_ITEMS,
     SYNTH_MONSTER_SPECIES,
@@ -834,13 +838,15 @@ _CLEAR_OUT_SITE = "t_clear_out_site"
 _SECOND_SITE = "t_clear_out_second_site"
 _ABSENT_SITE = "t_absent_site"
 _CLEAR_OUT_SITE_CAPACITY = 2
+_CLEAR_OUT_PAIR = "t_clear_out_pair"
+_CLEAR_OUT_SOLO = "t_clear_out_solo"
 _CLEAR_OUT_SITES = {
     _CLEAR_OUT_SITE: MonsterSite(
         _CLEAR_OUT_SITE,
         "nest",
         _HUNT_REGION,
         (4, 4),
-        (_HUNT_ORDINARY, _HUNT_STRONGER),
+        _CLEAR_OUT_PAIR,
         _CLEAR_OUT_SITE_CAPACITY,
         True,
     ),
@@ -849,13 +855,28 @@ _CLEAR_OUT_SITES = {
         "camp",
         _HUNT_REGION,
         (5, 5),
-        (_HUNT_ORDINARY,),
+        _CLEAR_OUT_SOLO,
         1,
         False,
         3600,
     ),
 }
-_CLEAR_OUT_EXTRA = {"monster_sites": _CLEAR_OUT_SITES}
+_CLEAR_OUT_EXTRA = {
+    "encounter_compositions": {
+        _CLEAR_OUT_PAIR: EncounterComposition(
+            _CLEAR_OUT_PAIR,
+            (
+                CompositionMember(_HUNT_ORDINARY, 1, 1),
+                CompositionMember(_HUNT_STRONGER, 1, 1),
+            ),
+        ),
+        _CLEAR_OUT_SOLO: EncounterComposition(
+            _CLEAR_OUT_SOLO,
+            (CompositionMember(_HUNT_ORDINARY, 1, 1),),
+        ),
+    },
+    "monster_sites": _CLEAR_OUT_SITES,
+}
 
 
 def _clear_out(

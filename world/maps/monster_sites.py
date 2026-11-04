@@ -45,7 +45,7 @@ individual is flushed from Evennia's instance cache so a rolled-back row can
 never be served for a recycled primary key.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 from typing import Any
@@ -196,9 +196,13 @@ def _require_occurrence(site: MonsterSite, record: Mapping[str, object]) -> tupl
 
 
 def _saved_member_ids(record: Mapping[str, object]) -> tuple[int, ...] | None:
-    """The site's authoritative member IDs, or ``None`` when unreadable."""
+    """The site's authoritative member IDs, or ``None`` when unreadable.
+
+    Evennia hands an attribute value back as its own mutation-aware sequence
+    type, so the check accepts any non-text sequence, not just ``list``.
+    """
     ids = record.get("member_ids")
-    if not isinstance(ids, (list, tuple)):
+    if isinstance(ids, (str, bytes)) or not isinstance(ids, Sequence):
         return None
     members: list[int] = []
     for value in ids:

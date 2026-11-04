@@ -23,7 +23,13 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.components import GuildStaff
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
-from world.lore.monster_placement import AmbientPlacementRule, MonsterSite
+from world.lore.monster_placement import (
+    AmbientPlacementRule,
+    CompositionMember,
+    EncounterComposition,
+    MonsterSite,
+    composition_variant_keys,
+)
 from world.maps import monster_sites
 from world.maps.monster_sites import (
     SITE_READ_CLEARED,
@@ -35,6 +41,7 @@ from world.maps.monster_sites import (
     site_state,
 )
 from world.maps.wilderness_population import _stored_hp
+from world.maps.regional_population import initialize_population_seed
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -92,11 +99,25 @@ SPECIES = SYNTH_MONSTER_SPECIES[next(iter(SYNTH_MONSTER_SPECIES))].key
 #: A walkable south-western wild cell, far from the contract-pinned hunting band.
 PROBE = (30, 30)
 HOUR = 3600
+_SEED = 13
 _BRANCH = SYNTH_GUILD_BRANCH_KEY
 
 NEST = "t_clear_out_nest"
 CAMP = "t_clear_out_camp"
 BOSS = "t_clear_out_boss"
+
+_PAIR = "t_clear_out_pair"
+_SOLO = "t_clear_out_solo"
+COMPOSITIONS = {
+    _PAIR: EncounterComposition(
+        _PAIR,
+        (
+            CompositionMember(ORDINARY, 1, 1),
+            CompositionMember(STRONGER, 1, 1),
+        ),
+    ),
+    _SOLO: EncounterComposition(_SOLO, (CompositionMember(STRONGER, 1, 1),)),
+}
 
 from world.tests.geography_fixture import publish_shipped_geography
 
@@ -132,13 +153,13 @@ class SiteClearOutAcceptanceTests(
         self.rule = AmbientPlacementRule(self.region, (ORDINARY,), 1, 1, 0)
         self.sites = {
             NEST: MonsterSite(
-                NEST, "nest", self.region, PROBE, (ORDINARY, STRONGER), 2, True
+                NEST, "nest", self.region, PROBE, _PAIR, 2, True
             ),
             CAMP: MonsterSite(
-                CAMP, "camp", self.region, PROBE, (ORDINARY, STRONGER), 2, False, HOUR
+                CAMP, "camp", self.region, PROBE, _PAIR, 2, False, HOUR
             ),
             BOSS: MonsterSite(
-                BOSS, "boss_site", self.region, PROBE, (STRONGER,), 1, True
+                BOSS, "boss_site", self.region, PROBE, _SOLO, 1, True
             ),
         }
         self.enterContext(
@@ -151,6 +172,7 @@ class SiteClearOutAcceptanceTests(
                 "guild_branches",
                 extra={
                     "ambient_placements": {self.region: self.rule},
+                    "encounter_compositions": COMPOSITIONS,
                     "monster_sites": self.sites,
                 },
             )
@@ -164,6 +186,7 @@ class SiteClearOutAcceptanceTests(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
         enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
         self.room = self.char1.location
         self.room.db.region_key = self.region
@@ -330,6 +353,32 @@ class SiteClearOutAcceptanceTests(
             list(record.objective_target_ids), stored["objective_target_ids"]
         )
         self.assertEqual(stored["stage_room_id"], None)
+
+    @covers_requirement(
+        "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
+    )
+    def test_a_binding_survives_the_site_clearing_without_generating_members(self):
+        self._settle()
+        record = accept(self.char1, self.nest_key)
+        bound = list(record.objective_target_ids)
+        self.assertEqual(len(bound), 2)
+
+        self._clear(NEST)
+        state_before = dict(self.wilderness.db.monster_sites)
+        occupancy_before = self._occupancy()
+        monsters_before = self._monster_pks()
+
+        # Every later read answers the cleared verdict instead of treating the
+        # binding as a reason to restore the site, and the bound IDs stay
+        # exactly the IDs the acceptance returned.
+        read = monster_sites.site_living_members(NEST, wilderness=self.wilderness)
+        self.assertEqual(read.reason, SITE_READ_CLEARED)
+        self.assertEqual(read.members, ())
+        self.assertFalse(site_clear_out_available(self._definition(self.nest_key)))
+        self.assertEqual(self._storage()[0]["objective_target_ids"], bound)
+        self.assertEqual(dict(self.wilderness.db.monster_sites), state_before)
+        self.assertEqual(self._occupancy(), occupancy_before)
+        self.assertEqual(self._monster_pks(), monsters_before)
 
     @covers_requirement(
         "quest-lifecycle::accept-quest-creates-one-deterministic-active-record"
@@ -525,7 +574,10 @@ class SiteClearOutAcceptanceTests(
         self.assertEqual(context["site"], NEST)
         self.assertEqual(context["region"], self.region)
         self.assertEqual(context["species"], (SPECIES,))
-        self.assertEqual(context["variant"], self.sites[NEST].variant_keys)
+        self.assertEqual(
+            context["variant"],
+            composition_variant_keys(COMPOSITIONS[_PAIR]),
+        )
         self.assertEqual(context["required"], 2)
         self.assertEqual(context["available"], 2)
         warn.assert_not_called()

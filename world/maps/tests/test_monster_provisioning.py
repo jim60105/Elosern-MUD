@@ -9,7 +9,13 @@ from unittest.mock import patch
 from django.db import transaction
 from evennia.utils.test_resources import EvenniaTest
 from typeclasses.monsters import Monster
-from world.lore.monster_placement import AmbientPlacementRule, MonsterSite
+from world.lore.monster_placement import (
+    AmbientPlacementRule,
+    CompositionMember,
+    EncounterComposition,
+    MonsterSite,
+)
+from world.maps.regional_population import initialize_population_seed
 from world.maps.monster_provisioning import (
     PROVISION_NO_AMBIENT_RULE,
     PROVISION_NO_ELIGIBLE_VARIANT,
@@ -71,6 +77,8 @@ assert SYNTH_MONSTER_VARIANTS[ORDINARY].species_key == SPECIES
 #: A walkable south-western wild cell, far from the contract-pinned hunting band.
 PROBE = (500, 700)
 _SITE_KEY = "t_hunt_provisioning_site"
+_SITE_COMPOSITION = "t_hunt_provisioning_composition"
+_SEED = 17
 _SITE_RECOVERY_TICKS = 3600
 def _first_cell_outside(regions: frozenset[str]) -> tuple[int, int]:
     """A walkable cell whose region is none of ``regions``."""
@@ -125,7 +133,7 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
             "camp",
             self.bare_region,
             self.bare_cell,
-            (ORDINARY,),
+            _SITE_COMPOSITION,
             1,
             False,
             _SITE_RECOVERY_TICKS,
@@ -142,6 +150,12 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
                         self.region: self.rule,
                         self.stronger_region: self.rule_stronger,
                     },
+                    "encounter_compositions": {
+                        _SITE_COMPOSITION: EncounterComposition(
+                            _SITE_COMPOSITION,
+                            (CompositionMember(ORDINARY, 1, 1),),
+                        )
+                    },
                     "monster_sites": {self.site.key: self.site},
                 },
             )
@@ -150,6 +164,7 @@ class ProvisioningWorldFixture(BattlefieldIsolation):
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
         enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
         self.room = self.char1.location
     # -- shared fixture helpers --------------------------------------------

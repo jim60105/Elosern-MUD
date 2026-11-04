@@ -56,8 +56,10 @@ from tools.spec_traceability import covers_requirement
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
 from world.lore.monster_placement import (
     AMBIENT_PLACEMENT_REGISTRY,
+    ENCOUNTER_COMPOSITION_REGISTRY,
     MONSTER_SITE_REGISTRY,
     MonsterSite,
+    composition_variant_keys,
 )
 from world.lore.monster_species import (
     MONSTER_SPECIES_REGISTRY,
@@ -229,18 +231,20 @@ def _declared_site(definition: QuestDefinition) -> MonsterSite:
 
 def _placed_species(site: MonsterSite) -> set[str]:
     """The species whose variants this site places."""
+    composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
     return {
         MONSTER_VARIANT_REGISTRY[variant_key].species_key
-        for variant_key in site.variant_keys
+        for variant_key in composition_variant_keys(composition)
     }
 
 
 def _strongest_placed_grade(site: MonsterSite) -> str:
     """The highest-ranked danger grade among the site's placed variants."""
+    composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
     return max(
         (
             MONSTER_VARIANT_REGISTRY[variant_key].danger_grade
-            for variant_key in site.variant_keys
+            for variant_key in composition_variant_keys(composition)
         ),
         key=lambda grade: GUILD_RANK_REGISTRY[grade].order,
     )

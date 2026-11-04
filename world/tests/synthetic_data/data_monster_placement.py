@@ -60,11 +60,14 @@ SYNTH_AMBIENT_PLACEMENTS: dict[str, AmbientPlacementRule] = {
 }
 
 SYNTH_MONSTER_SITES: dict[str, MonsterSite] = {
+    # A valid wilderness surface in the shared test world: scopes that settle
+    # the registry register each site's individuals through the placing owner's
+    # surface validation, so a site may not sit on an unwalkable cell.
     "t_breakwater_nest": MonsterSite(
         "t_breakwater_nest",
         "nest",
         "t_bramble_wold",
-        (5, 5),
+        (500, 700),
         "t_whisper_quail_pair",
         2,
         True,
@@ -73,7 +76,7 @@ SYNTH_MONSTER_SITES: dict[str, MonsterSite] = {
         "t_shoreward_camp",
         "camp",
         "t_glassmere",
-        (6, 5),
+        (500, 700),
         "t_whisper_quail_solitary",
         1,
         False,
@@ -83,7 +86,7 @@ SYNTH_MONSTER_SITES: dict[str, MonsterSite] = {
         "t_glassmere_boss",
         "boss_site",
         "t_glassmere",
-        (7, 5),
+        (500, 700),
         "t_whisper_quail_solitary",
         1,
         True,

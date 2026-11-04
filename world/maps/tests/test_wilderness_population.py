@@ -306,6 +306,11 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         self.script_cls = WildernessScript
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
         self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        # A manual site's occurrence derives from the explicitly initialized
+        # world seed, so a view test that settles the shipped sites supplies one.
+        from world.maps.regional_population import initialize_population_seed
+
+        initialize_population_seed(self.script, seed=0, tick=0)
         enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
         self.room = self.char1.location
 
@@ -787,6 +792,9 @@ class WildernessPopulationViewTests(EvenniaTest):
         self.script_cls = WildernessScript
         create_wilderness(name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider())
         self.script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        from world.maps.regional_population import initialize_population_seed
+
+        initialize_population_seed(self.script, seed=0, tick=0)
         enter_wilderness(self.char1, coordinates=ENTRY_XY, name=WILDERNESS_NAME)
         self.room = self.char1.location
 
