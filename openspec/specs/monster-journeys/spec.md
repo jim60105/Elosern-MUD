@@ -41,7 +41,7 @@ A durable monster journey SHALL settle committed travel physiology once through 
 
 #### Scenario: Deferred combat physiology transfers once
 - **WHEN** an actual monster flees after two unpaid six-second rounds, travels and later remains idle across partitioned catch-up and reload
-- **THEN** its committed reserve pays12 seconds of actual combat before passage, only newly elapsed journey/idle intervals afterwards, and no old terminal or generic settlement repeats those intervals
+- **THEN** its committed reserve pays 12 seconds of actual combat before passage, only newly elapsed journey/idle intervals afterwards, and no old terminal or generic settlement repeats those intervals
 
 ### Requirement: Journey operations restore complete state on failure and replay
 Journey operations SHALL commit receipts and every touched location, ownership, resource and encounter surface atomically, restoring durable state and live caches on failure and applying committed replay at most once.
