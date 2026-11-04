@@ -38,6 +38,7 @@ from world.rules.clock import (
     build_advance_snapshot_registry,
     get_world_clock,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.equipment import (
     apply_inventory_plan,
     plan_inventory_delta,
@@ -109,7 +110,11 @@ def _step_text(display_name: str, step: ItemEffectStep, applied: int) -> str:
 
 
 def _item_used_event_log(
-    plan: ItemUsePlan, actor_key: str, time_cost_seconds: int, settled: list[tuple[ItemEffectStep, int]]
+    plan: ItemUsePlan,
+    actor: Any,
+    actor_id: str,
+    time_cost_seconds: int,
+    settled: list[tuple[ItemEffectStep, int]],
 ) -> EventLog:
     """Build one ``item_used`` entry per settled step, in profile order.
 
@@ -125,9 +130,13 @@ def _item_used_event_log(
     """
     definition = ITEM_REGISTRY[plan.item_key]
     display_name = definition.display_name_zh.replace("{", "{{").replace("}", "}}")
+    actor_key = str(actor.key)
     entries: list[EventEntry] = []
+    labels_by_identity: dict[str, str] = {}
     for step, applied in settled:
         effect = step.effect
+        target_id = stable_actor_id(step.target)
+        labels_by_identity.setdefault(target_id, str(step.target.key))
         data: dict[str, Any] = {
             "item_key": plan.item_key,
             "consumable": plan.consumable,
@@ -143,6 +152,8 @@ def _item_used_event_log(
                 kind="item_used",
                 actor=actor_key,
                 target=str(step.target.key),
+                actor_id=actor_id,
+                target_id=target_id,
                 data=data,
                 text_template=_step_text(display_name, step, applied),
             )
@@ -150,9 +161,11 @@ def _item_used_event_log(
     return EventLog(
         actor=actor_key,
         skill_key=plan.item_key,
-        targets=tuple(dict.fromkeys(str(step.target.key) for step, _ in settled)),
+        targets=tuple(labels_by_identity.values()),
         entries=tuple(entries),
         time_cost_seconds=time_cost_seconds,
+        actor_id=actor_id,
+        target_ids=tuple(labels_by_identity),
     )
 
 
@@ -354,6 +367,11 @@ def resolve_item_use(
             outcome="rejected", reason=preflight.reason, detail=preflight.detail
         )
     plan = accepted.plan
+    # Resolve and validate every identity the settlement will write before
+    # the first mutation: a malformed combatant fails closed with no write.
+    actor_id = stable_actor_id(request.actor)
+    for step in plan.steps:
+        stable_actor_id(step.target)
     # Capture every entity the plan steps on before the first write (design
     # D3): a lazy per-target capture could not restore state an earlier
     # target's write cascade touched.
@@ -365,7 +383,8 @@ def resolve_item_use(
             settled = _apply_plan(accepted, journal)
             event_log = _item_used_event_log(
                 plan,
-                str(request.actor.key),
+                request.actor,
+                actor_id,
                 time_cost_seconds=0,
                 settled=settled,
             )

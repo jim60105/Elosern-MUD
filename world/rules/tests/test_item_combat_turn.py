@@ -31,6 +31,7 @@ from world.rules.combat import (
     Battlefield,
     ItemUseRequest,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     engage,
     engage_group,
@@ -767,6 +768,46 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         )
         self.assertEqual(int(self.monster.traits.hp.current), 100)
         self.assertEqual(int(second.traits.hp.current), 100)
+
+    def test_same_label_recipients_keep_distinct_event_log_identities(self):
+        from world.rules.items import use_item
+
+        twin = create_object(NPC, key="multi companion")
+        twin.race = _race_key()
+        twin.apply_race_baseline()
+        twin.location = self.room
+        join_party(twin, self.player)
+        for entity in (self.companion, twin):
+            entity.traits.hp.current = 50
+        self.player.db.inventory = [_MANA_KEY]
+        materialize_registry_object(self.player, _MANA_KEY)
+
+        settlement = use_item(self.player, _MANA_KEY)
+        self.assertEqual(settlement.result.outcome, "success")
+        event_log = settlement.result.event_log
+        entries = [
+            entry
+            for entry in event_log.entries
+            if entry.kind == "item_used"
+        ]
+        self.assertEqual(
+            {entry.actor_id for entry in entries},
+            {stable_actor_id(self.player)},
+        )
+        self.assertEqual(event_log.actor_id, stable_actor_id(self.player))
+        # Both same-label companions are separate recipients: their readable
+        # label is shared, their identity is not.
+        twin_entries = [entry for entry in entries if entry.target == "multi companion"]
+        self.assertGreaterEqual(len(twin_entries), 2)
+        self.assertEqual(
+            len({entry.target_id for entry in twin_entries}),
+            2,
+        )
+        self.assertTrue(all(entry.target_id for entry in twin_entries))
+        self.assertEqual(
+            len(event_log.targets),
+            len(set(event_log.target_ids)),
+        )
 
 
 class CompressedItemTurnTests(EvenniaTestCase):
