@@ -23,6 +23,11 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from world.lore import monster_placement as registry
 from world.lore import monster_species as species_registry
+from world.lore.monster_activity import (
+    ActivityArea,
+    AggressionCondition,
+    MonsterActivity,
+)
 from world.lore.monster_placement import (
     RECOVERY_CONDITION_FIELDS,
     CompositionMember,
@@ -56,6 +61,9 @@ OTHER_COMPOSITION = "t_fixture_other_composition"
 ZONE = "t_fixture_zone"
 OTHER_ZONE = "t_fixture_other_zone"
 POLICY_ANCHOR = "t_fixture_policy_anchor"
+AREA = "t_fixture_activity_area"
+ACTIVITY = "t_fixture_activity"
+OTHER_ACTIVITY = "t_fixture_other_activity"
 
 # The registry's public callables, in full: read and validate. An execution
 # entry point (spawn/place/populate/reconcile/respawn/recover) would have to
@@ -131,6 +139,7 @@ def _faces(**overrides):
         "species_face": {SPECIES: _species_row()},
         "kind_face": ("camp", "nest", "boss_site", "stray", "encounter"),
         "compositions": {COMPOSITION: _composition()},
+        "activities": {ACTIVITY: _activity()},
     }
     faces.update(overrides)
     return faces
@@ -143,6 +152,7 @@ def _site(**overrides) -> MonsterSite:
         "region_key": REGION,
         "coordinates": (4, 4),
         "composition_key": COMPOSITION,
+        "activity_key": ACTIVITY,
         "capacity": 1,
         "one_shot": True,
         "recover_after_ticks": None,
@@ -162,7 +172,29 @@ def _member(
 
 
 def _composition(key: str = COMPOSITION, members=None) -> EncounterComposition:
-    return EncounterComposition(key, (_member(),) if members is None else tuple(members))
+    return EncounterComposition(
+        key, ACTIVITY, (_member(),) if members is None else tuple(members)
+    )
+
+
+def _area(**overrides) -> ActivityArea:
+    fields = {"key": AREA, "home_radius": 0}
+    fields.update(overrides)
+    return ActivityArea(**fields)
+
+
+def _activity(
+    key: str = ACTIVITY, policy: str = "stationary", **overrides
+) -> MonsterActivity:
+    fields = {
+        "key": key,
+        "policy": policy,
+        "area_key": AREA,
+        "decision_interval": 1,
+        "aggression": AggressionCondition("passive"),
+    }
+    fields.update(overrides)
+    return MonsterActivity(**fields)
 
 
 def _zone(**overrides) -> EcologyZone:
@@ -191,6 +223,7 @@ def _ecology_faces(**overrides):
             STRONGER: _variant_row(STRONGER),
         },
         "species_face": {SPECIES: _species_row()},
+        "activities": {ACTIVITY: _activity()},
     }
     faces.update(overrides)
     return faces
@@ -300,6 +333,36 @@ class PlacementValidationTests(unittest.TestCase):
         self._reject(sites={SITE: _site(coordinates=(4,))})
         self._reject(sites={SITE: _site(coordinates=(4, "5"))})
 
+    def test_a_site_must_name_a_known_activity(self):
+        self._reject(sites={SITE: _site(activity_key=OTHER_ACTIVITY)})
+
+    @covers_requirement(
+        "monster-field-activity::activity-declarations-publish-complete-validated-bindings"
+    )
+    def test_a_solitary_site_override_must_fit_every_composition_outcome(self):
+        group = _composition(
+            COMPOSITION, (_member(ORDINARY, 1, 1), _member(STRONGER, 1, 1))
+        )
+        solitary = _activity(OTHER_ACTIVITY, "solitary_roaming")
+        with self.assertRaises(MonsterPlacementRegistryError) as captured:
+            registry.validate_monster_placement_registry(
+                {SITE: _site(capacity=2, activity_key=OTHER_ACTIVITY)},
+                **_faces(
+                    compositions={COMPOSITION: group},
+                    activities={ACTIVITY: _activity(), OTHER_ACTIVITY: solitary},
+                ),
+            )
+        self.assertIn("requires every legal outcome", str(captured.exception))
+
+    def test_a_stationary_site_override_accepts_a_complete_group(self):
+        group = _composition(
+            COMPOSITION, (_member(ORDINARY, 1, 1), _member(STRONGER, 1, 1))
+        )
+        registry.validate_monster_placement_registry(
+            {SITE: _site(capacity=2)},
+            **_faces(compositions={COMPOSITION: group}),
+        )
+
     def test_a_duplicate_site_key_is_rejected(self):
         with self.assertRaises(MonsterPlacementRegistryError):
             registry.build_monster_site_registry((_site(), _site()))
@@ -344,6 +407,7 @@ class EcologyDeclarationTests(unittest.TestCase):
         repeated = _composition(OTHER_COMPOSITION, (_member(ORDINARY, 2, 3),))
         mixed = EncounterComposition(
             "t_fixture_mixed",
+            ACTIVITY,
             (_member(ORDINARY, 1, 1), _member(STRONGER, 2, 2)),
         )
         compositions = {

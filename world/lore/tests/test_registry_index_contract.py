@@ -65,7 +65,8 @@ FIRST_BATCH = {
         "MonsterVariant": {"species_key", "threat_tier"},
     },
     "world.lore.monster_placement": {
-        "MonsterSite": {"region_key", "composition_key"},
+        "MonsterSite": {"region_key", "composition_key", "activity_key"},
+        "EncounterComposition": {"activity_key"},
     },
     "world.quests.definitions": {
         "QuestDefinition": {"rank"},
@@ -144,7 +145,7 @@ class RegistryInventoryContractTest(unittest.TestCase):
 
         mirrored = {**_ALL_REGISTRIES, **geography_registries()}
         names = {spec.name for spec in REGISTRY_INDEX}
-        self.assertEqual(len(mirrored), 20)
+        self.assertEqual(len(mirrored), 22)
         self.assertLessEqual(set(mirrored), names)
         self.assertLessEqual(ADDITIONAL_CATEGORIES, names)
         for category, registry in mirrored.items():

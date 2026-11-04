@@ -378,6 +378,9 @@ def _validate_game_joins(
         MonsterPlacementRegistryError,
         validate_ecology_registries,
     )
+    from world.lore.monster_activity import (
+        MONSTER_ACTIVITY_REGISTRY as _ACTIVITY_ROWS,
+    )
 
     try:
         validate_ecology_registries(
@@ -385,6 +388,7 @@ def _validate_game_joins(
             ENCOUNTER_COMPOSITION_REGISTRY,
             SETTLEMENT_BIRTH_POLICY_REGISTRY,
             region_face=regions,
+            activities=_ACTIVITY_ROWS,
         )
     except MonsterPlacementRegistryError as error:
         problems.append(str(error))
@@ -398,6 +402,42 @@ def _validate_game_joins(
                 policies=SETTLEMENT_BIRTH_POLICY_REGISTRY,
             )
         )
+    # Activity declarations are published with the same candidate world: their
+    # region form is checked against this candidate's own regions and frame,
+    # and every composition/site binding must still resolve and stay
+    # compatible with its declared complete composition.
+    from world.lore.monster_activity import (
+        ACTIVITY_AREA_REGISTRY,
+        MONSTER_ACTIVITY_REGISTRY,
+        MonsterActivityRegistryError,
+        activity_area_problems,
+        validate_activity_registries,
+    )
+    try:
+        validate_activity_registries(
+            ACTIVITY_AREA_REGISTRY,
+            MONSTER_ACTIVITY_REGISTRY,
+        )
+    except MonsterActivityRegistryError as error:
+        problems.append(str(error))
+    else:
+        for key in sorted(ACTIVITY_AREA_REGISTRY):
+            problems.extend(
+                activity_area_problems(ACTIVITY_AREA_REGISTRY[key], snapshot)
+            )
+    from world.lore.monster_placement import (
+        MONSTER_SITE_REGISTRY,
+        validate_monster_placement_registry,
+    )
+
+    try:
+        validate_monster_placement_registry(
+            MONSTER_SITE_REGISTRY,
+            region_face=regions,
+            activities=_ACTIVITY_ROWS,
+        )
+    except MonsterPlacementRegistryError as error:
+        problems.append(str(error))
     try:
         validate_wilderness_region_coverage(regions)
     except ValueError as error:

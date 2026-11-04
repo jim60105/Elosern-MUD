@@ -112,12 +112,17 @@ _SOLO = "t_clear_out_solo"
 COMPOSITIONS = {
     _PAIR: EncounterComposition(
         _PAIR,
+        "t_whisper_quail_group_activity",
         (
             CompositionMember(ORDINARY, 1, 1),
             CompositionMember(STRONGER, 1, 1),
         ),
     ),
-    _SOLO: EncounterComposition(_SOLO, (CompositionMember(STRONGER, 1, 1),)),
+    _SOLO: EncounterComposition(
+        _SOLO,
+        "t_whisper_quail_solitary_activity",
+        (CompositionMember(STRONGER, 1, 1),),
+    ),
 }
 
 from world.tests.geography_fixture import publish_shipped_geography
@@ -153,13 +158,35 @@ class SiteClearOutAcceptanceTests(
         self.region = region_for_coordinates(*PROBE)
         self.sites = {
             NEST: MonsterSite(
-                NEST, "nest", self.region, PROBE, _PAIR, 2, True
+                NEST,
+                "nest",
+                self.region,
+                PROBE,
+                _PAIR,
+                "t_whisper_quail_stationary",
+                2,
+                True,
             ),
             CAMP: MonsterSite(
-                CAMP, "camp", self.region, PROBE, _PAIR, 2, False, HOUR
+                CAMP,
+                "camp",
+                self.region,
+                PROBE,
+                _PAIR,
+                "t_whisper_quail_stationary",
+                2,
+                False,
+                HOUR,
             ),
             BOSS: MonsterSite(
-                BOSS, "boss_site", self.region, PROBE, _SOLO, 1, True
+                BOSS,
+                "boss_site",
+                self.region,
+                PROBE,
+                _SOLO,
+                "t_whisper_quail_stationary",
+                1,
+                True,
             ),
         }
         self.enterContext(

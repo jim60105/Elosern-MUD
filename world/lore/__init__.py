@@ -11,6 +11,16 @@ from .economy import (
 from .elements import ELEMENT_REGISTRY, Element
 from .guild import GUILD_RANK_REGISTRY, GuildRank
 from .magic import MAGIC_TIER_REGISTRY, MagicTier
+from .monster_activity import (
+    ACTIVITY_AREA_REGISTRY,
+    MONSTER_ACTIVITY_REGISTRY,
+    ActivityArea,
+    AggressionCondition,
+    MonsterActivity,
+    MonsterActivityRegistryError,
+    resolve_activity_area,
+    validate_activity_registries,
+)
 from .monster_placement import (
     MONSTER_SITE_KINDS,
     MONSTER_SITE_REGISTRY,
@@ -63,6 +73,7 @@ from .titles import (
 )
 
 __all__ = [
+    "ACTIVITY_AREA_REGISTRY",
     "ANCHOR_LORE",
     "AROUSAL_LEVELS",
     "CLIMAX_PHASE_LEVELS",
@@ -73,6 +84,7 @@ __all__ = [
     "FIXED_TITLE_REGISTRY",
     "GUILD_RANK_REGISTRY",
     "MAGIC_TIER_REGISTRY",
+    "MONSTER_ACTIVITY_REGISTRY",
     "MONSTER_SITE_KINDS",
     "MONSTER_SITE_REGISTRY",
     "MONSTER_SPECIES_REGISTRY",
@@ -89,11 +101,15 @@ __all__ = [
     "Anchor",
     "AnchorKind",
     "AnchorLore",
+    "ActivityArea",
+    "AggressionCondition",
     "Element",
     "FixedTitleDef",
     "GuildRank",
     "MagicTier",
     "MonsterCombatProfile",
+    "MonsterActivity",
+    "MonsterActivityRegistryError",
     "MonsterPlacementRegistryError",
     "MonsterSite",
     "MonsterSpecies",
@@ -116,7 +132,9 @@ __all__ = [
     "WETNESS_LEVELS",
     "published_species_view",
     "published_variant_view",
+    "resolve_activity_area",
     "to_copper",
+    "validate_activity_registries",
     "validate_fixed_titles",
     "validate_monster_placement_registry",
     "validate_monster_species_registry",

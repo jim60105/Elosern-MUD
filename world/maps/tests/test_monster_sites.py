@@ -78,6 +78,7 @@ from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 from world.tests.synthetic_data import (
+    SYNTH_MONSTER_ACTIVITIES,
     SYNTH_MONSTER_TIERS,
     SYNTH_MONSTER_VARIANTS,
     synthetic_registries,
@@ -90,6 +91,12 @@ _WITNESS_TIER = next(iter(SYNTH_MONSTER_TIERS))
 #: A walkable south-western wild cell: outside the capital's and the village's
 #: anchor footprints and far from the contract-pinned hunting band.
 PROBE = (500, 700)
+SOLITARY_ACTIVITY = "t_whisper_quail_solitary_activity"
+GROUP_ACTIVITY = "t_whisper_quail_group_activity"
+STATIONARY_ACTIVITY = "t_whisper_quail_stationary"
+assert {SOLITARY_ACTIVITY, GROUP_ACTIVITY, STATIONARY_ACTIVITY} <= set(
+    SYNTH_MONSTER_ACTIVITIES
+)
 NEST_KEY = "t_probe_nest"
 CAMP_KEY = "t_probe_camp"
 GROUP_KEY = "t_probe_group"
@@ -109,6 +116,7 @@ FLOCK = "t_probe_flock"
 COMPOSITIONS = {
     PAIR: EncounterComposition(
         PAIR,
+        GROUP_ACTIVITY,
         (
             CompositionMember(ORDINARY, 1, 1),
             CompositionMember(STRONGER, 1, 1),
@@ -116,13 +124,18 @@ COMPOSITIONS = {
     ),
     GROUP: EncounterComposition(
         GROUP,
+        GROUP_ACTIVITY,
         (
             CompositionMember(ORDINARY, 2, 2),
             CompositionMember(STRONGER, 1, 1),
         ),
     ),
-    SOLO: EncounterComposition(SOLO, (CompositionMember(STRONGER, 1, 1),)),
-    FLOCK: EncounterComposition(FLOCK, (CompositionMember(ORDINARY, 1, 2),)),
+    SOLO: EncounterComposition(
+        SOLO, SOLITARY_ACTIVITY, (CompositionMember(STRONGER, 1, 1),)
+    ),
+    FLOCK: EncounterComposition(
+        FLOCK, GROUP_ACTIVITY, (CompositionMember(ORDINARY, 1, 2),)
+    ),
 }
 
 
@@ -217,6 +230,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 self.region,
                 PROBE,
                 PAIR,
+                STATIONARY_ACTIVITY,
                 2,
                 True,
             ),
@@ -226,6 +240,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 self.region,
                 PROBE,
                 PAIR,
+                STATIONARY_ACTIVITY,
                 2,
                 False,
                 HOUR,
@@ -236,6 +251,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 self.region,
                 PROBE,
                 GROUP,
+                STATIONARY_ACTIVITY,
                 3,
                 True,
             ),
@@ -245,6 +261,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 self.region,
                 PROBE,
                 SOLO,
+                STATIONARY_ACTIVITY,
                 1,
                 True,
             ),
@@ -483,7 +500,14 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         # lost (an interrupted attempt leaves exactly that state). A variable
         # range makes a tick-dependent or seed-ignoring sample observable.
         flock = MonsterSite(
-            "t_probe_flock_site", "encounter", self.region, PROBE, FLOCK, 3, True
+            "t_probe_flock_site",
+            "encounter",
+            self.region,
+            PROBE,
+            FLOCK,
+            STATIONARY_ACTIVITY,
+            3,
+            True,
         )
         self.enterContext(
             synthetic_registries(
@@ -633,7 +657,14 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertTrue(_eligible_birth_cells(_cell_zone(PROBE, self.region)))
 
         site = MonsterSite(
-            "t_probe_ring_site", "encounter", region, cell, SOLO, 1, True
+            "t_probe_ring_site",
+            "encounter",
+            region,
+            cell,
+            SOLO,
+            STATIONARY_ACTIVITY,
+            1,
+            True,
         )
         self.enterContext(
             synthetic_registries(
@@ -1002,7 +1033,15 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
 
     def test_a_direct_recovery_advances_the_sequence_with_fresh_identities(self):
         herd = MonsterSite(
-            "t_probe_herd", "camp", self.region, PROBE, FLOCK, 3, False, HOUR
+            "t_probe_herd",
+            "camp",
+            self.region,
+            PROBE,
+            FLOCK,
+            STATIONARY_ACTIVITY,
+            3,
+            False,
+            HOUR,
         )
         self.enterContext(
             synthetic_registries(
@@ -1533,7 +1572,14 @@ class MonsterSiteWithoutWorldSeedTests(EvenniaTest):
         )
 
         site = MonsterSite(
-            "t_seedless_site", "nest", "t_bramble_wold", (5, 5), SOLO, 1, True
+            "t_seedless_site",
+            "nest",
+            "t_bramble_wold",
+            (5, 5),
+            SOLO,
+            STATIONARY_ACTIVITY,
+            1,
+            True,
         )
         self.enterContext(
             synthetic_registries(
@@ -1574,6 +1620,7 @@ class SiteRowVocabularyTests(EvenniaTest):
             region_for_coordinates(*PROBE),
             PROBE,
             SOLO,
+            STATIONARY_ACTIVITY,
             1,
             False,
             HOUR,

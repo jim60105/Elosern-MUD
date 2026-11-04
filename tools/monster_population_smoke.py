@@ -138,7 +138,9 @@ def run() -> dict:
 
     variant_key = next(iter(SYNTH_MONSTER_VARIANTS))
     composition = EncounterComposition(
-        "smoke_composition", (CompositionMember(variant_key, 1, 1),)
+        "smoke_composition",
+        "t_whisper_quail_solitary_activity",
+        (CompositionMember(variant_key, 1, 1),),
     )
     candidates = _candidate_cells()
     region, rectangle, birth_cells = _geometry_for(candidates[0])
@@ -151,6 +153,8 @@ def run() -> dict:
         "monster_species",
         "monster_variants",
         "monster_tiers",
+        "activity_areas",
+        "monster_activities",
         "ecology_zones",
         "encounter_compositions",
         extra={

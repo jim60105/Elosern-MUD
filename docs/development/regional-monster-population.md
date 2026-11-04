@@ -39,6 +39,7 @@ CompositionMember(
 
 EncounterComposition(
     key: str,
+    activity_key: str,   # ref("monster_activities", inverse="encounter_compositions")
     members: tuple[CompositionMember, ...],   # non-empty, no repeated variant
 )
 

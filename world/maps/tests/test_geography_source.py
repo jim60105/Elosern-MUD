@@ -24,6 +24,12 @@ from elosern_map_core.terrain import region_for_coordinates as core_region_for
 
 import world.maps.geography as geography
 from world.lore.anchors import AnchorKind, anchor_geography, anchors
+from world.lore import monster_activity as activity_registry
+from world.lore.monster_activity import (
+    ActivityArea,
+    AggressionCondition,
+    MonsterActivity,
+)
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 from world.lore import monster_placement as placement
 from world.lore.monster_placement import (
@@ -42,6 +48,43 @@ from world.tests.geography_fixture import (
 )
 
 publish_shipped_geography()
+
+
+ACTIVITY_AREA = "t_fixture_activity_area"
+ACTIVITY = "t_fixture_activity"
+
+
+def _synthetic_area(**overrides) -> ActivityArea:
+    fields = {"key": ACTIVITY_AREA, "home_radius": 0}
+    fields.update(overrides)
+    return ActivityArea(**fields)
+
+
+def _synthetic_activity(**overrides) -> MonsterActivity:
+    fields = {
+        "key": ACTIVITY,
+        "policy": "stationary",
+        "area_key": ACTIVITY_AREA,
+        "decision_interval": 60,
+        "aggression": AggressionCondition("passive"),
+    }
+    fields.update(overrides)
+    return MonsterActivity(**fields)
+
+
+def _activity_patches(area=None, activity=None):
+    return (
+        mock.patch.object(
+            activity_registry,
+            "ACTIVITY_AREA" + "_REGISTRY",
+            MappingProxyType({ACTIVITY_AREA: area or _synthetic_area()}),
+        ),
+        mock.patch.object(
+            activity_registry,
+            "MONSTER_ACTIVITY" + "_REGISTRY",
+            MappingProxyType({ACTIVITY: activity or _synthetic_activity()}),
+        ),
+    )
 
 
 def _settlements():
@@ -70,7 +113,7 @@ def _continent_variant(**terrain_overrides):
 
 def _synthetic_composition(key: str) -> EncounterComposition:
     return EncounterComposition(
-        key, (CompositionMember("t_fixture_variant", 1, 1),)
+        key, ACTIVITY, (CompositionMember("t_fixture_variant", 1, 1),)
     )
 
 
@@ -155,6 +198,12 @@ def _ecology_patches(zones, compositions, region_key: str = "t_fixture_region"):
             "MONSTER_SPECIES" + "_REGISTRY",
             MappingProxyType(_synthetic_species(region_key)),
         ),
+        mock.patch.object(
+            placement,
+            "MONSTER_SITE" + "_REGISTRY",
+            MappingProxyType({}),
+        ),
+        *_activity_patches(),
     )
 
 
@@ -456,8 +505,17 @@ def _synthetic_site(cell: tuple[int, int], region_key: str):
         region_key,
         cell,
         "t_fixture_site_composition",
+        ACTIVITY,
         1,
         True,
+    )
+
+
+def _synthetic_site_composition() -> EncounterComposition:
+    return EncounterComposition(
+        "t_fixture_site_composition",
+        ACTIVITY,
+        (CompositionMember("t_fixture_variant", 1, 1),),
     )
 
 
@@ -486,11 +544,44 @@ class MonsterSiteCandidatePublicationTests(EvenniaTest):
     def _reject(self, site, expected: str) -> None:
         before = geography.current()
         identity = before.identity
-        with mock.patch.object(
-            placement,
-            "MONSTER_SITE" + "_REGISTRY",
-            MappingProxyType({site.key: site}),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_SITE" + "_REGISTRY",
+                    MappingProxyType({site.key: site}),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement, "ECOLOGY_ZONE" + "_REGISTRY", MappingProxyType({})
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "ENCOUNTER_COMPOSITION" + "_REGISTRY",
+                    MappingProxyType(
+                        {site.composition_key: _synthetic_site_composition()}
+                    ),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_VARIANT" + "_REGISTRY",
+                    MappingProxyType(_synthetic_variants()),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_SPECIES" + "_REGISTRY",
+                    MappingProxyType(_synthetic_species(site.region_key)),
+                )
+            )
+            for patcher in _activity_patches():
+                stack.enter_context(patcher)
             with self.assertRaises(geography.GeographyError) as captured:
                 self._build()
         self.assertIn(f"monster site {site.key!r}", str(captured.exception))
@@ -523,13 +614,242 @@ class MonsterSiteCandidatePublicationTests(EvenniaTest):
     def test_a_lawful_manual_site_still_publishes(self):
         x, y, region_key = _birth_block()
         site = _synthetic_site((x, y), region_key)
-        with mock.patch.object(
-            placement,
-            "MONSTER_SITE" + "_REGISTRY",
-            MappingProxyType({site.key: site}),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_SITE" + "_REGISTRY",
+                    MappingProxyType({site.key: site}),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement, "ECOLOGY_ZONE" + "_REGISTRY", MappingProxyType({})
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "ENCOUNTER_COMPOSITION" + "_REGISTRY",
+                    MappingProxyType(
+                        {site.composition_key: _synthetic_site_composition()}
+                    ),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_VARIANT" + "_REGISTRY",
+                    MappingProxyType(_synthetic_variants()),
+                )
+            )
+            stack.enter_context(
+                mock.patch.object(
+                    placement,
+                    "MONSTER_SPECIES" + "_REGISTRY",
+                    MappingProxyType(_synthetic_species(site.region_key)),
+                )
+            )
+            for patcher in _activity_patches():
+                stack.enter_context(patcher)
             published = self._build()
         self.assertTrue(published.identity)
+
+
+class ActivityCandidatePublicationTests(EvenniaTest):
+    """Activity geometry is validated against the same candidate world."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        publish_shipped_geography()
+
+    def setUp(self):
+        self._shipped = geography.current()
+
+    def tearDown(self):
+        publish_geography(self._shipped)
+
+    def _build(self):
+        return geography.build_geography(
+            self._shipped.continent,
+            self._shipped.locations,
+            _settlements(),
+            fingerprints=dict(self._shipped.fingerprints),
+        )
+
+    def _publish(self, area, activity=None):
+        with ExitStack() as stack:
+            for module, name, value in (
+                (placement, "ECOLOGY_ZONE", MappingProxyType({})),
+                (placement, "ENCOUNTER_COMPOSITION", MappingProxyType({})),
+                (placement, "MONSTER_SITE", MappingProxyType({})),
+            ):
+                stack.enter_context(
+                    mock.patch.object(module, name + "_REGISTRY", value)
+                )
+            for patcher in _activity_patches(area, activity):
+                stack.enter_context(patcher)
+            return geography.build_geography(
+                self._shipped.continent,
+                self._shipped.locations,
+                _settlements(),
+                fingerprints=dict(self._shipped.fingerprints),
+            )
+
+    def _reject(self, area, expected: str) -> None:
+        before = geography.current()
+        identity = before.identity
+        with self.assertRaises(geography.GeographyError) as captured:
+            self._publish(area)
+        self.assertIn(area.key, str(captured.exception))
+        self.assertIn(expected, str(captured.exception))
+        self.assertIs(geography.current(), before)
+        self.assertEqual(geography.current().identity, identity)
+
+    def test_an_area_in_an_unknown_candidate_region_is_rejected(self):
+        area = _synthetic_area(
+            region_key="t_fixture_absent_region",
+            rectangles=((0, 0, 0, 0),),
+            home_radius=None,
+        )
+        self._reject(area, "names unknown candidate region")
+
+    def test_an_area_outside_the_candidate_frame_is_rejected(self):
+        bound = geography.current().max_x + 5
+        area = _synthetic_area(
+            region_key=next(iter(geography.current().regions)),
+            rectangles=((bound, bound, 0, 0),),
+            home_radius=None,
+        )
+        self._reject(area, "outside the candidate frame")
+
+    def test_an_area_with_no_legal_cell_is_rejected(self):
+        x, y = _first_non_land_cell()
+        area = _synthetic_area(
+            region_key=next(iter(geography.current().regions)),
+            rectangles=((x, x, y, y),),
+            home_radius=None,
+        )
+        self._reject(area, "intersects no legal cell")
+
+    def test_a_lawful_region_extent_publishes(self):
+        x, y, region_key = _birth_block()
+        area = _synthetic_area(
+            region_key=region_key,
+            rectangles=((x, x, y, y),),
+            home_radius=None,
+        )
+        published = self._publish(area)
+        self.assertTrue(published.identity)
+
+    @covers_requirement(
+        "monster-field-activity::activity-declarations-publish-complete-validated-bindings"
+    )
+    def test_site_activity_bindings_are_validated_at_candidate_publication(self):
+        x, y, region_key = _birth_block()
+        group = EncounterComposition(
+            "t_fixture_site_composition",
+            ACTIVITY,
+            (CompositionMember("t_fixture_variant", 1, 2),),
+        )
+        cases = (
+            (
+                placement.MonsterSite(
+                    "t_fixture_site",
+                    "encounter",
+                    region_key,
+                    (x, y),
+                    group.key,
+                    "t_absent_activity",
+                    2,
+                    True,
+                ),
+                {ACTIVITY: _synthetic_activity()},
+                "references unknown monster activity",
+            ),
+            (
+                placement.MonsterSite(
+                    "t_fixture_site",
+                    "encounter",
+                    region_key,
+                    (x, y),
+                    group.key,
+                    "t_fixture_solitary_site_activity",
+                    2,
+                    True,
+                ),
+                {
+                    ACTIVITY: _synthetic_activity(),
+                    "t_fixture_solitary_site_activity": _synthetic_activity(
+                        key="t_fixture_solitary_site_activity",
+                        policy="solitary_roaming",
+                    ),
+                },
+                "requires every legal outcome",
+            ),
+        )
+        for site, activities, expected in cases:
+            with self.subTest(expected=expected):
+                before = geography.current()
+                identity = before.identity
+                with ExitStack() as stack:
+                    stack.enter_context(
+                        mock.patch.object(
+                            placement,
+                            "MONSTER_SITE" + "_REGISTRY",
+                            MappingProxyType({site.key: site}),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            placement,
+                            "ECOLOGY_ZONE" + "_REGISTRY",
+                            MappingProxyType({}),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            placement,
+                            "ENCOUNTER_COMPOSITION" + "_REGISTRY",
+                            MappingProxyType({group.key: group}),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            placement,
+                            "MONSTER_VARIANT" + "_REGISTRY",
+                            MappingProxyType(_synthetic_variants()),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            placement,
+                            "MONSTER_SPECIES" + "_REGISTRY",
+                            MappingProxyType(_synthetic_species(region_key)),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            activity_registry,
+                            "ACTIVITY_AREA" + "_REGISTRY",
+                            MappingProxyType({ACTIVITY_AREA: _synthetic_area()}),
+                        )
+                    )
+                    stack.enter_context(
+                        mock.patch.object(
+                            activity_registry,
+                            "MONSTER_ACTIVITY" + "_REGISTRY",
+                            MappingProxyType(activities),
+                        )
+                    )
+                    with self.assertRaises(
+                        geography.GeographyError
+                    ) as captured:
+                        self._build()
+                self.assertIn(expected, str(captured.exception))
+                self.assertIs(geography.current(), before)
+                self.assertEqual(geography.current().identity, identity)
 
 
 class SnapshotIsolationTests(unittest.TestCase):

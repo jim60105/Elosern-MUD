@@ -94,6 +94,7 @@ def _composition(key: str, *ranges: tuple[int, int]) -> EncounterComposition:
     """One complete composition whose every member shares the synthetic variant."""
     return EncounterComposition(
         key,
+        "t_fixture_group_activity",
         tuple(
             CompositionMember(ORDINARY, minimum, maximum)
             for minimum, maximum in ranges

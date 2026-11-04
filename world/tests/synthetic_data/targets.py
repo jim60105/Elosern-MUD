@@ -23,7 +23,9 @@ from world.tests.synthetic_data.data_monster_species import (
 )
 from world.tests.synthetic_data.data_monster_placement import (
     SYNTH_ECOLOGY_ZONES,
+    SYNTH_ACTIVITY_AREAS,
     SYNTH_ENCOUNTER_COMPOSITIONS,
+    SYNTH_MONSTER_ACTIVITIES,
     SYNTH_MONSTER_SITES,
 )
 from world.tests.synthetic_data.data_world import (
@@ -71,6 +73,8 @@ def _content_by_logical() -> dict[str, Callable[[], Mapping[str, object]]]:
         "monster_tiers": lambda: SYNTH_MONSTER_TIERS,
         "monster_species": lambda: SYNTH_MONSTER_SPECIES,
         "monster_variants": lambda: SYNTH_MONSTER_VARIANTS,
+        "activity_areas": lambda: SYNTH_ACTIVITY_AREAS,
+        "monster_activities": lambda: SYNTH_MONSTER_ACTIVITIES,
         "encounter_compositions": lambda: SYNTH_ENCOUNTER_COMPOSITIONS,
         "ecology_zones": lambda: SYNTH_ECOLOGY_ZONES,
         "monster_sites": lambda: SYNTH_MONSTER_SITES,
@@ -121,6 +125,8 @@ def _synth_sync_capture() -> dict[str, Mapping[str, object]]:
         "monster_tiers": content["monster_tiers"](),
         "monster_species": content["monster_species"](),
         "monster_variants": content["monster_variants"](),
+        "activity_areas": content["activity_areas"](),
+        "monster_activities": content["monster_activities"](),
         "monster_sites": content["monster_sites"](),
         "anchor_placements": content["anchor_placements"](),
         "settlements": content["settlements"](),
@@ -146,6 +152,14 @@ REGISTRY_TARGETS: dict[str, tuple[str, str]] = {
     "monster_tiers": ("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY"),
     "monster_species": ("world.lore.monster_species", "MONSTER_SPECIES" + "_REGISTRY"),
     "monster_variants": ("world.lore.monster_species", "MONSTER_VARIANT" + "_REGISTRY"),
+    "activity_areas": (
+        "world.lore.monster_activity",
+        "ACTIVITY_AREA" + "_REGISTRY",
+    ),
+    "monster_activities": (
+        "world.lore.monster_activity",
+        "MONSTER_ACTIVITY" + "_REGISTRY",
+    ),
     "encounter_compositions": (
         "world.lore.monster_placement",
         "ENCOUNTER_COMPOSITION" + "_REGISTRY",
@@ -204,7 +218,11 @@ _CONTENT: dict[str, Callable[[], Mapping[str, object]]] = _content_by_logical()
 _TARGET_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     # A site names one complete composition, so a scope that swaps the site
     # registry must swap the composition registry it resolves against first.
-    "monster_sites": ("encounter_compositions",),
+    "monster_sites": ("encounter_compositions", "monster_activities"),
+    # A composition names one complete activity declaration.
+    "encounter_compositions": ("monster_activities",),
+    # An activity names one activity area.
+    "monster_activities": ("activity_areas",),
     # An ecology zone's pool rows name complete compositions, so the same
     # ordering applies to a zone scope.
     "ecology_zones": ("encounter_compositions",),
