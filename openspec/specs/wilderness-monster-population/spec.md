@@ -2,9 +2,11 @@
 
 The deterministic, offline-computable monster population for the wilderness/Virtual layer: bounded
 authored regional habitats whose actual individuals are created once through the regional population
-owner, evolve only through its game-time recovery contract, and remain registered by wilderness
-coordinate in the script's `itemcoordinates`. There is no coordinate-slot, tier-example, capital-supply
-or room-entry refill path, and reads project only actual living registrations.
+owner, thereafter evolve through its game-time recovery and explicitly bound ordinary-activity
+contracts (including unobserved group wandering and journeys), and remain registered by wilderness
+coordinate in the script's `itemcoordinates` while present. There is no coordinate-slot,
+tier-example, capital-supply or room-entry refill path, and reads project only actual living
+registrations.
 
 ## Requirements
 

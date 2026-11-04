@@ -242,7 +242,32 @@ def placement_section(monster: Any) -> dict[str, Any]:
         rows.append(row("抵達時刻", str(journey["arrival"]), mono=True))
         if journey["retry"] is not None:
             rows.append(row("延後重試", str(journey["retry"]), mono=True))
+    activity = _activity_of(monster)
+    if activity is not None:
+        # Ordinary field activity is a durable map-owned fact, independent of
+        # whether anyone observes the group. Reads never move the group.
+        rows.append(row("活動", activity["policy"], mono=True))
+        rows.append(row("下一次決策", str(activity["next_decision"]), mono=True))
     return ledger(rows)
+
+
+def _activity_of(monster: Any) -> dict[str, Any] | None:
+    """One individual's committed ordinary activity binding, or ``None``."""
+    from world.maps import monster_activity, regional_population
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not monster_activity.activity_provisioned(wilderness):
+        return None
+    group = monster_activity.group_of_member(wilderness, int(monster.pk))
+    if group is None:
+        return None
+    from world.lore.monster_activity import MONSTER_ACTIVITY_REGISTRY
+
+    declaration = MONSTER_ACTIVITY_REGISTRY.get(group.activity_key)
+    return {
+        "policy": "stationary" if declaration is None else declaration.policy,
+        "next_decision": group.next_decision_tick,
+    }
 
 
 def _journey_of(monster: Any) -> dict[str, Any] | None:

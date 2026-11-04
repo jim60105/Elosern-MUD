@@ -75,7 +75,7 @@
 | [`engage`](/game/command-reference?id=engage) | 與敵對魔物開戰；同格所有活著的魔物（含同名個體）一起加入敵方，指定的目標只是開戰對象。 |
 | [`combat forfeit`](/game/command-reference?id=combat-forfeit) | `combat forfeit` 取得整隊投降的確認提示，`combat forfeit confirm <token>` 才是確認；未確認前不改變戰況、不丟棄已選指令，也不推進時間。 |
 | [`combat retreat`](/game/command-reference?id=combat-retreat) | `combat retreat` 取得整隊撤退的確認提示，`combat retreat confirm <token>` 才嘗試脫離戰鬥；戰鬥中施放 `flee` 取得的是同一份提示。這兩個指令的 `confirm` 是同一個確認入口，token 綁定哪一種整隊操作就執行哪一種。 |
-| [`combat actions`](/game/command-reference?id=combat-actions) | 地圖上敵方魔物的個別逃跑會實際離場：該回合離開所在格，經過一段遊戲時間的旅程後才可能在相鄰地點出現；途中兩端都不算在場，抵達後可立即再被追擊與開戰。 |
+| [`combat actions`](/game/command-reference?id=combat-actions) | 地圖上敵方魔物的個別逃跑會實際離場：該回合離開所在格，經過一段遊戲時間的旅程後才可能在相鄰地點出現；途中兩端都不算在場，抵達後可立即再被追擊與開戰。未被觀察的魔物同樣依遊戲時間在活動範圍內做整組的留駐或移動決定，成群時同進同出並以最慢成員計時，不建立新房間；戰鬥中的參與者不會遊蕩。 |
 | [`combat command`](/game/command-reference?id=combat-command) | `combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]`、`combat command <actor-token> item <item_key>[=<target-token>]`、`combat command <actor-token> defend/dodge/taunt[=<enemy-token>]`：以同伴代號（`a2` 等）確認該成員的指令，不需要附身該成員；再次輸入同一成員即改選並取代前一筆，最後一位成員確認後自動結算本回合。 |
 | [`combat actions`](/game/command-reference?id=combat-actions) | `combat actions [<actor-token>]` 列出指定成員（省略代號時是你）的技能、道具與戰術，以及本回合的指令進度；列出同伴的指令同樣不需要附身。 |
 
