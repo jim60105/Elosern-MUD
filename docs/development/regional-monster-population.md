@@ -1239,6 +1239,7 @@ Delta requirements are unarchived, so the tests below carry **no**
 | --- | --- |
 | `world.quests.tests.test_species_hunt_acceptance.HuntAcceptanceTests.test_an_undersupplied_hunt_accepts_without_creating_a_target` | quest-lifecycle ADDED "Quest acceptance persists validated records without ordinary provisioning" — "Undersupplied hunt accepts without birth" |
 | `…test_a_hunt_wider_than_one_cell_accepts_without_generating_members` | quest-lifecycle ADDED (same requirement) — "Undersupplied hunt accepts without birth"; quest-blueprint ADDED "Published regional hunts require lawful authored sources" — "Quantity spans encounters" |
+| `…test_an_undersupplied_hunt_still_resolves_habitat_guidance` | no delta requirement: design-only "Guidance and introductory cutover" (owner-backed habitat guidance after an empty acceptance); its population-state assertions also support quest-lifecycle ADDED — "Undersupplied hunt accepts without birth" |
 | `…test_a_species_with_no_authored_source_is_rejected_at_publication` | quest-blueprint ADDED — "No lawful source" |
 | `…test_the_board_accepts_an_undersupplied_hunt_without_targets` | guild-quest-board MODIFIED "Board acceptance and abandonment delegate to quest lifecycle" — "Regional shortage is not a board refusal" |
 | `…test_the_board_rolls_back_the_record_when_the_affinity_write_fails` | guild-quest-board MODIFIED — "A failed acceptance restores every surface" |
@@ -1264,7 +1265,7 @@ Run from the worktree root with the single-token environment file
 | `world.quests.tests.test_compile_registration.SpeciesHuntPayloadTests` | 2 tests, OK |
 | `world.quests.tests.test_planner.SpeciesHuntPlannerTests` | 7 tests, OK |
 | `commands.tests.test_guild_economy_commands.SpeciesHuntBoardCommandTests` | 2 tests, OK |
-| `world.quests.tests.test_species_hunt_acceptance` | 7 tests, OK |
+| `world.quests.tests.test_species_hunt_acceptance` | 8 tests, OK |
 | `world.quests.tests.test_hunt_catalog_content` | 19 tests, OK |
 | `web.webclient.presentation.tests.test_map_quest_destinations` | 19 tests, OK |
 | `web.webclient.presentation.tests.test_area_map.GridAreaTests` | 6 tests, OK |

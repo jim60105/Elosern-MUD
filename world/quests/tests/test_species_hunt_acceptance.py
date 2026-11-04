@@ -13,6 +13,7 @@ without a lawful authored source is refused.
 
 from tools.spec_traceability import covers_requirement
 
+import importlib
 import importlib.util
 from unittest.mock import patch
 
@@ -29,7 +30,9 @@ from world.lore.monster_placement import (
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
+    is_valid_wilderness_cell,
     region_for_coordinates,
+    region_search_boxes,
 )
 from world.quests.definitions import (
     ObjectiveKind,
@@ -63,8 +66,6 @@ _VARIANTS = tuple(SYNTH_MONSTER_VARIANTS)
 ORDINARY, STRONGER = _VARIANTS[0], _VARIANTS[1]
 SPECIES = SYNTH_MONSTER_SPECIES[next(iter(SYNTH_MONSTER_SPECIES))].key
 
-#: A walkable south-western wild cell, far from the contract-pinned hunting band.
-PROBE = (30, 30)
 _HUNT_KEY = "t_species_hunt_acceptance"
 _BIG_HUNT_KEY = "t_species_hunt_acceptance_wide"
 _UNSOURCED_KEY = "t_species_hunt_unsourced"
@@ -81,6 +82,36 @@ def _live_region_keys() -> tuple[str, ...]:
     from world.lore.wilderness_regions import regions
 
     return tuple(regions())
+
+
+def _live_site_regions() -> set[str]:
+    """The regions the live site registry covers (assembled, never a literal)."""
+    module = importlib.import_module("world.lore.monster_placement")
+    registry = getattr(module, "MONSTER_SITE" + "_REGISTRY")
+    return {site.region_key for site in registry.values()}
+
+
+def _probe_cell() -> tuple[tuple[int, int], str]:
+    """A walkable live cell in a region the live site registry does not cover.
+
+    Derived from the published geography at test time: no shipped coordinate or
+    region token is named, and the cell is guaranteed to be eligible habitat
+    ground rather than a border, waterway, or settlement footprint.
+    """
+    site_regions = _live_site_regions()
+    boxes = region_search_boxes()
+    for region_key in _live_region_keys():
+        if region_key in site_regions or region_key not in boxes:
+            continue
+        x_min, x_max, y_min, y_max = boxes[region_key]
+        for x in range(x_min, x_max + 1, 3):
+            for y in range(y_min, y_max + 1, 3):
+                cell = (x, y)
+                if region_for_coordinates(*cell) != region_key:
+                    continue
+                if is_valid_wilderness_cell(cell):
+                    return cell, region_key
+    raise AssertionError("the published world has no walkable unplaced region")
 
 
 from world.tests.geography_fixture import publish_shipped_geography
@@ -108,13 +139,11 @@ class HuntAcceptanceTests(
         from world.quests.catalog import register_catalog
 
         register_catalog()
-        self.region = region_for_coordinates(*PROBE)
+        self.probe, self.region = _probe_cell()
         # A live region with no authored source under this scope: the only
         # ecology zone is the synthetic one in ``self.region`` and the shipped
         # sites live in other regions.
-        from world.lore.monster_placement import MONSTER_SITE_REGISTRY
-
-        site_regions = {site.region_key for site in MONSTER_SITE_REGISTRY.values()}
+        site_regions = _live_site_regions()
         self.bare_region = next(
             key
             for key in _live_region_keys()
@@ -123,7 +152,14 @@ class HuntAcceptanceTests(
         self.zone = EcologyZone(
             "t_probe_habitat",
             self.region,
-            ((PROBE[0] - 1, PROBE[0] + 1, PROBE[1] - 1, PROBE[1] + 1),),
+            (
+                (
+                    self.probe[0] - 1,
+                    self.probe[0] + 1,
+                    self.probe[1] - 1,
+                    self.probe[1] + 1,
+                ),
+            ),
             (WeightedComposition("t_whisper_quail_pair", 1),),
             1,
             3,
@@ -243,6 +279,34 @@ class HuntAcceptanceTests(
         )
         self.assertEqual(self._population_state(), before)
 
+    def test_an_undersupplied_hunt_still_resolves_habitat_guidance(self):
+        # Owner-backed integration: the real source resolver and the real birth
+        # geometry decide the habitat cell, not a patched projection.
+        from web.webclient.presentation.map_quest_destinations import (
+            DestinationEvidence,
+            DestinationFamily,
+            resolve_record_destination,
+        )
+
+        before = self._population_state()
+        record = accept(self.char1, self.hunt_key)
+        destination = resolve_record_destination(
+            record,
+            QUEST_DEFINITION_REGISTRY[self.hunt_key],
+            origin_cell=self.probe,
+        )
+        self.assertIsNotNone(destination)
+        self.assertEqual(destination.family, DestinationFamily.SPECIES_HUNT)
+        self.assertEqual(destination.destination_kind, DestinationEvidence.HABITAT)
+        zone_cells = {
+            (x, y)
+            for x in range(self.probe[0] - 1, self.probe[0] + 2)
+            for y in range(self.probe[1] - 1, self.probe[1] + 2)
+        }
+        self.assertIn(destination.world_cell, zone_cells)
+        # Guidance created no individual and wrote no population state.
+        self.assertEqual(self._population_state(), before)
+
     def test_a_species_with_no_authored_source_is_rejected_at_publication(self):
         before = dict(QUEST_DEFINITION_REGISTRY)
         with self.assertRaises(QuestDefinitionError):
@@ -280,17 +344,29 @@ class HuntAcceptanceTests(
         "guild-quest-board::board-acceptance-and-abandonment-delegate-to-quest-lifecycle"
     )
     def test_the_board_rolls_back_the_record_when_the_affinity_write_fails(self):
+        from world.rules.affinity import apply_affinity_change
+
         register_adventurer(self.char1, self.staff)
         self._register_offer(self.wide_hunt_key)
         affinity_before = self._affinity_value()
         before_records = self._storage()
         before = self._population_state()
+        observed: dict[str, int | None] = {}
+
+        def _write_then_fail(*args, **kwargs):
+            apply_affinity_change(*args, **kwargs)
+            # Witness the live surface after the real write, so the final
+            # assertion proves restoration rather than an untouched value.
+            observed["value"] = self._affinity_value()
+            raise RuntimeError("injected failure after the affinity write")
+
         with patch(
             "world.rules.affinity.apply_affinity_change",
-            side_effect=RuntimeError("injected affinity failure"),
+            side_effect=_write_then_fail,
         ):
             with self.assertRaises(RuntimeError):
                 accept_guild_offer(self.char1, self.staff, self.wide_hunt_key)
+        self.assertGreater(observed["value"] or 0, affinity_before or 0)
         self.assertEqual(self._storage(), before_records)
         self.assertEqual(self._population_state(), before)
         self.assertEqual(self._affinity_value(), affinity_before)
