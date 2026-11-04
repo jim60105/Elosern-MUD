@@ -285,25 +285,61 @@ def spawn_role_actor(
 
 
 def spawn_monster(room: Any, archetype: str | None, tier_key: str) -> Monster:
-    """Spawn one whitelisted scene monster from the monster-tier registry."""
+    """Spawn one whitelisted scene monster from the monster-tier registry.
+
+    A wilderness room is an explicit placement: the prototype carries no
+    location, and after its tier is applied the actual object is registered by
+    the map population owner at the room's real coordinate. The construction,
+    tier application and registration share one atomic, cache-compensated
+    boundary here, so a failure at any of those steps leaves no object, no
+    registration and no half-applied profile. Any enclosing placing
+    transaction still owns its own outer compensation boundary.
+    """
+    from django.db import transaction
+
+    from world.maps.regional_population import (
+        current_population_tick,
+        register_explicit_individual,
+        restore_population_surfaces,
+        snapshot_population_surfaces,
+        wilderness_registration_target,
+    )
+
+    target = wilderness_registration_target(room)
     prototype = {
         "prototype_parent": "scene_monster",
         "key": f"{scene_name(archetype)}的魔物",
-        "location": room,
     }
+    if target is None:
+        prototype["location"] = room
     validate_occupant_parent(prototype)
-    spawned = spawn(prototype)
-    if not spawned:
-        raise SceneBuilderSpawnError(
-            "spawner.spawn() returned no object for a scene monster"
-        )
-    monster = spawned[0]
-    if not isinstance(monster, Monster):
-        raise SceneBuilderSpawnError(
-            f"spawned object {monster!r} is not a Monster; rejecting it"
-        )
-    monster.threat_tier = tier_key
-    monster.apply_monster_tier("floor")
+    surfaces = snapshot_population_surfaces(target[0]) if target is not None else {}
+    try:
+        with transaction.atomic():
+            spawned = spawn(prototype)
+            if not spawned:
+                raise SceneBuilderSpawnError(
+                    "spawner.spawn() returned no object for a scene monster"
+                )
+            monster = spawned[0]
+            if not isinstance(monster, Monster):
+                raise SceneBuilderSpawnError(
+                    f"spawned object {monster!r} is not a Monster; rejecting it"
+                )
+            monster.threat_tier = tier_key
+            monster.apply_monster_tier("floor")
+            if target is not None:
+                wilderness, coordinates = target
+                register_explicit_individual(
+                    wilderness,
+                    monster,
+                    coordinates,
+                    tick=current_population_tick(),
+                )
+    except Exception:
+        if target is not None:
+            restore_population_surfaces(surfaces)
+        raise
     return monster
 
 

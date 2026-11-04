@@ -995,6 +995,7 @@
     "world.maps.tests.test_monster_provisioning",
     "world.maps.tests.test_monster_sites",
     "world.maps.tests.test_movement_roundtrip",
+    "world.maps.tests.test_regional_population",
     "world.maps.tests.test_retention_reclamation",
     "world.maps.tests.test_room_art_metadata"
    ],
