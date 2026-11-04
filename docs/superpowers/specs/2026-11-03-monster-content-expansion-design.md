@@ -309,3 +309,7 @@ Batches run serially; the changes inside one batch run in parallel.
 ### 12.3 Requirement-level ordering
 
 Change 1 modifies `monster-field-activity::activity-declarations-publish-complete-validated-bindings` and adds the group-formation requirement. Change 4 adds two `monster-site-placement` requirements that rely on change 1's formation rule, so change 4 archives after change 1. Change 2 adds one `monster-behaviour-profile` requirement that no other change touches.
+
+### 12.4 Known deviations recorded for review
+
+Slime, rat and the crocodile boss bind the utility decision mode because the legacy body never proposes a support skill. Under `monster-flee-policy` a utility monster never flees voluntarily, so §5's available innate flee, §7.1's retreat orientation and §7.3's "either side can flee" hold for these three only through passive or defended-area field aggression and the opposing party's paid retreat. The goblin and the boar stay legacy and keep their flee thresholds. The slime zones are bounded rectangles, not per-cell damp patches, because the zone model has no wetness predicate. Both deviations are recorded in the named review documents and do not block delivery.
