@@ -1,22 +1,30 @@
-"""Monster site lifecycle owner: camps, nests, and boss sites (monster-site-placement).
+"""Monster site lifecycle owner: authored manual sites (monster-site-placement).
 
 The authored site records live in ``world.lore.monster_placement``; this module
-owns their execution. It materializes each site's individuals through the one
-construction entry point (``world.rules.monster_individual``), keeps the
-minimal per-site durable state the design asks for (``state`` and
-``cleared_at_tick``) on the wilderness script, and settles clearings and
-in-game-clock recoveries inside the registered ``monster_site_lifecycle`` world
-clock stage — never on room entry, quest acceptance, or elapsed wall-clock
-time (design D-P3/D-P6).
+owns their execution. Each site holds one complete authored composition, so a
+mixed group, a same-variant group, and a solitary stray each place exactly the
+rows their composition declares. The owner keeps the per-site durable state the
+design asks for — ``state``, ``cleared_at_tick``, and the saved occurrence
+``seed``, ``generation_sequence`` and authoritative ``member_ids`` — on the
+wilderness script, and settles clearings and in-game-clock recoveries inside
+the registered ``monster_site_lifecycle`` world clock stage — never on room
+entry, quest acceptance, or elapsed wall-clock time (design D-P3/D-P6).
 
 Ownership (design D-P2): every individual created here carries the site's key
-as its persistent ``db.site_key`` marker and is registered in the wilderness
-script's ``itemcoordinates`` bookkeeping at the site's coordinate, so it is the
-only kind of object this module ever reads, writes, or deletes. Ambient-,
-quest-, story-, combat-session-, or other-site-owned monsters are never
-touched, and the ambient owner never resumes a site's lifecycle.
+as its persistent ``db.site_key`` marker, is registered through the regional
+population owner's explicit-placement operation (which validates the shared
+wilderness surface without applying ordinary birth exclusions or density), and
+is recorded in the site's own ``member_ids``. That identity list is the site's
+authority: a member is resolved by persistent identity wherever it currently
+stands or however temporarily absent it is, so a living detached member never
+lets the site be declared clear. Ambient-, quest-, story-, combat-session-, or
+other-site-owned monsters are never touched, and the ambient owner never
+resumes a site's lifecycle.
 
-Recovery creates fresh individuals with fresh persistent identities through the
+The site's occurrence state derives from the world seed the regional
+population owner supplies plus the site's own key, and a missing or malformed
+seed refuses before any site write: there is no implicit default. Recovery
+creates fresh individuals with fresh persistent identities through the
 construction owner and leaves the defeated rows dead: identity continuity
 across a recovery would let an old quest binding count new monsters (design
 D-P4). A one-shot site stays cleared until an author-side re-issue, which the
@@ -39,6 +47,7 @@ never be served for a recycled primary key.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
 from typing import Any
 
 from django.db import transaction
@@ -46,9 +55,20 @@ from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 
 from typeclasses.monsters import Monster
 from world.lore.monster_placement import (
+    ENCOUNTER_COMPOSITION_REGISTRY,
     MONSTER_SITE_REGISTRY,
     MonsterSite,
+    composition_variant_keys,
     variant_species_key,
+)
+from world.maps.regional_population import (
+    MALFORMED_STATE,
+    MalformedPopulationState,
+    read_population_seed,
+    register_explicit_individual,
+    restore_population_surfaces,
+    sample_composition_counts,
+    snapshot_population_surfaces,
 )
 from world.maps.wilderness_population import _session_participant_ids
 from world.maps.wilderness_provider import WILDERNESS_NAME
@@ -75,6 +95,7 @@ SITE_READ_WORLD_UNAVAILABLE = "world_unavailable"
 SITE_READ_UNKNOWN_SITE = "unknown_site"
 SITE_READ_UNPOPULATED = "site_unpopulated"
 SITE_READ_CLEARED = "site_cleared"
+SITE_READ_STATE_UNREADABLE = "state_unreadable"
 
 # The wilderness script attribute holding the per-site durable state.
 _SITES_ATTRIBUTE = "monster_sites"
@@ -83,11 +104,22 @@ _ITEMCOORDINATES_ATTRIBUTE = "itemcoordinates"
 
 @dataclass(frozen=True, slots=True)
 class SiteState:
-    """One site's durable lifecycle state, as the quest layer reads it."""
+    """One site's durable lifecycle state, as the quest layer reads it.
+
+    ``seed``, ``generation_sequence`` and ``member_ids`` are the site's saved
+    occurrence and member-identity authority, exposed so the recovery slice and
+    the GM inspection read the same state the owner decides from. ``readable``
+    is ``False`` when an existing record cannot be interpreted: the owner then
+    refuses lifecycle work instead of reinterpreting it as an empty site.
+    """
 
     key: str
     state: str
     cleared_at_tick: int | None
+    seed: int | None = None
+    generation_sequence: int | None = None
+    member_ids: tuple[int, ...] = ()
+    readable: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,11 +169,103 @@ def _write_state(wilderness: Any, states: Mapping[str, dict]) -> None:
     wilderness.db.monster_sites = dict(states)
 
 
+def _saved_occurrence(site_key: str, record: Mapping[str, object]) -> tuple[int, int] | None:
+    """The saved ``(seed, generation_sequence)`` of one record, or ``None``.
+
+    ``None`` means the record cannot be interpreted; a lifecycle decision must
+    then refuse rather than treat a corrupt save as an empty site.
+    """
+    seed = record.get("seed")
+    sequence = record.get("generation_sequence")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        return None
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+        return None
+    return seed, sequence
+
+
+def _require_occurrence(site: MonsterSite, record: Mapping[str, object]) -> tuple[int, int]:
+    """The record's saved occurrence, refusing a malformed record by name."""
+    occurrence = _saved_occurrence(site.key, record)
+    if occurrence is None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: site {site.key!r} has no readable saved seed "
+            "and generation sequence"
+        )
+    return occurrence
+
+
+def _saved_member_ids(record: Mapping[str, object]) -> tuple[int, ...] | None:
+    """The site's authoritative member IDs, or ``None`` when unreadable."""
+    ids = record.get("member_ids")
+    if not isinstance(ids, (list, tuple)):
+        return None
+    members: list[int] = []
+    for value in ids:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return None
+        members.append(value)
+    return tuple(members)
+
+
+def _require_member_ids(site: MonsterSite, record: Mapping[str, object]) -> tuple[int, ...]:
+    """The record's authoritative member IDs, refusing a malformed record by name."""
+    member_ids = _saved_member_ids(record)
+    if member_ids is None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: site {site.key!r} has no readable member IDs"
+        )
+    return member_ids
+
+
+def _members_from_ids(
+    site: MonsterSite, member_ids: tuple[int, ...]
+) -> tuple[Monster, ...]:
+    """Resolve one site's authoritative IDs to the rows that still exist.
+
+    Identity, not presence, is the authority: a member that moved away, lost
+    its room, or was detached is still this site's own individual, so a living
+    absent member keeps the site from being declared clear. A recycled primary
+    key that now carries another site's marker is never adopted.
+    """
+    if not member_ids:
+        return ()
+    return tuple(
+        member
+        for member in Monster.objects.filter(pk__in=member_ids).order_by("pk")
+        if member.db.site_key == site.key
+    )
+
+
+def _members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
+    """Every individual this site owns, by its saved member identity.
+
+    Tolerant for the pure read path: a missing record means the site was never
+    populated, and an unreadable one yields no answer rather than an inferred
+    set. Lifecycle decisions go through :func:`_require_member_ids` first.
+    """
+    record = _state_map(wilderness).get(site.key)
+    if record is None:
+        return ()
+    member_ids = _saved_member_ids(record)
+    if member_ids is None:
+        return ()
+    return _members_from_ids(site, member_ids)
+
+
+def _living_members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
+    return tuple(
+        member for member in _members(wilderness, site) if _persisted_hp(member) > 0
+    )
+
+
 def site_state(site_key: str, *, wilderness: Any | None = None) -> SiteState | None:
     """One authored site's durable state, or ``None`` when it has none yet.
 
     The visible state the quest layer reads so its republish decisions and the
-    site's lifecycle cannot contradict each other.
+    site's lifecycle cannot contradict each other. A present-but-unreadable
+    record is answered with ``readable=False`` and no member IDs; it is never
+    reinterpreted as an empty site.
     """
     wilderness = _wilderness() if wilderness is None else wilderness
     if wilderness is None:
@@ -149,21 +273,16 @@ def site_state(site_key: str, *, wilderness: Any | None = None) -> SiteState | N
     record = _state_map(wilderness).get(site_key)
     if record is None:
         return None
-    return SiteState(site_key, record.get("state"), record.get("cleared_at_tick"))
-
-
-def _members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
-    """Every individual this site owns, by its own marker, at its coordinate."""
-    return tuple(
-        obj
-        for obj in wilderness.get_objs_at_coordinates(site.coordinates)
-        if isinstance(obj, Monster) and obj.db.site_key == site.key
-    )
-
-
-def _living_members(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
-    return tuple(
-        member for member in _members(wilderness, site) if _persisted_hp(member) > 0
+    occurrence = _saved_occurrence(site_key, record)
+    member_ids = _saved_member_ids(record)
+    return SiteState(
+        site_key,
+        record.get("state"),
+        record.get("cleared_at_tick"),
+        seed=None if occurrence is None else occurrence[0],
+        generation_sequence=None if occurrence is None else occurrence[1],
+        member_ids=() if member_ids is None else member_ids,
+        readable=occurrence is not None and member_ids is not None,
     )
 
 
@@ -175,9 +294,9 @@ def site_living_members(
     The quest layer's binding source (monster-site-clear-out-hunts D-C2): a
     clear-out's bound set is exactly what this answers, so it decides nothing
     and therefore writes nothing, moves nothing, emits no event, and never
-    treats a not-yet-populated, cleared, unknown, or absent world as a recovery
-    opportunity. Every one of those four conditions is a named verdict rather
-    than an exception, so a caller can refuse by name.
+    treats a not-yet-populated, cleared, unknown, absent world, or unreadable
+    save as a recovery opportunity. Every one of those conditions is a named
+    verdict rather than an exception, so a caller can refuse by name.
     """
     world = _wilderness() if wilderness is None else wilderness
     if world is None:
@@ -193,6 +312,15 @@ def site_living_members(
     if state is None:
         return SiteLivingMembers(
             site_key, site, None, None, (), SITE_READ_UNPOPULATED
+        )
+    if not state.readable:
+        return SiteLivingMembers(
+            site_key,
+            site,
+            state.state,
+            state.cleared_at_tick,
+            (),
+            SITE_READ_STATE_UNREADABLE,
         )
     if state.state == SITE_STATE_CLEARED:
         return SiteLivingMembers(
@@ -213,27 +341,46 @@ def site_living_members(
     )
 
 
-def _populate(wilderness: Any, site: MonsterSite) -> tuple[Monster, ...]:
-    """Create the site's individuals through the construction owner.
+def _populate(
+    wilderness: Any,
+    site: MonsterSite,
+    *,
+    seed: int,
+    sequence: int,
+    tick: int,
+) -> tuple[Monster, ...]:
+    """Create one complete sampled composition through the construction owner.
 
-    Fresh rows every time, marked with the site key and registered in the
-    wilderness bookkeeping at the site's coordinate so the contrib attaches
-    them to whichever room is active there. No shipped number is duplicated
-    here: the individual's traits come from the construction owner's
-    balance-gated rule and the site's own authored variants.
+    Fresh rows every time: the site's occurrence selects one inclusive
+    count vector of its authored composition, every row of which is constructed
+    with its own identity and stored resources, marked with the site key, and
+    registered through the regional population owner's explicit-placement
+    operation at the site's coordinate. That operation validates the shared
+    wilderness surface while deliberately applying no ordinary settlement
+    buffer, zone/cell density or wave budget, so an explicit manual site is
+    never culled or capped by automatic maintenance. No shipped number is
+    duplicated here: the traits come from the construction owner's
+    balance-gated rule. ``seed``/``sequence`` are the site's saved occurrence
+    (the tick is reporting context only, so a retry at a later tick selects the
+    same complete group).
     """
-    created = []
-    for slot in range(site.capacity):
-        variant_key = site.variant_keys[slot % len(site.variant_keys)]
-        individual = construct_species_individual(
-            variant_species_key(variant_key), variant_key
-        )
-        individual.db.site_key = site.key
-        wilderness.db.itemcoordinates[individual] = site.coordinates
-        room = wilderness.db.rooms.get(site.coordinates)
-        if room is not None:
-            individual.location = room
-        created.append(individual)
+    created: list[Monster] = []
+    rows = sample_composition_counts(
+        site.composition_key,
+        seed=seed,
+        stream_key=site.key,
+        sequence=sequence,
+        budget=site.capacity,
+    )
+    for variant_key, count in rows:
+        species_key = variant_species_key(variant_key)
+        for _ in range(count):
+            individual = construct_species_individual(species_key, variant_key)
+            individual.db.site_key = site.key
+            register_explicit_individual(
+                wilderness, individual, site.coordinates, tick=tick
+            )
+            created.append(individual)
     return tuple(created)
 
 
@@ -256,14 +403,14 @@ def _emit(
 
 def _site_context(site: MonsterSite, **extra: object) -> dict[str, object]:
     """The boundary-event context every site decision carries."""
+    composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
+    variants = composition_variant_keys(composition)
     context: dict[str, object] = {
         "site": site.key,
         "region": site.region_key,
         "coordinate": site.coordinates,
-        "species": tuple(
-            sorted({variant_species_key(key) for key in site.variant_keys})
-        ),
-        "variant": site.variant_keys,
+        "species": tuple(sorted({variant_species_key(key) for key in variants})),
+        "variant": variants,
     }
     context.update(extra)
     return context
@@ -274,6 +421,33 @@ def _condition_matured(site: MonsterSite, cleared_at_tick: object, tick: int) ->
     if isinstance(cleared_at_tick, bool) or not isinstance(cleared_at_tick, int):
         return False
     return cleared_at_tick + site.recover_after_ticks <= tick
+
+
+def _site_seed(wilderness: Any, site: MonsterSite) -> int:
+    """The one saved-occurrence seed a site derives from the world's seed.
+
+    Derivation happens exactly once, when the site owner first creates the
+    site's row; recovery reuses the saved value. The world seed is read through
+    the regional population owner's already-required access, so an absent or
+    malformed seed refuses by name before any construction or site write
+    instead of selecting an implicit default.
+    """
+    world_seed = read_population_seed(wilderness)
+    payload = f"{world_seed}:{site.key}".encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+
+
+def _populated_record(
+    seed: int, sequence: int, created: tuple[Monster, ...]
+) -> dict[str, object]:
+    """The durable record of one complete, freshly placed site composition."""
+    return {
+        "state": SITE_STATE_POPULATED,
+        "cleared_at_tick": None,
+        "seed": seed,
+        "generation_sequence": sequence,
+        "member_ids": [member.pk for member in created],
+    }
 
 
 def _recovery_refusal(
@@ -315,12 +489,29 @@ def _apply_recovery(
     wilderness: Any,
     states: dict[str, dict],
     site: MonsterSite,
+    *,
+    seed: int,
+    sequence: int,
     tick: int,
 ) -> tuple[Monster, ...]:
-    """Repopulate a due site inside the caller's in-flight state map."""
-    created = _populate(wilderness, site)
-    cleared_at_tick = states[site.key].get("cleared_at_tick")
-    states[site.key] = {"state": SITE_STATE_POPULATED, "cleared_at_tick": None}
+    """Repopulate a due site inside the caller's in-flight state map.
+
+    The recovered group is a fresh sample of the same saved occurrence seed at
+    the next generation sequence, so every standing individual has a fresh
+    persistent identity and the defeated IDs are replaced rather than reused.
+    """
+    record = dict(states[site.key])
+    cleared_at_tick = record.get("cleared_at_tick")
+    created = _populate(
+        wilderness, site, seed=seed, sequence=sequence, tick=tick
+    )
+    states[site.key] = {
+        **record,
+        "state": SITE_STATE_POPULATED,
+        "cleared_at_tick": None,
+        "generation_sequence": sequence,
+        "member_ids": [member.pk for member in created],
+    }
     _emit(
         "monster_site_recovered",
         _site_context(
@@ -365,11 +556,34 @@ def settle_site_recovery(
         )
         return False
     states = _state_map(wilderness)
-    record = states.get(site.key) or {}
+    record = states.get(site.key)
+    if record is not None:
+        # A present record must be interpretable: a corrupt save is never
+        # reinterpreted as an empty site, so no replacement group is created
+        # over survivors.
+        _require_occurrence(site, record)
+        _require_member_ids(site, record)
+    record = record or {}
     if _recovery_refusal(wilderness, site, record, tick) is not None:
         return False
-    created = _apply_recovery(wilderness, states, site, tick)
-    _write_state(wilderness, states)
+    seed, saved_sequence = _require_occurrence(site, record)
+    states_before = _state_map(wilderness)
+    surfaces = snapshot_population_surfaces(wilderness)
+    try:
+        with transaction.atomic():
+            created = _apply_recovery(
+                wilderness,
+                states,
+                site,
+                seed=seed,
+                sequence=saved_sequence + 1,
+                tick=tick,
+            )
+            _write_state(wilderness, states)
+    except Exception:
+        _write_state(wilderness, states_before)
+        restore_population_surfaces(surfaces)
+        raise
     return bool(created)
 
 
@@ -377,14 +591,18 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     """Settle every authored site clear/recover decision for this advance.
 
     The registered ``monster_site_lifecycle`` stage. A site with no durable
-    state yet is populated for the first time; a populated site with no living
-    member of its own is marked cleared at ``end_tick`` (skipped while a
-    persisted combat session still references one of its individuals, so a
-    committed defeat settles before the site is declared clear); a cleared
-    recoverable site repopulates when its authored in-game condition matured.
-    One-shot sites never recover, and no pass writes anything for a site whose
-    state did not change. No wilderness script means no world to settle, and
-    the pass returns silently.
+    state yet is populated for the first time from its derived occurrence;
+    a populated site with no *living* member of its own is marked cleared at
+    ``end_tick`` (skipped while a persisted combat session still references one
+    of its individuals, so a committed defeat settles before the site is
+    declared clear); a cleared recoverable site repopulates when its authored
+    in-game condition matured. A member resolved by its saved identity counts
+    even when it currently stands elsewhere, so a living absent member never
+    clears the site. One-shot sites never recover, and no pass writes anything
+    for a site whose state did not change. A present record that cannot be
+    interpreted raises the population owner's named malformed-state refusal
+    before any write. No wilderness script means no world to settle, and the
+    pass returns silently.
     """
     wilderness = _wilderness()
     if wilderness is None:
@@ -395,16 +613,21 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
     for key, site in MONSTER_SITE_REGISTRY.items():
         record = states.get(key)
         if record is None:
-            created = _populate(wilderness, site)
-            states[key] = {"state": SITE_STATE_POPULATED, "cleared_at_tick": None}
+            seed = _site_seed(wilderness, site)
+            created = _populate(
+                wilderness, site, seed=seed, sequence=0, tick=end_tick
+            )
+            states[key] = _populated_record(seed, 0, created)
             changed = True
             _emit(
                 "monster_site_populated",
                 _site_context(site, tick=end_tick, created=len(created)),
             )
             continue
+        seed, saved_sequence = _require_occurrence(site, record)
+        member_ids = _require_member_ids(site, record)
         if record.get("state") == SITE_STATE_POPULATED:
-            members = _members(wilderness, site)
+            members = _members_from_ids(site, member_ids)
             if any(_persisted_hp(member) > 0 for member in members):
                 continue
             if members and _session_participant_ids().intersection(
@@ -413,7 +636,13 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
                 # A committed combat session still owns this defeat: the
                 # clearing decision waits for the session to settle.
                 continue
-            states[key] = {"state": SITE_STATE_CLEARED, "cleared_at_tick": end_tick}
+            # The defeated identities stay recorded: they are the site's
+            # ownership history and no recovered group may reuse them.
+            states[key] = {
+                **record,
+                "state": SITE_STATE_CLEARED,
+                "cleared_at_tick": end_tick,
+            }
             changed = True
             _emit(
                 "monster_site_cleared",
@@ -426,15 +655,23 @@ def settle_monster_sites(start_tick: int, end_tick: int) -> list[ScheduledEvent]
             continue
         if _recovery_refusal(wilderness, site, record, end_tick) is not None:
             continue
-        created = _apply_recovery(wilderness, states, site, end_tick)
+        created = _apply_recovery(
+            wilderness,
+            states,
+            site,
+            seed=seed,
+            sequence=saved_sequence + 1,
+            tick=end_tick,
+        )
         changed = True
+        composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
         events.append(
             ScheduledEvent(
                 "monster_site_recovered",
                 end_tick,
                 {
                     "site": key,
-                    "variants": list(site.variant_keys),
+                    "variants": list(composition_variant_keys(composition)),
                     "created": len(created),
                     "tick": end_tick,
                 },

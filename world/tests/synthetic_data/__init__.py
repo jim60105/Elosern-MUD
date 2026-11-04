@@ -166,6 +166,7 @@ from world.tests.synthetic_data.data_monster_species import (
 )
 from world.tests.synthetic_data.data_monster_placement import (
     SYNTH_AMBIENT_PLACEMENTS,
+    SYNTH_ENCOUNTER_COMPOSITIONS,
     SYNTH_MONSTER_SITES,
 )
 from world.tests.synthetic_data.data_world import (

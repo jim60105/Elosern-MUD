@@ -69,6 +69,7 @@ EXPECTED_PUBLIC_CALLABLES = frozenset(
         "build_monster_site_registry",
         "build_settlement_birth_policy_registry",
         "composition_bounds",
+        "composition_variant_keys",
         "validate_ecology_registries",
         "validate_monster_placement_registry",
         "variant_species_key",
@@ -130,7 +131,8 @@ def _faces(**overrides):
             STRONGER: _variant_row(STRONGER),
         },
         "species_face": {SPECIES: _species_row()},
-        "kind_face": ("camp", "nest", "boss_site"),
+        "kind_face": ("camp", "nest", "boss_site", "stray", "encounter"),
+        "compositions": {COMPOSITION: _composition()},
     }
     faces.update(overrides)
     return faces
@@ -154,7 +156,7 @@ def _site(**overrides) -> MonsterSite:
         "kind": "camp",
         "region_key": REGION,
         "coordinates": (4, 4),
-        "variant_keys": (ORDINARY,),
+        "composition_key": COMPOSITION,
         "capacity": 1,
         "one_shot": True,
         "recover_after_ticks": None,
@@ -227,12 +229,23 @@ class PlacementValidationTests(unittest.TestCase):
 
     def test_an_unknown_variant_reference_is_rejected(self):
         self._reject(ambient={REGION: _rule(variant_keys=(ABSENT_VARIANT,))})
-        self._reject(sites={SITE: _site(variant_keys=(ORDINARY, ABSENT_VARIANT))})
+        self._reject(
+            sites={SITE: _site()},
+            compositions={
+                COMPOSITION: _composition(
+                    members=(_member(ORDINARY), _member(ABSENT_VARIANT))
+                )
+            },
+        )
 
     def test_a_placement_may_not_name_a_non_variant_reference(self):
         # A species key is not a variant key: the pair's variant half is the
         # only reference placement authors.
         self._reject(ambient={REGION: _rule(variant_keys=(SPECIES,))})
+        self._reject(
+            sites={SITE: _site()},
+            compositions={COMPOSITION: _composition(members=(_member(SPECIES),))},
+        )
 
     @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
     def test_habitat_incompatible_authoring_fails_at_construction(self):
@@ -270,12 +283,44 @@ class PlacementValidationTests(unittest.TestCase):
     def test_a_site_kind_outside_the_closed_vocabulary_is_rejected(self):
         self._reject(sites={SITE: _site(kind="lair")})
 
-    @covers_requirement("monster-site-placement::placement-honors-capacity-and-determinism")
     def test_capacity_is_a_ceiling_never_below_the_quantity(self):
         self._reject(ambient={REGION: _rule(quantity=3, capacity=2)})
         self._reject(ambient={REGION: _rule(quantity=0)})
         self._reject(ambient={REGION: _rule(quantity=1, capacity=True)})
         self._reject(sites={SITE: _site(capacity=0)})
+
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
+    def test_a_site_names_one_known_complete_composition(self):
+        # A site's membership is the composition it names, never an inferred
+        # set: an empty, non-string or unknown reference fails at construction.
+        for composition_key in ("", None, "t_fixture_absent_composition"):
+            with self.subTest(composition_key=composition_key):
+                self._reject(sites={SITE: _site(composition_key=composition_key)})
+
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
+    def test_every_legal_composition_outcome_must_fit_the_site_capacity(self):
+        # The minimum outcome fits but the maximum does not: capacity is the
+        # ceiling of every legal outcome, not of the smallest one.
+        varying = _composition(COMPOSITION, (_member(ORDINARY, 1, 3),))
+        self._reject(
+            sites={SITE: _site(capacity=2)},
+            compositions={COMPOSITION: varying},
+        )
+        registry.validate_monster_placement_registry(
+            {REGION: _rule()},
+            {SITE: _site(capacity=3)},
+            **_faces(compositions={COMPOSITION: varying}),
+        )
+
+    @covers_requirement("monster-site-placement::ambient-and-site-placement-are-frozen-keyed-lore-data-validated-at-construction")
+    def test_explicit_site_kinds_admit_solitary_and_mixed_placements(self):
+        for kind in ("stray", "encounter"):
+            with self.subTest(kind=kind):
+                registry.validate_monster_placement_registry(
+                    {REGION: _rule()},
+                    {SITE: _site(kind=kind)},
+                    **_faces(),
+                )
 
     def test_an_empty_variant_set_is_rejected(self):
         self._reject(ambient={REGION: _rule(variant_keys=())})
@@ -675,6 +720,7 @@ class ShippedPlacementContentTests(unittest.TestCase):
     def test_every_shipped_site_habitat_is_the_region_of_its_coordinates(self):
         from world.maps.wilderness_provider import is_footprint_cell, region_for_coordinates
 
+        compositions = _published("ENCOUNTER_COMPOSITION")
         for key, site in _published("MONSTER_SITE").items():
             with self.subTest(site=key):
                 self.assertEqual(
@@ -683,6 +729,12 @@ class ShippedPlacementContentTests(unittest.TestCase):
                 # A site may only own walkable wild ground: an anchor footprint
                 # cell has no wilderness room to host its individuals.
                 self.assertFalse(is_footprint_cell(site.coordinates))
+                # Every site names a complete authored composition whose legal
+                # outcomes all fit the site's own ceiling.
+                composition = compositions[site.composition_key]
+                _smallest, largest = registry.composition_bounds(composition)
+                self.assertGreaterEqual(largest, 1)
+                self.assertLessEqual(largest, site.capacity)
 
     def test_every_shipped_ambient_rule_covers_an_authored_capability(self):
         published = _published("AMBIENT_PLACEMENT")
@@ -747,15 +799,19 @@ class ShippedEcologyContentTests(unittest.TestCase):
                     with self.subTest(zone=zone_key, variant=member.variant_key):
                         self.assertIn(zone.region_key, habitat_tags)
 
-    def test_every_shipped_composition_is_pooled_by_a_zone(self):
+    def test_every_shipped_composition_is_pooled_by_a_zone_or_owned_by_a_site(self):
         # An unreferenced composition would be an authoring leftover: every
-        # authored composition exists so some bounded habitat can select it.
+        # authored composition exists so some bounded habitat can select it,
+        # or an explicit manual site can own its complete membership.
         pooled = {
             row.composition_key
             for zone in _published("ECOLOGY_ZONE").values()
             for row in zone.pool
         }
-        self.assertEqual(pooled, set(_published("ENCOUNTER_COMPOSITION")))
+        owned = {site.composition_key for site in _published("MONSTER_SITE").values()}
+        self.assertEqual(
+            pooled | owned, set(_published("ENCOUNTER_COMPOSITION"))
+        )
 
     @covers_requirement(
         "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"

@@ -129,6 +129,11 @@ BLOCKED_NO_LEGAL_SPACE = "no_legal_space"
 _PURPOSE_CELL = "cell"
 _PURPOSE_COMPOSITION = "composition"
 _PURPOSE_COUNTS = "counts"
+#: The occurrence purpose of an explicit manual site's complete composition.
+#: A site's occurrence is identified by its saved seed, its own key and its
+#: generation sequence, so a retry at a later in-game tick reproduces the same
+#: group; the draw therefore never reads a tick.
+_PURPOSE_SITE_COUNTS = "site_counts"
 
 _DRAW_BYTES = 8
 _DRAW_SPACE = 1 << (_DRAW_BYTES * 8)
@@ -616,7 +621,7 @@ def population_counts(wilderness: Any, zone_key: str) -> PopulationCounts:
 
 
 def _draw(
-    seed: int, zone_key: str, sequence: int, tick: int, ordinal: int, purpose: str
+    seed: int, stream_key: str, sequence: int, tick: int, ordinal: int, purpose: str
 ) -> Callable[[int], int]:
     """A rejection-sampling integer sampler bound to one draw purpose."""
 
@@ -627,7 +632,7 @@ def _draw(
         draw_ordinal = 0
         while True:
             payload = json.dumps(
-                [seed, zone_key, sequence, tick, ordinal, purpose, draw_ordinal],
+                [seed, stream_key, sequence, tick, ordinal, purpose, draw_ordinal],
                 ensure_ascii=False,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -703,6 +708,44 @@ def _fitting_rows(
         if vectors:
             rows.append((weighted.weight, composition, vectors))
     return rows
+
+
+def sample_composition_counts(
+    composition_key: str,
+    *,
+    seed: int,
+    stream_key: str,
+    sequence: int,
+    budget: int,
+) -> tuple[tuple[str, int], ...]:
+    """Select one complete count vector of a composition inside a budget.
+
+    The pure occurrence sampler other explicit-placement owners share with the
+    ordinary wave planner: the same inclusive member ranges, the same
+    rejection-sampling stream, and no truncation below a member's minimum. An
+    occurrence is identified by ``(seed, stream_key, sequence)`` alone, so the
+    same saved occurrence selects the same complete group across restarts and
+    retries. A composition that cannot fit the budget at all is a caller
+    contract violation, not a temporary space refusal, and refuses by name.
+    """
+    composition = ENCOUNTER_COMPOSITION_REGISTRY.get(composition_key)
+    if composition is None:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: unknown composition {composition_key!r}"
+        )
+    vectors = _count_vectors(composition, budget)
+    if not vectors:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: composition {composition_key!r} has no complete "
+            f"outcome inside budget {budget}"
+        )
+    index = _draw(
+        seed, stream_key, sequence, 0, 0, _PURPOSE_SITE_COUNTS
+    )(len(vectors))
+    return tuple(
+        (member.variant_key, count)
+        for member, count in zip(composition.members, vectors[index])
+    )
 
 
 def _blocked(zone_key: str, tick: int, state: ZonePopulationState | None, reason: str) -> PopulationWavePlan:
@@ -1181,6 +1224,7 @@ __all__ = [
     "read_population_seed",
     "register_explicit_individual",
     "restore_population_surfaces",
+    "sample_composition_counts",
     "snapshot_population_surfaces",
     "snapshot_regional_population_surfaces",
     "wilderness_registration_target",
