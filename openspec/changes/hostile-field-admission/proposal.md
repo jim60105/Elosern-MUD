@@ -10,6 +10,10 @@ Admit immediate whole-cell hostile contacts with no free opening attack, consumi
 
 This is a bounded one-engineer-day slice. **BREAKING** where a current behavior is replaced, with every caller and substantive test migrated in that slice. No feature code is authorized by this proposal.
 
+## Sizing
+
+The slice has three mechanisms, namely the rules-only contact evaluator and writer (task1.1), the owner-mediated sleep interruption with retained exam-only FAIL (task2.1) and the atomic arrival-to-combat publication (task3.1). Contact authority without its writer hooks admits nothing observable, and the interruption contract is reachable only through a real admitted contact, so the three cannot become separately playable slices. Each task check names its observable end state instead of asserting a duration.
+
 ## Capabilities
 
 ### New Capabilities
@@ -22,7 +26,7 @@ None.
 
 ## Impact
 
-Consumes landed mechanisms: field_enemy_roster already collects all living local monsters in persistent-ID order, independently of effect recipients. engage_group is the staged roster API; hostile admission gets distinct rules authority without weakening voluntary sleep gates. Population lifecycle and recorded protection intervals provide chronological birth/arrival facts.
+Consumes landed mechanisms. field_enemy_roster already collects all living local monsters in persistent-ID order, independently of effect recipients. engage_group is the staged roster API; hostile admission gets distinct rules authority without weakening voluntary sleep gates. Population lifecycle and recorded protection intervals provide chronological birth/arrival facts.
 
 Attaches at combat_initiation.py, combat_session/{lifecycle,battlefield,rounds,settlement,records}.py, fatigue.py, sleep_control.py, movement_settlement.py and population_lifecycle.py.
 
@@ -38,4 +42,4 @@ No patrol guards, full ecology, cross-cell pursuit, disease, corrosion, wildfire
 
 depends-on: incapacitated-hostile-rounds
 
-Code conflicts: interruptible-field-contact consumes this admission and automatic-round accounting. paid-party-retreat later changes session terminal billing; serialize all session/clock edits. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
+Code conflicts begin with interruptible-field-contact, which consumes this admission and automatic-round accounting, and include paid-party-retreat, which later changes session terminal billing; serialize all session/clock edits. All changes share the developer review/evidence document; serialize that file, `.github/evennia-shards.json` and `.github/browser-shards.json`. Command behavior changes update `docs/game/commands.md` and `docs/game/command-reference.md` together.
