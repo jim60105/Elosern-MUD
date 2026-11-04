@@ -1085,42 +1085,23 @@ def _restore_attribute(
         )
 
 
-def _flush_rolled_back_instances() -> None:
-    """Evict cached instances whose rows the rolled-back write removed.
-
-    Evennia's idmapper is not transaction-aware: a created object's row can be
-    gone while the instance is still served. Object and script caches are both
-    swept because this owner creates individuals and, on a fresh provision, a
-    wilderness script.
-    """
-    from evennia.objects.models import ObjectDB
-    from evennia.scripts.models import ScriptDB
-
-    for model in (ObjectDB, ScriptDB):
-        cache = getattr(model, "__instance_cache__", None)
-        if cache is None:
-            continue
-        for key, instance in list(cache.items()):
-            if key is None or getattr(instance, "_is_deleted", False):
-                continue
-            if not model.objects.filter(pk=key).exists():
-                instance.flush_from_cache(force=True)
-
-
 def restore_population_surfaces(snapshot: Mapping[int, SurfaceSnapshot]) -> None:
     """Restore the durable and live surfaces captured before an owner write.
 
     Run after the failed transaction has rolled back. Restores each snapshot
-    attribute, clears the contents cache of every room the population may have
-    touched (a created individual's row is gone, but a room contents cache is
-    not transaction-aware), and evicts rolled-back instances. Safe to call with
-    an empty snapshot, and safe to call in addition to the clock's generic
-    stage restore: both are idempotent restorations of the same values. An
-    empty snapshot still evicts rolled-back instances, because the caller may
-    have created them before it could snapshot anything.
+    attribute, then reconciles the engine caches through the shared seam rather
+    than duplicating it: the orphan sweep evicts the rows this write removed --
+    created individuals, or a freshly provisioned wilderness script -- and
+    re-reads the contents cache of every room that had received one, because a
+    room contents cache is not transaction-aware. Safe to call with an empty
+    snapshot, and safe to call in addition to the clock's generic stage
+    restore: both are idempotent restorations of the same values. An empty
+    snapshot still evicts rolled-back instances, because the caller may have
+    created them before it could snapshot anything.
     """
     from evennia.objects.models import ObjectDB
     from evennia.scripts.models import ScriptDB
+    from world.rules.surfaces import flush_instance, flush_orphan_instances
 
     candidates = {
         id(instance): instance
@@ -1128,28 +1109,19 @@ def restore_population_surfaces(snapshot: Mapping[int, SurfaceSnapshot]) -> None
     }
     for obj_id, surface in snapshot.items():
         obj = candidates.get(obj_id)
-        if obj is None:
-            continue
-        if getattr(obj, "_is_deleted", False):
+        if obj is None or getattr(obj, "_is_deleted", False):
             continue
         for (key, category), value in surface.attributes.items():
             _restore_attribute(obj, key, category, value)
-        rooms = getattr(obj, "db", None)
-        rooms = getattr(rooms, "rooms", None) if rooms is not None else None
-        for room in (rooms or {}).values():
-            try:
-                room.contents_cache.clear()
-            except Exception as error:
-                log_warn(
-                    "rollback_restore_failed",
-                    exc=error,
-                    context={
-                        "stage": "regional_population_room_contents",
-                        "obj": str(room),
-                        "key": "contents",
-                    },
-                )
-    _flush_rolled_back_instances()
+    flush_orphan_instances()
+    # The orphan sweep covers the objects this write created; the snapshot's own
+    # object is evicted here when the rollback removed its row too.
+    for obj_id in snapshot:
+        obj = candidates.get(obj_id)
+        if obj is None or getattr(obj, "_is_deleted", False):
+            continue
+        if not type(obj).objects.filter(pk=obj.pk).exists():
+            flush_instance(obj)
 
 
 def snapshot_regional_population_surfaces(
@@ -1162,7 +1134,8 @@ def snapshot_regional_population_surfaces(
     seed and the coordinate registry, or answers ``{}`` before the world
     exists. A caller-owned rollback restores through
     :func:`restore_population_surfaces` with this exact mapping, which also
-    clears the room contents caches the generic clock restore cannot see.
+    reconciles the room contents caches and rolled-back instances the generic
+    clock restore cannot see.
     """
     wilderness = _wilderness()
     if wilderness is None:

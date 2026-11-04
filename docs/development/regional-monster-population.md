@@ -425,10 +425,15 @@ less often in aggregate, which the position-first design intends.
 `transaction.atomic()` covering every construction, home marker, coordinate
 registration, active-room attachment and the state write. Before the write they
 snapshot the world's population state, seed and coordinate registry, so a
-failure at any point restores the durable values, clears the contents cache of
-every registered room (Evennia's contents handler is not transaction-aware) and
-evicts the idmapper entries of created objects. A rolled-back wave publishes no
-`monster_population_wave` event and leaves no stray registration.
+failure at any point restores the durable values and reconciles the engine
+caches through the shared `world.rules.surfaces` seam:
+`flush_orphan_instances` evicts the rows the write created and re-reads the
+contents cache of every room that received one (Evennia's contents handler is
+not transaction-aware), and a snapshot object whose own row the rollback
+removed -- a freshly provisioned wilderness script -- goes through
+`flush_instance`. No private copy of that reconciliation lives in this owner. A
+rolled-back wave publishes no `monster_population_wave` event and leaves no
+stray registration.
 
 A **caller-owned** rollback (a later stage failing after a committed wave) uses
 the same pair:
