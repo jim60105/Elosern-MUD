@@ -1,7 +1,6 @@
 """Slice of ``test_defeat_aftermath_violation``: AttemptLoopTests, PoolAndDigestTests, EventLogOrderTests, FlagOffTests.
 """
 import unittest
-from dataclasses import replace as dataclass_replace
 from unittest.mock import patch
 from django.test import override_settings
 from evennia.utils.create import create_object
@@ -13,7 +12,6 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.quests.catalog import register_catalog
 from world.rules import clock as clock_module
-from world.rules import combat_session as combat_session_module
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
     engage,
@@ -125,8 +123,6 @@ class AttemptLoopTests(ViolationBase):
         # records that faithfully (roll None, auto_comply true).
         self._equalize_scores()
         self._arouse(13)
-        self.player.sexual.climax_phase.value = "進行中"
-        self.player.attributes.add("climax_turns", 1, category="sexual_state")
         consumed = []
         real_roll = defeat_aftermath_violation_module.derived_roll
 
@@ -134,12 +130,22 @@ class AttemptLoopTests(ViolationBase):
             consumed.append(args)
             return real_roll(*args)
 
+        engage(self.player, self.monster)
+        # The fight's own round runs while the victim can still act; the
+        # climax that must autocomply at the defeat settlement is entered
+        # afterwards, because a round's upkeep settles a 進行中 phase it finds.
+        with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch(
+            "world.rules.combat.damage.roll_d100", return_value=1
+        ), patch("world.rules.combat.rounds.roll_d100", return_value=1):
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        self.player.sexual.climax_phase.value = "進行中"
+        self.player.attributes.add("climax_turns", 1, category="sexual_state")
         with patch.object(
             defeat_aftermath_violation_module,
             "derived_roll",
             side_effect=counting_roll,
         ):
-            result = self._defeat()
+            result = forfeit(self.player)
         self.assertEqual(consumed, [])
         entries = [
             e for e in _aftermath_entries(result) if e.kind == "violation_attempt"
@@ -310,6 +316,10 @@ class AttemptLoopTests(ViolationBase):
             self.player.sexual.record_hostile_act()
         second_monster = self._lore_monster("哥布林")
         second_monster.location = self.room
+        # Engagement admits every living monster in the cell, so the first
+        # aftermath's winner must leave the room for this second engagement to
+        # have exactly one violator.
+        self.monster.location = create_object(Room, key="violation annex")
         self._equalize_scores(second_monster)
         second_monster.sexual.pleasure.base = 13
         engage(self.player, second_monster)
@@ -485,21 +495,10 @@ class EventLogOrderTests(ViolationBase):
         slime.sexual.pleasure.base = 13
         self._equalize_scores()
         self._arouse(13)
+        # One session, two violators: ordinary engagement already admits every
+        # living monster in the cell, so both winners are living foes at
+        # settlement without extending the durable record.
         engage(self.player, self.monster)
-        # One session, two violators: extend the durable record's enemies
-        # (the coercion suites' persisted-record seam) so both winners are
-        # living foes at settlement.
-        from dataclasses import replace as dataclass_replace
-
-        from world.rules import combat_session as combat_session_module
-
-        record = read_session(self.player)
-        combat_session_module._persist(
-            self.player,
-            dataclass_replace(
-                record, enemy_ids=(*record.enemy_ids, int(slime.pk))
-            ),
-        )
         with self._patch_rolls([1, 1]):
             with patch("world.rules.combat.battlefield.roll_d100", return_value=1), patch("world.rules.combat.damage.roll_d100", return_value=1), patch("world.rules.combat.rounds.roll_d100", return_value=1):
                 submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])

@@ -39,6 +39,7 @@ from world.rules.buffs import (
 )
 from world.rules.combat import _handle_damage
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat_identity import stable_actor_id
 from tools.spec_traceability import covers_requirement
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.effects import EffectPolicy, ResolvedEffect
@@ -510,8 +511,14 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         with patch.dict(skill_map, {skill.key: skill}):
             grant_lineage(self.attacker, [skill.key])
             battlefield = Battlefield(
-                {'party': frozenset({"fixture:synth_attacker"}), 'foes': frozenset({"fixture:synth_defender"})},
-                {"fixture:synth_attacker": self.attacker, "fixture:synth_defender": self.defender},
+                {
+                    'party': frozenset({stable_actor_id(self.attacker)}),
+                    'foes': frozenset({stable_actor_id(self.defender)}),
+                },
+                {
+                    stable_actor_id(self.attacker): self.attacker,
+                    stable_actor_id(self.defender): self.defender,
+                },
             )
             req = ActionRequest(
                 actor=self.attacker,

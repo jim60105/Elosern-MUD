@@ -25,6 +25,7 @@ from world.rules.buffs import TickRecord
 from world.rules.combat import Battlefield, RoundTactical, run_round
 from world.rules.combat.battlefield import COMBAT_YAML, CombatRulebookError, validate_combat_rulebook
 from world.rules.combat.damage import _handle_damage
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat.scalars import hit_margin, strike_amount, strike_lands
 from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
 

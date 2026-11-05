@@ -17,6 +17,7 @@ from world.rules.action import (
 )
 from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat_identity import stable_actor_id
 from world.rules.progression import practice_claims_for
 from world.rules.tests.combat_fixtures import grant_lineage
 from world.skills.effects import EffectPolicy
@@ -108,9 +109,11 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
             effect_policies=(EffectPolicy(), EffectPolicy(requires_hit_from=0)),
         )
         grant_lineage(actor, [skill.key])
+        actor_id = stable_actor_id(actor)
+        target_id = stable_actor_id(target)
         bf = Battlefield(
-            roster={"fixture:atomic_actor": actor, "fixture:atomic_target": target},
-            teams={'team_a': {"fixture:atomic_actor"}, 'team_b': {"fixture:atomic_target"}},
+            roster={actor_id: actor, target_id: target},
+            teams={'team_a': {actor_id}, 'team_b': {target_id}},
         )
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(actor, skill.key, [target], ctx)
@@ -154,9 +157,11 @@ class ActionPipelineAtomicityTests(EvenniaTestCase):
             effect_policies=(EffectPolicy(), EffectPolicy(requires_hit_from=0)),
         )
         grant_lineage(actor, [skill.key])
+        actor_id = stable_actor_id(actor)
+        target_id = stable_actor_id(target)
         bf = Battlefield(
-            roster={"fixture:fail_actor": actor, "fixture:fail_target": target},
-            teams={'team_a': {"fixture:fail_actor"}, 'team_b': {"fixture:fail_target"}},
+            roster={actor_id: actor, target_id: target},
+            teams={'team_a': {actor_id}, 'team_b': {target_id}},
         )
         ctx = BattlefieldActionContext(bf)
         req = ActionRequest(actor, skill.key, [target], ctx)

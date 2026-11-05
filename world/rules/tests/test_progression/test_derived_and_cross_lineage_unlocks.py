@@ -103,9 +103,10 @@ class DerivedUnlockNotificationTests(EvenniaTestCase):
             3 * SKILL_PROFICIENCY_XP_PER_LEVEL - SKILL_PRACTICE_XP_PER_USE
         )
         monster = self._monster(f"{key}-goblin")
+        actor_id = stable_actor_id(actor)
         battlefield = Battlefield(
-            {'party': frozenset({key}), 'foes': frozenset({stable_actor_id(monster)})},
-            {key: actor, stable_actor_id(monster): monster},
+            {'party': frozenset({actor_id}), 'foes': frozenset({stable_actor_id(monster)})},
+            {actor_id: actor, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             actor,

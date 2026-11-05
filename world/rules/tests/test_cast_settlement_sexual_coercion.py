@@ -42,6 +42,7 @@ from world.rules.cast_settlement import (
     settle_out_of_combat_cast,
 )
 from world.rules.clock import WorldClock, _EVENT_SOURCES
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     _scan_sexual_coercion,
     engage,
@@ -115,10 +116,20 @@ def _resist_log(actor, target, *, resisted, auto_comply, roll):
         kind="sexual_resist",
         actor=str(actor.key),
         target=str(target.key),
+        actor_id=stable_actor_id(actor),
+        target_id=stable_actor_id(target),
         data={"resisted": resisted, "auto_comply": auto_comply, "roll": roll},
         text_template="{actor} 對 {target} 施加了強制行為。",
     )
-    return EventLog(str(actor.key), _T_COERCE, (str(target.key),), (entry,), 0)
+    return EventLog(
+        str(actor.key),
+        _T_COERCE,
+        (str(target.key),),
+        (entry,),
+        0,
+        actor_id=stable_actor_id(actor),
+        target_ids=(stable_actor_id(target),),
+    )
 
 
 def _raising_stage():
@@ -355,11 +366,19 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
                 kind="sexual_resist",
                 actor=str(self.player.key),
                 target=str(target.key),
+                actor_id=stable_actor_id(self.player),
+                target_id=stable_actor_id(target),
                 data=data,
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
+                str(self.player.key),
+                _T_COERCE,
+                (str(target.key),),
+                (entry,),
+                0,
+                actor_id=stable_actor_id(self.player),
+                target_ids=(stable_actor_id(target),),
             )
             with patch("world.rules.cast_settlement.apply_affinity_change") as writer:
                 notifications, restore_state = self._scan([target], log)
@@ -380,7 +399,13 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), _T_COERCE, (str(first.key), str(second.key)), entries, 0
+            str(self.player.key),
+            _T_COERCE,
+            (str(first.key), str(second.key)),
+            entries,
+            0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=(stable_actor_id(first), stable_actor_id(second)),
         )
         original = affinity_module.apply_affinity_change
         calls = []
@@ -415,7 +440,13 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), _T_COERCE, (str(forced.key), str(complied.key)), entries, 0
+            str(self.player.key),
+            _T_COERCE,
+            (str(forced.key), str(complied.key)),
+            entries,
+            0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=(stable_actor_id(forced), stable_actor_id(complied)),
         )
         original = affinity_module.apply_affinity_change
         calls = []
@@ -468,11 +499,19 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             kind="sexual_resist",
             actor=str(self.player.key),
             target="no-such-target",
+            actor_id=stable_actor_id(self.player),
+            target_id="fixture:no-such-target",
             data={"resisted": False, "auto_comply": False, "roll": 55},
             text_template="x",
         )
         log = EventLog(
-            str(self.player.key), _T_COERCE, ("no-such-target",), (entry,), 0
+            str(self.player.key),
+            _T_COERCE,
+            ("no-such-target",),
+            (entry,),
+            0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=("fixture:no-such-target",),
         )
         with patch("world.rules.cast_settlement.apply_affinity_change") as writer:
             notifications, restore_state = self._scan([target], log)
@@ -487,6 +526,8 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             kind="damage",
             actor=str(self.player.key),
             target=str(target.key),
+            actor_id=stable_actor_id(self.player),
+            target_id=stable_actor_id(target),
             data={"amount": 5},
             text_template="x",
         )
@@ -494,6 +535,7 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             kind="skill_practice",
             actor=str(self.player.key),
             target=None,
+            actor_id=stable_actor_id(self.player),
             data={"skill": _T_COERCE},
             text_template="x",
         )
@@ -503,6 +545,8 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             (str(target.key),),
             (damage_entry, practice_entry),
             0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=(stable_actor_id(target),),
         )
         with patch("world.rules.cast_settlement.apply_affinity_change") as writer:
             notifications, restore_state = self._scan([target], log)
@@ -531,11 +575,19 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
                 kind="sexual_resist",
                 actor=str(self.player.key),
                 target=str(target.key),
+                actor_id=stable_actor_id(self.player),
+                target_id=stable_actor_id(target),
                 data=payload,
                 text_template="x",
             )
             log = EventLog(
-                str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
+                str(self.player.key),
+                _T_COERCE,
+                (str(target.key),),
+                (entry,),
+                0,
+                actor_id=stable_actor_id(self.player),
+                target_ids=(stable_actor_id(target),),
             )
             with patch("world.rules.affinity.apply_affinity_change") as writer:
                 notifications, restore_state = self._scan([target], log)
@@ -555,13 +607,21 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             kind="sexual_resist",
             actor=str(self.player.key),
             target=str(target.key),
+            actor_id=stable_actor_id(self.player),
+            target_id=stable_actor_id(target),
             data=MappingProxyType(
                 {"resisted": False, "auto_comply": False, "roll": 55}
             ),
             text_template="x",
         )
         log = EventLog(
-            str(self.player.key), _T_COERCE, (str(target.key),), (entry,), 0
+            str(self.player.key),
+            _T_COERCE,
+            (str(target.key),),
+            (entry,),
+            0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=(stable_actor_id(target),),
         )
         notifications, restore_state = self._scan([target], log)
         self.assertEqual(notifications, ())
@@ -586,7 +646,13 @@ class OutOfCombatCoercionScanTests(OutOfCombatCoercionBase):
             ).entries[0],
         )
         log = EventLog(
-            str(self.player.key), _T_COERCE, (str(first.key), str(second.key)), entries, 0
+            str(self.player.key),
+            _T_COERCE,
+            (str(first.key), str(second.key)),
+            entries,
+            0,
+            actor_id=stable_actor_id(self.player),
+            target_ids=(stable_actor_id(first), stable_actor_id(second)),
         )
         original = affinity_module.apply_affinity_change
         calls = {"count": 0}
@@ -721,18 +787,18 @@ class OutOfCombatCoercionSettlementTests(OutOfCombatCoercionBase):
         self.assertEqual(self._raw_relations(target), raw_before)
 
     @covers_requirement("sexual-resist-out-of-combat::the-scan-resolves-forced-targets-against-the-cast-s-own-target-list-with-one-independent-penalty-per-target")
-    def test_duplicate_target_keys_are_rejected_before_any_penalty(self):
-        # Two distinct NPCs sharing one key cannot be addressed separately by
-        # the ``sexual_resist`` entry contract (key-keyed), so a resistible
-        # cast whose explicit target list repeats a key is rejected fail-closed
-        # before resolution -- the scan's key index is sound by construction.
+    def test_duplicate_target_identities_are_rejected_before_any_penalty(self):
+        # The ``sexual_resist`` entry contract is identity-keyed, so a
+        # resistible cast whose explicit target list names the same individual
+        # twice would double-penalize it; that is rejected fail-closed before
+        # resolution -- the scan's identity index is sound by construction.
+        # Two distinct NPCs that merely share a display label are separate
+        # individuals, never one repeated identity.
         first = self._companion("同名目標", affinity=73)
-        second = self._npc("同名目標", affinity=73)
         with self.assertRaises(ValueError):
-            self._forced_cast(_T_COERCE, [first, second])
+            self._forced_cast(_T_COERCE, [first, first])
         self.assertEqual(self.clock.tick, 0)
         self.assertEqual(first.relations.affinity_for(self.player), 73)
-        self.assertEqual(second.relations.affinity_for(self.player), 73)
 
     @covers_requirement("sexual-resist-out-of-combat::the-scan-resolves-forced-targets-against-the-cast-s-own-target-list-with-one-independent-penalty-per-target")
     def test_duplicate_key_guard_does_not_fire_for_non_resistible_acts(self):

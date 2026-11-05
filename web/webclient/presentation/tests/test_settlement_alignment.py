@@ -262,7 +262,9 @@ class TerminalCombatCheckpointTests(CheckpointTestBase):
 
     @covers_requirement("webclient-settlement-alignment::every-completed-combat-termination-is-a-fresh-checkpoint")
     def test_a_failed_terminal_write_publishes_nothing(self):
-        record = self._engage()
+        # One elapsed round owns an unpaid clock interval, so the terminal
+        # write below really runs inside the durable unit.
+        record = replace(self._engage(), rounds_elapsed=1)
         with mock.patch(
             "world.rules.combat_session.settlement.settle_combat_result",
             side_effect=RuntimeError("clock settlement failed"),
@@ -494,6 +496,7 @@ class SkipCheckpointTests(CheckpointTestBase):
                 )
             ],
             next_boundary=lambda start, end: start + 15000,
+            interactive=True,
         )
         self.addCleanup(
             lambda: (

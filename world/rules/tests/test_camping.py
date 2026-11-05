@@ -337,6 +337,10 @@ class CampActionTests(CampFixture):
             if begin < boundary <= end
             else [],
             next_boundary=lambda begin, end: boundary if begin < boundary <= end else None,
+            # The shop calendar is an interactive boundary source: every event
+            # it settles pauses an interruptible skip (unlike a maintenance
+            # stage, whose events are not interactive).
+            interactive=True,
         )
         first = self._camp(mode="until-dawn", operation_id="camp-int")
         data = first["data"]

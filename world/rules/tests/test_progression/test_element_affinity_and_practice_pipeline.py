@@ -181,12 +181,13 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
         return ActionRequest(self.actor, skill, targets, context)
 
     def _field(self, monsters, **event_context):
+        actor_id = stable_actor_id(self.actor)
         field = Battlefield(
             {
-                'party': frozenset({"fixture:pipeline caster"}),
+                'party': frozenset({actor_id}),
                 'foes': frozenset(stable_actor_id(monster) for monster in monsters),
             },
-            {"pipeline caster": self.actor}
+            {actor_id: self.actor}
             | {stable_actor_id(monster): monster for monster in monsters},
         )
         return BattlefieldActionContext(field, event_context=dict(event_context))
@@ -633,7 +634,9 @@ class ElementalLearningEligibilityTests(EvenniaTestCase):
         return entity
 
     def _battlefield(self, party, foes):
-        entities = {str(entity.key): entity for entity in (*party, *foes)}
+        entities = {
+            stable_actor_id(entity): entity for entity in (*party, *foes)
+        }
         return Battlefield(
             {
                 'party': frozenset(stable_actor_id(entity) for entity in party),

@@ -18,6 +18,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from world.rules.action import ActionRequest, RejectReason
+from world.rules.combat_identity import stable_actor_id
 from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.targeting import RoomActionContext
@@ -85,12 +86,14 @@ class SyntheticDamageCastTests(EvenniaTestCase):
             entity.apply_race_baseline()
         self.actor.db.skills = {"active": [_T_CLEAVE.key], "passive": []}
         self.target.db.skills = {"active": [], "passive": []}
+        self.actor_id = stable_actor_id(self.actor)
+        self.target_id = stable_actor_id(self.target)
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:synth cleave actor"}),
-                'foes': frozenset({"fixture:synth cleave target"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.target_id}),
             },
-            {"fixture:synth cleave actor": self.actor, "fixture:synth cleave target": self.target},
+            {self.actor_id: self.actor, self.target_id: self.target},
         )
         self.request = ActionRequest(
             self.actor,
@@ -142,12 +145,14 @@ class SelfBuffCastTests(EvenniaTestCase):
             entity.apply_race_baseline()
         self.actor.db.skills = {"active": [_T_MOSS_VEIL.key], "passive": []}
         self.other.db.skills = {"active": [], "passive": []}
+        self.actor_id = stable_actor_id(self.actor)
+        self.other_id = stable_actor_id(self.other)
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:synth veil actor"}),
-                'foes': frozenset({"fixture:synth veil other"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.other_id}),
             },
-            {"fixture:synth veil actor": self.actor, "fixture:synth veil other": self.other},
+            {self.actor_id: self.actor, self.other_id: self.other},
         )
         self.context = BattlefieldActionContext(battlefield)
 

@@ -232,6 +232,7 @@ class RoundEstimateTests(unittest.TestCase):
         monsters = [
             FakeEntity(
                 f"monster-{index}",
+                combat_identity=f"monster-{index}",
                 hp=90,
                 atk_phys=6,
                 agility=6,
@@ -244,6 +245,7 @@ class RoundEstimateTests(unittest.TestCase):
         humans = [
             FakeEntity(
                 f"human-{index}",
+                combat_identity=f"human-{index}",
                 hp=120,
                 agility=9,
                 defense=7,
@@ -451,22 +453,25 @@ class CommandedDamageQueryTests(unittest.TestCase):
     """commanded_damage_reaches_enemy() static-read truth table and purity."""
 
     def field(self) -> Battlefield:
-        return battlefield(
-            [FakeEntity("actor", combat_identity='actor'), FakeEntity("ally", combat_identity='ally')],
-            [FakeEntity("enemy", combat_identity='enemy')],
-        )
+        actor = FakeEntity("actor", combat_identity='actor')
+        ally = FakeEntity("ally", combat_identity='ally')
+        enemy = FakeEntity("enemy", combat_identity='enemy')
+        self.actor_id = stable_actor_id(actor)
+        self.ally_id = stable_actor_id(ally)
+        self.enemy_id = stable_actor_id(enemy)
+        return battlefield([actor, ally], [enemy])
 
     def query(self, field, skill_key, target_keys):
         with patch.dict(live_skill_registry(), QUERY_SKILLS):
             return commanded_damage_reaches_enemy(
-                field, "actor", skill_key, target_keys
+                field, self.actor_id, skill_key, target_keys
             )
 
     @covers_requirement("overwhelm-threshold::a-pure-query-answers-whether-a-commanded-action-damages-an-enemy-read-statically-from-the-skill-definition")
     def test_damage_at_enemy_is_the_only_true_skill_row(self):
         field = self.field()
-        self.assertTrue(self.query(field, "q_damage", ["enemy"]))
-        self.assertTrue(self.query(field, "q_composite", ["enemy"]))
+        self.assertTrue(self.query(field, "q_damage", [self.enemy_id]))
+        self.assertTrue(self.query(field, "q_composite", [self.enemy_id]))
         for non_damage_key in (
             "q_buff",
             "q_heal",
@@ -480,16 +485,18 @@ class CommandedDamageQueryTests(unittest.TestCase):
             "q_drain",
         ):
             with self.subTest(skill=non_damage_key):
-                self.assertFalse(self.query(field, non_damage_key, ["enemy"]))
+                self.assertFalse(
+                    self.query(field, non_damage_key, [self.enemy_id])
+                )
 
     @covers_requirement("overwhelm-threshold::a-pure-query-answers-whether-a-commanded-action-damages-an-enemy-read-statically-from-the-skill-definition")
     def test_damage_skill_aimed_away_from_the_enemy_team_is_false(self):
         field = self.field()
         for label, targets in (
-            ("self", ["actor"]),
-            ("ally", ["ally"]),
+            ("self", [self.actor_id]),
+            ("ally", [self.ally_id]),
             ("nothing", []),
-            ("mixed-allies", ["actor", "ally"]),
+            ("mixed-allies", [self.actor_id, self.ally_id]),
         ):
             with self.subTest(aim=label):
                 self.assertFalse(self.query(field, "q_damage", targets))
@@ -503,16 +510,16 @@ class CommandedDamageQueryTests(unittest.TestCase):
         # A key removed from the roster after construction is not a concrete
         # roster combatant either.
         stale = self.field()
-        del stale.roster["enemy"]
-        self.assertFalse(self.query(stale, "q_damage", ["enemy"]))
+        del stale.roster[self.enemy_id]
+        self.assertFalse(self.query(stale, "q_damage", [self.enemy_id]))
         # An actor key on no team defines no opposing team at all.
         with patch.dict(live_skill_registry(), QUERY_SKILLS):
             self.assertFalse(
                 commanded_damage_reaches_enemy(
-                    field, "not-in-teams", "q_damage", ["enemy"]
+                    field, "fixture:not-in-teams", "q_damage", [self.enemy_id]
                 )
             )
-        self.assertFalse(self.query(field, "not-in-registry", ["enemy"]))
+        self.assertFalse(self.query(field, "not-in-registry", [self.enemy_id]))
 
     @covers_requirement("overwhelm-threshold::the-damage-query-is-side-effect-free-roll-free-and-recomputable")
     def test_query_is_pure_and_never_consulted_by_classify(self):
@@ -555,8 +562,8 @@ class CommandedDamageQueryTests(unittest.TestCase):
                 "world.rules.combat.rounds.roll_d100",
                 side_effect=AssertionError("query rolled dice"),
             ):
-                first = self.query(field, "q_damage", ["enemy"])
-                second = self.query(field, "q_damage", ["enemy"])
+                first = self.query(field, "q_damage", [self.enemy_id])
+                second = self.query(field, "q_damage", [self.enemy_id])
             self.assertTrue(first)
             self.assertEqual(first, second)
             self.assertEqual(before, snapshot())
@@ -568,18 +575,18 @@ class CommandedDamageQueryTests(unittest.TestCase):
         # team membership: changing either between calls must change the
         # result, which a cached answer would not.
         field = self.field()
-        self.assertTrue(self.query(field, "q_damage", ["enemy"]))
+        self.assertTrue(self.query(field, "q_damage", [self.enemy_id]))
         moved = battlefield(
             [FakeEntity("actor", combat_identity='actor'), FakeEntity("ally", combat_identity='ally'), FakeEntity("enemy", combat_identity='enemy')],
             [FakeEntity("other", combat_identity='other')],
         )
-        self.assertFalse(self.query(moved, "q_damage", ["enemy"]))
+        self.assertFalse(self.query(moved, "q_damage", [self.enemy_id]))
         weakened = dict(QUERY_SKILLS)
         weakened["q_damage"] = _skill_def("q_damage", ["buff_apply:fixture_focus"])
         with patch.dict(live_skill_registry(), weakened):
             self.assertFalse(
                 commanded_damage_reaches_enemy(
-                    self.field(), "actor", "q_damage", ["enemy"]
+                    self.field(), self.actor_id, "q_damage", [self.enemy_id]
                 )
             )
         # Implementation inspection: the query computes from a registry

@@ -36,6 +36,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.clock import get_world_clock
 from world.rules.targeting import (
     ActionContext,
@@ -96,16 +97,23 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.caster.traits.magic_power.base = 30
         self.caster.traits.mp.current = 100
 
+        self.caster_id = stable_actor_id(self.caster)
+        self.target_id = stable_actor_id(self.target)
+        self.companion_id = stable_actor_id(self.companion)
+        self.bystander_id = stable_actor_id(self.bystander)
+
         self.battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:caster", "fixture:companion", "fixture:bystander"}),
-                'foes': frozenset({"fixture:target"}),
+                'party': frozenset(
+                    {self.caster_id, self.companion_id, self.bystander_id}
+                ),
+                'foes': frozenset({self.target_id}),
             },
             {
-                "fixture:caster": self.caster,
-                "fixture:target": self.target,
-                "fixture:companion": self.companion,
-                "fixture:bystander": self.bystander,
+                self.caster_id: self.caster,
+                self.target_id: self.target,
+                self.companion_id: self.companion,
+                self.bystander_id: self.bystander,
             },
         )
         self.context = BattlefieldActionContext(self.battlefield)

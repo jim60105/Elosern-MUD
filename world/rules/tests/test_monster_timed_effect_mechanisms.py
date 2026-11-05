@@ -93,14 +93,20 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
         self.control = self._character("t_timed_control", agility=10, defense=10)
         self.battlefield = Battlefield(
             roster={
-                "fixture:t_timed_caster": self.caster,
-                "fixture:t_timed_enemy": self.enemy,
-                "fixture:t_timed_ally": self.ally,
-                "fixture:t_timed_control": self.control,
+                stable_actor_id(self.caster): self.caster,
+                stable_actor_id(self.enemy): self.enemy,
+                stable_actor_id(self.ally): self.ally,
+                stable_actor_id(self.control): self.control,
             },
             teams={
-                'party': {"fixture:t_timed_caster", "fixture:t_timed_ally"},
-                'foes': {"fixture:t_timed_enemy", "fixture:t_timed_control"},
+                'party': {
+                    stable_actor_id(self.caster),
+                    stable_actor_id(self.ally),
+                },
+                'foes': {
+                    stable_actor_id(self.enemy),
+                    stable_actor_id(self.control),
+                },
             },
         )
         self.context = BattlefieldActionContext(self.battlefield)

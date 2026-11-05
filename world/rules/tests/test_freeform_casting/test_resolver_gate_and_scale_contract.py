@@ -17,6 +17,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import engage, submit_player_action
 from world.rules.player_messages import rejection_message
 from world.rules.progression import (
@@ -73,12 +74,14 @@ class FreeformResolverGateTests(EvenniaTestCase):
         self.target.apply_race_baseline()
         self.actor.traits.mp.base = 500
         self.actor.traits.mp.current = 500
+        self.actor_id = stable_actor_id(self.actor)
+        self.target_id = stable_actor_id(self.target)
         self.field = Battlefield(
             {
-                'party': frozenset({"fixture:freeform caster"}),
-                'foes': frozenset({"fixture:freeform target"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.target_id}),
             },
-            {"fixture:freeform caster": self.actor, "fixture:freeform target": self.target},
+            {self.actor_id: self.actor, self.target_id: self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 
@@ -179,12 +182,14 @@ class ActionRequestScaleContractTests(EvenniaTestCase):
         )
         self.actor.traits.mp.base = 500
         self.actor.traits.mp.current = 500
+        self.actor_id = stable_actor_id(self.actor)
+        self.target_id = stable_actor_id(self.target)
         self.field = Battlefield(
             {
-                'party': frozenset({"fixture:freeform caster"}),
-                'foes': frozenset({"fixture:scale contract target"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.target_id}),
             },
-            {"fixture:freeform caster": self.actor, "fixture:scale contract target": self.target},
+            {self.actor_id: self.actor, self.target_id: self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 

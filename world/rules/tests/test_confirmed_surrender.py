@@ -709,9 +709,21 @@ class AlliedFleeRemovalTests(PartyExitFixture):
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     def test_enemy_disengagement_still_resolves_through_the_action_pipeline(self):
+        from world.rules.world_escape import AbstractEscapeContext
+
         engage(self.player, self.monster)
         hp_before = self.player.traits.hp.current
+        # This case is about the enemy's disengagement resolving through the
+        # action pipeline, not about a mapped journey: the engagement is
+        # stated as abstract, exactly like a staged session's own authority,
+        # so the flee outcome changes battlefield eligibility only. An
+        # authored-room hostile session otherwise requires a real lawful
+        # route (a provisioned wilderness and an activity-group member).
         with (
+            patch(
+                "world.rules.combat_session.battlefield._escape_context_for",
+                return_value=AbstractEscapeContext(),
+            ),
             patch("world.rules.monster_behaviour._should_flee", return_value=True),
             patch("world.rules.disengage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=1),

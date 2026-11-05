@@ -50,15 +50,36 @@ _HERO = "hero"
 _GOBLIN = "goblin"
 _HERO_DBREF = 101
 _GOBLIN_DBREF = 202
-_IDENTITIES = {_HERO: _HERO_DBREF, _GOBLIN: _GOBLIN_DBREF}
+# The round record, its beats and every entry identity field are keyed by the
+# participant's stable individual identity; the labels above stay prose only.
+_HERO_ID = f"dbref:{_HERO_DBREF}"
+_GOBLIN_ID = f"dbref:{_GOBLIN_DBREF}"
+_IDENTITIES = {_HERO_ID: _HERO_DBREF, _GOBLIN_ID: _GOBLIN_DBREF}
 _SESSION_ID = "hostile:7:42"
 
 _ROLL_TEMPLATE = "{actor} 對 {target} 的攻擊擲出了 {data[raw_roll]}。"
 _DAMAGE_TEMPLATE = "{actor} 對 {target} 造成了 {data[amount]} 點傷害。"
 
 
-def _entry(kind, *, actor=_HERO, target=None, data=None, template="{actor} 行動。"):
-    return EventEntry(kind, actor, target, {} if data is None else data, template)
+def _entry(
+    kind,
+    *,
+    actor=_HERO,
+    target=None,
+    data=None,
+    template="{actor} 行動。",
+    actor_id=_HERO_ID,
+    target_id=None,
+):
+    return EventEntry(
+        kind,
+        actor,
+        target,
+        {} if data is None else data,
+        template,
+        actor_id=actor_id,
+        target_id=target_id,
+    )
 
 
 def _round_logs(entries=None):
@@ -67,12 +88,14 @@ def _round_logs(entries=None):
             _entry(
                 "roll",
                 target=_GOBLIN,
+                target_id=_GOBLIN_ID,
                 data={"raw_roll": 42, "hit": True},
                 template=_ROLL_TEMPLATE,
             ),
             _entry(
                 "damage",
                 target=_GOBLIN,
+                target_id=_GOBLIN_ID,
                 data={"amount": 12},
                 template=_DAMAGE_TEMPLATE,
             ),

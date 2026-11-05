@@ -17,6 +17,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import engage, submit_player_action
 from world.rules.player_messages import rejection_message
 from world.rules.progression import (
@@ -71,12 +72,14 @@ class FreeformPreviewTests(EvenniaTestCase):
             [_mastery_key()],
             rungs={_T_CAST.key: len(FREEFORM_SCALE_VALUES) * 2},
         )
+        self.actor_id = stable_actor_id(self.actor)
+        self.target_id = stable_actor_id(self.target)
         self.field = Battlefield(
             {
-                'party': frozenset({"fixture:freeform caster"}),
-                'foes': frozenset({"fixture:preview target"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.target_id}),
             },
-            {"fixture:freeform caster": self.actor, "fixture:preview target": self.target},
+            {self.actor_id: self.actor, self.target_id: self.target},
         )
         self.context = BattlefieldActionContext(self.field)
 

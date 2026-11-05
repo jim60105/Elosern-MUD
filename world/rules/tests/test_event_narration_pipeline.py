@@ -337,8 +337,8 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
             number=1,
             logs=(result.event_log,),
             identities={
-                self.player.key: self.player.pk,
-                monster.key: monster.pk,
+                stable_actor_id(self.player): self.player.pk,
+                stable_actor_id(monster): monster.pk,
             },
             hp_before={monster.pk: hp_before},
             hp_after={monster.pk: hp_after},
@@ -363,7 +363,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         )()
         logs = settle_upkeep(
             field,
-            {monster.key: (record,)},
+            {stable_actor_id(monster): (record,)},
             narration_scope="field|3|upkeep",
         )
         self.assertEqual(len(logs), 1)
@@ -394,7 +394,7 @@ class NarrationPipelineTests(BattlefieldIsolation, EvenniaTest):
         ):
             logs = settle_upkeep(
                 field,
-                {monster.key: (record,)},
+                {stable_actor_id(monster): (record,)},
                 narration_scope="field|3|upkeep",
             )
         self.assertEqual(len(logs), 1)

@@ -31,6 +31,7 @@ from world.rules.combat import (
     _heal_magnitude,
     _to_hit,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_modifiers import (
     adjusted_agility,
     evaluate_combat_modifiers,
@@ -684,16 +685,19 @@ class AdjustedAgilityTests(_FixtureFieldCase):
         _worn(boosted, weapon=_BLADE.key)
         field = Battlefield(
             {
-                'first': frozenset({"fixture:cloak carrier"}),
-                'second': frozenset({"fixture:plain runner"}),
+                'first': frozenset({stable_actor_id(boosted)}),
+                'second': frozenset({stable_actor_id(plain)}),
             },
-            {"fixture:cloak carrier": boosted, "fixture:plain runner": plain},
+            {stable_actor_id(boosted): boosted, stable_actor_id(plain): plain},
         )
         with patch("world.rules.combat.battlefield.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.damage.roll_d100", side_effect=[1, 1]), patch("world.rules.combat.rounds.roll_d100", side_effect=[1, 1]):
             order = combat.roll_initiative(field)
         # Raw effective agility decides: the plain runner outranks the
         # gear-boosted carrier despite the higher adjusted value.
-        self.assertEqual(order, ["plain runner", "cloak carrier"])
+        self.assertEqual(
+            order,
+            [stable_actor_id(plain), stable_actor_id(boosted)],
+        )
 class HealWiringTests(_WearerCase):
     def setUp(self):
         super().setUp()

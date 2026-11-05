@@ -96,7 +96,7 @@ class ResolutionTests(unittest.TestCase):
         field = battlefield()
 
         def run_round(current, provider, **kwargs):
-            current.roster["human"].traits.hp.value = 0
+            current.roster["fixture:human"].traits.hp.value = 0
             return [damage_log(120)]
 
         with (
@@ -121,10 +121,10 @@ class ResolutionTests(unittest.TestCase):
         field = battlefield()
 
         def run_round(current, provider, **kwargs):
-            current.roster["elf"].skills.values["agility"] = 10
-            current.roster["elf"].skills.values["atk_phys"] = 1
-            current.roster["elf"].skills.values["defense"] = 1
-            current.roster["elf"].skills.values["magic_power"] = 1
+            current.roster["fixture:elf"].skills.values["agility"] = 10
+            current.roster["fixture:elf"].skills.values["atk_phys"] = 1
+            current.roster["fixture:elf"].skills.values["defense"] = 1
+            current.roster["fixture:elf"].skills.values["magic_power"] = 1
             return []
 
         with (
@@ -156,7 +156,7 @@ class ResolutionTests(unittest.TestCase):
             },
         )
         finished = battlefield()
-        finished.roster["human"].traits.hp.value = 0
+        finished.roster["fixture:human"].traits.hp.value = 0
         with (
             patch(
                 "world.rules.overwhelm.evaluate_combat_modifiers",
@@ -276,14 +276,14 @@ class FirstActorForwardingTests(unittest.TestCase):
                 field,
                 provider,
                 max_rounds=3,
-                first_actor="elf",
+                first_actor="fixture:elf",
             )
         self.assertEqual(result.rounds_elapsed, 3)
         self.assertEqual(result.total_seconds, 18)
         self.assertEqual(len(calls), 3)
         for args, _ in calls:
             self.assertEqual(args, (field, provider))
-        self.assertEqual(calls[0][1], {"first_actor": "elf"})
+        self.assertEqual(calls[0][1], {"first_actor": "fixture:elf"})
         self.assertEqual(calls[1][1], {"first_actor": None})
         self.assertEqual(calls[2][1], {"first_actor": None})
 
@@ -340,7 +340,10 @@ class FirstActorForwardingTests(unittest.TestCase):
                     ),
                 ):
                     resolve_overwhelm(
-                        field, provider, max_rounds=rounds_cap, first_actor="elf"
+                        field,
+                        provider,
+                        max_rounds=rounds_cap,
+                        first_actor="fixture:elf",
                     )
                 self.assertEqual(calls, [])
 
@@ -397,7 +400,7 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
     @staticmethod
     def _state(field: Battlefield) -> dict[str, float]:
         return {
-            key.split("-")[0]: entity.traits.hp.value
+            str(entity.key).split("-")[0]: entity.traits.hp.value
             for key, entity in field.roster.items()
         }
 
@@ -585,11 +588,12 @@ class RealCombatEquivalenceTests(EvenniaTestCase):
             plain, default_attack_policy, decision_scope_base=engagement_base()
         )
         marked = self._field("marked", strong_first=True)
+        commanded = next(iter(marked.teams["first"]))
         random.seed(1017)
         result = resolve_overwhelm(
             marked,
             default_attack_policy,
-            commanded_actor="first-marked",
+            commanded_actor=commanded,
             commanded_action_kind="skill", commanded_action_key=_T_STRIKE.key,
             decision_scope_base=engagement_base(),
         )

@@ -26,6 +26,7 @@ from world.rules.action import (
     _handle_self_buff_apply,
 )
 from world.rules.buffs import apply_buff, entity_active_buffs, tick_buffs
+from world.rules.combat_identity import stable_actor_id
 from world.rules.equipment_effects import equipment_immune_buff_keys
 from world.tests.synthetic_data import make_item
 
@@ -215,7 +216,9 @@ class EquipmentImmunityStagingTests(_ImmunityScope):
         effects[0].apply()
         self.assertEqual(entity_active_buffs(entity), set())
         self.assertEqual(entity.attributes.get("buffs", default={}), before)
-        (entry,) = _entries_from_effect(str(entity.key), effects[0])
+        (entry,) = _entries_from_effect(
+            str(entity.key), stable_actor_id(entity), effects[0]
+        )
         self.assertEqual(entry.kind, "equipment_immune")
         self.assertEqual(entry.data, {"buff_key": "poisoned"})
         # The authored pool owns the wording; the entry must still deliver a
@@ -259,7 +262,8 @@ class EquipmentImmunityStagingTests(_ImmunityScope):
         self.assertEqual(entity.attributes.get("buffs", default={}), before)
         self.assertEqual(entity_active_buffs(entity), set())
         entries = [
-            _entries_from_effect(str(entity.key), effect) for effect in staged
+            _entries_from_effect(str(entity.key), stable_actor_id(entity), effect)
+            for effect in staged
         ]
         self.assertEqual(
             [entry[0].kind for entry in entries],

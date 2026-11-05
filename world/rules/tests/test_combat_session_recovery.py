@@ -184,6 +184,16 @@ class MalformedSessionRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.hp.current = 1
         engage(self.player, self.monster)
         self.monster.traits.hp.current = 0
+        # The terminal settlement pays only the session's still-unpaid round
+        # range: a record with nothing outstanding settles no clock time at
+        # all, so the fixture must carry one accumulated, unpaid round for the
+        # settlement's clock write to be reachable.
+        from world.rules.combat_session import _persist
+
+        _persist(
+            self.player,
+            replace(read_session(self.player), rounds_elapsed=1),
+        )
         clock = WorldClock()
         with (
             patch("world.rules.combat_session.settlement.get_world_clock", return_value=clock),
@@ -597,6 +607,10 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         # session settles as victory in one round).
         weak = _monster("weak goblin", hp=100, atk=10)
         weak.location = self.room
+        # Ordinary engagement admits every living monster in the cell, so the
+        # setUp's overwhelming foe must leave the room for this case to face
+        # the weak monster alone.
+        self.monster.location = create_object(Room, key="overwhelm direction annex")
         for key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, key).base = 200
         self.player.traits.hp.base = 2000

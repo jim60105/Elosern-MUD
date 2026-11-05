@@ -33,6 +33,7 @@ from world.rules.combat import (
     _handle_self_heal,
     _heal_magnitude,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.tests.combat_fixtures import FakeEntity
 from world.skills.effects import (
     DamageEffect,
@@ -607,13 +608,15 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
 
         self.battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:caster", "fixture:ally"}),
-                'foes': frozenset({"fixture:target"}),
+                'party': frozenset(
+                    {stable_actor_id(self.caster), stable_actor_id(self.ally)}
+                ),
+                'foes': frozenset({stable_actor_id(self.target)}),
             },
             {
-                "fixture:caster": self.caster,
-                "fixture:target": self.target,
-                "fixture:ally": self.ally,
+                stable_actor_id(self.caster): self.caster,
+                stable_actor_id(self.target): self.target,
+                stable_actor_id(self.ally): self.ally,
             },
         )
 

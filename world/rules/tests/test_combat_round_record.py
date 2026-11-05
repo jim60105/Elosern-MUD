@@ -21,6 +21,7 @@ from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.action import stored_gauge_pair
 from world.rules.combat_beats import RoundRecord
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import (
     engage,
     forfeit,
@@ -106,7 +107,10 @@ class CombatRoundRecordTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(record.hp_before, hp_before)
         self.assertEqual(
             record.identities,
-            {str(self.player.key): int(self.player.pk), str(self.monster.key): int(self.monster.pk)},
+            {
+                stable_actor_id(self.player): int(self.player.pk),
+                stable_actor_id(self.monster): int(self.monster.pk),
+            },
         )
         # The committed end-of-round HP equals the same revision's combat panel
         # HP for every participant (nothing writes HP between the capture and

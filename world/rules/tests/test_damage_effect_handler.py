@@ -36,6 +36,7 @@ from world.rules.combat import (
     _handle_damage,
     _stored_hp,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.skills.effects import RuleTableEffect, parse_effect
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill, synthetic_registries
 
@@ -111,7 +112,7 @@ class DamageEffectHandlerTests(unittest.TestCase):
                 actor, [target], "damage:dark:physical", {}, 1.0
             )[0]
         self.assertEqual(target.traits.hp.value, 100)
-        entries = _entries_from_effect("actor", pending)
+        entries = _entries_from_effect("actor", stable_actor_id(actor), pending)
         self.assertEqual([entry.kind for entry in entries], ["roll", "damage"])
         pending.apply()
         self.assertLess(target.traits.hp.value, 100)
@@ -306,10 +307,13 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         self.target.db.skills = {"active": [], "passive": []}
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:actor"}),
-                'foes': frozenset({"fixture:target"}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset({stable_actor_id(self.target)}),
             },
-            {"fixture:actor": self.actor, "fixture:target": self.target},
+            {
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.target): self.target,
+            },
         )
         self.request = ActionRequest(
             self.actor,
@@ -344,7 +348,7 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         self.assertEqual(self.target.traits.hp.value, before)
 
     def test_fled_target_reaches_named_range_rejection(self):
-        self.request.context.battlefield.fled.add("target")
+        self.request.context.battlefield.fled.add(stable_actor_id(self.target))
         result = resolve_combat_action(self.request)
         self.assertEqual(result.reason, RejectReason.TARGET_OUT_OF_RANGE)
 
@@ -422,10 +426,13 @@ class DamageResolverIntegrationTests(EvenniaTestCase):
         npc.traits.agility.current = 5
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:actor"}),
-                'foes': frozenset({"fixture:orc alpha"}),
+                'party': frozenset({stable_actor_id(self.actor)}),
+                'foes': frozenset({stable_actor_id(npc)}),
             },
-            {"fixture:actor": self.actor, "fixture:orc alpha": npc},
+            {
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(npc): npc,
+            },
         )
         request = ActionRequest(
             self.actor,

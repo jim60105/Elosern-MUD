@@ -36,6 +36,7 @@ from world.rules.action import (
 )
 from world.rules.tests._combat_session_helpers import resolve_combat_action
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat_identity import stable_actor_id
 from world.rules.sexual_resist import ResistVerdict
 from world.rules.sexual_state import _LIFETIME_COUNTER_KEYS, climax_settlement_action
 from world.rules.targeting import RoomActionContext
@@ -269,15 +270,18 @@ class DivineCastTests(EvenniaTest):
         # no self-exclusion).
         other = _entity("second target")
         other.location = self.room1
+        actor_id = stable_actor_id(self.actor)
+        target_id = stable_actor_id(self.target)
+        other_id = stable_actor_id(other)
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:divine caster", "fixture:divine target"}),
-                'foes': frozenset({"fixture:second target"}),
+                'party': frozenset({actor_id, target_id}),
+                'foes': frozenset({other_id}),
             },
             {
-                "fixture:divine caster": self.actor,
-                "fixture:divine target": self.target,
-                "fixture:second target": other,
+                actor_id: self.actor,
+                target_id: self.target,
+                other_id: other,
             },
         )
         context = BattlefieldActionContext(battlefield)

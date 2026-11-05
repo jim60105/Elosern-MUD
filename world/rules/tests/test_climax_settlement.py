@@ -390,7 +390,6 @@ class ClimaxRollbackTests(EvenniaTest):
         monster.location = arena
         _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
         grant_lineage(entity, [_T_CAST])
-        engage(entity, monster)
         clock = WorldClock()
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
@@ -435,6 +434,14 @@ class ClimaxRollbackTests(EvenniaTest):
             ),
             self.assertRaises(RuntimeError),
         ):
+            # Admission admits the whole cell and, while no ally can act,
+            # resolves automatic enemy-only rounds. The climax zero-action
+            # lock would make the staged player exactly that case, and those
+            # rounds' upkeep would consume the staged extension before the
+            # round under test exists. Engaging inside the neutralized scope
+            # keeps the player able to act, so the staged bookkeeping reaches
+            # the round this case faults.
+            engage(entity, monster)
             submit_player_action(entity, _T_CAST, [monster])
         self.assertEqual(
             entity.attributes.get("climax_turns", category="sexual_state"), 2

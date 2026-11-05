@@ -360,7 +360,7 @@ class FireBurnImmolationBehaviorTests(EvenniaTest):
         self.assertIn("t_synth_ignite_debuff", entity_active_buffs(self.foe))
         self.assertEqual(
             getattr(self.foe.buffs.all["t_synth_ignite_debuff"], "source_key", None),
-            str(self.caster.key),
+            stable_actor_id(self.caster),
         )
 
         # Foe takes -8 HP on tick

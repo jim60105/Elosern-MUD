@@ -17,6 +17,7 @@ from world.lore.items import EquipmentModifierKey
 from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.action_preview import preview_skill
 from world.rules.combat import Battlefield, roll_initiative
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers, evaluate_combat_modifiers_no_create
 from world.rules.economy import TradeError, TradeReason, buy, sell
 from world.rules.equipment import InventoryError, materialize_registry_object, plan_inventory_delta, toggle_equipment
@@ -172,7 +173,7 @@ class RestrictionBehaviorTests(EvenniaTest):
             self.assertEqual(self.host.skills.effective_value("atk_phys") + evaluate_combat_modifiers(self.host)["atk_phys"], 22)
         with patch("world.rules.combat_modifiers._RULES", [Rule("t_exam_penalty", {"buff_active": _PEN_BUFF.key}, {"agility_flat": -5})]):
             self.assertEqual(adjusted_agility(self.host), 7)
-        host_key, player_key = str(self.host.key), str(self.player.key)
+        host_key, player_key = stable_actor_id(self.host), stable_actor_id(self.player)
         battlefield = Battlefield(
             {'one': frozenset({host_key}), 'two': frozenset({player_key})},
             {host_key: self.host, player_key: self.player},

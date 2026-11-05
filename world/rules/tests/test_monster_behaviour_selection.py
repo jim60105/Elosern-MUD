@@ -107,10 +107,10 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
                 'party': frozenset({"fixture:alive", "fixture:dead", "fixture:fled"}),
             },
             {stable_actor_id(entity): entity for entity in (actor, alive, dead, fled)},
-            fled={"fled"},
+            fled={stable_actor_id(fled)},
         )
         self.assertEqual(_living_enemies(field, actor), [alive])
-        field.fled.add("alive")
+        field.fled.add(stable_actor_id(alive))
         self.assertEqual(_living_enemies(field, actor), [])
 
     @covers_requirement("monster-action-policy::target-selection-differs-by-archetype-and-is-deterministic-under-a-fixed-seed")

@@ -8,6 +8,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from typeclasses.exits import Exit
 from typeclasses.monsters import Monster
 from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
@@ -58,7 +59,9 @@ _SYNTH_GROUND_MARKER = BuffDefinition(
 
 _SYNTH_CONTROL_BUFF = BuffDefinition(
     key="t_control_buff",
-    duration=30,
+    # Outlives the confirmed retreat's own time cost, so the assertion below
+    # observes "swept nothing" rather than "the buff's own duration ran out".
+    duration=300,
     tick_interval=None,
     stacking="refresh",
     modifiers={},
@@ -229,6 +232,8 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         # The allied escape is the confirmed party retreat (§6), never a
         # personal flee submission: the prompt binds the session/revision and
         # the confirmation resolves the one retreat attempt.
+        annex = create_object(Room, key="arena escape")
+        create_object(Exit, key="out", location=self.room, destination=annex)
         record = read_session(self.player)
         prompt = request_party_exit(
             self.player,

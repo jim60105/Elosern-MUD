@@ -17,6 +17,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
 )
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_session import engage, submit_player_action
 from world.rules.player_messages import rejection_message
 from world.rules.progression import (
@@ -69,12 +70,14 @@ class FreeformScaledResolutionTests(EvenniaTestCase, BattlefieldIsolation):
         self.monster = _monster("freeform wolf")
         self.actor.traits.mp.base = 1000
         self.actor.traits.mp.current = 1000
+        self.actor_id = stable_actor_id(self.actor)
+        self.monster_id = stable_actor_id(self.monster)
         self.field = Battlefield(
             {
-                'party': frozenset({"fixture:freeform caster"}),
-                'foes': frozenset({"fixture:freeform wolf"}),
+                'party': frozenset({self.actor_id}),
+                'foes': frozenset({self.monster_id}),
             },
-            {"fixture:freeform caster": self.actor, "fixture:freeform wolf": self.monster},
+            {self.actor_id: self.actor, self.monster_id: self.monster},
         )
         self.context = BattlefieldActionContext(self.field)
         grant_lineage(

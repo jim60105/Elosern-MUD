@@ -27,6 +27,7 @@ from world.rules.buffs import (
 )
 from world.rules.clock import AdvanceSource, WorldClock, _settle_gauge_regen
 from world.rules.clock import _settle_buffs_and_decay
+from world.rules.combat_identity import stable_actor_id
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.mp_flow import apply_mp_change
 from world.rules.targeting import RoomActionContext
@@ -295,11 +296,11 @@ class AudienceConditionTests(GaugeTransferTestBase):
         enemy_zero_mp.traits.mp.base = 0
         enemy_zero_mp.traits.mp.current = 0
 
-        actor_key = str(self.actor.key)
-        ally_with_mp_key = str(ally_with_mp.key)
-        ally_zero_mp_key = str(ally_zero_mp.key)
-        enemy_with_mp_key = str(enemy_with_mp.key)
-        enemy_zero_mp_key = str(enemy_zero_mp.key)
+        actor_key = stable_actor_id(self.actor)
+        ally_with_mp_key = stable_actor_id(ally_with_mp)
+        ally_zero_mp_key = stable_actor_id(ally_zero_mp)
+        enemy_with_mp_key = stable_actor_id(enemy_with_mp)
+        enemy_zero_mp_key = stable_actor_id(enemy_zero_mp)
 
         battlefield = Battlefield(
             {

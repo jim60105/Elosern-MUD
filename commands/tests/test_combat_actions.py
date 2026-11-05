@@ -17,6 +17,7 @@ from commands.items import CmdUseItem
 from world.lore.elements import Element
 from world.rules.player_messages import rejection_message, session_reason_message
 from typeclasses.characters import PlayerCharacter
+from typeclasses.exits import Exit
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.rules.combat_session import (
@@ -799,6 +800,13 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=_scope_extra())
         super().setUp()
         self.room = create_object(Room, key="text party room")
+        # A confirmed retreat must execute a lawful affordable route, so the
+        # arena carries one real adjacent authored edge.
+        self.escape_room = create_object(Room, key="text party escape")
+        create_object(Exit, key="out", location=self.room, destination=self.escape_room)
+        create_object(
+            Exit, key="back", location=self.escape_room, destination=self.room
+        )
         self.char1.location = self.room
         self.char1.race = "t_duskmari"
         self.char1.apply_race_baseline()

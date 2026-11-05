@@ -16,6 +16,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from commands.action import CmdCast
 from commands.combat import CmdCombatForfeit, CmdCombatRetreat
+from typeclasses.exits import Exit
 from typeclasses.rooms import Room
 from world.rules.combat_session import (
     PARTY_EXIT_RETREAT,
@@ -41,6 +42,13 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         )
         super().setUp()
         self.room = create_object(Room, key="exit command room")
+        # A confirmed retreat must execute a lawful affordable route, so the
+        # encounter room carries one real adjacent authored edge.
+        self.escape_room = create_object(Room, key="exit command escape")
+        create_object(Exit, key="out", location=self.room, destination=self.escape_room)
+        create_object(
+            Exit, key="back", location=self.escape_room, destination=self.room
+        )
         self.player = _player("exit commander")
         self.player.location = self.room
         self.monster = _monster("exit command goblin")

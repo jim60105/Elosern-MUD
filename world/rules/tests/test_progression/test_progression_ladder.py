@@ -21,6 +21,7 @@ from world.rules.action import (
 from world.rules.action_preview import preview_skill
 from world.rules.buffs import grant_conferred_growth_rate
 from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
+from world.rules.combat_identity import stable_actor_id
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
@@ -284,8 +285,11 @@ class ProgressionTests(EvenniaTestCase):
         monster = self._monster("goblin")
         monster.traits.hp.current = 1
         battlefield = Battlefield(
-            {'party': frozenset({"fixture:fighter"}), 'foes': frozenset({"fixture:goblin"})},
-            {"fixture:fighter": actor, "fixture:goblin": monster},
+            {
+                'party': frozenset({stable_actor_id(actor)}),
+                'foes': frozenset({stable_actor_id(monster)}),
+            },
+            {stable_actor_id(actor): actor, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             actor,
@@ -317,14 +321,15 @@ class ProgressionTests(EvenniaTestCase):
         corpse.traits.hp.current = 0
         battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:area-fighter"}),
-                'foes': frozenset({"fixture:first", "fixture:second", "fixture:corpse"}),
+                'party': frozenset({stable_actor_id(actor)}),
+                'foes': frozenset(
+                    stable_actor_id(monster)
+                    for monster in (first, second, corpse)
+                ),
             },
             {
-                "fixture:area-fighter": actor,
-                "fixture:first": first,
-                "fixture:second": second,
-                "fixture:corpse": corpse,
+                stable_actor_id(entity): entity
+                for entity in (actor, first, second, corpse)
             },
         )
         request = ActionRequest(
@@ -357,8 +362,11 @@ class ProgressionTests(EvenniaTestCase):
         monster = self._monster("duplicate-goblin")
         monster.traits.hp.current = 1
         battlefield = Battlefield(
-            {'party': frozenset({"fixture:duplicate-fighter"}), 'foes': frozenset({"fixture:duplicate-goblin"})},
-            {"fixture:duplicate-fighter": actor, "fixture:duplicate-goblin": monster},
+            {
+                'party': frozenset({stable_actor_id(actor)}),
+                'foes': frozenset({stable_actor_id(monster)}),
+            },
+            {stable_actor_id(actor): actor, stable_actor_id(monster): monster},
         )
         request = ActionRequest(
             actor,
@@ -379,8 +387,11 @@ class ProgressionTests(EvenniaTestCase):
         target.threat_tier = _monster_tier_key()
         target.traits.hp.current = 1
         battlefield = Battlefield(
-            {'party': frozenset({"fixture:player-fighter"}), 'foes': frozenset({"fixture:tiered-player"})},
-            {"fixture:player-fighter": actor, "fixture:tiered-player": target},
+            {
+                'party': frozenset({stable_actor_id(actor)}),
+                'foes': frozenset({stable_actor_id(target)}),
+            },
+            {stable_actor_id(actor): actor, stable_actor_id(target): target},
         )
         request = ActionRequest(
             actor,

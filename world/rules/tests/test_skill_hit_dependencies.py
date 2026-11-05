@@ -62,11 +62,17 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.target_b.traits.defense.base = 10
         self.battlefield = Battlefield(
             roster={
-                "fixture:hit_actor": self.actor,
-                "fixture:hit_target_a": self.target_a,
-                "fixture:hit_target_b": self.target_b,
+                stable_actor_id(self.actor): self.actor,
+                stable_actor_id(self.target_a): self.target_a,
+                stable_actor_id(self.target_b): self.target_b,
             },
-            teams={'team_a': {"fixture:hit_actor"}, 'team_b': {"fixture:hit_target_a", "fixture:hit_target_b"}},
+            teams={
+                'team_a': {stable_actor_id(self.actor)},
+                'team_b': {
+                    stable_actor_id(self.target_a),
+                    stable_actor_id(self.target_b),
+                },
+            },
         )
         self.context = BattlefieldActionContext(self.battlefield)
 
@@ -103,8 +109,15 @@ class SkillHitDependenciesTests(EvenniaTestCase):
             f.traits.agility.base = 10
             f.db.display_name = "哥布林"
         bf = Battlefield(
-            roster={"fixture:goblin_1": foe1, "fixture:goblin_2": foe2, "fixture:hit_actor": self.actor},
-            teams={'team_a': {"fixture:hit_actor"}, 'team_b': {"fixture:goblin_1", "fixture:goblin_2"}},
+            roster={
+                stable_actor_id(foe1): foe1,
+                stable_actor_id(foe2): foe2,
+                stable_actor_id(self.actor): self.actor,
+            },
+            teams={
+                'team_a': {stable_actor_id(self.actor)},
+                'team_b': {stable_actor_id(foe1), stable_actor_id(foe2)},
+            },
         )
         ctx = BattlefieldActionContext(bf)
 
@@ -625,12 +638,15 @@ class SkillHitDependenciesTests(EvenniaTestCase):
                 context = BattlefieldActionContext(Battlefield(
                     roster={
                         stable_actor_id(actor): actor,
-                        "fixture:hit_target_a": self.target_a,
-                        "fixture:hit_target_b": self.target_b,
+                        stable_actor_id(self.target_a): self.target_a,
+                        stable_actor_id(self.target_b): self.target_b,
                     },
                     teams={
                         'actors': {stable_actor_id(actor)},
-                        'foes': {"fixture:hit_target_a", "fixture:hit_target_b"},
+                        'foes': {
+                            stable_actor_id(self.target_a),
+                            stable_actor_id(self.target_b),
+                        },
                     },
                 ))
                 # Swap hit/miss in the next invocation, so stale evidence fails.

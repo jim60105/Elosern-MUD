@@ -135,6 +135,7 @@ class EffectRegistryTests(unittest.TestCase):
                     "action_evidence",
                     "church",
                     "fatigue",
+                    "monster_journey",
                 }
             ),
         )
@@ -542,6 +543,7 @@ class CleanseHandlerTests(EvenniaTest):
     def test_cleanse_event_log_entry_reports_the_cleansed_count(self):
         class Actor:
             key = "cleanse-caster"
+            combat_identity = "cleanse-caster"
 
         apply_buff(self.entity, "poisoned")
         apply_buff(self.entity, "paralysis")

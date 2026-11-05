@@ -17,6 +17,11 @@ from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
 # compressor never resolves them.
 _T_MARKER = synth_damage_skill("t_marker_strike", "合成突擊")
 
+# The compressor matches a commanded action on the stable actor identity, so
+# these label-only fixtures carry the identity beside their display label.
+_PLAYER_ID = "fixture:player"
+_COMPANION_ID = "fixture:companion"
+
 
 def entry(kind, *, actor="elf", target="human", hit=None, amount=None):
     data = {}
@@ -94,6 +99,7 @@ class CompressionTests(unittest.TestCase):
                 ("human",),
                 (entry("roll", hit=True), entry("damage", amount=10)),
                 6,
+                actor_id="fixture:elf",
             ),
             EventLog(
                 "elf",
@@ -101,6 +107,7 @@ class CompressionTests(unittest.TestCase):
                 ("human",),
                 (entry("roll", hit=True), entry("damage", amount=15)),
                 6,
+                actor_id="fixture:elf",
             ),
         ]
         plain = compress_event_logs(logs, "elves", "humans", 1)
@@ -113,7 +120,7 @@ class CompressionTests(unittest.TestCase):
             "elves",
             "humans",
             1,
-            commanded_actor="elf",
+            commanded_actor="fixture:elf",
             commanded_action_kind="skill", commanded_action_key="attack",
             commanded_window=logs,
         )
@@ -161,31 +168,42 @@ class MarkerTests(unittest.TestCase):
     def setUp(self):
         open_synthetic_scope(self, "skills", extra={"skills": {_T_MARKER.key: _T_MARKER}})
 
-    def _action_log(self, actor, skill_key, *, target="human", hit=True, amount=30):
+    def _action_log(
+        self, actor, skill_key, *, actor_id=None, target="human", hit=True, amount=30
+    ):
         roll = entry("roll", actor=actor, target=target, hit=hit)
         if not hit:
-            return EventLog(actor, skill_key, (target,), (roll,), 6)
+            return EventLog(
+                actor, skill_key, (target,), (roll,), 6, actor_id=actor_id
+            )
         return EventLog(
             actor,
             skill_key,
             (target,),
             (roll, entry("damage", actor=actor, target=target, amount=amount)),
             6,
+            actor_id=actor_id,
         )
 
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marker_prepends_to_the_first_matching_window_log(self):
         player = "瑟琳"
-        commanded = self._action_log(player, _T_MARKER.key, target=player, hit=False)
-        companion = self._action_log("夥伴", "t_companion_skill")
-        auto = self._action_log(player, _T_MARKER.key, amount=40)
+        commanded = self._action_log(
+            player, _T_MARKER.key, actor_id=_PLAYER_ID, target=player, hit=False
+        )
+        companion = self._action_log(
+            "夥伴", "t_companion_skill", actor_id=_COMPANION_ID
+        )
+        auto = self._action_log(
+            player, _T_MARKER.key, actor_id=_PLAYER_ID, amount=40
+        )
         window = (commanded, companion)
         result = compress_event_logs(
             (commanded, companion, auto),
             "party",
             "foes",
             2,
-            commanded_actor=player,
+            commanded_actor=_PLAYER_ID,
             commanded_action_kind="skill", commanded_action_key=_T_MARKER.key,
             commanded_window=window,
         )
@@ -207,8 +225,12 @@ class MarkerTests(unittest.TestCase):
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marker_follows_window_order_not_raw_order(self):
         player = "瑟琳"
-        first = self._action_log("夥伴", "t_companion_skill")
-        second = self._action_log(player, _T_MARKER.key, hit=False)
+        first = self._action_log(
+            "夥伴", "t_companion_skill", actor_id=_COMPANION_ID
+        )
+        second = self._action_log(
+            player, _T_MARKER.key, actor_id=_PLAYER_ID, hit=False
+        )
         # The window lists the player's log first, inverting the raw order;
         # the marker must land on the first match in WINDOW order.
         result = compress_event_logs(
@@ -216,7 +238,7 @@ class MarkerTests(unittest.TestCase):
             "party",
             "foes",
             1,
-            commanded_actor=player,
+            commanded_actor=_PLAYER_ID,
             commanded_action_kind="skill", commanded_action_key=_T_MARKER.key,
             commanded_window=(second, first),
         )
@@ -226,15 +248,19 @@ class MarkerTests(unittest.TestCase):
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_invalidated_round1_command_yields_no_marker(self):
         player = "瑟琳"
-        companion = self._action_log("夥伴", "t_companion_skill")
-        auto = self._action_log(player, _T_MARKER.key, amount=40)
+        companion = self._action_log(
+            "夥伴", "t_companion_skill", actor_id=_COMPANION_ID
+        )
+        auto = self._action_log(
+            player, _T_MARKER.key, actor_id=_PLAYER_ID, amount=40
+        )
         window = (companion,)
         result = compress_event_logs(
             (companion, auto),
             "party",
             "foes",
             2,
-            commanded_actor=player,
+            commanded_actor=_PLAYER_ID,
             commanded_action_kind="skill", commanded_action_key=_T_MARKER.key,
             commanded_window=window,
         )
@@ -256,7 +282,7 @@ class MarkerTests(unittest.TestCase):
             "elves",
             "humans",
             1,
-            commanded_actor="elf",
+            commanded_actor="fixture:elf",
             commanded_action_kind="skill", commanded_action_key="attack",
         )
         self.assertNotIn(
@@ -267,13 +293,13 @@ class MarkerTests(unittest.TestCase):
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_unknown_commanded_skill_falls_back_to_raw_key(self):
         player = "瑟琳"
-        log = self._action_log(player, "mystery_art")
+        log = self._action_log(player, "mystery_art", actor_id=_PLAYER_ID)
         result = compress_event_logs(
             [log],
             "party",
             "foes",
             1,
-            commanded_actor=player,
+            commanded_actor=_PLAYER_ID,
             commanded_action_kind="skill", commanded_action_key="mystery_art",
             commanded_window=(log,),
         )
@@ -282,13 +308,15 @@ class MarkerTests(unittest.TestCase):
     @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
     def test_marked_log_renders_player_perspective_line(self):
         player = "瑟琳"
-        log = self._action_log(player, _T_MARKER.key, target=player, hit=False)
+        log = self._action_log(
+            player, _T_MARKER.key, actor_id=_PLAYER_ID, target=player, hit=False
+        )
         result = compress_event_logs(
             [log],
             "party",
             "foes",
             1,
-            commanded_actor=player,
+            commanded_actor=_PLAYER_ID,
             commanded_action_kind="skill", commanded_action_key=_T_MARKER.key,
             commanded_window=(log,),
         )
@@ -339,6 +367,7 @@ def _maximum_size_compressed_log() -> tuple[EventLog, ...]:
                         ),
                     ),
                     6,
+                    actor_id=f"fixture:{actor}",
                 )
             )
     return compress_event_logs(
@@ -346,7 +375,7 @@ def _maximum_size_compressed_log() -> tuple[EventLog, ...]:
         "party",
         "foes",
         12,
-        commanded_actor="戰士0-0",
+        commanded_actor=f"fixture:{raw_logs[0].actor}",
         commanded_action_kind="skill", commanded_action_key="t_war_strike",
         commanded_window=tuple(raw_logs[:16]),
     )

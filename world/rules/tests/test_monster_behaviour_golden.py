@@ -36,6 +36,7 @@ class MonsterBehaviourGoldenTests(unittest.TestCase):
         return FakeMonster(
             f"{tier}-monster",
             threat_tier=tier,
+            combat_identity=f"{tier}-monster",
             owned=[_T_SINGLE.key, _T_AREA.key],
         )
 

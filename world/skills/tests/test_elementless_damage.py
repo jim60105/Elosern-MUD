@@ -132,9 +132,11 @@ class ElementlessDamageSettlementParityTests(EvenniaTestCase):
     def _resolve_cast(self, skill_key: str, roll: int = 60):
         restore_gauges_to_full(self.actor)
         restore_gauges_to_full(self.target)
+        actor_id = stable_actor_id(self.actor)
+        target_id = stable_actor_id(self.target)
         battlefield = Battlefield(
-            {'party': frozenset({"fixture:ed_actor"}), 'foes': frozenset({"fixture:ed_target"})},
-            {"fixture:ed_actor": self.actor, "fixture:ed_target": self.target},
+            {'party': frozenset({actor_id}), 'foes': frozenset({target_id})},
+            {actor_id: self.actor, target_id: self.target},
         )
         request = ActionRequest(
             self.actor,
@@ -202,9 +204,11 @@ class ElementlessPracticeAccrualParityTests(EvenniaTestCase):
     def _resolve_cast(self, actor):
         restore_gauges_to_full(actor)
         restore_gauges_to_full(self.target)
+        actor_id = stable_actor_id(actor)
+        target_id = stable_actor_id(self.target)
         battlefield = Battlefield(
-            {'party': frozenset({stable_actor_id(actor)}), 'foes': frozenset({"fixture:ep_target"})},
-            {stable_actor_id(actor): actor, "fixture:ep_target": self.target},
+            {'party': frozenset({actor_id}), 'foes': frozenset({target_id})},
+            {actor_id: actor, target_id: self.target},
         )
         request = ActionRequest(
             actor,
