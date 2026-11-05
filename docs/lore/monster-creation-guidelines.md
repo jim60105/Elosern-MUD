@@ -4,6 +4,8 @@
 
 **核准日期：**2026-10-05。創作準則已核准；本篇不核准任何個別物種，也不宣告物種名錄或生成機制已實作。首批物種創作集中於低階與中階，高階與災厄物種不屬於首批內容。
 
+**第三批核准（2026-11-03）：**[魔物內容擴充設計](/superpowers/specs/2026-11-03-monster-content-expansion-design) 另行核准三種低階物種（泥膜史萊姆、膠掌小鬼、蠟囊鼠）、吞潮鱷的高階強化變體蓄潮型，以及高階物種焙鬃野豬。每個物種只出現在明確宣告的棲地、據點或遭遇中；災厄級物種與新的文明種族仍不在核准範圍內。
+
 世界背景請搭配 [世界觀總覽](/lore/overview) 閱讀，能力與魔法邊界請參照 [魔法技能體系](/lore/magic-system)。
 
 物種、變體、個體與委託的資料責任，另見 [魔物資料模型設計](/superpowers/specs/2026-10-05-monster-data-model-design)。該設計已核准，尚未實作，也不取代個別物種的內容審查。
@@ -86,6 +88,14 @@
 
 物種與變體分開整理，不能把同一物種的普通、精英與首領版本當成不同物種湊數。名稱與外觀的變化不會自動成立新的物種身分。
 
+## 8．公開敘述以肯定句描寫
+
+- 公開敘述（物種描述、外觀、生態、變體方向、委託背景）直接寫出可觀察的身體特徵、行為、能力作用範圍、所需材料與代價，讓讀者從牠做了什麼認識牠。
+- 技術上的排除條件與實作限制寫在作者私有欄位、設計文件或開發文件，不寫進公開敘述；公開敘述不列出牠不具備的能力，也不與其他能力比較。
+- 公開敘述描寫身體與行為，不引用指令名稱、介面元素、增益識別碼或資源欄位名稱。
+- 既有物種的現行段落在改寫時套用本原則；未改寫的段落維持原樣。
+- 肯定句是編輯審查的判斷，記錄在 [魔物圖鑑編輯審查紀錄](/development/bestiary-editorial-review)，不由測試或字串比對判定。
+
 ## 候選物種審查
 
 每個候選須完整回答下表，再進入正式物種選擇。審查只依創作內容判斷，不以測試資料或已有程式名稱作為核准證據。
@@ -104,10 +114,10 @@
 
 ## 魔物資源技能與套組配置（2026-10-09 起陸續生效）
 
-每個變體都以列上的 `profile_required` 自行宣告是否必須具備完整戰鬥設定與有效公會評級。宣告為必要者若缺少完整檔案或評級，註冊表載入即失敗；未宣告必要者可以留空，個體建構時沿用該變體所屬威脅層級的既有帶狀預設值。吞潮鱷、穗鳴雀、潮燈蟹各有兩個變體實作專屬資源技能套組；資源池與戰鬥數值一律以現行宣告為準，不另維護核准數值表，也不從名稱、敘述或其他變體推導數字。
+每個變體都以列上的 `profile_required` 自行宣告是否必須具備完整戰鬥設定與有效公會評級。宣告為必要者若缺少完整檔案或評級，註冊表載入即失敗；未宣告必要者可以留空，個體建構時沿用該變體所屬威脅層級的既有帶狀預設值。每個變體是否具備專屬資源技能套組，完全由該變體列自己的宣告決定；資源池與戰鬥數值一律以現行宣告為準，不另維護核准數值表，也不從名稱、敘述或其他變體推導數字。
 
-1. **套組配置**：變體可選擇性宣告有序主動技能（`active_skill_keys`）、被動技能（`passive_skill_keys`）與行為設定檔鍵（`behaviour_profile_key`）。吞潮鱷配置 `tide_devouring_bite`（吞潮咬擊），穗鳴雀配置 `grain_shaking_peck`（震穗啄擊），潮燈蟹配置 `lamp_carapace_claw`（燈甲螯擊），皆於固有普通攻擊（`basic_attack`）與逃跑（`flee`）之前選用。可執行能力的所有權完全來自列本身宣告的資料，沒有物種白名單；未宣告套組的列不會因為敘述提到某項能力而取得技能、資源或效果。
-2. **其餘六變體未宣告套組**：其餘六個變體保留完整戰鬥設定宣告，但不宣告任何技能或行為設定檔，資源池不得從敘述推導。三項尚未實作的敘事能力（壓實土埂、聚集霧氣、敲岩脈動）維持敘事邊界與純物理普通攻擊，不建立造假技能或捏造前置。
+1. **套組配置**：變體可選擇性宣告有序主動技能（`active_skill_keys`）、被動技能（`passive_skill_keys`）與行為設定檔鍵（`behaviour_profile_key`）。每個主動技能皆於固有普通攻擊（`basic_attack`）與逃跑（`flee`）之前選用。可執行能力的所有權完全來自列本身宣告的資料，沒有物種白名單；未宣告套組的列不會因為敘述提到某項能力而取得技能、資源或效果。
+2. **未宣告套組的變體**：未宣告技能或行為設定檔的變體只使用純物理普通攻擊，資源池不得從敘述推導，也不建立造假技能或捏造前置。
 3. **無啟動重置或線上遷移**：個體建構時將持久化身分、套組與當前資源，重載維持已消耗之 MP/SP 與行為綁定；註冊表更新不重置線上個體。
 
 ### Test authoring boundaries
@@ -141,7 +151,10 @@ what the structural relationship check
 missing, duplicated, orphaned, mis-parented, field-incomplete, private-field and
 status-mismatched entries by naming the key and the relationship. Historical
 appendices belong behind the document's historical boundary marker and never
-count as current coverage.
+count as current coverage. Public prose describes bodies and observed behaviour
+in affirmative sentences; it never names command keys, UI elements, buff
+identifiers or resource-field names, and its exclusions belong in
+author-private fields.
 
 Whether the prose is *any good* is not something a test can assert. Each current
 species therefore needs one dated entry in the indexed editorial ledger
