@@ -882,6 +882,21 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         1,
         True,
     ),
+    # An abandoned hill transport station: a mixed manual encounter whose two
+    # goblins forage as one cohesive pair beside a lone rat gathering grain
+    # from the same facility. The three are co-located independent animals, and
+    # the encounter is one-shot, so clearing it is a durable authored victory
+    # until an author re-issues it.
+    MonsterSite(
+        "abandoned_transfer_station_encounter",
+        "encounter",
+        "western_hills_valleys",
+        (1290, 990),
+        "abandoned_transfer_station_group",
+        None,
+        3,
+        True,
+    ),
 )
 
 # ---------------------------------------------------------------------------
@@ -1025,6 +1040,28 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
         "tide_mouth_boss",
         "tide_mouth_boss_activity",
         (CompositionMember("bay_warden", 1, 1),),
+    ),
+    # The abandoned transfer station's complete membership: the goblin pair
+    # keeps its own cohesive binding, and the explicitly authored rat stray
+    # keeps its solitary binding instead of the ordinary family birth range.
+    # Co-location never merges the two groups.
+    EncounterComposition(
+        "abandoned_transfer_station_group",
+        "transfer_station_nest_activity",
+        (
+            CompositionMember(
+                "hanging_nest_forager",
+                2,
+                2,
+                activity_key="transfer_station_nest_activity",
+            ),
+            CompositionMember(
+                "wax_cache_forager",
+                1,
+                1,
+                activity_key="transfer_station_stray_activity",
+            ),
+        ),
     ),
 )
 

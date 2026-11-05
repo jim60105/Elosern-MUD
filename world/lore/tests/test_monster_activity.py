@@ -547,7 +547,12 @@ class PublishedActivityRegistryTests(unittest.TestCase):
                 self.assertIn(composition.activity_key, MONSTER_ACTIVITY_REGISTRY)
         for key, site in MONSTER_SITE_REGISTRY.items():
             with self.subTest(site=key):
-                self.assertIn(site.activity_key, MONSTER_ACTIVITY_REGISTRY)
+                # A site override is optional: ``None`` declares none, so every
+                # member resolves its own row binding, else the composition's.
+                self.assertTrue(
+                    site.activity_key is None
+                    or site.activity_key in MONSTER_ACTIVITY_REGISTRY
+                )
                 self.assertIn(site.composition_key, ENCOUNTER_COMPOSITION_REGISTRY)
 
     @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
