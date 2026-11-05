@@ -590,3 +590,19 @@ chrome-headless-shell 與約 30 個系統套件；被節流的 job 就把 30 秒
 **重新打包**：evennia 60 → **72** 個分片、browser 84 → **89** 個分片，兩者都以
 本次 run 的實測 `Run … shard` 步驟時間為依據（evennia 只切 > 240 秒、browser 只切
 > 250 秒的分片），且保證兩個行程清單都非空、沒有任何標籤遺失。
+
+**單一模組無法再切分時的處理**：`tests.test_evennia_test_optimization_contract` 只
+接受模組或套件目錄作為標籤，因此一個 600 秒以上的單一模組不能靠調整清單拆開。這兩個
+模組改為套件：
+
+| 原模組 | 套件 | 拆出的模組 |
+|---|---|---|
+| `world.maps.tests.test_monster_sites`（615 秒） | `test_monster_sites/` | `test_site_population`、`test_site_clearing`、`test_site_without_world`、`test_site_row_vocabulary` |
+| `web.webclient.presentation.tests.test_area_map`（641 秒） | `test_area_map/` | `test_wilderness_window`、`test_wilderness_content`、`test_grid_area`、`test_room_graph_area`、`test_area_map_dispatch`、`test_fog_and_bounds` |
+
+兩者共用一個 `_support` 模組（非 `test*.py`，因此不被探索）：`test_monster_sites`
+把原本 1,677 行的單一測試類別拆成 `_MonsterSiteFixture` 基底加上兩個測試子類別，
+`test_area_map` 的荒野類別同樣拆成 `_WildernessFixture` 與兩個子類別；其餘類別原本
+就各自獨立，依類別搬移即可。evennia 分片因此由 72 增至 **78**，新增的六個分片各自
+只承載一個模組。本機整包量測：`test_monster_sites` 43 個測試 126 秒、
+`test_area_map` 58 個測試約 135 秒（原本分別是單一 job 615／641 秒）。

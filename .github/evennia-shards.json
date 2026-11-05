@@ -1160,7 +1160,7 @@
       "name": "maps-34-3",
       "workers": 4,
       "labels": [
-        "world.maps.tests.test_monster_sites"
+        "world.maps.tests.test_monster_sites.test_site_population"
       ]
     },
     {
@@ -1313,7 +1313,7 @@
       "name": "webclient-41",
       "workers": 4,
       "labels": [
-        "web.webclient.presentation.tests.test_area_map"
+        "web.webclient.presentation.tests.test_area_map.test_wilderness_window"
       ]
     },
     {
@@ -1390,6 +1390,56 @@
         "web.webclient.presentation.tests.test_roster",
         "web.webclient.presentation.tests.test_title_ballot_panel",
         "web.webclient.presentation.tests.test_watchers"
+      ]
+    },
+    {
+      "index": 72,
+      "name": "maps-34-3a",
+      "workers": 4,
+      "labels": [
+        "world.maps.tests.test_monster_sites.test_site_clearing"
+      ]
+    },
+    {
+      "index": 73,
+      "name": "maps-34-4",
+      "workers": 4,
+      "labels": [
+        "world.maps.tests.test_monster_sites.test_site_without_world",
+        "world.maps.tests.test_monster_sites.test_site_row_vocabulary"
+      ]
+    },
+    {
+      "index": 74,
+      "name": "webclient-41a",
+      "workers": 4,
+      "labels": [
+        "web.webclient.presentation.tests.test_area_map.test_wilderness_content"
+      ]
+    },
+    {
+      "index": 75,
+      "name": "webclient-41b",
+      "workers": 4,
+      "labels": [
+        "web.webclient.presentation.tests.test_area_map.test_grid_area"
+      ]
+    },
+    {
+      "index": 76,
+      "name": "webclient-41c",
+      "workers": 4,
+      "labels": [
+        "web.webclient.presentation.tests.test_area_map.test_room_graph_area"
+      ]
+    },
+    {
+      "index": 77,
+      "name": "webclient-41d",
+      "workers": 4,
+      "labels": [
+        "web.webclient.presentation.tests.test_area_map.test_area_map_dispatch",
+        "web.webclient.presentation.tests.test_area_map.test_fog_and_bounds"
       ]
     }
   ]
