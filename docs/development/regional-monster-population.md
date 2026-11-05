@@ -340,6 +340,75 @@ defeat credit per actual individual with a redelivered event adding nothing,
 and a cleared one-shot site that stays cleared across a committed reload, a
 later clock settlement, the map read and a refused clear-out acceptance.
 
+### High-tier boss sites
+
+`reservoir_crocodile_boss_site` and `ember_bristle_boss_site` are this batch's
+two one-shot high-tier bosses. The first holds one `reservoir_warden` (the local
+name 閉灣者) in a remote southeast tidal backwater; the second holds one
+`warm_den_boar` (赤背) in remote dry western rocky woodland. The declarations
+remain the only authority for cells, extents and counts; this section repeats
+none of them.
+
+**Remoteness and geography.** The crocodile's backwater is southeast-coast land
+immediately beside a cluster of inland-water cells, far from every maintained
+settlement and outside every authored ecology rectangle, so the place reads as a
+quiet tidal inlet rather than a working coast. The boar's ground is dry western
+hill-valley woodland with no inland water inside it, which matches the species'
+authored old-kiln and reused-den ecology, and it also stands clear of maintained
+settlements and authored rectangles. Both positions are walkable wilderness
+ground and neither is an anchor footprint.
+
+**Territory and defended extents.** Each boss roams one bounded territory and
+defends a smaller extent strictly inside it: the crocodile's deep bay inside the
+backwater grounds, and the boar's den inside the woodland grounds. Roaming the
+outer grounds stays retreat-oriented; entering the defended extent admits an
+immediate hostile response. Each site declares one solitary individual, so the
+composition's own territorial binding governs and no site override is needed.
+
+**Labels are display facts.** 閉灣者 and 赤背 are display keys only. Each boss's
+identity remains its registered species/variant pair, and the site's authority
+over the individual is its saved persistent identity, never the label.
+
+**Escape and the crocodile trade-off.** The boar keeps its legacy `pack_hunter`
+flee threshold, so a real session can drive it to a legal adjacent departure. The
+living individual keeps its identity, its site ownership and its actual
+remaining resources through the journey, re-entry and a committed reload, and a
+later engagement starts with those same values; nothing resets them on exit. The
+crocodile's utility binding never chooses a voluntary flee, so its fight is
+decided by the party's own legal retreat. That trade-off is recorded here and
+adds no mechanism. Neither high-tier variant joins an ecology pool: both
+compositions are owned by these one-shot sites.
+
+**One-shot lifecycle.** Defeating a boss leaves the site's durable record
+cleared at the committed loss boundary, and no clock settlement, map read,
+revisit or quest acceptance recreates it. The cleared record keeps the defeated
+member identities as ownership history, so a later quest binding can never
+count a replacement individual.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-boss-tests.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-boss-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-boss-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-boss-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-boss-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-boss-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0 |
+| `openspec validate high-tier-boss-sites --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change high-tier-boss-sites` | passed |
+
+The smoke module populates both boss sites through the real lifecycle owner and
+observes one labelled individual per site with its composition's variant and
+territorial binding, no boss variant in any ecology pool, a defeated crocodile
+whose cleared record survives a committed reload, a revisit, the map read and a
+refused clear-out acceptance with no new individual, and an escaped boar that
+departs through a real journey, keeps its persistent identity and site
+ownership while absent, reloads with its actual departure HP/MP/SP, and is
+re-engaged at its destination with those same values.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

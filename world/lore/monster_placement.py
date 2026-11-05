@@ -897,6 +897,38 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         3,
         True,
     ),
+    # A remote southeast tidal backwater: one stronger crocodile holds the deep
+    # bay beside inland water, far from every maintained settlement and outside
+    # every authored ecology rectangle. The label is the individual's display
+    # key only; identity stays the species/variant pair. The site is one-shot,
+    # and it declares no activity override, so the composition's territorial
+    # binding governs.
+    MonsterSite(
+        "reservoir_crocodile_boss_site",
+        "boss_site",
+        "southeast_coast",
+        (2076, 381),
+        "reservoir_crocodile_boss",
+        None,
+        1,
+        True,
+        individual_label_zh="閉灣者",
+    ),
+    # A remote dry western woodland consistent with the boar's authored old
+    # charcoal-kiln and reused-den ecology, also clear of maintained
+    # settlements and ecology rectangles. The label is display only, and the
+    # one-shot site lets the composition's territorial binding govern.
+    MonsterSite(
+        "ember_bristle_boss_site",
+        "boss_site",
+        "western_hills_valleys",
+        (710, 530),
+        "ember_bristle_boss",
+        None,
+        1,
+        True,
+        individual_label_zh="赤背",
+    ),
 )
 
 # ---------------------------------------------------------------------------
@@ -1062,6 +1094,19 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
                 activity_key="transfer_station_stray_activity",
             ),
         ),
+    ),
+    # The two high-tier boss compositions are solitary rows owned by explicit
+    # one-shot sites. Neither row joins an ecology pool, so automatic birth can
+    # never select a stronger variant.
+    EncounterComposition(
+        "reservoir_crocodile_boss",
+        "reservoir_crocodile_territory_activity",
+        (CompositionMember("reservoir_warden", 1, 1),),
+    ),
+    EncounterComposition(
+        "ember_bristle_boss",
+        "ember_bristle_territory_activity",
+        (CompositionMember("warm_den_boar", 1, 1),),
     ),
 )
 

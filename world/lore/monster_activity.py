@@ -727,6 +727,32 @@ _ACTIVITY_AREA_DECLARATIONS: tuple[ActivityArea, ...] = (
         "western_hills_valleys",
         ((1291, 1295, 991, 995),),
     ),
+    # The two high-tier boss territories. Each boss roams one bounded remote
+    # patch and defends a smaller extent inside it: the crocodile's tidal
+    # backwater bay and the boar's dry woodland den. The defended extent sits
+    # strictly inside its grounds, so ordinary roaming stays retreat-oriented
+    # while an approach into the defended extent admits an unprompted hostile
+    # response.
+    ActivityArea(
+        "reservoir_backwater_grounds",
+        "southeast_coast",
+        ((2066, 2086, 371, 391),),
+    ),
+    ActivityArea(
+        "reservoir_backwater_bay",
+        "southeast_coast",
+        ((2071, 2081, 376, 386),),
+    ),
+    ActivityArea(
+        "ember_bristle_grounds",
+        "western_hills_valleys",
+        ((700, 719, 520, 539),),
+    ),
+    ActivityArea(
+        "ember_bristle_den",
+        "western_hills_valleys",
+        ((705, 714, 525, 534),),
+    ),
 )
 
 _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
@@ -926,6 +952,25 @@ _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
         "transfer_station_grounds",
         60,
         AggressionCondition("defended_area", "transfer_station_cache"),
+    ),
+    # Both bosses are solitary territorial animals: one individual roams its
+    # whole grounds and turns hostile only inside its defended bay or den. The
+    # crocodile's utility binding never chooses a voluntary flee, so its fight
+    # is decided by the party's own legal retreat; the boar stays legacy and
+    # keeps its authored flee threshold.
+    MonsterActivity(
+        "reservoir_crocodile_territory_activity",
+        "solitary_roaming",
+        "reservoir_backwater_grounds",
+        60,
+        AggressionCondition("defended_area", "reservoir_backwater_bay"),
+    ),
+    MonsterActivity(
+        "ember_bristle_territory_activity",
+        "solitary_roaming",
+        "ember_bristle_grounds",
+        60,
+        AggressionCondition("defended_area", "ember_bristle_den"),
     ),
 )
 
