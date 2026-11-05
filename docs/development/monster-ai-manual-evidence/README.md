@@ -25,7 +25,11 @@ fingerprint; the recorded measurements are unchanged again. They were
 regenerated once more for `wax-pouch-rat-species` (baseline commit
 `14b4dff09b06852b8e0dcec126de0f50a50c8b45`), for the same reason: that content
 change adds one buff definition and one modifier rule; the recorded
-measurements are unchanged again.
+measurements are unchanged again. They were regenerated once more for
+`sticky-palm-goblin-species` (baseline commit
+`78b2c12237c83ffcd229155f053caee4dcf35725`), again because that content change
+adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again.
 
 ## Exact operations
 
@@ -146,11 +150,11 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`e583cb956f90c0827c6c04526c6001238b93a85673d4a0bce941fa9b48e535f4` -- that
+`c4d4e06bbfab806742fc083296a11ef8109c85d15c894ca043d76ef76a000f85` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `a29fd4fa...`, `e2677d39...` and `3ee653b9...` describe
-tunings production no longer loads and are superseded, not evidence for the
-changed tuning. See `docs/development/monster-ai-activation-evidence/`.
+the earlier values `a29fd4fa...`, `e2677d39...`, `3ee653b9...` and `e583cb95...`
+describe tunings production no longer loads and are superseded, not evidence
+for the changed tuning. See `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
 
