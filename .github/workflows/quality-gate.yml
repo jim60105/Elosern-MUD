@@ -287,6 +287,8 @@ jobs:
         # The image ships both browsers and their system libraries; this smoke
         # check fails loudly instead of letting a journey report a launch error
         # half-way through a shard.
+        env:
+          HOME: /root
         run: |
           uv run --locked python - <<'PY'
           from playwright.sync_api import sync_playwright
@@ -305,6 +307,9 @@ jobs:
 
       - name: Run browser shard ${{ matrix.index }}
         env:
+          # Firefox refuses to run as root against a home it does not own, and
+          # the runner's container default points HOME at ``/github/home``.
+          HOME: /root
           COVERAGE_FILE: coverage-browser-shard-${{ matrix.index }}-p1
           OPENSPEC_TEST_EVIDENCE: evidence.browser-shard-${{ matrix.index }}-p1.jsonl
         run: |
