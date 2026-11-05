@@ -74,6 +74,7 @@ from world.lore.monster_placement import (
     SETTLEMENT_BIRTH_POLICY_REGISTRY,
     EcologyZone,
     EncounterComposition,
+    composition_row_bindings,
     variant_species_key,
 )
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
@@ -216,9 +217,12 @@ class PopulationPlacement:
     ``groups`` is the composition's member order, so a caller reading the
     placement sees the authored group shape; the sum of the counts is the
     number of individuals the placement creates. ``composition_key`` and
-    ``activity_key`` are the exact selected composition and its resolved
-    binding: the commit compares them and the map-owned group is created from
-    this retained selection, never by a reverse lookup of the member rows.
+    ``activity_key`` are the exact selected composition and its composition
+    binding: the commit compares them, never a reverse lookup of the member
+    rows. The committed groups' own bindings come from
+    :func:`world.lore.monster_placement.composition_row_bindings`, so
+    ``activity_key`` is the fallback a row without its own binding resolves —
+    not necessarily any one group's effective binding.
     """
 
     cell: tuple[int, int]
@@ -1892,10 +1896,13 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
                     created.append(individual)
             from world.maps import monster_activity
 
-            # One group per movement unit: a solitary binding disperses the
-            # sampled members, a cohesive binding keeps them together.
+            # One group per movement unit: each row resolves the site-free
+            # precedence rule (its own binding, else the composition's), so a
+            # solitary row disperses while a cohesive row keeps its own members
+            # together.
+            composition = ENCOUNTER_COMPOSITION_REGISTRY[placement.composition_key]
             units = movement_units(
-                placement.groups, (placement.activity_key,) * len(placement.groups)
+                placement.groups, composition_row_bindings(composition)
             )
             for ordinal, unit in enumerate(units):
                 monster_activity.create_group(

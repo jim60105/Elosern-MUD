@@ -66,6 +66,7 @@ FIRST_BATCH = {
     },
     "world.lore.monster_placement": {
         "MonsterSite": {"region_key", "composition_key", "activity_key"},
+        "CompositionMember": {"variant_key", "activity_key"},
         "EncounterComposition": {"activity_key"},
     },
     "world.quests.definitions": {

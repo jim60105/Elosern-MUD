@@ -105,6 +105,11 @@ CAMP_KEY = "t_probe_camp"
 GROUP_KEY = "t_probe_group"
 STRAY_KEY = "t_probe_stray"
 COHESIVE_KEY = "t_probe_cohesive"
+MIXED_KEY = "t_probe_mixed"
+OVERRIDE_KEY = "t_probe_override"
+LABELLED_KEY = "t_probe_labelled"
+UNLABELLED_KEY = "t_probe_unlabelled"
+LABEL = "t_probe_designated_name"
 HOUR = 3600
 SEED = 11
 
@@ -112,6 +117,7 @@ PAIR = "t_probe_pair"
 GROUP = "t_probe_group_composition"
 SOLO = "t_probe_solo"
 FLOCK = "t_probe_flock"
+MIXED = "t_probe_mixed_composition"
 
 #: One solitary composition, one same-variant group, one mixed pair and one
 #: variable-range group, all built from the kit's synthetic variants. The
@@ -139,6 +145,16 @@ COMPOSITIONS = {
     ),
     FLOCK: EncounterComposition(
         FLOCK, GROUP_ACTIVITY, (CompositionMember(ORDINARY, 1, 2),)
+    ),
+    # One cohesive pair beside one independent individual: the row bindings are
+    # what separate them, because no site override is declared.
+    MIXED: EncounterComposition(
+        MIXED,
+        GROUP_ACTIVITY,
+        (
+            CompositionMember(ORDINARY, 2, 2, GROUP_ACTIVITY),
+            CompositionMember(STRONGER, 1, 1, SOLITARY_ACTIVITY),
+        ),
     ),
 }
 
@@ -266,6 +282,47 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 PROBE,
                 SOLO,
                 STATIONARY_ACTIVITY,
+                1,
+                True,
+            ),
+            MIXED_KEY: MonsterSite(
+                MIXED_KEY,
+                "encounter",
+                self.region,
+                PROBE,
+                MIXED,
+                None,
+                3,
+                True,
+            ),
+            OVERRIDE_KEY: MonsterSite(
+                OVERRIDE_KEY,
+                "encounter",
+                self.region,
+                PROBE,
+                MIXED,
+                STATIONARY_ACTIVITY,
+                3,
+                True,
+            ),
+            LABELLED_KEY: MonsterSite(
+                LABELLED_KEY,
+                "stray",
+                self.region,
+                PROBE,
+                SOLO,
+                None,
+                1,
+                True,
+                individual_label_zh=LABEL,
+            ),
+            UNLABELLED_KEY: MonsterSite(
+                UNLABELLED_KEY,
+                "stray",
+                self.region,
+                PROBE,
+                SOLO,
+                None,
                 1,
                 True,
             ),
@@ -540,6 +597,178 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             {groups[group_id].member_ids[0] for group_id in ids},
             {member.pk for member in _members(self.wilderness, site)},
         )
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_row_bound_site_forms_one_group_per_row_binding(self):
+        self._settle()
+
+        site = self.sites[MIXED_KEY]
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        ids = [f"site:{MIXED_KEY}:0#{ordinal}" for ordinal in range(2)]
+        self.assertEqual(
+            [key for key in groups if key.startswith(f"site:{MIXED_KEY}:")], ids
+        )
+        cohesive, solitary = (groups[group_id] for group_id in ids)
+        # The cohesive row keeps its pair together; the solitary row stays
+        # independent. Both groups belong to the one site.
+        self.assertEqual(cohesive.activity_key, GROUP_ACTIVITY)
+        self.assertEqual(len(cohesive.member_ids), 2)
+        self.assertEqual(solitary.activity_key, SOLITARY_ACTIVITY)
+        self.assertEqual(len(solitary.member_ids), 1)
+        for group in (cohesive, solitary):
+            self.assertEqual(group.home_owner, ("site", MIXED_KEY))
+        self.assertEqual(
+            set(cohesive.member_ids) | set(solitary.member_ids),
+            {member.pk for member in _members(self.wilderness, site)},
+        )
+        # Each group carries its own binding's decision interval, so the two
+        # rows decide independently instead of sharing the site's schedule.
+        self.assertEqual(
+            cohesive.next_decision_tick,
+            activity_owner.activity_decision_interval(GROUP_ACTIVITY),
+        )
+        self.assertEqual(
+            solitary.next_decision_tick,
+            activity_owner.activity_decision_interval(SOLITARY_ACTIVITY),
+        )
+        self.assertNotEqual(
+            cohesive.next_decision_tick, solitary.next_decision_tick
+        )
+        # A due decision of the solitary group leaves its cohesive sibling
+        # exactly where it was: the two rows decide from their own saved state.
+        decision = activity_owner.plan_group_decision(
+            self.wilderness, ids[1], tick=solitary.next_decision_tick
+        )
+        if decision.edge is not None:
+            activity_owner.commit_group_decision(self.wilderness, decision)
+        after = activity_owner.read_monster_activity(self.wilderness).groups
+        self.assertEqual(after[ids[0]].position, cohesive.position)
+        self.assertEqual(after[ids[0]].member_ids, cohesive.member_ids)
+        self.assertEqual(after[ids[0]].sequence, cohesive.sequence)
+        self.assertIsNone(after[ids[0]].journey_id)
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_stationary_site_override_suppresses_every_row_binding(self):
+        self._settle()
+
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        ids = [f"site:{OVERRIDE_KEY}:0#{ordinal}" for ordinal in range(3)]
+        self.assertEqual(
+            [key for key in groups if key.startswith(f"site:{OVERRIDE_KEY}:")],
+            ids,
+        )
+        for group_id in ids:
+            with self.subTest(group=group_id):
+                group = groups[group_id]
+                self.assertEqual(len(group.member_ids), 1)
+                self.assertEqual(group.home_owner, ("site", OVERRIDE_KEY))
+                self.assertEqual(group.activity_key, STATIONARY_ACTIVITY)
+        # Every group is stationary in its own binding, so even a due decision
+        # neither departs nor lets a row binding move a member.
+        for group_id in ids:
+            due = groups[group_id].next_decision_tick
+            decision = activity_owner.plan_group_decision(
+                self.wilderness, group_id, tick=due
+            )
+            with self.subTest(decision=group_id):
+                self.assertIsNone(decision.edge)
+                self.assertEqual(decision.reason, activity_owner.STAY_STATIONARY)
+                self.assertIsNone(
+                    activity_owner.read_monster_activity(self.wilderness)
+                    .groups[group_id]
+                    .journey_id
+                )
+
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
+    def test_a_labelled_site_names_its_individual_without_changing_identity(self):
+        self._settle()
+
+        labelled = self.sites[LABELLED_KEY]
+        unlabelled = self.sites[UNLABELLED_KEY]
+        labelled_members = _members(self.wilderness, labelled)
+        unlabelled_members = _members(self.wilderness, unlabelled)
+        self.assertEqual(len(labelled_members), 1)
+        self.assertEqual(len(unlabelled_members), 1)
+        named, plain = labelled_members[0], unlabelled_members[0]
+
+        self.assertEqual(named.key, LABEL)
+        self.assertNotEqual(plain.key, LABEL)
+        self.assertEqual(named.species_key, plain.species_key)
+        self.assertEqual(named.variant_key, plain.variant_key)
+        self.assertEqual(named.db.site_key, LABELLED_KEY)
+        self.assertEqual(plain.db.site_key, UNLABELLED_KEY)
+
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        named_group = groups[f"site:{LABELLED_KEY}:0#0"]
+        plain_group = groups[f"site:{UNLABELLED_KEY}:0#0"]
+        self.assertEqual(named_group.home_owner, ("site", LABELLED_KEY))
+        self.assertEqual(plain_group.home_owner, ("site", UNLABELLED_KEY))
+        self.assertEqual(named_group.member_ids, (named.pk,))
+        self.assertEqual(plain_group.member_ids, (plain.pk,))
+        self.assertEqual(named_group.activity_key, plain_group.activity_key)
+
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
+    def test_a_recovered_labelled_individual_keeps_the_label_and_a_new_identity(self):
+        ward = MonsterSite(
+            "t_probe_labelled_camp",
+            "camp",
+            self.region,
+            PROBE,
+            SOLO,
+            None,
+            1,
+            False,
+            HOUR,
+            individual_label_zh=LABEL,
+        )
+        self.enterContext(
+            synthetic_registries(
+                "monster_species",
+                "monster_variants",
+                "monster_tiers",
+                "monster_sites",
+                extra={
+                    "encounter_compositions": COMPOSITIONS,
+                    "monster_sites": {ward.key: ward},
+                },
+            )
+        )
+        self._settle()
+        first = _members(self.wilderness, ward)
+        self.assertEqual(len(first), 1)
+        first_pk = first[0].pk
+        self.assertEqual(first[0].key, LABEL)
+        first[0].traits.hp.current = 0
+        self.clock.advance(60, AdvanceSource.SKIP, [])
+        self.assertEqual(
+            site_state(ward.key, wilderness=self.wilderness).state,
+            SITE_STATE_CLEARED,
+        )
+
+        self.assertTrue(
+            settle_site_recovery(ward.key, 60 + HOUR, wilderness=self.wilderness)
+        )
+
+        recovered = _members(self.wilderness, ward)
+        self.assertEqual(len(recovered), 1)
+        # A recovery is a new persistent identity that keeps the authored
+        # display label; identity stays keyed by species, variant and site.
+        self.assertNotEqual(recovered[0].pk, first_pk)
+        self.assertEqual(recovered[0].key, LABEL)
+        self.assertEqual(recovered[0].db.site_key, ward.key)
+        group = activity_owner.read_monster_activity(self.wilderness).groups[
+            f"site:{ward.key}:1#0"
+        ]
+        self.assertEqual(group.home_owner, ("site", ward.key))
+        self.assertEqual(group.member_ids, (recovered[0].pk,))
 
     @covers_requirement(
         "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"

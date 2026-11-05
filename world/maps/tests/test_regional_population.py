@@ -89,6 +89,7 @@ from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registr
 
 PROBE = (500, 700)
 ORDINARY = next(iter(SYNTH_MONSTER_VARIANTS))
+STRONGER = tuple(SYNTH_MONSTER_VARIANTS)[1]
 SEED = 11
 GROUP_ACTIVITY = "t_fixture_group_activity"
 SOLITARY_ACTIVITY = "t_fixture_solitary_activity"
@@ -741,6 +742,54 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         group = state.groups[f"wave:{zone.key}:1#0"]
         self.assertEqual(set(group.member_ids), set(created))
         self.assertEqual(group.activity_key, GROUP_ACTIVITY)
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_row_bound_birth_forms_each_rows_own_group(self):
+        # One row declares its own solitary binding; the other declares none and
+        # therefore falls back to the cohesive composition binding. Both rows
+        # keep their own group inside the one zone-owned birth.
+        self.compositions["t_row_bound"] = EncounterComposition(
+            "t_row_bound",
+            GROUP_ACTIVITY,
+            (
+                CompositionMember(ORDINARY, 2, 2),
+                CompositionMember(STRONGER, 1, 1, SOLITARY_ACTIVITY),
+            ),
+        )
+        zone = self._use(
+            zone=_zone(
+                lower=1,
+                upper=99,
+                capacity=3,
+                budget=3,
+                pool=(("t_row_bound", 1),),
+            )
+        )
+        self._seed()
+        self._initialize_state(zone)
+        plan = plan_population_wave(self.wilderness, zone.key, tick=0)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        # The retained placement keeps the composition binding, not a group's
+        # effective row binding.
+        self.assertEqual(plan.placements[0].activity_key, GROUP_ACTIVITY)
+        created = commit_population_wave(self.wilderness, plan)
+        self.assertEqual(len(created), 3)
+
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        ids = [f"wave:{zone.key}:1#{ordinal}" for ordinal in range(2)]
+        self.assertEqual(sorted(groups), ids)
+        unbound, bound = (groups[group_id] for group_id in ids)
+        self.assertEqual(unbound.activity_key, GROUP_ACTIVITY)
+        self.assertEqual(len(unbound.member_ids), 2)
+        self.assertEqual(bound.activity_key, SOLITARY_ACTIVITY)
+        self.assertEqual(len(bound.member_ids), 1)
+        for group in (unbound, bound):
+            self.assertEqual(group.home_owner, ("zone", zone.key))
+        self.assertEqual(
+            set(unbound.member_ids) | set(bound.member_ids), set(created)
+        )
 
     @covers_requirement(
         "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces",

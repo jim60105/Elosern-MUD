@@ -17,6 +17,12 @@ Habitat tags constrain what an author MAY place, never what spawns: the
 ``region_key`` of every zone and site is checked against every referenced
 variant's species ``habitat_tags`` at construction time, and no runtime spawn
 decision anywhere reads a habitat tag.
+
+Each composition row MAY declare its own activity binding, a site MAY declare
+one override that governs every row, and a site MAY label the one individual of
+a composition whose every legal outcome is exactly one. The pure resolver
+:func:`composition_row_bindings` is the single precedence rule the zone writer,
+the site owner and the read-only forecast all share.
 """
 
 from collections.abc import Iterable, Mapping
@@ -74,6 +80,11 @@ class MonsterSite:
     ``one_shot`` sites stay cleared after their individuals are defeated until
     an author-side re-issue; a recoverable site declares exactly one condition
     from the closed :data:`RECOVERY_CONDITION_FIELDS` vocabulary.
+    ``activity_key`` is the site's optional override: ``None`` declares none, so
+    every member resolves its row's binding, else the composition's.
+    ``individual_label_zh`` is one authored display label for a site whose every
+    legal outcome is exactly one individual; it is the constructed object's
+    display key only and never its identity.
     """
 
     key: str
@@ -83,12 +94,13 @@ class MonsterSite:
     composition_key: str = field(
         metadata=ref("encounter_compositions", inverse="monster_sites")
     )
-    activity_key: str = field(
-        metadata=ref("monster_activities", inverse="monster_sites")
+    activity_key: str | None = field(
+        metadata=ref("monster_activities", inverse="monster_sites", nullable=True)
     )
     capacity: int
     one_shot: bool
     recover_after_ticks: int | None = None
+    individual_label_zh: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +110,9 @@ class CompositionMember:
     ``minimum`` and ``maximum`` are the inclusive count range the row may
     contribute. A row is never truncated below its minimum at runtime, so every
     achievable composition total lies inside the sum of its members' ranges.
+    ``activity_key`` binds this row's individuals on their own; ``None`` keeps
+    the composition binding, so a mixed encounter can hold a cohesive pair
+    beside an independent individual.
     """
 
     variant_key: str = field(
@@ -105,6 +120,14 @@ class CompositionMember:
     )
     minimum: int
     maximum: int
+    activity_key: str | None = field(
+        default=None,
+        metadata=ref(
+            "monster_activities",
+            inverse="composition_member_bindings",
+            nullable=True,
+        ),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,13 +349,45 @@ def _check_composition_activity(
     return activity
 
 
+def _check_member_activities(
+    composition: EncounterComposition,
+    activities: Mapping[str, MonsterActivity],
+    what: str,
+) -> None:
+    """Reject a row binding that is empty or names no published activity.
+
+    A row that declares no binding is lawful: it inherits the composition
+    binding. The check runs even when a site override would mask the row at
+    construction, so an authored typo can never hide behind an override.
+    """
+    for index, member in enumerate(composition.members):
+        activity_key = member.activity_key
+        if activity_key is None:
+            continue
+        if not isinstance(activity_key, str) or not activity_key:
+            raise MonsterPlacementRegistryError(
+                f"{what} row {index} declares no activity binding"
+            )
+        if activity_key not in activities:
+            raise MonsterPlacementRegistryError(
+                f"{what} row {index} references unknown monster activity "
+                f"{activity_key!r}"
+            )
+
+
 def _check_site_activity(
     site: MonsterSite,
     activities: Mapping[str, MonsterActivity],
     what: str,
-) -> MonsterActivity:
-    """Reject a site override whose activity reference does not resolve."""
+) -> MonsterActivity | None:
+    """Reject a site override whose activity reference does not resolve.
+
+    ``None`` is lawful: the site declares no override, so every member resolves
+    its row's binding, else the composition's.
+    """
     activity_key = site.activity_key
+    if activity_key is None:
+        return None
     if not isinstance(activity_key, str) or not activity_key:
         raise MonsterPlacementRegistryError(
             f"{what} declares no activity binding"
@@ -343,6 +398,26 @@ def _check_site_activity(
             f"{what} references unknown monster activity {activity_key!r}"
         )
     return activity
+
+
+def _check_individual_label(
+    site: MonsterSite,
+    composition: EncounterComposition,
+    what: str,
+) -> None:
+    """Reject an empty label or one on a site that can place several individuals."""
+    label = site.individual_label_zh
+    if label is None:
+        return
+    if not isinstance(label, str) or not label:
+        raise MonsterPlacementRegistryError(
+            f"{what} declares an empty individual label"
+        )
+    if composition_bounds(composition) != (1, 1):
+        raise MonsterPlacementRegistryError(
+            f"{what} declares individual label {label!r}, but composition "
+            f"{composition.key!r} can place several individuals"
+        )
 
 
 def build_monster_site_registry(
@@ -434,6 +509,30 @@ def composition_variant_keys(composition: EncounterComposition) -> tuple[str, ..
     return tuple(member.variant_key for member in composition.members)
 
 
+def composition_row_bindings(
+    composition: EncounterComposition,
+    *,
+    site: MonsterSite | None = None,
+) -> tuple[str, ...]:
+    """One effective activity key per composition member row, in member order.
+
+    A site override governs the whole site: when ``site`` declares one, every
+    row resolves it and no row binding is consulted. Without an override, each
+    row resolves its own binding when it declares one, else the composition's.
+    The result is parallel to the sampled ``(variant_key, count)`` rows, so a
+    writer or the forecast passes it to
+    :func:`world.lore.monster_activity.movement_units` unchanged.
+    """
+    if site is not None and site.activity_key is not None:
+        return (site.activity_key,) * len(composition.members)
+    return tuple(
+        composition.activity_key
+        if member.activity_key is None
+        else member.activity_key
+        for member in composition.members
+    )
+
+
 def _check_rectangles(rectangles: object, what: str) -> None:
     """Reject authored zone geometry that is not inclusive integer rectangles."""
     if not isinstance(rectangles, tuple) or not rectangles:
@@ -463,6 +562,8 @@ def _check_composition(
     variants: Mapping[str, object],
     species: Mapping[str, object],
     what: str,
+    *,
+    activities: Mapping[str, MonsterActivity],
 ) -> None:
     """Reject an incomplete composition or one naming illegal member ranges."""
     if not isinstance(composition.key, str) or not composition.key:
@@ -491,6 +592,7 @@ def _check_composition(
             f"{what} member {member.variant_key!r} maximum",
             member.minimum,
         )
+    _check_member_activities(composition, activities, what)
 
 
 def validate_ecology_registries(
@@ -533,7 +635,9 @@ def validate_ecology_registries(
                 f"{what} declares key {composition.key!r}; a composition is keyed "
                 "by its own key"
             )
-        _check_composition(composition, variants, species, what)
+        _check_composition(
+            composition, variants, species, what, activities=activity_rows
+        )
         _check_composition_activity(composition, activity_rows, what)
 
     for mapping_key, zone in zones.items():
@@ -684,7 +788,11 @@ def validate_monster_placement_registry(
             site, composition_rows, variants, species, what
         )
         _check_composition_activity(composition, activity_rows, what)
+        _check_member_activities(
+            composition, activity_rows, f"{what} composition {composition.key!r}"
+        )
         _check_site_activity(site, activity_rows, what)
+        _check_individual_label(site, composition, what)
         if not isinstance(site.one_shot, bool):
             raise MonsterPlacementRegistryError(
                 f"{what} must author its one-shot/recoverable life cycle as a "

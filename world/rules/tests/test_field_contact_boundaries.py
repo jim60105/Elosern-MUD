@@ -868,10 +868,21 @@ class GroupFormationForecastParityTests(_BoundaryBase):
                 CompositionMember(_VARIANT, 1, 1),
             ),
         )
+        # One unbound pair row beside one explicitly solitary row: the
+        # composition binding is cohesive, so only the second row differs.
+        self.row_bound_composition = EncounterComposition(
+            "t_parity_row_bound",
+            self.group_activity,
+            (
+                CompositionMember(_VARIANT, 2, 2),
+                CompositionMember(_VARIANT, 1, 1, _PASSIVE),
+            ),
+        )
         compositions = {
             **self.compositions,
             self.solitary_composition.key: self.solitary_composition,
             self.cohesive_composition.key: self.cohesive_composition,
+            self.row_bound_composition.key: self.row_bound_composition,
         }
         self.enterContext(
             patch.object(
@@ -919,11 +930,28 @@ class GroupFormationForecastParityTests(_BoundaryBase):
             replenishment_interval=5,
             wave_budget=3,
         )
+        self.row_bound_zone = EcologyZone(
+            "t_parity_row_bound_zone",
+            self.region,
+            ((0, 0, 0, 0),),
+            (WeightedComposition(self.row_bound_composition.key, 1),),
+            1,
+            99,
+            3,
+            recovery_delay=5,
+            replenishment_interval=5,
+            wave_budget=3,
+        )
         self.enterContext(
             patch.object(
                 regional_population,
                 "ECOLOGY_ZONE_REGISTRY",
-                MappingProxyType({self.parity_zone.key: self.parity_zone}),
+                MappingProxyType(
+                    {
+                        self.parity_zone.key: self.parity_zone,
+                        self.row_bound_zone.key: self.row_bound_zone,
+                    }
+                ),
             )
         )
         self.parity_site = MonsterSite(
@@ -937,11 +965,27 @@ class GroupFormationForecastParityTests(_BoundaryBase):
             recover_after_ticks=20,
             activity_key=self.group_activity,
         )
+        self.mixed_site = MonsterSite(
+            key="t_parity_mixed_site",
+            kind="camp",
+            region_key=self.region,
+            coordinates=_SITE_CELL,
+            composition_key=self.row_bound_composition.key,
+            capacity=3,
+            one_shot=False,
+            recover_after_ticks=20,
+            activity_key=None,
+        )
         self.enterContext(
             patch.object(
                 monster_sites,
                 "MONSTER_SITE_REGISTRY",
-                MappingProxyType({self.parity_site.key: self.parity_site}),
+                MappingProxyType(
+                    {
+                        self.parity_site.key: self.parity_site,
+                        self.mixed_site.key: self.mixed_site,
+                    }
+                ),
             )
         )
 
@@ -958,6 +1002,15 @@ class GroupFormationForecastParityTests(_BoundaryBase):
     def _unit_counts(groups: dict, prefix: str) -> list[int]:
         return sorted(
             len(group.member_ids)
+            for group_id, group in groups.items()
+            if group_id.startswith(prefix)
+        )
+
+    @staticmethod
+    def _unit_shapes(groups: dict, prefix: str) -> list[tuple[int, str]]:
+        """Every projected unit's member count and its own binding."""
+        return sorted(
+            (len(group.member_ids), group.activity_key)
             for group_id, group in groups.items()
             if group_id.startswith(prefix)
         )
@@ -1039,5 +1092,97 @@ class GroupFormationForecastParityTests(_BoundaryBase):
         committed = self._unit_counts(
             monster_activity.read_monster_activity(self.wilderness).groups,
             f"site:{self.parity_site.key}:1",
+        )
+        self.assertEqual(committed, projected)
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_matured_mixed_row_site_projects_the_committed_groups(self):
+        # The site declares no override, so the cohesive composition binding
+        # keeps the unbound pair together while the bound single row stands
+        # alone. Projection and commit must agree on both shape and binding.
+        tick = 300
+        self.wilderness.db.monster_sites = {
+            self.mixed_site.key: {
+                "state": monster_sites.SITE_STATE_CLEARED,
+                "cleared_at_tick": tick - self.mixed_site.recover_after_ticks,
+                "seed": _SEED,
+                "generation_sequence": 0,
+                "member_ids": [999999],
+            }
+        }
+        self.wilderness.db.population_timeline = {
+            "settled_through_tick": tick,
+            "transitions": [],
+            "protection": [],
+        }
+
+        projection = self._projection(tick)
+        before = set(projection.groups)
+        projection._settle_sites(tick)
+        projected = self._unit_shapes(
+            {
+                group_id: projection.groups[group_id]
+                for group_id in set(projection.groups) - before
+            },
+            f"site:{self.mixed_site.key}:1",
+        )
+        self.assertEqual(
+            projected, [(1, _PASSIVE), (2, self.group_activity)]
+        )
+
+        self.assertTrue(
+            monster_sites.settle_site_recovery(
+                self.mixed_site.key, tick, wilderness=self.wilderness
+            )
+        )
+        committed = self._unit_shapes(
+            monster_activity.read_monster_activity(self.wilderness).groups,
+            f"site:{self.mixed_site.key}:1",
+        )
+        self.assertEqual(committed, projected)
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_row_bound_zone_birth_projects_the_committed_groups(self):
+        tick = 400
+        self.wilderness.db.regional_population = {
+            self.row_bound_zone.key: {
+                "initialized": True,
+                "seed": _SEED,
+                "generation_sequence": 0,
+                "recovery_due_tick": tick,
+                "settled_through_tick": tick,
+            }
+        }
+        self.wilderness.db.population_timeline = {
+            "settled_through_tick": tick,
+            "transitions": [],
+            "protection": [],
+        }
+
+        projection = self._projection(tick)
+        before = set(projection.groups)
+        projection._settle_zone_recoveries(tick)
+        projected = self._unit_shapes(
+            {
+                group_id: projection.groups[group_id]
+                for group_id in set(projection.groups) - before
+            },
+            f"zone:{self.row_bound_zone.key}:1",
+        )
+        self.assertEqual(
+            projected, [(1, _PASSIVE), (2, self.group_activity)]
+        )
+
+        plan = plan_population_wave(self.wilderness, self.row_bound_zone.key, tick=tick)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        created = commit_population_wave(self.wilderness, plan)
+        self.assertEqual(len(created), 3)
+        committed = self._unit_shapes(
+            monster_activity.read_monster_activity(self.wilderness).groups,
+            f"wave:{self.row_bound_zone.key}:1",
         )
         self.assertEqual(committed, projected)

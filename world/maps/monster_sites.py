@@ -58,6 +58,7 @@ from world.lore.monster_placement import (
     ENCOUNTER_COMPOSITION_REGISTRY,
     MONSTER_SITE_REGISTRY,
     MonsterSite,
+    composition_row_bindings,
     composition_variant_keys,
     variant_species_key,
 )
@@ -483,29 +484,36 @@ def _populate(
 
     Fresh rows every time: the site's occurrence selects one inclusive
     count vector of its authored composition, every row of which is constructed
-    with its own identity and stored resources and marked with the site key.
-    The complete composition then forms movement groups by the site binding's
-    policy and registers each group through the regional population owner's
-    explicit-placement operation at the site's coordinate: a stationary or
-    solitary override leaves one group per individual while a cohesive override
-    keeps the whole sampled group together. That operation validates the shared
-    wilderness surface while deliberately applying no ordinary settlement
-    buffer, zone/cell density or wave budget, so an explicit manual site is
-    never culled or capped by automatic maintenance. No shipped number is
-    duplicated here: the traits come from the construction owner's
+    with its own identity and stored resources and marked with the site key. A
+    labelled site is always a one-individual composition, so the authored label
+    is the one individual's display key and never its identity. The complete
+    composition then forms movement groups from the resolved row bindings
+    (:func:`world.lore.monster_placement.composition_row_bindings`): a site
+    override governs every member, otherwise each row's own binding, else the
+    composition's. Each group is registered through the regional population
+    owner's explicit-placement operation at the site's coordinate, so a
+    stationary or solitary binding leaves one group per individual while a
+    cohesive binding keeps its members together. That operation validates the
+    shared wilderness surface while deliberately applying no ordinary
+    settlement buffer, zone/cell density or wave budget, so an explicit manual
+    site is never culled or capped by automatic maintenance. No shipped number
+    is duplicated here: the traits come from the construction owner's
     balance-gated rule. ``seed``/``sequence`` are the site's saved occurrence
     (the tick is reporting context only, so a retry at a later tick selects the
     same complete group).
     """
     created: list[Monster] = []
     rows = site_occurrence_groups(site, seed=seed, sequence=sequence)
+    composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
     for variant_key, count in rows:
         species_key = variant_species_key(variant_key)
         for _ in range(count):
-            individual = construct_species_individual(species_key, variant_key)
+            individual = construct_species_individual(
+                species_key, variant_key, key=site.individual_label_zh
+            )
             individual.db.site_key = site.key
             created.append(individual)
-    units = movement_units(rows, (site.activity_key,) * len(rows))
+    units = movement_units(rows, composition_row_bindings(composition, site=site))
     for ordinal, unit in enumerate(units):
         register_explicit_group(
             wilderness,

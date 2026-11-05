@@ -37,6 +37,7 @@ from world.lore.monster_placement import (
     MonsterSite,
     SettlementBirthPolicy,
     WeightedComposition,
+    composition_row_bindings,
     variant_species_key,
 )
 from world.lore.monster_species import MonsterSpecies, MonsterVariant
@@ -64,6 +65,8 @@ POLICY_ANCHOR = "t_fixture_policy_anchor"
 AREA = "t_fixture_activity_area"
 ACTIVITY = "t_fixture_activity"
 OTHER_ACTIVITY = "t_fixture_other_activity"
+ABSENT_ACTIVITY = "t_fixture_absent_activity"
+LABEL = "t_fixture_label"
 
 # The registry's public callables, in full: read and validate. An execution
 # entry point (spawn/place/populate/reconcile/respawn/recover) would have to
@@ -75,6 +78,7 @@ EXPECTED_PUBLIC_CALLABLES = frozenset(
         "build_monster_site_registry",
         "build_settlement_birth_policy_registry",
         "composition_bounds",
+        "composition_row_bindings",
         "composition_variant_keys",
         "validate_ecology_registries",
         "validate_monster_placement_registry",
@@ -166,9 +170,12 @@ def _recovered_site(**overrides) -> MonsterSite:
 
 
 def _member(
-    variant_key: str = ORDINARY, minimum: int = 1, maximum: int = 1
+    variant_key: str = ORDINARY,
+    minimum: int = 1,
+    maximum: int = 1,
+    activity_key: str | None = None,
 ) -> CompositionMember:
-    return CompositionMember(variant_key, minimum, maximum)
+    return CompositionMember(variant_key, minimum, maximum, activity_key)
 
 
 def _composition(key: str = COMPOSITION, members=None) -> EncounterComposition:
@@ -382,6 +389,148 @@ class PlacementValidationTests(unittest.TestCase):
             registry.validate_monster_placement_registry(sites, **_faces())
         self.assertEqual(sites, {SITE: _site(one_shot=False)})
         self.assertEqual(dict(_published("MONSTER_SITE")), published_before)
+
+
+class MemberActivityBindingTests(unittest.TestCase):
+    """Row bindings resolve by one precedence rule; a label needs one individual."""
+
+    @staticmethod
+    def _mixed() -> EncounterComposition:
+        """One synthetic composition: a bound row beside an unbound row."""
+        return _composition(
+            COMPOSITION,
+            (_member(ORDINARY, 2, 2, OTHER_ACTIVITY), _member(STRONGER, 1, 1)),
+        )
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_an_unoverridden_row_resolves_its_own_binding_then_the_composition(self):
+        # The first row declares its own binding; the second one falls back.
+        self.assertEqual(
+            composition_row_bindings(self._mixed()), (OTHER_ACTIVITY, ACTIVITY)
+        )
+        self.assertEqual(composition_row_bindings(_composition()), (ACTIVITY,))
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_site_override_governs_every_row_and_masks_row_bindings(self):
+        bindings = composition_row_bindings(
+            self._mixed(), site=_site(activity_key=OTHER_ACTIVITY)
+        )
+        self.assertEqual(bindings, (OTHER_ACTIVITY, OTHER_ACTIVITY))
+        # The same rows under the default site binding follow the override too,
+        # so no row binding can move a member of an overridden site.
+        self.assertEqual(
+            composition_row_bindings(self._mixed(), site=_site()),
+            (ACTIVITY, ACTIVITY),
+        )
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_a_site_without_an_override_resolves_row_bindings(self):
+        self.assertEqual(
+            composition_row_bindings(
+                self._mixed(), site=_site(activity_key=None)
+            ),
+            (OTHER_ACTIVITY, ACTIVITY),
+        )
+        registry.validate_monster_placement_registry(
+            {SITE: _site(activity_key=None, capacity=3)},
+            **_faces(
+                compositions={COMPOSITION: self._mixed()},
+                activities={ACTIVITY: _activity(), OTHER_ACTIVITY: _activity()},
+            ),
+        )
+
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
+    def test_an_unknown_or_empty_row_binding_is_rejected(self):
+        for activity_key in (ABSENT_ACTIVITY, "", 7):
+            broken = _composition(
+                COMPOSITION, (_member(ORDINARY, 1, 1, activity_key),)
+            )
+            with self.subTest(row_binding=activity_key):
+                # Both publication paths reject it, and an unoverridden site
+                # cannot hide the typo behind a masking override either.
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    registry.validate_ecology_registries(
+                        {ZONE: _zone()},
+                        {COMPOSITION: broken},
+                        {},
+                        **_ecology_faces(),
+                    )
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    registry.validate_monster_placement_registry(
+                        {SITE: _site()},
+                        **_faces(compositions={COMPOSITION: broken}),
+                    )
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    registry.validate_monster_placement_registry(
+                        {SITE: _site(activity_key=OTHER_ACTIVITY)},
+                        **_faces(
+                            compositions={COMPOSITION: broken},
+                            activities={
+                                ACTIVITY: _activity(),
+                                OTHER_ACTIVITY: _activity(),
+                            },
+                        ),
+                    )
+        # The diagnostic names the composition, the row and the key, so an
+        # author can find the row that must be fixed.
+        with self.assertRaises(MonsterPlacementRegistryError) as raised:
+            registry.validate_ecology_registries(
+                {ZONE: _zone()},
+                {COMPOSITION: _composition(
+                    COMPOSITION, (_member(ORDINARY, 1, 1, ABSENT_ACTIVITY),)
+                )},
+                {},
+                **_ecology_faces(),
+            )
+        self.assertIn(COMPOSITION, str(raised.exception))
+        self.assertIn("row 0", str(raised.exception))
+        self.assertIn(ABSENT_ACTIVITY, str(raised.exception))
+
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
+    def test_a_label_requires_every_outcome_to_be_exactly_one_individual(self):
+        registry.validate_monster_placement_registry(
+            {SITE: _site(individual_label_zh=LABEL)}, **_faces()
+        )
+        # A fixed pair and one variable row both admit several individuals.
+        for members in (
+            (_member(ORDINARY, 1, 1), _member(STRONGER, 1, 1)),
+            (_member(ORDINARY, 1, 2),),
+        ):
+            with self.subTest(rows=len(members)):
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    registry.validate_monster_placement_registry(
+                        {
+                            SITE: _site(
+                                capacity=2, individual_label_zh=LABEL
+                            )
+                        },
+                        **_faces(
+                            compositions={
+                                COMPOSITION: _composition(COMPOSITION, members)
+                            }
+                        ),
+                    )
+
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
+    def test_an_empty_label_is_rejected(self):
+        for label in ("", 0):
+            with self.subTest(label=label):
+                with self.assertRaises(MonsterPlacementRegistryError):
+                    registry.validate_monster_placement_registry(
+                        {SITE: _site(individual_label_zh=label)}, **_faces()
+                    )
 
 
 class EcologyDeclarationTests(unittest.TestCase):
