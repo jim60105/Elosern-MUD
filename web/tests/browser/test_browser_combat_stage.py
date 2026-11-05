@@ -1764,6 +1764,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 self.assertAlmostEqual(a["width"], b["width"], delta=0.5)
                 self.assertAlmostEqual(a["height"], b["height"], delta=0.5)
                 self.assertAlmostEqual(a["y"], b["y"], delta=0.5)
+        page.mouse.move(2, 2)
         # No selection cue at rest. The first entry is always the listbox's
         # active descendant (aria-selected), but while the rail does not hold
         # focus it shows neither the lift nor the focus underline.
@@ -1782,9 +1783,11 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page, entries = self._rail_page()
         lead = page.locator('[data-testid="exploration-readout-lead"]')
 
-        def hover(index: int) -> dict:
+        def hover(index: int, name: str) -> dict:
             box = entries.nth(index).bounding_box()
             page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            # Read only once the readout has followed the pointer.
+            expect(lead.locator('[data-testid="exploration-readout-name"]')).to_have_text(name)
             return {
                 # The lead holds the name followed by the tag, nothing else;
                 # the two are separate flex items, so their rendered text is
@@ -1795,13 +1798,13 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             }
 
         page.mouse.move(2, 2)
-        plain = hover(1)
+        plain = hover(1, "合成蟹類甲")
         self.assertEqual(plain["lead"], "合成蟹類甲合成型")
         self.assertIsNone(plain["named"])
-        named = hover(0)
+        named = hover(0, "潮眠合成者")
         self.assertEqual(named["lead"], "潮眠合成者合成型合成鱷")
         self.assertEqual(named["named"], "true")
-        person = hover(2)
+        person = hover(2, "合成旅人")
         self.assertEqual(person["lead"], "合成旅人")
         self.assertIsNone(person["named"])
         # Switching entries never moves the readout's lead line.
