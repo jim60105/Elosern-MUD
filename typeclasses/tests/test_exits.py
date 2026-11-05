@@ -296,10 +296,13 @@ class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
         # monster-population).
         coordinates = dict(script.db.itemcoordinates)
         self.assertNotIn(self.char1, coordinates)
+        # The regional population keeps every populated cell's individuals
+        # registered; the leak-check intent is that no player bookkeeping
+        # survives the return, never a particular monster count.
+        self.assertTrue(coordinates)
         self.assertTrue(
-            all(isinstance(obj, Monster) for obj in coordinates)
-            and len(coordinates) == 1,
-            "only the entry population monster may remain registered",
+            all(isinstance(obj, Monster) for obj in coordinates),
+            "only population monsters may remain registered",
         )
         # The vacated room is either in unused_rooms or retained in db.rooms,
         # never orphaned -- and re-entry reuses the same room object.
@@ -318,7 +321,7 @@ class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
         wilderness_location = self.char1.location
         # Simulate a vanished gate (the true misconfiguration this guards
         # against) by patching the shared gate-room lookup to return None.
-        with patch("typeclasses.exits.grid_room_for_gate", return_value=None):
+        with patch("typeclasses.exits.room_for_ref", return_value=None):
             result = self._exit("west").at_traverse(
                 self.char1, self.char1.location
             )

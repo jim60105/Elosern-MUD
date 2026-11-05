@@ -243,8 +243,9 @@ class LandmarkArrivalTests(EvenniaTest):
         def preflight(*args,**kwargs):
             yield NS(status=TraversalStatus.RESOLVED,cost=None)
         self.district.landmark_node=encode_wild(WILDERNESS_NAME,*cell)
+        # The exit resolves its edge through the lore registry binding, so one
+        # patch covers both the traversal and the canonical landmark read.
         with patch("world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",{"t_gate":entry}), \
-             patch("typeclasses.exits.WILDERNESS_ENTRY_REGISTRY",{"t_gate":entry}), \
              patch("world.rules.travel_cost.preflight_movement_cost",preflight), \
              patch.object(self.char1,"msg") as msg,self.captureOnCommitCallbacks(execute=True):
             gate.at_traverse(self.char1,self.source)
