@@ -71,14 +71,34 @@ class BrowserVerificationContractTests(unittest.TestCase):
             preflight_names.index("Compute browser shard matrix"),
             "the Node suite runs in preflight before any execution job starts",
         )
-        self.assertIn(
-            "playwright install --with-deps chromium",
-            jobs["browser"]["steps"][
-                [step["name"] for step in jobs["browser"]["steps"]].index(
-                    "Install Chromium and Firefox for browser acceptance"
-                )
-            ]["run"],
+        # Both acceptance browsers must be present before the shard's Python
+        # runner starts. The shard runs inside the pinned Playwright image,
+        # which ships them with their system libraries; the step that verifies
+        # the bundle launches each one for real instead of downloading it
+        # eighty-nine times over the network.
+        browser_names = [step["name"] for step in jobs["browser"]["steps"]]
+        self.assertEqual(
+            jobs["browser"]["container"]["image"],
+            "mcr.microsoft.com/playwright/python:v1.62.0-noble",
         )
+        verify_index = browser_names.index(
+            "Verify the container's browser bundle"
+        )
+        browser_run_index = browser_names.index(
+            next(
+                name
+                for name in browser_names
+                if name.startswith("Run browser shard")
+            )
+        )
+        self.assertLess(
+            verify_index,
+            browser_run_index,
+            "the browser bundle is verified before the shard's runner starts",
+        )
+        verify_run = jobs["browser"]["steps"][verify_index]["run"]
+        for browser in ("chromium", "firefox"):
+            self.assertIn(browser, verify_run)
         self.assertEqual(
             preflight_steps["Run Node DOM-independent test suite"]["run"],
             "node --test web/static/webclient/js/tests/*.test.js",
