@@ -17,7 +17,7 @@ afterEach(() => {
 }, 60000);
 
 const unavailableArea = () => ({
-  schema_version: 3, available: false, reason: { code: "map_unavailable", message: "這一帶的地圖目前無法顯示" },
+  schema_version: 4, available: false, reason: { code: "map_unavailable", message: "這一帶的地圖目前無法顯示" },
 });
 
 function travel(store) {

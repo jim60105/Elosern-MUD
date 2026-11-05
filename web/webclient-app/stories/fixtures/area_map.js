@@ -43,7 +43,7 @@ const townNode = (id, label, x, y, visibility, extra = {}) => ({
 export function townArea(overrides = {}) {
   const T = TOWN_IDS;
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "grid",
     map_id: TOWN,
@@ -149,7 +149,7 @@ const room = (id, label, visibility, extra = {}) => ({ id, label, visibility, ga
 export function dungeonArea(overrides = {}) {
   const D = DUNGEON_IDS;
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "instance",
     map_id: "instance:41",
@@ -187,7 +187,7 @@ export function dungeonArea(overrides = {}) {
 
 export function interiorArea() {
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "interior",
     map_id: "room:120",
@@ -230,10 +230,12 @@ export function interiorArea() {
 export const WILD_CENTRE = { x: 100, y: 200 };
 export const WILD_GATE_ID = gridId(TOWN, 400, 60);
 export const WILD_QUEST_CELL = { x: 104, y: 197 };
-/** A revealed cell no node stands on (seen, never visited). */
-export const WILD_REMEMBERED_CELL = { x: 101, y: 196 };
-/** A visited trail cell with no step from the current cell. */
-export const WILD_TRAIL_CELL = { x: 97, y: 197 };
+/** A revealed, never-walked cell outside live sight (explored grade). */
+export const WILD_EXPLORED_CELL = { x: 98, y: 195 };
+/** A walked cell outside live sight (the same explored grade). */
+export const WILD_EXPLORED_WALKED_CELL = { x: 96, y: 195 };
+/** A revealed cell inside the supplied live-sight disc (bright grade). */
+export const WILD_SIGHTED_CELL = { x: 101, y: 196 };
 const POND = new Set(["96:199", "96:200", "97:200", "96:201", "95:200"]);
 const FOOTPRINT = (x, y) => x >= 103 && x <= 105 && y >= 203 && y <= 205;
 const APPROACH = { x: 102, y: 202 };
@@ -321,6 +323,43 @@ function wildDisplay(x, terrain, ford) {
   };
 }
 
+// A synthetic 5 km coarse overview of the current (east) district, centred on
+// the current one-kilometre cell. Only cells east of x = 99 are owned by the
+// disclosed district; the rest of the box stays unknown. Fixture data only.
+const OVERVIEW_KM = 5;
+function wildOverview(cellKm) {
+  const centreX = Math.floor((WILD_CENTRE.x + 0.5) * cellKm / OVERVIEW_KM);
+  const centreY = Math.floor((WILD_CENTRE.y + 0.5) * cellKm / OVERVIEW_KM);
+  const minX = centreX - 4;
+  const minY = centreY - 4;
+  const size = 9;
+  const rows = [];
+  for (let row = 0; row < size; row += 1) {
+    const runs = [];
+    for (let col = 0; col < size; col += 1) {
+      const x = (minX + col) * OVERVIEW_KM + Math.floor(OVERVIEW_KM / 2);
+      const y = (minY + row) * OVERVIEW_KM + Math.floor(OVERVIEW_KM / 2);
+      const facts = x >= 99 ? wildTerrain(x, y) : null;
+      const run = facts && facts.terrain !== "sea"
+        ? { kind: "terrain", terrain: facts.terrain, band: facts.band, passable: facts.passable }
+        : { kind: "unknown" };
+      const entry = { length: 1, ...run };
+      const last = runs[runs.length - 1];
+      const same = last && JSON.stringify({ ...last, length: 0 }) === JSON.stringify({ ...entry, length: 0 });
+      if (same) last.length += 1;
+      else runs.push(entry);
+    }
+    rows.push(runs);
+  }
+  return {
+    key: "story_east_foothills",
+    name_zh: "灰鬃荒原東麓",
+    cell_km: OVERVIEW_KM,
+    window: { min_x: minX, min_y: minY, width: size, height: size },
+    rows,
+  };
+}
+
 function revealedAt(x, y) {
   return WILD_VISITS.some(([vx, vy, r]) => (x - vx) ** 2 + (y - vy) ** 2 <= (r + 0.5) ** 2);
 }
@@ -343,7 +382,7 @@ function wildRows(minX, minY) {
   return rows;
 }
 
-export function wildernessArea({ cellKm = 1 } = {}) {
+export function wildernessArea({ cellKm = 1, district = undefined } = {}) {
   const { x: cx, y: cy } = WILD_CENTRE;
   const centre = (value) => (value + 0.5) * cellKm;
   const current = wildId(cx, cy);
@@ -400,7 +439,7 @@ export function wildernessArea({ cellKm = 1 } = {}) {
   const minX = cx - 20;
   const minY = cy - 20;
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -413,6 +452,7 @@ export function wildernessArea({ cellKm = 1 } = {}) {
       { id: "q_story_wolves", title: "驅離荒原狼群", tracked: true, destination: { kind: "node", node_id: wildId(WILD_QUEST_CELL.x, WILD_QUEST_CELL.y) } },
     ],
     district_name: "灰鬃荒原東麓",
+    district: district === undefined ? wildOverview(cellKm) : district,
     cell_km: cellKm,
     window: { min_x: minX, min_y: minY, width: 41, height: 41 },
     rows: wildRows(minX, minY),

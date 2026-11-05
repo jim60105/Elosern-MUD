@@ -350,6 +350,23 @@ describe("map zoom stops and fit follow scope and aspect ratio", () => {
     expect(bottom.bottom).toBeLessThanOrEqual(576 + EPS);
   });
 
+  it("adds the district stop only for a supplied overview and widens only its limit", () => {
+    const plain = wildernessStops(FRAME);
+    expect(plain.map((stop) => stop.key)).toEqual(["window", "surroundings", "nearby"]);
+    const plainLimits = spanLimits(plain);
+    const widened = wildernessStops(FRAME, {
+      overviewBounds: { minX: -60, minY: -80, maxX: 60, maxY: 80 },
+    });
+    expect(widened.map((stop) => stop.key)).toEqual(["district", "window", "surroundings", "nearby"]);
+    expect(widened[0].label).toBe("地區");
+    expect(widened[0].span).toBeGreaterThan(plain[0].span);
+    const widenedLimits = spanLimits(widened);
+    expect(widenedLimits.max).toBeGreaterThan(plainLimits.max);
+    // The narrower stops and the inward limit are unchanged.
+    expect(widened.slice(1).map((stop) => stop.span)).toEqual(plain.map((stop) => stop.span));
+    expect(widenedLimits.min).toBe(plainLimits.min);
+  });
+
 
   it("jumps between stops with plus/minus and caps the continuous wheel", () => {
     const stops = worldStops(CONTINENT, { width: 1600, height: 600 });

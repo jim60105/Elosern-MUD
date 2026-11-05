@@ -67,6 +67,7 @@ import {
   areaDotField,
   areaStops,
   areaUnit,
+  decodeDistrictOverview,
   decodeWindow,
   entityMarks,
   isRadialLayer,
@@ -125,6 +126,7 @@ const signature = computed(() => viewSignature(props.area));
 const unit = computed(() => areaUnit(props.area));
 const radial = computed(() => isRadialLayer(props.area));
 const isWild = computed(() => props.area.layer === "wilderness");
+const overview = computed(() => (isWild.value ? decodeDistrictOverview(props.area) : null));
 const placed = computed(() => placeNodes(props.area));
 const placedById = computed(() => new Map(placed.value.map((entry) => [entry.node.id, entry])));
 const adjacent = computed(() => adjacentIds(props.area));
@@ -389,7 +391,36 @@ const terrainDraws = computed(() => {
       y: r.top,
       width: Math.max(0.5, r.right - r.left),
       height: Math.max(0.5, r.bottom - r.top),
-      opacity: cell.state === "remembered" ? 0.5 + relief * 0.3 : 0.78 + relief * 0.22,
+      opacity: cell.state === "explored" ? 0.5 + relief * 0.3 : 0.78 + relief * 0.22,
+    });
+  }
+  return out;
+});
+
+// The coarse district overview behind the fine window. A coarse cell `(x, y)`
+// covers the panel cells `[x * scale, (x + 1) * scale)`; unknown coarse cells
+// draw nothing and stay the surface's fog. The SVG mask cuts the fine window
+// out of this layer, so coarse terrain never bleeds into unrevealed cells.
+const districtDraws = computed(() => {
+  const data = overview.value;
+  if (!data) return [];
+  const { width, height } = frame.value;
+  const scale = data.cellKm / props.area.cell_km;
+  const out = [];
+  for (const cell of data.cells) {
+    if (!cell) continue;
+    const startX = cell.x * scale;
+    const startY = cell.y * scale;
+    const sw = screenRect(startX, startY);
+    const ne = screenRect(startX + scale, startY + scale);
+    if (ne.left < 0 || sw.left > width || sw.bottom < 0 || ne.top > height) continue;
+    out.push({
+      key: `${cell.x}:${cell.y}`,
+      terrain: cell.terrain,
+      x: sw.left,
+      y: ne.top,
+      width: Math.max(0.5, ne.left - sw.left),
+      height: Math.max(0.5, sw.bottom - ne.top),
     });
   }
   return out;
@@ -833,6 +864,26 @@ onBeforeUnmount(() => {
             <stop offset="0.55" stop-color="#0a0908" stop-opacity="0" />
             <stop offset="1" stop-color="#0a0908" stop-opacity="0.62" />
           </radialGradient>
+          <mask
+            v-if="overview"
+            :id="`${uid}-overview-clip`"
+            maskUnits="userSpaceOnUse"
+            maskContentUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            :width="frame.width"
+            :height="frame.height"
+          >
+            <rect x="0" y="0" :width="frame.width" :height="frame.height" fill="#fff" />
+            <rect
+              v-if="windowDraw"
+              :x="windowDraw.x"
+              :y="windowDraw.y"
+              :width="windowDraw.width"
+              :height="windowDraw.height"
+              fill="#000"
+            />
+          </mask>
         </defs>
 
         <rect
@@ -848,6 +899,29 @@ onBeforeUnmount(() => {
           :fill="`url(#${uid}-dots)`"
           aria-hidden="true"
         />
+
+        <g
+          v-if="overview"
+          class="area-map__overview"
+          :mask="`url(#${uid}-overview-clip)`"
+          data-testid="area-map__overview"
+          aria-hidden="true"
+        >
+          <rect
+            v-for="cell in districtDraws"
+            :key="cell.key"
+            class="area-map__terrain area-map__overview-terrain is-explored"
+            :class="`t-${cell.terrain}`"
+            data-testid="area-map__overview-terrain"
+            :data-cell="cell.key"
+            :data-terrain="cell.terrain"
+            :x="cell.x"
+            :y="cell.y"
+            :width="cell.width"
+            :height="cell.height"
+            fill-opacity="0.62"
+          />
+        </g>
 
         <g v-if="windowDraw" class="area-map__window" aria-hidden="true" data-testid="area-map__window">
           <!-- The unknown remainder of the window: an even fog wash. -->
@@ -1123,6 +1197,7 @@ onBeforeUnmount(() => {
 .area-map__terrain.t-sea { fill: var(--terrain-sea); }
 .area-map__terrain.t-ridge { fill: var(--terrain-ridge); }
 .area-map__terrain.t-settlement { fill: var(--terrain-settlement); }
+.area-map__overview-terrain { stroke: none; }
 .area-map__hatch { pointer-events: none; }
 .area-map__hatch-line { stroke: #0c0b09; stroke-opacity: 0.55; stroke-width: 1.4; }
 .area-map__relief { fill: none; stroke: var(--paper-100); stroke-opacity: 0.38; stroke-width: 1.2; stroke-linejoin: round; }

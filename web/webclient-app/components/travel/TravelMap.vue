@@ -69,12 +69,20 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import WorldHatchPattern from "../WorldHatchPattern.vue";
 import MapNodeGlyph from "../MapNodeGlyph.vue";
 import TravelGlyph from "./TravelGlyph.vue";
-import { SAMPLES_PER_CELL, paintSignature, paintTravelMap } from "../../lib/travel-paint.js";
+import {
+  DISTRICT_SAMPLES_PER_CELL,
+  SAMPLES_PER_CELL,
+  districtPaintSignature,
+  paintDistrictOverview,
+  paintSignature,
+  paintTravelMap,
+} from "../../lib/travel-paint.js";
 import {
   GLIDE_MS,
   ZOOM,
   bearingAngle,
   cellSize,
+  districtFitCamera,
   fitRouteCamera,
   followCamera,
   openStage,
@@ -164,6 +172,7 @@ const announcement = computed(() => {
 
 const root = ref(null);
 const canvas = ref(null);
+const districtCanvas = ref(null);
 
 function focusInside() {
   const active = typeof document === "undefined" ? null : document.activeElement;
@@ -254,6 +263,16 @@ function observe() {
 const zoom = ref(ZOOM.initial);
 const uiScaleNow = computed(() => safeScale(props.uiScale ?? measured.value.scale));
 const baseCell = computed(() => cellSize(zoom.value, uiScaleNow.value));
+const overview = computed(() => props.grid?.district ?? null);
+// The symbolic whole-district fit. It is not a zoom rung: the cell size may
+// fall below the 18 px local ladder and is never clamped through it.
+const districtFit = ref(false);
+let lastFitDistrict = overview.value?.key ?? null;
+const fineBounds = computed(() => {
+  const grid = props.grid;
+  if (!grid) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+  return { minX: grid.origin.x, minY: grid.origin.y, maxX: grid.origin.x + grid.width, maxY: grid.origin.y + grid.height };
+});
 
 const camera = computed(() => {
   const grid = props.grid;
@@ -263,9 +282,53 @@ const camera = computed(() => {
     const points = [grid.party, ...(Array.isArray(plan.steps) ? plan.steps.map((s) => s.cell) : []), plan.destination].filter(Boolean);
     return fitRouteCamera({ points, cellPx: baseCell.value, minCellPx: 14 * uiScaleNow.value, safe: measured.value.safe });
   }
+  if (districtFit.value) {
+    const fitted = districtFitCamera({
+      district: overview.value,
+      bounds: fineBounds.value,
+      safe: measured.value.safe,
+      cellKm: grid.cellKm,
+    });
+    if (fitted) return fitted;
+  }
   return followCamera({ party: grid.party, cellPx: baseCell.value, stage: measured.value.stage });
 });
 const c = computed(() => camera.value.cellPx);
+
+function toggleDistrictFit() {
+  if (!overview.value) return;
+  if (districtFit.value) {
+    districtFit.value = false;
+    zoom.value = ZOOM.min;
+    emit("zoom", ZOOM.min);
+  } else {
+    districtFit.value = true;
+  }
+  snap();
+}
+
+// A committed overview that becomes null or names a different district never
+// leaves an orphaned sub-18 scale behind: leave the fit and return to the
+// local ladder.
+watch(
+  () => overview.value?.key ?? null,
+  (key) => {
+    if (!key && !overview.value) {
+      if (districtFit.value) {
+        districtFit.value = false;
+        zoom.value = ZOOM.min;
+        emit("zoom", ZOOM.min);
+      }
+      return;
+    }
+    if (districtFit.value && key !== lastFitDistrict) {
+      districtFit.value = false;
+      zoom.value = ZOOM.min;
+      emit("zoom", ZOOM.min);
+    }
+    lastFitDistrict = key;
+  },
+);
 
 // A zoom, a new map or the first frame snaps instead of gliding.
 const snapping = ref(true);
@@ -291,26 +354,55 @@ const worldStyle = computed(() => ({
 // ── painting ─────────────────────────────────────────────────────────────
 
 const painted = ref(null); // { origin, width, height } of the canvas's grid
+const paintedDistrict = ref(null); // { origin, width, height, cellKm } of the overview canvas
 const paintCache = {};
 let paintFrame = 0;
 let lastSignature = null;
+let lastDistrictSignature = null;
 
 function paintNow() {
   paintFrame = 0;
   const grid = props.grid;
-  const el = canvas.value;
-  if (!grid || !el || !showMap.value) return;
+  if (!grid || !showMap.value) return;
   const signature = paintSignature(grid);
-  if (signature === lastSignature) return;
-  const w = grid.width * SAMPLES_PER_CELL;
-  const h = grid.height * SAMPLES_PER_CELL;
-  if (el.width !== w) el.width = w;
-  if (el.height !== h) el.height = h;
-  const ctx = el.getContext?.("2d") ?? null;
-  if (!ctx) return;
-  paintTravelMap(ctx, grid, { cache: paintCache });
-  lastSignature = signature;
-  painted.value = { origin: { ...grid.origin }, width: grid.width, height: grid.height };
+  const el = canvas.value;
+  if (el && signature !== lastSignature) {
+    const w = grid.width * SAMPLES_PER_CELL;
+    const h = grid.height * SAMPLES_PER_CELL;
+    if (el.width !== w) el.width = w;
+    if (el.height !== h) el.height = h;
+    const ctx = el.getContext?.("2d") ?? null;
+    if (ctx) {
+      paintTravelMap(ctx, grid, { cache: paintCache });
+      lastSignature = signature;
+      painted.value = { origin: { ...grid.origin }, width: grid.width, height: grid.height };
+    }
+  }
+  const districtSignature = districtPaintSignature(grid);
+  if (districtSignature === lastDistrictSignature) return;
+  const district = grid.district;
+  const districtEl = districtCanvas.value;
+  if (!district) {
+    paintedDistrict.value = null;
+    lastDistrictSignature = districtSignature;
+    return;
+  }
+  // Not mounted yet: retry on the next scheduled paint.
+  if (!districtEl) return;
+  const dw = district.width * DISTRICT_SAMPLES_PER_CELL;
+  const dh = district.height * DISTRICT_SAMPLES_PER_CELL;
+  if (districtEl.width !== dw) districtEl.width = dw;
+  if (districtEl.height !== dh) districtEl.height = dh;
+  const districtCtx = districtEl.getContext?.("2d") ?? null;
+  if (!districtCtx) return;
+  paintDistrictOverview(districtCtx, grid, { cache: paintCache });
+  lastDistrictSignature = districtSignature;
+  paintedDistrict.value = {
+    origin: { ...district.origin },
+    width: district.width,
+    height: district.height,
+    cellKm: district.cellKm,
+  };
 }
 
 function schedulePaint() {
@@ -330,6 +422,17 @@ const canvasStyle = computed(() => {
     left: `${p.origin.x * c.value}px`,
     top: `${-(p.origin.y + p.height) * c.value}px`,
     transform: `scale(${c.value / SAMPLES_PER_CELL})`,
+  };
+});
+
+const districtCanvasStyle = computed(() => {
+  const p = paintedDistrict.value;
+  if (!p) return { visibility: "hidden" };
+  const cell = p.cellKm * c.value;
+  return {
+    left: `${p.origin.x * cell}px`,
+    top: `${-(p.origin.y + p.height) * cell}px`,
+    transform: `scale(${cell / DISTRICT_SAMPLES_PER_CELL})`,
   };
 });
 
@@ -354,7 +457,12 @@ function ly(y) {
   return (props.grid.origin.y + props.grid.height - 1 - y + 0.5) * c.value;
 }
 function cellBox(x, y, inset = 1) {
-  return { x: lx(x) - c.value / 2 + inset, y: ly(y) - c.value / 2 + inset, width: c.value - inset * 2, height: c.value - inset * 2 };
+  return {
+    x: lx(x) - c.value / 2 + inset,
+    y: ly(y) - c.value / 2 + inset,
+    width: Math.max(0, c.value - inset * 2),
+    height: Math.max(0, c.value - inset * 2),
+  };
 }
 // Never below 0.75, so the smallest target stays perceivable at minimum zoom.
 const glyphScale = computed(() => Math.max(0.75, c.value / TRAVEL_GLYPH_CELL));
@@ -373,7 +481,7 @@ const UNKNOWN_THREAT = "威脅不明";
 
 const neighbours = computed(() => {
   const grid = props.grid;
-  if (!grid || !partyInWindow.value || props.walking) return [];
+  if (!grid || !partyInWindow.value || props.walking || districtFit.value) return [];
   const out = [];
   for (const d of DIRECTIONS) {
     const cell = travelCellAt(grid, grid.party.x + d.dx, grid.party.y + d.dy);
@@ -646,9 +754,29 @@ const legendStyle = computed(() => {
   const s = uiScaleNow.value;
   return { left: `${measured.value.stage.left + 22 * s}px`, top: `${measured.value.stage.top + 18 * s}px` };
 });
+const fitStyle = computed(() => {
+  const s = uiScaleNow.value;
+  return {
+    left: `${measured.value.stage.left + 22 * s}px`,
+    top: `${measured.value.stage.top + (18 + 44 + 8) * s}px`,
+  };
+});
 const scaleBar = computed(() => {
   const km = props.grid?.cellKm;
-  return Number.isFinite(km) && km > 0 ? (5 / km) * c.value : null;
+  if (!Number.isFinite(km) || km <= 0) return null;
+  if (districtFit.value) {
+    const five = (5 / km) * c.value;
+    if (five >= 48) return { px: five, km: 5 };
+    // Far context: the 5 km bar is a hairline, so the fit states a readable
+    // 50 or 100 km step.
+    const step =
+      [50, 100].find((candidate) => {
+        const px = (candidate / km) * c.value;
+        return px >= 48 && px <= 180;
+      }) ?? 100;
+    return { px: (step / km) * c.value, km: step };
+  }
+  return { px: (5 / km) * c.value, km: 5 };
 });
 
 // ── pointer and zoom ─────────────────────────────────────────────────────
@@ -693,10 +821,18 @@ function onClick(event) {
   if (event.target?.closest?.(".travel-map__state")) return;
   root.value?.focus({ preventScroll: true });
   if (!interactive.value) return;
+  // The district-fit state is a whole-district reader: a click never steps.
+  if (districtFit.value) return;
   const cell = cellFromEvent(event);
   if (cell) emit("pick", cell);
 }
 function zoomBy(direction) {
+  if (districtFit.value) {
+    districtFit.value = false;
+    zoom.value = ZOOM.min;
+    emit("zoom", ZOOM.min);
+    return;
+  }
   const next = stepZoom(zoom.value, direction);
   if (next === zoom.value) return;
   zoom.value = next;
@@ -807,7 +943,13 @@ onBeforeUnmount(() => {
   paintFrame = 0;
 });
 
-defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true }), el: () => root.value });
+defineExpose({
+  focusInside,
+  focus: () => root.value?.focus({ preventScroll: true }),
+  el: () => root.value,
+  districtFit,
+  toggleDistrictFit,
+});
 </script>
 
 <template>
@@ -820,6 +962,7 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
     :data-motion="motionLevel"
     :data-zoom="zoom"
     :data-cell-px="c"
+    :data-district-fit="districtFit ? 'true' : 'false'"
     role="application"
     :aria-label="CONTROLS_LABEL"
     :aria-describedby="routeText ? routeTextId : null"
@@ -845,6 +988,12 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
       :style="worldStyle"
       data-testid="travel-map__world"
     >
+      <canvas
+        ref="districtCanvas"
+        class="travel-map__district-canvas"
+        :style="districtCanvasStyle"
+        aria-hidden="true"
+      ></canvas>
       <canvas ref="canvas" class="travel-map__canvas" :style="canvasStyle" data-testid="travel-map__canvas" aria-hidden="true"></canvas>
       <template v-if="grid">
         <svg
@@ -1003,10 +1152,21 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
       </svg>
       <span class="tm-legend__n">北</span>
       <span v-if="scaleBar !== null" class="tm-legend__scale">
-        <span class="tm-legend__bar" data-testid="travel-map__scale-bar" :style="{ width: `${scaleBar}px` }"></span>
-        5 公里
+        <span class="tm-legend__bar" data-testid="travel-map__scale-bar" :style="{ width: `${scaleBar.px}px` }"></span>
+        {{ scaleBar.km }} 公里
       </span>
     </div>
+    <button
+      v-if="overview"
+      type="button"
+      class="tm-district-fit"
+      :class="{ 'is-active': districtFit }"
+      :style="fitStyle"
+      :aria-pressed="districtFit ? 'true' : 'false'"
+      data-testid="travel-map__district-fit"
+      @click.stop="toggleDistrictFit"
+      @keydown.stop
+    >全區</button>
     <template v-if="showMap">
       <div
         v-for="card in sightingCards"
@@ -1106,7 +1266,8 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
   opacity: 0.55;
   filter: saturate(0.45) brightness(0.8);
 }
-.travel-map__canvas {
+.travel-map__canvas,
+.travel-map__district-canvas {
   position: absolute;
   transform-origin: 0 0;
   image-rendering: auto;
@@ -1337,6 +1498,23 @@ defineExpose({ focusInside, focus: () => root.value?.focus({ preventScroll: true
   border: 1px solid rgba(201, 196, 185, 0.7);
   border-top: 0;
   transition: width var(--motion-base) var(--ease-standard);
+}
+/* The symbolic whole-district fit toggle: an on-map control, not a zoom stop. */
+.tm-district-fit {
+  position: absolute;
+  z-index: 1;
+  padding: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale));
+  border: 1px solid rgba(201, 196, 185, 0.5);
+  border-radius: calc(3px * var(--ui-scale));
+  background: rgba(11, 13, 16, 0.72);
+  color: var(--paper-300);
+  font: var(--text-xs)/1 var(--f-display);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.tm-district-fit.is-active {
+  border-color: var(--gold-400);
+  color: var(--gold-400);
 }
 /* Distant sightings: cards on the safe rectangle's edge along their bearing. */
 .tm-sighting {

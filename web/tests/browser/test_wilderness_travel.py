@@ -84,6 +84,30 @@ def _rows(known) -> list:
     return rows
 
 
+def _district_overview() -> dict:
+    """A synthetic 5 km overview around the party: open ground with a few
+    water cells, merged south to north. Fixture data only."""
+    size, cell_km = 9, 5
+    rows = []
+    for row in range(size):
+        runs: list = []
+        for col in range(size):
+            terrain = "water" if (row * size + col) % 7 == 0 else "open_ground"
+            run = {"kind": "terrain", "terrain": terrain, "band": 3, "passable": terrain != "water"}
+            if runs and {**runs[-1], "length": 0} == {**run, "length": 0}:
+                runs[-1]["length"] += 1
+            else:
+                runs.append({"length": 1, **run})
+        rows.append(runs)
+    return {
+        "key": "t_east",
+        "name_zh": "合成東區",
+        "cell_km": cell_km,
+        "window": {"min_x": 8, "min_y": 12, "width": size, "height": size},
+        "rows": rows,
+    }
+
+
 def _fact_area(cx: int = CX, cy: int = CY) -> dict:
     """A window whose west half (columns 0..20) is revealed: woodland on the
     northern rows, a water line along row 18, open ground elsewhere; the
@@ -98,6 +122,7 @@ def _fact_area(cx: int = CX, cy: int = CY) -> dict:
 
     area = _area(cx, cy)
     area["rows"] = _rows(known)
+    area["district"] = _district_overview()
     return area
 
 
@@ -122,7 +147,7 @@ def _area(cx: int = CX, cy: int = CY) -> dict:
             rows.append([{"length": WINDOW, "kind": "unknown"}])
     current = "wild:elosern:%d:%d" % (cx, cy)
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "layer": "wilderness",
         "map_id": "elosern",
@@ -138,6 +163,7 @@ def _area(cx: int = CX, cy: int = CY) -> dict:
         "edges": [],
         "quest_markers": [],
         "district_name": "合成東麓",
+        "district": None,
         "cell_km": 1,
         "window": {"min_x": cx - 20, "min_y": cy - 20, "width": WINDOW, "height": WINDOW},
         "rows": rows,
@@ -376,6 +402,42 @@ _DIGEST = """() => {
 
 _PAINTS = "() => window.__elosernBridge.travelPaint.stats().count"
 
+# The coarse overview canvas: its backing size, and how many of its pixels
+# remain painted outside the fine window versus inside it. The fine window
+# must be fully cleared (no coarse bleed); the rim outside it must be painted.
+_DISTRICT = """() => {
+  const map = document.querySelector('[data-testid="travel-map"]');
+  const canvas = document.querySelector('.travel-map__district-canvas');
+  const grid = window.__elosernBridge.store.view.travel.map;
+  if (!canvas || !grid || !grid.district) return { error: 'missing overview' };
+  const d = grid.district;
+  const samples = canvas.width / d.width;
+  const cellKm = grid.cellKm;
+  const x0 = Math.floor(((grid.origin.x * cellKm) / d.cellKm - d.origin.x) * samples);
+  const south = (grid.origin.y * cellKm) / d.cellKm - d.origin.y;
+  const height = (grid.height * cellKm) / d.cellKm;
+  const y0 = Math.floor((d.height - south - height) * samples);
+  const x1 = Math.ceil((((grid.origin.x + grid.width) * cellKm) / d.cellKm - d.origin.x) * samples);
+  const y1 = Math.ceil((d.height - south) * samples);
+  const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  let bleed = 0;
+  let rim = 0;
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      if (!data[(y * canvas.width + x) * 4 + 3]) continue;
+      if (x >= x0 && x < x1 && y >= y0 && y < y1) bleed += 1;
+      else rim += 1;
+    }
+  }
+  return {
+    size: [canvas.width, canvas.height],
+    clip: [x0, y0, x1, y1],
+    bleed,
+    rim,
+    fit: map.getAttribute('data-district-fit'),
+  };
+}"""
+
 # The repaint benchmark: the real painter on the real decoder's output
 # (wilderness-travel-window-ui) for rich synthetic 41 x 41 schema-3 bodies
 # (bands, tiers, roads, a river with a ford, woods, two districts, a
@@ -419,10 +481,10 @@ _BENCH = """() => {
       rows.push(runs);
     }
     const current = 'wild:elosern:' + party.x + ':' + party.y;
-    return { schema_version: 3, available: true, layer: 'wilderness', map_id: 'elosern', frame: { key: 'elosern', unit: 'km' },
+    return { schema_version: 4, available: true, layer: 'wilderness', map_id: 'elosern', frame: { key: 'elosern', unit: 'km' },
       current_node: current, title: '合成', nodes: [{ id: current, label: '合成', x: party.x + 0.5, y: party.y + 0.5,
         visibility: 'current', visited: true, gateway: null, action: null, landmark: null }],
-      edges: [], quest_markers: [], district_name: '合成', cell_km: 1,
+      edges: [], quest_markers: [], district_name: '合成', district: null, cell_km: 1,
       window: { min_x: ox, min_y: oy, width: N, height: N }, rows,
       light_phase: phases[k % 4], ground_radius: 1 + (k % 6), entities: [], sightings: [] };
   };
@@ -477,6 +539,14 @@ class TravelMapTests(_TravelStage):
         # Woodland dabs and the water line stop with the reveal: nothing is
         # painted more than half a cell into the unknown half.
         self.assertEqual(layers["east"], 0)
+        # The coarse district overview paints outside the fine window and is
+        # cleared entirely inside it: no coarse terrain bleeds into an
+        # unrevealed one-kilometre cell.
+        district = page.evaluate(_DISTRICT)
+        self.assertNotIn("error", district)
+        self.assertEqual(district["size"], [9 * 3, 9 * 3])
+        self.assertEqual(district["bleed"], 0)
+        self.assertGreater(district["rim"], 0)
         page.close()
 
     @covers_requirement("webclient-travel-map::travel-camera-preserves-the-open-stage")
@@ -520,6 +590,22 @@ class TravelMapTests(_TravelStage):
             page.wait_for_timeout(300)
             self.assertEqual(page.evaluate(_PAINTS), paints)
             self.assertEqual(page.evaluate(_DIGEST), digest)
+            # The symbolic whole-district fit: no neighbour targets, a cell
+            # size that is not the 18 px local rung, and a return to 18 when
+            # the fit is left.
+            page.evaluate("() => document.querySelector('.tm-district-fit').click()")
+            page.wait_for_timeout(150)
+            self.assertEqual(stage.get_attribute("data-district-fit"), "true")
+            fitted = float(stage.get_attribute("data-cell-px"))
+            self.assertNotAlmostEqual(fitted, 18 * scale, places=3)
+            self.assertEqual(
+                page.evaluate("() => document.querySelectorAll('[data-testid=\"travel-map__neighbour\"]').length"),
+                0,
+            )
+            page.evaluate("() => document.querySelector('.tm-district-fit').click()")
+            page.wait_for_timeout(150)
+            self.assertEqual(stage.get_attribute("data-district-fit"), "false")
+            self.assertAlmostEqual(float(stage.get_attribute("data-cell-px")), 18 * scale, places=3)
             page.close()
 
     @covers_requirement("webclient-travel-map::travel-painting-uses-disclosed-cell-facts")

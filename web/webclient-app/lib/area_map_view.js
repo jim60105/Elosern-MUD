@@ -45,7 +45,9 @@ import {
   spanLimits,
 } from "@elosern/map-view";
 import { MIN_NEARBY_SPAN_M, settlementStops, wildernessStops } from "./map_stops.js";
-import { decodeWildernessGrid } from "./wilderness-grid.js";
+import { decodeDistrictOverview, decodeWildernessGrid } from "./wilderness-grid.js";
+
+export { decodeDistrictOverview };
 
 /** Minimum on-screen gap between scale-true dots (CSS px at ui-scale 1). */
 export const DOT_MIN_GAP_PX = 30;
@@ -144,7 +146,7 @@ export function areaStops(area, placed, frame) {
     return settlementStops(boundsOfPoints(placed), nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX });
   }
   if (area.layer === "wilderness") {
-    return wildernessStops(frame);
+    return wildernessStops(frame, { overviewBounds: districtOverviewBounds(area) });
   }
   // The widest radial stop is the graph seen from the current room, so the
   // centred opening never needs to exceed the zoom limits.
@@ -192,10 +194,41 @@ export function windowBounds(area) {
   return { minX: x, minY: y, maxX: x + width, maxY: y + height };
 }
 
+/**
+ * The coarse overview's cell-unit bounds: a coarse cell `(cx, cy)` covers the
+ * one-kilometre cells `[cx * cellKm, (cx + 1) * cellKm)`. Null without an
+ * overview.
+ */
+export function districtOverviewBounds(area) {
+  const overview = decodeDistrictOverview(area);
+  if (!overview) return null;
+  const { origin, width, height, cellKm } = overview;
+  const panelCellKm = area.cell_km;
+  return {
+    minX: (origin.x * cellKm) / panelCellKm,
+    minY: (origin.y * cellKm) / panelCellKm,
+    maxX: ((origin.x + width) * cellKm) / panelCellKm,
+    maxY: ((origin.y + height) * cellKm) / panelCellKm,
+  };
+}
+
+/** The union of the 41-cell window and a supplied overview, or the window. */
+export function wildernessFitBounds(area) {
+  const window = windowBounds(area);
+  const district = districtOverviewBounds(area);
+  if (!district) return window;
+  return {
+    minX: Math.min(window.minX, district.minX),
+    minY: Math.min(window.minY, district.minY),
+    maxX: Math.max(window.maxX, district.maxX),
+    maxY: Math.max(window.maxY, district.maxY),
+  };
+}
+
 /** The whole known area at one uniform scale (the full window in the wilderness). */
 export function wholeView(area, placed, frame, rect = null) {
   const stops = areaStops(area, placed, frame);
-  const bounds = area.layer === "wilderness" ? windowBounds(area) : boundsOfPoints(placed);
+  const bounds = area.layer === "wilderness" ? wildernessFitBounds(area) : boundsOfPoints(placed);
   const fitted = fitBounds(
     bounds,
     frame,
@@ -258,11 +291,13 @@ const windowCache = new WeakMap();
 /**
  * The revealed cells of a wilderness window as ephemeral display cells, in
  * row order: `{ key, x, y, terrain, passable, band, tier, road, ford,
- * display, state }` with cell-unit `x`/`y` (the cell spans [x, x+1)), read
- * through the shared decoder (lib/wilderness-grid.js). Unknown runs yield no
- * cell. `state` is "current", "visited" (the cell carries a visited node:
- * the server's actual visit record) or "remembered" (revealed without a
- * visit). Empty for other layers and for a window the decoder refuses.
+ * display, state, visited }` with cell-unit `x`/`y` (the cell spans
+ * [x, x+1)), read through the shared decoder (lib/wilderness-grid.js).
+ * Unknown runs yield no cell. `state` is "current", "sighted" (inside the
+ * supplied ground disc `dx*dx + dy*dy <= (ground_radius + 0.5)**2`) or
+ * "explored" (every other revealed cell, walked or district-revealed alike).
+ * `visited` still records the server's visit for the trail. Empty for other
+ * layers and for a window the decoder refuses.
  */
 export function decodeWindow(area) {
   if (area?.layer !== "wilderness" || !area.window) return Object.freeze([]);
@@ -274,23 +309,30 @@ export function decodeWindow(area) {
     windowCache.set(area, none);
     return none;
   }
-  const visited = new Set();
   let current = null;
+  const visited = new Set();
   for (const node of area.nodes) {
     if (!node.id.startsWith("wild:")) continue;
     const key = `${Math.floor(node.x / area.cell_km)}:${Math.floor(node.y / area.cell_km)}`;
     if (node.id === area.current_node) current = key;
     else if (node.visited) visited.add(key);
   }
+  const [currentX, currentY] = (current ?? "").split(":").map(Number);
+  const radius = typeof area.ground_radius === "number" ? area.ground_radius : null;
+  const reach = radius === null ? -Infinity : (radius + 0.5) ** 2;
   const cells = [];
   for (const cell of grid.cells) {
     if (!cell) continue;
     const key = `${cell.x}:${cell.y}`;
+    const dx = cell.x - currentX;
+    const dy = cell.y - currentY;
+    const state = key === current ? "current" : dx * dx + dy * dy <= reach ? "sighted" : "explored";
     cells.push(
       Object.freeze({
         key,
         ...cell,
-        state: key === current ? "current" : visited.has(key) ? "visited" : "remembered",
+        state,
+        visited: visited.has(key),
       }),
     );
   }

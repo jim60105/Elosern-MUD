@@ -2,7 +2,7 @@
 // and wilderness-travel-window-ui). Dependency-light ES module: no Vue, no
 // DOM.
 //
-// `decodeTravelGrid(area)` turns one validated schema-3 wilderness
+// `decodeTravelGrid(area)` turns one validated schema-4 wilderness
 // `area_map` body into the grid the travel stage paints from. The rows come
 // from the one shared decoder (lib/wilderness-grid.js, the drawer's too), so
 // both maps lay out and refuse a window identically; the base design's
@@ -16,7 +16,7 @@
 // phase from the hour and no radius from the terrain. A node keeps its
 // payload object verbatim (its id, action, gateway and landmark included).
 
-import { decodeWildernessGrid } from "./wilderness-grid.js";
+import { decodeDistrictOverview, decodeWildernessGrid } from "./wilderness-grid.js";
 
 /** The cell coordinates `{ x, y }` a payload node stands in. */
 function nodeCell(area, node) {
@@ -85,6 +85,9 @@ export function decodeTravelGrid(area) {
     party: Object.freeze(nodeCell(area, current)),
     lightPhase: area.light_phase,
     groundRadius: area.ground_radius,
+    // The current lit district's coarse overview (or null): the stage paints
+    // it behind the fine window, clipped out of the fine-window rectangle.
+    district: decodeDistrictOverview(area),
     entities: Object.freeze(area.entities.map((entity) => Object.freeze({ ...entity, cell: Object.freeze({ ...entity.cell }) }))),
     sightings: Object.freeze(area.sightings.map((sighting) => Object.freeze({ ...sighting }))),
   });

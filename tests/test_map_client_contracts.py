@@ -184,6 +184,13 @@ class AreaViewContracts(VitestContractMixin, unittest.TestCase):
         # whole names with lower-priority labels hidden; new-map resets.
         self.assert_block_passed("area rendering uses truthful geometry and server fog")
 
+    def test_explored_wilderness_uses_one_sight_based_style(self):
+        # Added by wilderness-district-overview. The ADDED requirement gains
+        # its canonical ID only at archive sync, so this partner stays
+        # unannotated: walked and district-revealed cells outside sight share
+        # one explored grade, and only the supplied ground disc is bright.
+        self.assert_block_passed("explored wilderness uses one sight-based style")
+
     @covers_requirement(
         "webclient-area-map-view::area-selection-offers-travel-only-for-an-authoritative-adjacent-exit"
     )
