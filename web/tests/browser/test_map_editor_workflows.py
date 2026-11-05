@@ -534,6 +534,14 @@ class _AuthoringWorkflows(_EditorBrowser):
         core = self.step("create_room", INTERIOR)
         self.assertIn("store", core["documents"][INTERIOR]["rooms"])
 
+        # A created room lands on the next free grid cell without moving the
+        # camera, so at the reference width it can be drawn outside the visible
+        # canvas, where the inspector's column takes the pointer instead of the
+        # map and both the endpoint selection and the layout drag miss it. The
+        # fit control is a client-side camera move that issues no request, so it
+        # changes nothing the steps above and below assert.
+        page.click('[data-zoom="fit"]')
+
         # 4. A two-way connection with both names.
         page.keyboard.press("Escape")
         page.locator('[data-region="canvas"]').focus()
