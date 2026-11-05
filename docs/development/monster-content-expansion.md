@@ -493,3 +493,191 @@ The final review over the landed diff raised one blocking finding, adopted:
 * Its suggestion to assert that the committed reload really returns fresh rows
   was adopted as well: the derived member test now proves the cache eviction
   happened instead of passing on an in-memory object.
+
+## 吞潮鱷・蓄潮型
+
+The high-tier stronger variant of the existing 吞潮鱷
+(`tide_devouring_crocodile`) is 蓄潮型 (`reservoir_warden`): a complete
+standalone grade-A record, not an override chain and not an in-place buff of
+守灣型. It keeps the existing contact drain 吞潮咬擊 (`tide_devouring_bite`)
+and adds the MP-funded self film 蓄潮護膜 (`reservoir_guard`). The crocodile's
+default 潛岸型 and its ordinary 守灣型 keep their own rows and kits, and the
+species' existing low/mid data is not globally strengthened.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* The profile lies wholly inside the high tier's declared bands. Every
+  physical axis and the hit-point pool are no lower than 守灣型's corresponding
+  value, because this is the stronger variant of the same species rather than
+  a sidegrade: the pool is well above the mid-tier 守灣型's, and the attack,
+  agility and defense are all at or above that row's own values while staying
+  inside the high bands.
+* `magic_power` is the only value the tier band admits.
+* The authored MP pool covers both kit costs at once, so the variant can
+  alternate the drain and the film instead of choosing one permanently. The
+  bite keeps its existing cost and the film's MP cost lies inside the 學徒
+  single-target band, so the film classifies as a mortal-tier elemental spell.
+* The authored SP pool holds at least two casts of the bite's SP cost.
+* The film raises the caster's defense for a short window of the same order as
+  the shipped self guards; the refresh rule replaces an aged mount instead of
+  accumulating one.
+* The defense contribution is a modest single-digit value inside the high
+  tier's own defense band: it is smaller than the band's width and well below
+  the strongest sustained high-tier defensive mounts, so a personal film
+  shifts mitigation without replacing a dedicated defender's role. The
+  authored lifetime matches the other monster self guards.
+
+### Composition and representative
+
+The drain-plus-self-support kit is a new composition shape: one enemy damage
+occurrence, one hit-qualified enemy transfer and one caster-only support
+mount. No other shipped variant declares that ordered shape, so the change owns
+the group's stable-key-ordered representative,
+`world/rules/tests/test_reservoir_warden_resource_skill.py`. The module derives
+both skill keys and costs, the mounted effect and the live modifier row from
+the declarations, then observes candidacy, guard payment and routing, an
+actual-loss drain with caster credit, refresh, expiry, insufficient-MP
+rejection and a committed reload. The existing 潛岸型 composition keeps its own
+representative untouched.
+
+### Intelligence rationale
+
+`reservoir_warden` authors intelligence 62 and binds the utility decision. The
+authoring rationale is the behaviour itself: it weighs drawing an opponent's
+magic against spending its own on the film, a recurring trade-off read from
+its own resources. That is more decision depth than the reflexive film of
+濕岸型 (20), the timed slip of 藏穀型 (30) and the single probing rule of
+獵道型 (44), and less than the terrain-and-group reading of 守礁型 (66). The
+value is read from this variant's own lore, never from its tier, grade, stats
+or archetype, and it adds no statistic, resource, kit or proficiency.
+
+### Known flee trade-off
+
+The permanent legacy decision body never proposes a support active, so this
+variant must bind utility or its film could never be selected
+(`support_kit_mode_violations` reports exactly that). Under
+`monster-flee-policy` a utility-mode monster never voluntarily flees, which is
+the known deviation from design §5's available innate flee and §7.3's
+either-side retreat record: the boss's escapes in play come from the opposing
+party's paid retreat and later re-engagement, and rollback to legacy would
+restore its flee priority while making the owned guard unusable.
+
+### Non-gating observations
+
+Observed with a temporary probe module, deleted after the run, in real
+battlefields holding the constructed representative and one real player
+opponent:
+
+* One committed utility round selected `tide_devouring_bite`, wrote a damage
+  entry and a `gauge_transfer` entry, lowered the defender from 400 to 354 hit
+  points, and left the representative at 30/40 MP and 35/40 SP after the
+  bite's payment. This is the smoke encounter outcome checked against the
+  authored A-grade role: the high-band profile and the two-resource payment
+  are observed through real settlement, not through the tier label.
+* A 20-decision short inspection run (each iteration lowers the actor's
+  current hit points by one, so the snapshot-derived selector seed differs)
+  reported 3 candidates in every decision, no exclusions or unavailable
+  skills, and selections of `basic_attack` 10, `tide_devouring_bite` 6 and
+  `reservoir_guard` 4, at temperature 0.5246. The film is therefore a real
+  candidate the selector chooses, while the committed smoke asserts candidacy
+  and value rather than selection frequency.
+* The committed representative smoke itself resolved a guard mount (12 MP,
+  +6 defense, caster only) and a hit bite that removed the defender's actual
+  7 MP, credited it to the caster's cap and then paid both costs, with the
+  opponent and a constructed ally as untouched controls.
+
+### Evidence map
+
+* Identity, literal construction, the new composition group, candidacy, guard
+  payment and routing, actual-loss transfer with capped credit, payment order,
+  refresh, expiry, insufficient-MP rejection and committed reload are
+  established by `world/rules/tests/test_reservoir_warden_resource_skill.py`,
+  the committed representative of the new drain-plus-self-support group.
+* Payment and effect fault rollback for the new kit is owned by the shared
+  generic transfer/self-support/lifetime suites named in design §10 "Failure";
+  this smoke establishes the durable happy path and does not clone those
+  vectors.
+* The `activation.json` intelligence entry is the existing release-record
+  mirror of the tuning the process loads, not a new approval table and not a
+  second source of the value. The authored value remains in
+  `world/rules/rulebook/monster_behaviour.yaml`.
+
+### Focused commands and results
+
+The implementation runs the focused labels from the change design plus the
+registry, narration and classification contracts the new elemental support
+enters. `/tmp/mud-field-tests.env` contains `MUD_TEST_SETTINGS=1`.
+
+| command | result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_reservoir_warden_resource_skill` | OK (1 test) |
+| `... world.rules.tests.test_crocodile_resource_skill` | OK (1 test) |
+| `... world.rules.tests.test_monster_composition_coverage` | OK (4 tests) |
+| `... world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | OK (4 tests) |
+| `... world.rules.tests.test_combat_modifiers.CombatModifierTests` | OK (99 tests) |
+| `... world.lore.tests.test_monster_species_content` | OK (17 tests) |
+| `... world.lore.tests.test_bestiary_documentation` | OK (13 tests) |
+| `... world.skills.tests.test_skill_registry.test_out_of_combat_policy world.skills.tests.test_skill_registry.test_category_classification world.skills.tests.test_skill_registry.test_narration_coverage` | OK (41 tests) |
+| `... world.skills.tests.test_narration_catalog world.lore.tests.test_monster_visuals` | OK (49 tests) |
+| `... world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | OK (4 tests) |
+| `... world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | OK (4 tests) |
+| `... world.rules.tests.test_monster_ai_activation.RollbackTests` | OK (3 tests) |
+| `... world.rules.tests.test_human_combat_calibration.HumanCombatCalibrationTests` | OK (3 tests) |
+| `... world.rules.tests.test_human_combat_calibration.EncounterCalibrationTests` | OK (1 test) |
+| `... world.rules.tests.test_human_combat_calibration.EncounterSelectedValueTests` | OK (2 tests) |
+| `uv run --locked python tools/monster_ai_manual_reports.py selector` | regenerated: paired difference 0.344 (required >= 0.15), margin met |
+| `uv run --locked python -m tools.map_reference_context --check` | up to date |
+| `uv run --locked openspec validate reservoir-warden-variant --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change reservoir-warden-variant` | passed: reference-context, traceability, observability, test-data, manifests, contracts |
+
+### Human review of the prose
+
+The crocodile's published ecology was rewritten affirmatively from design
+§4.4: it states the contact drain, what the opponent actually has available,
+its recovery after rest, and the crocodile's own reserve directly. The
+bestiary replaces the former exclusion paragraph with a behaviour paragraph
+and adds the three approved 蓄潮型 passages verbatim, including the local name
+「閉灣者」. The section names no command, buff identifier or resource field.
+The author-private fields keep the unknown-origin boundary, the authoring
+rationale and one explicitly unverified ferry-station conjecture. The editorial
+ledger records the same read; no test judges prose quality or sentence
+content.
+
+### Review dispositions
+
+The independent plan review raised two blocking findings and four non-blocking
+ones; all were adopted before or during implementation:
+
+* `reservoir_guard` declares `usable_out_of_combat=False`, so the frozen false
+  inventory in `world/skills/tests/test_skill_registry/_support.py` has to name
+  it. Adopted, and the out-of-combat, classification and narration contracts
+  were added to the focused runs.
+* The planned bite assertion at full caster MP could not detect a missing
+  caster credit or an actual-loss clamp. Adopted: the guard cast runs first,
+  the defender is reduced below the declared fixed drain, and the caster is
+  given headroom so the credited amount and the maximum cap are both
+  observable, with the formula written from the declared values.
+* The candidacy check now also asserts the guard's positive control value and
+  the bite's positive damage value, so a broken or zero-valued projection
+  cannot pass as mere plan presence.
+* The representative smoke now owns refresh and expiry as well, because the
+  two-skill shape is not a member of the existing hit-independent self-support
+  group.
+* The activation record and both AI evidence READMEs carried five-variant
+  counts and two fingerprint sites. Adopted: the set, the rollback count, both
+  selector fingerprint paragraphs and the superseded-value list were updated
+  together.
+* The composition-coverage AST invariants were preserved: the module binds
+  `REPRESENTATIVE_VARIANT` once, names no other shipped variant key and
+  constructs only through that declaration.
+
+One observation changed the insufficient-MP assertion without weakening it:
+at 11 MP the selector offered the affordable bite as a candidate but chose the
+innate attack, so the test asserts the guard's absence from the candidate set
+and the forced request's refusal rather than requiring the bite to be
+selected.
