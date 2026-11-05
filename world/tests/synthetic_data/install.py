@@ -32,6 +32,12 @@ _INSTALLED_DICTS: list[tuple[dict, dict]] = []
 #: whole catalog, and so does every in-process scope.
 _BORROWED_VOCABULARY = frozenset({"archetypes"})
 
+#: Catalog vocabularies whose rows name ground in a coordinate space. A
+#: borrowed install keeps the authored continent live, whose terrain partition
+#: is a pure function of the coordinates and knows no kit region key, so the
+#: kit's own ground would classify into no region and hold no eligible cell.
+_GROUND_TARGETS = frozenset({"ecology_zones", "activity_areas"})
+
 
 def install_synthetic_catalogs(
     logicals: tuple[str, ...] | None = None,
@@ -58,6 +64,9 @@ def install_synthetic_catalogs(
     vocabulary and the shipped permanent rooms stay published and the kit's own
     rooms, anchors and placements join them. The default publishes the kit's
     world alone, which is the only self-consistent world for t_-only catalogs.
+    A borrowed install also files the kit's ground rows (its ecology zones and
+    activity areas) under the authored region each rectangle lands in, because
+    that continent's terrain partition knows no kit region key.
     """
     if _INSTALL_STATE["installed"]:
         return False
@@ -66,6 +75,16 @@ def install_synthetic_catalogs(
     ) + ("lore_sync",)
     _INSTALL_REPLACEMENTS.clear()
     _resolve_import_time_derivations(names)
+    borrowed_ground = borrow_authored_world and any(
+        name in _GROUND_TARGETS for name in names
+    )
+    if borrowed_ground:
+        # The retarget below reads the authored terrain partition, which only
+        # exists once the authored world is published (it still is: no catalog
+        # has been swapped yet).
+        from world.maps import runtime as runtime_module
+
+        runtime_module.ensure_published()
     for logical in _dependency_order(names):
         module_name, attribute = REGISTRY_TARGETS[logical]
         module = importlib.import_module(module_name)
@@ -73,6 +92,8 @@ def install_synthetic_catalogs(
         content = dict(_CONTENT[logical]())
         if borrow_authored_world and logical in _BORROWED_VOCABULARY:
             content = {**dict(shipped), **content}
+        if borrowed_ground and logical in _GROUND_TARGETS:
+            content = _on_authored_partition(content)
         if not isinstance(shipped, MappingProxyType):
             _INSTALLED_DICTS.append((shipped, dict(shipped)))
             shipped.clear()
@@ -105,6 +126,34 @@ def install_synthetic_catalogs(
             borrow_authored_world=borrow_authored_world
         )
     return True
+
+
+def _on_authored_partition(
+    content: Mapping[str, object],
+) -> dict[str, object]:
+    """File kit ground rows under the authored region that classifies them.
+
+    The kit authors its zones and activity areas in its own coordinate space.
+    A borrowed process runs on the authored continent, so the row keeps its
+    rectangle and takes the authored partition's region key for that ground:
+    the population geometry and the activity resolver both classify cells
+    through the live terrain, and a kit-region key would classify nothing.
+    """
+    from dataclasses import replace
+
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    retargeted: dict[str, object] = {}
+    for key, row in content.items():
+        rectangles = getattr(row, "rectangles", ())
+        if not rectangles:
+            retargeted[key] = row
+            continue
+        x_min, _x_max, y_min, _y_max = rectangles[0]
+        retargeted[key] = replace(
+            row, region_key=region_for_coordinates(x_min, y_min)
+        )
+    return retargeted
 
 
 def _publish_kit_world(*, borrow_authored_world: bool):
