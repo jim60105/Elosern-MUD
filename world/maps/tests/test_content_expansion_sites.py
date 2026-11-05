@@ -82,7 +82,11 @@ from world.tests.geography_fixture import GeographyPublicationMixin
 SITE_KEY = "abandoned_transfer_station_encounter"
 
 SEED = 11
-DAY = 86400
+#: Four in-game hours: four times the authored one-hour recovery window, and
+#: the widest advance these acceptance journeys need. A skipped day settles
+#: 2,880 ambient movement boundaries (minutes of runner time) without
+#: observing one more site decision.
+LONG_SKIP = 4 * 3600
 
 
 class TransferStationEncounterTests(
@@ -346,7 +350,7 @@ class TransferStationEncounterTests(
 
         # A later clock settlement, the map's own population read and the
         # quest layer's binding read all observe the same cleared site.
-        get_world_clock().advance(DAY, AdvanceSource.SKIP, [])
+        get_world_clock().advance(LONG_SKIP, AdvanceSource.SKIP, [])
         state = site_state(SITE_KEY, wilderness=reloaded)
         self.assertEqual(state.state, SITE_STATE_CLEARED)
         self.assertEqual(state.cleared_at_tick, loss_tick)
@@ -571,7 +575,7 @@ class HighTierBossSiteTests(
 
         # A later clock settlement, a real revisit, the map's own population
         # read and the quest layer's binding read observe one cleared site.
-        get_world_clock().advance(DAY, AdvanceSource.SKIP, [])
+        get_world_clock().advance(LONG_SKIP, AdvanceSource.SKIP, [])
         x, y = site.coordinates
         self.assertTrue(
             enter_wilderness(
