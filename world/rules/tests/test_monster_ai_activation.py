@@ -314,6 +314,9 @@ class ActivationBindingTests(EvenniaTestCase):
                 self.assertIsNone(resolution.intelligence)
                 self.assertEqual(resolution.variant_key, key)
 
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
     def test_every_shipped_support_kit_binds_utility(self):
         # The shipped startup tuning must resolve an effective utility mode for
         # every registered variant that owns a support active; otherwise the
@@ -544,6 +547,9 @@ class RollbackTests(EvenniaTestCase):
         return _enemy_policy(entity, battlefield, self.record)
 
     @covers_requirement("monster-ai-rollout::legacy-mode-rollback-is-demonstrated")
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
     def test_a_restart_loading_the_edited_mode_reproduces_the_legacy_smoke(self):
         record = _record()["legacy_rollback"]
         rollback = _legacy_edited_tuning()
