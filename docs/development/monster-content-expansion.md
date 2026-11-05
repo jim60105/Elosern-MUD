@@ -832,11 +832,11 @@ non-blocking one; all were adopted before implementation:
   deterministic. Adopted: the smoke pins the legacy tie-break die to the even
   branch that keeps the owned kit first, and asserts the charge is the
   selection.
-* Two sweeps spend more than the authored SP pool, so a later MP-exhaustion
-  probe would have been vacuous, and subtracting one from one skill's cost
-  leaves the cheaper skill affordable. Adopted: the pools are restored before
-  each exhaustion probe, and each probe sits below the cheapest kit cost of
-  that resource.
+* Two sweeps leave 4 SP (20 - 2 x 8), below the cheapest kit SP cost of 6, so
+  a later MP-exhaustion probe would have been vacuous; subtracting one from
+  one skill's cost would also leave the cheaper skill affordable. Adopted: the
+  pools are restored before each exhaustion probe, and each probe sits below
+  the cheapest kit cost of that resource.
 * Comparing cumulative hit points after the first sweep would not prove
   per-recipient defense mitigation. Adopted: the second sweep records each
   recipient's own pre-cast value and compares that cast's two losses, with the
@@ -844,3 +844,21 @@ non-blocking one; all were adopted before implementation:
 * The single-target strike was only selected, never settled. Adopted: the
   smoke resolves the selected charge as well, observing its damage, its single
   MP/SP payment and the untouched ally control.
+
+The final review over the landed diff raised two blocking findings and two
+non-blocking ones; all were adopted:
+
+* The exhaustion probes ran against a single opponent, where the legacy body
+  never prefers an area skill, so they could not prove the sweep left the
+  affordable set. Adopted: both probes now run against the two-opponent field,
+  where a surviving area skill would still be preferred over the innate
+  attack.
+* The ally-control check never exercised the sweep's declared enemy audience,
+  because the `all-enemies` shorthand already filters the target pool. Adopted:
+  the second sweep admits the whole roster and only the declared audience keeps
+  the caster and the ally out of the strike.
+* Nothing asserted that the charge is stronger per recipient than the sweep.
+  Adopted: the smoke compares the two landed losses against the same
+  defense-zero recipient.
+* The review text described the SP arithmetic imprecisely. Adopted: it now
+  states the actual remainder and the cheapest kit cost it falls below.

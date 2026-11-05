@@ -21,7 +21,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import ActionResolver
+from world.rules.action import ActionRequest, ActionResolver
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
@@ -141,7 +141,8 @@ class EmberBristleBoarResourceSkillSmokeTests(EvenniaTestCase):
         ):
             charged = ActionResolver.resolve(single)
         self.assertEqual(charged.outcome, "success")
-        self.assertLess(front.traits.hp.current, front_before)
+        charge_loss = front_before - front.traits.hp.current
+        self.assertGreater(charge_loss, 0)
         self.assertEqual(boar.traits.mp.current, paid_mp - CHARGE.cost["mp"])
         self.assertEqual(boar.traits.sp.current, paid_sp - CHARGE.cost["sp"])
         self.assertEqual(_resources(ally), ally_control)
@@ -170,29 +171,42 @@ class EmberBristleBoarResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(_resources(ally), ally_control)
 
         # Second sweep: both recipients land, and each strike is mitigated by
-        # that recipient's own defense, so the per-cast losses differ.
+        # that recipient's own defense, so the per-cast losses differ. The
+        # request admits the whole roster through targeting, so only the
+        # declared enemy audience keeps the caster and the ally out of the
+        # strike, and the wide motion is weaker per recipient than the charge.
         front_before = front.traits.hp.current
         rear_before = rear.traits.hp.current
         paid_mp = boar.traits.mp.current
         paid_sp = boar.traits.sp.current
+        boar_control = _resources(boar)
+        ally_control = _resources(ally)
         with (
             patch(
                 "world.rules.combat.damage.roll_d100", side_effect=[100, 100]
             ),
             combat_provenance(engagement_provenance().at_slot(0)),
         ):
-            swept_again = ActionResolver.resolve(pair)
+            swept_again = ActionResolver.resolve(
+                ActionRequest(boar, SWEEP_KEY, "all", pair_context)
+            )
         self.assertEqual(swept_again.outcome, "success")
         front_loss = front_before - front.traits.hp.current
         rear_loss = rear_before - rear.traits.hp.current
         self.assertGreater(front_loss, 0)
         self.assertGreater(rear_loss, 0)
         self.assertGreater(front_loss, rear_loss)
+        self.assertGreater(charge_loss, front_loss)
+        self.assertEqual(_resources(ally), ally_control)
+        # The caster's own hit points are unchanged; only the two costs move.
+        self.assertEqual(boar.traits.hp.current, boar_control[0])
         self.assertEqual(boar.traits.mp.current, paid_mp - SWEEP.cost["mp"])
         self.assertEqual(boar.traits.sp.current, paid_sp - SWEEP.cost["sp"])
 
         # Either exhausted resource removes the whole kit from the affordable
-        # set, and the innate attack takes over through the same boundary.
+        # set, and the innate attack takes over through the same boundary. The
+        # probe runs against two opponents, so a surviving area skill would
+        # still be preferred over the innate attack.
         boar.traits.mp.current = boar.traits.mp.max
         boar.traits.sp.current = boar.traits.sp.max
         boar.traits.mp.current = MINIMUM_KIT_MP - 1
@@ -200,7 +214,7 @@ class EmberBristleBoarResourceSkillSmokeTests(EvenniaTestCase):
             "world.rules.monster_behaviour.dice.roll_d100", return_value=100
         ):
             exhausted_mp = monster_behaviour_policy(
-                boar, single_field, context=single_context
+                boar, pair_field, context=pair_context
             )
         self.assertIsNotNone(exhausted_mp)
         self.assertEqual(exhausted_mp.skill_key, BASIC_ATTACK_KEY)
@@ -211,7 +225,7 @@ class EmberBristleBoarResourceSkillSmokeTests(EvenniaTestCase):
             "world.rules.monster_behaviour.dice.roll_d100", return_value=100
         ):
             exhausted_sp = monster_behaviour_policy(
-                boar, single_field, context=single_context
+                boar, pair_field, context=pair_context
             )
         self.assertIsNotNone(exhausted_sp)
         self.assertEqual(exhausted_sp.skill_key, BASIC_ATTACK_KEY)
@@ -219,7 +233,9 @@ class EmberBristleBoarResourceSkillSmokeTests(EvenniaTestCase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             combat_provenance(engagement_provenance().at_slot(0)),
         ):
-            fallback = ActionResolver.resolve(exhausted_sp)
+            fallback = ActionResolver.resolve(
+                ActionRequest(boar, BASIC_ATTACK_KEY, [front], pair_context)
+            )
         self.assertEqual(fallback.outcome, "success")
 
         # Shape eligibility alone never grants freeform scaling: the element's
