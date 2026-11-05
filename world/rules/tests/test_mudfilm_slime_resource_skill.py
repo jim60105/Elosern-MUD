@@ -284,6 +284,15 @@ class SelfSupportGroupMemberTests(EvenniaTestCase):
                 skill_key = row.active_skill_keys[0]
                 skill = SKILL_REGISTRY[skill_key]
                 buff_key = _mounted_buff_key(skill)
+                # The durable shape of the mounted effect is the member's own
+                # authored declaration: a positive lifetime refreshed by a
+                # recast rather than an unbounded stack. Aging, expiry and the
+                # refresh arithmetic itself stay with the representative and
+                # the shared lifetime suites (design D7).
+                definition = BUFF_DEFINITIONS[buff_key]
+                self.assertIs(type(definition.duration), int)
+                self.assertGreater(definition.duration, 0)
+                self.assertEqual(definition.stacking, "refresh")
                 rule = next(
                     rule
                     for rule in load_rules(

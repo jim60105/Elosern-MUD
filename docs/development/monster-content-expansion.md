@@ -194,9 +194,10 @@ The legacy decision body never proposes a support active, so this variant binds
 utility; under `monster-flee-policy` a utility monster never flees voluntarily.
 That is the deviation design §12.4 records from §5's available innate flee and
 §7.1's retreat orientation for the slime, the rat and the crocodile boss. For
-this species the retreat orientation is expressed instead through its passive
-field aggression in the placement changes, and the opposing party's paid
-retreat remains available.
+this species the retreat orientation is expressed instead through its
+defended-cache field aggression — hostile inside the authored cache area and
+retreat-oriented while foraging outside it — in the placement changes, and the
+opposing party's paid retreat remains available.
 
 ### Non-gating observations
 
@@ -265,3 +266,31 @@ resource field. The author-private fields carry the unknown-origin boundary,
 the authoring rationale and one explicitly unverified conjecture. The
 editorial ledger entry records the same read; no test judges prose quality or
 sentence content.
+
+### Review dispositions
+
+The independent plan and final reviews raised four findings; each is recorded
+here with its disposition.
+
+* The representative-smoke AST contract was weakened by the derived-members
+  allowance: a dead helper could satisfy the representative construction, and
+  a second literal copy of the representative key could pass. Adopted: the
+  check now accepts only the declared name or a loop variable of a group the
+  module derives from the registries, requires the resolving test itself to
+  construct the declared representative, and permits exactly one module-level
+  declaration binding with no other shipped variant-key literal. Temporary
+  probe modules proved the good shape passes and the dead-helper, copied-literal,
+  arbitrary-variable, loop-literal and shadowed-declaration shapes are rejected.
+* A stale pre-change selector fingerprint remained in the activation evidence
+  prose. Adopted: updated to the regenerated fingerprint.
+* The rat's field aggression was described as passive. Adopted: both documents
+  now describe its defended-cache aggression with retreat-oriented foraging,
+  as the approved design states.
+* No test pinned the derived members' authored lifetime shape. Adopted in part:
+  `SelfSupportGroupMemberTests` asserts each member's buff declares a positive
+  duration and `refresh` stacking; aging, expiry and the refresh arithmetic stay
+  with the representative and shared lifetime suites, as the change design
+  assigns them.
+* Comprehension-bound group members were suggested as an additional accepted
+  form. Rejected: no representative module constructs individuals inside a
+  comprehension, so the extra AST branch would be untested generality.

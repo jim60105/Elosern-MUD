@@ -39,7 +39,7 @@ Every acceptance clause of the change, and where it is established:
 | --- | --- |
 | Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate` passes observability, test-data, shard manifests and the ownership contracts; its traceability gate reports the change's own four new capability IDs as `unknown-requirement-id`, which is the documented pre-sync state of an active change (its requirements enter the index only when the archive workflow syncs the delta; see `scripts/openspec-gates.sh`). Verified green against the equivalent delta-applied tree: 2189 requirements, 0 uncovered, 0 errors. The post-sync check is the authoritative one and belongs to the archive workflow. |
 | The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f` |
-| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `3ee653b9...` |
+| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `e583cb95...` |
 | Complete-policy performance | `performance.json`: warm utility p95 16.84 ms and p50 16.36 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
 | A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves legacy |
 | A real affected encounter | `RealEncounterTests`: one real `Monster` row of an activated variant decides inside a real round scope **through the production session adapter** (`_enemy_policy`), its selected candidate is the request that settlement receives, the round writes a damage entry and the defender's committed hit points fall, and the monster's own statistics, resources, kit and proficiency are unchanged |
@@ -187,8 +187,8 @@ To activate more variants, or to retune one of these:
   The original three activated variants are low- and mid-tier monsters whose
   own lore keeps them in the fight (a flock leader coordinating, a reef warden
   holding its narrow mouth, a trail hunter probing the edge); the slime's and
-  the rat's retreat orientation are expressed instead through passive field
-  aggression, the known deviation recorded in design §12.4 and
-  `docs/development/monster-content-expansion.md`. Rollback restores the legacy
-  flee priority for all five immediately.
+  the rat's retreat orientation are expressed instead through passive or
+  defended-area field aggression, the known deviation recorded in design
+  §12.4 and `docs/development/monster-content-expansion.md`. Rollback restores
+  the legacy flee priority for all five immediately.
 * Reaching production does not add a player command or a browser action.

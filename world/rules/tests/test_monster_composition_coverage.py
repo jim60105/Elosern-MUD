@@ -148,6 +148,98 @@ def _declared_representatives() -> dict[str, pathlib.Path]:
     return found
 
 
+def _constructed_variant_arguments(call: ast.Call) -> list[ast.AST]:
+    """The ``variant_key`` argument nodes of one constructor call."""
+    for keyword in call.keywords:
+        if keyword.arg == "variant_key":
+            return [keyword.value]
+    return list(call.args[1:2])
+
+
+def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
+    """Every node's immediate parent, for enclosing-scope questions."""
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(tree):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+    return parents
+
+
+def _enclosing(node: ast.AST, parents: dict[ast.AST, ast.AST], kinds):
+    """Every ancestor of ``node`` that is an instance of one of ``kinds``."""
+    found = []
+    current = node
+    while current in parents:
+        current = parents[current]
+        if isinstance(current, kinds):
+            found.append(current)
+    return found
+
+
+def _bound_names(target: ast.AST):
+    """Every name one assignment/loop target binds."""
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for element in target.elts:
+            yield from _bound_names(element)
+
+
+def _derived_group_member(node: ast.AST, call: ast.Call, parents) -> bool:
+    """Is this variant argument a loop variable of a registry-derived group?
+
+    The legitimate non-representative source of a variant key in a smoke
+    module is a member of the composition group the module derives itself,
+    never a copied literal or an arbitrary variable: the name has to be bound
+    by a ``for`` statement enclosing the call, inside a function that really
+    calls ``composition_groups``.
+    """
+    if not isinstance(node, ast.Name):
+        return False
+    functions = _enclosing(call, parents, (ast.FunctionDef, ast.AsyncFunctionDef))
+    if not functions:
+        return False
+    owner = functions[0]
+    derives_groups = any(
+        isinstance(inner, ast.Call)
+        and (
+            (isinstance(inner.func, ast.Name) and inner.func.id == "composition_groups")
+            or (
+                isinstance(inner.func, ast.Attribute)
+                and inner.func.attr == "composition_groups"
+            )
+        )
+        for inner in ast.walk(owner)
+    )
+    if not derives_groups:
+        return False
+    return any(
+        loop.target is not None and node.id in set(_bound_names(loop.target))
+        for loop in _enclosing(call, parents, ast.For)
+    )
+
+
+def _binds_representative(node: ast.AST) -> bool:
+    """Does this statement bind the ``REPRESENTATIVE_VARIANT`` name?"""
+    if isinstance(node, ast.Assign):
+        targets = list(node.targets)
+    elif isinstance(node, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+        targets = [node.target]
+    elif isinstance(node, (ast.For, ast.AsyncFor)):
+        targets = [node.target]
+    elif isinstance(node, (ast.With, ast.AsyncWith)):
+        targets = [
+            item.optional_vars for item in node.items if item.optional_vars is not None
+        ]
+    else:
+        return False
+    return any(
+        REPRESENTATIVE_DECLARATION in set(_bound_names(target))
+        for target in targets
+        if target is not None
+    )
+
+
 class CompositionGroupingTests(unittest.TestCase):
     """Requirement: grouping is derived from declarations, never a roster."""
 
@@ -269,42 +361,32 @@ class RepresentativeCoverageTests(unittest.TestCase):
                     and node.func.id == "construct_species_individual"
                 ]
                 self.assertTrue(calls, "the smoke constructs no individual")
+                parents = _parents(tree)
                 for call in calls:
-                    arguments = [
-                        keyword.value
-                        for keyword in call.keywords
-                        if keyword.arg == "variant_key"
-                    ] or call.args[1:2]
+                    arguments = _constructed_variant_arguments(call)
                     # A constructed variant is either the declared
-                    # representative itself or a value derived from the
-                    # registry (a member of the declared group); a literal
-                    # key would be a second, stale copy of the choice.
+                    # representative itself or a loop variable of the group
+                    # this module derives from the registries. A literal or an
+                    # arbitrary variable would be a second, stale copy of the
+                    # choice, so neither is accepted.
                     self.assertTrue(
                         arguments
-                        and not any(
-                            isinstance(argument, ast.Constant)
+                        and all(
+                            (
+                                isinstance(argument, ast.Name)
+                                and (
+                                    argument.id == REPRESENTATIVE_DECLARATION
+                                    or _derived_group_member(
+                                        argument, call, parents
+                                    )
+                                )
+                            )
                             for argument in arguments
                         ),
                         "construct_species_individual must take the declared "
-                        "representative or a registry-derived variant, never a "
-                        "literal variant key",
+                        "representative or a registry-derived group member, "
+                        "never a literal or copied variant key",
                     )
-                self.assertTrue(
-                    any(
-                        isinstance(argument, ast.Name)
-                        and argument.id == REPRESENTATIVE_DECLARATION
-                        for call in calls
-                        for argument in (
-                            [
-                                keyword.value
-                                for keyword in call.keywords
-                                if keyword.arg == "variant_key"
-                            ]
-                            or call.args[1:2]
-                        )
-                    ),
-                    "the smoke never constructs its declared representative",
-                )
                 # A declaration plus an empty or skipped test would satisfy
                 # every wiring rule above while contributing no evidence, so
                 # the module also has to carry a non-skipped test that
@@ -334,16 +416,55 @@ class RepresentativeCoverageTests(unittest.TestCase):
                     "no non-skipped test resolves an action, so the declared "
                     "representative has no committed evidence",
                 )
+                # The representative's own resolving test has to construct the
+                # declared variant: a helper that nothing calls cannot stand in
+                # for it.
+                self.assertTrue(
+                    any(
+                        isinstance(inner, ast.Call)
+                        and isinstance(inner.func, ast.Name)
+                        and inner.func.id == "construct_species_individual"
+                        and any(
+                            isinstance(argument, ast.Name)
+                            and argument.id == REPRESENTATIVE_DECLARATION
+                            for argument in _constructed_variant_arguments(inner)
+                        )
+                        for test in resolving
+                        for inner in ast.walk(test)
+                    ),
+                    "no resolving test constructs the declared representative",
+                )
+                # The declaration is one module-level assignment, and it is the
+                # only place this module may bind the name or carry a shipped
+                # variant key: a second literal copy, even of the right key,
+                # would be a second source of the choice.
+                bindings = [
+                    node for node in ast.walk(tree) if _binds_representative(node)
+                ]
+                self.assertEqual(
+                    len(bindings),
+                    1,
+                    "the module must bind REPRESENTATIVE_VARIANT exactly once",
+                )
+                declaration = bindings[0]
+                self.assertIn(
+                    declaration,
+                    tree.body,
+                    "REPRESENTATIVE_VARIANT must be a module-level assignment",
+                )
+                self.assertIsInstance(declaration, ast.Assign)
+                self.assertIsInstance(declaration.value, ast.Constant)
+                declaration_literals = {id(declaration.value)}
                 literals = {
                     node.value
                     for node in ast.walk(tree)
-                    if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    if isinstance(node, ast.Constant)
+                    and isinstance(node.value, str)
+                    and id(node) not in declaration_literals
                 }
-                # The declaration itself is the one name this module is
-                # allowed to carry: any *other* shipped variant key literal
-                # would be a second, stale copy of the choice.
                 self.assertEqual(
-                    (literals - {variant_key}) & set(MONSTER_VARIANT_REGISTRY),
+                    literals & set(MONSTER_VARIANT_REGISTRY),
                     set(),
-                    "a representative smoke names a shipped variant key literally",
+                    "a representative smoke names a shipped variant key "
+                    "literally outside its declaration",
                 )
