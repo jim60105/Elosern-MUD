@@ -56,6 +56,7 @@
   - [新增物品指南](/development/adding-items)
   - [新增角色模板指南](/development/adding-player-presets)
   - [新增 NPC 指南](/development/adding-npcs)
+  - [新增魔物指南](/development/adding-monsters)
   - [大陸地理與座標單位](/development/continental-geography)
   - [魔物圖鑑編輯審查紀錄](/development/bestiary-editorial-review)
   - [魔物戰鬥 AI 調校](/development/monster-ai)

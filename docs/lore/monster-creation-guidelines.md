@@ -167,3 +167,5 @@ freshness or semantic accuracy.
 ## 參考文件
 
 [世界觀總覽](/lore/overview) 說明大陸地理、種族、政治、經濟與信仰。[魔法技能體系](/lore/magic-system) 說明元素作用、神性資格與尚未解答的魔法謎團。涉及具體聚落的創作，請另對照 [聚落地點指南](/lore/settlement-locations)。
+
+內容審查通過之後的工程實作，見 [新增魔物指南](/development/adding-monsters)。該文列出物種與變體宣告、技能與規則書、圖鑑與審查紀錄、代表煙霧、清單登記與驗證指令，並說明移除一隻魔物的順序。
