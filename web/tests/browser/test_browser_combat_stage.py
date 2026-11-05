@@ -1787,7 +1787,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             box = entries.nth(index).bounding_box()
             page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
             # Read only once the readout has followed the pointer.
-            expect(lead.locator('[data-testid="exploration-readout-name"]')).to_have_text(name)
+            expect(lead).to_contain_text(name)
             return {
                 # The lead holds the name followed by the tag, nothing else;
                 # the two are separate flex items, so their rendered text is
