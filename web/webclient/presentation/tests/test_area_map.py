@@ -118,6 +118,23 @@ def _edge_set(payload):
     return {frozenset((edge["source"], edge["destination"])) for edge in payload["edges"]}
 
 
+def _decode_overview(payload):
+    """``{(coarse_x, coarse_y): facts | None}`` of one overview window."""
+    overview = payload["district"]
+    window = overview["window"]
+    cells = {}
+    for row, runs in enumerate(overview["rows"]):
+        column = 0
+        for run in runs:
+            for offset in range(run["length"]):
+                cell = (window["min_x"] + column + offset, window["min_y"] + row)
+                cells[cell] = None if run["kind"] == "unknown" else {
+                    key: value for key, value in run.items() if key not in ("length", "kind")
+                }
+            column += run["length"]
+    return cells
+
+
 def _js_accepts(payload) -> bool:
     script = (
         "const fs=require('node:fs');"
@@ -776,7 +793,7 @@ class WildernessAreaTests(EvenniaTest):
         self._at_wild(start)
         self._pin({start: 3, (start[0] - 1, start[1]): 0})
         payload = _render(self.char1)
-        self.assertEqual(payload["schema_version"], 3)
+        self.assertEqual(payload["schema_version"], 4)
         self.assertEqual(payload["layer"], "wilderness")
         self.assertEqual(payload["frame"]["unit"], "km")
         half = WILDERNESS_WINDOW // 2
@@ -812,6 +829,251 @@ class WildernessAreaTests(EvenniaTest):
         self.assertEqual(payload["cell_km"], km)
         self.assertIn(payload["light_phase"], ("day", "dusk", "night", "dawn"))
         self.assertTrue(_js_accepts(payload))
+
+    # -- district overview (wilderness-district-overview) ------------------
+
+    def _lit_overview(self, start, radius=2):
+        from world.lore import map_districts
+
+        district_at = _live("world.maps.district_partition", "district_at")
+        key = district_at(start)
+        self.assertIsNotNone(key)
+        landmark = map_districts.landmark_node_ids()[key]
+        self._pin({start: radius}, visited_grid=(landmark,))
+        return key, _render(self.char1)
+
+    def test_a_lit_current_district_publishes_a_bounded_overview(self):
+        start = self._away()
+        self._at_wild(start)
+        # An unlit district (no landmark visit) publishes no overview at all.
+        self._pin({start: 2})
+        unlit = _render(self.char1)
+        self.assertIsNone(unlit["district"])
+        key, payload = self._lit_overview(start)
+        overview = payload["district"]
+        self.assertIsNotNone(overview)
+        self.assertEqual(overview["key"], key)
+        self.assertEqual(
+            overview["name_zh"],
+            _live("world.lore.map_districts", "current")().districts[key].district_name_zh,
+        )
+        self.assertIn(overview["cell_km"], area_map_module.DISTRICT_OVERVIEW_CELL_KM)
+        cells = _decode_overview(payload)
+        self.assertLessEqual(len(cells), area_map_module.DISTRICT_OVERVIEW_MAX_CELLS)
+        self.assertGreaterEqual(sum(len(row) for row in overview["rows"]), 1)
+        self.assertLessEqual(
+            sum(len(row) for row in overview["rows"]),
+            area_map_module.DISTRICT_OVERVIEW_MAX_RUNS,
+        )
+        self.assertLessEqual(
+            json_byte_size(overview), area_map_module.DISTRICT_OVERVIEW_MAX_BYTES
+        )
+        # The fine 41-cell window is unchanged beside the coarse record.
+        half = WILDERNESS_WINDOW // 2
+        self.assertEqual(
+            payload["window"],
+            {"min_x": start[0] - half, "min_y": start[1] - half, "width": 41, "height": 41},
+        )
+        self.assertTrue(_js_accepts(payload))
+
+    def test_the_overview_spans_exact_ownership_and_the_party(self):
+        start = self._away()
+        self._at_wild(start)
+        key, payload = self._lit_overview(start)
+        overview = payload["district"]
+        cell_km = overview["cell_km"]
+        window = overview["window"]
+        bounds = _live("world.maps.district_partition", "district_bounds")(key)
+        self.assertIsNotNone(bounds)
+        min_km_x, min_km_y, max_km_x, max_km_y = bounds
+        self.assertLessEqual(window["min_x"], min_km_x // cell_km)
+        self.assertLessEqual(window["min_y"], min_km_y // cell_km)
+        self.assertGreaterEqual(window["min_x"] + window["width"], -(-max_km_x // cell_km))
+        self.assertGreaterEqual(window["min_y"] + window["height"], -(-max_km_y // cell_km))
+        self.assertTrue(
+            window["min_x"] <= start[0] // cell_km < window["min_x"] + window["width"]
+        )
+        self.assertTrue(
+            window["min_y"] <= start[1] // cell_km < window["min_y"] + window["height"]
+        )
+        district_at = _live("world.maps.district_partition", "district_at")
+        for (cx, cy), facts in _decode_overview(payload).items():
+            sample = (cx * cell_km + cell_km // 2, cy * cell_km + cell_km // 2)
+            owned = district_at(sample) == key
+            self.assertEqual(facts is not None, owned, (cx, cy))
+            if facts is not None:
+                self.assertEqual(
+                    set(facts), {"terrain", "band", "passable"}
+                )
+                self.assertNotEqual(facts["terrain"], "sea")
+
+    def test_an_unowned_current_cell_publishes_no_overview(self):
+        start = self._away()
+        self._at_wild(start)
+        with mock.patch.object(area_map_module, "_district_key", return_value=None):
+            payload = _render(self.char1)
+        self.assertIsNone(payload["district"])
+        self.assertTrue(payload["rows"])
+
+    def test_an_adjacent_owner_and_a_hidden_anchor_never_leak(self):
+        class _Partition:
+            frame_cells = 2700
+
+            def district_bounds(self, key):
+                return (0, 0, 10, 5)
+
+            def district_at(self, cell):
+                return "t_owner" if cell[0] < 5 else "t_other"
+
+        class _Oracle:
+            def facts(self, cell):
+                if cell == (2, 2):
+                    # A hidden anchor's footprint keeps its underlying
+                    # regional terrain and is not a disclosed settlement.
+                    return {"terrain": "woodland", "band": 3, "passable": False}
+                return {"terrain": "hills", "band": 4, "passable": True}
+
+        overview = area_map_module._build_district_overview(
+            _Partition(),
+            "t_owner",
+            "合成領地",
+            _Oracle(),
+            (2, 2),
+            {"terrain": "open_ground", "band": 2, "passable": True},
+            force_party=True,
+        )
+        cells = _decode_overview({"district": overview})
+        for (cx, _cy), facts in cells.items():
+            self.assertEqual(facts is not None, cx < 5, (cx, _cy))
+        self.assertEqual(cells[(2, 2)], {"terrain": "woodland", "band": 3, "passable": False})
+        for row in overview["rows"]:
+            for run in row:
+                self.assertLessEqual(
+                    set(run),
+                    {"length", "kind", "terrain", "band", "passable"},
+                )
+
+    def test_even_rung_sampling_uses_cell_km_over_two(self):
+        class _Partition:
+            frame_cells = 2700
+
+            def district_bounds(self, key):
+                return (0, 0, 60, 60)
+
+            def district_at(self, cell):
+                return "t_owner"
+
+        class _Oracle:
+            def facts(self, cell):
+                return {"terrain": "hills", "band": (cell[0] + cell[1]) % 16, "passable": True}
+
+        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1_000), mock.patch.object(
+            area_map_module, "DISTRICT_OVERVIEW_MAX_BYTES", 10_000_000
+        ):
+            overview = area_map_module._build_district_overview(
+                _Partition(),
+                "t_owner",
+                "合成領地",
+                _Oracle(),
+                (0, 0),
+                None,
+                force_party=False,
+            )
+        # 60 x 60 one-kilometre cells exceed the patched 1000-cell budget; the
+        # 2 km rung (900 cells) is the finest that fits and samples at +1.
+        self.assertEqual(overview["cell_km"], 2)
+        cells = _decode_overview({"district": overview})
+        for (cx, cy), facts in cells.items():
+            sample = (cx * 2 + 1, cy * 2 + 1)
+            self.assertEqual(facts["band"], (sample[0] + sample[1]) % 16)
+
+    def test_every_shipped_district_fits_a_rung_with_terrain(self):
+        from world.lore import map_districts
+
+        partition = _live("world.maps.district_partition", "frozen_partition")()
+        oracle = area_map_module._TerrainOracle()
+        for key, declaration in map_districts.current().districts.items():
+            with self.subTest(district=key):
+                overview = area_map_module._build_district_overview(
+                    partition,
+                    key,
+                    declaration.district_name_zh,
+                    oracle,
+                    (0, 0),
+                    None,
+                    force_party=False,
+                )
+                self.assertIsNotNone(overview)
+                self.assertIn(overview["cell_km"], area_map_module.DISTRICT_OVERVIEW_CELL_KM)
+                window = overview["window"]
+                self.assertLessEqual(
+                    window["width"] * window["height"],
+                    area_map_module.DISTRICT_OVERVIEW_MAX_CELLS,
+                )
+                self.assertLessEqual(
+                    sum(len(row) for row in overview["rows"]),
+                    area_map_module.DISTRICT_OVERVIEW_MAX_RUNS,
+                )
+                self.assertLessEqual(
+                    json_byte_size(overview),
+                    area_map_module.DISTRICT_OVERVIEW_MAX_BYTES,
+                )
+                self.assertTrue(
+                    any(
+                        run["kind"] == "terrain"
+                        for row in overview["rows"]
+                        for run in row
+                    ),
+                    key,
+                )
+
+    def test_overview_cache_follows_partition_elevation_and_policy(self):
+        start = self._away()
+        key = _live("world.maps.district_partition", "district_at")(start)
+        self.assertIsNotNone(key)
+        cached = area_map_module._district_overview_base
+        cached.cache_clear()
+        arguments = (key, "binding", "partition-1", "elevation-1", 1)
+        self.assertIsNotNone(cached(*arguments))
+        self.assertIs(cached(*arguments), cached(*arguments))
+        misses = cached.cache_info().misses
+        for changed in (
+            (key, "binding", "partition-2", "elevation-1", 1),
+            (key, "binding", "partition-1", "elevation-2", 1),
+            (key, "binding", "partition-1", "elevation-1", 2),
+            (key, "binding-2", "partition-1", "elevation-1", 1),
+        ):
+            with self.subTest(arguments=changed):
+                self.assertIsNotNone(cached(*changed))
+                self.assertGreater(cached.cache_info().misses, misses)
+                misses = cached.cache_info().misses
+        cached.cache_clear()
+
+    def test_an_over_bound_overview_is_null_and_the_window_still_publishes(self):
+        start = self._away()
+        self._at_wild(start)
+        area_map_module._district_overview_base.cache_clear()
+        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1), mock.patch.object(
+            area_map_module, "log_warn"
+        ) as log_warn:
+            key, payload = self._lit_overview(start)
+        self.assertIsNone(payload["district"])
+        self.assertTrue(payload["rows"])
+        self.assertTrue(_js_accepts(payload))
+        events = [call.args[0] for call in log_warn.call_args_list]
+        self.assertIn("area_map_district_overview_over_bound", events)
+        area_map_module._district_overview_base.cache_clear()
+
+    def test_reading_a_lit_district_overview_writes_nothing(self):
+        start = self._away()
+        self._at_wild(start)
+        key, _payload = self._lit_overview(start)
+        clock = get_world_clock()
+        before = (self.char1.location, parse_knowledge(self.char1), clock.tick)
+        for _ in range(2):
+            payload = _render(self.char1)
+            self.assertEqual(payload["district"]["key"], key)
+        self.assertEqual((self.char1.location, parse_knowledge(self.char1), clock.tick), before)
 
     @covers_requirement(
         "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
@@ -1320,7 +1582,7 @@ class MapViewDispatchTests(EvenniaTestCase):
         self.registry = PresentationRegistry("test")
         self.registry.register(_status_spec())
         self.registry.register(
-            PresenterSpec("area_map", 3, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
+            PresenterSpec("area_map", 4, ("map_unavailable", "區域地圖目前無法顯示"), spy, on_demand=True)
         )
         self.session = _Session(self.char)
         self.coordinator = PresentationCoordinator(
@@ -1537,7 +1799,7 @@ def _largest_grid_body(labels: int = 16) -> dict:
         for i in range(AREA_MAX_QUEST_MARKERS)
     ]
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "layer": "grid",
         "map_id": map_key,

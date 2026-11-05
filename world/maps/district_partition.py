@@ -72,6 +72,17 @@ def district_outlines() -> Mapping[str, tuple[tuple[int, ...], ...]]:
     return frozen_partition().outlines
 
 
+def district_bounds(key: str) -> tuple[int, int, int, int] | None:
+    """The exact-ownership box of one district, in one-kilometre cells.
+
+    The tuple is ``(min_x, min_y, max_x, max_y)`` with exclusive maxima,
+    inflated to the coarse tile grid and clamped to the frame. It is never
+    the smoothed display outline.
+    """
+
+    return frozen_partition().district_bounds(key)
+
+
 def artifact_metadata() -> PartitionMetadata:
     """The committed artifact's version and signatures, without expanding it."""
     return read_partition_metadata(DATA_PATH.read_text(encoding="utf-8"))

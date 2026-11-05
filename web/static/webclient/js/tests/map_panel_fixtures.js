@@ -32,7 +32,7 @@ function gridNode(x, y, overrides) {
 function gridArea(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       layer: "grid",
       map_id: MAP,
@@ -73,7 +73,7 @@ function gridArea(overrides) {
 function interiorArea(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       layer: "interior",
       map_id: "room:40",
@@ -162,6 +162,27 @@ function wildNode(x, y, overrides) {
     overrides || {}
   );
 }
+// A synthetic 5 km overview around the current coarse cell: one terrain cell
+// in the middle, unknown everywhere else. Fixture data only.
+function wildOverview() {
+  return {
+    key: "t_east",
+    name_zh: "合成東區",
+    cell_km: 5,
+    window: { min_x: 22, min_y: 22, width: 5, height: 5 },
+    rows: [
+      [{ length: 5, kind: "unknown" }],
+      [{ length: 5, kind: "unknown" }],
+      [
+        { length: 2, kind: "unknown" },
+        { length: 1, kind: "terrain", terrain: "open_ground", band: 3, passable: true },
+        { length: 2, kind: "unknown" },
+      ],
+      [{ length: 5, kind: "unknown" }],
+      [{ length: 5, kind: "unknown" }],
+    ],
+  };
+}
 function wildernessArea(overrides) {
   const current = `wild:elosern:${WILD_C}:${WILD_C}`;
   const nodes = [wildNode(WILD_C, WILD_C, { label: "合成曠野中心", visibility: "current", visited: true })];
@@ -179,7 +200,7 @@ function wildernessArea(overrides) {
   edges.push({ source: current, destination: sw.id });
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       layer: "wilderness",
       map_id: "elosern",
@@ -190,6 +211,7 @@ function wildernessArea(overrides) {
       edges,
       quest_markers: [],
       district_name: "合成地區",
+      district: wildOverview(),
       cell_km: 1,
       window: { min_x: WILD_MIN, min_y: WILD_MIN, width: 41, height: 41 },
       rows: wildRowsFor(wildTerrainAt),

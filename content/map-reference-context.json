@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2f18c1b36417e507adf74bdf9f6866600794f4dd8dcd8d74172498ea46b4649a",
+  "fingerprint": "07defc6a1ae168286dd407977921d7d283c2e1972f23d16c3b9365eeaa32197e",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -900,7 +900,7 @@
     "packages/map-core/elosern_map_core/geometry.py": "1f7d4cc9600949fdd16ed54991dab0bb598f1965f41e5eec9d6c36f3315dfaf9",
     "packages/map-core/elosern_map_core/inspection.py": "9d1f51ba9449840c4c1bd38e929a4c9a0c569a8a512b40ae9a03e69ffc1f4040",
     "packages/map-core/elosern_map_core/partition.py": "18d27b8e97a958185ac49eaead8ab66050f9464ef92bd426dfacfeecbc256031",
-    "packages/map-core/elosern_map_core/partition_codec.py": "ddc5834c0e74e38f045c65e21fff95f65ae3360daa3b4192e87b1f19ae897e48",
+    "packages/map-core/elosern_map_core/partition_codec.py": "6a2d59655609b72110dd342531c9669d44dd7a824d8671e23c273f5f4bb526ca",
     "packages/map-core/elosern_map_core/reference_context.py": "23b290c95e6a94f281bc8281c075a1074dab0e7aebb061237640de759607cd13",
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/schema.py": "0458f4a076803766c035487c74bed8739123e44f6910be8ddb0ad517ebeda6ba",
