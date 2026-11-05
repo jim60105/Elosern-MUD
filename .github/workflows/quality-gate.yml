@@ -216,12 +216,15 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.62.0-noble
       options: --ipc=host
-      # GitHub points HOME at a user-owned directory inside the container.
-      # Firefox refuses to run as root against a home it does not own, so the
-      # image's own root home is used for the whole job.
-      env:
-        HOME: /root
     timeout-minutes: 20
+    # GitHub points HOME at ``/github/home`` inside a job container, and that
+    # directory belongs to the image's ``pwuser``. Firefox refuses to start as
+    # root against a home it does not own, and the runner's own HOME assignment
+    # wins over ``container.env``, so the job declares it here. Chromium
+    # launched either way; without this every shard died at its browser smoke
+    # step before a journey ran.
+    env:
+      HOME: /root
     strategy:
       fail-fast: false
       matrix:
