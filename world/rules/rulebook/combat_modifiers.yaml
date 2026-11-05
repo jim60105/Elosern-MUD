@@ -251,6 +251,12 @@
   when: {buff_active: mudfilm_shell}
   then: {defense: 3}
 
+# 魔物資源技能（monster-content-expansion §5）：滑蠟翻身的自身敏捷提升，
+# buff 列為 mount，+3 資料在此（rock_echo_stagger_agility_flat 的 agility_flat 先例）。
+- id: wax_slip_agility_flat
+  when: {buff_active: wax_slip}
+  then: {agility_flat: 3}
+
 # 生理性疲勞的戰鬥修正（project-physiological-fatigue）：精神儲備投影的排他
 # 階段在此結算；敏捷為既有百分比詞彙，準度為既有的平坦加減值詞彙。
 # 基礎數值永遠不改寫，移動也只讀疲勞自身的步速倍率，不重複套用敏捷。

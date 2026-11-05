@@ -209,6 +209,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "shadow_veil_execution",
                 "shadow_dance_finale",
                 "mudfilm_guard",
+                "wax_pouch_slip",
             },
             SkillCategory.ENHANCEMENT: {
                 "body_enhancement",

@@ -36,6 +36,9 @@ variant_intelligence:
   # range; reflexive self-protection is the least decision depth of any
   # activated variant.
   mudbank_dweller: 20
+  # 藏穀型: times its slip around a defended cache and family foraging -- a
+  # little more situational reading than the slime's reflexive film.
+  wax_cache_forager: 30
 
 # Per-variant mode override; an absent entry uses the resolved archetype's
 # decision_mode. This is the rollback seam: editing one entry back to `legacy`
@@ -48,6 +51,7 @@ variant_decision_mode:
   reef_warden: utility
   trail_hunter: utility
   mudbank_dweller: utility
+  wax_cache_forager: utility
 
 archetypes:
   instinctive:
