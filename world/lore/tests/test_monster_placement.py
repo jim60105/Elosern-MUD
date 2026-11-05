@@ -499,7 +499,7 @@ class MemberActivityBindingTests(unittest.TestCase):
         self.assertIn(ABSENT_ACTIVITY, str(raised.exception))
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_a_label_requires_every_outcome_to_be_exactly_one_individual(self):
         registry.validate_monster_placement_registry(
@@ -526,7 +526,7 @@ class MemberActivityBindingTests(unittest.TestCase):
                     )
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_an_empty_label_is_rejected(self):
         for label in ("", 0):

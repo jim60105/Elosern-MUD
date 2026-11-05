@@ -5,11 +5,11 @@ Exact combat context actions panel, keyboard menu, allowlisted combat adapters, 
 ## Requirements
 
 ### Requirement: Combat context actions are an exact read-only panel
-The production presentation registry SHALL register `context_actions` schema version 7.
+The production presentation registry SHALL register `context_actions` schema version 8.
 For a valid active combat session, its available payload SHALL contain exactly
 `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`,
 `secondary_actions`, `actors`, `choices`, `draft`, and `suggestions`; `available` SHALL be true, `kind`
-SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`.
+SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`. Every participant SHALL carry a required `monster_identity` field that is null or exactly `individual_name`, `species_name` and `variant_name`.
 
 #### Scenario: Active session produces canonical combat presentation
 - **WHEN** a puppeted WebClient in a valid persistent combat session receives a full snapshot
@@ -72,6 +72,10 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 #### Scenario: Version 7 adds authoritative party facts
 - **WHEN** the combat available form is serialized at version 7
 - **THEN** it carries bounded actor summaries, one actor-scoped choices object and durable draft progress, retains participant conditions and skill polarity, stays read-only, and changes exploration/unavailable forms only in schema_version
+
+#### Scenario: Version 8 adds monster identity facts
+- **WHEN** the combat available form is serialized at version 8
+- **THEN** its top-level field set is unchanged from version 7, every participant additionally carries `monster_identity`, the presenter stays read-only, and the exploration and unavailable forms differ from version 7 only in `schema_version`
 
 ### Requirement: Combat presentation enumerates complete deterministic choices
 The requested actor's `choices.skills` field SHALL be an ordered array of category groups, each
@@ -992,3 +996,29 @@ Retreat and Surrender SHALL remain reachable independently of commanded member. 
 #### Scenario: Invalidation and replay
 - **WHEN** session/round/epoch changes, disconnect occurs or the token becomes stale
 - **THEN** pending confirmation is canceled without auto-retry and no personal flee or retired action route can mutate
+
+### Requirement: The combat target prompt shows the focused monster's variant
+The target prompt SHALL show a focused monster's name with a variant tag derived by the client from `monster_identity`: the variant name for an unnamed individual, and the variant name followed by the species name for a named one. A participant without `monster_identity` SHALL show no tag.
+
+#### Scenario: Unnamed foe
+- **WHEN** the stage target step focuses a synthetic foe with a species name, a variant name and no individual name
+- **THEN** the prompt shows the species name with a tag holding the variant name
+
+#### Scenario: Named foe
+- **WHEN** the step focuses a synthetic foe with an individual name
+- **THEN** the prompt shows the individual name with a tag holding the variant name followed by the species name
+
+#### Scenario: Participant without identity
+- **WHEN** the step focuses a party member, or a monster whose identity is null
+- **THEN** the prompt shows its name with no variant tag
+
+### Requirement: A figure plate marks a named individual without moving
+A plate whose participant has an individual name SHALL show that name in the gold display treatment with a hairline along the plate's top. The plate SHALL keep the size and line positions of an unnamed plate, keep its single crown at rest, and use no selection cue. Its accessible name and title SHALL include the variant tag.
+
+#### Scenario: Named and unnamed plates share geometry
+- **WHEN** a named and an unnamed plate render at one form
+- **THEN** their slot, name line and stroke positions and sizes are equal, and the name's rendered text is complete
+
+#### Scenario: Plate states still read
+- **WHEN** a named plate is the focused target, is acting, or is fallen
+- **THEN** it keeps that state's existing cue together with the named treatment

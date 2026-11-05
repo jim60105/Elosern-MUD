@@ -96,3 +96,11 @@ SHALL raise on an unknown `ObjectiveKind` so drift fails loudly in tests.
 #### Scenario: Unknown objective kind raises
 - **WHEN** the renderer is invoked with an `ObjectiveKind` it does not recognize
 - **THEN** it raises an explicit error instead of emitting a wrong description
+
+#### Scenario: A bound objective on a named site renders the name
+- **WHEN** a bound site objective names a synthetic site that declares an individual name
+- **THEN** the description is the defeat verb followed by that name, with no count and no note
+
+#### Scenario: A bound objective on an unnamed site is unchanged
+- **WHEN** a bound site objective names a synthetic site with no individual name
+- **THEN** the description is the generic bound-target line with the required count

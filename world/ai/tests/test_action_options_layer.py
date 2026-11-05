@@ -416,6 +416,9 @@ class ActionOptionsMonsterIdentityTests(unittest.TestCase):
         "variant_name": "合成守灣型",
     }
 
+    @covers_requirement(
+        "action-options-layer::monster-entries-carry-identity-facts"
+    )
     def test_a_named_monster_prompt_holds_its_three_names(self):
         context = _context(monster_entries=[self.NAMED])
         (entry,) = context.monster_entries
@@ -428,6 +431,9 @@ class ActionOptionsMonsterIdentityTests(unittest.TestCase):
         for fact in ('"individual_name"', '"合成首領"', '"species_name"', '"合成鱷"', '"合成守灣型"'):
             self.assertIn(fact, rendered)
 
+    @covers_requirement(
+        "action-options-layer::monster-entries-carry-identity-facts"
+    )
     def test_a_tier_only_monster_carries_null_facts(self):
         context = _context(
             monster_entries=[{"monster_id": 8, "display_name": "合成散兵", "threat_tier": "低"}]
@@ -439,6 +445,9 @@ class ActionOptionsMonsterIdentityTests(unittest.TestCase):
         _, user = build_action_options_prompt(context)
         self.assertIn('"individual_name": null', user["content"])
 
+    @covers_requirement(
+        "action-options-layer::monster-entries-carry-identity-facts"
+    )
     def test_an_over_long_identity_value_is_truncated_to_the_entry_bound(self):
         from world.ai.action_options.context import MAX_MONSTER_ENTRY_LENGTH
 

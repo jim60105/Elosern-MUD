@@ -5,11 +5,11 @@ The read-only version-3 `exploration` panel and version-7 `character` panel, the
 ## Requirements
 
 ### Requirement: The exploration panel is an exact read-only version-4 presentation panel
-The production exploration panel SHALL use exact schema6 fields and read-only canonical data, retaining bounded move rows whose wilderness destination can be null when disclosure is withheld while known destinations remain canonical.
+The production exploration panel SHALL use exact schema7 fields and read-only canonical data, retaining bounded move rows whose wilderness destination can be null when disclosure is withheld while known destinations remain canonical. Every interact target and `look.entities` row SHALL carry a required `monster_identity` field that is null or exactly `individual_name`, `species_name` and `variant_name`.
 
 #### Scenario: Exploration snapshot carries the exploration root
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot; any asserted wilderness destination facts are revealed and location-identity permitted
-- **THEN** `exploration` reports schema version 6 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
+- **THEN** `exploration` reports schema version 7 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
 
 #### Scenario: A bound companion's possess affordance never degrades the panel
 - **WHEN** the room contains a bound companion of the actor and the full `exploration` panel is; any asserted wilderness destination facts are revealed and location-identity permitted
@@ -91,16 +91,28 @@ The production exploration panel SHALL use exact schema6 fields and read-only ca
 - **THEN** it is built only from canonical room, entity, component, object, and service data, emits no live object or filesystem reference, does not mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and uses the registered common unavailable form outside exploration mode
 
 #### Scenario: Available schema versions cut over together
-- **WHEN** either validator receives an available exploration panel with schema version 6, and then otherwise identical panels with version 4 or another unsupported version; any asserted wilderness destination facts are revealed and location-identity permitted
-- **THEN** only version 6 is accepted, including its non-null reference fields and its nullable wilderness move-row destination, and no dual-version conversion is performed
+- **WHEN** either validator receives an available exploration panel with schema version 7, and then otherwise identical panels with version 6 or another unsupported version; any asserted wilderness destination facts are revealed and location-identity permitted
+- **THEN** only version 7 is accepted, including its non-null reference fields and its nullable wilderness move-row destination, and no dual-version conversion is performed
 
 #### Scenario: Bounded independent services field
 - **WHEN** an NPC interact descriptor is serialized; any asserted wilderness destination facts are revealed and location-identity permitted
-- **THEN** services has exact state none/ready/unreadable and at most 16 stable-key label/enabled/reason/route entries, independent of the eight general-affordance limit; Python and browser accept only schema 6
+- **THEN** services has exact state none/ready/unreadable and at most 16 stable-key label/enabled/reason/route entries, independent of the eight general-affordance limit; Python and browser accept only schema 7
 
 #### Scenario: Undisclosed directional target
 - **WHEN** a synthetic unvisited wilderness neighbour remains outside reveal
 - **THEN** it has no local-map node or identifying exit metadata, while its enabled opaque direction can still submit exit_ref/current_node without a fabricated minimap highlight
+
+#### Scenario: Rows carry monster identity facts
+- **WHEN** a synthetic room holds an unnamed species-backed monster, a named one, a tier-only monster and an NPC
+- **THEN** the first row's identity has a null `individual_name`, the second's holds the name, the last two identities are null, and no row carries a composed name or tag
+
+#### Scenario: Display name follows identity
+- **WHEN** a monster with a non-null identity has had its object key changed
+- **THEN** its `display_name` is still the individual name or else the species name, and the validators accept the payload
+
+#### Scenario: A disagreeing display name is rejected
+- **WHEN** either validator receives a row whose `display_name` differs from the individual name or else the species name of its non-null identity, or an identity with an empty name
+- **THEN** the payload is rejected as a protocol error
 
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
 The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: an unlawful possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.

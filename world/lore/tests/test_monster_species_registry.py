@@ -528,6 +528,9 @@ class MembershipValidationTests(unittest.TestCase):
 class DisplayNameBoundTests(unittest.TestCase):
     """Requirement: monster display names fit the narrow name slots."""
 
+    @covers_requirement(
+        "monster-species-registry::monster-display-names-fit-the-narrow-name-slots"
+    )
     def test_names_at_the_bound_are_accepted(self):
         species, variants = _valid_registry()
         at_bound = "合" * registry.MONSTER_NAME_MAX_CODE_POINTS
@@ -535,6 +538,9 @@ class DisplayNameBoundTests(unittest.TestCase):
         variants = dict(variants, t_fixture_ordinary=_variant(display_name_zh=at_bound))
         registry.validate_monster_species_registry(species, variants, **_faces())
 
+    @covers_requirement(
+        "monster-species-registry::monster-display-names-fit-the-narrow-name-slots"
+    )
     def test_an_over_long_species_or_variant_name_is_rejected(self):
         over = "合" * (registry.MONSTER_NAME_MAX_CODE_POINTS + 1)
         species, variants = _valid_registry()

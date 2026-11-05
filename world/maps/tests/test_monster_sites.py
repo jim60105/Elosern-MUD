@@ -684,7 +684,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 )
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_a_labelled_site_names_its_individual_without_changing_identity(self):
         self._settle()
@@ -716,7 +716,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(named_group.activity_key, plain_group.activity_key)
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_a_recovered_labelled_individual_keeps_the_label_and_a_new_identity(self):
         ward = MonsterSite(

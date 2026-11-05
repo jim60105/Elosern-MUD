@@ -361,6 +361,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(reloaded.variant_key, ORDINARY)
         self.assertEqual(reloaded.individual_name, "標籤")
 
+    @covers_requirement(
+        "monster-individual-construction::a-species-backed-individual-is-named-by-its-species-or-its-individual-name"
+    )
     def test_an_unnamed_individual_is_keyed_by_its_species_name(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
         self.assertEqual(str(individual.key), SPECIES_ROW.display_name_zh)
@@ -369,6 +372,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         # The field is not autocreated: an unnamed individual stores nothing.
         self.assertFalse(individual.attributes.has("individual_name"))
 
+    @covers_requirement(
+        "monster-individual-construction::a-species-backed-individual-is-named-by-its-species-or-its-individual-name"
+    )
     def test_a_named_individual_keeps_its_identity_keys(self):
         individual = construct_species_individual(
             SPECIES, STRONGER, individual_name="合成首領"
@@ -378,6 +384,9 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(individual.species_key, SPECIES)
         self.assertEqual(individual.variant_key, STRONGER)
 
+    @covers_requirement(
+        "monster-individual-construction::a-species-backed-individual-is-named-by-its-species-or-its-individual-name"
+    )
     def test_an_invalid_individual_name_builds_nothing(self):
         before = _object_count()
         for name in ("", "   ", 7, b"name"):
@@ -657,6 +666,9 @@ if __name__ == "__main__":
 class MonsterIdentityViewTests(EvenniaTestCase):
     """The lenient identity read: registry names plus the stored individual name."""
 
+    @covers_requirement(
+        "monster-individual-construction::monster-identity-reads-are-lenient-and-registry-backed"
+    )
     def test_an_unnamed_individual_reads_its_registry_names(self):
         individual = construct_species_individual(SPECIES, ORDINARY)
         self.assertEqual(
@@ -668,6 +680,9 @@ class MonsterIdentityViewTests(EvenniaTestCase):
             ),
         )
 
+    @covers_requirement(
+        "monster-individual-construction::monster-identity-reads-are-lenient-and-registry-backed"
+    )
     def test_a_named_individual_reads_its_stored_name(self):
         individual = construct_species_individual(
             SPECIES, STRONGER, individual_name="合成首領"
@@ -684,6 +699,9 @@ class MonsterIdentityViewTests(EvenniaTestCase):
             ),
         )
 
+    @covers_requirement(
+        "monster-individual-construction::monster-identity-reads-are-lenient-and-registry-backed"
+    )
     def test_entities_without_a_resolvable_identity_read_none(self):
         from evennia.utils.create import create_object
         from typeclasses.characters import PlayerCharacter

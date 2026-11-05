@@ -184,13 +184,17 @@ Each composition row SHALL resolve exactly one activity binding: a site's declar
 - **WHEN** a row or site names an activity absent from the activity registry
 - **THEN** placement publication raises the named placement-registry error and nothing is published
 
-### Requirement: A designated site individual carries an authored display label
-A site MAY declare a display label for its individual only when every legal outcome of its composition is exactly one individual. The site owner SHALL construct that individual with the label as its display name, and identity, ownership, binding and defeat credit SHALL remain keyed by species, variant, site and persistent individual identity.
+### Requirement: A designated site individual carries an authored individual name
+A site MAY declare an individual name only when every legal outcome of its composition is exactly one individual. The site owner SHALL construct that individual with the name, and identity, ownership, binding and defeat credit SHALL remain keyed by species, variant, site and persistent individual identity.
 
 #### Scenario: Label applied
-- **WHEN** a synthetic one-member site with a label populates
-- **THEN** the constructed individual's display key equals the label while its species and variant keys, site marker and group ownership equal an unlabelled site's
+- **WHEN** a synthetic one-member site with a name populates
+- **THEN** the constructed individual's individual name equals the site's name while its species and variant keys, site marker and group ownership equal an unnamed site's
 
 #### Scenario: Label on a group rejected
-- **WHEN** a label is declared on a site whose composition can place more than one individual, or the label is empty
+- **WHEN** a name is declared on a site whose composition can place more than one individual, or the name is empty
+- **THEN** publication raises the named placement-registry error
+
+#### Scenario: Over-long name rejected
+- **WHEN** a site declares a name longer than the shared monster name bound
 - **THEN** publication raises the named placement-registry error

@@ -10,7 +10,7 @@ unavailable form whose field set is unchanged across versions and which carries 
 
 ### Requirement: context_actions is an exact read-only version-7 panel
 The production presentation registry SHALL register panel name `context_actions` at schema
-version 7. The panel SHALL expose exactly one available form per mode and the registered common
+version 8. The panel SHALL expose exactly one available form per mode and the registered common
 unavailable form otherwise. The presenter SHALL be read-only: it SHALL NOT mutate traits,
 resources, buffs, sexual state, battlefield, session, quest, location, party, or world time, and
 SHALL emit no live object or filesystem reference.
@@ -19,23 +19,23 @@ SHALL emit no live object or filesystem reference.
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot, and again when the
   same actor is inside an active combat session
 - **THEN** the first `context_actions` payload is the exploration available form and the second is
-  the combat available form, each schema-valid at version 7, each carrying exactly its
+  the combat available form, each schema-valid at version 8, each carrying exactly its
   `suggestions` envelope, with no cross-form fields
 
 #### Scenario: The unavailable form differs only in schema version
 - **WHEN** the active puppet is creation-pending or has no location
 - **THEN** `context_actions` reports its registered unavailable form with the same field set,
-  reason, and semantics as the version-4 form, its `schema_version` equals 7, and no
+  reason, and semantics as the version-4 form, its `schema_version` equals 8, and no
   affordance, session, participant, skill, or suggestions data is present
 
 #### Scenario: The exploration form no longer forbids suggestions
-- **WHEN** the exploration available form is validated at version 7 with a valid `suggestions`
+- **WHEN** the exploration available form is validated at version 8 with a valid `suggestions`
   envelope and without one
 - **THEN** both payloads are accepted — the former version-4 "SHALL NOT contain a suggestions
   section" constraint is gone — and the `affordances` vocabulary contract is unchanged
 
 #### Scenario: The combat form is byte-identical to version 4 plus suggestions
-- **WHEN** a combat fixture is validated by the version-7 validator (and by the client mirror)
+- **WHEN** a combat fixture is validated by the version-8 validator (and by the client mirror)
 - **THEN** the combat payload follows the exact v7 party field set, retains conditions and polarity introduced in v6, and carries suggestions unavailable; the combat capability owns all party-field details
 
 #### Scenario: A possession affordance validates instead of raising
@@ -59,7 +59,7 @@ SHALL emit no live object or filesystem reference.
 
 #### Scenario: The unavailable form field set stays exact at version 5
 - **WHEN** the unavailable form is serialized
-- **THEN** its exact field set SHALL remain `schema_version`, `available`, and `reason` — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (7) like every other form
+- **THEN** its exact field set SHALL remain `schema_version`, `available`, and `reason` — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (8) like every other form
 
 #### Scenario: Every validation is server-side with a strict closed schema
 - **WHEN** a candidate payload carries unknown keys, wrong kinds, unpresent fields, underepresent fields, or out-of-bound values

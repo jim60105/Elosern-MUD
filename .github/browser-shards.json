@@ -258,7 +258,11 @@
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication"
+        "web.tests.browser.test_browser_services_guild.GuildQuestJourneys.test_drawer_renders_book_and_counter_without_duplication",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_a_named_foe_plate_keeps_the_geometry_of_an_unnamed_plate",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_the_target_prompt_tags_the_focused_monster_with_its_variant",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_a_named_rail_entry_keeps_the_geometry_of_an_unnamed_entry",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_the_rail_readout_tags_a_hovered_monster_with_its_variant"
       ]
     },
     {
