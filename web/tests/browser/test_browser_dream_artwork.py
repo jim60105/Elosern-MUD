@@ -30,8 +30,10 @@ from .browser_helpers import (
     activate_wait_row,
     install_outbound_recorder,
     narrative_log_text,
+    outbound_messages,
     sent_action_count,
     store_state,
+    wait_for_store_state,
 )
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -240,6 +242,24 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             dispatched + 1,
             "the awakening never left the client",
         )
+        # The answer to THAT request names the server's decision: a refusal is
+        # what would leave the panel open, so the journey asserts the committed
+        # result before it waits on the surface it produces.
+        awaken_request = [
+            args[0].get("request_id")
+            for cmdname, args, _kwargs in outbound_messages(page2)
+            if cmdname == "ui_action"
+            and args
+            and args[0].get("action_id") == "dream.awaken"
+        ][-1]
+        wait_for_store_state(
+            page2,
+            lambda state: (state.get("lastActionResult") or {}).get("requestId")
+            == awaken_request,
+            timeout=60000,
+        )
+        committed = store_state(page2)["lastActionResult"]
+        self.assertEqual(committed["outcome"], "success", committed.get("message"))
         page2.wait_for_selector(PANEL, state="detached", timeout=60000)
         # Nothing was queued for the physical room across either phase.
         self.assertEqual(self.art_scene(page2), art_before2)
