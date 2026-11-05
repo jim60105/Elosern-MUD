@@ -166,7 +166,7 @@ class ProjectedSite:
     cleared_at_tick: int | None
     recovery_due_tick: int | None
     composition_key: str
-    activity_key: str
+    activity_key: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -353,7 +353,7 @@ class _SiteState:
     cleared_at_tick: int | None
     recovery_due_tick: int | None
     composition_key: str
-    activity_key: str
+    activity_key: str | None
 
 
 class _Projection:
@@ -540,8 +540,10 @@ class _Projection:
 
     def _settle_sites(self, tick: int) -> None:
         from world.lore.monster_activity import movement_units
+        from world.lore.monster_placement import composition_row_bindings
         from world.maps.monster_activity import activity_decision_interval
         from world.maps.monster_sites import (
+            ENCOUNTER_COMPOSITION_REGISTRY,
             MONSTER_SITE_REGISTRY,
             recovery_condition_matured,
             site_occurrence_groups,
@@ -563,8 +565,9 @@ class _Projection:
             groups = site_occurrence_groups(
                 site, seed=int(state.seed), sequence=int(state.generation_sequence or 0) + 1
             )
+            composition = ENCOUNTER_COMPOSITION_REGISTRY[state.composition_key]
             units = movement_units(
-                groups, (state.activity_key,) * len(groups)
+                groups, composition_row_bindings(composition, site=site)
             )
             if not units:
                 continue
@@ -599,9 +602,11 @@ class _Projection:
 
     def _settle_zone_recoveries(self, tick: int) -> None:
         from world.lore.monster_activity import movement_units
+        from world.lore.monster_placement import composition_row_bindings
         from world.maps.monster_activity import activity_decision_interval
         from world.maps.regional_population import (
             ECOLOGY_ZONE_REGISTRY,
+            ENCOUNTER_COMPOSITION_REGISTRY,
             ZonePopulationState,
             plan_population_wave_from,
             zone_lower_bound,
@@ -637,9 +642,10 @@ class _Projection:
                 continue
             placement = plan.placements[0]
             sequence = state.generation_sequence + 1
+            composition = ENCOUNTER_COMPOSITION_REGISTRY[placement.composition_key]
             units = movement_units(
                 placement.groups,
-                (placement.activity_key,) * len(placement.groups),
+                composition_row_bindings(composition),
             )
             for ordinal, unit in enumerate(units):
                 self._place(
