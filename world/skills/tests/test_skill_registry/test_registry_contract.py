@@ -570,7 +570,7 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
     )
     def test_every_declared_kit_skill_resolves_with_matching_kind_cost_and_effects(self):
         from world.skills.effects.combat import GaugeTransferEffect
-        from world.skills.cost_tiers import is_freeform_eligible, spell_tier_for
+        from world.skills.cost_tiers import spell_tier_for
 
         references = self._declared_kit_references()
         self.assertTrue(references)
@@ -619,10 +619,15 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
                     if effect_id.partition(":")[0] == "gauge_transfer":
                         self.assertIsInstance(parsed, GaugeTransferEffect, effect_id)
                         self.assertIn(parsed.direction, ("drain", "restore"), effect_id)
-                # The shared freeform-shape gate applies to the authored skill
-                # without any species-specific branch: no kit skill is a
-                # freeform-scalable elemental spell.
-                self.assertFalse(is_freeform_eligible(skill))
+                # Freeform scaling needs the element's mastery passive
+                # (``freeform_mastery_entitled``); a monster kit never declares
+                # one, so shape eligibility grants no scale even for the
+                # damage-only elemental strikes whose shape admits it.
+                if skill.element is not None:
+                    self.assertNotIn(
+                        f"{skill.element.key}_mastery",
+                        (*variant.active_skill_keys, *variant.passive_skill_keys),
+                    )
                 # Prerequisite closure mirrors the construction validator: a
                 # declared active kit is satisfied by the variant's own
                 # active-or-passive keys, with no fabricated prerequisite.

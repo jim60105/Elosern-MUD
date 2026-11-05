@@ -691,3 +691,174 @@ The final review over the landed diff raised one blocking finding, adopted:
   resolves two hits: the first, after the guard payment, has headroom and
   proves the actual-amount credit is neither absent nor nominal; the second
   fills to the ceiling and proves the cap and the credit-before-cost order.
+
+## 焙鬃野豬
+
+The fourth delivered species of the batch, and the first high-tier species, is
+焙鬃野豬 (`ember_bristle_boar`) with its ordinary default variant 焙窩型
+(`warm_den_boar`): a complete high-tier, grade-B individual whose kit is two
+fire-element physical strikes, 熱鬃衝撞 (`ember_tusk_charge`, one enemy) and
+熱鬃橫掃 (`ember_bristle_sweep`, all eligible enemies). The species owns one
+variant; no stronger variant, site or placement belongs to this change.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* The profile lies wholly inside the high tier's declared bands (hit points
+  300-750, attack 26-40, agility 16-30, defense 18-32, magic `(0, 0)`).
+* Ordinary B baseline below the A-grade threat: every non-magic axis is below
+  the stronger crocodile variant 蓄潮型's own value, so the row is not a
+  second A-grade threat. Hit points sit above the band floor and well below
+  the A pool; attack sits just above the band floor; agility and defense sit
+  near the floor of their bands. The row therefore reads as the lower half of
+  the high tier, which is what an ordinary baseline means here.
+* `magic_power` is the only value the tier band admits. Authoring a fire
+  element never raises it: the strikes read the actor's physical attack under
+  the existing physical-school contract, and the element follows the ordinary
+  elemental rules.
+* The MP pool holds at least two casts of the larger MP cost and the SP pool
+  at least two casts of the larger SP cost, so either strike can be repeated
+  and the innate fallback is only reached by real depletion.
+* Both costs are positive and each MP cost lies inside its target-spec cost
+  column: the charge's 12 MP classifies in the 學徒 single-target band and the
+  sweep's 16 MP in the 學徒 area band. Both therefore resolve a magic-tier data
+  label without inventing a second cost table.
+* The charge's coefficient is above the sweep's: one committed impact is
+  stronger per recipient than one wide motion. The sweep still pays both costs
+  once per cast while each recipient is resolved on its own hit and defense.
+
+### Composition and representative
+
+The two-damage-actives kit is a new composition shape: two `damage`
+occurrences on the enemies audience with no rider and no support mount. No
+other shipped variant declares that ordered shape, so the group's
+stable-key-ordered representative is `warm_den_boar`, committed as
+`world/rules/tests/test_ember_bristle_boar_resource_skill.py`. The module
+derives both skill keys, both costs and the behaviour binding from the
+declarations, then observes the single-target selection against one opponent,
+the area selection against two, separate per-recipient hit and defense
+outcomes with an untouched constructed ally, one MP/SP payment per cast, the
+innate fallback when either resource is exhausted, an empty freeform ladder
+and a committed reload. The existing one-active and one-damage-plus-rider
+groups keep their own representatives untouched.
+
+### Decision mode and the flee threshold
+
+`warm_den_boar` binds the existing `pack_hunter` archetype and authors neither
+`variant_intelligence` nor `variant_decision_mode`, so it keeps the permanent
+legacy decision with no rulebook edit. `highest_expected_damage` scores the
+charge and the innate attack equally, because both read the physical attack
+and the legacy tie-break die decides; `prefer_area_when_multiple_enemies`
+makes the sweep the selection whenever more than one enemy stands. Its
+inclusive flee fraction keeps design §7.3's "either side can flee" available
+to the boar through a legal affordable route. Both actives carry damage, so
+`support_kit_mode_violations` stays empty for this variant. No rulebook value
+changes, so the AI tuning fingerprint and the recorded activation evidence are
+unchanged.
+
+### Non-gating role observation
+
+Read against the existing calibration boundary, the documented high-tier lower
+probe is 320 hit points / 28 attack / 18 agility / 20 defense and the upper
+probe is 700/38/26/28. The authored ordinary B profile (380/28/17/20) sits just
+above the lower probe on hit points, level with it on attack and defense, one
+point below it on agility while staying inside the high band's floor of 16,
+and below the A-grade 蓄潮型 on every axis. The row therefore reads as an
+ordinary B baseline in the lower half of the high tier rather than a second
+A-grade threat. This is a declaration relation observed through the existing
+calibration boundary, not a balance re-approval.
+
+### Evidence map
+
+* Identity, literal construction, the new composition group, single-target and
+  area selection, per-recipient hit and defense outcomes, one payment per
+  cast, the innate fallback on either exhausted resource, the empty freeform
+  ladder and committed reload are established by
+  `world/rules/tests/test_ember_bristle_boar_resource_skill.py`, the committed
+  representative of the new two-strike group.
+* Payment and effect fault rollback for the new kit is owned by the shared
+  generic damage/payment suites named in design §10 "Failure"; this smoke
+  establishes the durable happy path and does not clone those vectors.
+* The kit-contract correction in
+  `world/skills/tests/test_skill_registry/test_registry_contract.py` names the
+  real freeform gate: shape eligibility no longer stands in for the element
+  mastery entitlement, and the smoke observes the empty ladder on a
+  constructed boar.
+* The two narration rows are covered by the shared narration catalog
+  contracts, which require each element module to carry exactly its own active
+  elemental spells.
+
+### Focused commands and results
+
+The implementation runs the focused labels from the change design plus the
+narration, classification, availability and registry contracts the new
+elemental strikes enter. `/tmp/mud-field-tests.env` contains
+`MUD_TEST_SETTINGS=1`.
+
+| command | result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_ember_bristle_boar_resource_skill` | OK (1 test) |
+| `... world.lore.tests.test_monster_species_content world.lore.tests.test_bestiary_documentation world.lore.tests.test_monster_visuals world.rules.tests.test_monster_composition_coverage world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | OK (45 tests) |
+| `... world.skills.tests.test_skill_registry.test_narration_coverage world.skills.tests.test_skill_registry.test_category_classification world.skills.tests.test_skill_registry.test_out_of_combat_policy world.skills.tests.test_narration_catalog world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | OK (87 tests) |
+| `uv run --locked python -m tools.map_reference_context` then `--check` | regenerated; up to date |
+| `openspec validate ember-bristle-boar-species --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change ember-bristle-boar-species` | passed: reference-context, traceability, observability, test-data, manifests, contracts |
+
+### Human review of the prose
+
+The three published passages are design §4.5's approved text verbatim: the
+species paragraph, the appearance paragraph and the ecology paragraph, the
+last including the local name 「赤背」. The bestiary section renders them
+affirmatively as 原型與棲地 / 外觀 / 生態與在地關係 and adds a
+戰鬥中的表現 paragraph that states the single-target charge, the sweep over
+every hostile figure, the boar's own magic and stamina as the cost, and the
+ordinary contact attack it keeps when those run out. The section names no
+command, buff identifier or resource field. The author-private fields keep the
+unknown-origin boundary, the authoring rationale and one explicitly unverified
+charcoal-worker conjecture. The editorial ledger records the same read; no
+test judges prose quality or sentence content.
+
+### Review dispositions
+
+The independent plan review raised three blocking findings and one
+non-blocking one; all were adopted before implementation:
+
+* Under `pack_hunter`, `highest_expected_damage` scores the charge and the
+  innate attack equally, so the single-opponent selection was not
+  deterministic. Adopted: the smoke pins the legacy tie-break die to the even
+  branch that keeps the owned kit first, and asserts the charge is the
+  selection.
+* Two sweeps leave 4 SP (20 - 2 x 8), below the cheapest kit SP cost of 6, so
+  a later MP-exhaustion probe would have been vacuous; subtracting one from
+  one skill's cost would also leave the cheaper skill affordable. Adopted: the
+  pools are restored before each exhaustion probe, and each probe sits below
+  the cheapest kit cost of that resource.
+* Comparing cumulative hit points after the first sweep would not prove
+  per-recipient defense mitigation. Adopted: the second sweep records each
+  recipient's own pre-cast value and compares that cast's two losses, with the
+  roster order fixed so the hit and miss land on the intended recipients.
+* The single-target strike was only selected, never settled. Adopted: the
+  smoke resolves the selected charge as well, observing its damage, its single
+  MP/SP payment and the untouched ally control.
+
+The final review over the landed diff raised two blocking findings and two
+non-blocking ones; all were adopted:
+
+* The exhaustion probes ran against a single opponent, where the legacy body
+  never prefers an area skill, so they could not prove the sweep left the
+  affordable set. Adopted: both probes now run against the two-opponent field,
+  where a surviving area skill would still be preferred over the innate
+  attack.
+* The ally-control check never exercised the sweep's declared enemy audience,
+  because the `all-enemies` shorthand already filters the target pool. Adopted:
+  the second sweep admits the whole roster and only the declared audience keeps
+  the caster and the ally out of the strike.
+* Nothing asserted that the charge is stronger per recipient than the sweep.
+  Adopted: the smoke compares the two landed losses against the same
+  defense-zero recipient.
+* The review text described the SP arithmetic imprecisely. Adopted: it now
+  states the actual remainder and the cheapest kit cost it falls below.

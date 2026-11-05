@@ -99,6 +99,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 身形被赤焰吞沒，火從那處向四方漫開。",
         ),
     ),
+    NarrationRow(
+        "ember_tusk_charge",
+        action=(
+            "{actor} 鬃尖透出暗紅光，低頭朝對手直衝而去。",
+            "{actor} 蹬開土屑，帶著熱氣的肩背猛然撞上前。",
+        ),
+    ),
+    NarrationRow(
+        "ember_bristle_sweep",
+        action=(
+            "{actor} 猛力甩動粗鬃，帶熱的橫掃掠過身旁每個身影。",
+            "{actor} 原地扭身，烘焦的根皮與熱風一起向四周掃開。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

@@ -393,6 +393,10 @@
    "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
   },
   {
+   "path": "world/rules/tests/test_ember_bristle_boar_resource_skill.py",
+   "reason": "boar two-strike representative-composition production smoke over the generic area/single damage and payment contracts"
+  },
+  {
    "path": "world/skills/sexual_acts/tests/test_acceptance.py",
    "reason": "sexual act acceptance catalog contract"
   },
