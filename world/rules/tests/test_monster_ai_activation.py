@@ -65,6 +65,7 @@ from world.rules.monster_behaviour import (
     DecisionMode,
     monster_behaviour_policy,
     resolve_monster_ai,
+    support_kit_mode_violations,
 )
 from world.rules.monster_individual import construct_species_individual
 from world.skills.registry import SKILL_REGISTRY, SkillKind
@@ -313,6 +314,16 @@ class ActivationBindingTests(EvenniaTestCase):
                 self.assertIsNone(resolution.intelligence)
                 self.assertEqual(resolution.variant_key, key)
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
+    def test_every_shipped_support_kit_binds_utility(self):
+        # The shipped startup tuning must resolve an effective utility mode for
+        # every registered variant that owns a support active; otherwise the
+        # permanent legacy body can never select that owned kit. The check
+        # reports instead of rejecting a load, so a rollback tuning still runs.
+        self.assertEqual(support_kit_mode_violations(MONSTER_AI_TUNING), ())
+
     @covers_requirement("monster-ai-rollout::expansion-and-retuning-require-affected-evidence")
     def test_a_retuned_profile_moves_the_fingerprint_and_rebalances_nothing(self):
         record = _record()
@@ -539,6 +550,7 @@ class RollbackTests(EvenniaTestCase):
     def test_a_restart_loading_the_edited_mode_reproduces_the_legacy_smoke(self):
         record = _record()["legacy_rollback"]
         rollback = _legacy_edited_tuning()
+        self.assertIsInstance(rollback, behaviour.MonsterAITuning)
         self.assertEqual(rollback.fingerprint, record["configuration_fingerprint"])
         self.assertEqual(dict(rollback.variant_decision_mode), {})
         self.assertEqual(
