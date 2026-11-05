@@ -768,26 +768,6 @@ class ActivityCandidatePublicationTests(EvenniaTest):
                 {ACTIVITY: _synthetic_activity()},
                 "references unknown monster activity",
             ),
-            (
-                placement.MonsterSite(
-                    "t_fixture_site",
-                    "encounter",
-                    region_key,
-                    (x, y),
-                    group.key,
-                    "t_fixture_solitary_site_activity",
-                    2,
-                    True,
-                ),
-                {
-                    ACTIVITY: _synthetic_activity(),
-                    "t_fixture_solitary_site_activity": _synthetic_activity(
-                        key="t_fixture_solitary_site_activity",
-                        policy="solitary_roaming",
-                    ),
-                },
-                "requires every legal outcome",
-            ),
         )
         for site, activities, expected in cases:
             with self.subTest(expected=expected):
@@ -850,6 +830,47 @@ class ActivityCandidatePublicationTests(EvenniaTest):
                 self.assertIn(expected, str(captured.exception))
                 self.assertIs(geography.current(), before)
                 self.assertEqual(geography.current().identity, identity)
+
+    def test_a_solitary_binding_on_a_wider_composition_publishes_dispersed_units(self):
+        # A solitary policy no longer rejects a multi-member binding: the group
+        # former disperses one unit per member slot (activity-group-formation),
+        # so candidate publication accepts the placement.
+        x, y, region_key = _birth_block()
+        group = EncounterComposition(
+            "t_fixture_site_composition",
+            ACTIVITY,
+            (CompositionMember("t_fixture_variant", 1, 2),),
+        )
+        site = placement.MonsterSite(
+            "t_fixture_site",
+            "encounter",
+            region_key,
+            (x, y),
+            group.key,
+            "t_fixture_solitary_site_activity",
+            2,
+            True,
+        )
+        activity = _synthetic_activity(
+            key="t_fixture_solitary_site_activity", policy="solitary_roaming"
+        )
+        with ExitStack() as stack:
+            for module, name, value in (
+                (placement, "MONSTER_SITE", MappingProxyType({site.key: site})),
+                (placement, "ECOLOGY_ZONE", MappingProxyType({})),
+                (placement, "ENCOUNTER_COMPOSITION", MappingProxyType({group.key: group})),
+                (placement, "MONSTER_VARIANT", MappingProxyType(_synthetic_variants())),
+                (placement, "MONSTER_SPECIES", MappingProxyType(_synthetic_species(region_key))),
+                (activity_registry, "ACTIVITY_AREA", MappingProxyType({ACTIVITY_AREA: _synthetic_area()})),
+                (
+                    activity_registry,
+                    "MONSTER_ACTIVITY",
+                    MappingProxyType({ACTIVITY: _synthetic_activity(), activity.key: activity}),
+                ),
+            ):
+                stack.enter_context(mock.patch.object(module, name + "_REGISTRY", value))
+            published = self._build()
+        self.assertTrue(published.identity)
 
 
 class SnapshotIsolationTests(unittest.TestCase):
