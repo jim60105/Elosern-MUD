@@ -13,6 +13,8 @@ The rat body action is assembled the same way with a self-only agility
 improvement and no damage occurrence at all.
 The goblin contact grab is assembled the same way with elementless physical
 damage plus a hit-dependent agility debuff on the struck enemy.
+The reservoir warden body action is assembled the same way with a self-only
+water defense guard paid from the actor's own MP and no damage occurrence.
 """
 
 from world.skills.effects import (
@@ -334,6 +336,34 @@ ROWS: tuple[SkillDef, ...] = (
                 coefficient=1.0,
                 audience=EffectAudience.ENEMIES,
                 requires_hit_from=0,
+            ),
+        ),
+    ),
+    _skill(
+        "reservoir_guard",
+        "蓄潮護膜",
+        "以自身魔力讓頸側與背脊的薄水膜貼合鱗甲，短暫提高自身防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SELF,
+        cost={"mp": 12},
+        # A body action with no damage occurrence: this support shape has no
+        # field use, so it stays combat-only (the damage-carrying monster
+        # abilities above remain selectable outside combat).
+        usable_out_of_combat=False,
+        element="water",
+        effects=["self_buff_apply:reservoir_film"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="water",
+        faction_constraint=FactionConstraint.SELF_ONLY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("tide_devouring_crocodile",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.SELF,
             ),
         ),
     ),

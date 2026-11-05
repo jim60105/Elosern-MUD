@@ -29,7 +29,11 @@ measurements are unchanged again. They were regenerated once more for
 `sticky-palm-goblin-species` (baseline commit
 `78b2c12237c83ffcd229155f053caee4dcf35725`), again because that content change
 adds one buff definition and one modifier rule and so moves the process's
-startup fingerprint; the recorded measurements are unchanged again.
+startup fingerprint; the recorded measurements are unchanged again. They were
+regenerated once more for `reservoir-warden-variant` (baseline commit
+`0b0455b0ed68f61175a167f7b806f8cbbee0b4e1`), for the same reason: that content
+change adds one buff definition, one modifier rule and one activated variant;
+the recorded measurements are unchanged again.
 
 ## Exact operations
 
@@ -150,11 +154,12 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`c4d4e06bbfab806742fc083296a11ef8109c85d15c894ca043d76ef76a000f85` -- that
+`237f9a85bb52bd4c1a2c6369252afbfbd57eee69ead10ebb6a0d7da6583b0f3c` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `a29fd4fa...`, `e2677d39...`, `3ee653b9...` and `e583cb95...`
-describe tunings production no longer loads and are superseded, not evidence
-for the changed tuning. See `docs/development/monster-ai-activation-evidence/`.
+the earlier values `a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`
+and `c4d4e06b...` describe tunings production no longer loads and are
+superseded, not evidence for the changed tuning. See
+`docs/development/monster-ai-activation-evidence/`.
 
 ## Results
 

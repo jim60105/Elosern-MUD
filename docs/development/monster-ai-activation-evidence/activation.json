@@ -1,11 +1,12 @@
 {
   "schema": "monster-ai-activation-evidence/1",
   "algorithm_version": 5,
-  "configuration_fingerprint": "c4d4e06bbfab806742fc083296a11ef8109c85d15c894ca043d76ef76a000f85",
+  "configuration_fingerprint": "237f9a85bb52bd4c1a2c6369252afbfbd57eee69ead10ebb6a0d7da6583b0f3c",
   "activated": {
     "flock_leader": 58,
     "mudbank_dweller": 20,
     "reef_warden": 66,
+    "reservoir_warden": 62,
     "trail_hunter": 44,
     "wax_cache_forager": 30
   },
@@ -13,12 +14,13 @@
     "flock_leader": ["low", "instinctive"],
     "mudbank_dweller": ["low", "instinctive"],
     "reef_warden": ["low", "instinctive"],
+    "reservoir_warden": ["high", "ambush_predator"],
     "trail_hunter": ["mid", "ambush_predator"],
     "wax_cache_forager": ["low", "instinctive"]
   },
   "legacy_rollback": {
-    "edit": "variant_decision_mode: {} (the five named entries removed; variant_intelligence is kept and stays validated)",
-    "configuration_fingerprint": "8c07b8d8aa89c5874e1e86ea062f02190ca064f1fae31eb3d5dbdfd321ad0394",
+    "edit": "variant_decision_mode: {} (the six named entries removed; variant_intelligence is kept and stays validated)",
+    "configuration_fingerprint": "1c39e28bbe8b1ffb2761abb4cd180f8c711bebf5c162fd190d6fe5c3adb74987",
     "restart_required": true,
     "migration": "none",
     "database_restore": "none",
@@ -27,7 +29,7 @@
   "evidence": [
     {
       "path": "docs/development/monster-ai-manual-evidence/selector-check.json",
-      "fingerprint": "c4d4e06bbfab806742fc083296a11ef8109c85d15c894ca043d76ef76a000f85",
+      "fingerprint": "237f9a85bb52bd4c1a2c6369252afbfbd57eee69ead10ebb6a0d7da6583b0f3c",
       "claim": "paired selector evidence, regenerated under this tuning because the operation records the process's startup fingerprint"
     },
     {

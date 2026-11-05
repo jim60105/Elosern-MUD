@@ -8,7 +8,7 @@ record still describes the tuning the process loads.
 
 ## What is activated
 
-Five registered variants are switched from the permanent legacy decision to the
+Six registered variants are switched from the permanent legacy decision to the
 utility decision by `variant_decision_mode` in
 `world/rules/rulebook/monster_behaviour.yaml`, each with its own explicitly
 authored intelligence:
@@ -18,6 +18,7 @@ authored intelligence:
 | `flock_leader` | 領群型 | low | instinctive | 58 | Its own lore has it coordinate the flock's calls and vary its own angle of attack, so it weighs several allies and targets at once. |
 | `mudbank_dweller` | 濕岸型 | low | instinctive | 20 | Its own lore has it tighten its film only when pressed and bump back at short range, so reflexive self-protection is the least decision depth of the activated set. |
 | `reef_warden` | 守礁型 | low | instinctive | 66 | Its own lore has it pick and hold the narrowest reef mouth that shields its group: it reads the terrain and the group it protects before acting. |
+| `reservoir_warden` | 蓄潮型 | high | ambush_predator | 62 | Its own lore has it weigh drawing an opponent's magic against spending its own on the film, a recurring trade-off read from its own resources. |
 | `trail_hunter` | 獵道型 | mid | ambush_predator | 44 | Its own lore is one repeated rule -- probe the party's edge, avoid a formed line -- which is the least decision depth of the earlier three. |
 | `wax_cache_forager` | 藏穀型 | low | instinctive | 30 | Its own lore has it time its slip around a defended cache and family foraging, a little more situational reading than the slime's reflexive film. |
 
@@ -29,13 +30,13 @@ its archetype's legacy mode; nothing supplies intelligence or a mode by tier,
 species, rank, stat or archetype.
 
 Tuning fingerprint of the activated configuration (algorithm version 5):
-`c4d4e06bbfab806742fc083296a11ef8109c85d15c894ca043d76ef76a000f85`.
+`237f9a85bb52bd4c1a2c6369252afbfbd57eee69ead10ebb6a0d7da6583b0f3c`.
 
-The named set and its authored intelligence are unchanged from the previous
-content change: `sticky-palm-goblin-species` adds one buff definition and one
-modifier rule, which move the startup fingerprint because every estimate
-averages over them, but it activates no variant. `膠掌小鬼` stays legacy, so it
-keeps its archetype's flee threshold and never enters this table.
+`reservoir-warden-variant` adds the high-tier 蓄潮型 `reservoir_warden` to the
+named set with its own authored intelligence of 62. Its new buff definition and
+modifier rule also move the startup fingerprint because every estimate averages
+over them. `膠掌小鬼` stays legacy, so it keeps its archetype's flee threshold
+and never enters this table.
 
 ## Evidence linkage
 
@@ -45,7 +46,7 @@ Every acceptance clause of the change, and where it is established:
 | --- | --- |
 | Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate` passes observability, test-data, shard manifests and the ownership contracts; its traceability gate reports the change's own four new capability IDs as `unknown-requirement-id`, which is the documented pre-sync state of an active change (its requirements enter the index only when the archive workflow syncs the delta; see `scripts/openspec-gates.sh`). Verified green against the equivalent delta-applied tree: 2189 requirements, 0 uncovered, 0 errors. The post-sync check is the authoritative one and belongs to the archive workflow. |
 | The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f` |
-| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `c4d4e06b...` |
+| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `237f9a85...` |
 | Complete-policy performance | `performance.json`: warm utility p95 16.84 ms and p50 16.36 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
 | A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves legacy |
 | A real affected encounter | `RealEncounterTests`: one real `Monster` row of an activated variant decides inside a real round scope **through the production session adapter** (`_enemy_policy`), its selected candidate is the request that settlement receives, the round writes a damage entry and the defender's committed hit points fall, and the monster's own statistics, resources, kit and proficiency are unchanged |
@@ -140,7 +141,7 @@ variant maps do not enter their tuning or their recorded fingerprint
 
 The activation is a rulebook mode map, so rollback is an edit plus a restart:
 
-1. Set `variant_decision_mode: {}` (the five named entries removed;
+1. Set `variant_decision_mode: {}` (the six named entries removed;
    `variant_intelligence` is kept and remains validated).
 2. Restart the process. Startup validation is the only path that loads a
    changed on-disk mode; there is no hot reload, and a new *session* in the
@@ -152,8 +153,8 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
    tuning and the observation memory).
 
 Rollback fingerprint of the edited configuration:
-`8c07b8d8aa89c5874e1e86ea062f02190ca064f1fae31eb3d5dbdfd321ad0394`. Recorded
-acceptance claims made under `c4d4e06b...` do not describe it, which is exactly
+`1c39e28bbe8b1ffb2761abb4cd180f8c711bebf5c162fd190d6fe5c3adb74987`. Recorded
+acceptance claims made under `237f9a85...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce.
 
 ## Expansion and retuning
@@ -180,7 +181,7 @@ To activate more variants, or to retune one of these:
   makes no difficulty claim: the manual evidence establishes exercised
   boundaries, verified preconditions, decision shares, replay inputs and a
   timing envelope.
-* Five activated variants are a first small set, not a policy for the whole
+* Six activated variants are a small named set, not a policy for the whole
   bestiary; the remaining registered variants stay legacy until their own
   evidence exists.
 * The utility decision samples with a temperature derived from intelligence, so
@@ -195,6 +196,8 @@ To activate more variants, or to retune one of these:
   holding its narrow mouth, a trail hunter probing the edge); the slime's and
   the rat's retreat orientation are expressed instead through passive or
   defended-area field aggression, the known deviation recorded in design
-  §12.4 and `docs/development/monster-content-expansion.md`. Rollback restores
-  the legacy flee priority for all five immediately.
+  §12.4 and `docs/development/monster-content-expansion.md`. The high-tier
+  crocodile boss follows the same trade-off: its escapes in play come from the
+  opposing party's paid retreat, and rollback restores the legacy flee priority
+  for all six immediately.
 * Reaching production does not add a player command or a browser action.

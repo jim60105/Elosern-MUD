@@ -39,6 +39,9 @@ variant_intelligence:
   # 藏穀型: times its slip around a defended cache and family foraging -- a
   # little more situational reading than the slime's reflexive film.
   wax_cache_forager: 30
+  # 蓄潮型: weighs drawing an opponent's magic against spending its own on
+  # the film -- a recurring trade-off read from its own resources.
+  reservoir_warden: 62
 
 # Per-variant mode override; an absent entry uses the resolved archetype's
 # decision_mode. This is the rollback seam: editing one entry back to `legacy`
@@ -52,6 +55,7 @@ variant_decision_mode:
   trail_hunter: utility
   mudbank_dweller: utility
   wax_cache_forager: utility
+  reservoir_warden: utility
 
 archetypes:
   instinctive:
