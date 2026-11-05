@@ -176,7 +176,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "53579fab5e5866fe5a15f82e9c7aece2e321efe6846057866da6b89fb84455d9",
+  "fingerprint": "d7e01b109505ca9e7311cedffae0f4a3cdf4105753a3e335d4a1098aee54561c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -935,8 +935,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "eb54b0ec874b2b44df31d87722e1fa7e094482f86178c254134a3b8f6150e139",
-    "world/lore/monster_placement.py": "ff72f10821037ce688537a456a8193e7c0174cea600a3824e7ee902401212f6f",
+    "world/lore/monster_activity.py": "b0d4bd1933d26949e5df72469a3240118590a19ab6a4d98322a53f59fdff73ac",
+    "world/lore/monster_placement.py": "6e6e27a8c6b636e4e32f103ddb8f6eec446469afaf21beab393c647e70e23206",
     "world/lore/monster_species.py": "95997e3dd88cfd96ef5974a52f73e568f59088439050254bfbda5064159b075a",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
