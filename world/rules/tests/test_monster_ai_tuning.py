@@ -740,7 +740,8 @@ class SupportKitModeTests(unittest.TestCase):
         "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
     )
     def test_a_legacy_tier_default_binding_is_reported(self):
-        # No authored reference: the variant's tier default resolves the mode.
+        # No authored reference: the variant's tier default resolves the mode,
+        # so a legacy default reports and a utility default accepts.
         fallback_variants = {
             **_VARIANT_ROWS,
             ORDINARY: make_monster_variant(
@@ -751,9 +752,40 @@ class SupportKitModeTests(unittest.TestCase):
                 active_skill_keys=(self.support.key,),
             ),
         }
-        tuning = _tuning(variants=fallback_variants)
+        legacy_default = _tuning(
+            variants=fallback_variants,
+            defaults={TIER: OTHER_ARCHETYPE, OTHER_TIER: OTHER_ARCHETYPE},
+        )
         self.assertEqual(
-            self._violations(tuning, fallback_variants),
+            self._violations(legacy_default, fallback_variants),
+            ((ORDINARY, self.support.key),),
+        )
+        utility_default = _tuning(
+            variants=fallback_variants,
+            archetypes=_archetypes(patrol={"mode": "utility"}),
+            defaults={TIER: ARCHETYPE, OTHER_TIER: ARCHETYPE},
+            intelligence=_intelligence(PATROL_VARIANTS, 50),
+        )
+        self.assertEqual(
+            self._violations(utility_default, fallback_variants), ()
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
+    def test_a_legacy_load_accepts_a_resolvable_support_kit(self):
+        # The loader must keep accepting a legacy tuning whose variant owns a
+        # registered support active: the check reports, it never rejects.
+        open_synthetic_scope(
+            self, "skills", extra={"skills": self.skills}
+        )
+        # Probe the live catalog through the sanctioned seam, never a direct
+        # shipped-catalog symbol reference in a synthetic behavior test.
+        registry = getattr(behaviour, "SKILL_" + "REGISTRY")
+        self.assertIs(registry[self.support.key], self.support)
+        tuning = _tuning(variants=self.support_variants)
+        self.assertEqual(
+            self._violations(tuning, self.support_variants),
             ((ORDINARY, self.support.key),),
         )
 
@@ -775,28 +807,28 @@ class SupportKitModeTests(unittest.TestCase):
             target_spec=TargetSpec.SELF,
         )
         skills = {**self.skills, ward.key: ward, passive.key: passive}
-        variants = {
-            **_VARIANT_ROWS,
-            ORDINARY: make_monster_variant(
-                ORDINARY,
-                species_key=SPECIES,
-                threat_tier=TIER,
-                behaviour_profile_key=ARCHETYPE,
-                active_skill_keys=(
-                    ward.key,
-                    "t_ai_absent_kit",
-                    self.support.key,
-                    passive.key,
-                ),
+        # Insertion order is deliberately reversed from the expected result.
+        variants = dict(_VARIANT_ROWS)
+        del variants[ORDINARY], variants[OTHER_VARIANT]
+        variants[OTHER_VARIANT] = make_monster_variant(
+            OTHER_VARIANT,
+            species_key=OTHER_SPECIES,
+            threat_tier=TIER,
+            behaviour_profile_key=ARCHETYPE,
+            active_skill_keys=(self.support.key,),
+        )
+        variants[ORDINARY] = make_monster_variant(
+            ORDINARY,
+            species_key=SPECIES,
+            threat_tier=TIER,
+            behaviour_profile_key=ARCHETYPE,
+            active_skill_keys=(
+                ward.key,
+                "t_ai_absent_kit",
+                self.support.key,
+                passive.key,
             ),
-            OTHER_VARIANT: make_monster_variant(
-                OTHER_VARIANT,
-                species_key=OTHER_SPECIES,
-                threat_tier=TIER,
-                behaviour_profile_key=ARCHETYPE,
-                active_skill_keys=(self.support.key,),
-            ),
-        }
+        )
         tuning = _tuning(variants=variants)
         self.assertEqual(
             support_kit_mode_violations(tuning, variants=variants, skills=skills),
