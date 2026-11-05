@@ -115,6 +115,12 @@ def _settlement_sources(
     point-shaped (or map-less) settlement uses its published anchor cell. Only
     inhabited categories appear, so a dungeon entrance can never become an
     automatic birth exclusion.
+
+    An inhabited anchor that publishes no geometry at all contributes no
+    exclusion: a settlement with no ground in this world has no surroundings to
+    keep free. The authored composition root already refuses a location without
+    a cell before publication, so this only describes a hand-built world (the
+    managed-browser kit merges its stand-in anchors into the authored one).
     """
     sources: dict[str, tuple[tuple[int, int], ...]] = {}
     for anchor_key, anchor in geography.anchors.items():
@@ -129,9 +135,7 @@ def _settlement_sources(
         if cell is None and entry is not None:
             cell = entry.anchor_cell
         if cell is None:
-            raise PopulationGeometryError(
-                f"inhabited settlement {anchor_key!r} publishes no anchor cell"
-            )
+            continue
         sources[anchor_key] = (tuple(cell),)
     return sources
 

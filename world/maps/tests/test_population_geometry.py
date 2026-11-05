@@ -83,13 +83,18 @@ class _Candidate:
     anchor_geography: Mapping[str, GeographicAnchor]
 
 
-def _candidate(anchors=()) -> _Candidate:
-    """A candidate world carrying exactly the given ``(key, kind, cell)`` anchors."""
+def _candidate(anchors=(), *, placed: bool = True) -> _Candidate:
+    """A candidate world carrying exactly the given ``(key, kind, cell)`` anchors.
+
+    ``placed`` publishes each anchor's geographic cell; ``False`` models a
+    world whose anchor rows exist without any published map geometry.
+    """
     anchor_map: dict[str, Anchor] = {}
     geography_map: dict[str, GeographicAnchor] = {}
     for key, kind, cell in anchors:
         anchor_map[key] = Anchor(key, kind, "合成錨點", None, None, None, "合成地點。")
-        geography_map[key] = GeographicAnchor(key, cell, "合成地理限制")
+        if placed:
+            geography_map[key] = GeographicAnchor(key, cell, "合成地理限制")
     regions = {
         key: WildernessRegion(key, "合成區域", None, ("合成荒野敘述。",))
         for key in REGION_KEYS
@@ -392,6 +397,17 @@ class BirthGeometryTests(unittest.TestCase):
             MappingProxyType(live),
         ):
             cells = _eligible()
+        self.assertEqual(cells, tuple(sorted(_rectangle_cells())))
+
+    def test_an_inhabited_anchor_without_published_geometry_excludes_nothing(self):
+        # A world may carry an inhabited anchor row whose map geometry does not
+        # exist (the managed-browser install merges its stand-in anchors into
+        # the authored world). Such a settlement has no surroundings to keep
+        # free, so its presence must not reject the zone's whole geometry.
+        unplaced = _candidate([(TOWN, AnchorKind.TOWN, (14, 12))], placed=False)
+        cells = eligible_birth_cells(
+            _zone(), geography=unplaced, entries={}, policies={}
+        )
         self.assertEqual(cells, tuple(sorted(_rectangle_cells())))
 
     @covers_requirement(
