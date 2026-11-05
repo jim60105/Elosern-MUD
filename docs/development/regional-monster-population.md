@@ -327,6 +327,7 @@ root with the single-token environment file `/tmp/mud-transfer-station.env`
 | `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
 | `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
 | `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact_boundaries` | OK |
 | `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK |
 | `uv run --locked python -m tools.map_reference_context --check` | exit 0 |
 | `openspec validate abandoned-transfer-station-encounter --strict` | valid |
