@@ -25,6 +25,13 @@ def _press(page, key, wait_ms=80):
     page.wait_for_timeout(wait_ms)
 
 
+#: How long a dispatched move may take to become observable. A CI runner
+#: answering an admitted move slower than this is not a stale rejection, so the
+#: journeys wait for the *recorded outcome* instead of inferring one from the
+#: expiry of a short map-refresh window.
+MOVE_SETTLE_TIMEOUT = 60000
+
+
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Boots one dedicated isolated server per test with the exploration fixture."""
     @classmethod
@@ -51,14 +58,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # exploration key; callers poll, so a missing panel reads as None.
         return store_state(page)["panels"].get("exploration")
 
-    def _wait_exploration_available(self, page, timeout=30000):
+    def _wait_exploration_available(self, page, timeout=60000):
         def _exploration_available(state: dict) -> bool:
             panel = (state.get("panels") or {}).get("exploration") or {}
             return panel.get("available") is True
 
         wait_for_store_state(page, _exploration_available, timeout=timeout)
 
-    def _wait_panel(self, page, name, predicate, timeout=30000):
+    def _wait_panel(self, page, name, predicate, timeout=60000):
         def _panel_ready(state: dict) -> bool:
             panel = (state.get("panels") or {}).get(name)
             return panel is not None and predicate(panel)
@@ -102,21 +109,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the exploration root pane renders as the pane host's only child",
         )
         activate_first_compass_exit(page)  # the compass's first exit
-        try:
-            self._wait_panel(
-                page,
-                "local_map",
-                lambda p: p.get("available") is True and p["current_node"] != home,
-                timeout=10000,
-            )
-            moves_sent = 1
-        except AssertionError:
-            state = store_state(page)
-            last = state.get("lastActionResult")
-            self.assertIsNotNone(
-                last,
-                "no action result was recorded before the map could refresh",
-            )
+        # The move's observable outcome is either the committed map node or the
+        # dispatcher's own recorded result. Waiting on a short map-refresh
+        # window and calling the expiry "stale" turned a runner answering an
+        # admitted move slowly into a failure, so the wait is on the outcome.
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+            != home
+            or bool((s.get("lastActionResult") or {}).get("outcome")),
+            timeout=MOVE_SETTLE_TIMEOUT,
+        )
+        if store_state(page)["panels"]["local_map"]["current_node"] == home:
+            last = store_state(page)["lastActionResult"]
             self.assertEqual(
                 last["outcome"],
                 "stale",
@@ -132,8 +137,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 page,
                 "local_map",
                 lambda p: p.get("available") is True and p["current_node"] != home,
+                timeout=MOVE_SETTLE_TIMEOUT,
             )
             moves_sent = 2
+        else:
+            moves_sent = 1
         self.assertEqual(sent_action_count(page, "explore.move"), moves_sent)
         after = store_state(page)
         self.assertNotEqual(after["panels"]["local_map"]["current_node"], home)
@@ -163,22 +171,25 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         for _attempt in range(3):
             request_id = self._dispatch_move(page)
             self.assertIsNotNone(request_id)
-            try:
-                wait_for_store_state(
-                    page,
-                    lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
-                    != node_before,
-                    timeout=10000,
-                )
+            wait_for_store_state(
+                page,
+                lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+                != node_before
+                or ((s.get("lastActionResult") or {}).get("requestId") == request_id),
+                timeout=MOVE_SETTLE_TIMEOUT,
+            )
+            node_now = (store_state(page).get("panels") or {}).get("local_map", {}).get(
+                "current_node"
+            )
+            if node_now != node_before:
                 return
-            except AssertionError:
-                last = store_state(page).get("lastActionResult") or {}
-                self.assertEqual(
-                    last.get("outcome"),
-                    "stale",
-                    "the move was neither admitted nor rejected as stale",
-                )
-                wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+            last = store_state(page).get("lastActionResult") or {}
+            self.assertEqual(
+                last.get("outcome"),
+                "stale",
+                "the move was neither admitted nor rejected as stale",
+            )
+            wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
 
     @covers_requirement("webclient-frame-resolution::router-frames-store-descriptors-and-a-focus-key-and-resolve-at-access-time")

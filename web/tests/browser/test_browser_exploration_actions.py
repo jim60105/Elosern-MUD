@@ -65,14 +65,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # exploration key; callers poll, so a missing panel reads as None.
         return store_state(page)["panels"].get("exploration")
 
-    def _wait_exploration_available(self, page, timeout=30000):
+    def _wait_exploration_available(self, page, timeout=60000):
         def _exploration_available(state: dict) -> bool:
             panel = (state.get("panels") or {}).get("exploration") or {}
             return panel.get("available") is True
 
         wait_for_store_state(page, _exploration_available, timeout=timeout)
 
-    def _wait_panel(self, page, name, predicate, timeout=30000):
+    def _wait_panel(self, page, name, predicate, timeout=60000):
         def _panel_ready(state: dict) -> bool:
             panel = (state.get("panels") or {}).get(name)
             return panel is not None and predicate(panel)
@@ -175,13 +175,26 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             },
         )
         _press(page, "Enter")  # confirm the default one-hour wait
+        # Wait for THIS wait's recorded outcome. The recorded result still
+        # holds the previous move's answer ("moved"), so the wait is keyed by
+        # the dispatched request id rather than by any recorded code; the
+        # assertion below still demands "skipped".
+        wait_request = [
+            args[0].get("request_id")
+            for cmdname, args, _kwargs in outbound_messages(page)
+            if cmdname == "ui_action"
+            and args
+            and args[0].get("action_id") == "explore.wait"
+        ][-1]
+        self.assertIsNotNone(wait_request, "the wait form dispatched no explore.wait")
         wait_for_store_state(
             page,
-            lambda s: (s.get("lastActionResult") or {}).get("code") == "skipped",
-            timeout=20000,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId") == wait_request,
+            timeout=60000,
         )
         ok = store_state(page)["lastActionResult"]
         self.assertIsNotNone(ok, "a safe wait must succeed")
+        self.assertEqual(ok["code"], "skipped")
         time_after = store_state(page)["serverTime"]
         self.assertNotEqual(
             (time_after["hour"], time_after["minute"]),
@@ -421,22 +434,29 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         for _attempt in range(3):
             request_id = self._dispatch_move(page)
             self.assertIsNotNone(request_id)
-            try:
-                wait_for_store_state(
-                    page,
-                    lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
-                    != node_before,
-                    timeout=10000,
-                )
+            # Wait for the move's own outcome — the committed map node or the
+            # dispatcher's record for this request. A short map-refresh window
+            # whose expiry was read as "stale" failed a runner that admitted
+            # the move slowly.
+            wait_for_store_state(
+                page,
+                lambda s: (s.get("panels") or {}).get("local_map", {}).get("current_node")
+                != node_before
+                or ((s.get("lastActionResult") or {}).get("requestId") == request_id),
+                timeout=60000,
+            )
+            node_now = (store_state(page).get("panels") or {}).get("local_map", {}).get(
+                "current_node"
+            )
+            if node_now != node_before:
                 return
-            except AssertionError:
-                last = store_state(page).get("lastActionResult") or {}
-                self.assertEqual(
-                    last.get("outcome"),
-                    "stale",
-                    "the move was neither admitted nor rejected as stale",
-                )
-                wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
+            last = store_state(page).get("lastActionResult") or {}
+            self.assertEqual(
+                last.get("outcome"),
+                "stale",
+                "the move was neither admitted nor rejected as stale",
+            )
+            wait_for_store_state(page, lambda s: s["dispatch"]["inFlight"] is None)
         self.fail("three consecutive move dispatches were all answered stale")
 
     def _dock_holds_focus(self, page):

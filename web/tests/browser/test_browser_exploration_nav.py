@@ -68,14 +68,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # exploration key; callers poll, so a missing panel reads as None.
         return store_state(page)["panels"].get("exploration")
 
-    def _wait_exploration_available(self, page, timeout=30000):
+    def _wait_exploration_available(self, page, timeout=60000):
         def _exploration_available(state: dict) -> bool:
             panel = (state.get("panels") or {}).get("exploration") or {}
             return panel.get("available") is True
 
         wait_for_store_state(page, _exploration_available, timeout=timeout)
 
-    def _wait_panel(self, page, name, predicate, timeout=30000):
+    def _wait_panel(self, page, name, predicate, timeout=60000):
         def _panel_ready(state: dict) -> bool:
             panel = (state.get("panels") or {}).get(name)
             return panel is not None and predicate(panel)
@@ -593,7 +593,7 @@ class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcc
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
 
-    def _wait_exploration_available(self, page, timeout=30000):
+    def _wait_exploration_available(self, page, timeout=60000):
         def _ready(state: dict) -> bool:
             panels = state.get("panels") or {}
             exploration = panels.get("exploration") or {}
