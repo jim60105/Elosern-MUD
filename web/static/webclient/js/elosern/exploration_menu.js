@@ -777,14 +777,19 @@
   // entry IS the existing look row (`lookItems`), so its `explore.look`
   // payload and command echo stay byte-identical. `summary` is the readout's
   // second line: the target's verb labels joined by ／, else 查看.
+  // `monsterIdentity` carries the row's wire `monster_identity` facts (the
+  // interact target's own, else its look entity's; null for an object) so the
+  // rail and its readout can read the identity (monster-individual-names).
   // -------------------------------------------------------------------------
 
   function presenceEntries(panel) {
     var targets = (panel && panel.interact) || [];
     var entities = (panel && panel.look && panel.look.entities) || [];
     var portraitOf = {};
+    var monsterIdentityOf = {};
     entities.forEach(function (entity) {
       portraitOf[entity.identity] = entity.portrait_ref === undefined ? null : entity.portrait_ref;
+      monsterIdentityOf[entity.identity] = entity.monster_identity || null;
     });
     var interactIds = {};
     var entries = targets.map(function (target) {
@@ -802,6 +807,7 @@
         identity: target.identity,
         label: target.display_name,
         portraitRef: portraitRef,
+        monsterIdentity: target.monster_identity || monsterIdentityOf[target.identity] || null,
         summary:
           verbs
             .map(function (item) {
@@ -820,6 +826,7 @@
         entry.identity = item.payload.target_id;
         entry.portraitRef =
           portraitOf[item.payload.target_id] === undefined ? null : portraitOf[item.payload.target_id];
+        entry.monsterIdentity = monsterIdentityOf[item.payload.target_id] || null;
         entry.summary = "查看";
         entries.push(entry);
       }
@@ -830,6 +837,7 @@
         entry.presence = "object";
         entry.identity = item.payload.target_id;
         entry.portraitRef = null;
+        entry.monsterIdentity = null;
         entry.summary = "查看";
         entries.push(entry);
       }

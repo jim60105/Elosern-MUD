@@ -55,6 +55,7 @@ import FoeLineup from "./components/FoeLineup.vue";
 import { drawnFoes, fallenLook, foeStageLimit } from "./components/foe-lineup.js";
 import FigurePlate from "./components/FigurePlate.vue";
 import { plateHpCurrent, repeatedNames } from "./components/figure-plate.js";
+import { isNamedMonster, monsterDetailTag } from "./components/monster-identity.js";
 import { formationOrderFor, markersFor, onStage, positionKeyFor, targetingFor } from "./components/stage-targeting.js";
 import { useCombatFormation } from "./composables/use-combat-formation.js";
 import { useFormationGlide } from "./composables/use-formation-glide.js";
@@ -728,6 +729,8 @@ const plateEntries = computed(() => {
       hpCurrent: row ? plateHpCurrent(row, displayHp) : null,
       hpMaximum: row?.hp_maximum ?? null,
       conditions: row?.conditions ?? [],
+      named: isNamedMonster(row?.monster_identity),
+      tag: monsterDetailTag(row?.monster_identity),
       plate: shape.party.figures[index].plate,
       fallen: fallenOf(slot.identity),
       target: false,
@@ -748,6 +751,8 @@ const plateEntries = computed(() => {
       hpCurrent: plateHpCurrent(row, displayHp),
       hpMaximum: row.hp_maximum ?? null,
       conditions: row.conditions ?? [],
+      named: isNamedMonster(row.monster_identity ?? p.monster_identity),
+      tag: monsterDetailTag(row.monster_identity ?? p.monster_identity),
       plate: shape.foes.figures[index].plate,
       fallen: fallenOf(p.identity),
       target: focusedCombatTarget.value != null && String(focusedCombatTarget.value) === String(p.identity),
@@ -1185,6 +1190,8 @@ const rootStyle = computed(() => {
               :conditions="entry.conditions"
               :stage-x="entry.plate.left + entry.plate.width / 2"
               :fallen="entry.fallen"
+              :named="entry.named"
+              :tag="entry.tag"
             />
           </TransitionGroup>
           <!-- The stage target step's arrow markers (webclient-combat-stage-
@@ -1679,6 +1686,8 @@ const rootStyle = computed(() => {
                   v-if="!travelLayout"
                   class="exploration-root__readout"
                   :lead="readoutContent.lead"
+                  :tag="readoutContent.tag || null"
+                  :named="!!readoutContent.named"
                   :text="readoutContent.text"
                   :tone="readoutContent.tone"
                   :flash="readoutContent.flash"

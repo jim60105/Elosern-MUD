@@ -33,6 +33,15 @@
 // one brass hairline crown along the bottom edge. `role="group"` with the whole
 // reading (and its conditions) as its accessible name; only the glyphs take
 // pointer events.
+//
+// A named individual (monster-individual-names design D6, `named`): the name
+// in the gold display face and one fading gold hairline along the plate's top
+// (rank language, like ChoiceCard's crest); the brass crown stays single (a
+// doubled crown is the acting foe) and nothing is a selection cue, so the
+// target brackets and the acting crown still read. Both rules take no layout
+// space and the name keeps its line box, so a named plate's slot, lines and
+// stroke match an unnamed one's. A monster's variant `tag` joins the name's
+// `title` and the accessible name.
 import { computed, inject } from "vue";
 import ConditionChips from "./ConditionChips.vue";
 import {
@@ -42,6 +51,7 @@ import {
   plateConditions,
   plateHpPercent,
   plateLabel,
+  plateTitle,
 } from "./figure-plate.js";
 
 const props = defineProps({
@@ -58,6 +68,10 @@ const props = defineProps({
   // Without one (a standalone story) the plate lays out in flow.
   box: { type: Object, default: null },
   identity: { type: [Number, String], default: null },
+  // A named individual (the `data-named` treatment) and the monster's
+  // client-composed variant tag (monster-identity.js), or null.
+  named: { type: Boolean, default: false },
+  tag: { type: String, default: null },
   // Non-colour cues: the focused target and the acting foe.
   target: { type: Boolean, default: false },
   acting: { type: Boolean, default: false },
@@ -102,6 +116,7 @@ const label = computed(() =>
   plateLabel({
     name: props.name,
     token: props.token,
+    tag: props.tag,
     side: props.side,
     current: props.hpCurrent,
     maximum: props.hpMaximum,
@@ -137,10 +152,12 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
     :data-acting="acting ? 'true' : null"
     :data-low-hp="low ? 'true' : null"
     :data-fallen="fallen"
+    :data-named="named ? 'true' : null"
     :data-stage-x="stageX"
     :style="style"
   >
-    <div class="figure-plate__name" :aria-hidden="compact ? 'true' : null" :title="name">
+    <span v-if="named" class="figure-plate__crest" data-testid="figure-plate-crest" aria-hidden="true"></span>
+    <div class="figure-plate__name" :aria-hidden="compact ? 'true' : null" :title="plateTitle(name, tag)">
       <span class="figure-plate__name-text">{{ name }}</span>
       <span v-if="showToken && token" class="figure-plate__token" data-testid="figure-plate-token">{{ token }}</span>
     </div>
@@ -262,6 +279,23 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* The named individual (design D6): the name swaps only its colour and face
+   (the shorthand's fixed line height of 1 keeps the line box), and one fading
+   gold hairline (the crest) runs along the plate's top, out of flow, in both
+   forms. */
+.figure-plate[data-named] .figure-plate__name-text {
+  color: var(--gold-400);
+  font-family: var(--f-display);
+}
+.figure-plate__crest {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent);
+  pointer-events: none;
 }
 .figure-plate__token {
   flex: none;
@@ -412,6 +446,11 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
   display: none;
 }
 .figure-plate[data-fallen="defeated"] .figure-plate__name {
+  color: var(--paper-300);
+}
+/* A defeated named individual keeps the receding name: the fallen cue wins
+   the colour, the display face and the crest stay. */
+.figure-plate[data-fallen="defeated"][data-named] .figure-plate__name-text {
   color: var(--paper-300);
 }
 .figure-plate__fallen {

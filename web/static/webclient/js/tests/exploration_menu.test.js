@@ -1032,3 +1032,36 @@ test("verbMenuFor maps the npc_persona affordance to a bound editor row", () => 
   assert.equal(disabled.description, reason.message);
   assert.deepEqual(disabled.disabledReason, reason);
 });
+
+// monster-individual-names: presence entries carry the wire monster identity
+// (the target's own, else its look entity's; null for objects and persons).
+test("rail entries carry the row's monster identity facts", () => {
+  const named = { individual_name: "合成首領", species_name: "合成鶉", variant_name: "合成型" };
+  const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+  const panel = validPanel({
+    look: {
+      room: { identity: 3, display_name: "南門", room: true },
+      entities: [
+        { identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null, monster_identity: null },
+        { identity: 9, display_name: "合成首領", kind: "monster", portrait_ref: null, monster_identity: named },
+        { identity: 10, display_name: "合成鶉", kind: "monster", portrait_ref: null, monster_identity: unnamed },
+      ],
+      objects: [{ identity: 6, display_name: "木箱" }],
+    },
+  });
+  panel.interact.push({
+    identity: 9,
+    display_name: "合成首領",
+    portrait_ref: null,
+    monster_identity: named,
+    services: { state: "none", entries: [] },
+    affordances: [],
+  });
+  const entries = ExplorationMenu.presenceEntries(panel);
+  const byKey = Object.fromEntries(entries.map((entry) => [entry.key, entry]));
+  assert.deepEqual(byKey["target-9"].monsterIdentity, named);
+  assert.equal(byKey["target-5"].monsterIdentity, null);
+  assert.deepEqual(byKey["entity-10"].monsterIdentity, unnamed);
+  assert.equal(byKey["entity-10"].presence, "bystander");
+  assert.equal(byKey["object-6"].monsterIdentity, null);
+});

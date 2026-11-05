@@ -54,6 +54,7 @@
 import { computed, nextTick, provide, ref, watch } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
 import { DOCK_DETAIL_VARIANT } from "./dock-panes.js";
+import { isNamedMonster, monsterDetailTag } from "./monster-identity.js";
 // The card frame's rules are ChoiceCard's global (unscoped) styles; importing
 // the component registers them wherever the dock renders, Storybook included.
 import "./ChoiceCard.vue";
@@ -90,17 +91,21 @@ const SIDE_LABELS = { foes: "敵方", party: "我方" };
 const dockRef = ref(null);
 const step = computed(() => (props.card ? props.stageTarget : null));
 // The focused position's summary (line 2 of the prompt), as parts so the
-// side and the state read as small tags beside the name.
+// side and the state read as small tags beside the name. A monster member
+// leads its tags with its variant tag (monster-individual-names), and a named
+// individual's name takes the named treatment (`named`).
 const summary = computed(() => {
   const s = step.value;
   const p = s && s.focused;
   if (!p) return { name: "以方向鍵選擇目標", tags: [] };
   if (p.kind === "self") return { name: "自己", tags: [{ text: "我方", tone: "party" }] };
   if (p.kind === "member") {
-    const tags = [{ text: SIDE_LABELS[p.side], tone: p.side }];
+    const variant = monsterDetailTag(p.monsterIdentity);
+    const tags = variant ? [{ text: variant, tone: "variant" }] : [];
+    tags.push({ text: SIDE_LABELS[p.side], tone: p.side });
     if (p.offStage) tags.push({ text: "場外", tone: "muted" });
     if (s.selectedIds.includes(p.identities[0])) tags.push({ text: "已選", tone: "chosen" });
-    return { name: p.label, tags };
+    return { name: p.label, tags, named: isNamedMonster(p.monsterIdentity) };
   }
   if (p.kind === "group") return { name: p.label, tags: [{ text: `共 ${p.identities.length} 名`, tone: p.side || "muted" }] };
   if (s.selectedIds.length > 0) return { name: "施展", tags: [{ text: `已選 ${s.selectedIds.length} 名`, tone: "chosen" }] };
@@ -250,14 +255,15 @@ function onPaneActivate(payload) {
         </span>
         <span class="target-prompt__esc"><kbd>Esc</kbd> 返回</span>
       </p>
-      <p class="target-prompt__focus" data-testid="target-prompt-focus">
+      <p class="target-prompt__focus" data-testid="target-prompt-focus" :data-named="summary.named ? 'true' : null">
         <span class="target-prompt__glyph" aria-hidden="true">▸</span>
-        <span class="target-prompt__name">{{ summary.name }}</span>
+        <span class="target-prompt__name" data-testid="target-prompt-name">{{ summary.name }}</span>
         <span
           v-for="tag in summary.tags"
           :key="tag.text"
           class="target-prompt__tag"
           :data-tone="tag.tone"
+          :title="tag.tone === 'variant' ? tag.text : null"
         >{{ tag.text }}</span>
       </p>
       <div v-if="chips.length" class="target-prompt__chips" data-testid="target-prompt-chips">
@@ -717,6 +723,35 @@ function onPaneActivate(payload) {
   font-size: var(--text-xs);
   line-height: calc(18px * var(--ui-scale));
   color: var(--paper-500);
+}
+/* The variant tag (monster-individual-names): a gold-ruled tag, square like
+   the readout's, so it never reads as the side or state pills. */
+.target-prompt__tag[data-tone="variant"] {
+  /* The detail gives way first in the narrow card: the name and the side
+     tag stay whole. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: rgba(185, 154, 96, 0.55);
+  border-radius: var(--radius-sm);
+  background: rgba(185, 154, 96, 0.1);
+  color: var(--gold-300);
+  letter-spacing: 0.04em;
+}
+/* A named individual (design D6): the name between two fading gold hairlines
+   as background layers; its line height stays the prompt's. */
+/* A monster's name is at most five code points: it never shrinks beside its
+   variant tag. */
+.target-prompt__focus:has(.target-prompt__tag[data-tone="variant"]) .target-prompt__name {
+  flex: none;
+}
+.target-prompt__focus[data-named] .target-prompt__name {
+  background:
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) bottom / 100% 1px no-repeat;
+  color: var(--gold-400);
+  font-family: var(--f-display);
 }
 .target-prompt__tag[data-tone="foes"] {
   color: #f0a59a;

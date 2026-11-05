@@ -15,10 +15,17 @@
 // Passive: `activate(key)` is the only intent; the store decides what the
 // entry does (open the verb card or the overflow card, or submit a look).
 // An empty room renders no element at all.
+//
+// A named individual (monster-individual-names design D6) carries
+// `data-named`: an inner gold rule inside its medallion (GuildRankCard's
+// stamp) and its name in the gold display face between two fading
+// horizontal hairlines. Every rule is an overlay or a background layer, so the
+// entry keeps an unnamed entry's size and position, and none of it is a
+// selection cue (no side rule, single underline or outer ring).
 import { computed, nextTick, ref, useId, watch } from "vue";
 import AvatarArtwork from "./AvatarArtwork.vue";
 import { portraitFor } from "./party-helpers.js";
-import { railReadout, railSlots } from "./presence-rail.js";
+import { isNamedSlot, railReadout, railSlots } from "./presence-rail.js";
 
 const props = defineProps({
   // The committed rail entries (`store.view.presenceEntries`).
@@ -220,6 +227,7 @@ defineExpose({ focus, focusEntry });
           data-testid="presence-entry"
           :data-entry-key="item.slot.key"
           :data-presence="item.slot.presence"
+          :data-named="isNamedSlot(item.slot) ? 'true' : null"
           @mouseenter="onEnter(item.index)"
           @mouseleave="onLeave"
           @click="onClick(item.index)"
@@ -369,10 +377,39 @@ defineExpose({ focus, focusEntry });
   border-radius: var(--radius-sm);
   background: rgba(10, 11, 14, 0.78);
   font: var(--text-xs) / 1.5 var(--f-sans);
+  /* One fixed line box: the named display face's metrics never change the
+     plate's height (monster-individual-names). */
+  height: 1.5em;
   color: var(--paper-100);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The named individual (design D6): rank language, never selection language.
+   The medallion's inner rule sits inside its clip as an overlay; the name only
+   swaps its colour and face (its size and line height stay the ordinary
+   plate's) and draws its two hairlines as background layers. */
+.presence-rail__entry[data-named] .presence-rail__medal {
+  border-color: var(--gold-300);
+}
+.presence-rail__entry[data-named] .presence-rail__medal::after {
+  content: "";
+  position: absolute;
+  inset: calc(2px * var(--ui-scale));
+  z-index: 1;
+  border: 1px solid var(--gold-400);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.presence-rail__entry[data-named] .presence-rail__name {
+  border-radius: 0;
+  background:
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) bottom / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(10, 11, 14, 0.82) 12%, rgba(10, 11, 14, 0.82) 88%, transparent);
+  color: var(--gold-400);
+  font-family: var(--f-display);
 }
 
 .presence-rail__digit {

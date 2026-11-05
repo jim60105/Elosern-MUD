@@ -6,8 +6,15 @@
 // (`exploration-readout.js`) chose: a blocked-move flash (warn tone), the
 // compass aim, or the idle summary (quiet tone). At the `off` motion level
 // the flash is a static seal-red rule with no animation.
+//
+// A monster's lead carries its variant tag (monster-individual-names): the
+// client-composed `tag` pill beside the name, and a named individual's name in
+// the gold display face between two fading hairlines (`named`). The lead line
+// has one fixed height, so a tag or the display face never moves the text line.
 defineProps({
   lead: { type: String, default: "" },
+  tag: { type: String, default: null },
+  named: { type: Boolean, default: false },
   text: { type: String, default: "" },
   // normal | warn | quiet
   tone: { type: String, default: "normal" },
@@ -29,7 +36,10 @@ defineProps({
     :data-flash="flash ? 'true' : 'false'"
     :data-motion-level="motionLevel"
   >
-    <span class="exploration-readout__lead" data-testid="exploration-readout-lead">{{ lead }}</span>
+    <span class="exploration-readout__lead" data-testid="exploration-readout-lead" :data-named="named ? 'true' : null"
+      ><span class="exploration-readout__name" data-testid="exploration-readout-name">{{ lead }}</span
+      ><span v-if="tag" class="exploration-readout__tag" data-testid="exploration-readout-tag" :title="tag">{{ tag }}</span></span
+    >
     <p class="exploration-readout__text" data-testid="exploration-readout-text">{{ text }}</p>
   </div>
 </template>
@@ -49,11 +59,51 @@ defineProps({
 }
 
 .exploration-readout__lead {
-  min-height: 1.4em;
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--ui-scale));
+  min-width: 0;
+  /* One fixed line: the tag pill and the named display face sit inside it. */
+  height: calc(20px * var(--ui-scale));
   color: var(--gold-400);
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
-  line-height: 1.4;
+  line-height: calc(20px * var(--ui-scale));
+  white-space: nowrap;
+}
+/* The name never shrinks (a monster name is at most five code points); in the
+   narrow command column the detail tag gives way first. */
+.exploration-readout__name {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.exploration-readout__tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  padding: 0 calc(6px * var(--ui-scale));
+  border: 1px solid rgba(185, 154, 96, 0.55);
+  border-radius: var(--radius-sm);
+  background: rgba(185, 154, 96, 0.1);
+  color: var(--gold-300);
+  font-family: var(--f-sans);
+  line-height: calc(16px * var(--ui-scale));
+  letter-spacing: 0.04em;
+}
+/* A named individual: rank language (design D6), the name between two
+   fading gold hairlines drawn as background layers. */
+.exploration-readout__lead[data-named] .exploration-readout__name {
+  padding: 0 calc(8px * var(--ui-scale));
+  margin: 0 calc(-8px * var(--ui-scale));
+  background:
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--gold-400) 22%, var(--gold-400) 78%, transparent) bottom / 100% 1px no-repeat;
+  color: var(--gold-400);
+  font-family: var(--f-display);
 }
 
 .exploration-readout__text {

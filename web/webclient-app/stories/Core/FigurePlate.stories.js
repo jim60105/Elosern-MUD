@@ -106,3 +106,22 @@ export const PlaybackDrain = {
       </div>`,
   }),
 };
+
+// A named individual (monster-individual-names design D6): the gold display
+// name and the crest hairline along the plate's top, at an unnamed plate's
+// size and line positions; the variant tag joins the name's title and the
+// accessible name. The longest legal name (five code points) renders whole.
+const NAMED = { name: "潮眠守灣者", token: "e2", side: "foes", hpCurrent: 318, hpMaximum: 420, form: "full", named: true, tag: "守灣型吞潮鱷" };
+export const NamedIndividual = { render, args: NAMED };
+// The focused target keeps its paper side brackets with the treatment.
+export const NamedTarget = { render, args: { ...NAMED, target: true } };
+// The acting foe keeps its doubled crown with the treatment.
+export const NamedActing = { render, args: { ...NAMED, acting: true } };
+// A defeated named individual: the receding name, ✕ 已擊破 and the dashed
+// stroke, with the crest and display face kept.
+export const NamedDefeated = { render, args: { ...NAMED, hpCurrent: 0, fallen: "defeated" } };
+// The compact form keeps the crest; the name leaves the layout as usual.
+export const NamedCompact = { render, args: { ...NAMED, form: "compact" } };
+// An unnamed monster beside it: the species name and its variant tag in the
+// title, no treatment.
+export const UnnamedMonster = { render, args: { name: "潮燈蟹", token: "e1", side: "foes", hpCurrent: 44, hpMaximum: 60, form: "full", tag: "守礁型" } };

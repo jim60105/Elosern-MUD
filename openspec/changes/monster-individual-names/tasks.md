@@ -17,10 +17,10 @@ Follow `design.md`. Tests use synthetic fixtures and never pin a shipped name, s
 
 ## 3. Client presentation
 
-- [ ] 3.1 Add `components/monster-identity.js` with `isNamedMonster()` and `monsterDetailTag()`. Check: unit tests cover named, unnamed and null identity.
-- [ ] 3.2 Carry the identity onto presence entries in `exploration_menu.js`. Add the `data-named` treatment to `PresenceRail.vue`, and the tag to `railReadout()` and `ExplorationReadout.vue` with a fixed lead line height. Add named states to the rail and readout stories. Check: Vitest confirms full DOM text for a five-code-point name, equal geometry against an unnamed entry, and readout lines that do not move.
-- [ ] 3.3 Pass a named flag and tag to `FigurePlate.vue`, with the hairline, name treatment, and tag in `title` and `plateLabel()`. Add named, `target`, `acting` and fallen stories. Check: Vitest confirms equal geometry and full DOM text, and `agent-browser` shows each state keeping its cue at 1451x790 and 2560x1440.
-- [ ] 3.4 Carry the identity onto `stage_targets.js` member positions, and add the tag to `ActionDock.vue`'s `summary.tags`, with the named name treatment. Check: tests cover unnamed, named, party member and null identity, and a repeated name still takes its session token.
+- [x] 3.1 Add `components/monster-identity.js` with `isNamedMonster()` and `monsterDetailTag()`. Check: unit tests cover named, unnamed and null identity.
+- [x] 3.2 Carry the identity onto presence entries in `exploration_menu.js`. Add the `data-named` treatment to `PresenceRail.vue`, and the tag to `railReadout()` and `ExplorationReadout.vue` with a fixed lead line height. Add named states to the rail and readout stories. Check: Vitest confirms full DOM text for a five-code-point name, equal geometry against an unnamed entry, and readout lines that do not move.
+- [x] 3.3 Pass a named flag and tag to `FigurePlate.vue`, with the hairline, name treatment, and tag in `title` and `plateLabel()`. Add named, `target`, `acting` and fallen stories. Check: Vitest confirms equal geometry and full DOM text, and `agent-browser` shows each state keeping its cue at 1451x790 and 2560x1440.
+- [x] 3.4 Carry the identity onto `stage_targets.js` member positions, and add the tag to `ActionDock.vue`'s `summary.tags`, with the named name treatment. Check: tests cover unnamed, named, party member and null identity, and a repeated name still takes its session token.
 
 ## 4. Story and quest surfaces
 

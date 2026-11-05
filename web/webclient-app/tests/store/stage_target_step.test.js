@@ -477,3 +477,57 @@ describe("stage target step (store)", () => {
     expect(step().focusKey).toBe(focus());
   });
 });
+
+// monster-individual-names: member positions carry the participant's
+// committed monster identity; a repeated display name still takes its
+// session token. Synthetic names only.
+describe("stage target positions carry monster identity", () => {
+  const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+  const named = { individual_name: "合成首領", species_name: "合成鱷", variant_name: "合成型" };
+  const row = (identity, token, name, team, identity_) => ({
+    ...participant(identity, token, name, team),
+    monster_identity: identity_,
+  });
+  const model = (participants, targets) =>
+    stageTargetModel({
+      source: "combat.target",
+      menu: { items: targets.map((id) => ({ key: `target-${id}`, payload: { target_ids: [id] } })) },
+      subject: { key: "t_x", enabled: true, targetSpec: "single", targets },
+      participants,
+      formationOrder: null,
+      controlledIdentity: "42",
+      focusKey: `target-${targets[0]}`,
+      locked: false,
+    });
+
+  it("gives each member its identity, null for a party member or a monster without one", () => {
+    const m = model(
+      [
+        row(PLAYER, "a1", "影行者", "party", null),
+        row(ALLY, "a2", "同行劍士", "party", null),
+        row(FOE_A, "e1", "合成首領", "foes", named),
+        row(FOE_B, "e2", "合成鶉", "foes", unnamed),
+        participant(FOE_C, "e3", "合成散兵", "foes"),
+      ],
+      [ALLY, FOE_A, FOE_B, FOE_C],
+    );
+    const byKey = Object.fromEntries(m.positions.map((p) => [p.key, p]));
+    expect(byKey[`target-${FOE_A}`].monsterIdentity).toEqual(named);
+    expect(byKey[`target-${FOE_B}`].monsterIdentity).toEqual(unnamed);
+    expect(byKey[`target-${ALLY}`].monsterIdentity).toBeNull();
+    expect(byKey[`target-${FOE_C}`].monsterIdentity).toBeNull();
+  });
+
+  it("keeps the session token on a repeated species name", () => {
+    const m = model(
+      [
+        row(PLAYER, "a1", "影行者", "party", null),
+        row(FOE_A, "e1", "合成鶉", "foes", unnamed),
+        row(FOE_B, "e2", "合成鶉", "foes", { ...unnamed, variant_name: "合成強型" }),
+      ],
+      [FOE_A, FOE_B],
+    );
+    expect(m.positions.map((p) => p.label)).toEqual(["合成鶉（e1）", "合成鶉（e2）"]);
+    expect(m.positions.map((p) => p.monsterIdentity.variant_name)).toEqual(["合成型", "合成強型"]);
+  });
+});

@@ -8,7 +8,10 @@
 // participants and the formation's stage order; it mutates nothing, so the
 // store, the components and Vitest all read the same answer.
 //
-// A position is `{ key, kind, identities, side, digit, offStage, label }`:
+// A position is `{ key, kind, identities, side, digit, offStage, label,
+// monsterIdentity }` (`monsterIdentity` is a member's committed
+// `monster_identity` facts, monster-individual-names; null on every other
+// position and on a participant without one):
 // - `member` — one SINGLE `target-<id>` or AREA `area-<id>` item, on one figure;
 // - `self` — the SELF `self-confirm` item, on the commanded actor's figure;
 // - `group` — one AREA `shorthand-<key>` item, lighting a whole side;
@@ -189,6 +192,7 @@ export function stageTargetModel({
         digit: digitOf(index),
         offStage: !drawn(position.identity),
         label: nameOf(position.identity),
+        monsterIdentity: byId.get(id)?.monster_identity ?? null,
         serverIndex: index,
       });
     } else if (position.kind === "self") {
@@ -201,6 +205,7 @@ export function stageTargetModel({
         digit: digitOf(index),
         offStage: false,
         label: "自己",
+        monsterIdentity: null,
         serverIndex: index,
       });
     } else if (position.kind === "group") {
@@ -215,6 +220,7 @@ export function stageTargetModel({
         digit: digitOf(index),
         offStage: false,
         label: GROUP_LABELS[position.shorthand] || item.label || position.shorthand,
+        monsterIdentity: null,
       });
     } else {
       tail.push({
@@ -225,6 +231,7 @@ export function stageTargetModel({
         digit: digitOf(index),
         offStage: false,
         label: "施展",
+        monsterIdentity: null,
       });
     }
   }

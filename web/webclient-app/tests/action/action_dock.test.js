@@ -322,6 +322,29 @@ describe("ActionDock stage target prompt", () => {
       slots: { default: () => h("div", { "data-testid": "dock-menu" }, [h("button", { "data-testid": "row" }, "row")]) },
     });
 
+  // monster-individual-names: the focused monster's variant tag leads the
+  // prompt's tags, and a named individual's name takes the named treatment.
+  it("shows a monster's variant tag and a named individual's treatment", async () => {
+    const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+    const named = { individual_name: "合成首領", species_name: "合成鱷", variant_name: "合成型" };
+    const tags = () => wrapper.findAll(".target-prompt__tag").map((t) => [t.text(), t.attributes("data-tone")]);
+    const focus = () => wrapper.get('[data-testid="target-prompt-focus"]');
+    wrapper = dock({ stageTarget: step({ positions: [member(7, "foes", 1, { label: "合成鶉", monsterIdentity: unnamed })] }) });
+    expect(wrapper.get('[data-testid="target-prompt-name"]').text()).toBe("合成鶉");
+    expect(tags()).toEqual([["合成型", "variant"], ["敵方", "foes"]]);
+    expect(focus().attributes("data-named")).toBeUndefined();
+    await wrapper.setProps({ stageTarget: step({ positions: [member(7, "foes", 1, { label: "合成首領", monsterIdentity: named })] }) });
+    expect(wrapper.get('[data-testid="target-prompt-name"]').text()).toBe("合成首領");
+    expect(tags()).toEqual([["合成型合成鱷", "variant"], ["敵方", "foes"]]);
+    expect(focus().attributes("data-named")).toBe("true");
+    // A party member and a monster without an identity show no variant tag.
+    await wrapper.setProps({ stageTarget: step({ positions: [member(8, "party", 1, { label: "同行者", monsterIdentity: null })] }) });
+    expect(tags()).toEqual([["我方", "party"]]);
+    expect(focus().attributes("data-named")).toBeUndefined();
+    await wrapper.setProps({ stageTarget: step({ positions: [member(9, "foes", 1, { label: "合成散兵" })] }) });
+    expect(tags()).toEqual([["敵方", "foes"]]);
+  });
+
   it("renders the prompt per form and hides the row region, crumb and legend", async () => {
     wrapper = dock({ stageTarget: step({ scaleLabel: "威力 ×2" }) });
     expect(wrapper.get("#action-dock").classes()).toContain("action-dock--target");
