@@ -31,6 +31,9 @@ MAX_NPC_ENTRIES = 8
 MAX_NPC_DIGEST_LENGTH = 160
 MAX_MONSTER_ENTRIES = 4
 MAX_MONSTER_ENTRY_LENGTH = 80
+# The identity facts a monster entry carries beside its display name, each
+# bounded to ``MAX_MONSTER_ENTRY_LENGTH`` (monster-individual-names).
+MONSTER_IDENTITY_FIELDS = ("individual_name", "species_name", "variant_name")
 MAX_OBJECTIVE_LENGTH = 120
 MAX_AFFORDANCES = 16
 
@@ -93,11 +96,20 @@ class ActionOptionsNPCEntry:
 
 
 class ActionOptionsMonsterEntry:
-    """One present monster in the bounded context."""
+    """One present monster in the bounded context.
+
+    ``individual_name``, ``species_name`` and ``variant_name`` are the
+    monster's identity facts (monster-individual-names): all three are ``None``
+    for a monster with no resolvable species identity, and ``individual_name``
+    is ``None`` for an unnamed individual.
+    """
 
     monster_id: int
     display_name: str
     threat_tier: str | None = None
+    individual_name: str | None = None
+    species_name: str | None = None
+    variant_name: str | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.monster_id, bool) or not isinstance(self.monster_id, int):
@@ -106,6 +118,10 @@ class ActionOptionsMonsterEntry:
             raise ActionOptionsInputError("display_name must be a non-empty string")
         if self.threat_tier is not None and not isinstance(self.threat_tier, str):
             raise ActionOptionsInputError("threat_tier must be a string or None")
+        for field in MONSTER_IDENTITY_FIELDS:
+            value = getattr(self, field)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ActionOptionsInputError(f"{field} must be a non-empty string or None")
 
 
 @dataclass(frozen=True)
@@ -168,6 +184,13 @@ class ActionOptionsContext:
                     f"monster display name exceeds the maximum of "
                     f"{MAX_MONSTER_ENTRY_LENGTH} chars"
                 )
+            for field in MONSTER_IDENTITY_FIELDS:
+                value = getattr(entry, field)
+                if value is not None and len(value) > MAX_MONSTER_ENTRY_LENGTH:
+                    raise ActionOptionsInputError(
+                        f"monster {field} exceeds the maximum of "
+                        f"{MAX_MONSTER_ENTRY_LENGTH} chars"
+                    )
         if not isinstance(self.affordances, tuple) or not all(
             isinstance(getattr(entry, "navigation", None), bool)
             and isinstance(getattr(entry, "action_id", None), (str, type(None)))
@@ -234,10 +257,17 @@ def _build_monster_entry(raw: Mapping[str, Any]) -> ActionOptionsMonsterEntry:
     threat_tier = raw.get("threat_tier")
     if threat_tier is not None and not isinstance(threat_tier, str):
         raise ActionOptionsInputError("threat_tier must be a string or absent")
+    identity: dict[str, str | None] = {}
+    for field in MONSTER_IDENTITY_FIELDS:
+        value = raw.get(field)
+        if value is not None and (not isinstance(value, str) or not value):
+            raise ActionOptionsInputError(f"{field} must be a non-empty string or absent")
+        identity[field] = None if value is None else value[:MAX_MONSTER_ENTRY_LENGTH]
     return ActionOptionsMonsterEntry(
         monster_id=monster_id,
         display_name=display_name[:MAX_MONSTER_ENTRY_LENGTH],
         threat_tier=threat_tier,
+        **identity,
     )
 
 

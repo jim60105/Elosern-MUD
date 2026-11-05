@@ -400,6 +400,64 @@ class ActionOptionsPromptTests(unittest.TestCase):
             render_prompt("action_options.user", room_name="名", bogus="x")
 
 
+class ActionOptionsMonsterIdentityTests(unittest.TestCase):
+    """Monster entries carry identity facts (monster-individual-names).
+
+    Synthetic names only; the facts are plain mapping values, exactly what the
+    situation builder supplies.
+    """
+
+    NAMED = {
+        "monster_id": 7,
+        "display_name": "合成首領",
+        "threat_tier": "低",
+        "individual_name": "合成首領",
+        "species_name": "合成鱷",
+        "variant_name": "合成守灣型",
+    }
+
+    def test_a_named_monster_prompt_holds_its_three_names(self):
+        context = _context(monster_entries=[self.NAMED])
+        (entry,) = context.monster_entries
+        self.assertEqual(
+            (entry.individual_name, entry.species_name, entry.variant_name),
+            ("合成首領", "合成鱷", "合成守灣型"),
+        )
+        _, user = build_action_options_prompt(context)
+        rendered = user["content"]
+        for fact in ('"individual_name"', '"合成首領"', '"species_name"', '"合成鱷"', '"合成守灣型"'):
+            self.assertIn(fact, rendered)
+
+    def test_a_tier_only_monster_carries_null_facts(self):
+        context = _context(
+            monster_entries=[{"monster_id": 8, "display_name": "合成散兵", "threat_tier": "低"}]
+        )
+        (entry,) = context.monster_entries
+        self.assertEqual(
+            (entry.individual_name, entry.species_name, entry.variant_name), (None, None, None)
+        )
+        _, user = build_action_options_prompt(context)
+        self.assertIn('"individual_name": null', user["content"])
+
+    def test_an_over_long_identity_value_is_truncated_to_the_entry_bound(self):
+        from world.ai.action_options.context import MAX_MONSTER_ENTRY_LENGTH
+
+        long_name = "合" * (MAX_MONSTER_ENTRY_LENGTH + 5)
+        context = _context(
+            monster_entries=[{**self.NAMED, "individual_name": long_name, "variant_name": long_name}]
+        )
+        (entry,) = context.monster_entries
+        self.assertEqual(entry.individual_name, "合" * MAX_MONSTER_ENTRY_LENGTH)
+        self.assertEqual(entry.variant_name, "合" * MAX_MONSTER_ENTRY_LENGTH)
+        self.assertEqual(entry.species_name, "合成鱷")
+
+    def test_a_malformed_identity_value_is_rejected(self):
+        for value in ("", 3):
+            with self.subTest(value=value):
+                with self.assertRaises(ActionOptionsInputError):
+                    _context(monster_entries=[{**self.NAMED, "species_name": value}])
+
+
 class ActionOptionsGenerationTests(unittest.TestCase):
     """Generation pipeline on FakeLLMClient (tasks 3.3-3.4)."""
 

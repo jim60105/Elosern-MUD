@@ -170,3 +170,52 @@ class SchedulingContractTests(_BaseServiceTests):
             self._schedule(client=client)
             self._schedule(client=client)
         self.assertEqual(client.calls, 1)
+
+
+class GenerationContextMonsterIdentityTests(EvenniaTest):
+    """The situation builder hands the layer each monster's identity facts.
+
+    monster-individual-names: synthetic species rows only.
+    """
+
+    def test_monster_entries_carry_identity_facts_into_the_prompt(self):
+        from server.option_proposal_service.situation import _build_generation_context
+        from world.ai.action_options import build_action_options_prompt
+        from world.rules.monster_individual import construct_species_individual
+        from world.tests.synthetic_data import (
+            SYNTH_MONSTER_SPECIES,
+            SYNTH_MONSTER_VARIANTS,
+            synthetic_registries,
+        )
+
+        with synthetic_registries("monster_species", "monster_variants", "monster_tiers"):
+            species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+            stronger = SYNTH_MONSTER_VARIANTS["t_whisper_quail_stronger"]
+            room = create_object(Room, key="合成林地")
+            actor = create_object(PlayerCharacter, key="合成旅人", location=room)
+            named = construct_species_individual(
+                species.key, stronger.key, individual_name="合成首領"
+            )
+            named.location = room
+            tier_only = create_object(Monster, key="合成散兵", location=room)
+            context = _build_generation_context(actor, [], [named, tier_only], (), ())
+            by_id = {entry.monster_id: entry for entry in context.monster_entries}
+            self.assertEqual(
+                (
+                    by_id[named.pk].individual_name,
+                    by_id[named.pk].species_name,
+                    by_id[named.pk].variant_name,
+                ),
+                ("合成首領", species.display_name_zh, stronger.display_name_zh),
+            )
+            self.assertEqual(
+                (
+                    by_id[tier_only.pk].individual_name,
+                    by_id[tier_only.pk].species_name,
+                    by_id[tier_only.pk].variant_name,
+                ),
+                (None, None, None),
+            )
+            _, user = build_action_options_prompt(context)
+            for fact in ("合成首領", species.display_name_zh, stronger.display_name_zh):
+                self.assertIn(fact, user["content"])

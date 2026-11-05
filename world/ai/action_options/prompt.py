@@ -56,6 +56,9 @@ def build_action_options_prompt(
             "monster_id": entry.monster_id,
             "display_name": entry.display_name,
             "threat_tier": entry.threat_tier,
+            "individual_name": entry.individual_name,
+            "species_name": entry.species_name,
+            "variant_name": entry.variant_name,
         }
         for entry in context.monster_entries
     ]

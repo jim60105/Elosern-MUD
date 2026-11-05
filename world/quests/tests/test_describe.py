@@ -140,6 +140,25 @@ class DescribeObjectiveTests(unittest.TestCase):
         )
 
     @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
+    def test_a_bound_objective_on_a_named_site_renders_the_name(self):
+        from dataclasses import replace
+
+        from world.tests.synthetic_data import make_monster_site
+
+        named = make_monster_site("t_made_named_site", individual_name_zh="合成首領")
+        plain = make_monster_site("t_made_plain_site")
+        with synthetic_registries(
+            "monster_sites", extra={"monster_sites": {named.key: named, plain.key: plain}}
+        ):
+            on_named = replace(defeat(bound=True, quantity=1), site_key=named.key)
+            on_plain = replace(defeat(bound=True, quantity=2), site_key=plain.key)
+            self.assertEqual(describe_objective_parts(on_named), ("討伐合成首領", None))
+            self.assertEqual(describe_objective(on_named), "討伐合成首領")
+            self.assertEqual(
+                describe_objective_parts(on_plain), ("討伐綁定的目標 2 個", None)
+            )
+
+    @covers_requirement("quest-detail-view::objective-descriptions-are-deterministic-and-exhaustive")
     def test_reach_anchor_renders_anchor_display_name(self):
         anchor = SYNTH_ANCHORS[_T_ANCHOR]
         objective = QuestObjective(

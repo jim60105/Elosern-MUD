@@ -24,9 +24,9 @@ Follow `design.md`. Tests use synthetic fixtures and never pin a shipped name, s
 
 ## 4. Story and quest surfaces
 
-- [ ] 4.1 Add `individual_name`, `species_name` and `variant_name` to `situation.py`, `ActionOptionsMonsterEntry`, its bounded mapping, and `prompt.py`. Check: action-options tests cover named, tier-only and over-long values, and the rendered prompt holds the facts.
-- [ ] 4.2 Add `individual_name` to defeat data in `event_log.py` and `upkeep.py` when present. Check: event tests cover named and unnamed defeats, and kill accounting tests pass unchanged.
-- [ ] 4.3 Render `討伐{name}` in `describe_objective_parts()` for a bound objective on a named site. Check: describe tests use a synthetic named site and an unnamed one, and no quest catalog data changes.
+- [x] 4.1 Add `individual_name`, `species_name` and `variant_name` to `situation.py`, `ActionOptionsMonsterEntry`, its bounded mapping, and `prompt.py`. Check: action-options tests cover named, tier-only and over-long values, and the rendered prompt holds the facts.
+- [x] 4.2 Add `individual_name` to defeat data in `event_log.py` and `upkeep.py` when present. Check: event tests cover named and unnamed defeats, and kill accounting tests pass unchanged.
+- [x] 4.3 Render `討伐{name}` in `describe_objective_parts()` for a bound objective on a named site. Check: describe tests use a synthetic named site and an unnamed one, and no quest catalog data changes.
 
 ## 5. Integration checks
 

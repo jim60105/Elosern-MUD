@@ -68,6 +68,7 @@ def _build_generation_context(
         build_options_context,
     )
     from world.rules.dialogue import dialogue_key_for
+    from world.rules.monster_individual import monster_identity_view
     from world.rules.persona import PersonaStore
     from web.webclient.presentation.fingerprints import public_tier_labels
 
@@ -96,11 +97,17 @@ def _build_generation_context(
     monster_entries = []
     for monster in monsters:
         threat_tier = getattr(monster, "threat_tier", None)
+        # The identity facts (monster-individual-names): a named boss reads as
+        # a specific creature and the variant stays visible to the prompt.
+        identity = monster_identity_view(monster)
         monster_entries.append(
             {
                 "monster_id": int(monster.pk),
                 "display_name": str(getattr(monster, "key", None) or "???"),
                 "threat_tier": str(threat_tier) if threat_tier is not None else None,
+                "individual_name": None if identity is None else identity.individual_name,
+                "species_name": None if identity is None else identity.species_name,
+                "variant_name": None if identity is None else identity.variant_name,
             }
         )
     secret_tokens = []
