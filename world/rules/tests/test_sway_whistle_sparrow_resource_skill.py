@@ -7,11 +7,17 @@ aged refresh and expiry on the representative's own declared lifetime, ordinary
 fallback on its exhausted SP axis, the inclusive flee edge, a late-target
 rejection and a committed reload. Shared synthetic suites own the hit,
 recipient-control, rollback and lifetime mechanism vectors.
+
+``EnemyRiderGroupMemberTests`` derives that composition group from the shipped
+declarations instead of naming its members, so every variant that joins the
+shape is exercised on its own rider axis through a landed hit, a miss and a
+committed reload.
 """
 
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
+from evennia.utils.idmapper.models import flush_cache
 from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
@@ -19,19 +25,35 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
-from world.rules.action import ActionResolver, RejectReason
-from world.rules.tests._combat_session_helpers import engagement_provenance
+from world.rules.action import ActionRequest, ActionResolver, RejectReason
+from world.rules.tests._combat_session_helpers import (
+    engagement_provenance,
+    resolve_combat_action,
+)
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import Battlefield, combat_provenance
+from world.rules.combat import (
+    Battlefield,
+    BattlefieldActionContext,
+    combat_provenance,
+)
 from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
 from world.rules.combat_session.records import read_session
 from world.rules.disengage import FLEE_SKILL_KEY
-from world.rules.monster_behaviour import resolve_behaviour_profile
+from world.rules.monster_behaviour import (
+    DecisionMode,
+    monster_behaviour_policy,
+    resolve_behaviour_profile,
+    resolve_monster_ai,
+)
 from world.rules.monster_individual import construct_species_individual
 from world.rules.tests.combat_fixtures import flee_edge
+from world.rules.tests.test_monster_composition_coverage import (
+    composition_groups,
+    variant_signature,
+)
 from world.skills.registry import SKILL_REGISTRY
 from world.rules.combat_identity import stable_actor_id
 
@@ -72,8 +94,8 @@ def _linked_modifier_axis_and_delta(buff_key: str) -> tuple[str, int]:
 MODIFIER_AXIS, MODIFIER_DELTA = _linked_modifier_axis_and_delta(BUFF_KEY)
 
 
-def _buff_instances(entity):
-    return [buff for buff in entity.buffs.all.values() if buff.definition_key == BUFF_KEY]
+def _buff_instances(entity, buff_key=BUFF_KEY):
+    return [buff for buff in entity.buffs.all.values() if buff.definition_key == buff_key]
 
 
 class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
@@ -217,3 +239,175 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         if edge < maximum:
             reloaded.traits.hp.current = edge + 1
             self.assertEqual(_enemy_policy(reloaded, field, record).skill_key, SKILL_KEY)
+
+
+class EnemyRiderGroupMemberTests(EvenniaTestCase):
+    """Every derived member of the enemy hit-rider composition group.
+
+    The smoke above exercises the group's stable-key-ordered representative;
+    this check derives the whole group from the shipped declarations (no key
+    list) and repeats the rider contract on each member: the member's own
+    decision mode offers its owned kit against the lone enemy, settlement
+    pays the declared cost once on a miss and on a hit, a landed hit mounts
+    the member's own rider on the struck enemy only and moves that enemy's
+    declared modifier axis, a miss leaves every recipient untouched, and a
+    committed reload keeps both spent pools and the mounted rider. Movement
+    and flee availability stay with the shared rider and flee suites.
+    """
+
+    _TARGET_AGILITY = 10
+
+    def _opponent(self, room, key):
+        """One real target that survives either attempt and adds no defense."""
+        player = create_object(PlayerCharacter, key=key, location=room)
+        player.race = "human"
+        player.apply_race_baseline()
+        player.traits.hp.base = 10000
+        player.traits.hp.current = 10000
+        player.traits.defense.base = 0
+        player.traits.agility.base = self._TARGET_AGILITY
+        return player
+
+    @staticmethod
+    def _gauges(entity):
+        return (entity.traits.hp.current, entity.traits.mp.current, entity.traits.sp.current)
+
+    @staticmethod
+    def _paid_once(member, skill, before):
+        """The declared cost left the member's own pools exactly once."""
+        return (
+            member.traits.mp.current == before[0] - skill.cost.get("mp", 0),
+            member.traits.sp.current == before[1] - skill.cost.get("sp", 0),
+        )
+
+    def test_every_group_member_lands_its_own_rider_and_misses_clean(self):
+        signature = variant_signature(REPRESENTATIVE_ROW, SKILL_REGISTRY)
+        members = composition_groups(MONSTER_VARIANT_REGISTRY, SKILL_REGISTRY)[signature]
+        self.assertIn(REPRESENTATIVE_VARIANT, members)
+        for position, variant_key in enumerate(members):
+            with self.subTest(variant=variant_key):
+                row = MONSTER_VARIANT_REGISTRY[variant_key]
+                skill_key = row.active_skill_keys[0]
+                skill = SKILL_REGISTRY[skill_key]
+                buff_key = _mounted_buff_key(skill)
+                axis, magnitude = _linked_modifier_axis_and_delta(buff_key)
+                definition = BUFF_DEFINITIONS[buff_key]
+                self.assertIs(type(definition.duration), int)
+                self.assertGreater(definition.duration, 0)
+                self.assertEqual(definition.stacking, "refresh")
+
+                member = construct_species_individual(row.species_key, variant_key)
+                room = create_object(Room, key=f"t_rider_member_room_{position}")
+                member.location = room
+                opponent = self._opponent(room, f"t_rider_member_target_{position}")
+                ally = construct_species_individual(row.species_key, variant_key)
+                ally.location = room
+                field = Battlefield(
+                    {
+                        "party": frozenset({stable_actor_id(opponent)}),
+                        "foes": frozenset(
+                            {stable_actor_id(member), stable_actor_id(ally)}
+                        ),
+                    },
+                    {
+                        stable_actor_id(opponent): opponent,
+                        stable_actor_id(member): member,
+                        stable_actor_id(ally): ally,
+                    },
+                )
+                context = BattlefieldActionContext(field)
+                target_state = (
+                    *self._gauges(opponent),
+                    dict(evaluate_combat_modifiers(opponent)),
+                )
+                ally_state = (
+                    *self._gauges(ally),
+                    dict(evaluate_combat_modifiers(ally)),
+                )
+
+                # Candidacy: a legacy member's own decision returns its kit
+                # against the lone enemy; a utility member offers the same kit
+                # as a scored plan aimed at it, whatever else it may choose.
+                trace = []
+                request = monster_behaviour_policy(
+                    member, field, context=context, trace=trace
+                )
+                self.assertIsNotNone(request)
+                if resolve_monster_ai(member).mode is DecisionMode.LEGACY:
+                    self.assertEqual(request.skill_key, skill_key)
+                    self.assertEqual(request.targets, [opponent])
+                else:
+                    plans = [
+                        plan for plan in trace[-1].plans if plan.skill_key == skill_key
+                    ]
+                    self.assertEqual(len(plans), 1)
+                    self.assertEqual(
+                        plans[0].target_ids, (stable_actor_id(opponent),)
+                    )
+                    self.assertGreater(plans[0].damage, 0)
+
+                # A miss still pays the declared cost and grants nothing to
+                # any recipient: the rider is hit-qualified.
+                before = (member.traits.mp.current, member.traits.sp.current)
+                with patch("world.rules.combat.damage.roll_d100", return_value=1):
+                    missed = resolve_combat_action(
+                        ActionRequest(member, skill_key, [opponent], context)
+                    )
+                self.assertEqual(missed.outcome, "success")
+                self.assertEqual(self._paid_once(member, skill, before), (True, True))
+                for entity in (opponent, ally, member):
+                    self.assertNotIn(buff_key, entity_active_buffs(entity))
+                self.assertEqual(
+                    (*self._gauges(opponent), dict(evaluate_combat_modifiers(opponent))),
+                    target_state,
+                )
+
+                # A landed hit mounts the member's own rider on the struck
+                # enemy only and moves that enemy's declared axis by the
+                # member's authored magnitude. Restoring both pools keeps the
+                # hit probe independent of which pools the kit spends.
+                member.traits.mp.current = member.traits.mp.max
+                member.traits.sp.current = member.traits.sp.max
+                before = (member.traits.mp.current, member.traits.sp.current)
+                with patch("world.rules.combat.damage.roll_d100", return_value=80):
+                    landed = resolve_combat_action(
+                        ActionRequest(member, skill_key, [opponent], context)
+                    )
+                self.assertEqual(landed.outcome, "success")
+                self.assertEqual(self._paid_once(member, skill, before), (True, True))
+                self.assertLess(opponent.traits.hp.current, target_state[0])
+                self.assertIn(buff_key, entity_active_buffs(opponent))
+                self.assertNotIn(buff_key, entity_active_buffs(member))
+                self.assertNotIn(buff_key, entity_active_buffs(ally))
+                self.assertEqual(
+                    evaluate_combat_modifiers(opponent).get(axis, 0),
+                    target_state[3].get(axis, 0) + magnitude,
+                )
+                self.assertEqual(
+                    (*self._gauges(ally), dict(evaluate_combat_modifiers(ally))),
+                    ally_state,
+                )
+
+                # Committed reload: the mounted rider, its remaining lifetime,
+                # the recipient's moved axis and both spent pools are durable.
+                remaining = _buff_instances(opponent, buff_key)[0].remaining_seconds
+                self.assertGreater(remaining, 0)
+                self.assertLessEqual(remaining, definition.duration)
+                spent = (member.traits.mp.current, member.traits.sp.current)
+                opponent.flush_cached_instance(opponent)
+                member.flush_cached_instance(member)
+                flush_cache()
+                reloaded_target = PlayerCharacter.objects.get(pk=opponent.pk)
+                reloaded_member = Monster.objects.get(pk=member.pk)
+                self.assertIn(buff_key, entity_active_buffs(reloaded_target))
+                self.assertEqual(
+                    evaluate_combat_modifiers(reloaded_target).get(axis, 0),
+                    target_state[3].get(axis, 0) + magnitude,
+                )
+                self.assertEqual(
+                    (
+                        reloaded_member.traits.mp.current,
+                        reloaded_member.traits.sp.current,
+                    ),
+                    spent,
+                )

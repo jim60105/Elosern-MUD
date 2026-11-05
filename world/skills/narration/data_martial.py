@@ -133,6 +133,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 鼓起頰囊，順勢側翻，長尾貼著身後掃過。",
         ),
     ),
+    NarrationRow(
+        "sticky_palm_grab",
+        action=(
+            "{actor} 張開黏亮的寬掌，一把扯向對手的手臂。",
+            "{actor} 攀低身形，細長手指拽住對方的衣角猛力一拉。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]
