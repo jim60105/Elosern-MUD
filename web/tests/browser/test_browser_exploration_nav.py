@@ -128,7 +128,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 6,
+            "schema_version": 7,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -159,6 +159,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "identity": identity,
             "display_name": name,
             "portrait_ref": None,
+            "monster_identity": None,
             "services": {"state": "none", "entries": []},
             "affordances": [
                 {

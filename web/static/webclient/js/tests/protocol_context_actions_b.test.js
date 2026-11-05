@@ -19,7 +19,10 @@ test("the combat form follows the exact v7 party field set", () => {
   // The v4 participant and skill fields: strip the v6 participant conditions
   // and the v6 polarity booleans, which survive inside the v7 choices catalog.
   const version4Participants = JSON.parse(JSON.stringify(version7.participants));
-  version4Participants.forEach((participant) => delete participant.conditions);
+  version4Participants.forEach((participant) => {
+    delete participant.conditions;
+    delete participant.monster_identity;
+  });
   const version4Skills = JSON.parse(JSON.stringify(version7.choices.skills));
   version4Skills.forEach((category) =>
     category.groups.forEach((group) =>
@@ -29,13 +32,20 @@ test("the combat form follows the exact v7 party field set", () => {
       })
     )
   );
-  assert.equal(version7.schema_version, 7);
+  // The current panel is v8: the v7 party fields plus the participant
+  // monster_identity, which v8 adds.
+  assert.equal(version7.schema_version, 8);
   const normalized = Protocol.validateContextActionsPanel(version7);
-  assert.equal(normalized.schema_version, 7);
+  assert.equal(normalized.schema_version, 8);
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(Object.assign({}, version7, { schema_version: 7 }))
+  );
+  assert.deepEqual(normalized.participants.map((participant) => participant.monster_identity), [null]);
   assert.deepEqual(
     normalized.participants.map((participant) => {
       const copy = Object.assign({}, participant);
       delete copy.conditions;
+      delete copy.monster_identity;
       return copy;
     }),
     version4Participants
@@ -133,7 +143,7 @@ test("the unavailable forms differ only in schema_version", () => {
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
   const version7 = {
-    schema_version: 7,
+    schema_version: 8,
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
@@ -144,18 +154,18 @@ test("the unavailable forms differ only in schema_version", () => {
   };
   assert.deepEqual(withoutVersion(version7), withoutVersion(version4));
   assert.doesNotThrow(() =>
-    Protocol.validatePanel("context_actions", 7, version7)
+    Protocol.validatePanel("context_actions", 8, version7)
   );
-  assert.throws(() => Protocol.validatePanel("context_actions", 7, version4));
+  assert.throws(() => Protocol.validatePanel("context_actions", 8, version4));
   assert.throws(() =>
-    Protocol.validatePanel("context_actions", 7, Object.assign({}, version7, { schema_version: 5 }))
+    Protocol.validatePanel("context_actions", 8, Object.assign({}, version7, { schema_version: 7 }))
   );
   // The unavailable form rejects a suggestions field: the field set stays
   // exactly schema_version/available/reason.
   assert.throws(() =>
     Protocol.validatePanel(
       "context_actions",
-      7,
+      8,
       Object.assign({}, version7, { suggestions: { status: "unavailable" } })
     )
   );
@@ -461,3 +471,32 @@ test("a combat snapshot with a malformed context_actions panel is rejected atomi
   assert.equal(store.getState().phase, "idle");
 });
 
+
+// v8 (monster-individual-names): every combat participant carries the
+// nullable monster_identity facts; a non-null identity fixes display_name.
+test("combat participants carry exact monster identity facts agreeing with display_name", () => {
+  const withParticipant = (participant) => {
+    const panel = validCombatPanel();
+    panel.participants = [Object.assign({}, panel.participants[0], participant)];
+    return panel;
+  };
+  const named = { individual_name: "合成首領", species_name: "合成鶉", variant_name: "合成型" };
+  const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(withParticipant({ display_name: "合成首領", monster_identity: named }))
+  );
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(withParticipant({ display_name: "合成鶉", monster_identity: unnamed }))
+  );
+  for (const participant of [
+    { display_name: "合成鶉", monster_identity: named },
+    { display_name: "別名", monster_identity: unnamed },
+    { display_name: "合成鶉", monster_identity: Object.assign({}, unnamed, { variant_name: "" }) },
+    { display_name: "合成鶉", monster_identity: Object.assign({}, unnamed, { extra: 1 }) },
+  ]) {
+    assert.throws(() => Protocol.validateContextActionsPanel(withParticipant(participant)));
+  }
+  const missing = validCombatPanel();
+  delete missing.participants[0].monster_identity;
+  assert.throws(() => Protocol.validateContextActionsPanel(missing), /monster_identity/);
+});

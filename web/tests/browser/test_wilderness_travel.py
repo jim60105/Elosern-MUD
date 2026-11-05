@@ -829,7 +829,7 @@ def _walk_panels(cx: int, cy: int) -> dict:
             "edges": [], "legend": ["每格約一公里"],
         },
         "exploration": {
-            "schema_version": 6, "available": True, "kind": "exploration",
+            "schema_version": 7, "available": True, "kind": "exploration",
             "move": [
                 {
                     "exit_ref": "e_wild_" + key, "label": word, "destination": _node(cx + dx, cy + dy),

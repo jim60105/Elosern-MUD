@@ -79,7 +79,7 @@ export function statusPanel(overrides = undefined) {
 export function explorationActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "exploration",
       affordances: [
@@ -112,7 +112,7 @@ export function explorationActions(overrides = undefined) {
 export function explorationPanel(overrides = undefined) {
   const panel = deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       move: [
@@ -153,17 +153,26 @@ export function explorationPanel(overrides = undefined) {
     },
     overrides,
   );
+  // Rows a test names without the v7 monster identity are ordinary persons
+  // (a null identity), so the fixture stays the one place the field defaults.
   panel.interact = panel.interact.map((target) => ({
     services: { state: "none", entries: [] },
+    monster_identity: null,
     ...target,
   }));
+  if (panel.look && Array.isArray(panel.look.entities)) {
+    panel.look = {
+      ...panel.look,
+      entities: panel.look.entities.map((entity) => ({ monster_identity: null, ...entity })),
+    };
+  }
   return panel;
 }
 
 export function combatActions(overrides = undefined) {
   const panel = deepMerge(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "combat",
       session: { session_id: "s-1", mode: "hostile", round: 1, round_revision: 0, state: "ready", reason: null },
@@ -215,6 +224,12 @@ export function combatActions(overrides = undefined) {
   if (panel.skills !== undefined) {
     panel.choices = { ...panel.choices, skills: panel.skills };
     delete panel.skills;
+  }
+  // v8 participants carry a monster identity; one a test omits is null.
+  if (Array.isArray(panel.participants)) {
+    panel.participants = panel.participants.map((row) =>
+      row && typeof row === "object" ? { monster_identity: null, ...row } : row,
+    );
   }
   // A participants override must leave a self-consistent v7 panel: the actor
   // summaries, the requested actor and the required draft actors are derived

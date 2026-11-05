@@ -103,8 +103,9 @@ var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical
 
 // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
 // The panel's own schema version (mirror of CONTEXT_ACTIONS_SCHEMA_VERSION):
-// v7 publishes the exact party actor/choices/draft read model.
-var CONTEXT_ACTIONS_SCHEMA_VERSION = 7;
+// v7 publishes the exact party actor/choices/draft read model; v8 adds the
+// nullable participant monster_identity (monster-individual-names).
+var CONTEXT_ACTIONS_SCHEMA_VERSION = 8;
 var MAX_SESSION_ID_CODE_POINTS = 128;
 var MAX_PARTICIPANTS = 16;
 // v7 party bounds (mirror of world.rules.combat_view): ordered allied actor
@@ -568,7 +569,7 @@ var PANEL_ALLOWLIST = {
   objectives: 1,
   services: SERVICES_SCHEMA_VERSION,
   creation: 6,
-  exploration: 6,
+  exploration: 7,
   character: 9,
   lineage: 2,
   dialogue: DIALOGUE_SCHEMA_VERSION,

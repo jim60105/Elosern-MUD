@@ -853,6 +853,37 @@ function requireExitRef(value, field) {
   return value;
 }
 
+// The shared `monster_identity` row field (exploration v7 targets and look
+// entities, context_actions v8 combat participants; mirror of
+// web.webclient.presentation.monster_identity): null, or exactly
+// {individual_name: string|null, species_name, variant_name} with non-empty
+// bounded names, and a non-null identity fixes the row's display_name to the
+// individual name, else the species name.
+function requireMonsterName(value, field, maximum) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("monster_identity " + field + " must be a non-empty string");
+  }
+  requireString(value, "monster_identity " + field, maximum);
+  return value;
+}
+
+function validateMonsterIdentity(value, displayName, maximum) {
+  if (value === null) {
+    return null;
+  }
+  requireExactFields(value, "monster_identity", ["individual_name", "species_name", "variant_name"], []);
+  if (value.individual_name !== null) {
+    requireMonsterName(value.individual_name, "individual_name", maximum);
+  }
+  requireMonsterName(value.species_name, "species_name", maximum);
+  requireMonsterName(value.variant_name, "variant_name", maximum);
+  var expected = value.individual_name !== null ? value.individual_name : value.species_name;
+  if (displayName !== expected) {
+    throw new Error("display_name must equal the identity's individual or species name");
+  }
+  return value;
+}
+
 module.exports = {
   createRetiredEpochSet: createRetiredEpochSet,
   isPlainObject: isPlainObject,
@@ -885,4 +916,5 @@ module.exports = {
   hasLoneSurrogate: hasLoneSurrogate,
   requireNodeId: requireNodeId,
   requireExitRef: requireExitRef,
+  validateMonsterIdentity: validateMonsterIdentity,
 };

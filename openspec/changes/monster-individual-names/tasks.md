@@ -11,9 +11,9 @@ Follow `design.md`. Tests use synthetic fixtures and never pin a shipped name, s
 
 ## 2. Panels and protocol
 
-- [ ] 2.1 Add `monster_identity` to exploration targets and `look.entities`, and derive their `display_name` from a non-null identity. Move `EXPLORATION_SCHEMA_VERSION` to 7 with server validation. Check: exploration panel tests cover the identity cases, a changed key, and rejection of a mismatch.
-- [ ] 2.2 Add `monster_identity` to `ParticipantView` and the combat form with `display_name` from the identity, and move `CONTEXT_ACTIONS_SCHEMA_VERSION` to 8 with server validation. Check: combat view and panel tests cover the same cases, and the exploration and unavailable forms differ only in version.
-- [ ] 2.3 Mirror both versions, the identity validator and the `display_name` rule in `protocol/constants.js`, `panels/exploration.js` and `panels/combat.js`. Update Python, Node and Storybook panel fixtures. Check: `node --test web/static/webclient/js/tests/*.test.js` and the panel parity tests pass.
+- [x] 2.1 Add `monster_identity` to exploration targets and `look.entities`, and derive their `display_name` from a non-null identity. Move `EXPLORATION_SCHEMA_VERSION` to 7 with server validation. Check: exploration panel tests cover the identity cases, a changed key, and rejection of a mismatch.
+- [x] 2.2 Add `monster_identity` to `ParticipantView` and the combat form with `display_name` from the identity, and move `CONTEXT_ACTIONS_SCHEMA_VERSION` to 8 with server validation. Check: combat view and panel tests cover the same cases, and the exploration and unavailable forms differ only in version.
+- [x] 2.3 Mirror both versions, the identity validator and the `display_name` rule in `protocol/constants.js`, `panels/exploration.js` and `panels/combat.js`. Update Python, Node and Storybook panel fixtures. Check: `node --test web/static/webclient/js/tests/*.test.js` and the panel parity tests pass.
 
 ## 3. Client presentation
 

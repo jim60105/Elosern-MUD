@@ -519,7 +519,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                             // The registered panel version (the v7 party-combat
                             // cutover); the exploration form's exact field set
                             // is unchanged.
-                            schema_version: 7,
+                            schema_version: 8,
                             available: true,
                             kind: 'exploration',
                             affordances: [],

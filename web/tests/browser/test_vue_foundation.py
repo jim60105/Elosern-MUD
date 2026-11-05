@@ -642,7 +642,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
             # The registered ``context_actions`` version (v7 since the
             # party-combat protocol cutover); the exploration form's exact
             # field set is unchanged.
-            "schema_version": 7,
+            "schema_version": 8,
             "available": True,
             "kind": "exploration",
             "affordances": [
@@ -679,7 +679,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # panel with no traversal exits — the root resolves to the
                 # empty exploration root (exploration-room-actions).
                 "exploration": {
-                    "schema_version": 6,
+                    "schema_version": 7,
                     "available": True,
                     "kind": "exploration",
                     "move": [],

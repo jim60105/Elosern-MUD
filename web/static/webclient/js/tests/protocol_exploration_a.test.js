@@ -23,9 +23,9 @@ test("validates the exploration panel available/unavailable discriminator", () =
     Protocol.validatePanel(
       "exploration",
       Protocol.PANEL_ALLOWLIST.exploration,
-      unavailableStatusPanel({ schema_version: 6 })
+      unavailableStatusPanel({ schema_version: 7 })
     ),
-    unavailableStatusPanel({ schema_version: 6 })
+    unavailableStatusPanel({ schema_version: 7 })
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));
@@ -41,10 +41,14 @@ test("validates the exploration panel available/unavailable discriminator", () =
   assert.throws(() =>
     Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 3 }))
   );
-  // The schema-5 panel is retired by the nullable-destination cutover: only 6
-  // is accepted, with no dual-version adapter.
+  // The schema-5 and schema-6 panels are retired (the nullable-destination
+  // and monster-identity cutovers): only 7 is accepted, with no dual-version
+  // adapter.
   assert.throws(() =>
     Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 5 }))
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 6 }))
   );
 });
 
@@ -57,7 +61,7 @@ test("a withheld wilderness move-row destination is null and nothing else is", (
   const panel = Protocol.validateExplorationPanel(
     validExplorationPanel({ move: [withheld] })
   );
-  assert.equal(panel.schema_version, 6);
+  assert.equal(panel.schema_version, 7);
   assert.equal(panel.move[0].destination, null);
   assert.equal(panel.move[0].enabled, true);
   for (const destination of ["", "null", "wild:", 0]) {

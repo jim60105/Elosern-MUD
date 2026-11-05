@@ -64,6 +64,7 @@ function validCombatParticipant(overrides) {
       hp_maximum: 100,
       portrait_ref: null,
       conditions: [],
+      monster_identity: null,
     },
     overrides
   );
@@ -101,7 +102,7 @@ function validCombatDraft(overrides) {
 
 function validCombatPanel(overrides) {
   const base = {
-    schema_version: 7,
+    schema_version: 8,
     available: true,
     kind: "combat",
     session: {
@@ -133,7 +134,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "combat",
       session: {
@@ -173,7 +174,7 @@ function validSuggestions(overrides) {
 function validContextActionsExplorationPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 7,
+      schema_version: 8,
       available: true,
       kind: "exploration",
       affordances: [],
@@ -337,7 +338,7 @@ function validExplorationMoveRow(overrides) {
 
 function validExplorationLookEntity(overrides) {
   return Object.assign(
-    { identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null },
+    { identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null, monster_identity: null },
     overrides || {}
   );
 }
@@ -352,6 +353,7 @@ function validExplorationTarget(overrides) {
       identity: 5,
       display_name: "南門守衛",
       portrait_ref: null,
+      monster_identity: null,
       services: { state: "none", entries: [] },
       affordances: [validExplorationAffordance()],
     },
@@ -362,7 +364,7 @@ function validExplorationTarget(overrides) {
 function validExplorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       move: [validExplorationMoveRow()],

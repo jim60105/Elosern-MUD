@@ -163,12 +163,13 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
                 "identity": i + 1,
                 "display_name": "極限長度名稱測試用角色" * 2,
                 "portrait_ref": None,
+                "monster_identity": None,
                 "services": {"state": "none", "entries": []},
                 "affordances": affordances,
             })
 
         max_payload = {
-            "schema_version": 6,
+            "schema_version": 7,
             "available": True,
             "kind": "exploration",
             "move": [],

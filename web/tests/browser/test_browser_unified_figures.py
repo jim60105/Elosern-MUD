@@ -146,7 +146,7 @@ def _art_panel(*, with_candidate: bool = True) -> dict:
 
 def _exploration_panel() -> dict:
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "exploration",
         "move": [],
@@ -156,8 +156,8 @@ def _exploration_panel() -> dict:
         "look": {
             "room": {"identity": 42, "display_name": "南門街道", "room": True},
             "entities": [
-                {"identity": 7, "display_name": "店長", "kind": "npc", "portrait_ref": "7"},
-                {"identity": 8, "display_name": "旅人", "kind": "character", "portrait_ref": "8"},
+                {"identity": 7, "display_name": "店長", "kind": "npc", "portrait_ref": "7", "monster_identity": None},
+                {"identity": 8, "display_name": "旅人", "kind": "character", "portrait_ref": "8", "monster_identity": None},
             ],
             "objects": [],
         },
@@ -166,6 +166,7 @@ def _exploration_panel() -> dict:
                 "identity": 7,
                 "display_name": "店長",
                 "portrait_ref": "7",
+                "monster_identity": None,
                 "services": {"state": "none", "entries": []},
                 "affordances": [
                     {
@@ -181,6 +182,7 @@ def _exploration_panel() -> dict:
                 "identity": 8,
                 "display_name": "旅人",
                 "portrait_ref": "8",
+                "monster_identity": None,
                 "services": {"state": "none", "entries": []},
                 "affordances": [
                     {

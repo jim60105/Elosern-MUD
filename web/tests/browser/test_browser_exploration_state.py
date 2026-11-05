@@ -645,7 +645,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
-            "schema_version": 6,
+            "schema_version": 7,
             "available": True,
             "kind": "exploration",
             "move": list(move),
@@ -680,6 +680,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "identity": identity,
             "display_name": name,
             "portrait_ref": None,
+            "monster_identity": None,
             "services": {"state": "none", "entries": []},
             "affordances": [
                 {
@@ -715,7 +716,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 # (CONTEXT_ACTIONS_SCHEMA_VERSION in the client mirror): v7
                 # since the party-combat protocol cutover. The exploration
                 # form's exact field set is unchanged.
-                "schema_version": 7,
+                "schema_version": 8,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -833,7 +834,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         pinned_context = {
             "context_actions": {
-                "schema_version": 7,
+                "schema_version": 8,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -853,7 +854,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {
             "exploration": {
-                "schema_version": 6,
+                "schema_version": 7,
                 "available": False,
                 "reason": {"code": "exploration.unavailable", "message": withdrawn},
             },
@@ -914,7 +915,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         def context_actions(suggestions: dict) -> dict:
             return {
                 "context_actions": {
-                    "schema_version": 7,
+                    "schema_version": 8,
                     "available": True,
                     "kind": "exploration",
                     "affordances": [],

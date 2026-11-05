@@ -174,6 +174,7 @@ def _valid_participant(**overrides):
         "hp_maximum": 100,
         "portrait_ref": None,
         "conditions": [],
+        "monster_identity": None,
     }
     value.update(overrides)
     return value
@@ -211,7 +212,7 @@ def _valid_draft(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "combat",
         "session": {
@@ -249,7 +250,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "combat",
         "session": {
@@ -281,7 +282,7 @@ def _player(key="panel player"):
 
 def _exploration_panel(**overrides):
     value = {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "exploration",
         "affordances": [

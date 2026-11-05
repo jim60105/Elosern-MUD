@@ -48,7 +48,7 @@ function withServices(target) {
 function validPanel(overrides) {
   const panel = Object.assign(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       move: [
@@ -62,7 +62,7 @@ function validPanel(overrides) {
       ],
       look: {
         room: { identity: 3, display_name: "南門", room: true },
-        entities: [{ identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null }],
+        entities: [{ identity: 5, display_name: "南門守衛", kind: "npc", portrait_ref: null, monster_identity: null }],
         objects: [{ identity: 6, display_name: "木箱" }],
       },
       interact: [
@@ -70,6 +70,7 @@ function validPanel(overrides) {
           identity: 5,
           display_name: "南門守衛",
           portrait_ref: null,
+          monster_identity: null,
           services: {
             state: "ready",
             entries: [
@@ -258,7 +259,7 @@ test("rail target entries name their server-authored affordances", () => {
 
 test("a target with no affordances still opens its card, and its affordance frame keeps the empty placeholder", () => {
   const panel = validPanel({
-    interact: [{ identity: 8, display_name: "路人", portrait_ref: null, affordances: [] }],
+    interact: [{ identity: 8, display_name: "路人", portrait_ref: null, monster_identity: null, affordances: [] }],
   });
   const model = ExplorationMenu.buildMenus(panel, {});
   // The rail entry is always enabled and reads 查看: its verb card has at
@@ -309,6 +310,7 @@ test("a disabled service row keeps its server reason and submits nothing", () =>
         identity: 7,
         display_name: "雜貨店老闆",
         portrait_ref: null,
+        monster_identity: null,
         services: {
           state: "ready",
           entries: [
@@ -354,6 +356,7 @@ test("dialogue and command service rows carry their handoff and no drawer", () =
         identity: 9,
         display_name: "公會執事",
         portrait_ref: null,
+        monster_identity: null,
         services: {
           state: "ready",
           entries: [
@@ -401,6 +404,7 @@ test("an unreadable service projection keeps one disabled sentence row", () => {
         identity: 11,
         display_name: "沉默的祭司",
         portrait_ref: null,
+        monster_identity: null,
         services: { state: "unreadable", entries: [] },
         affordances: [],
       },
@@ -447,6 +451,7 @@ test("the conversation row submits explore.talk_open with the host identity", ()
         identity: 9,
         display_name: "吟遊詩人",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -478,6 +483,7 @@ test("a disabled conversation row keeps its reason and submits nothing", () => {
         identity: 9,
         display_name: "吟遊詩人",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -515,6 +521,7 @@ test("engage submits explore.engage only when enabled", () => {
         identity: 10,
         display_name: "哥布林",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -542,6 +549,7 @@ test("party invite submits explore.party_invite with the server NPC id", () => {
         identity: 11,
         display_name: "艾洛希雅",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -569,6 +577,7 @@ test("a disabled party invite keeps its reason and never submits", () => {
         identity: 11,
         display_name: "艾洛希雅",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -598,6 +607,7 @@ test("party leave submits explore.party_leave with the server NPC id", () => {
         identity: 12,
         display_name: "艾洛希雅",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -625,6 +635,7 @@ test("deliver forwards the server-normalized params and echoes the server label"
         identity: 13,
         display_name: "灰婆婆",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -661,6 +672,7 @@ test("a disabled delivery keeps its reason and never submits", () => {
         identity: 13,
         display_name: "灰婆婆",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [
           {
             kind: "action",
@@ -709,8 +721,8 @@ function overviewPanel() {
     look: {
       room: { identity: 3, display_name: "試驗大廳", room: true },
       entities: [
-        { identity: 5, display_name: "試驗守衛", kind: "npc", portrait_ref: null },
-        { identity: 8, display_name: "旅人甲", kind: "character", portrait_ref: null },
+        { identity: 5, display_name: "試驗守衛", kind: "npc", portrait_ref: null, monster_identity: null },
+        { identity: 8, display_name: "旅人甲", kind: "character", portrait_ref: null, monster_identity: null },
       ],
       objects: [
         { identity: 6, display_name: "試驗箱" },
@@ -722,6 +734,7 @@ function overviewPanel() {
         identity: 5,
         display_name: "試驗守衛",
         portrait_ref: null,
+        monster_identity: null,
         affordances: [],
       },
     ],

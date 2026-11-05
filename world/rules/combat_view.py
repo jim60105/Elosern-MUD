@@ -45,6 +45,7 @@ from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.items import enumerate_actor_item_choices
 from world.rules.player_messages import rejection_message, session_reason_message
 from world.rules.progression import freeform_scale_entries_for
+from world.rules.monster_individual import MonsterIdentityView, monster_identity_view
 from world.rules.status_display import MissingDisplayMetadataError
 from world.rules.status_query import StatusQueryError, build_status_read_model
 from world.skills.effects.polarity import skill_target_polarity
@@ -105,6 +106,10 @@ class ParticipantView:
     hp_maximum: int
     portrait_ref: str | None
     conditions: tuple[ConditionRow, ...]
+    # The participant's name facts (monster-individual-names), or ``None`` for
+    # a party member or a monster without a resolvable species identity. When
+    # present, ``display_name`` is derived from it, never from the object key.
+    monster_identity: MonsterIdentityView | None = None
 
 
 @dataclass(frozen=True)
@@ -282,6 +287,17 @@ def _bound(value: str, maximum: int, field: str) -> str:
     if sum(1 for _ in value) > maximum:
         raise CombatViewError(f"{field} exceeds {maximum} code points")
     return value
+
+
+def _bounded_identity(view: MonsterIdentityView | None) -> MonsterIdentityView | None:
+    """Check every identity name against the participant name bound (raises like it)."""
+    if view is None:
+        return None
+    for field in ("individual_name", "species_name", "variant_name"):
+        value = getattr(view, field)
+        if value is not None:
+            _bound(value, MAX_DISPLAY_NAME_CODE_POINTS, f"monster_identity.{field}")
+    return view
 
 
 def combat_participants(actor: Any) -> tuple[int, ...]:
@@ -628,12 +644,19 @@ def _build_participants(
             if entity is None:
                 raise CombatViewError(f"participant {dbref} is unreconstructable")
             current, maximum = _stored_hp(entity, "hp")
+            identity_view = _bounded_identity(monster_identity_view(entity))
+            if identity_view is None:
+                display_name = str(entity.key)
+            elif identity_view.individual_name is not None:
+                display_name = identity_view.individual_name
+            else:
+                display_name = identity_view.species_name
             participants.append(
                 ParticipantView(
                     identity=int(dbref),
                     token=f"{prefix}{index}",
                     display_name=_bound(
-                        str(entity.key), MAX_DISPLAY_NAME_CODE_POINTS, "display_name"
+                        display_name, MAX_DISPLAY_NAME_CODE_POINTS, "display_name"
                     ),
                     team=team,
                     state=_participant_state(entity, int(dbref), record),
@@ -641,6 +664,7 @@ def _build_participants(
                     hp_maximum=maximum,
                     portrait_ref=portrait_catalog_key(int(dbref)),
                     conditions=participant_conditions(entity),
+                    monster_identity=identity_view,
                 )
             )
     if not participants or len(participants) > MAX_PARTICIPANTS:
