@@ -1650,7 +1650,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
     def test_a_named_foe_plate_keeps_the_geometry_of_an_unnamed_plate(self):
         page = self._page(REFERENCE)
         self._commit(page, "combat", self._identify_foes(_combat_panels(3)))
-        self._wait(page, "s.plates.length === 5")
+        # The controlled player carries no plate: three foes, three plates.
+        self._wait(page, "s.plates.length === 3")
         plate = lambda identity: page.locator(
             f'[data-anchor="plates"] [data-testid="figure-plate"][data-identity="{identity}"]'
         )
@@ -1716,14 +1717,16 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(first["named"], "true")
         self.assertEqual(first["tags"], ["合成型合成鱷"])
         # The next foe is unnamed: the species name and the bare variant name.
-        page.keyboard.press("ArrowRight")
+        # The arrows walk stage order (the party stands left of the foes), so
+        # the step is focused by item key, as the router's own focus does.
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-12')"))
         second = read()
         self.assertEqual(second["focus"], "target-12")
         self.assertIn("合成蟹類甲", second["name"])
         self.assertIsNone(second["named"])
         self.assertEqual(second["tags"], ["合成型"])
         # A foe without identity carries no variant tag.
-        page.keyboard.press("ArrowRight")
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-13')"))
         third = read()
         self.assertEqual(third["focus"], "target-13")
         self.assertEqual(third["tags"], [])
@@ -1761,8 +1764,17 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 self.assertAlmostEqual(a["width"], b["width"], delta=0.5)
                 self.assertAlmostEqual(a["height"], b["height"], delta=0.5)
                 self.assertAlmostEqual(a["y"], b["y"], delta=0.5)
-        # No selection cue at rest: the entry is not the focused one.
-        self.assertEqual(named.get_attribute("aria-selected"), "false")
+        # No selection cue at rest. The first entry is always the listbox's
+        # active descendant (aria-selected), but while the rail does not hold
+        # focus it shows neither the lift nor the focus underline.
+        self.assertFalse(page.evaluate(
+            "() => document.activeElement?.closest('[data-testid=\"presence-rail\"]') != null"
+        ))
+        rest = named.evaluate(
+            "el => ({ lift: getComputedStyle(el.querySelector('.presence-rail__medal')).transform,"
+            " underline: getComputedStyle(el.querySelector('.presence-rail__name')).boxShadow })"
+        )
+        self.assertEqual(rest, {"lift": "none", "underline": "none"})
         page.close()
 
     @covers_requirement("webclient-presence-rail::the-rail-readout-shows-a-monster-s-variant")
@@ -1774,8 +1786,10 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             box = entries.nth(index).bounding_box()
             page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
             return {
-                # The lead holds the name followed by the tag, nothing else.
-                "lead": lead.inner_text(),
+                # The lead holds the name followed by the tag, nothing else;
+                # the two are separate flex items, so their rendered text is
+                # compared without the line break between them.
+                "lead": re.sub(r"\s+", "", lead.inner_text()),
                 "named": lead.get_attribute("data-named"),
                 "box": lead.bounding_box(),
             }
