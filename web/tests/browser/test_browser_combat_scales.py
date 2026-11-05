@@ -429,7 +429,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         enemy_ids = [
             p["identity"] for p in panel["participants"] if p["team"] == "foes"
         ]
-        self.assertEqual(len(enemy_ids), 1, "engage opens a single-enemy battle")
+        # Whole-cell admission opens the battle with every hostile resident of
+        # the cell; the AREA journey below toggles exactly one candidate.
+        self.assertTrue(enemy_ids, "engage admits the cell's hostile residents")
+        self.assertEqual(len(enemy_ids), len(set(enemy_ids)))
 
         # H3 (design D11): the ladder skill sits in the elemental_magic /
         # mastery-element group. Skills row -> category frame -> group frame
@@ -486,7 +489,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(envelope["action_id"], "combat.command")
         inner = envelope["payload"]["command"]["payload"]
         self.assertEqual(inner["skill_key"], ladder)
-        self.assertEqual(inner["target_ids"], enemy_ids)
+        self.assertEqual(inner["target_ids"], [enemy_ids[0]])
 
     @covers_requirement("webclient-combat-menu::the-combat-dock-offers-a-scale-choice-step-only-for-masters")
     def test_master_scale_step_casts_at_the_chosen_magnitude(self):
