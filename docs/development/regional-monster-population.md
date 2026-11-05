@@ -279,6 +279,67 @@ ordinary variant, and a fresh reload preserved identity, home zone, resources
 and cell. The probe itself is not committed, because the retained production
 smoke module belongs to the mixed-encounter change.
 
+### Content expansion sites
+
+`abandoned_transfer_station_encounter` is this batch's mixed manual site. Its
+cell lies in remote western hill-valley ground on a hill transport route, far
+from every maintained settlement and outside every authored ecology rectangle,
+so the place reads as a disused station on an old route. The declarations stay
+the only authority for the geometry and the counts; this section repeats none
+of them.
+
+**Co-location of independent animals.** The composition holds exactly two
+`hanging_nest_forager` goblins and one `wax_cache_forager` rat. The goblin row
+binds the cohesive station activity and the rat row binds the solitary stray
+activity, so the site owner forms one pair and one independent individual. The
+rat is an explicitly authored stray, distinct from its species' ordinary family
+birth range. The site declares no activity override, so those row bindings
+resolve for the whole composition.
+
+**Defended sub-areas.** Both bindings roam the station grounds. The goblin pair
+turns hostile only inside the nest sub-area and the rat only inside the cache
+sub-area, which keeps an ordinary meeting elsewhere on the grounds
+retreat-oriented.
+
+**One cell only at the start.** All three are placed on the site's cell and
+share it until their first independent decisions fall due. The goblin pair
+decides on its cohesive interval and the rat on its solitary interval, so the
+two movement groups may separate after that boundary. Whole-cell engagement
+admitting all three is a property of the freshly populated site, and the smoke
+engages before any decision is due.
+
+**One-shot lifecycle.** The site is one-shot. Defeating its members leaves the
+durable record cleared, and the clock settlement is the only writer of that
+state. A committed reload, a later clock settlement, the map's own population
+read and a clear-out quest acceptance all observe the same cleared site, and
+none of them creates an individual. Future repeatable content must declare its
+own lifecycle in its own declaration; quest acceptance or map observation never
+restores a cleared site.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-transfer-station.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites.TransferStationEncounterTests` | OK, 5 tests |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact_boundaries` | OK |
+| `uv run --locked --env-file=/tmp/mud-transfer-station.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0 |
+| `openspec validate abandoned-transfer-station-encounter --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change abandoned-transfer-station-encounter` | passed |
+
+The smoke module populates the shipped site through the real lifecycle owner
+and observes three persisted identities, the movement groups its declarations
+derive, one ordinary session admitting all three as distinct targets, one
+defeat credit per actual individual with a redelivered event adding nothing,
+and a cleared one-shot site that stays cleared across a committed reload, a
+later clock settlement, the map read and a refused clear-out acceptance.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

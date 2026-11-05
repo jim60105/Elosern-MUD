@@ -707,6 +707,26 @@ _ACTIVITY_AREA_DECLARATIONS: tuple[ActivityArea, ...] = (
         "western_hills_valleys",
         ((827, 832, 727, 732),),
     ),
+    # The abandoned transfer station's three extents: the whole disused
+    # facility, the goblins' defended nest, and the rat's defended cache. The
+    # two sub-areas sit strictly inside the grounds, so ordinary foraging
+    # covers the facility while only a defended sub-area admits an unprompted
+    # hostile response.
+    ActivityArea(
+        "transfer_station_grounds",
+        "western_hills_valleys",
+        ((1285, 1295, 985, 995),),
+    ),
+    ActivityArea(
+        "transfer_station_nest",
+        "western_hills_valleys",
+        ((1286, 1290, 986, 990),),
+    ),
+    ActivityArea(
+        "transfer_station_cache",
+        "western_hills_valleys",
+        ((1291, 1295, 991, 995),),
+    ),
 )
 
 _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
@@ -888,6 +908,24 @@ _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
         "western_cache_grounds",
         90,
         AggressionCondition("defended_area", "western_cache_store"),
+    ),
+    # The abandoned transfer station holds co-located but independent animals:
+    # the goblin pair forages as one cohesive group and defends its nest, while
+    # the lone rat roams on its own and defends only its cache. Neither binding
+    # ever joins the other's members.
+    MonsterActivity(
+        "transfer_station_nest_activity",
+        "cohesive_group",
+        "transfer_station_grounds",
+        90,
+        AggressionCondition("defended_area", "transfer_station_nest"),
+    ),
+    MonsterActivity(
+        "transfer_station_stray_activity",
+        "solitary_roaming",
+        "transfer_station_grounds",
+        60,
+        AggressionCondition("defended_area", "transfer_station_cache"),
     ),
 )
 
