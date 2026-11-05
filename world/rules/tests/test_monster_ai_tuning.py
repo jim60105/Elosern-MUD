@@ -646,9 +646,6 @@ class SupportKitModeTests(unittest.TestCase):
             tuning, variants=variants, skills=self.skills
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_legacy_bound_support_owner_is_reported(self):
         tuning = _tuning(variants=self.support_variants)
         self.assertEqual(
@@ -656,9 +653,6 @@ class SupportKitModeTests(unittest.TestCase):
             ((ORDINARY, self.support.key),),
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_validated_utility_override_is_accepted(self):
         tuning = _tuning(
             variants=self.support_variants,
@@ -667,9 +661,6 @@ class SupportKitModeTests(unittest.TestCase):
         )
         self.assertEqual(self._violations(tuning, self.support_variants), ())
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_utility_archetype_is_accepted(self):
         tuning = _tuning(
             variants=self.support_variants,
@@ -678,9 +669,6 @@ class SupportKitModeTests(unittest.TestCase):
         )
         self.assertEqual(self._violations(tuning, self.support_variants), ())
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_damage_only_legacy_kit_is_accepted(self):
         damage_variants = {
             **_VARIANT_ROWS,
@@ -695,9 +683,6 @@ class SupportKitModeTests(unittest.TestCase):
         tuning = _tuning(variants=damage_variants)
         self.assertEqual(self._violations(tuning, damage_variants), ())
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_an_explicit_binding_beats_a_utility_tier_default(self):
         # The authored reference is a legacy archetype while the variant's tier
         # default is utility: only the explicit binding may decide the mode.
@@ -721,9 +706,6 @@ class SupportKitModeTests(unittest.TestCase):
             ((ORDINARY, self.support.key),),
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_an_explicit_legacy_override_beats_a_utility_archetype(self):
         tuning = _tuning(
             variants=self.support_variants,
@@ -736,9 +718,6 @@ class SupportKitModeTests(unittest.TestCase):
             ((ORDINARY, self.support.key),),
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_legacy_tier_default_binding_is_reported(self):
         # No authored reference: the variant's tier default resolves the mode,
         # so a legacy default reports and a utility default accepts.
@@ -770,9 +749,6 @@ class SupportKitModeTests(unittest.TestCase):
             self._violations(utility_default, fallback_variants), ()
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_a_legacy_load_accepts_a_resolvable_support_kit(self):
         # The loader must keep accepting a legacy tuning whose variant owns a
         # registered support active: the check reports, it never rejects.
@@ -789,9 +765,6 @@ class SupportKitModeTests(unittest.TestCase):
             ((ORDINARY, self.support.key),),
         )
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_results_are_sorted_and_filtered(self):
         ward = make_skill(
             "t_ai_support_ward",

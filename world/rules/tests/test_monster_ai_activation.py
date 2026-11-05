@@ -314,9 +314,6 @@ class ActivationBindingTests(EvenniaTestCase):
                 self.assertIsNone(resolution.intelligence)
                 self.assertEqual(resolution.variant_key, key)
 
-    @covers_requirement(
-        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
-    )
     def test_every_shipped_support_kit_binds_utility(self):
         # The shipped startup tuning must resolve an effective utility mode for
         # every registered variant that owns a support active; otherwise the
