@@ -598,6 +598,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             {member.pk for member in _members(self.wilderness, site)},
         )
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_row_bound_site_forms_one_group_per_row_binding(self):
         self._settle()
 
@@ -646,6 +649,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(after[ids[0]].sequence, cohesive.sequence)
         self.assertIsNone(after[ids[0]].journey_id)
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_stationary_site_override_suppresses_every_row_binding(self):
         self._settle()
 
@@ -677,6 +683,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                     .journey_id
                 )
 
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
     def test_a_labelled_site_names_its_individual_without_changing_identity(self):
         self._settle()
 
@@ -704,6 +713,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(plain_group.member_ids, (plain.pk,))
         self.assertEqual(named_group.activity_key, plain_group.activity_key)
 
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
     def test_a_recovered_labelled_individual_keeps_the_label_and_a_new_identity(self):
         ward = MonsterSite(
             "t_probe_labelled_camp",

@@ -743,6 +743,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(set(group.member_ids), set(created))
         self.assertEqual(group.activity_key, GROUP_ACTIVITY)
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_row_bound_birth_forms_each_rows_own_group(self):
         # One row declares its own solitary binding; the other declares none and
         # therefore falls back to the cohesive composition binding. Both rows

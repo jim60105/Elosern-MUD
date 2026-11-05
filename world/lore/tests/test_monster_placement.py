@@ -402,6 +402,9 @@ class MemberActivityBindingTests(unittest.TestCase):
             (_member(ORDINARY, 2, 2, OTHER_ACTIVITY), _member(STRONGER, 1, 1)),
         )
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_an_unoverridden_row_resolves_its_own_binding_then_the_composition(self):
         # The first row declares its own binding; the second one falls back.
         self.assertEqual(
@@ -409,6 +412,9 @@ class MemberActivityBindingTests(unittest.TestCase):
         )
         self.assertEqual(composition_row_bindings(_composition()), (ACTIVITY,))
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_site_override_governs_every_row_and_masks_row_bindings(self):
         bindings = composition_row_bindings(
             self._mixed(), site=_site(activity_key=OTHER_ACTIVITY)
@@ -421,6 +427,9 @@ class MemberActivityBindingTests(unittest.TestCase):
             (ACTIVITY, ACTIVITY),
         )
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_site_without_an_override_resolves_row_bindings(self):
         self.assertEqual(
             composition_row_bindings(
@@ -436,6 +445,9 @@ class MemberActivityBindingTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_an_unknown_or_empty_row_binding_is_rejected(self):
         for activity_key in (ABSENT_ACTIVITY, "", 7):
             broken = _composition(
@@ -482,6 +494,9 @@ class MemberActivityBindingTests(unittest.TestCase):
         self.assertIn("row 0", str(raised.exception))
         self.assertIn(ABSENT_ACTIVITY, str(raised.exception))
 
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
     def test_a_label_requires_every_outcome_to_be_exactly_one_individual(self):
         registry.validate_monster_placement_registry(
             {SITE: _site(individual_label_zh=LABEL)}, **_faces()
@@ -506,6 +521,9 @@ class MemberActivityBindingTests(unittest.TestCase):
                         ),
                     )
 
+    @covers_requirement(
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+    )
     def test_an_empty_label_is_rejected(self):
         for label in ("", 0):
             with self.subTest(label=label):

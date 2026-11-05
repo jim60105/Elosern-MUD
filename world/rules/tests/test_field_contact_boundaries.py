@@ -1095,6 +1095,9 @@ class GroupFormationForecastParityTests(_BoundaryBase):
         )
         self.assertEqual(committed, projected)
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_matured_mixed_row_site_projects_the_committed_groups(self):
         # The site declares no override, so the cohesive composition binding
         # keeps the unbound pair together while the bound single row stands
@@ -1140,6 +1143,9 @@ class GroupFormationForecastParityTests(_BoundaryBase):
         )
         self.assertEqual(committed, projected)
 
+    @covers_requirement(
+        "monster-site-placement::composition-rows-resolve-one-effective-activity-binding"
+    )
     def test_a_row_bound_zone_birth_projects_the_committed_groups(self):
         tick = 400
         self.wilderness.db.regional_population = {
