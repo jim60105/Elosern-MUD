@@ -587,9 +587,10 @@ opponent:
   candidate the selector chooses, while the committed smoke asserts candidacy
   and value rather than selection frequency.
 * The committed representative smoke itself resolved a guard mount (12 MP,
-  +6 defense, caster only) and a hit bite that removed the defender's actual
-  7 MP, credited it to the caster's cap and then paid both costs, with the
-  opponent and a constructed ally as untouched controls.
+  +6 defense, caster only) and two hit bites that each removed the defender's
+  actual 7 MP: the first credited the caster the actual amount with headroom
+  below the pool ceiling, and the second credited to the ceiling before paying
+  both costs, with the opponent and a constructed ally as untouched controls.
 
 ### Evidence map
 
@@ -659,9 +660,9 @@ ones; all were adopted before or during implementation:
   were added to the focused runs.
 * The planned bite assertion at full caster MP could not detect a missing
   caster credit or an actual-loss clamp. Adopted: the guard cast runs first,
-  the defender is reduced below the declared fixed drain, and the caster is
-  given headroom so the credited amount and the maximum cap are both
-  observable, with the formula written from the declared values.
+  the defender is reduced below the declared fixed drain, and a first hit
+  observes the uncapped actual credit while a second hit observes the pool
+  ceiling, with both formulas written from the declared values.
 * The candidacy check now also asserts the guard's positive control value and
   the bite's positive damage value, so a broken or zero-valued projection
   cannot pass as mere plan presence.
@@ -681,3 +682,12 @@ at 11 MP the selector offered the affordable bite as a candidate but chose the
 innate attack, so the test asserts the guard's absence from the candidate set
 and the forced request's refusal rather than requiring the bite to be
 selected.
+
+The final review over the landed diff raised one blocking finding, adopted:
+
+* The single bite assertion still saturated the caster pool at its maximum,
+  so a handler that credited the full declared fixed drain instead of the
+  opponent's actual loss would have produced the same number. The smoke now
+  resolves two hits: the first, after the guard payment, has headroom and
+  proves the actual-amount credit is neither absent nor nominal; the second
+  fills to the ceiling and proves the cap and the credit-before-cost order.

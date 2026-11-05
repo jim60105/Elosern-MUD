@@ -192,15 +192,16 @@ class ReservoirWardenResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(_buff_instances(crocodile)[0].remaining_seconds, duration)
 
         # Bite settlement on a hit: the opponent loses exactly the MP it
-        # actually had below the declared fixed drain, the caster is credited
-        # that actual amount up to its maximum, and only then are the bite's
-        # own MP and SP costs deducted.
+        # actually had below the declared fixed drain, and the caster is
+        # credited that actual amount. After the guard payment there is
+        # headroom below the maximum, so this uncapped credit distinguishes the
+        # actual amount from both no credit and the declared nominal amount.
         removed = DECLARED_DRAIN - 3
         self.assertGreater(removed, 0)
         self.assertLess(removed, DECLARED_DRAIN)
         opponent.traits.mp.current = removed
-        crocodile.traits.mp.current = crocodile.traits.mp.max - 2
         bite_mp_before = crocodile.traits.mp.current
+        self.assertLessEqual(bite_mp_before + removed, crocodile.traits.mp.max)
         bite_sp_before = crocodile.traits.sp.current
         with patch(
             "world.rules.combat.damage.roll_d100", return_value=80
@@ -210,13 +211,28 @@ class ReservoirWardenResourceSkillSmokeTests(EvenniaTestCase):
             )
         self.assertEqual(bitten.outcome, "success")
         self.assertEqual(opponent.traits.mp.current, 0)
-        expected_mp = (
-            min(crocodile.traits.mp.max, bite_mp_before + removed)
-            - BITE.cost["mp"]
-        )
+        expected_mp = bite_mp_before + removed - BITE.cost["mp"]
         self.assertEqual(crocodile.traits.mp.current, expected_mp)
         self.assertEqual(
             crocodile.traits.sp.current, bite_sp_before - BITE.cost["sp"]
+        )
+
+        # A second hit with the credit reaching the pool's ceiling: the credit
+        # is capped at the maximum and still precedes the bite's own costs.
+        opponent.traits.mp.current = removed
+        crocodile.traits.mp.current = crocodile.traits.mp.max - 2
+        bite_mp_before = crocodile.traits.mp.current
+        with patch(
+            "world.rules.combat.damage.roll_d100", return_value=80
+        ), combat_provenance(engagement_provenance().at_slot(0)):
+            capped = ActionResolver.resolve(
+                ActionRequest(crocodile, BITE_KEY, [opponent], context)
+            )
+        self.assertEqual(capped.outcome, "success")
+        self.assertEqual(opponent.traits.mp.current, 0)
+        self.assertEqual(
+            crocodile.traits.mp.current,
+            crocodile.traits.mp.max - BITE.cost["mp"],
         )
 
         # Aging then a committed reload: the spent pools, the remaining
