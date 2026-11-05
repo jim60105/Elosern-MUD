@@ -35,6 +35,8 @@ from world.skills.registry import (
     TargetSpec,
 )
 
+from world.rules.combat_identity import stable_actor_id
+
 from ._combat_session_helpers import live_skill_registry, resolve_combat_action
 from .combat_fixtures import FakeEntity
 
@@ -217,7 +219,7 @@ class HealEffectHandlerTests(unittest.TestCase):
         actor = FakeEntity("actor", combat_identity='actor')
         target = FakeEntity("target", combat_identity='target', hp=50, max_hp=100)
         pending = _handle_heal(actor, [target], "heal:single", {}, 1.0)[0]
-        entries = _entries_from_effect("actor", pending)
+        entries = _entries_from_effect("actor", stable_actor_id(actor), pending)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].kind, "heal")
         self.assertEqual(entries[0].data["amount"], _heal_magnitude(actor))
@@ -225,7 +227,7 @@ class HealEffectHandlerTests(unittest.TestCase):
     def test_self_heal_entries_emit_a_self_heal_event_with_amount(self):
         actor = FakeEntity("actor", combat_identity='actor', hp=50, max_hp=100, magic_power=20)
         pending = _handle_self_heal(actor, [], "self_heal", {}, 1.0)[0]
-        entries = _entries_from_effect("actor", pending)
+        entries = _entries_from_effect("actor", stable_actor_id(actor), pending)
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].kind, "self_heal")
         self.assertEqual(entries[0].target, "actor")
@@ -243,7 +245,7 @@ class HealEffectHandlerTests(unittest.TestCase):
             apply=pending.apply,
         )
         with self.assertRaises(ValueError):
-            _entries_from_effect("actor", malformed)
+            _entries_from_effect("actor", stable_actor_id(actor), malformed)
 
     def test_heal_magnitude_never_drops_below_the_floor(self):
         actor = FakeEntity("actor", combat_identity='actor', magic_power=0)
@@ -273,16 +275,20 @@ class HealResolverIntegrationTests(EvenniaTestCase):
         self.ally.traits.hp.current = 80
         enemy.traits.hp.current = 60
         self.actor.traits.magic_power.base = 20
+        self.healer_id = stable_actor_id(self.actor)
+        self.patient_id = stable_actor_id(self.target)
+        self.ally_id = stable_actor_id(self.ally)
+        self.enemy_id = stable_actor_id(enemy)
         self.battlefield = Battlefield(
             {
-                'party': frozenset({"fixture:healer", "fixture:patient", "fixture:ally"}),
-                'foes': frozenset({"fixture:enemy"}),
+                'party': frozenset({self.healer_id, self.patient_id, self.ally_id}),
+                'foes': frozenset({self.enemy_id}),
             },
             {
-                "fixture:healer": self.actor,
-                "fixture:patient": self.target,
-                "fixture:ally": self.ally,
-                "fixture:enemy": enemy,
+                self.healer_id: self.actor,
+                self.patient_id: self.target,
+                self.ally_id: self.ally,
+                self.enemy_id: enemy,
             },
         )
 
@@ -360,7 +366,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
             ["damage:fire:magic", "self_heal"],
             TargetSpec.SINGLE,
         )
-        enemy = self.battlefield.roster["enemy"]
+        enemy = self.battlefield.roster[self.enemy_id]
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
@@ -386,7 +392,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
             ["damage:fire:magic", "self_heal:missing_fraction:0.1"],
             TargetSpec.SINGLE,
         )
-        enemy = self.battlefield.roster["enemy"]
+        enemy = self.battlefield.roster[self.enemy_id]
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch(
@@ -421,7 +427,7 @@ class HealResolverIntegrationTests(EvenniaTestCase):
             ["damage:fire:magic", "heal:single"],
             TargetSpec.SINGLE,
         )
-        enemy = self.battlefield.roster["enemy"]
+        enemy = self.battlefield.roster[self.enemy_id]
         enemy.traits.hp.current = 10
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=100),
