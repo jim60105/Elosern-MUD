@@ -467,6 +467,20 @@ class MemberActivityBindingTests(unittest.TestCase):
                             },
                         ),
                     )
+        # The diagnostic names the composition, the row and the key, so an
+        # author can find the row that must be fixed.
+        with self.assertRaises(MonsterPlacementRegistryError) as raised:
+            registry.validate_ecology_registries(
+                {ZONE: _zone()},
+                {COMPOSITION: _composition(
+                    COMPOSITION, (_member(ORDINARY, 1, 1, ABSENT_ACTIVITY),)
+                )},
+                {},
+                **_ecology_faces(),
+            )
+        self.assertIn(COMPOSITION, str(raised.exception))
+        self.assertIn("row 0", str(raised.exception))
+        self.assertIn(ABSENT_ACTIVITY, str(raised.exception))
 
     def test_a_label_requires_every_outcome_to_be_exactly_one_individual(self):
         registry.validate_monster_placement_registry(
