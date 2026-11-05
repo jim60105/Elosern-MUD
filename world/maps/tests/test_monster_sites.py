@@ -479,6 +479,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(members[0].variant_key, STRONGER)
         self.assertEqual(members[0].db.site_key, STRAY_KEY)
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_cohesive_site_binding_forms_one_group_owned_by_the_site(self):
         cohesive = MonsterSite(
             COHESIVE_KEY,
@@ -515,6 +518,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             [f"site:{COHESIVE_KEY}:0#0"],
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_stationary_site_binding_forms_one_group_per_member(self):
         self._settle()
 
@@ -535,6 +541,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             {member.pk for member in _members(self.wilderness, site)},
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_failed_second_unit_restores_the_site_and_every_member(self):
         states_before = self.wilderness.db.monster_sites
         coordinates_before = dict(self.wilderness.db.itemcoordinates)

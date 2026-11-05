@@ -375,6 +375,9 @@ def _policies(**overrides: str) -> dict[str, MonsterActivity]:
 class MovementUnitTests(unittest.TestCase):
     """One placement's binding policies decide its movement groups."""
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_solitary_row_of_three_forms_three_single_slot_units(self):
         units = movement_units((("t_fixture_row", 3),), (SOLITARY,), activities=_policies())
         self.assertEqual(
@@ -386,6 +389,9 @@ class MovementUnitTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_cohesive_rows_join_one_unit_in_flattened_member_order(self):
         units = movement_units(
             (("t_fixture_row_a", 2), ("t_fixture_row_b", 1)),
@@ -394,6 +400,9 @@ class MovementUnitTests(unittest.TestCase):
         )
         self.assertEqual(units, (MovementUnit(COHESIVE_A, (0, 1, 2)),))
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_two_cohesive_keys_stay_two_units(self):
         units = movement_units(
             (("t_fixture_row_a", 2), ("t_fixture_row_b", 2)),
@@ -405,6 +414,9 @@ class MovementUnitTests(unittest.TestCase):
             (MovementUnit(COHESIVE_A, (0, 1)), MovementUnit(COHESIVE_B, (2, 3))),
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_interleaved_cohesive_slots_merge_and_sort_by_first_slot(self):
         units = movement_units(
             (("t_fixture_row_a", 1), ("t_fixture_row_b", 1), ("t_fixture_row_c", 1)),
@@ -416,6 +428,9 @@ class MovementUnitTests(unittest.TestCase):
             (MovementUnit(COHESIVE_A, (0, 2)), MovementUnit(SOLITARY, (1,))),
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_stationary_row_of_two_forms_two_units(self):
         units = movement_units((("t_fixture_row", 2),), (STATIONARY,), activities=_policies())
         self.assertEqual(
@@ -423,6 +438,9 @@ class MovementUnitTests(unittest.TestCase):
             (MovementUnit(STATIONARY, (0,)), MovementUnit(STATIONARY, (1,))),
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_zero_count_row_contributes_no_slot_but_is_still_validated(self):
         units = movement_units(
             (("t_fixture_absent", 0), ("t_fixture_row", 2)),
@@ -437,6 +455,9 @@ class MovementUnitTests(unittest.TestCase):
                 (("t_fixture_absent", 0),), ("t_fixture_unknown",), activities=_policies()
             )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_illegal_rows_refuse_the_whole_formation(self):
         policies = _policies()
         cases = (

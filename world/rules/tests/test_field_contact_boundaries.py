@@ -962,6 +962,9 @@ class GroupFormationForecastParityTests(_BoundaryBase):
             if group_id.startswith(prefix)
         )
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_solitary_zone_birth_projects_the_committed_dispersal(self):
         tick = 100
         self.wilderness.db.regional_population = {
@@ -1001,6 +1004,9 @@ class GroupFormationForecastParityTests(_BoundaryBase):
         )
         self.assertEqual(committed, projected)
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
     def test_a_matured_cohesive_site_recovery_projects_the_committed_group(self):
         tick = 200
         self.wilderness.db.monster_sites = {
