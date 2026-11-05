@@ -20,6 +20,9 @@ from typing import Any, ParamSpec, TypeVar
 EVIDENCE_ENV = "OPENSPEC_TEST_EVIDENCE"
 DECORATOR_MODULE = "tools.spec_traceability"
 REQUIREMENT_HEADING = re.compile(r"^### Requirement:\s*(.*?)\s*$")
+DELTA_SECTION = re.compile(r"^##\s+(ADDED|MODIFIED|REMOVED|RENAMED)\s+Requirements\s*$")
+RENAMED_FROM = re.compile(r"^-\s*FROM:\s*`?###\s+Requirement:\s*(.*?)\s*`?\s*$")
+CHANGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -58,6 +61,9 @@ class TraceabilityReport:
     covered: tuple[str, ...]
     uncovered: tuple[str, ...]
     errors: tuple[VerificationError, ...]
+    # Uncovered requirements the named change's delta removes or renames. They
+    # leave openspec/specs/ at archive sync, so a pre-sync check tolerates them.
+    retiring: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -85,6 +91,7 @@ class TraceabilityReport:
                 for identifier in self.uncovered
             ],
             "errors": [asdict(item) for item in self.errors],
+            "retiring": list(self.retiring),
         }
 
 
@@ -166,6 +173,39 @@ def parse_requirements(repo_root: Path) -> tuple[tuple[Requirement, ...], tuple[
             by_id[requirement.identifier] = requirement
             requirements.append(requirement)
     return tuple(sorted(requirements, key=lambda item: item.identifier)), tuple(sorted(errors))
+
+
+def retiring_requirements(repo_root: Path, change: str) -> frozenset[str]:
+    """Return main IDs that an active change's delta removes or renames away.
+
+    Only REMOVED headings and RENAMED ``FROM`` lines count; ADDED and MODIFIED
+    requirements never qualify, so the pre-sync gate stays strict for them.
+    """
+    if not CHANGE_NAME.fullmatch(change):
+        raise ValueError(f"invalid change name: {change!r}")
+    change_root = repo_root / "openspec" / "changes" / change
+    if not change_root.is_dir():
+        raise ValueError(f"unknown active change: {change_root}")
+    specs_root = change_root / "specs"
+    retiring: set[str] = set()
+    for spec_path in sorted(specs_root.glob("*/spec.md")):
+        capability = spec_path.parent.name
+        section: str | None = None
+        for line in spec_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("## "):
+                match = DELTA_SECTION.fullmatch(line.strip())
+                section = match.group(1) if match else None
+                continue
+            name: str | None = None
+            if section == "REMOVED":
+                heading = REQUIREMENT_HEADING.fullmatch(line)
+                name = heading.group(1) if heading else None
+            elif section == "RENAMED":
+                renamed = RENAMED_FROM.fullmatch(line.strip())
+                name = renamed.group(1) if renamed else None
+            if name and (slug := normalize_requirement_name(name)):
+                retiring.add(f"{capability}::{slug}")
+    return frozenset(retiring)
 
 
 def _module_name(repo_root: Path, path: Path) -> str:
@@ -298,7 +338,11 @@ def requirement_by_id(requirements: Iterable[Requirement]) -> dict[str, Requirem
     return {item.identifier: item for item in requirements}
 
 
-def verify(repo_root: Path, evidence_path: Path | None = None) -> TraceabilityReport:
+def verify(
+    repo_root: Path,
+    evidence_path: Path | None = None,
+    retiring: frozenset[str] = frozenset(),
+) -> TraceabilityReport:
     requirements, requirement_errors = parse_requirements(repo_root)
     associations, association_errors = discover_associations(repo_root, set(requirement_by_id(requirements)))
     evidence_pairs: set[tuple[str, str]] | None = None
@@ -311,12 +355,14 @@ def verify(repo_root: Path, evidence_path: Path | None = None) -> TraceabilityRe
         if evidence_pairs is None or (association.test_identity, association.identifier) in evidence_pairs
     }
     identifiers = set(requirement_by_id(requirements))
+    uncovered = identifiers - covered
     return TraceabilityReport(
         requirements,
         associations,
         tuple(sorted(covered)),
-        tuple(sorted(identifiers - covered)),
+        tuple(sorted(uncovered - retiring)),
         tuple(sorted((*requirement_errors, *association_errors, *evidence_errors))),
+        tuple(sorted(uncovered & retiring)),
     )
 
 
@@ -333,6 +379,11 @@ def _print_console(report: TraceabilityReport, show_covered: bool) -> None:
     if report.uncovered:
         print("Uncovered requirements:")
         for identifier in report.uncovered:
+            location = by_id[identifier].location
+            print(f"  - {identifier} ({location.path}:{location.line})")
+    if report.retiring:
+        print("Uncovered but retired by the change at archive sync (tolerated):")
+        for identifier in report.retiring:
             location = by_id[identifier].location
             print(f"  - {identifier} ({location.path}:{location.line})")
     if report.errors:
@@ -370,7 +421,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-covered", action="store_true",
         help="Also print the full list of covered requirement IDs in the console output",
     )
-    verify_parser = subparsers.add_parser("verify", help="Require successful runtime evidence")
+    check_parser.add_argument(
+        "--change",
+        help=(
+            "Pre-archive only: tolerate uncovered requirements this active change's "
+            "delta removes or renames; the post-sync check must omit it"
+        ),
+    )
+    verify_parser =subparsers.add_parser("verify", help="Require successful runtime evidence")
     verify_parser.add_argument("--evidence", type=Path, required=True)
     verify_parser.add_argument("--json-output", type=Path)
     verify_parser.add_argument(
@@ -389,7 +447,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = TraceabilityReport(requirements, (), (), (), errors)
         _write_report(report, args.json_output, show_covered)
         return bool(errors)
-    report = verify(repo_root, getattr(args, "evidence", None))
+    retiring: frozenset[str] = frozenset()
+    if getattr(args, "change", None):
+        try:
+            retiring = retiring_requirements(repo_root, args.change)
+        except ValueError as exc:
+            print(f"spec traceability: {exc}", file=sys.stderr)
+            return 2
+    report = verify(repo_root, getattr(args, "evidence", None), retiring)
     _write_report(report, args.json_output, show_covered)
     return 0 if report.ok else 1
 

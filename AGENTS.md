@@ -174,7 +174,9 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
 - Before handoff or archive, run `uv run --locked python -m tools.contract_gate`
   (traceability, the two lints, shard manifests, and the shard-ownership and
   frozen-audit contracts; seconds). It is not a test run to skip; CI preflight
-  reuses it.
+  reuses it. On a feature worktree before archive sync, add `--change <change>`
+  so traceability tolerates only requirements that change's delta removes or
+  renames; never pass it after the sync.
 - The full non-browser Evennia suite is allowed once only when needed, under 10
   minutes, and run with `--parallel 16 --noinput`; never run it serially.
 - The full managed browser suite and `tools.spec_traceability verify --evidence`

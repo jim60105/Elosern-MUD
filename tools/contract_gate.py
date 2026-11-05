@@ -8,6 +8,12 @@ or name a subset (CI preflight runs the gates its other steps do not):
 
     uv run --locked python -m tools.contract_gate manifests contracts
 
+On a feature worktree before the change's archive sync, name the active change
+so the traceability gate tolerates only the requirements that change's delta
+removes or renames (they stay in openspec/specs/ until the sync):
+
+    uv run --locked python -m tools.contract_gate --change <change>
+
 Each gate runs even when an earlier one fails, so one invocation reports every
 broken contract. The exit status is non-zero when any selected gate fails.
 """
@@ -72,9 +78,14 @@ def _run(*args: str) -> Callable[[], bool]:
     return run
 
 
+def _traceability(change: str | None = None) -> Callable[[], bool]:
+    extra = ("--change", change) if change else ()
+    return _run("-m", "tools.spec_traceability", "check", *extra)
+
+
 GATES: dict[str, Callable[[], bool]] = {
     "reference-context": _run("-m", "tools.map_reference_context", "--check"),
-    "traceability": _run("-m", "tools.spec_traceability", "check"),
+    "traceability": _traceability(),
     "observability": _run("-m", "tools.observability_lint", "check"),
     "test-data": _run("-m", "tools.test_data_lint", "check"),
     "manifests": _check_manifests,
@@ -82,16 +93,49 @@ GATES: dict[str, Callable[[], bool]] = {
 }
 
 
+def _split_change(args: list[str]) -> tuple[list[str], str | None]:
+    """Remove `--change <name>` / `--change=<name>`; raise ValueError if malformed."""
+    names: list[str] = []
+    change: str | None = None
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg == "--change" or arg.startswith("--change="):
+            if change is not None:
+                raise ValueError("--change given more than once")
+            if arg == "--change":
+                index += 1
+                if index == len(args):
+                    raise ValueError("--change needs a change name")
+                change = args[index]
+            else:
+                change = arg.removeprefix("--change=")
+            if not change or change.startswith("-"):
+                raise ValueError("--change needs a change name")
+        else:
+            names.append(arg)
+        index += 1
+    return names, change
+
+
 def main(argv: list[str] | None = None) -> int:
-    selected = list(argv if argv is not None else sys.argv[1:]) or list(GATES)
+    try:
+        selected, change = _split_change(list(argv if argv is not None else sys.argv[1:]))
+    except ValueError as exc:
+        print(exc)
+        return 2
+    selected = selected or list(GATES)
     unknown = [name for name in selected if name not in GATES]
     if unknown:
         print(f"unknown gate(s): {', '.join(unknown)}; choose from {', '.join(GATES)}")
         return 2
+    gates = dict(GATES)
+    if change:
+        gates["traceability"] = _traceability(change)
     failed = []
     for name in selected:
         print(f"== contract gate: {name}", flush=True)
-        if not GATES[name]():
+        if not gates[name]():
             failed.append(name)
     if failed:
         print(f"contract gate FAILED: {', '.join(failed)}")

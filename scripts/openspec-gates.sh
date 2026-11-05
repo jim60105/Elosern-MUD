@@ -32,9 +32,17 @@ case "$phase" in
   archive)
     # PRE-archive. The traceability check is kept as a regression guard for
     # capabilities already synced into openspec/specs/; this change's own new
-    # requirements are not yet in the index (see post-archive).
-    print -u2 "gate: spec_traceability check"
-    uv run --locked python -m tools.spec_traceability check
+    # requirements are not yet in the index (see post-archive). Requirements
+    # the change REMOVES or RENAMES are still indexed until the sync, so with a
+    # change name the check tolerates them being uncovered; every other
+    # uncovered requirement and every annotation error still fails.
+    if [[ -n "$change" ]]; then
+      print -u2 "gate: spec_traceability check --change ${change}"
+      uv run --locked python -m tools.spec_traceability check --change "${change}"
+    else
+      print -u2 "gate: spec_traceability check"
+      uv run --locked python -m tools.spec_traceability check
+    fi
     print -u2 "gate: openspec validate --all --strict"
     uv run --locked openspec validate --all --strict
     if [[ -n "$change" ]]; then

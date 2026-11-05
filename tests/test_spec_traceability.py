@@ -13,7 +13,9 @@ from unittest.mock import patch
 from tools.spec_traceability import (
     EVIDENCE_ENV,
     covers_requirement,
+    main,
     parse_requirements,
+    retiring_requirements,
     verify,
 )
 
@@ -67,6 +69,88 @@ class RequirementParsingTests(unittest.TestCase):
         self.assertEqual(len(requirements), 1)
         self.assertEqual(errors[0].code, "requirement-id-collision")
         self.assertIn(":1", errors[0].message)
+
+
+RETIRING_SPEC = """## Requirements
+
+### Requirement: Useful behavior
+The system SHALL work.
+
+### Requirement: Old behavior
+The system SHALL still do the old thing.
+
+### Requirement: Old name
+The system SHALL keep its name.
+
+### Requirement: Changed behavior
+The system SHALL change.
+"""
+
+RETIRING_DELTA = """## REMOVED Requirements
+
+### Requirement: Old behavior
+**Reason**: Replaced.
+
+## RENAMED Requirements
+
+- FROM: `### Requirement: Old name`
+- TO: `### Requirement: New name`
+
+## MODIFIED Requirements
+
+### Requirement: Changed behavior
+The system SHALL change differently.
+"""
+
+
+class PreArchiveRetirementTests(unittest.TestCase):
+    def _write_delta(self, root: Path, change: str = "retire-old") -> None:
+        delta = root / "openspec" / "changes" / change / "specs" / "sample" / "spec.md"
+        delta.parent.mkdir(parents=True)
+        delta.write_text(RETIRING_DELTA, encoding="utf-8")
+
+    def test_only_removed_and_renamed_from_requirements_retire(self):
+        with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
+            self._write_delta(root)
+            retiring = retiring_requirements(root, "retire-old")
+        self.assertEqual(retiring, {"sample::old-behavior", "sample::old-name"})
+
+    def test_retiring_requirements_are_tolerated_but_others_still_fail(self):
+        with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
+            self._write_delta(root)
+            report = verify(root, retiring=retiring_requirements(root, "retire-old"))
+        self.assertEqual(report.retiring, ("sample::old-behavior", "sample::old-name"))
+        self.assertEqual(report.uncovered, ("sample::changed-behavior",))
+        self.assertFalse(report.ok)
+
+    def test_check_without_change_stays_strict(self):
+        with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
+            self._write_delta(root)
+            report = verify(root)
+        self.assertEqual(report.retiring, ())
+        self.assertIn("sample::old-behavior", report.uncovered)
+
+    def test_cli_change_passes_when_only_retiring_requirements_are_uncovered(self):
+        spec = "### Requirement: Useful behavior\n### Requirement: Old behavior\n"
+        with fixture_repository(spec, ANNOTATED_TEST) as root:
+            self._write_delta(root)
+            with patch("sys.stdout"):
+                strict = main(["--repo-root", str(root), "check"])
+                tolerant = main(["--repo-root", str(root), "check", "--change", "retire-old"])
+        self.assertEqual((strict, tolerant), (1, 0))
+
+    def test_change_without_delta_specs_retires_nothing(self):
+        with fixture_repository(SPEC, ANNOTATED_TEST) as root:
+            (root / "openspec" / "changes" / "content-only").mkdir(parents=True)
+            retiring = retiring_requirements(root, "content-only")
+        self.assertEqual(retiring, frozenset())
+
+    def test_cli_rejects_unknown_or_unsafe_change_names(self):
+        with fixture_repository(SPEC, ANNOTATED_TEST) as root:
+            with patch("sys.stderr"):
+                missing = main(["--repo-root", str(root), "check", "--change", "absent"])
+                unsafe = main(["--repo-root", str(root), "check", "--change", "../x"])
+        self.assertEqual((missing, unsafe), (2, 2))
 
 
 class StaticAnnotationTests(unittest.TestCase):

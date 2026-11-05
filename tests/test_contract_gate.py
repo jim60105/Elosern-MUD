@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 import yaml
 
@@ -29,6 +30,28 @@ class ContractGateTests(unittest.TestCase):
 
     def test_unknown_gate_is_rejected_before_anything_runs(self):
         self.assertEqual(contract_gate.main(["no-such-gate"]), 2)
+
+    def test_change_is_forwarded_only_to_the_traceability_check(self):
+        for argv in (["--change", "retire-old", "traceability"], ["traceability", "--change=retire-old"]):
+            with self.subTest(argv=argv), patch.object(contract_gate.subprocess, "run") as run:
+                run.return_value.returncode = 0
+                self.assertEqual(contract_gate.main(argv), 0)
+                self.assertEqual(
+                    run.call_args.args[0][1:],
+                    ["-m", "tools.spec_traceability", "check", "--change", "retire-old"],
+                )
+
+    def test_traceability_without_change_stays_strict(self):
+        with patch.object(contract_gate.subprocess, "run") as run:
+            run.return_value.returncode = 0
+            self.assertEqual(contract_gate.main(["traceability"]), 0)
+            self.assertEqual(run.call_args.args[0][1:], ["-m", "tools.spec_traceability", "check"])
+
+    def test_malformed_change_is_rejected_before_anything_runs(self):
+        for argv in (["--change"], ["--change="], ["--change", "--x"], ["--change", "a", "--change", "b"]):
+            with self.subTest(argv=argv), patch.object(contract_gate.subprocess, "run") as run:
+                self.assertEqual(contract_gate.main(argv), 2)
+                run.assert_not_called()
 
     def test_every_bundled_gate_is_selectable_and_the_contracts_are_named(self):
         self.assertEqual(list(contract_gate.GATES), ["reference-context", "traceability", "observability", "test-data", "manifests", "contracts"])
