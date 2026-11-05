@@ -8,10 +8,13 @@ a real committed reload. Every observation names the defect it detects, and no
 assertion pins a coordinate, count or variant key that the authored
 declarations already own.
 
-The change's ADDED delta requirements have no canonical requirement id until
-the archive sync, so this module deliberately carries no ``covers_requirement``
-annotation. Its data-contract exemption is registered in
-``tools/test_data_freeze.json`` and ``tools/test_data_lint_seed.json``.
+The change declares no delta specs (``skip_specs: true``): the site, row
+binding, grouping, whole-cell engagement, identity-keyed defeat credit and
+one-shot lifecycle requirements already exist in the main specs. This module
+therefore carries no new requirement annotation; the hand-off lists the
+existing requirement and scenario each observation establishes. Its
+data-contract exemption is registered in ``tools/test_data_freeze.json`` and
+``tools/test_data_lint_seed.json``.
 """
 
 from collections import Counter
