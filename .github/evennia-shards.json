@@ -327,7 +327,7 @@
       "name": "rules-11",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_map_knowledge_integration"
+        "world.rules.tests.test_map_knowledge_integration.test_recording"
       ]
     },
     {
@@ -1440,6 +1440,30 @@
       "labels": [
         "web.webclient.presentation.tests.test_area_map.test_area_map_dispatch",
         "web.webclient.presentation.tests.test_area_map.test_fog_and_bounds"
+      ]
+    },
+    {
+      "index": 78,
+      "name": "webclient-41e",
+      "workers": 4,
+      "labels": [
+        "web.webclient.presentation.tests.test_area_map.test_wilderness_entry"
+      ]
+    },
+    {
+      "index": 79,
+      "name": "rules-11-3",
+      "workers": 4,
+      "labels": [
+        "world.rules.tests.test_map_knowledge_integration.test_non_recording"
+      ]
+    },
+    {
+      "index": 80,
+      "name": "rules-11-4",
+      "workers": 4,
+      "labels": [
+        "world.rules.tests.test_map_knowledge_integration.test_pruning"
       ]
     }
   ]

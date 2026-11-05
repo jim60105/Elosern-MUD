@@ -599,10 +599,17 @@ chrome-headless-shell 與約 30 個系統套件；被節流的 job 就把 30 秒
 |---|---|---|
 | `world.maps.tests.test_monster_sites`（615 秒） | `test_monster_sites/` | `test_site_population`、`test_site_clearing`、`test_site_without_world`、`test_site_row_vocabulary` |
 | `web.webclient.presentation.tests.test_area_map`（641 秒） | `test_area_map/` | `test_wilderness_window`、`test_wilderness_content`、`test_grid_area`、`test_room_graph_area`、`test_area_map_dispatch`、`test_fog_and_bounds` |
+| `world.rules.tests.test_map_knowledge_integration`（733 秒） | `test_map_knowledge_integration/` | `test_recording`、`test_non_recording`、`test_pruning` |
 
-兩者共用一個 `_support` 模組（非 `test*.py`，因此不被探索）：`test_monster_sites`
+三者共用一個 `_support` 模組（非 `test*.py`，因此不被探索）：`test_monster_sites`
 把原本 1,677 行的單一測試類別拆成 `_MonsterSiteFixture` 基底加上兩個測試子類別，
 `test_area_map` 的荒野類別同樣拆成 `_WildernessFixture` 與兩個子類別；其餘類別原本
-就各自獨立，依類別搬移即可。evennia 分片因此由 72 增至 **78**，新增的六個分片各自
-只承載一個模組。本機整包量測：`test_monster_sites` 43 個測試 126 秒、
-`test_area_map` 58 個測試約 135 秒（原本分別是單一 job 615／641 秒）。
+就各自獨立，依類別搬移即可。`test_map_knowledge_integration` 的 16 個 seam 旅程
+同樣拆成 `_MapKnowledgeFixture` 加兩個子類別。evennia 分片因此由 72 增至 **81**，
+新增的九個分片各自只承載一個模組。本機整包量測：`test_monster_sites` 43 個測試
+126 秒、`test_area_map` 58 個測試 131 秒、`test_map_knowledge_integration` 22 個
+測試 77 秒（原本分別是單一 job 615／641／733 秒）。
+
+第一版的荒野對半分（14／12）在 CI 上仍留下 376 秒的分片：每個荒野旅程的固定成本
+約 27 秒（fixture 主導），所以 14 個測試就是 376 秒。實際切法是依「每個分片 ≤ 9
+個旅程」重新平衡成 9／9／8。

@@ -5,13 +5,12 @@ from tools.spec_traceability import covers_requirement
 from web.webclient.presentation import area_map as area_map_module
 from web.webclient.presentation.map_panels import WILDERNESS_WINDOW
 from web.webclient.presentation.protocol import json_byte_size
-from world.rules.clock import get_world_clock
-from world.rules.map_knowledge import parse_knowledge
-from ..test_local_map._support import EAST_APPROACH, EAST_GATE_XYZ, _T_MAP_KEY, _live, _t_anchor_display, _t_grid_id, _t_region_display_for, _t_wild_id
-from ._support import _render, _by_id, _edge_set, _decode_overview, _js_accepts, _decode_rows
+from ..test_local_map._support import _live, _t_region_display_for, _t_wild_id
 
 
 from ._wilderness_fixture import _WildernessFixture
+
+from ._support import _by_id, _decode_overview, _decode_rows, _js_accepts, _render
 
 class WildernessWindowTests(_WildernessFixture):
     """One wilderness reading rule per journey."""
@@ -353,114 +352,3 @@ class WildernessWindowTests(_WildernessFixture):
                     ),
                     key,
                 )
-
-    def test_overview_cache_follows_partition_elevation_and_policy(self):
-        start = self._away()
-        key = _live("world.maps.district_partition", "district_at")(start)
-        self.assertIsNotNone(key)
-        cached = area_map_module._district_overview_base
-        cached.cache_clear()
-        arguments = (key, "binding", "partition-1", "elevation-1", 1)
-        self.assertIsNotNone(cached(*arguments))
-        self.assertIs(cached(*arguments), cached(*arguments))
-        misses = cached.cache_info().misses
-        for changed in (
-            (key, "binding", "partition-2", "elevation-1", 1),
-            (key, "binding", "partition-1", "elevation-2", 1),
-            (key, "binding", "partition-1", "elevation-1", 2),
-            (key, "binding-2", "partition-1", "elevation-1", 1),
-        ):
-            with self.subTest(arguments=changed):
-                self.assertIsNotNone(cached(*changed))
-                self.assertGreater(cached.cache_info().misses, misses)
-                misses = cached.cache_info().misses
-        cached.cache_clear()
-
-    @covers_requirement(
-        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
-    )
-    def test_an_over_bound_overview_is_null_and_the_window_still_publishes(self):
-        start = self._away()
-        self._at_wild(start)
-        area_map_module._district_overview_base.cache_clear()
-        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1), mock.patch.object(
-            area_map_module, "log_warn"
-        ) as log_warn:
-            key, payload = self._lit_overview(start)
-        self.assertIsNone(payload["district"])
-        self.assertTrue(payload["rows"])
-        self.assertTrue(_js_accepts(payload))
-        events = [call.args[0] for call in log_warn.call_args_list]
-        self.assertIn("area_map_district_overview_over_bound", events)
-        area_map_module._district_overview_base.cache_clear()
-
-    def test_reading_a_lit_district_overview_writes_nothing(self):
-        start = self._away()
-        self._at_wild(start)
-        key, _payload = self._lit_overview(start)
-        clock = get_world_clock()
-        before = (self.char1.location, parse_knowledge(self.char1), clock.tick)
-        for _ in range(2):
-            payload = _render(self.char1)
-            self.assertEqual(payload["district"]["key"], key)
-        self.assertEqual((self.char1.location, parse_knowledge(self.char1), clock.tick), before)
-
-    @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
-    )
-    def test_only_legal_revealed_immediate_steps_are_actionable(self):
-        start = self._away()
-        self._at_wild(start)
-        neighbor = _live("world.maps.wilderness_destination", "wilderness_neighbor")
-        directions = _live("world.maps.wilderness_destination", "DIRECTION_DELTAS")
-        legal = {_t_wild_id(*cell) for cell in (neighbor(*start, d) for d in directions) if cell is not None}
-        self.assertTrue(legal)
-        # Radius 1 reveals all eight neighbours: every legal step acts.
-        self._pin({start: 1})
-        payload = _render(self.char1)
-        actionable = {node["id"] for node in payload["nodes"] if node["action"] is not None}
-        self.assertEqual(actionable, legal)
-        for node in payload["nodes"]:
-            if node["action"] is not None:
-                self.assertEqual(node["action"]["destination"], node["id"])
-        self.assertEqual(
-            _edge_set(payload), {frozenset((_t_wild_id(*start), node_id)) for node_id in legal}
-        )
-        # Radius 0 reveals only the current cell: no neighbour is a node and
-        # unknown steps stay opaque directional controls elsewhere.
-        self._pin({start: 0})
-        payload = _render(self.char1)
-        self.assertEqual([node["id"] for node in payload["nodes"]], [_t_wild_id(*start)])
-        self.assertEqual(payload["edges"], [])
-        self.assertTrue(_js_accepts(payload))
-
-    @covers_requirement(
-        "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
-    )
-    @covers_requirement(
-        "webclient-area-map::area-maps-reveal-visited-nodes-and-one-step-frontier-across-all-layers"
-    )
-    def test_gateway_step_replaces_its_cell_with_the_gate_room(self):
-        self._at_wild(EAST_APPROACH)
-        payload = _render(self.char1)
-        grid = [node for node in payload["nodes"] if node["id"].startswith("grid:")]
-        self.assertEqual([node["id"] for node in grid], [_t_grid_id(*EAST_GATE_XYZ[:2])])
-        self.assertEqual(grid[0]["gateway"], {"leads_to": _t_anchor_display(_T_MAP_KEY)})
-        self.assertEqual(grid[0]["action"]["destination"], grid[0]["id"])
-        positions = [(node["x"], node["y"]) for node in payload["nodes"]]
-        self.assertEqual(len(positions), len(set(positions)), "a replaced cell is never doubled")
-        for node in payload["nodes"]:
-            if node["id"].startswith("wild:"):
-                self.assertIsNone(node["gateway"])
-        self.assertTrue(_js_accepts(payload))
-        # A woodland-night radius 0 leaves the gate cell unrevealed: no gate
-        # room, label or far side is published; the step stays an opaque
-        # directional control on the exploration rows.
-        self._pin({EAST_APPROACH: 0})
-        payload = _render(self.char1)
-        self.assertEqual([node["id"] for node in payload["nodes"]], [payload["current_node"]])
-        # (The current cell itself is revealed; its own approach name is its
-        # location metadata, not the unrevealed gate's.)
-        self.assertTrue(all(node["gateway"] is None for node in payload["nodes"]))
-        self.assertEqual(payload["edges"], [])
-        self.assertTrue(_js_accepts(payload))
