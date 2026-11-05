@@ -93,6 +93,22 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.webclient_url = server.runtime.webclient_url
         return server
 
+    def refusals(self) -> str:
+        """Every dream-surface refusal the live servers logged, newest last."""
+        found: list[str] = []
+        for server in self.servers:
+            log = server.runtime.log_dir / "server.log"
+            if not log.exists():
+                continue
+            found.extend(
+                line
+                for line in log.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+                if "dream_surface_rejected" in line
+            )
+        return "\n".join(found[-5:]) or "(the server logged no refusal)"
+
     def enter_dream(self, page) -> None:
         """Enter the committed dream through the wait card's sleep question."""
         activate_wait_row(page, "wait-sleep", dream=True, timeout=60000)
@@ -245,16 +261,24 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         # for that fact and then for the surface to leave the player's view.
         # The panel keeps its snapshot entry while the ending settles, so
         # neither that key nor its detachment is the thing to wait on.
-        wait_for_store_state(
-            page2,
-            lambda state: (
-                ((state.get("panels") or {}).get("dream") or {})
-                .get("state", {})
-                .get("open")
-                is False
-            ),
-            timeout=60000,
-        )
+        try:
+            wait_for_store_state(
+                page2,
+                lambda state: (
+                    ((state.get("panels") or {}).get("dream") or {})
+                    .get("state", {})
+                    .get("open")
+                    is False
+                ),
+                timeout=60000,
+            )
+        except AssertionError:
+            # The service logs why it refused the request, and that reason is
+            # what separates a stale surface from a control change or a lost
+            # ownership check.
+            raise AssertionError(
+                "the awakening was refused:\n" + self.refusals()
+            ) from None
         self.assertFalse(
             page2.locator(PANEL).is_visible(),
             "the dream surface stayed in front of the player",
