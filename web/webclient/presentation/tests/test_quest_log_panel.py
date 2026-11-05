@@ -155,7 +155,11 @@ class QuestLogPresenterTests(EvenniaTest):
     def test_species_hunt_parts_and_authored_fields_match_tracker(self):
         from world.quests.tests.test_describe import _hunt_objective, _record
         from world.quests.describe import describe_objective
-        open_synthetic_scope(self, "monster_species", "monster_variants", "regions")
+        # The hunt definition proves its species is lawfully supplied in the
+        # named region, so the synthetic zone that pools it must be live too.
+        open_synthetic_scope(
+            self, "monster_species", "monster_variants", "regions", "ecology_zones"
+        )
         objective = _hunt_objective()
         definition = register(quest(
             "structured_hunt", stages=(QuestStage(0, objective),),

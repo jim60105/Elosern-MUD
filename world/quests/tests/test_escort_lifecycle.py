@@ -913,7 +913,6 @@ def _smoke_gate():
     return settlement_node_xyz(gate.destination), entry.approach_cell(gate)
 
 
-@_SMOKE_SCOPE
 class EscortRealOwnerSmokeTests(EscortTestBase):
     """Task 6.1: the change's own real-owner smoke, construction to reload.
 
@@ -1000,25 +999,29 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
         self.assertEqual(self.owner.location.coordinates, approach)
         self.assertEqual(self.protected.location, self.owner.location)
 
-        # 4) Received combat damage through the real action pipeline.
-        hostile = create_object(NPC, key="伏兵", location=self.owner.location)
-        hostile.race = "human"
-        hostile.apply_race_baseline()
-        grant_lineage(hostile, [_SMOKE_CLAW.key])
-        hp_before = self.protected.traits.hp.current
-        field = self._field(hostile, [self.protected])
-        request = ActionRequest(
-            hostile,
-            _SMOKE_CLAW.key,
-            [self.protected],
-            BattlefieldActionContext(field),
-        )
-        with patch("world.rules.combat.damage.roll_d100", return_value=100):
-            result = resolve_combat_action(request)
-        self.assertEqual(result.outcome, "success")
-        self.assertLess(self.protected.traits.hp.current, hp_before)
-        self.assertGreater(self.protected.traits.hp.current, 0)
-        self.assertEqual(read_records(self.owner)[0].state.value, "in_progress")
+        # 4) Received combat damage through the real action pipeline. The
+        #    synthetic skill catalog is scoped to this step alone: the world
+        #    provisioning above must run on the shipped catalogs, because the
+        #    authored ecology zones construct their own declared variants.
+        with _SMOKE_SCOPE:
+            hostile = create_object(NPC, key="伏兵", location=self.owner.location)
+            hostile.race = "human"
+            hostile.apply_race_baseline()
+            grant_lineage(hostile, [_SMOKE_CLAW.key])
+            hp_before = self.protected.traits.hp.current
+            field = self._field(hostile, [self.protected])
+            request = ActionRequest(
+                hostile,
+                _SMOKE_CLAW.key,
+                [self.protected],
+                BattlefieldActionContext(field),
+            )
+            with patch("world.rules.combat.damage.roll_d100", return_value=100):
+                result = resolve_combat_action(request)
+            self.assertEqual(result.outcome, "success")
+            self.assertLess(self.protected.traits.hp.current, hp_before)
+            self.assertGreater(self.protected.traits.hp.current, 0)
+            self.assertEqual(read_records(self.owner)[0].state.value, "in_progress")
 
         # 5) Back to the grid, then possession movement: the owner possesses
         #    the protected actor and walks it through a literal Exit to the
