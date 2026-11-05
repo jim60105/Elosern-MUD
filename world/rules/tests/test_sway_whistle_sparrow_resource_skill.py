@@ -399,6 +399,8 @@ class EnemyRiderGroupMemberTests(EvenniaTestCase):
                 flush_cache()
                 reloaded_target = PlayerCharacter.objects.get(pk=opponent.pk)
                 reloaded_member = Monster.objects.get(pk=member.pk)
+                self.assertIsNot(reloaded_target, opponent)
+                self.assertIsNot(reloaded_member, member)
                 self.assertIn(buff_key, entity_active_buffs(reloaded_target))
                 self.assertEqual(
                     evaluate_combat_modifiers(reloaded_target).get(axis, 0),
