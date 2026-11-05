@@ -98,6 +98,15 @@ class ShardTimingResult(unittest.TextTestResult):
 
 
 def main() -> None:
+    # The shard's evidence file is a contracted artifact, not a side effect of
+    # carrying an annotated test: a process list whose journeys carry no
+    # requirement annotation still owes the workflow its (empty) file. The
+    # decorator appends one record per passing annotated test; this only
+    # guarantees the file exists so the shard's merge step never reports a
+    # missing artifact for a successful run.
+    evidence = os.environ.get("OPENSPEC_TEST_EVIDENCE")
+    if evidence:
+        open(evidence, "a", encoding="utf-8").close()
     runner = unittest.TextTestRunner(
         stream=sys.stderr,
         verbosity=1,
