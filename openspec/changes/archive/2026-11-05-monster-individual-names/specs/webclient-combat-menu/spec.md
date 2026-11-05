@@ -33,7 +33,7 @@ The production presentation registry SHALL register `context_actions` schema ver
 For a valid active combat session, its available payload SHALL contain exactly
 `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`,
 `secondary_actions`, `actors`, `choices`, `draft`, and `suggestions`; `available` SHALL be true, `kind`
-SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`. Every participant SHALL carry a required `monster_identity` field that is null or exactly `individual_name`, `species_name` and `variant_name`.
+SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`.
 
 #### Scenario: Active session produces canonical combat presentation
 - **WHEN** a puppeted WebClient in a valid persistent combat session receives a full snapshot
@@ -99,4 +99,4 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 
 #### Scenario: Version 8 adds monster identity facts
 - **WHEN** the combat available form is serialized at version 8
-- **THEN** its top-level field set is unchanged from version 7, every participant additionally carries `monster_identity`, the presenter stays read-only, and the exploration and unavailable forms differ from version 7 only in `schema_version`
+- **THEN** its top-level field set is unchanged from version 7, every participant additionally carries a required `monster_identity` that is null or exactly `individual_name`, `species_name` and `variant_name`, the presenter stays read-only, and the exploration and unavailable forms differ from version 7 only in `schema_version`
