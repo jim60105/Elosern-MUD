@@ -34,6 +34,7 @@ EXPECTED_STAGE_ORDER = (
     "correspondence_delivery",
     "instance_reclamation",
     "monster_site_lifecycle",
+    "field_contact",
 )
 BLOCKING_PIN = "quest:1:stage:0"
 
