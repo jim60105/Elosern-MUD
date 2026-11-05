@@ -213,6 +213,10 @@
    "reason": "capital map walkability contract"
   },
   {
+   "path": "world/maps/tests/test_content_expansion_sites.py",
+   "reason": "content-expansion manual sites production smoke over the generic site, grouping, engagement and one-shot contracts"
+  },
+  {
    "path": "world/maps/tests/test_geography_source.py",
    "reason": "geography publication, composition and snapshot-isolation mechanism contract"
   },
