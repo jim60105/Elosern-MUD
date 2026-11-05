@@ -641,11 +641,11 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "吞潮鱷",
         "大型鱷類，棲息於東南部偏遠河口、濕地與潮汐支流。",
         "大型鱷類。",
-        "牠在接觸活物時，可以透過水屬性力量吸取對方的部分魔力。"
-        "施法者與牠纏鬥時，可能先感到魔力消耗異常，再發現危險。"
-        "牠仍依靠咬合與伏擊捕食，並非遠距離施法者。"
-        "能力需要近身接觸，不能隔著整條河抽取魔力，也不會把吸取的魔力轉成傷口治療。"
-        "此處的吸取對應可消耗的魔力資源，不表示永久降低目標的固定 magic_power。",
+        "牠在接觸活物時，透過水屬性力量吸取對方的部分魔力。"
+        "施法者與牠纏鬥時，常先察覺魔力消耗異常，再意識到危險。"
+        "牠依靠咬合與伏擊捕食，吸取發生在咬合接觸的瞬間；"
+        "被吸走的是對方當下可用的魔力，休息後便會回復，"
+        "吞潮鱷則把吸得的魔力納入自己的儲備。",
         ("southeast_coast",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；吸取魔力的成因不在設定中交代。",
         "（作者私有：作者解釋）以近身水屬性咬合吸取魔力作為資源消耗型危害，"
@@ -951,6 +951,24 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("sticky_palm_grab",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "reservoir_warden",
+        "tide_devouring_crocodile",
+        "蓄潮型",
+        "蓄潮型長期占據偏遠潮汐支流的深灣，利用退潮後留下的窄水道伏擊。"
+        "頸側與背脊的發達皺褶維持著薄水膜，咬合接觸活物時吸取部分魔力，"
+        "再將自身魔力投入短暫護膜。",
+        "high",
+        False,
+        MonsterCombatProfile(
+            hp=520, mp=40, sp=40, atk_phys=32, agility=18, defense=24, magic_power=0
+        ),
+        "A",
+        True,
+        active_skill_keys=("tide_devouring_bite", "reservoir_guard"),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

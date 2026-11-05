@@ -69,5 +69,5 @@ _MASTERY_KEYS = frozenset(
 #: combat-context-only support shapes: they carry no damage occurrence, so a
 #: cast with no fight in progress has no recipient to help.
 USABLE_OUT_OF_COMBAT_FALSE_KEYS = frozenset(
-    {"flee", "mudfilm_guard", "wax_pouch_slip"}
+    {"flee", "mudfilm_guard", "wax_pouch_slip", "reservoir_guard"}
 )
