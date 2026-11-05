@@ -31,6 +31,12 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 
 from typeclasses.monsters import Monster
+import world.lore.monster_activity as lore_activity
+from world.lore.monster_activity import (
+    ActivityArea,
+    AggressionCondition,
+    MonsterActivity,
+)
 from world.lore.monster_placement import (
     CompositionMember,
     EcologyZone,
@@ -38,6 +44,7 @@ from world.lore.monster_placement import (
     WeightedComposition,
     variant_species_key,
 )
+from world.maps import monster_activity as activity_owner
 from world.maps import regional_population as owner
 from world.maps.regional_population import (
     BLOCKED_HOME_SATURATED,
@@ -70,6 +77,12 @@ from world.maps.wilderness_provider import (
     region_for_coordinates,
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.rules.fatigue import (
+    SleepPosture,
+    project_fatigue_status,
+    write_fatigue_state,
+)
+from world.rules.movement_edges import LocationRef
 from world.rules.monster_individual import construct_species_individual
 from world.tests.geography_fixture import publish_shipped_map_world
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registries
@@ -77,6 +90,10 @@ from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registr
 PROBE = (500, 700)
 ORDINARY = next(iter(SYNTH_MONSTER_VARIANTS))
 SEED = 11
+GROUP_ACTIVITY = "t_fixture_group_activity"
+SOLITARY_ACTIVITY = "t_fixture_solitary_activity"
+STATIONARY_ACTIVITY = "t_fixture_stationary_activity"
+AREA_KEY = "t_fixture_formation_ground"
 
 
 def _cells(base: tuple[int, int], count: int) -> tuple[tuple[int, int], ...]:
@@ -90,11 +107,13 @@ REMOTE = _cells((520, 700), 4)
 ALL_CELLS = LOCAL + REMOTE
 
 
-def _composition(key: str, *ranges: tuple[int, int]) -> EncounterComposition:
+def _composition(
+    key: str, *ranges: tuple[int, int], activity_key: str = GROUP_ACTIVITY
+) -> EncounterComposition:
     """One complete composition whose every member shares the synthetic variant."""
     return EncounterComposition(
         key,
-        "t_fixture_group_activity",
+        activity_key,
         tuple(
             CompositionMember(ORDINARY, minimum, maximum)
             for minimum, maximum in ranges
@@ -140,6 +159,50 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         self.region = region_for_coordinates(*PROBE)
+        self.enterContext(
+            patch.object(
+                lore_activity,
+                "ACTIVITY_AREA_REGISTRY",
+                MappingProxyType(
+                    {
+                        AREA_KEY: ActivityArea(
+                            AREA_KEY, self.region, ((500, 530, 690, 710),)
+                        )
+                    }
+                ),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                lore_activity,
+                "MONSTER_ACTIVITY_REGISTRY",
+                MappingProxyType(
+                    {
+                        GROUP_ACTIVITY: MonsterActivity(
+                            GROUP_ACTIVITY,
+                            "cohesive_group",
+                            AREA_KEY,
+                            90,
+                            AggressionCondition("passive"),
+                        ),
+                        SOLITARY_ACTIVITY: MonsterActivity(
+                            SOLITARY_ACTIVITY,
+                            "solitary_roaming",
+                            AREA_KEY,
+                            60,
+                            AggressionCondition("passive"),
+                        ),
+                        STATIONARY_ACTIVITY: MonsterActivity(
+                            STATIONARY_ACTIVITY,
+                            "stationary",
+                            AREA_KEY,
+                            120,
+                            AggressionCondition("passive"),
+                        ),
+                    }
+                ),
+            )
+        )
         self.compositions = {
             "t_trio": _composition("t_trio", (3, 3)),
             "t_quint": _composition("t_quint", (5, 5)),
@@ -580,6 +643,177 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(context["cell"], plan.placements[0].cell)
         self.assertEqual(context["tick"], 9)
         self.assertEqual(tuple(context["individual"]), created)
+
+    @covers_requirement(
+        "monster-field-activity::due-activity-moves-bounded-complete-groups-globally",
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy",
+    )
+    def test_a_solitary_binding_disperses_the_birth_and_one_group_may_leave(self):
+        self.compositions["t_solitary_trio"] = _composition(
+            "t_solitary_trio", (3, 3), activity_key=SOLITARY_ACTIVITY
+        )
+        zone = self._use(
+            zone=_zone(
+                lower=1,
+                upper=99,
+                capacity=3,
+                budget=3,
+                pool=(("t_solitary_trio", 1),),
+            )
+        )
+        self._seed()
+        self._initialize_state(zone)
+        plan = plan_population_wave(self.wilderness, zone.key, tick=0)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        cell = plan.placements[0].cell
+        created = commit_population_wave(self.wilderness, plan)
+        self.assertEqual(len(created), 3)
+
+        state = activity_owner.read_monster_activity(self.wilderness)
+        group_ids = [f"wave:{zone.key}:1#{ordinal}" for ordinal in range(3)]
+        self.assertEqual(sorted(state.groups), sorted(group_ids))
+        for group_id in group_ids:
+            with self.subTest(group=group_id):
+                group = state.groups[group_id]
+                self.assertEqual(len(group.member_ids), 1)
+                self.assertEqual(group.activity_key, SOLITARY_ACTIVITY)
+                self.assertEqual(group.home_owner, ("zone", zone.key))
+                self.assertEqual(
+                    group.position,
+                    LocationRef.wilderness(WILDERNESS_NAME, *cell),
+                )
+        self.assertEqual(
+            {group.member_ids[0] for group in state.groups.values()}, set(created)
+        )
+
+        # Each group owns its own saved decision: one due departure moves one
+        # group and leaves the other two exactly where they were.
+        for pk in created:
+            body = Monster.objects.get(pk=pk)
+            write_fatigue_state(body, 360000, SleepPosture.AWAKE)
+            project_fatigue_status(body)
+        due = state.groups[group_ids[0]].next_decision_tick
+        moved = None
+        for group_id in group_ids:
+            decision = activity_owner.plan_group_decision(
+                self.wilderness, group_id, tick=due
+            )
+            if decision.edge is not None:
+                activity_owner.commit_group_decision(self.wilderness, decision)
+                moved = group_id
+                break
+        self.assertIsNotNone(moved, "no solitary group could take its departure")
+        after = activity_owner.read_monster_activity(self.wilderness).groups
+        self.assertIsNotNone(after[moved].journey_id)
+        for group_id in group_ids:
+            if group_id == moved:
+                continue
+            with self.subTest(staying=group_id):
+                self.assertIsNone(after[group_id].journey_id)
+                self.assertEqual(after[group_id].position, state.groups[group_id].position)
+                self.assertEqual(after[group_id].sequence, 0)
+                self.assertEqual(after[group_id].member_ids, state.groups[group_id].member_ids)
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_cohesive_binding_keeps_the_whole_birth_in_one_group(self):
+        self.compositions["t_cohesive_pair"] = _composition(
+            "t_cohesive_pair", (1, 1), (1, 1)
+        )
+        zone = self._use(
+            zone=_zone(
+                lower=1,
+                upper=99,
+                capacity=2,
+                budget=2,
+                pool=(("t_cohesive_pair", 1),),
+            )
+        )
+        self._seed()
+        self._initialize_state(zone)
+        plan = plan_population_wave(self.wilderness, zone.key, tick=0)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        created = commit_population_wave(self.wilderness, plan)
+
+        state = activity_owner.read_monster_activity(self.wilderness)
+        self.assertEqual(list(state.groups), [f"wave:{zone.key}:1#0"])
+        group = state.groups[f"wave:{zone.key}:1#0"]
+        self.assertEqual(set(group.member_ids), set(created))
+        self.assertEqual(group.activity_key, GROUP_ACTIVITY)
+
+    @covers_requirement(
+        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces",
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy",
+    )
+    def test_a_failed_group_write_restores_every_surface_and_a_retry_commits(self):
+        self.compositions["t_solitary_pair"] = _composition(
+            "t_solitary_pair", (2, 2), activity_key=SOLITARY_ACTIVITY
+        )
+        zone = self._use(
+            zone=_zone(
+                lower=1,
+                upper=99,
+                capacity=2,
+                budget=2,
+                pool=(("t_solitary_pair", 1),),
+            )
+        )
+        self._seed()
+        self._initialize_state(zone)
+        plan = plan_population_wave(self.wilderness, zone.key, tick=0)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        self.assertTrue(
+            enter_wilderness(
+                self.char1, coordinates=plan.placements[0].cell, name=WILDERNESS_NAME
+            )
+        )
+        room = self.char1.location
+        baseline_state = {
+            key: dict(value)
+            for key, value in self.wilderness.db.regional_population.items()
+        }
+        baseline_coordinates = dict(self.wilderness.db.itemcoordinates)
+        baseline_activity = dict(self.wilderness.db.monster_activity)
+        baseline_contents = {obj.pk for obj in room.contents}
+        monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
+
+        real_create = activity_owner.create_group
+        calls: list[int] = []
+
+        def flaky(*args, **kwargs):
+            calls.append(1)
+            if len(calls) == 2:
+                raise RuntimeError("injected second group failure")
+            return real_create(*args, **kwargs)
+
+        with patch.object(activity_owner, "create_group", side_effect=flaky):
+            with self.assertRaises(RuntimeError):
+                commit_population_wave(self.wilderness, plan)
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            {
+                key: dict(value)
+                for key, value in self.wilderness.db.regional_population.items()
+            },
+            baseline_state,
+        )
+        self.assertEqual(dict(self.wilderness.db.itemcoordinates), baseline_coordinates)
+        self.assertEqual(dict(self.wilderness.db.monster_activity), baseline_activity)
+        self.assertEqual({obj.pk for obj in room.contents}, baseline_contents)
+        self.assertEqual(
+            sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
+        )
+
+        retried = plan_population_wave(self.wilderness, zone.key, tick=0)
+        self.assertEqual(retried, plan)
+        committed = commit_population_wave(self.wilderness, retried)
+        self.assertEqual(len(committed), plan.placements[0].total)
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        self.assertEqual(
+            sorted(groups), [f"wave:{zone.key}:1#0", f"wave:{zone.key}:1#1"]
+        )
 
     @covers_requirement(
         "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"

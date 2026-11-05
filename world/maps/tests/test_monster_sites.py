@@ -32,6 +32,7 @@ from world.lore.monster_placement import (
     variant_species_key,
 )
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+from world.maps import monster_activity as activity_owner
 from world.maps import monster_sites
 from world.maps import regional_population
 from world.maps.geography import current as current_geography
@@ -71,6 +72,8 @@ from world.maps.regional_population import (
     initialize_population_seed,
     plan_population_wave,
     population_counts,
+    read_population_timeline,
+    register_explicit_individual,
     sample_composition_counts,
 )
 from world.rules import clock as clock_module
@@ -101,6 +104,7 @@ NEST_KEY = "t_probe_nest"
 CAMP_KEY = "t_probe_camp"
 GROUP_KEY = "t_probe_group"
 STRAY_KEY = "t_probe_stray"
+COHESIVE_KEY = "t_probe_cohesive"
 HOUR = 3600
 SEED = 11
 
@@ -475,6 +479,145 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(members[0].variant_key, STRONGER)
         self.assertEqual(members[0].db.site_key, STRAY_KEY)
 
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_cohesive_site_binding_forms_one_group_owned_by_the_site(self):
+        cohesive = MonsterSite(
+            COHESIVE_KEY,
+            "encounter",
+            self.region,
+            PROBE,
+            GROUP,
+            GROUP_ACTIVITY,
+            3,
+            True,
+        )
+        self.enterContext(
+            synthetic_registries(
+                "monster_sites",
+                extra={
+                    "encounter_compositions": COMPOSITIONS,
+                    "monster_sites": {**self.sites, cohesive.key: cohesive},
+                },
+            )
+        )
+        self._settle()
+
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        group = groups[f"site:{COHESIVE_KEY}:0#0"]
+        self.assertEqual(group.home_owner, ("site", COHESIVE_KEY))
+        self.assertEqual(group.activity_key, GROUP_ACTIVITY)
+        self.assertEqual(
+            set(group.member_ids),
+            {member.pk for member in _members(self.wilderness, cohesive)},
+        )
+        self.assertEqual(len(group.member_ids), 3)
+        self.assertEqual(
+            [key for key in groups if key.startswith(f"site:{COHESIVE_KEY}:")],
+            [f"site:{COHESIVE_KEY}:0#0"],
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_stationary_site_binding_forms_one_group_per_member(self):
+        self._settle()
+
+        site = self.sites[GROUP_KEY]
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        ids = [f"site:{GROUP_KEY}:0#{ordinal}" for ordinal in range(3)]
+        self.assertEqual(
+            [key for key in groups if key.startswith(f"site:{GROUP_KEY}:")], ids
+        )
+        for group_id in ids:
+            with self.subTest(group=group_id):
+                group = groups[group_id]
+                self.assertEqual(len(group.member_ids), 1)
+                self.assertEqual(group.home_owner, ("site", GROUP_KEY))
+                self.assertEqual(group.activity_key, STATIONARY_ACTIVITY)
+        self.assertEqual(
+            {groups[group_id].member_ids[0] for group_id in ids},
+            {member.pk for member in _members(self.wilderness, site)},
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_failed_second_unit_restores_the_site_and_every_member(self):
+        states_before = self.wilderness.db.monster_sites
+        coordinates_before = dict(self.wilderness.db.itemcoordinates)
+        activity_before = dict(self.wilderness.db.monster_activity)
+        monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
+        room = (self.wilderness.db.rooms or {})[PROBE]
+        contents_before = {obj.pk for obj in room.contents}
+
+        real_register = monster_sites.register_explicit_group
+
+        def flaky(wilderness, individuals, coordinates, **kwargs):
+            if (
+                kwargs["operation_id"] == f"site:{GROUP_KEY}:0"
+                and kwargs["ordinal"] == 1
+            ):
+                raise RuntimeError("injected second unit failure")
+            return real_register(wilderness, individuals, coordinates, **kwargs)
+
+        with patch.object(
+            monster_sites, "register_explicit_group", side_effect=flaky
+        ):
+            with self.assertRaises(RuntimeError):
+                self.clock.advance(60, AdvanceSource.SKIP, [])
+
+        self.assertEqual(self.wilderness.db.monster_sites, states_before)
+        self.assertEqual(dict(self.wilderness.db.itemcoordinates), coordinates_before)
+        self.assertEqual(dict(self.wilderness.db.monster_activity), activity_before)
+        self.assertEqual({obj.pk for obj in room.contents}, contents_before)
+        self.assertEqual(
+            sorted(Monster.objects.values_list("pk", flat=True)), monsters_before
+        )
+        for site in self.sites.values():
+            self.assertEqual(_members(self.wilderness, site), ())
+
+        # A retry populates every site, each stationary member with its own
+        # group and no partial survivor of the rolled-back pass.
+        self._settle()
+        for key, site in self.sites.items():
+            with self.subTest(site=key):
+                self.assertEqual(len(_members(self.wilderness, site)), site.capacity)
+        groups = activity_owner.read_monster_activity(self.wilderness).groups
+        self.assertEqual(
+            len([key for key in groups if key.startswith(f"site:{GROUP_KEY}:")]), 3
+        )
+
+    @covers_requirement("regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied")
+    def test_single_registration_keeps_its_explicit_identity_and_presence_evidence(self):
+        self._settle()
+        individual = construct_species_individual(
+            variant_species_key(ORDINARY), ORDINARY
+        )
+        register_explicit_individual(
+            self.wilderness,
+            individual,
+            PROBE,
+            tick=0,
+            owner_kind="explicit",
+            owner_key="gm:1",
+            activity_key=STATIONARY_ACTIVITY,
+        )
+
+        operation_id = f"explicit:{PROBE[0]}:{PROBE[1]}:{individual.pk}"
+        group = activity_owner.read_monster_activity(self.wilderness).groups[
+            f"{operation_id}#0"
+        ]
+        self.assertEqual(group.home_owner, ("explicit", "gm:1"))
+        self.assertEqual(group.member_ids, (individual.pk,))
+        transitions = [
+            entry
+            for entry in read_population_timeline(self.wilderness).transitions
+            if entry.individual_id == individual.pk
+        ]
+        self.assertEqual([entry.source_id for entry in transitions], [operation_id])
+
     @covers_requirement("monster-site-placement::placement-samples-complete-deterministic-occurrences")
     def test_the_saved_occurrence_reproduces_its_group_and_ignores_the_retry_tick(
         self,
@@ -530,6 +673,16 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         for member in list(_members(self.wilderness, flock)):
             self.wilderness.db.itemcoordinates.pop(member, None)
             member.delete()
+        # The lost attempt loses its movement groups with its record: the
+        # owning transaction would have rolled both back together.
+        for group_id in [
+            group_id
+            for group_id in activity_owner.read_monster_activity(
+                self.wilderness
+            ).groups
+            if group_id.startswith(f"site:{flock.key}:")
+        ]:
+            activity_owner.release_group(self.wilderness, group_id)
         states = {
             key: dict(value)
             for key, value in self.wilderness.db.monster_sites.items()

@@ -28,8 +28,6 @@ from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
 from .monster_activity import (
     MONSTER_ACTIVITY_REGISTRY,
     MonsterActivity,
-    MonsterActivityRegistryError,
-    validate_activity_binding,
 )
 from .registry_refs import ref
 # Read the variant registry as a MODULE attribute at call time (never a
@@ -309,7 +307,12 @@ def _check_composition_activity(
     activities: Mapping[str, MonsterActivity],
     what: str,
 ) -> MonsterActivity:
-    """Reject a composition whose activity reference or policy is unusable."""
+    """Reject a composition whose activity reference does not resolve.
+
+    Membership is deliberately not checked here: a binding's policy decides how
+    construction forms movement groups (``monster_activity.movement_units``),
+    so a composition that permits several members is a lawful declaration.
+    """
     activity_key = composition.activity_key
     if not isinstance(activity_key, str) or not activity_key:
         raise MonsterPlacementRegistryError(
@@ -320,23 +323,15 @@ def _check_composition_activity(
         raise MonsterPlacementRegistryError(
             f"{what} references unknown monster activity {activity_key!r}"
         )
-    _, largest = composition_bounds(composition)
-    try:
-        validate_activity_binding(
-            activity, largest, f"{what} activity {activity_key!r}"
-        )
-    except MonsterActivityRegistryError as error:
-        raise MonsterPlacementRegistryError(str(error)) from error
     return activity
 
 
 def _check_site_activity(
     site: MonsterSite,
-    composition: EncounterComposition,
     activities: Mapping[str, MonsterActivity],
     what: str,
 ) -> MonsterActivity:
-    """Reject a site override that cannot carry its complete composition."""
+    """Reject a site override whose activity reference does not resolve."""
     activity_key = site.activity_key
     if not isinstance(activity_key, str) or not activity_key:
         raise MonsterPlacementRegistryError(
@@ -347,13 +342,6 @@ def _check_site_activity(
         raise MonsterPlacementRegistryError(
             f"{what} references unknown monster activity {activity_key!r}"
         )
-    _, largest = composition_bounds(composition)
-    try:
-        validate_activity_binding(
-            activity, largest, f"{what} activity {activity_key!r}"
-        )
-    except MonsterActivityRegistryError as error:
-        raise MonsterPlacementRegistryError(str(error)) from error
     return activity
 
 
@@ -696,7 +684,7 @@ def validate_monster_placement_registry(
             site, composition_rows, variants, species, what
         )
         _check_composition_activity(composition, activity_rows, what)
-        _check_site_activity(site, composition, activity_rows, what)
+        _check_site_activity(site, activity_rows, what)
         if not isinstance(site.one_shot, bool):
             raise MonsterPlacementRegistryError(
                 f"{what} must author its one-shot/recoverable life cycle as a "

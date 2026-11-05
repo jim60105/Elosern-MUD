@@ -209,8 +209,9 @@ than shipped wording, coordinates or counts.
 
 ### Declaration schema
 
-`world/lore/monster_activity.py` publishes three frozen slotted row types and
-two immutable registries:
+`world/lore/monster_activity.py` publishes frozen slotted row types, the
+`MovementUnit` formation value, the pure `movement_units` helper, and two
+immutable registries:
 
 ```python
 ActivityArea(key, region_key, rectangles, home_radius)
@@ -238,11 +239,13 @@ MonsterActivity(key, policy, area_key, decision_interval, aggression)
 `world/lore/monster_placement.py` adds required `activity_key` to
 `EncounterComposition` and to `MonsterSite`. The site override wins only for
 that site's own movement declaration; there is no variant fallback and exactly
-one complete binding. `solitary_roaming` requires every permitted composition
-outcome to total one individual (`sum(member.maximum) == 1`), checked at
-publication for the composition binding and again for a site override. A
-sampled singleton never authorizes a wider possible outcome. A
-`cohesive_group` declaration is legal only as a complete composition binding.
+one complete binding. Publication only resolves that binding: it checks that
+the composition and the site override each name a published activity, and it
+never lets a member count select or reject a policy. A binding's policy instead
+decides group formation at construction
+(`monster_activity.movement_units`), so a `solitary_roaming` binding of a
+composition whose legal outcomes exceed one individual is lawful and disperses
+its members into one-member groups. See "Activity Group Formation" below.
 
 ### Candidate publication
 
@@ -291,7 +294,7 @@ The listed tests carry that literal ID through `covers_requirement`.
 | Complete forms | `world.lore.tests.test_monster_activity.GeometryResolutionTests` (region enumeration, home radius, canonical sort, room zero); `PublishedActivityRegistryTests.test_every_shipped_reference_resolves` |
 | Atomic rejection | `DeclarationValidationTests` (bad forms, unknown refs/dayparts, bool/nonpositive timing, duplicate keys, no mutation on failure); `CandidateAreaValidationTests` (unknown region, outside frame, no legal cell); `world.maps.tests.test_geography_source.ActivityCandidatePublicationTests` (whole candidate rejects, prior snapshot retained) |
 | Separate topology | `GeometryResolutionTests.test_settlement_buffers_never_participate_in_activity_geometry`; `PublishedActivityRegistryTests.test_the_module_offers_no_execution_callable` |
-| Every solitary outcome is valid | `BindingValidationTests.test_solitary_binding_rejects_any_multi_individual_outcome`; `world.lore.tests.test_monster_placement` site-override tests |
+| Every solitary outcome is valid | `MovementUnitTests` (a solitary row of three becomes three units, cohesive rows stay one unit); `world.lore.tests.test_monster_placement` site-override tests |
 
 ### Focused verification run
 
@@ -1228,3 +1231,146 @@ limit has been reached (code=usage_limit_reached)`), so no review finding is
 claimed as disposed and no review output is fabricated. The implementation
 evidence above and the focused/gate runs are the accepted substitute for this
 change, exactly as the assignment's provider-failure clause permits.
+
+## Activity Group Formation
+
+`activity-group-formation` makes one pure rule decide how a placement's sampled
+individuals become movement groups, and shares it between both writers and the
+read-only forecast. The rule is
+`world.lore.monster_activity.movement_units(row_counts, row_bindings, *,
+activities=None)`; it returns immutable `MovementUnit(activity_key,
+member_indices)` values in the placement's flattened construction order.
+
+### The rule
+
+- Every slot of a `cohesive_group` binding sharing one key joins exactly one
+  unit, even when those rows are separated by other rows or share no variant.
+- Every `solitary_roaming` or `stationary` slot is a unit of its own.
+- Units are ordered by their smallest member slot; slot numbers start at zero
+  and follow the sampled row order, which is exactly the order a writer
+  constructs its individuals.
+- A zero-count row contributes no slot, but its binding is still validated.
+- Length mismatch, a non-integer (including `bool`) or negative count, and an
+  unknown or empty binding raise `MonsterActivityRegistryError`. An explicitly
+  supplied empty activity mapping therefore rejects every binding.
+
+The rule deliberately does not add a policy value: `solitary_roaming` keeps its
+movement semantics and simply disperses a multi-member composition instead of
+forbidding it.
+
+### Removed solitary-total check
+
+Publication no longer requires a `solitary_roaming` binding's every legal
+outcome to total one individual. `validate_activity_binding` and its
+`__all__` entry are gone, and `world.lore.monster_placement` keeps only the
+key-presence and unknown-reference checks for a composition binding and a site
+override. Capacity, geometry, timing, aggression and unknown-reference
+validation is unchanged. A solitary site override of a two-member composition
+now publishes and disperses at construction.
+
+### Writers
+
+- **Zone waves.** `commit_population_wave` keeps constructing in
+  `placement.groups` order, then creates one group per unit with
+  `wave:<zone>:<sequence>#<ordinal>`, each member list from that unit's slots.
+  The groups, zone state and event stay inside the existing transaction and
+  surface snapshot/restore.
+- **Manual sites.** `monster_sites._populate` constructs every row of the
+  sampled occurrence (stamping `db.site_key`), then registers one group per
+  unit through the new `regional_population.register_explicit_group`, keyed
+  `site:<site>:<sequence>#<ordinal>`. A cohesive override therefore creates one
+  multi-member group owned by the site; a stationary or solitary override
+  creates one group per individual. The old `explicit:<x>:<y>:<pk>` prefix is no
+  longer used for site groups and no compatibility reader was added.
+  `register_explicit_individual` remains the single-individual entry point for
+  GM, quest and staged placements and delegates with
+  `explicit:<x>:<y>:<pk>#0` and presence evidence `source_id`
+  `explicit:<x>:<y>:<pk>`, so every existing caller assertion is unchanged.
+- **Registration contract.** `register_explicit_group` validates the cell and
+  every individual before its first write, refuses an empty or duplicate list
+  with `ExplicitPlacementRefused`, writes each coordinate and room attachment,
+  creates exactly one group, records one `PopulationTransition` per individual
+  and emits one `monster_population_individual_registered` event per
+  individual. It opens no transaction and compensates nothing by itself.
+
+### Writer/forecast parity
+
+`world.maps.population_forecast` computes the same `movement_units` from the
+same rows and binding and calls `_place` once per unit for a projected zone
+birth (`zone:<zone>:<sequence>#<ordinal>`) and a projected matured site
+recovery (`site:<site>:<sequence>#<ordinal>`), with
+`count=len(unit.member_indices)` and the unit's own decision interval. Group
+ids are not compared between the two paths (the committed zone prefix is
+`wave:`); their group count and member counts are. Projected groups still
+contribute no idle decision and still create no durable state.
+
+### Traceability hand-off
+
+The added requirement lives only in this change's delta
+(`openspec/changes/activity-group-formation/specs/monster-field-activity/spec.md`)
+and has no canonical ID until archive sync. Following the repository rule, the
+tests written for it carry **no** `covers_requirement` annotation: a closest
+current requirement, borrowed ID or hand-built slug would be a false claim. The
+table below is the implementation-stage hand-off; the archive stage adds the
+tool-generated annotation after the sync. This branch predates the traceability
+gate's `--change` variant, so the handoff gate runs as
+`uv run --locked python -m tools.contract_gate` and os-archive forwards the
+change name after rebasing. Pre-existing annotations on tests this change did
+not add are unchanged; the one existing canonical claim kept on a new test is
+the wave's real due decision, which establishes
+`monster-field-activity::due-activity-moves-bounded-complete-groups-globally`.
+
+### Evidence map
+
+Scenarios below are from the delta requirement "Placements form movement groups
+from their binding policy".
+
+| Scenario | Substantive test assertions |
+| --- | --- |
+| Solitary birth disperses | `world.maps.tests.test_regional_population.RegionalPopulationTests.test_a_solitary_binding_disperses_the_birth_and_one_group_may_leave` (three one-member groups at the birth cell; one later due decision departs while the other two keep position, members and sequence) |
+| Cohesive birth stays whole | `RegionalPopulationTests.test_a_cohesive_binding_keeps_the_whole_birth_in_one_group` (exactly one group holds every constructed member) |
+| Manual site formation | `world.maps.tests.test_monster_sites.MonsterSiteLifecycleTests.test_a_cohesive_site_binding_forms_one_group_owned_by_the_site`; `test_a_stationary_site_binding_forms_one_group_per_member` (three groups, all owned by the site) |
+| Forecast agreement | `world.rules.tests.test_field_contact_boundaries.GroupFormationForecastParityTests.test_a_solitary_zone_birth_projects_the_committed_dispersal`; `test_a_matured_cohesive_site_recovery_projects_the_committed_group` (projected member counts equal the committed writer's for the same saved seed and sequence) |
+| Failure leaves no partial grouping | `RegionalPopulationTests.test_a_failed_group_write_restores_every_surface_and_a_retry_commits` (fault on the second `create_group`: individuals, groups, zone state, coordinates and room contents restored, retry commits the same selection); `MonsterSiteLifecycleTests.test_a_failed_second_unit_restores_the_site_and_every_member` (same for the site writer) |
+| Every possible solitary outcome is valid (modified requirement) | `world.lore.tests.test_monster_activity.MovementUnitTests`; `world.lore.tests.test_monster_placement.PlacementValidationTests.test_a_solitary_site_override_accepts_a_multi_member_composition` |
+| Single registration keeps its identity | `MonsterSiteLifecycleTests.test_single_registration_keeps_its_explicit_identity_and_presence_evidence` (`explicit:<x>:<y>:<pk>#0` group and `explicit:<x>:<y>:<pk>` transition source) |
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity world.lore.tests.test_monster_placement
+  -> Ran 78 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population
+  -> Ran 28 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --noinput world.maps.tests.test_regional_population_recovery
+  -> Ran 24 tests, OK (fresh database; see the retained-database note below)
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
+  -> Ran 12 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
+  -> Ran 39 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact_boundaries
+  -> Ran 14 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_gm world.quests.tests.test_permanent_occupants
+  -> Ran 19 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_site_clear_out_acceptance
+  -> Ran 20 tests, OK
+uv run --locked python -m tools.observability_lint check
+  -> scanned=832 frozen=0 violations=0 exemptions=406
+uv run --locked python -m tools.map_reference_context --check
+  -> content/map-reference-context.json is up to date
+uv run --locked openspec validate activity-group-formation --strict
+  -> Change 'activity-group-formation' is valid
+uv run --locked python -m tools.contract_gate
+  -> contract gate passed: reference-context, traceability, observability, test-data, manifests, contracts
+```
+
+No new test module was added, so `.github/evennia-shards.json` is unchanged.
+
+The recovery suite reproduces the repository's known retained-database
+`round != victory` symptom when the shared retained test database has drifted;
+omitting `--keepdb` and running with `--noinput` against a freshly created
+database is the recorded evidence above. An earlier retained-database run also
+surfaced `monster_activity_group_exists` from the same drift. `_reset` in that
+suite now clears the map-owned activity record with the rest of the population
+state a fresh world starts without, and the real session fixture joins a
+zone-born individual's own group instead of re-registering it.

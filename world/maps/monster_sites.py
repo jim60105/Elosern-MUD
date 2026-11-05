@@ -61,6 +61,7 @@ from world.lore.monster_placement import (
     composition_variant_keys,
     variant_species_key,
 )
+from world.lore.monster_activity import movement_units
 from world.maps.regional_population import (
     MALFORMED_STATE,
     MalformedPopulationState,
@@ -68,7 +69,7 @@ from world.maps.regional_population import (
     protected_cells,
     read_population_seed,
     read_population_timeline,
-    register_explicit_individual,
+    register_explicit_group,
     restore_population_surfaces,
     sample_composition_counts,
     snapshot_population_surfaces,
@@ -482,9 +483,12 @@ def _populate(
 
     Fresh rows every time: the site's occurrence selects one inclusive
     count vector of its authored composition, every row of which is constructed
-    with its own identity and stored resources, marked with the site key, and
-    registered through the regional population owner's explicit-placement
-    operation at the site's coordinate. That operation validates the shared
+    with its own identity and stored resources and marked with the site key.
+    The complete composition then forms movement groups by the site binding's
+    policy and registers each group through the regional population owner's
+    explicit-placement operation at the site's coordinate: a stationary or
+    solitary override leaves one group per individual while a cohesive override
+    keeps the whole sampled group together. That operation validates the shared
     wilderness surface while deliberately applying no ordinary settlement
     buffer, zone/cell density or wave budget, so an explicit manual site is
     never culled or capped by automatic maintenance. No shipped number is
@@ -500,16 +504,20 @@ def _populate(
         for _ in range(count):
             individual = construct_species_individual(species_key, variant_key)
             individual.db.site_key = site.key
-            register_explicit_individual(
-                wilderness,
-                individual,
-                site.coordinates,
-                tick=tick,
-                owner_kind="site",
-                owner_key=site.key,
-                activity_key=site.activity_key,
-            )
             created.append(individual)
+    units = movement_units(rows, (site.activity_key,) * len(rows))
+    for ordinal, unit in enumerate(units):
+        register_explicit_group(
+            wilderness,
+            [created[index] for index in unit.member_indices],
+            site.coordinates,
+            tick=tick,
+            owner_kind="site",
+            owner_key=site.key,
+            activity_key=unit.activity_key,
+            operation_id=f"site:{site.key}:{sequence}",
+            ordinal=ordinal,
+        )
     return tuple(created)
 
 

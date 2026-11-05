@@ -112,7 +112,12 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         super().setUp()
         publish_shipped_map_world()
         self.enterContext(
-            synthetic_registries("monster_species", "monster_variants", "monster_tiers")
+            synthetic_registries(
+                "monster_species",
+                "monster_variants",
+                "monster_tiers",
+                "monster_activities",
+            )
         )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
@@ -231,7 +236,12 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
         super().setUp()
         publish_shipped_map_world()
         self.enterContext(
-            synthetic_registries("monster_species", "monster_variants", "monster_tiers")
+            synthetic_registries(
+                "monster_species",
+                "monster_variants",
+                "monster_tiers",
+                "monster_activities",
+            )
         )
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
@@ -346,7 +356,9 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
         )
         commit_population_wave(self.wilderness, other_plan)
         second = read_monster_activity(self.wilderness)
-        self.assertEqual(len(second.groups), 2)
+        # The solitary three-member wave disperses into three one-member
+        # groups, so one cohesive group plus three solitary ones stand here.
+        self.assertEqual(len(second.groups), 4)
         self.assertEqual(
             {entry.activity_key for entry in second.groups.values()},
             {
@@ -354,6 +366,13 @@ class GroupConstructionTests(RegistryIsolationMixin, EvenniaTest):
                 "t_whisper_quail_solitary_activity",
             },
         )
+        solitary = [
+            entry
+            for entry in second.groups.values()
+            if entry.activity_key == "t_whisper_quail_solitary_activity"
+        ]
+        self.assertEqual(len(solitary), 3)
+        self.assertTrue(all(len(entry.member_ids) == 1 for entry in solitary))
 
     def test_a_replayed_commit_cannot_replace_a_foreign_group(self):
         zone = self._use(_zone("t_zone", pool=(("t_three_a", 1),)))

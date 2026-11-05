@@ -31,19 +31,19 @@ from world.lore.monster_activity import (
     MONSTER_ACTIVITY_REGISTRY,
     ActivityArea,
     AggressionCondition,
+    MovementUnit,
     MonsterActivity,
     MonsterActivityRegistryError,
     activity_area_problems,
     build_activity_area_registry,
     build_monster_activity_registry,
+    movement_units,
     resolve_activity_area,
-    validate_activity_binding,
     validate_activity_registries,
 )
 from world.lore.monster_placement import (
     ENCOUNTER_COMPOSITION_REGISTRY,
     MONSTER_SITE_REGISTRY,
-    composition_bounds,
 )
 from world.lore.wilderness_regions import WildernessRegion
 
@@ -352,26 +352,125 @@ class DeclarationValidationTests(unittest.TestCase):
         self.assertEqual((dict(areas), dict(activities)), before)
 
 
-class BindingValidationTests(unittest.TestCase):
-    """A solitary binding requires every legal composition outcome to be one."""
+SOLITARY = "t_fixture_solitary"
+COHESIVE_A = "t_fixture_cohesive_a"
+COHESIVE_B = "t_fixture_cohesive_b"
+STATIONARY = "t_fixture_stationary"
 
-    @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
-    def test_solitary_binding_rejects_any_multi_individual_outcome(self):
-        activity = _activity(policy="solitary_roaming")
-        validate_activity_binding(activity, 1, "t_fixture")
-        for largest in (2, 3):
-            with self.subTest(largest=largest):
-                with self.assertRaises(MonsterActivityRegistryError):
-                    validate_activity_binding(activity, largest, "t_fixture")
 
-    def test_other_policies_accept_complete_groups_but_need_an_integer(self):
-        for policy in ("stationary", "cohesive_group"):
-            with self.subTest(policy=policy):
-                validate_activity_binding(_activity(policy=policy), 3, "t_fixture")
+def _policies(**overrides: str) -> dict[str, MonsterActivity]:
+    """The file-local activity registry the formation rule resolves against."""
+    policies = {
+        SOLITARY: "solitary_roaming",
+        COHESIVE_A: "cohesive_group",
+        COHESIVE_B: "cohesive_group",
+        STATIONARY: "stationary",
+    }
+    policies.update(overrides)
+    return {
+        key: _activity(key=key, policy=policy) for key, policy in policies.items()
+    }
+
+
+class MovementUnitTests(unittest.TestCase):
+    """One placement's binding policies decide its movement groups."""
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_solitary_row_of_three_forms_three_single_slot_units(self):
+        units = movement_units((("t_fixture_row", 3),), (SOLITARY,), activities=_policies())
+        self.assertEqual(
+            units,
+            (
+                MovementUnit(SOLITARY, (0,)),
+                MovementUnit(SOLITARY, (1,)),
+                MovementUnit(SOLITARY, (2,)),
+            ),
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_cohesive_rows_join_one_unit_in_flattened_member_order(self):
+        units = movement_units(
+            (("t_fixture_row_a", 2), ("t_fixture_row_b", 1)),
+            (COHESIVE_A, COHESIVE_A),
+            activities=_policies(),
+        )
+        self.assertEqual(units, (MovementUnit(COHESIVE_A, (0, 1, 2)),))
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_two_cohesive_keys_stay_two_units(self):
+        units = movement_units(
+            (("t_fixture_row_a", 2), ("t_fixture_row_b", 2)),
+            (COHESIVE_A, COHESIVE_B),
+            activities=_policies(),
+        )
+        self.assertEqual(
+            units,
+            (MovementUnit(COHESIVE_A, (0, 1)), MovementUnit(COHESIVE_B, (2, 3))),
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_interleaved_cohesive_slots_merge_and_sort_by_first_slot(self):
+        units = movement_units(
+            (("t_fixture_row_a", 1), ("t_fixture_row_b", 1), ("t_fixture_row_c", 1)),
+            (COHESIVE_A, SOLITARY, COHESIVE_A),
+            activities=_policies(),
+        )
+        self.assertEqual(
+            units,
+            (MovementUnit(COHESIVE_A, (0, 2)), MovementUnit(SOLITARY, (1,))),
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_stationary_row_of_two_forms_two_units(self):
+        units = movement_units((("t_fixture_row", 2),), (STATIONARY,), activities=_policies())
+        self.assertEqual(
+            units,
+            (MovementUnit(STATIONARY, (0,)), MovementUnit(STATIONARY, (1,))),
+        )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_a_zero_count_row_contributes_no_slot_but_is_still_validated(self):
+        units = movement_units(
+            (("t_fixture_absent", 0), ("t_fixture_row", 2)),
+            (COHESIVE_A, SOLITARY),
+            activities=_policies(),
+        )
+        self.assertEqual(
+            units, (MovementUnit(SOLITARY, (0,)), MovementUnit(SOLITARY, (1,)))
+        )
+        with self.assertRaises(MonsterActivityRegistryError):
+            movement_units(
+                (("t_fixture_absent", 0),), ("t_fixture_unknown",), activities=_policies()
+            )
+
+    @covers_requirement(
+        "monster-field-activity::placements-form-movement-groups-from-their-binding-policy"
+    )
+    def test_illegal_rows_refuse_the_whole_formation(self):
+        policies = _policies()
+        cases = (
+            ((("t_fixture_row", 1),), (SOLITARY, SOLITARY)),
+            ((("t_fixture_row", True),), (SOLITARY,)),
+            ((("t_fixture_row", -1),), (SOLITARY,)),
+            ((("t_fixture_row", 1.5),), (SOLITARY,)),
+            ((("t_fixture_row", 1),), ("t_fixture_unknown",)),
+        )
+        for rows, bindings in cases:
+            with self.subTest(rows=rows, bindings=bindings):
                 with self.assertRaises(MonsterActivityRegistryError):
-                    validate_activity_binding(
-                        _activity(policy=policy), True, "t_fixture"
-                    )
+                    movement_units(rows, bindings, activities=policies)
 
     def test_unknown_policies_and_kinds_stay_closed(self):
         self.assertEqual(
@@ -445,19 +544,11 @@ class PublishedActivityRegistryTests(unittest.TestCase):
                     )
         for key, composition in ENCOUNTER_COMPOSITION_REGISTRY.items():
             with self.subTest(composition=key):
-                activity = MONSTER_ACTIVITY_REGISTRY[composition.activity_key]
-                validate_activity_binding(
-                    activity, composition_bounds(composition)[1], key
-                )
+                self.assertIn(composition.activity_key, MONSTER_ACTIVITY_REGISTRY)
         for key, site in MONSTER_SITE_REGISTRY.items():
             with self.subTest(site=key):
-                activity = MONSTER_ACTIVITY_REGISTRY[site.activity_key]
-                composition = ENCOUNTER_COMPOSITION_REGISTRY[
-                    site.composition_key
-                ]
-                validate_activity_binding(
-                    activity, composition_bounds(composition)[1], key
-                )
+                self.assertIn(site.activity_key, MONSTER_ACTIVITY_REGISTRY)
+                self.assertIn(site.composition_key, ENCOUNTER_COMPOSITION_REGISTRY)
 
     @covers_requirement("monster-field-activity::activity-declarations-publish-complete-validated-bindings")
     def test_the_module_offers_no_execution_callable(self):
@@ -466,7 +557,17 @@ class PublishedActivityRegistryTests(unittest.TestCase):
             for name in dir(registry)
             if not name.startswith("_") and callable(getattr(registry, name))
         }
-        for fragment in ("spawn", "move", "populate", "reconcile", "schedule"):
+        # A snake_case movement verb (``move_group``, ``commit_move``) is an
+        # execution entry point; the pure formation noun (``movement_units``)
+        # is not, and neither is the ``MovementUnit`` row type.
+        for fragment in (
+            "spawn",
+            "move_",
+            "_move",
+            "populate",
+            "reconcile",
+            "schedule",
+        ):
             offending = [name for name in public if fragment in name.lower()]
             self.assertEqual(offending, [], f"{fragment} appears in {offending}")
 

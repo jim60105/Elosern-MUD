@@ -17,7 +17,7 @@ composition binding only for that site's movement declaration. See
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -342,27 +342,77 @@ def validate_activity_registries(
         _check_activity(activity, what, areas, dayparts)
 
 
-def validate_activity_binding(
-    activity: MonsterActivity, largest_total: int, what: str
-) -> None:
-    """Raise when one complete composition outcome cannot use the activity.
+@dataclass(frozen=True, slots=True)
+class MovementUnit:
+    """One movement group a placement creates: its binding and member slots."""
 
-    Only ``solitary_roaming`` constrains membership: every permitted outcome
-    must total exactly one individual, so the composition's inclusive maximum
-    total is the deciding figure. A sampled singleton never authorizes an
-    incompatible possible outcome. Every other policy accepts the complete
-    composition as declared.
+    activity_key: str
+    member_indices: tuple[int, ...]
+
+
+def movement_units(
+    row_counts: Sequence[tuple[str, int]],
+    row_bindings: Sequence[str],
+    *,
+    activities: Mapping[str, MonsterActivity] | None = None,
+) -> tuple[MovementUnit, ...]:
+    """The movement groups one complete placement forms under its binding.
+
+    ``row_counts`` is the sampled ``(variant_key, count)`` composition in
+    member order and ``row_bindings`` is the activity key each row resolves,
+    parallel to it. Member slots are the flattened construction order -- row
+    zero's individuals first, then row one's -- and slot numbers start at zero,
+    so a writer must construct its individuals in exactly this order.
+
+    Every slot of a ``cohesive_group`` binding sharing one key joins the same
+    unit; each ``solitary_roaming`` or ``stationary`` slot is a unit of its
+    own. A binding that permits several members therefore disperses instead of
+    rejecting the placement. Units come back ordered by their smallest member
+    slot. A zero-count row contributes no slot but is still validated.
     """
-    if isinstance(largest_total, bool) or not isinstance(largest_total, int):
+    counts = tuple(row_counts)
+    bindings = tuple(row_bindings)
+    if len(counts) != len(bindings):
         raise MonsterActivityRegistryError(
-            f"{what} must compare an integer member total, got {largest_total!r}"
+            f"movement units need one binding per row, got {len(counts)} rows "
+            f"and {len(bindings)} bindings"
         )
-    if activity.policy == "solitary_roaming" and largest_total != 1:
-        raise MonsterActivityRegistryError(
-            f"{what} policy {activity.policy!r} requires every legal outcome to "
-            f"total exactly one individual, but the composition permits up to "
-            f"{largest_total}"
-        )
+    registry = MONSTER_ACTIVITY_REGISTRY if activities is None else activities
+    units: list[MovementUnit] = []
+    cohesive_positions: dict[str, int] = {}
+    slot = 0
+    for (_variant_key, count), binding in zip(counts, bindings):
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise MonsterActivityRegistryError(
+                f"movement unit row count must be an integer literal, got {count!r}"
+            )
+        if count < 0:
+            raise MonsterActivityRegistryError(
+                f"movement unit row count must be at least 0, got {count!r}"
+            )
+        if not isinstance(binding, str) or not binding:
+            raise MonsterActivityRegistryError(
+                f"movement unit binding must be a nonempty string, got {binding!r}"
+            )
+        activity = registry.get(binding)
+        if activity is None:
+            raise MonsterActivityRegistryError(
+                f"movement unit binding {binding!r} names no monster activity"
+            )
+        for _ in range(count):
+            if activity.policy == "cohesive_group":
+                position = cohesive_positions.get(binding)
+                if position is None:
+                    cohesive_positions[binding] = len(units)
+                    units.append(MovementUnit(binding, (slot,)))
+                else:
+                    units[position] = MovementUnit(
+                        binding, (*units[position].member_indices, slot)
+                    )
+            else:
+                units.append(MovementUnit(binding, (slot,)))
+            slot += 1
+    return tuple(sorted(units, key=lambda unit: unit.member_indices[0]))
 
 
 def _candidate_terrain(candidate_world: Any):
@@ -780,12 +830,13 @@ __all__ = [
     "MONSTER_ACTIVITY_REGISTRY",
     "ActivityArea",
     "AggressionCondition",
+    "MovementUnit",
     "MonsterActivity",
     "MonsterActivityRegistryError",
     "activity_area_problems",
     "build_activity_area_registry",
     "build_monster_activity_registry",
+    "movement_units",
     "resolve_activity_area",
-    "validate_activity_binding",
     "validate_activity_registries",
 ]

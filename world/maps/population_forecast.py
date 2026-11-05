@@ -539,6 +539,7 @@ class _Projection:
                 )
 
     def _settle_sites(self, tick: int) -> None:
+        from world.lore.monster_activity import movement_units
         from world.maps.monster_activity import activity_decision_interval
         from world.maps.monster_sites import (
             MONSTER_SITE_REGISTRY,
@@ -562,25 +563,28 @@ class _Projection:
             groups = site_occurrence_groups(
                 site, seed=int(state.seed), sequence=int(state.generation_sequence or 0) + 1
             )
-            count = sum(amount for _variant, amount in groups)
-            if count <= 0:
+            units = movement_units(
+                groups, (state.activity_key,) * len(groups)
+            )
+            if not units:
                 continue
             sequence = int(state.generation_sequence or 0) + 1
-            self._place(
-                group_id=f"site:{key}:{sequence}",
-                activity_key=state.activity_key,
-                home=LocationRef.wilderness(self.wilderness, *site.coordinates),
-                cell=site.coordinates,
-                count=count,
-                owner_kind="site",
-                owner_key=key,
-                sequence=sequence,
-                next_decision_tick=tick
-                + activity_decision_interval(state.activity_key),
-                seed=int(state.seed),
-                home_zone=None,
-                site_key=key,
-            )
+            for ordinal, unit in enumerate(units):
+                self._place(
+                    group_id=f"site:{key}:{sequence}#{ordinal}",
+                    activity_key=unit.activity_key,
+                    home=LocationRef.wilderness(self.wilderness, *site.coordinates),
+                    cell=site.coordinates,
+                    count=len(unit.member_indices),
+                    owner_kind="site",
+                    owner_key=key,
+                    sequence=sequence,
+                    next_decision_tick=tick
+                    + activity_decision_interval(unit.activity_key),
+                    seed=int(state.seed),
+                    home_zone=None,
+                    site_key=key,
+                )
             self.sites[key] = _SiteState(
                 key=key,
                 seed=state.seed,
@@ -594,6 +598,7 @@ class _Projection:
             )
 
     def _settle_zone_recoveries(self, tick: int) -> None:
+        from world.lore.monster_activity import movement_units
         from world.maps.monster_activity import activity_decision_interval
         from world.maps.regional_population import (
             ECOLOGY_ZONE_REGISTRY,
@@ -632,21 +637,26 @@ class _Projection:
                 continue
             placement = plan.placements[0]
             sequence = state.generation_sequence + 1
-            self._place(
-                group_id=f"zone:{key}:{sequence}",
-                activity_key=placement.activity_key,
-                home=LocationRef.wilderness(self.wilderness, *placement.cell),
-                cell=placement.cell,
-                count=placement.total,
-                owner_kind="zone",
-                owner_key=key,
-                sequence=sequence,
-                next_decision_tick=tick
-                + activity_decision_interval(placement.activity_key),
-                seed=state.seed,
-                home_zone=key,
-                site_key=None,
+            units = movement_units(
+                placement.groups,
+                (placement.activity_key,) * len(placement.groups),
             )
+            for ordinal, unit in enumerate(units):
+                self._place(
+                    group_id=f"zone:{key}:{sequence}#{ordinal}",
+                    activity_key=unit.activity_key,
+                    home=LocationRef.wilderness(self.wilderness, *placement.cell),
+                    cell=placement.cell,
+                    count=len(unit.member_indices),
+                    owner_kind="zone",
+                    owner_key=key,
+                    sequence=sequence,
+                    next_decision_tick=tick
+                    + activity_decision_interval(unit.activity_key),
+                    seed=state.seed,
+                    home_zone=key,
+                    site_key=None,
+                )
             state.generation_sequence = sequence
             state.recovery_due_tick = (
                 tick + zone.replenishment_interval
