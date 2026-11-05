@@ -195,6 +195,90 @@ Human reviewers should judge, in the declarations themselves:
   need shared placement validity (walkable wilderness surface for a site,
   approved species and variants, lawful lifecycle).
 
+### Content expansion habitats
+
+The three weak species of the content expansion (泥膜史萊姆, 膠掌小鬼 and
+蠟囊鼠) are placed only through the bounded zones below. Each rectangle is land
+classified into its own parent region, and it stands clear of every published
+settlement, harbor and authored site, so the shared validity rule and the
+generic settlement ring leave the patch eligible without an explicit birth
+policy. The declarations remain the only authority. No coordinate, density,
+count or timing is repeated here.
+
+| Zone keys | Dossier fact it serves | Terrain and scenario fit |
+| --- | --- | --- |
+| `eastern_mudbank_habitat`, `western_mudbank_habitat` | 泥膜史萊姆 keeps to damp banks, old irrigation side-channels and seepage mouths, and depends on standing film water. | Both patches sit in low plains and hill-valley ground that inland waterways cross, which is the damp, shaded low ground the dossier describes. |
+| `western_quarry_habitat` | 膠掌小鬼 lives in hill scrub, disused quarry ground and under rock shelving. | Remote, dry, passable western hills, with no inland waterway cell inside the patch and no maintained settlement nearby. |
+| `eastern_cache_habitat`, `western_cache_habitat` | 蠟囊鼠 works plains field margins, disused grain stores and hill transport ground. | A plains field margin and a hill transport patch, both remote from settlements and working facilities, so the authored cache stays a field cache and never a working granary or canal. |
+
+**Movement and aggression.** The mudbank binding is `solitary_roaming`. Its
+birth group disperses into independent single-member units that each roam the
+whole patch, and its condition is `passive`, because the dossier describes a
+creature that retreats from footsteps and answers after engagement. The goblin
+group and each rat family are `cohesive_group` with a `defended_area` condition
+bound to a small nest or cache sub-area inside their own grounds. They forage
+over the patch and turn hostile in the defended area, which keeps their ordinary
+foraging retreat-oriented. Every patch's grounds repeat its birth rectangle, so
+movement and birth geometry stay aligned.
+
+**No stronger variant in an ordinary pool.** Each of these pools holds the one
+ordinary variant of its species. Stronger variants belong to manual sites and
+boss sites, and none of them joins a pool. No pool names a variant the species
+registry does not declare.
+
+**Declared values.** These zones keep the shared sparse profile of the existing
+zones, with the same density interval, the same delayed recovery and
+replenishment timing, and the same home-owned per-cell ceiling wherever that
+ceiling already fits the pool's largest group. The quarry patch and the cache
+patches raise the per-cell capacity and the wave budget, because their single
+composition can place a larger complete group than the earlier pools. The rule
+that a complete composition fits one cell and one wave, together with the
+recovery proof, is what moves those two values. The mudbank patches keep the
+profile unchanged because their largest group already fit. Working canals,
+granaries and settlement-adjacent conflicts stay outside automatic birth
+geometry and require explicit manual or quest placement under the approved
+exceptions.
+
+**Accepted deviation, damp cells.** Design §4.1 limits the slime to explicitly
+authored damp cells, while the zone model has no per-cell wetness predicate and
+derives density from every eligible cell of a rectangle. The mudbank patches are
+bounded rectangles inside the damp low ground instead of a set of individually
+damp cells, and part of each rectangle lies immediately beside inland water. A
+later change may shrink those rectangles onto the water cluster without a test
+edit, because no test pins their geometry.
+
+**Moving a rectangle later.** The birth registry and the activity registry are
+validated independently, and no validator ties a zone's rectangle to its
+grounds area. A reviewer who moves or shrinks any of these rectangles must apply
+the same change to the matching grounds and, for the goblin nest and the two rat
+caches, to the defended sub-area, and keep the sub-area strictly inside its
+grounds.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-field-tests.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap` | OK |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0 |
+| `openspec validate weak-species-habitats --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change weak-species-habitats` | passed |
+
+A disposable-database placement smoke observed the real births through the
+deterministic owner. It published the authored map candidate, provisioned a
+fresh wilderness, initialized every authored zone and read the committed
+state. The mudbank patches produced only independent single-member groups under
+their passive binding, each quarry and cache patch kept its members together
+inside its own patch, every individual carried its authored species and
+ordinary variant, and a fresh reload preserved identity, home zone, resources
+and cell. The probe itself is not committed, because the retained production
+smoke module belongs to the mixed-encounter change.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
