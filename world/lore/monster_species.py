@@ -715,6 +715,27 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "hanging_nest_forager",
         True,
     ),
+    MonsterSpecies(
+        "ember_bristle_boar",
+        "焙鬃野豬",
+        "焙鬃野豬生活於西部偏遠岩林與廢棄燒炭地，會用肩背鬃毛的局部熱力烘乾泥窩、烘軟挖出的根莖。"
+        "粗鬃末端在發熱時透出暗紅色，巢地留下乾燥土圈與烘焦根皮。",
+        "厚實肩背披著粗硬鬃毛，短獠牙從寬吻兩側向外彎出。"
+        "發熱時，鬃尖透出暗紅光；轉身時，乾燥根皮與土屑沿著背側抖落。",
+        "牠通常獨居，長期使用少數泥窩與覓食路線，從根莖與林地食物取得日常養分。"
+        "舊炭窯與背風岩坡提供乾燥住處，重複使用的運料道也可能成為領域的一部分。"
+        "工人遇上占路個體時會改道，再委託熟練隊伍處理。"
+        "牠以自身魔力維持鬃熱，配合身體力量作短程衝撞與近身甩鬃；熱力與動作都受自身資源支配。"
+        "首隻指定個體因醒目的背鬃被稱為「赤背」。",
+        ("western_hills_valleys",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；鬃毛熱力的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階獨居野豬：以自身魔力維持肩背鬃毛的局部熱力，"
+        "連結烘乾泥窩與烘軟根莖；戰鬥呈現為身體力量主導的火屬性物理衝撞與橫掃，"
+        "魔力資質維持高階帶狀值。",
+        "（作者私有：尚未證實的猜想）燒炭工人相信焙鬃野豬偏愛舊炭窯是為了取暖，這種說法尚未證實。",
+        "warm_den_boar",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -969,6 +990,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("tide_devouring_bite", "reservoir_guard"),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "warm_den_boar",
+        "ember_bristle_boar",
+        "焙窩型",
+        "普通版本，反覆使用烘乾的泥窩與固定覓食路線。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=380, mp=36, sp=20, atk_phys=28, agility=17, defense=20, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("ember_tusk_charge", "ember_bristle_sweep"),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
     ),
 )
 

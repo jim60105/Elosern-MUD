@@ -15,6 +15,10 @@ The goblin contact grab is assembled the same way with elementless physical
 damage plus a hit-dependent agility debuff on the struck enemy.
 The reservoir warden body action is assembled the same way with a self-only
 water defense guard paid from the actor's own MP and no damage occurrence.
+The boar's two fire strikes are assembled the same way with physical-school
+damage that reads the actor's physical attack: one single-target charge and one
+area sweep, each paid in both MP and SP, and the area cast resolves every
+recipient's own hit and defense while the action pays once.
 """
 
 from world.skills.effects import (
@@ -364,6 +368,68 @@ ROWS: tuple[SkillDef, ...] = (
             EffectPolicy(
                 coefficient=1.0,
                 audience=EffectAudience.SELF,
+            ),
+        ),
+    ),
+    _skill(
+        "ember_tusk_charge",
+        "熱鬃衝撞",
+        "以發熱的肩背鬃毛帶動身體衝撞單一敵方目標，造成火屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="fire",
+        # The school stays physical and reads the actor's own physical attack;
+        # the fire element follows the ordinary elemental rules and never
+        # substitutes for the attack axis.
+        effects=["damage:fire:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="fire",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ember_bristle_boar",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(
+                coefficient=1.2,
+                audience=EffectAudience.ENEMIES,
+            ),
+        ),
+    ),
+    _skill(
+        "ember_bristle_sweep",
+        "熱鬃橫掃",
+        "甩動發熱的粗鬃橫掃周圍所有敵方目標，對每個目標造成火屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="fire",
+        # Physical school on the actor's own attack axis, fire element. The
+        # settlement rolls each routed recipient's own hit and mitigates with
+        # that recipient's own defense, while the action pays both costs once.
+        effects=["damage:fire:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="fire",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ember_bristle_boar",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            # Below the charge's coefficient: one wide motion is weaker per
+            # recipient than a committed single-target impact.
+            EffectPolicy(
+                coefficient=0.8,
+                audience=EffectAudience.ENEMIES,
             ),
         ),
     ),
