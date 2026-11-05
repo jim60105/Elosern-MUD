@@ -28,6 +28,12 @@ from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
+import world.lore.monster_activity as lore_activity
+from world.lore.monster_activity import (
+    ActivityArea,
+    AggressionCondition,
+    MonsterActivity,
+)
 from world.lore.monster_placement import (
     CompositionMember,
     EcologyZone,
@@ -107,6 +113,43 @@ def _solo_composition(key: str = "t_recovery_solo") -> EncounterComposition:
     )
 
 
+def _patch_activity_fixtures(case) -> None:
+    """Scope the file-local activity rows the placement writers now resolve."""
+    case.enterContext(
+        patch.object(
+            lore_activity,
+            "ACTIVITY_AREA_REGISTRY",
+            MappingProxyType(
+                {"t_fixture_ground": ActivityArea("t_fixture_ground", home_radius=0)}
+            ),
+        )
+    )
+    case.enterContext(
+        patch.object(
+            lore_activity,
+            "MONSTER_ACTIVITY_REGISTRY",
+            MappingProxyType(
+                {
+                    "t_fixture_solo_activity": MonsterActivity(
+                        "t_fixture_solo_activity",
+                        "solitary_roaming",
+                        "t_fixture_ground",
+                        60,
+                        AggressionCondition("passive"),
+                    ),
+                    "t_fixture_site_activity": MonsterActivity(
+                        "t_fixture_site_activity",
+                        "stationary",
+                        "t_fixture_ground",
+                        120,
+                        AggressionCondition("passive"),
+                    ),
+                }
+            ),
+        )
+    )
+
+
 class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
     """Delayed episodes, chronological waves, and their protection."""
 
@@ -116,6 +159,7 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
         )
+        _patch_activity_fixtures(self)
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
@@ -560,10 +604,16 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
     # -- partition and site chronology --------------------------------------
 
     def _reset(self, zone: EcologyZone, tick: int) -> tuple[int, ...]:
+        from world.maps import monster_activity as activity_owner
+
         for individual in self._individuals():
             individual.delete()
         self.wilderness.db.itemcoordinates = {}
         self.wilderness.db.regional_population = {}
+        # A fresh world carries no movement group either; the map-owned activity
+        # record is part of the population state this helper resets.
+        self.wilderness.attributes.remove("monster_activity")
+        activity_owner.initialize_monster_activity(self.wilderness, tick=tick)
         self.wilderness.db.population_timeline = {
             "settled_through_tick": tick,
             "transitions": [],
@@ -1092,6 +1142,7 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.enterContext(
             synthetic_registries("monster_species", "monster_variants", "monster_tiers")
         )
+        _patch_activity_fixtures(self)
         create_wilderness(
             name=WILDERNESS_NAME, mapprovider=ElosernWildernessMapProvider()
         )
@@ -1122,12 +1173,27 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         grant_lineage(self.player, [self.skill])
         self.player.traits.hp.base = 100000
         self.player.traits.hp.current = 100000
+        # A zone-born individual already owns its movement group: it is never
+        # re-registered, so the party joins the one member standing alone at its
+        # own cell and the encounter roster stays exactly that individual.
+        cells = {
+            pk: regional_population.actual_cell(
+                self.wilderness, Monster.objects.get(pk=pk)
+            )
+            for pk in self.created
+        }
+        shared = {
+            cell for cell in cells.values() if tuple(cells.values()).count(cell) > 1
+        }
+        self.combatant = Monster.objects.get(
+            pk=next(pk for pk, cell in cells.items() if cell not in shared)
+        )
+        self.combatant_cell = cells[int(self.combatant.pk)]
         self.assertTrue(
             enter_wilderness(
-                self.player, coordinates=LOCAL[0], name=WILDERNESS_NAME
+                self.player, coordinates=self.combatant_cell, name=WILDERNESS_NAME
             )
         )
-        self.combatant = Monster.objects.get(pk=self.created[1])
         # The synthetic tier vocabulary is a zone-authoring seam; give the live
         # behaviour rulebook the same key so the round policy resolves an
         # authored archetype for the zone-born individual.
@@ -1142,15 +1208,6 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
         self.combatant.traits.hp.base = 100000
         self.combatant.traits.hp.current = 100000
-        regional_population.register_explicit_individual(
-            self.wilderness,
-            self.combatant,
-            LOCAL[0],
-            tick=100,
-            owner_kind="explicit",
-            owner_key="test",
-            activity_key="t_whisper_quail_solitary_activity",
-        )
         engage(self.player, self.combatant)
         # One earlier loss leaves the zone deficient and due at 110.
         self._kill(Monster.objects.get(pk=self.created[0]), 100)
@@ -1277,7 +1334,11 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         self.assertEqual(reloaded.started_tick, 100)
         self.assertEqual(
             reloaded.population_cell,
-            {"wilderness": WILDERNESS_NAME, "x": LOCAL[0][0], "y": LOCAL[0][1]},
+            {
+                "wilderness": WILDERNESS_NAME,
+                "x": self.combatant_cell[0],
+                "y": self.combatant_cell[1],
+            },
         )
         self.assertEqual(reloaded.rounds_elapsed, 2)
 
