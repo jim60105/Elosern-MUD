@@ -7,6 +7,14 @@ on:
 permissions:
   contents: read
 
+# A job that runs in a container gets ``sh`` as its default shell, while the
+# same step on a host runner gets ``bash``. Every step here is authored against
+# bash (``"$(<file)"`` and the like), so the shell is pinned at the workflow
+# level rather than drifting with the execution environment.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   preflight:
     runs-on: ubuntu-latest
