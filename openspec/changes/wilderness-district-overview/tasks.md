@@ -43,5 +43,5 @@
 ## 7. Verification
 
 - [x] 7.1 Run the focused Python area-map, protocol and traceability tests plus `uv run --locked python -m tools.spec_traceability check`.
-- [ ] 7.2 Run the focused Node protocol tests, the focused Vitest suites and `uv run --locked python -m tools.contract_gate`; inspect a real rendered wilderness screen with a lit district at the local, district-fit and area-map stops.
+- [x] 7.2 Run the focused Node protocol tests, the focused Vitest suites and `uv run --locked python -m tools.contract_gate`; inspect a real rendered wilderness screen with a lit district at the local, district-fit and area-map stops.
 - [x] 7.3 Run `openspec validate wilderness-district-overview --strict` and update `.github/evennia-shards.json` only if a test module was added.
