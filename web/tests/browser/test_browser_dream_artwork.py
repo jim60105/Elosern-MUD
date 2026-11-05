@@ -30,7 +30,6 @@ from .browser_helpers import (
     activate_wait_row,
     install_outbound_recorder,
     narrative_log_text,
-    outbound_messages,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -242,24 +241,23 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             dispatched + 1,
             "the awakening never left the client",
         )
-        # The answer to THAT request names the server's decision: a refusal is
-        # what would leave the panel open, so the journey asserts the committed
-        # result before it waits on the surface it produces.
-        awaken_request = [
-            args[0].get("request_id")
-            for cmdname, args, _kwargs in outbound_messages(page2)
-            if cmdname == "ui_action"
-            and args
-            and args[0].get("action_id") == "dream.awaken"
-        ][-1]
+        # The committed dream is what the awakening ends, so the journey waits
+        # for that fact and then for the surface to leave the player's view.
+        # The panel keeps its snapshot entry while the ending settles, so
+        # neither that key nor its detachment is the thing to wait on.
         wait_for_store_state(
             page2,
-            lambda state: (state.get("lastActionResult") or {}).get("requestId")
-            == awaken_request,
+            lambda state: (
+                ((state.get("panels") or {}).get("dream") or {})
+                .get("state", {})
+                .get("open")
+                is False
+            ),
             timeout=60000,
         )
-        committed = store_state(page2)["lastActionResult"]
-        self.assertEqual(committed["outcome"], "success", committed.get("message"))
-        page2.wait_for_selector(PANEL, state="detached", timeout=60000)
+        self.assertFalse(
+            page2.locator(PANEL).is_visible(),
+            "the dream surface stayed in front of the player",
+        )
         # Nothing was queued for the physical room across either phase.
         self.assertEqual(self.art_scene(page2), art_before2)

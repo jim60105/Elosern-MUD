@@ -55,6 +55,7 @@ NEW_HELPER_FILES = (
 #: the zero-findings guarantee covers every slice verbatim.
 _SPLIT_PACKAGES = (
     "test_titles",
+    "test_map_knowledge_integration",
 )
 
 

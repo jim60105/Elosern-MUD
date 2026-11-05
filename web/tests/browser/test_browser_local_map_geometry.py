@@ -471,6 +471,13 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                 }
                 self._inject_panel(page, interior_payload)
                 page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
+                # The mirror joins the island's own layout: measure after the
+                # frame that paints it, or the box read is a snapshot of the
+                # reflow before the injected node has its space.
+                page.evaluate(
+                    "() => new Promise((resolve) => requestAnimationFrame("
+                    "() => requestAnimationFrame(resolve)))"
+                )
                 island_box_after = page.locator('[data-testid="local-map"]').bounding_box()
                 self.assertAlmostEqual(island_box_after["width"], island_box["width"], delta=1.0)
                 self.assertAlmostEqual(island_box_after["height"], island_box["height"], delta=1.0)
