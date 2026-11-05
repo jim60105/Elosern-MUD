@@ -46,6 +46,7 @@ from world.maps import regional_population
 from world.maps.monster_activity import create_group
 from world.maps.population_forecast import (
     FORECAST_SOURCE_BIRTH,
+    _Projection,
     capture_activity_snapshot,
     project_activity_window,
 )
@@ -54,7 +55,9 @@ from world.maps.population_lifecycle import (
     register_regional_population,
 )
 from world.maps.regional_population import (
+    commit_population_wave,
     initialize_population_seed,
+    plan_population_wave,
     read_population_timeline,
 )
 from world.maps.wilderness_provider import (
@@ -844,3 +847,197 @@ class FaultRestorationTests(_BoundaryBase):
         self.assertEqual(read_optional_fatigue_state(self.player), state_before)
         self.assertEqual(dict(self.wilderness.db.regional_population or {}), zones_before)
         self.assertIsNone(read_session(self.player))
+
+
+class GroupFormationForecastParityTests(_BoundaryBase):
+    """The forecast projects exactly the groups the committed writer forms."""
+
+    def setUp(self):
+        super().setUp()
+        self.solitary_composition = EncounterComposition(
+            "t_parity_solitary",
+            _PASSIVE,
+            (CompositionMember(_VARIANT, 3, 3),),
+        )
+        self.group_activity = "t_parity_group_activity"
+        self.cohesive_composition = EncounterComposition(
+            "t_parity_cohesive",
+            self.group_activity,
+            (
+                CompositionMember(_VARIANT, 2, 2),
+                CompositionMember(_VARIANT, 1, 1),
+            ),
+        )
+        compositions = {
+            **self.compositions,
+            self.solitary_composition.key: self.solitary_composition,
+            self.cohesive_composition.key: self.cohesive_composition,
+        }
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "ENCOUNTER_COMPOSITION_REGISTRY",
+                MappingProxyType(compositions),
+            )
+        )
+        self.enterContext(
+            patch.object(
+                monster_sites,
+                "ENCOUNTER_COMPOSITION_REGISTRY",
+                MappingProxyType(compositions),
+            )
+        )
+        self.enterContext(
+            patch(
+                "world.lore.monster_activity.MONSTER_ACTIVITY_REGISTRY",
+                {
+                    _CONTACT: _activity(
+                        _CONTACT, aggression=AggressionCondition("contact")
+                    ),
+                    _PASSIVE: _activity(
+                        _PASSIVE, aggression=AggressionCondition("passive")
+                    ),
+                    self.group_activity: MonsterActivity(
+                        self.group_activity,
+                        "cohesive_group",
+                        _GROUND,
+                        20,
+                        AggressionCondition("passive"),
+                    ),
+                },
+            )
+        )
+        self.parity_zone = EcologyZone(
+            "t_parity_zone",
+            self.region,
+            ((0, 0, 0, 0),),
+            (WeightedComposition(self.solitary_composition.key, 1),),
+            1,
+            99,
+            3,
+            recovery_delay=5,
+            replenishment_interval=5,
+            wave_budget=3,
+        )
+        self.enterContext(
+            patch.object(
+                regional_population,
+                "ECOLOGY_ZONE_REGISTRY",
+                MappingProxyType({self.parity_zone.key: self.parity_zone}),
+            )
+        )
+        self.parity_site = MonsterSite(
+            key="t_parity_site",
+            kind="camp",
+            region_key=self.region,
+            coordinates=_SITE_CELL,
+            composition_key=self.cohesive_composition.key,
+            capacity=3,
+            one_shot=False,
+            recover_after_ticks=20,
+            activity_key=self.group_activity,
+        )
+        self.enterContext(
+            patch.object(
+                monster_sites,
+                "MONSTER_SITE_REGISTRY",
+                MappingProxyType({self.parity_site.key: self.parity_site}),
+            )
+        )
+
+    def _projection(self, start_tick: int) -> _Projection:
+        snapshot = capture_activity_snapshot(start_tick=start_tick)
+        return _Projection(
+            snapshot,
+            start_tick=start_tick,
+            wilderness=WILDERNESS_NAME,
+            observers=(),
+        )
+
+    @staticmethod
+    def _unit_counts(groups: dict, prefix: str) -> list[int]:
+        return sorted(
+            len(group.member_ids)
+            for group_id, group in groups.items()
+            if group_id.startswith(prefix)
+        )
+
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
+    )
+    def test_a_solitary_zone_birth_projects_the_committed_dispersal(self):
+        tick = 100
+        self.wilderness.db.regional_population = {
+            self.parity_zone.key: {
+                "initialized": True,
+                "seed": _SEED,
+                "generation_sequence": 0,
+                "recovery_due_tick": tick,
+                "settled_through_tick": tick,
+            }
+        }
+        self.wilderness.db.population_timeline = {
+            "settled_through_tick": tick,
+            "transitions": [],
+            "protection": [],
+        }
+
+        projection = self._projection(tick)
+        before = set(projection.groups)
+        projection._settle_zone_recoveries(tick)
+        projected = self._unit_counts(
+            {
+                group_id: projection.groups[group_id]
+                for group_id in set(projection.groups) - before
+            },
+            f"zone:{self.parity_zone.key}:1",
+        )
+        self.assertEqual(projected, [1, 1, 1])
+
+        plan = plan_population_wave(self.wilderness, self.parity_zone.key, tick=tick)
+        self.assertFalse(plan.is_blocked, plan.blocked_reason)
+        created = commit_population_wave(self.wilderness, plan)
+        self.assertEqual(len(created), 3)
+        committed = self._unit_counts(
+            monster_activity.read_monster_activity(self.wilderness).groups,
+            f"wave:{self.parity_zone.key}:1",
+        )
+        self.assertEqual(committed, projected)
+
+    @covers_requirement(
+        "hostile-field-contact::contact-forecasts-stop-interruptible-time-at-actual-interaction"
+    )
+    def test_a_matured_cohesive_site_recovery_projects_the_committed_group(self):
+        tick = 200
+        self.wilderness.db.monster_sites = {
+            self.parity_site.key: {
+                "state": monster_sites.SITE_STATE_CLEARED,
+                "cleared_at_tick": tick - self.parity_site.recover_after_ticks,
+                "seed": _SEED,
+                "generation_sequence": 0,
+                "member_ids": [999999],
+            }
+        }
+
+        projection = self._projection(tick)
+        before = set(projection.groups)
+        projection._settle_sites(tick)
+        projected = self._unit_counts(
+            {
+                group_id: projection.groups[group_id]
+                for group_id in set(projection.groups) - before
+            },
+            f"site:{self.parity_site.key}:1",
+        )
+        self.assertEqual(projected, [3])
+
+        self.assertTrue(
+            monster_sites.settle_site_recovery(
+                self.parity_site.key, tick, wilderness=self.wilderness
+            )
+        )
+        committed = self._unit_counts(
+            monster_activity.read_monster_activity(self.wilderness).groups,
+            f"site:{self.parity_site.key}:1",
+        )
+        self.assertEqual(committed, projected)
