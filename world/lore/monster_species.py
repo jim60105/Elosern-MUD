@@ -1,7 +1,8 @@
 """Monster species and variant registries (monster-data-model design §2-§3).
 
 The authored bestiary (``docs/lore/bestiary.md``) as read-only lore data:
-six frozen ``MonsterSpecies`` rows and twelve frozen ``MonsterVariant`` rows,
+one frozen ``MonsterSpecies`` row per authored species and one frozen
+``MonsterVariant`` row per authored variant,
 keyed by stable keys, validated while the module-level registries are built
 (design D-S2: an authored typo fails at import, so no consumer can observe a
 half-valid registry). Registry membership is the content authority: nothing
@@ -31,8 +32,8 @@ Two boundaries are pinned here and must not be blurred:
   active/passive skill keys or a behaviour profile is executable through the
   shared engine, and one declaring none registers no skill key, behaviour
   profile or combat trait, with no placeholder field standing in for one.
-  There is no species allowlist: the crocodile, sparrow, crab, hare, goat and lynx
-  kits are delivered because their rows declare them. The authored prose
+  There is no species allowlist: every delivered kit is delivered because its
+  row declares it. The authored prose
   (including its stated limits) lives in the narrative fields only.
 
 Key grammar (requirement R1) is the shared stable-key contract, whose predicate
@@ -522,12 +523,12 @@ def validate_monster_species_registry(
 # interpolated from a display name, a description, a threat tier, another
 # variant, or a tier band. MP and SP are the authored resource pools of the
 # variants whose mechanic has landed and authored zeros for the rest;
-# ``magic_power`` is zero for all twelve and every tier's magic band is
+# ``magic_power`` is zero for every variant and every tier's magic band is
 # deliberately ``(0, 0)``.
 #
-# ``profile_required`` is authored per row and is ``True`` for all twelve: each
-# currently ships a complete profile and a danger grade, and the declaration is
-# what keeps that completeness an obligation rather than an incidental fact
+# ``profile_required`` is authored per row and is ``True`` for every currently
+# shipped row: each ships a complete profile and a danger grade, and the
+# declaration keeps that completeness an obligation rather than an incidental fact
 # about today's data. A future row authored without a profile states ``False``
 # and keeps the tier-band fallback of individual construction.
 #
@@ -651,6 +652,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "限制無遠程抽取、無生命治療與無永久魔力降低。",
         "（作者私有：尚未證實的猜想）渡運站傳說河口鱷群受沉沒魔法器物吸引，沒有實地證實。",
         "bank_lurker",
+        True,
+    ),
+    MonsterSpecies(
+        "mudfilm_slime",
+        "泥膜史萊姆",
+        "泥膜史萊姆棲息於潮濕溝岸、舊灌溉支渠與滲水洞口，以水膜中的腐葉碎屑及微小生物為食。"
+        "透明膠體外膜黏集細泥，收縮時將泥粒壓成薄韌護膜；移動時，泥紋沿著體表摺疊。",
+        "半透明膠體貼著濕地起伏，外膜浮著細緻泥紋。"
+        "收膜時，泥粒聚成較深的環帶，撞擊留下的缺口隨著身體舒展露出濕亮膠質。",
+        "牠通常獨自行動，濕潤處可見數隻分散覓食。靠近的腳步會使牠縮向陰濕處；"
+        "遭到逼近時，牠收緊泥膜護住身體，再以短距離撞擊自衛。"
+        "聚集的個體將細泥帶到狹窄分水口，農人會疏通渠口並處理反覆停留的個體。"
+        "牠的活動集中於保有水膜的陰濕地帶，護膜則由體表已附著的細泥形成。",
+        ("eastern_plains", "western_hills_valleys"),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；泥膜的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階防禦型濕地物種：體表附著的細泥收縮成護膜，"
+        "生態連結窄分水口的淤積；戰鬥呈現為自身護膜與接觸撞擊。棲地限於明確宣告的陰濕地塊。",
+        "（作者私有：尚未證實的猜想）農人傳說泥膜史萊姆停留過的渠口特別清澈，這種說法尚未證實。",
+        "mudbank_dweller",
         True,
     ),
 )
@@ -841,6 +861,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         True,
         active_skill_keys=("tide_devouring_bite",),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "mudbank_dweller",
+        "mudfilm_slime",
+        "濕岸型",
+        "普通版本，貼著潮濕溝岸與滲水洞口覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=60, mp=0, sp=12, atk_phys=4, agility=3, defense=7, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("mudfilm_guard",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 

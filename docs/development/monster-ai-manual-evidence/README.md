@@ -17,7 +17,11 @@ tuning, which the staged activation does not enter. `selector-check.json` /
 `.md` were regenerated for `monster-ai-staged-activation` (baseline commit
 `0970ab84a61732037cdce478c05854c66e81057c`), because that operation records the
 process's *startup* fingerprint and the activation moved it; the recorded
-measurements are unchanged.
+measurements are unchanged. They were regenerated once more for
+`mudfilm-slime-species` (baseline commit
+`1eae071df88683ae28c20c77b2b59b63342ad2f4`), because that content change adds a
+buff definition and a modifier rule and therefore moves the process's startup
+fingerprint; the recorded measurements are unchanged again.
 
 ## Exact operations
 
@@ -138,10 +142,10 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`e2677d39e27adff0bc12f19478fe552a83d65695e0bcb8f6b5aa6273986c9866` -- that
+`3ee653b92c6865128e8e6a3d3bbfb7ea486286aafdc9c0d9c607392a22f3323d` -- that
 operation records the process's startup fingerprint, which this value now is;
-the pre-activation value `a29fd4fa...` describes a tuning production no longer
-loads and is superseded, not evidence for the changed tuning. See
+the earlier values `a29fd4fa...` and `e2677d39...` describe tunings production
+no longer loads and are superseded, not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
