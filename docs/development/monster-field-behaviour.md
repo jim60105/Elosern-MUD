@@ -1374,3 +1374,113 @@ surfaced `monster_activity_group_exists` from the same drift. `_reset` in that
 suite now clears the map-owned activity record with the rest of the population
 state a fresh world starts without, and the real session fixture joins a
 zone-born individual's own group instead of re-registering it.
+
+## Site Member Activity Bindings
+
+`site-member-activity-bindings` adds two authored facts on top of the group
+formation rule above: a composition row may bind its own individuals, and a
+site may name the one individual it designates.
+
+### The binding rule
+
+One pure resolver owns the precedence:
+`world.lore.monster_placement.composition_row_bindings(composition, *, site=None)`
+returns one effective activity key per composition member row, in member order.
+
+- A site that declares `activity_key` governs **every** row of that site; no row
+  binding is consulted. This is the unchanged behaviour of every shipped site,
+  which pass their stationary override positionally.
+- A site that declares no override (`activity_key=None`) lets each row resolve
+  its own `CompositionMember.activity_key` when it declares one, else the
+  composition's `activity_key`.
+- Zone births have no site, so they always resolve row binding, else
+  composition binding.
+- `PopulationPlacement.activity_key` keeps retaining the composition binding for
+  plan comparison; it is the fallback a row without its own binding resolves,
+  never a group's effective binding.
+
+Rows are never filtered or reordered: the sampled `(variant_key, count)` rows
+are the composition's rows in member order, so the resolver's tuple is parallel
+to what `movement_units` consumes. A cohesive row therefore stays whole next to
+an independent row inside one manual composition.
+
+Publication rejects a row binding or a site override that is empty or names no
+published activity (`MonsterPlacementRegistryError`, naming the composition, the
+row index and the key). The check runs even when a site override would mask the
+row at construction, so an authored typo cannot hide behind an override. A
+`None` site override is lawful.
+
+### The designated-individual label
+
+`MonsterSite.individual_label_zh` is optional. Publication accepts it only when
+`composition_bounds(composition) == (1, 1)` — every legal outcome of the site's
+composition is exactly one individual — and rejects an empty label or a label on
+any wider composition. The site owner passes the label as
+`construct_species_individual(..., key=label)`, i.e. the constructed object's
+display key; `None` keeps the variant's display name. Species key, variant key,
+the `db.site_key` ownership marker, group ownership and defeat credit are
+unchanged, and a recovered labelled site's members are new persistent
+identities carrying the same display label. No naming tradition, nickname
+generator or shipped label lives in this change.
+
+### Evidence map
+
+Scenarios below are from the delta requirements "Composition rows resolve one
+effective activity binding" and "A designated site individual carries an
+authored display label".
+
+| Scenario | Substantive test assertions |
+| --- | --- |
+| Mixed manual encounter | `world.maps.tests.test_monster_sites.MonsterSiteLifecycleTests.test_a_row_bound_site_forms_one_group_per_row_binding` (two site-owned groups sized 2 and 1, each binding's own decision interval) |
+| Site override precedence | `MonsterSiteLifecycleTests.test_a_stationary_site_override_suppresses_every_row_binding` (three one-member stationary groups; no row binding moves a member) |
+| Zone row bindings | `world.maps.tests.test_regional_population.RegionalPopulationTests.test_a_row_bound_birth_forms_each_rows_own_group` (unbound row keeps the cohesive composition binding, bound row stands alone, both zone-owned); `world.rules.tests.test_field_contact_boundaries.GroupFormationForecastParityTests.test_a_row_bound_zone_birth_projects_the_committed_groups` (projected shapes and bindings equal the committed writer's) |
+| Unknown binding | `world.lore.tests.test_monster_placement.MemberActivityBindingTests.test_an_unknown_or_empty_row_binding_is_rejected` (both publication paths, including a masked row under a valid override) |
+| Label applied | `MonsterSiteLifecycleTests.test_a_labelled_site_names_its_individual_without_changing_identity` (display key equals the label while species, variant, site marker and site-owned group match the unlabelled site) |
+| Label on a group rejected | `MemberActivityBindingTests.test_a_label_requires_every_outcome_to_be_exactly_one_individual`; `test_an_empty_label_is_rejected` |
+| Forecast agreement for a mixed site | `GroupFormationForecastParityTests.test_a_matured_mixed_row_site_projects_the_committed_groups` |
+
+### Traceability hand-off
+
+Both requirements are added by this change's delta
+(`openspec/changes/site-member-activity-bindings/specs/monster-site-placement/spec.md`)
+and have no canonical ID until archive sync, so the tests written for them carry
+**no** `covers_requirement` annotation. The implementation report carries the
+test → (delta requirement, scenario) table; os-archive adds the tool-generated
+annotation after the sync. Pre-existing annotations on untouched tests are
+unchanged.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement
+  -> Ran 56 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
+  -> Ran 42 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population
+  -> Ran 29 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_field_contact_boundaries
+  -> Ran 16 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_registry_index_contract
+  -> Ran 13 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity
+  -> Ran 28 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_sync
+  -> Ran 6 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_site_clear_out_acceptance
+  -> Ran 20 tests, OK
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --noinput world.maps.tests.test_regional_population_recovery
+  -> Ran 24 tests, OK (fresh database)
+uv run --locked python -m tools.map_reference_context --check
+  -> content/map-reference-context.json is up to date
+uv run --locked python -m tools.observability_lint check
+  -> scanned=832 frozen=0 violations=0 exemptions=406
+openspec validate site-member-activity-bindings --strict
+  -> Change 'site-member-activity-bindings' is valid
+uv run --locked python -m tools.contract_gate --change site-member-activity-bindings
+  -> contract gate passed: reference-context, traceability, observability, test-data, manifests, contracts
+```
+
+No new test module was added, so `.github/evennia-shards.json` is unchanged, and
+no data-contract module was added, so `tools/test_data_freeze.json` is unchanged.
+Only the placement dataclass definitions, the resolver and the validators
+changed: every shipped site and composition declaration is untouched.
