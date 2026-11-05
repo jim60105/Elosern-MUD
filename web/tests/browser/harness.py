@@ -253,14 +253,25 @@ class ManagedServer:
         the kernel itself protects the bound ports, so the readiness poll runs
         outside the lock.
         """
+        phases: list[tuple[str, float]] = []
+
+        def mark(name: str, started: float) -> float:
+            now = time.monotonic()
+            phases.append((name, now - started))
+            return now
+
+        at = time.monotonic()
         self._run_migrate()
+        at = mark("migrate", at)
         self._run_seed()
+        at = mark("seed", at)
         with _startup_lock():
             self.runtime.allocate_ports()
             self._clear_pidfiles()
             self._run_boot()
             self._raise_if_joined_foreign_portal()
             self._record_pids()
+        at = mark("boot", at)
         self.ready = fixtures.webclient_ready(
             self.runtime, timeout=self.ready_timeout
         )
@@ -269,6 +280,7 @@ class ManagedServer:
                 "managed server did not become ready in time\n"
                 + self._diagnostics()
             )
+        at = mark("ready", at)
         # The portal answering is not the world being up: the server process
         # runs its ordered startup steps a few seconds later, and a session that
         # logs in before them commits a snapshot resolved without them (a scene
@@ -280,6 +292,7 @@ class ManagedServer:
                 "the server's world bootstrap never finished\n"
                 + self._diagnostics()
             )
+        at = mark("world", at)
         # A booted world is not a rendering website: a fresh runtime can answer
         # the webclient template while Django pages still return an empty 200
         # during the first-boot restart the login helper documents, and every
@@ -293,6 +306,16 @@ class ManagedServer:
             raise HarnessError(
                 "the Django auth page never rendered\n" + self._diagnostics()
             )
+        mark("web", at)
+        # Phase timings are the only way to price a browser shard: the shard
+        # budget is dominated by this boot, and the runner's log is the only
+        # measurement the rebalancing may use. Diagnostic output only.
+        print(
+            "harness timing: "
+            + " ".join(f"{name}={seconds:.3f}s" for name, seconds in phases)
+            + f" total={sum(seconds for _, seconds in phases):.3f}s",
+            flush=True,
+        )
         self.started = True
 
     def _raise_if_joined_foreign_portal(self) -> None:
