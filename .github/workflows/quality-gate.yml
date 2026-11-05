@@ -216,6 +216,11 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.62.0-noble
       options: --ipc=host
+      # GitHub points HOME at a user-owned directory inside the container.
+      # Firefox refuses to run as root against a home it does not own, so the
+      # image's own root home is used for the whole job.
+      env:
+        HOME: /root
     timeout-minutes: 20
     strategy:
       fail-fast: false
