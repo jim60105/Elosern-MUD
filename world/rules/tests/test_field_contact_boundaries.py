@@ -267,7 +267,13 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
         register_regional_population()
+        from world.rules import clock as clock_module
+
+        self.addCleanup(
+            clock_module._EVENT_SOURCES.pop, population_lifecycle.STAGE_KIND, None
+        )
         register_field_contact_stage()
+        self.addCleanup(clock_module._EVENT_SOURCES.pop, "field_contact", None)
         self.clock = get_world_clock()
         self.clock._persist(0)
         self.clock.tick = 0

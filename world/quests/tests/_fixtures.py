@@ -18,6 +18,7 @@ from world.quests.definitions import (
     RoomLocator,
     register_quest_definition,
 )
+from world.rules import clock as clock_module
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY, QuestReward
 from world.rules.quest_issuance import (
     QUEST_ISSUANCE_REGISTRY,
@@ -31,10 +32,10 @@ from world.quests.transitions import apply_quest_log_replacement
 
 
 class QuestRegistryIsolation:
-    """Snapshot and restore the process-global quest registries.
+    """Snapshot and restore the process-global quest-facing registries.
 
-    All four ``_PROCESS_GLOBAL_REGISTRIES`` are module-global and shared across
-    the whole test process; every quest test restores whatever it found.
+    Every ``_PROCESS_GLOBAL_REGISTRIES`` entry is module-global and shared
+    across the whole test process; every quest test restores whatever it found.
     """
 
     def setUp(self):
@@ -51,12 +52,17 @@ class QuestRegistryIsolation:
         super().tearDown()
 
 
-#: The process-global registries shared across the whole test process.
+#: The process-global registries shared across the whole test process. The
+#: clock's event sources belong here too: a quest test that boots the server
+#: (``at_server_start``) registers the population and contact stages, and a
+#: leak makes every later clock advance in the same worker run those stages
+#: against whatever catalogs the later test happens to have in scope.
 _PROCESS_GLOBAL_REGISTRIES = (
     QUEST_DEFINITION_REGISTRY,
     GUILD_OFFER_REGISTRY,
     SCENE_REQUIREMENT_REGISTRY,
     QUEST_ISSUANCE_REGISTRY,
+    clock_module._EVENT_SOURCES,
 )
 
 

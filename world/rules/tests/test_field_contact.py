@@ -110,7 +110,14 @@ class _ContactBase(BattlefieldIsolation, EvenniaTestCase):
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
         register_regional_population()
+        from world.maps import population_lifecycle
+        from world.rules import clock as clock_module
+
+        self.addCleanup(
+            clock_module._EVENT_SOURCES.pop, population_lifecycle.STAGE_KIND, None
+        )
         register_field_contact_stage()
+        self.addCleanup(clock_module._EVENT_SOURCES.pop, "field_contact", None)
         self.origin = create_object(Room, key="contact origin")
         self.destination = create_object(Room, key="contact destination")
         self.player = _player("contact player")
