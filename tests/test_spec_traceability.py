@@ -109,12 +109,18 @@ class PreArchiveRetirementTests(unittest.TestCase):
         delta.parent.mkdir(parents=True)
         delta.write_text(RETIRING_DELTA, encoding="utf-8")
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_only_removed_and_renamed_from_requirements_retire(self):
         with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
             self._write_delta(root)
             retiring = retiring_requirements(root, "retire-old")
         self.assertEqual(retiring, {"sample::old-behavior", "sample::old-name"})
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_retiring_requirements_are_tolerated_but_others_still_fail(self):
         with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
             self._write_delta(root)
@@ -123,6 +129,9 @@ class PreArchiveRetirementTests(unittest.TestCase):
         self.assertEqual(report.uncovered, ("sample::changed-behavior",))
         self.assertFalse(report.ok)
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_check_without_change_stays_strict(self):
         with fixture_repository(RETIRING_SPEC, ANNOTATED_TEST) as root:
             self._write_delta(root)
@@ -130,6 +139,9 @@ class PreArchiveRetirementTests(unittest.TestCase):
         self.assertEqual(report.retiring, ())
         self.assertIn("sample::old-behavior", report.uncovered)
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_cli_change_passes_when_only_retiring_requirements_are_uncovered(self):
         spec = "### Requirement: Useful behavior\n### Requirement: Old behavior\n"
         with fixture_repository(spec, ANNOTATED_TEST) as root:
@@ -139,12 +151,18 @@ class PreArchiveRetirementTests(unittest.TestCase):
                 tolerant = main(["--repo-root", str(root), "check", "--change", "retire-old"])
         self.assertEqual((strict, tolerant), (1, 0))
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_change_without_delta_specs_retires_nothing(self):
         with fixture_repository(SPEC, ANNOTATED_TEST) as root:
             (root / "openspec" / "changes" / "content-only").mkdir(parents=True)
             retiring = retiring_requirements(root, "content-only")
         self.assertEqual(retiring, frozenset())
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-traceability-tolerates-only-requirements-the-named-change-retires"
+    )
     def test_cli_rejects_unknown_or_unsafe_change_names(self):
         with fixture_repository(SPEC, ANNOTATED_TEST) as root:
             with patch("sys.stderr"):

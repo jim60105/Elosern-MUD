@@ -7,6 +7,7 @@ from unittest.mock import patch
 import yaml
 
 from tools import contract_gate
+from tools.spec_traceability import covers_requirement
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,9 @@ class ContractGateTests(unittest.TestCase):
     def test_unknown_gate_is_rejected_before_anything_runs(self):
         self.assertEqual(contract_gate.main(["no-such-gate"]), 2)
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-gates-forward-the-change-name-only-to-traceability"
+    )
     def test_change_is_forwarded_only_to_the_traceability_check(self):
         for argv in (["--change", "retire-old", "traceability"], ["traceability", "--change=retire-old"]):
             with self.subTest(argv=argv), patch.object(contract_gate.subprocess, "run") as run:
@@ -41,12 +45,18 @@ class ContractGateTests(unittest.TestCase):
                     ["-m", "tools.spec_traceability", "check", "--change", "retire-old"],
                 )
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-gates-forward-the-change-name-only-to-traceability"
+    )
     def test_traceability_without_change_stays_strict(self):
         with patch.object(contract_gate.subprocess, "run") as run:
             run.return_value.returncode = 0
             self.assertEqual(contract_gate.main(["traceability"]), 0)
             self.assertEqual(run.call_args.args[0][1:], ["-m", "tools.spec_traceability", "check"])
 
+    @covers_requirement(
+        "spec-test-traceability::pre-archive-gates-forward-the-change-name-only-to-traceability"
+    )
     def test_malformed_change_is_rejected_before_anything_runs(self):
         for argv in (["--change"], ["--change="], ["--change", "--x"], ["--change", "a", "--change", "b"]):
             with self.subTest(argv=argv), patch.object(contract_gate.subprocess, "run") as run:
