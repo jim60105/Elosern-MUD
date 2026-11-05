@@ -350,8 +350,13 @@ def graft_synth_defeat_rulebook() -> None:
 
     archetype_defaults = _behaviour.MONSTER_BEHAVIOUR_YAML["tier_default_archetype"]
     ladder = ("instinctive", "pack_hunter")
+    grafted: dict[str, str] = {}
     for index, tier_key in enumerate(sorted(SYNTH_MONSTER_TIERS)):
         archetype_defaults.setdefault(tier_key, ladder[min(index, len(ladder) - 1)])
+        grafted[tier_key] = archetype_defaults[tier_key]
+    # The resolved tuning copied the defaults it read at import, so the kit
+    # tiers above reach the AI only once the installed record carries them.
+    _behaviour.install_tier_defaults(grafted)
 
     import yaml
     from dataclasses import replace

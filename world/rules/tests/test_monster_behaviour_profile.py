@@ -141,3 +141,29 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
             resolve_behaviour_profile(monster),
             BEHAVIOUR_PROFILES["tactical_caster"],
         )
+
+    def test_a_tier_default_installed_after_import_reaches_resolution(self):
+        """A tier this process mounts later still resolves one archetype."""
+        from world.rules import monster_behaviour as behaviour
+
+        monster = type(
+            "MonsterFixture",
+            (),
+            {"threat_tier": "t_grafted", "behaviour_tree": None},
+        )()
+        before = behaviour.resolve_monster_ai(monster)
+        self.assertIs(
+            before.invalid_reason, behaviour.InvalidDecisionReason.INVALID_BINDING
+        )
+        self.addCleanup(
+            setattr, behaviour, "MONSTER_AI_TUNING", behaviour.MONSTER_AI_TUNING
+        )
+        installed = behaviour.install_tier_defaults({"t_grafted": "instinctive"})
+        after = behaviour.resolve_monster_ai(monster)
+        self.assertEqual(after.archetype_key, "instinctive")
+        self.assertIsNone(after.invalid_reason)
+        # A tier default is a decision-relevant input, so the record's
+        # fingerprint changes with it.
+        self.assertNotEqual(installed.fingerprint, before.tuning_fingerprint)
+        with self.assertRaises(behaviour.MonsterBehaviourConfigError):
+            behaviour.install_tier_defaults({"t_grafted": "no_such_archetype"})

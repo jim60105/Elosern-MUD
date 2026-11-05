@@ -708,6 +708,46 @@ def _load_ai_tuning(
 MONSTER_AI_TUNING = _load_ai_tuning(MONSTER_BEHAVIOUR_YAML)
 
 
+def install_tier_defaults(defaults: Mapping[str, str]) -> MonsterAITuning:
+    """Install the resolved tuning with extra tier defaults.
+
+    The tuning is resolved once at import and holds a copy of the tier defaults
+    it read, so a tier this process mounts afterwards has no archetype and every
+    monster on it reports an unusable binding. A whole re-resolution cannot
+    serve that case -- the install that mounts such a tier may carry a
+    vocabulary the shipped rulebook names -- so the extension applies to the
+    record already resolved. The fingerprint is recomputed because a tier
+    default is a decision-relevant input.
+    """
+    global MONSTER_AI_TUNING
+    current = MONSTER_AI_TUNING
+    merged = dict(current.tier_defaults)
+    for tier, archetype in defaults.items():
+        merged[tier] = archetype
+    unknown = sorted(
+        f"{tier}->{archetype}"
+        for tier, archetype in merged.items()
+        if archetype not in current.behaviour_profiles
+    )
+    if unknown:
+        raise _configuration_error(
+            f"tier defaults name unregistered archetypes {unknown}"
+        )
+    MONSTER_AI_TUNING = replace(
+        current,
+        tier_defaults=MappingProxyType(merged),
+        fingerprint=_tuning_fingerprint(
+            candidate_budget=current.candidate_budget,
+            defaults=merged,
+            profiles=current.behaviour_profiles,
+            intelligence=current.variant_intelligence,
+            modes=current.variant_decision_mode,
+            bindings=current.variant_bindings,
+        ),
+    )
+    return MONSTER_AI_TUNING
+
+
 def _invalid_binding(fingerprint: str) -> MonsterAIDecision:
     """The typed state of a monster whose actual stored binding is unusable."""
     return MonsterAIDecision(

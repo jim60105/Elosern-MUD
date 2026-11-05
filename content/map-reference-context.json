@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "23bba3022ddcf48da68b24dfdeac97849344a3e75bd37d0d5fcafdecd9686b4b",
+  "fingerprint": "eb34e4323df68feacc019023d8f59bc827c44a99a3a42639dd6a646c1a4d4a8d",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1169,7 +1169,7 @@
     "world/rules/monster_ai/snapshot.py": "2566f9b0cf373b7653b19da511ef273043669785797e55742a0684cab8cc0a01",
     "world/rules/monster_ai/trace.py": "159ef938a74fea37ed86dffe79496abf6477efc60fe5d085743bdad9f9a4c649",
     "world/rules/monster_ai/utility.py": "0ae217655d0e4e1c2e8a7b1ade154f73cdb24d72072efa901c856b8dd065fbe4",
-    "world/rules/monster_behaviour.py": "d5f896aa62a3df3384f134054a8d17249d0eba0f5e1aff6259dc6a0d69f17255",
+    "world/rules/monster_behaviour.py": "57e58f8022e94ca5dac89353245c6bfb701f487b5222381677a58e33fe7f3dcf",
     "world/rules/monster_individual.py": "aacf9a52419bfff9677495d5305e8b7380bb375905c10268e4287c0f5e8773fd",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_edges.py": "dc07fce13e91bee630557ce493bc1089855ffba5b28285ac32c51bdf1239006e",
