@@ -1342,8 +1342,8 @@ uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test
   -> Ran 78 tests, OK
 uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population
   -> Ran 28 tests, OK
-uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population_recovery
-  -> Ran 24 tests, OK (see the retained-database note below)
+uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --noinput world.maps.tests.test_regional_population_recovery
+  -> Ran 24 tests, OK (fresh database; see the retained-database note below)
 uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
   -> Ran 12 tests, OK
 uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
@@ -1366,11 +1366,11 @@ uv run --locked python -m tools.contract_gate
 
 No new test module was added, so `.github/evennia-shards.json` is unchanged.
 
-The recovery suite first failed with `monster_activity_group_exists` and a
-`round != victory` assertion while the shared retained test database carried
-state from the interrupted first run; rerunning the same label against a clean
-per-test transaction settled both, and the final run above is the recorded
-evidence. `_reset` in that suite now clears the map-owned activity record with
-the rest of the population state a fresh world starts without, and the real
-session fixture joins a zone-born individual's own group instead of
-re-registering it.
+The recovery suite reproduces the repository's known retained-database
+`round != victory` symptom when the shared retained test database has drifted;
+omitting `--keepdb` and running with `--noinput` against a freshly created
+database is the recorded evidence above. An earlier retained-database run also
+surfaced `monster_activity_group_exists` from the same drift. `_reset` in that
+suite now clears the map-owned activity record with the rest of the population
+state a fresh world starts without, and the real session fixture joins a
+zone-born individual's own group instead of re-registering it.
