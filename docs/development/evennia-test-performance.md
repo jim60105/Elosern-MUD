@@ -507,3 +507,49 @@ Evennia import 與該 class 競爭 CPU。
 
 editor 的完整世界契約維持不變：兩個 moved-node method 仍各自在完整世界上
 做一次真實收斂（本機 4 tests 78.6 秒），不靠縮小 fixture 換時間。
+
+### 2026-11-05：以 run 42025038878 的每測試實測重新打包，46 → 60 個 Evennia 分片、78 → 84 個瀏覽器分片
+
+CI run 42025038878（`bc43efa6`，138 個工作）的實測顯示 5 個 evennia 分片與 4 個
+瀏覽器分片超過 360 秒，其中最嚴重的是 `maps-34` 的 **2,506 秒**。該輪 log 的
+`--durations 0` 與瀏覽器 driver 逐 method 輸出即為本次重新打包的唯一輸入。
+
+**evennia 的實際成本結構**：`maps-34` 的 2,506 秒並非分片分配問題，而是三個
+「跨 reload/re-entry 的 cleared one-shot site」測試本身：
+
+| 測試 | CI 時間 |
+|---|---:|
+| `test_monster_sites.MonsterSiteLifecycleTests.test_a_one_shot_site_stays_cleared_across_advances_and_re_entry` | 2,117.8 s |
+| `test_content_expansion_sites.TransferStationEncounterTests.test_a_cleared_one_shot_site_stays_cleared_across_reload_settlement_read_and_acceptance` | 1,065.0 s |
+| `test_content_expansion_sites.HighTierBossEncounterTests.test_defeating_the_crocodile_boss_leaves_the_site_cleared_across_reload_revisit_read_and_acceptance` | 903.0 s |
+
+三者都以「清空一次性 site 後整天 skip」為主體。本機量測（把 86,400 秒的 advance
+暫改成 600 秒）顯示 `population_lifecycle._settle_population_at` 在 600 秒內被
+呼叫 15 次（邊界序列 60, 90, 120, 180, 240, 270, 300, …，即 30 至 60 秒一次），
+一個 method 約 7 秒；換算整天 skip 為 2,880 次邊界結算，CI 上每次約 0.7 秒，
+正好對上 2,000 秒級的實測。這是**每次邊界結算的成本**與**30 秒一次的 blocked
+recovery 重試節奏**相乘的結果，不是分片能解決的問題。
+
+因此本次**只切不混**地重新分配，並保留這個已知下限：
+
+- evennia：46 → **60 個分片**。每個超過 700 秒序列成本的分片切成連續片段
+  （`maps-34` 切成 4 個，`webclient-21`、`rules-6`、`rules-13`、`maps-28`、
+  `webclient-40`、`rules-12`、`rules-2`、`rules-4`、`quests-15`、`rules-11`、
+  `quests-16`、`commands-19`、`rules-1`、`maps-37` 各切成 2 至 3 個），標籤順序
+  不交換，`server` 套件標籤維持完整。
+- browser：78 → **84 個分片**。逐 method 實測換算後，把 `packed-13`（501 秒）、
+  `packed-56`（388 秒）、`packed-61`（1,174 秒）、`packed-51`（722 秒）的
+  `files_a`／`files_b` 各自切成等量連續片段並重新配對，讓每個清單的 method
+  總和降到 90 秒附近；`test_browser_dream_artwork`（單一 method 286.6 秒）與
+  `test_browser_exploration_actions…test_safe_wait_until_dawn`（209.0 秒）是單一
+  method 的下限，只能各自獨佔一個清單。
+
+兩個 manifest 通過 `tests.test_evennia_test_optimization_contract` 與
+`tests.test_quality_gate_contract`（索引唯一且排序、每個標籤恰好一個擁有者、
+每個清單非空）。
+
+**尚未解決的下限**：`maps-34` 的兩個新分片仍會各花約 2,000 秒，因為它們各自帶著
+一個上述的整天-skip 測試；`packed-56` 的分片仍約 290 + 固定開銷秒。要讓它們進入
+6 分鐘預算，下一步必須降低 `_settle_population_at` 的每次成本或讓 blocked
+recovery 不要在每 30 秒重試，再把 `day`-skip 的邊界數從 2,880 降下來；繼續切
+分片不會有幫助。
