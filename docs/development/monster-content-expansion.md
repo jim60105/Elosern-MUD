@@ -294,3 +294,202 @@ here with its disposition.
 * Comprehension-bound group members were suggested as an additional accepted
   form. Rejected: no representative module constructs individuals inside a
   comprehension, so the extra AST branch would be untested generality.
+
+## 膠掌小鬼
+
+The third delivered weak species of the batch is 膠掌小鬼
+(`sticky_palm_goblin`) with its ordinary default variant 懸巢型
+(`hanging_nest_forager`): a low-tier, grade-F individual whose only active is
+the contact grab 黏掌抓扯 (`sticky_palm_grab`), an ordinary elementless
+physical strike whose brief agility penalty reaches the struck enemy only when
+the grab lands. Its social policy and habitat compatibility are exactly the
+approved dossier's: two to four individuals forming one cohesive activity
+group, habitat compatibility `western_hills_valleys`, and a retreat-oriented
+ordinary foraging individual behind a defended nest.
+
+The approved taxonomy is kept literally: this is an ordinary animal-level
+monster species whose signalling is calls, knocks and learned object use. No
+beastfolk or civilised-people modelling, language, writing, trade or
+settlement is added, and no placement, nest-building or material-collection
+mechanic is derived from the advisory prose.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* The profile lies wholly inside the low tier's declared bands, and its
+  hit-point pool sits between the shipped low-tier ordinary references rather
+  than at either end, so a created character's single strike is a small
+  fraction of it.
+* Agile climber means the authored agility is above every shipped low-tier
+  ordinary variant's (the rat's is the highest of them) while staying inside
+  the low agility band, with the band's own ceiling left unclaimed.
+* The physical attack is a modest contact grab inside the low attack band; the
+  defense equals the lowest shipped low-tier ordinary defense, so the species
+  reads as thin-skinned and evasive instead of armored.
+* `magic_power` is the only value the tier band admits, and neither the kit nor
+  the innate attack spends MP, so the authored MP pool is zero.
+* The authored SP pool holds at least two casts of the grab's positive SP cost,
+  so a refresh of an aged mount is observable on the species itself.
+* The grab's damage coefficient stays within the shipped low-tier monster kit
+  range `0.8..1.0`, and its short agility penalty is no larger in magnitude
+  than the shipped `rock_echo_stagger_agility_flat` contribution, with a
+  lifetime of the same order as `rock_echo_stagger`.
+
+### Reuse of the enemy hit-rider representative
+
+The new active keeps the same composition signature as the shipped contact
+rider kits: one damage occurrence on enemies followed by a hit-dependent
+enemy buff. Its variant therefore joins that existing composition group
+instead of declaring a new one, and `cliff_stepper` stays the
+stable-key-ordered representative (`"cliff_stepper" < "hanging_nest_forager"`),
+so no test module, representative declaration or shard entry is added.
+
+`EnemyRiderGroupMemberTests` in
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` derives the
+group's members from the shipped declarations and exercises each of them on
+its own rider axis, including this one: its own decision mode offers the owned
+grab against the lone enemy, settlement pays the declared cost once on a miss
+and once on a hit, the landed grab mounts its own effect on the struck enemy
+only and moves that enemy's declared modifier axis, the miss leaves the
+target's state untouched, the same-member control is unchanged throughout, and
+a committed reload keeps both spent pools and the mounted rider.
+
+### Decision mode
+
+`hanging_nest_forager` stays in the permanent legacy decision: it authors
+neither `variant_intelligence` nor `variant_decision_mode`, binds the existing
+`instinctive` archetype, and the legacy body selects the grab because it
+carries a damage occurrence. Design §12.4 therefore does not apply to it — the
+species keeps the legacy flee priority and the archetype's inclusive flee
+threshold, which is where its retreat orientation lives, rather than the
+utility binding the slime and the rat had to take.
+
+### Non-gating observations
+
+Observed with
+`uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_tmp_observation_probe`
+(a temporary probe module, deleted after the run), a 20-decision short
+inspection run of the shipped legacy policy — each iteration lowers the
+actor's current hit points by one, so the cloned-actor guard stays satisfied —
+in a real battlefield holding the constructed individual and one real player
+opponent, followed by one real resolution of the selected grab. This is an
+observation, not a test:
+
+* Candidate count: the legacy body carries no utility trace, so no scored-plan
+  count exists for it; every one of the 20 decisions returned the owned grab
+  itself (`sticky_palm_grab` 20 of 20), which is the `first_owned` behaviour
+  the design records as intended while the grab is affordable.
+* Exclusions and unavailable skills: none.
+* Low-tier role observation from the same run: the resolution succeeded,
+  settlement spent the declared SP once (12 → 7 with the other payable pool
+  untouched at zero), the mounted effect reached the opponent only — a
+  constructed same-species control stayed clean — and the opponent's evaluated
+  bundle moved `agility_flat` 0 → −2 while its authored base agility was
+  unchanged at 10. The debuff is a modifier, not a stored statistic.
+
+### Evidence map
+
+* Identity, literal construction, ownership, AI selection, payment, recipient
+  routing, the landed-hit and miss cases of the declared rider, and the
+  committed reload are established for this variant by
+  `world/rules/tests/test_sway_whistle_sparrow_resource_skill.py::EnemyRiderGroupMemberTests`.
+* The hit-rider and fault-rollback vectors stay owned by the shared rider
+  suites and by the group's representative `cliff_stepper` in
+  `SwayWhistleSparrowResourceSkillSmokeTests`: this check adds the goblin's own
+  axis and does not clone payment ordering, formula or rollback.
+* Movement and flee availability stay governed by their ordinary gates and are
+  owned by the shared flee suites; no clone is added here.
+* The fingerprint moves in `activation.json` because the new buff definition
+  and modifier rule enter the decision-relevant projection every estimate
+  averages over. `activated` and `activation_bindings` are unchanged: this
+  change activates no variant.
+
+### Focused commands and results
+
+The implementation runs the focused labels from the change design plus the
+registry classification, narration and availability contracts the new active
+enters. `/tmp/mud-field-tests.env` contains `MUD_TEST_SETTINGS=1`.
+
+| command | result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-field-tests.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_species_content world.lore.tests.test_monster_visuals` | OK (24 tests) |
+| `... world.lore.tests.test_bestiary_documentation` | OK (13 tests) |
+| `... world.rules.tests.test_sway_whistle_sparrow_resource_skill world.rules.tests.test_monster_composition_coverage` | OK (6 tests) |
+| `... world.rules.tests.test_combat_modifiers.CombatModifierTests` | OK (98 tests) |
+| `... world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests ...test_category_classification ...test_narration_coverage world.skills.tests.test_narration_catalog ...test_out_of_combat_policy` | OK (87 tests) |
+| `... world.rules.tests.test_monster_ai_tuning` | OK (40 tests) |
+| `... world.rules.tests.test_monster_ai_activation.ActivationRecordTests ...ActivationBindingTests ...RollbackTests` | OK (11 tests) |
+| `uv run --locked python tools/monster_ai_manual_reports.py selector` | regenerated: paired difference 0.344 (required >= 0.15), margin met |
+| `uv run --locked python -m tools.map_reference_context --check` | up to date |
+| `uv run --locked openspec validate sticky-palm-goblin-species --strict` | valid |
+| `uv run --locked python -m tools.contract_gate --change sticky-palm-goblin-species` | passed: reference-context, traceability, observability, test-data, manifests, contracts |
+
+One unrelated label is red at this branch's base and not this slice's:
+`world.rules.tests.test_monster_timed_effect_mechanisms` builds its roster with
+`fixture:` keys against persisted objects, while `Battlefield.__post_init__` at
+the base commit requires each roster key to equal `stable_actor_id(entity)`
+(`dbref:<pk>`). The drift comes from the in-progress individual-identity
+cutover; neither the module nor `world/rules/combat/battlefield.py` is touched
+here. This change therefore carries the landed-hit and miss evidence on real
+authored content instead of relying on that synthetic suite.
+
+### Human review of the prose
+
+The public prose was written affirmatively from design §4.2: it describes the
+creature's large ears, long thin limbs and wide palms, the temporary palm
+adhesive that binds twigs, grit and fur into hanging nests and helps it cling
+to rough surfaces, the small group's calls and knocks, the learned use of
+materials people leave behind, the thinning film in rain, and the short loss of
+rhythm after a landed grab. It names no command, buff identifier or resource
+field, and it states the animal-level taxonomy without inventing a people.
+The author-private fields carry the unknown-origin boundary, the authoring
+rationale and one explicitly unverified quarrymen's conjecture. The editorial
+ledger entry records the same read; no test judges prose quality or sentence
+content.
+
+### Review dispositions
+
+The independent plan and final reviews' findings are recorded here with their
+disposition. The plan review's two blocking findings both concerned the new
+derived group-member test and were adopted before implementation:
+
+* The test assumed every member of the hit-rider group is in the legacy
+  decision, but `flock_leader` and `trail_hunter` are activated utility
+  variants. Adopted: the candidacy check branches on the member's own resolved
+  mode — a legacy member must return its own kit against the lone enemy, and a
+  utility member must offer the same kit as a scored plan aimed at that enemy —
+  while the payment, hit, miss and reload assertions stay mode-independent.
+* The group mixes `mp`-plus-`sp` kits with this `sp`-only kit, so a fixed
+  gauge assertion would either raise on the goblin or silently skip a payment
+  on the others. Adopted: payment is asserted through the skill's own declared
+  cost keys and both pools are restored before the hit probe.
+* The module-level `_buff_instances` helper was bound to the representative's
+  key only. Adopted: it takes an optional effect key so a derived member reads
+  its own mounted effect.
+* The manual-evidence README carries the selector fingerprint twice (the
+  regeneration paragraph and the superseded-values paragraph). Adopted: both
+  updated, with the previous value moved into the superseded list.
+* The ledger row had to state the animal-level taxonomy explicitly, because
+  the design requires the depiction to stay distinct from beastfolk. Adopted:
+  the row states it in the ecology face.
+
+The final review over the landed diff raised one blocking finding, adopted:
+
+* The public bestiary section carried negative exclusions — a
+  "they are animals, not a people with language, writing or trade" contrast and
+  a "a missed grab leaves the opponent unaffected" sentence — plus the
+  rulebook-shaped phrase "movement and retreat are decided by the ordinary
+  rules". `docs/lore/monster-creation-guidelines.md` §8 requires public prose to
+  describe what the creature does and to keep exclusions in author-private or
+  developer text. Adopted: the section now states the group's calls, knocks and
+  learned object use affirmatively, states that the rhythm disruption follows a
+  grab that lands, and describes the withdrawal along rock faces and scrub as
+  observed behaviour. The taxonomy exclusion stays in `author_explanation_zh`,
+  the editorial ledger and this document.
+* Its suggestion to assert that the committed reload really returns fresh rows
+  was adopted as well: the derived member test now proves the cache eviction
+  happened instead of passing on an in-memory object.

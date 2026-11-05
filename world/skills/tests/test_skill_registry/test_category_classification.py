@@ -210,6 +210,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "shadow_dance_finale",
                 "mudfilm_guard",
                 "wax_pouch_slip",
+                "sticky_palm_grab",
             },
             SkillCategory.ENHANCEMENT: {
                 "body_enhancement",

@@ -693,6 +693,28 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "wax_cache_forager",
         True,
     ),
+    MonsterSpecies(
+        "sticky_palm_goblin",
+        "膠掌小鬼",
+        "膠掌小鬼是耳大、四肢細長、掌面寬的小鬼型魔獸，活動於丘陵灌木、廢棄採石地與岩棚下。"
+        "掌部的短效黏液將枯枝、碎石及獸毛黏成懸掛巢，也協助牠攀附粗糙表面。",
+        "瘦長身軀覆著淡綠色粗皮，寬掌與細長手指在攀爬時張開。"
+        "指尖帶著黏亮痕跡，身旁的懸巢掛著細枝、繩絮與零碎石片。",
+        "小群個體共同覓食、搬運巢材，以短促啼叫與敲擊傳遞警戒。"
+        "牠們熟練運用手邊物件，能合作驅趕靠近巢穴的動物。"
+        "人類工地留下的繩束、木片及保溫材料容易被搬進巢中；"
+        "巢群占據通風口或岩棚通道時，工人會請人處理。"
+        "黏液適合附著輕小巢材，雨水使膠膜逐漸稀薄。"
+        "近身抓扯讓對手短暫失去動作節奏，覓食個體則傾向沿岩面退避。",
+        ("western_hills_valleys",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；掌部黏液的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階社群型魔物：短效掌部黏液支撐懸掛巢、攀附與輕小巢材收集；"
+        "溝通限於動物式啼叫、敲擊與學習而來的物件使用，與獸人族的登錄與描寫分開。"
+        "戰鬥呈現為抓扯與命中後短暫的動作節奏干擾。",
+        "（作者私有：尚未證實的猜想）採石工人說膠掌小鬼會模仿人類的敲擊節奏，這種說法尚未證實。",
+        "hanging_nest_forager",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -911,6 +933,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "F",
         True,
         active_skill_keys=("wax_pouch_slip",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "hanging_nest_forager",
+        "sticky_palm_goblin",
+        "懸巢型",
+        "普通版本，在岩棚與灌木間搬運巢材、維護懸掛巢。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=38, mp=0, sp=12, atk_phys=7, agility=11, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("sticky_palm_grab",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),

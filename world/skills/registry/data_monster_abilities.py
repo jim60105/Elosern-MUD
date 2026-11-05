@@ -11,6 +11,8 @@ The slime body action is assembled the same way with a self-only defense guard
 and no damage occurrence at all.
 The rat body action is assembled the same way with a self-only agility
 improvement and no damage occurrence at all.
+The goblin contact grab is assembled the same way with elementless physical
+damage plus a hit-dependent agility debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -293,6 +295,45 @@ ROWS: tuple[SkillDef, ...] = (
             EffectPolicy(
                 coefficient=1.0,
                 audience=EffectAudience.SELF,
+            ),
+        ),
+    ),
+    _skill(
+        "sticky_palm_grab",
+        "黏掌抓扯",
+        "以黏亮寬掌抓扯單一敵方目標，造成物理傷害；命中後使對手短暫失去動作節奏，降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 5},
+        # True for every damage-carrying monster ability: the one written
+        # ``usable_out_of_combat`` policy makes every damage-carrying ability
+        # selectable outside combat, and "combat-only" names the action shape
+        # and targeting, never this flag (settled 2026-10-10; same value the
+        # delivered crocodile, sparrow, crab, hare, goat and lynx declare).
+        usable_out_of_combat=True,
+        # A body action, not magic: no element, so no magic tier and no
+        # freeform eligibility. The school stays physical.
+        effects=["damage:none:physical", "buff_apply:sticky_palm_drag"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("sticky_palm_goblin",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            # Occurrence 0 is the ordinary enemy strike.
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+            ),
+            # Occurrence 1 is the hit-dependent rider: the link is only
+            # granted by a landed hit of occurrence 0, so a miss leaves the
+            # struck enemy's agility untouched.
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
             ),
         ),
     ),
