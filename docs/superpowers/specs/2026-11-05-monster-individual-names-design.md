@@ -144,8 +144,21 @@ decides how identity reads. It exports:
 | Combat target prompt | 潮燈蟹 [守礁型] | 閉灣者 [守灣型吞潮鱷] |
 | Figure plate `title` and aria label | name and tag | name and tag |
 
-- Named styling uses an existing gold token through `data-named`. No new colour
-  is added.
+- The named treatment is approved in the Storybook prototype at
+  `docs/design/monster-individual-names/` and is driven by `data-named`.
+- Named styling reuses rank language and adds no new colour or ornament:
+  - The name takes `--gold-400` and `--f-display`, keeping the ordinary size,
+    line height and spacing.
+  - The rail medallion gains an inner gold rule, after `GuildRankCard`'s stamp.
+  - The rail name, the readout name and the target-prompt name sit between two
+    horizontal gold hairlines that fade at both ends.
+  - The figure plate gains the same hairline along its top, and its brass crown
+    stays single.
+- The treatment avoids the client's selection cues: vertical side rules, a single
+  underline, an outer ring, and a doubled crown.
+- The rules are a shape cue, so a named individual does not rely on hue.
+- Every rule is an overlay or background layer. A named box matches an unnamed
+  box in position and size on every surface, and no name is truncated.
 - `presence-rail.js` carries the identity through `railReadout()`, and
   `ExplorationReadout.vue` gains a `tag` prop.
 - `stage_targets.js` carries the identity on member positions, and
@@ -210,7 +223,9 @@ All tests use synthetic fixtures, not shipped species or sites.
   `display_name` mismatch, and agree on schema versions.
 - **Client:** `monster-identity.js` unit tests; rail and plate render a
   five-code-point name with full DOM text; `data-named` appears only on named
-  individuals; the readout and target prompt render the tag.
+  individuals; a named and an unnamed rail entry and plate share one geometry;
+  the named plate works with the `target` and `acting` states; the readout and
+  target prompt render the tag.
 - **Story and quests:** `monster_entries` and event data carry the fields; a
   synthetic named site renders `討伐{name}`.
 
@@ -231,7 +246,8 @@ OpenSpec proposal.
 3. The wire carries `monster_identity` facts and no composed name or tag string.
 4. The rail and plates show the individual or species name without ellipsis at
    the reference scale; the readout and target prompt show the variant.
-5. Named individuals are visibly distinct on the rail and plates.
+5. Named individuals are distinct on the rail and plates by shape as well as
+   colour, without reading as selected and without moving any box.
 6. LLM context and event data expose `individual_name`, and a bound objective on
    a named site renders that name.
 7. `uv run --locked python -m tools.contract_gate` passes, along with the test
