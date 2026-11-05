@@ -1,4 +1,4 @@
-"""Exact schema-version-5 ``exploration`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-7 ``exploration`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes a read-only exploration surface from canonical room,
 entity, component, and service data. It is registered beside ``status``,
@@ -47,6 +47,14 @@ the ordinary editor/party controls, and an unreadable projection is a distinct
 state rather than an empty list. The projection itself is
 ``world.rules.npc_services.project_npc_services``.
 
+Version 7 (monster-individual-names) adds one required, nullable
+``monster_identity`` to every look entity and interact target: ``null`` or
+exactly ``{individual_name, species_name, variant_name}`` facts read through
+``world.rules.monster_individual.monster_identity_view``. A row with a non-null
+identity takes its ``display_name`` from it (the individual name, else the
+species name), never from the object key, and both validators reject a row
+whose display name disagrees. No composed name or tag string is sent.
+
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
 by a dual-direction parity test.
@@ -93,9 +101,15 @@ from web.webclient.presentation.protocol_validation import (
     require_exit_ref,
     require_node_id_shape,
 )
+from web.webclient.presentation.monster_identity import (
+    identity_display_name,
+    monster_identity_payload,
+    validate_monster_identity,
+)
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation.options import _validate_affordance_params
 from world.rules.dialogue import is_dialogue_host, opens_dialogue
+from world.rules.monster_individual import monster_identity_view
 from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
 from world.rules.map_knowledge import (
     KnowledgeError,
@@ -121,9 +135,11 @@ from world.rules.service_view import build_services_view
 
 # Schema 6 (wilderness-map-disclosure D3): a wilderness move row's
 # ``destination`` is nullable when the direction's target is withheld; every
-# other row keeps a canonical non-null destination. Mirrored exactly by the
-# client validator.
-EXPLORATION_SCHEMA_VERSION = 6
+# other row keeps a canonical non-null destination. Schema 7
+# (monster-individual-names): every look entity and interact target carries a
+# required nullable ``monster_identity``. Mirrored exactly by the client
+# validator.
+EXPLORATION_SCHEMA_VERSION = 7
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
@@ -282,7 +298,10 @@ def _validate_affordance(value: Any) -> dict[str, Any]:
 
 def _validate_look_entity(value: Any) -> dict[str, Any]:
     _require_exact_fields(
-        value, "look entity", {"identity", "display_name", "kind", "portrait_ref"}, {}
+        value,
+        "look entity",
+        {"identity", "display_name", "kind", "portrait_ref", "monster_identity"},
+        {},
     )
     identity = _require_identity(value, "identity")
     display_name = _require_str(value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS)
@@ -292,11 +311,15 @@ def _validate_look_entity(value: Any) -> dict[str, Any]:
     if kind not in ENTITY_KINDS:
         raise ProtocolValidationError("entity kind is not a stable value")
     portrait_ref = _validate_portrait_ref(value["portrait_ref"])
+    monster_identity = validate_monster_identity(
+        value["monster_identity"], display_name, MAX_DISPLAY_NAME_CODE_POINTS
+    )
     return {
         "identity": identity,
         "display_name": display_name,
         "kind": kind,
         "portrait_ref": portrait_ref,
+        "monster_identity": monster_identity,
     }
 
 
@@ -342,7 +365,14 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "interact target",
-        {"identity", "display_name", "portrait_ref", "services", "affordances"},
+        {
+            "identity",
+            "display_name",
+            "portrait_ref",
+            "monster_identity",
+            "services",
+            "affordances",
+        },
         {},
     )
     identity = _require_identity(value, "identity")
@@ -350,6 +380,9 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     if not display_name.strip():
         raise ProtocolValidationError("target display_name must be non-empty")
     portrait_ref = _validate_portrait_ref(value["portrait_ref"])
+    monster_identity = validate_monster_identity(
+        value["monster_identity"], display_name, MAX_DISPLAY_NAME_CODE_POINTS
+    )
     services = _validate_services(value["services"], identity)
     affordances = value["affordances"]
     if not isinstance(affordances, list) or len(affordances) > MAX_AFFORDANCES:
@@ -361,6 +394,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
         "identity": identity,
         "display_name": display_name,
         "portrait_ref": portrait_ref,
+        "monster_identity": monster_identity,
         "services": services,
         "affordances": affordances,
     }
@@ -690,6 +724,16 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def _identity_row(obj: Any) -> tuple[str, dict[str, Any] | None]:
+    """The row's ``(display_name, monster_identity)``: identity-derived when present."""
+    identity = monster_identity_payload(
+        monster_identity_view(obj), MAX_DISPLAY_NAME_CODE_POINTS
+    )
+    if identity is None:
+        return _bounded_display_name(obj), None
+    return identity_display_name(identity), identity
+
+
 def _look_entities(
     actor: Any,
     portrait_ref_for: "Callable[[Any], str | None] | None" = None,
@@ -711,12 +755,14 @@ def _look_entities(
     present.sort(key=lambda obj: (int(obj.pk),))
     entities: list[dict[str, Any]] = []
     for obj in present[:MAX_LOOK_ENTITIES]:
+        display_name, monster_identity = _identity_row(obj)
         entities.append(
             {
                 "identity": int(obj.pk),
-                "display_name": _bounded_display_name(obj),
+                "display_name": display_name,
                 "kind": _entity_kind(obj),
                 "portrait_ref": resolve(obj),
+                "monster_identity": monster_identity,
             }
         )
     return entities
@@ -911,11 +957,13 @@ def _interact_targets(
                     "disabled_reason": dis_reason,
                 }
             )
+        display_name, monster_identity = _identity_row(obj)
         targets.append(
             {
                 "identity": int(obj.pk),
-                "display_name": _bounded_display_name(obj),
+                "display_name": display_name,
                 "portrait_ref": resolve(obj),
+                "monster_identity": monster_identity,
                 "services": _services_payload(actor, obj),
                 "affordances": affordances[:MAX_AFFORDANCES],
             }

@@ -221,7 +221,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(
             comparable,
             {
-                "schema_version": 6,
+                "schema_version": 7,
                 "available": True,
                 "kind": "exploration",
                 "move": [
@@ -255,6 +255,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                             "display_name": "公會職員",
                             "kind": "npc",
                             "portrait_ref": portrait_catalog_key(self.host.pk),
+                            "monster_identity": None,
                         },
                         {
                             "identity": int(self.bard.pk),
@@ -264,18 +265,21 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                             # named-policy character, so the bounded art view
                             # does not admit it: the truthful null stands.
                             "portrait_ref": None,
+                            "monster_identity": None,
                         },
                         {
                             "identity": int(self.passerby.pk),
                             "display_name": "路人",
                             "kind": "npc",
                             "portrait_ref": None,
+                            "monster_identity": None,
                         },
                         {
                             "identity": int(self.goblin.pk),
                             "display_name": "哥布林",
                             "kind": "monster",
                             "portrait_ref": None,
+                            "monster_identity": None,
                         },
                     ],
                     "objects": [
@@ -287,6 +291,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.host.pk),
                         "display_name": "公會職員",
                         "portrait_ref": portrait_catalog_key(self.host.pk),
+                        "monster_identity": None,
                         "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
@@ -312,6 +317,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.bard.pk),
                         "display_name": "吟遊詩人",
                         "portrait_ref": None,
+                        "monster_identity": None,
                         "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
@@ -344,6 +350,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.passerby.pk),
                         "display_name": "路人",
                         "portrait_ref": None,
+                        "monster_identity": None,
                         "services": {"state": "none", "entries": []},
                         "affordances": [
                             {
@@ -371,6 +378,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                         "identity": int(self.goblin.pk),
                         "display_name": "哥布林",
                         "portrait_ref": None,
+                        "monster_identity": None,
                         "services": {"state": "none", "entries": []},
                         "affordances": [
                             {

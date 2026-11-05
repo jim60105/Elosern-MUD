@@ -1,4 +1,4 @@
-"""Exact schema-version-7 ``context_actions`` panel and presenter.
+"""Exact schema-version-8 ``context_actions`` panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
@@ -9,6 +9,12 @@ secondary_actions, actors, choices, draft, suggestions.
 In exploration mode it emits the exploration available form carrying the canonical
 affordance vocabulary and the state-backed suggestions envelope.
 Outside both modes it raises :class:`PanelUnavailableError`.
+
+Version 8 (monster-individual-names) adds one required, nullable
+``monster_identity`` to every combat participant (see
+``web.webclient.presentation.monster_identity``); the participant's
+``display_name`` is derived from a non-null identity. The top-level field sets
+and the exploration and unavailable forms are otherwise unchanged.
 """
 
 from typing import Any
@@ -40,6 +46,10 @@ from web.webclient.presentation.protocol import (
     _validate_message,
     json_byte_size,
 )
+from web.webclient.presentation.monster_identity import (
+    monster_identity_payload,
+    validate_monster_identity,
+)
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.combat_view import (
     MAX_ACTORS,
@@ -67,7 +77,7 @@ from world.rules.progression import (
 from world.rules.status_display import CONDITION_SEVERITIES
 from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 7
+CONTEXT_ACTIONS_SCHEMA_VERSION = 8
 
 MAX_CONTEXT_AFFORDANCES = 320
 MAX_AFFORDANCE_LABEL = 128
@@ -181,6 +191,7 @@ def _validate_participant(value: Any) -> dict[str, Any]:
             "hp_maximum",
             "portrait_ref",
             "conditions",
+            "monster_identity",
         },
         {},
     )
@@ -210,6 +221,9 @@ def _validate_participant(value: Any) -> dict[str, Any]:
         if len(portrait_ref) > MAX_PARTICIPANT_REF:
             raise ProtocolValidationError("portrait_ref exceeds its bound")
     conditions = _validate_participant_conditions(value["conditions"])
+    monster_identity = validate_monster_identity(
+        value["monster_identity"], display_name, MAX_DISPLAY_NAME_CODE_POINTS
+    )
     return {
         "identity": identity,
         "token": token,
@@ -220,6 +234,7 @@ def _validate_participant(value: Any) -> dict[str, Any]:
         "hp_maximum": hp_maximum,
         "portrait_ref": portrait_ref,
         "conditions": conditions,
+        "monster_identity": monster_identity,
     }
 
 
@@ -1355,6 +1370,9 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
                 {"code": row.code, "label": row.label, "severity": row.severity}
                 for row in participant.conditions
             ],
+            "monster_identity": monster_identity_payload(
+                participant.monster_identity, MAX_DISPLAY_NAME_CODE_POINTS
+            ),
         }
         for participant in view.participants
     ]

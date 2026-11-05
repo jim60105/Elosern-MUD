@@ -1227,7 +1227,7 @@ class CoordinationRoundTests(EvenniaTestCase):
         self.room = create_object(Room, key="coordination round arena")
 
     def _monster(self, key, *, variant=VARIANT, skills=(STRIKE.key,)):
-        monster = construct_species_individual(SPECIES, variant, key=key)
+        monster = construct_species_individual(SPECIES, variant, individual_name=key)
         monster.location = self.room
         monster.db.skills = {"active": list(skills), "passive": []}
         return monster

@@ -516,10 +516,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                     server_time: s.serverTime,
                     panels: {
                         context_actions: {
-                            // The registered panel version (the v7 party-combat
-                            // cutover); the exploration form's exact field set
-                            // is unchanged.
-                            schema_version: 7,
+                            // The registered panel version (v8 since the
+                            // monster-identity cutover); the exploration form's
+                            // exact field set is unchanged.
+                            schema_version: 8,
                             available: true,
                             kind: 'exploration',
                             affordances: [],

@@ -505,3 +505,44 @@ class UpkeepCommitFailureTests(EvenniaTestCase):
         # commit rolled back with the failing effect.
         self.assertIsNone(self.actor.db.skill_proficiency)
         self.assertIsNone(self.actor.db.magic_xp)
+
+
+class UnattributedCasualtyIdentityTests(EvenniaTestCase):
+    """monster-individual-names: an unattributed casualty's defeat data carries
+    the individual's name beside its identity keys, and only when it has one.
+    Synthetic species rows only."""
+
+    def test_casualty_defeat_data_carries_the_individual_name_when_present(self):
+        from world.rules.monster_individual import construct_species_individual
+        from world.rules.upkeep import _stage_casualties
+        from world.tests.synthetic_data import (
+            SYNTH_MONSTER_SPECIES,
+            SYNTH_MONSTER_VARIANTS,
+            synthetic_registries,
+        )
+
+        captured = []
+
+        def planner(request, log):
+            captured.extend(log.entries)
+            return ()
+
+        with synthetic_registries("monster_species", "monster_variants", "monster_tiers"):
+            species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+            variant = SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"]
+            named = construct_species_individual(
+                species.key, variant.key, individual_name="合成首領"
+            )
+            unnamed = construct_species_individual(species.key, variant.key)
+            field = _field(_player(), named, unnamed)
+            losses = {
+                named.pk: (named, 5.0, 5.0),
+                unnamed.pk: (unnamed, 5.0, 5.0),
+            }
+            with patch("world.rules.upkeep._EVENT_EFFECT_PLANNERS", {"t_capture": planner}):
+                _stage_casualties(field, losses, set())
+        by_target = {entry.data["target_id"]: entry.data for entry in captured}
+        self.assertEqual(by_target[named.pk]["individual_name"], "合成首領")
+        self.assertEqual(by_target[named.pk]["variant_key"], variant.key)
+        self.assertNotIn("individual_name", by_target[unnamed.pk])
+        self.assertEqual(by_target[unnamed.pk]["species_key"], species.key)

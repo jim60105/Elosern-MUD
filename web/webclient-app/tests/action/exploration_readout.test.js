@@ -242,3 +242,37 @@ describe("ExplorationReadout", () => {
     expect(w.classes()).not.toContain("exploration-readout--animated");
   });
 });
+
+// monster-individual-names: the rail readout's monster lead — the name with
+// its client-composed variant tag, the named treatment, and a lead line whose
+// box never changes, so switching entries cannot move the readout's lines.
+describe("ExplorationReadout monster lead", () => {
+  const LINE = ["height", "line-height", "font-size", "margin-top", "margin-bottom", "padding-top", "padding-bottom"];
+  const line = (w) => {
+    const style = getComputedStyle(w.get('[data-testid="exploration-readout-lead"]').element);
+    return Object.fromEntries(LINE.map((prop) => [prop, style.getPropertyValue(prop)]));
+  };
+
+  it("shows the name and the tag, and a named individual's name in the named treatment", () => {
+    const unnamed = mount(ExplorationReadout, { props: { lead: "合成鶉", tag: "合成型", text: "戰鬥" } });
+    expect(unnamed.get('[data-testid="exploration-readout-name"]').text()).toBe("合成鶉");
+    expect(unnamed.get('[data-testid="exploration-readout-tag"]').text()).toBe("合成型");
+    expect(unnamed.get('[data-testid="exploration-readout-lead"]').attributes("data-named")).toBeUndefined();
+    const named = mount(ExplorationReadout, { props: { lead: "合成首領", tag: "合成型合成鶉", named: true, text: "戰鬥" } });
+    expect(named.get('[data-testid="exploration-readout-lead"]').attributes("data-named")).toBe("true");
+    expect(named.get('[data-testid="exploration-readout-tag"]').text()).toBe("合成型合成鶉");
+    const person = mount(ExplorationReadout, { props: { lead: "店長", text: "交談" } });
+    expect(person.find('[data-testid="exploration-readout-tag"]').exists()).toBe(false);
+    expect(person.get('[data-testid="exploration-readout-lead"]').text()).toBe("店長");
+  });
+
+  it("keeps one fixed lead line with or without a tag or the named face", () => {
+    const plain = mount(ExplorationReadout, { props: { lead: "店長", text: "交談" } });
+    const tagged = mount(ExplorationReadout, { props: { lead: "合成鶉", tag: "合成型", text: "戰鬥" } });
+    const named = mount(ExplorationReadout, { props: { lead: "合成首領", tag: "合成型合成鶉", named: true, text: "戰鬥" } });
+    expect(line(tagged)).toEqual(line(plain));
+    expect(line(named)).toEqual(line(plain));
+    expect(line(plain).height).not.toBe("");
+    expect(line(plain).height).toBe(line(plain)["line-height"]);
+  });
+});

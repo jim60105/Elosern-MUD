@@ -40,7 +40,11 @@ from world.lore.monster_placement import (
     composition_row_bindings,
     variant_species_key,
 )
-from world.lore.monster_species import MonsterSpecies, MonsterVariant
+from world.lore.monster_species import (
+    MONSTER_NAME_MAX_CODE_POINTS,
+    MonsterSpecies,
+    MonsterVariant,
+)
 from world.lore.sync import (
     MONSTER_PLACEMENT_CATEGORIES,
     _ALL_REGISTRIES,
@@ -66,7 +70,7 @@ AREA = "t_fixture_activity_area"
 ACTIVITY = "t_fixture_activity"
 OTHER_ACTIVITY = "t_fixture_other_activity"
 ABSENT_ACTIVITY = "t_fixture_absent_activity"
-LABEL = "t_fixture_label"
+LABEL = "合成首領"
 
 # The registry's public callables, in full: read and validate. An execution
 # entry point (spawn/place/populate/reconcile/respawn/recover) would have to
@@ -495,11 +499,11 @@ class MemberActivityBindingTests(unittest.TestCase):
         self.assertIn(ABSENT_ACTIVITY, str(raised.exception))
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_a_label_requires_every_outcome_to_be_exactly_one_individual(self):
         registry.validate_monster_placement_registry(
-            {SITE: _site(individual_label_zh=LABEL)}, **_faces()
+            {SITE: _site(individual_name_zh=LABEL)}, **_faces()
         )
         # A fixed pair and one variable row both admit several individuals.
         for members in (
@@ -511,7 +515,7 @@ class MemberActivityBindingTests(unittest.TestCase):
                     registry.validate_monster_placement_registry(
                         {
                             SITE: _site(
-                                capacity=2, individual_label_zh=LABEL
+                                capacity=2, individual_name_zh=LABEL
                             )
                         },
                         **_faces(
@@ -522,15 +526,25 @@ class MemberActivityBindingTests(unittest.TestCase):
                     )
 
     @covers_requirement(
-        "monster-site-placement::a-designated-site-individual-carries-an-authored-display-label"
+        "monster-site-placement::a-designated-site-individual-carries-an-authored-individual-name"
     )
     def test_an_empty_label_is_rejected(self):
         for label in ("", 0):
             with self.subTest(label=label):
                 with self.assertRaises(MonsterPlacementRegistryError):
                     registry.validate_monster_placement_registry(
-                        {SITE: _site(individual_label_zh=label)}, **_faces()
+                        {SITE: _site(individual_name_zh=label)}, **_faces()
                     )
+
+    def test_a_name_over_the_shared_bound_is_rejected(self):
+        at_bound = "合" * MONSTER_NAME_MAX_CODE_POINTS
+        registry.validate_monster_placement_registry(
+            {SITE: _site(individual_name_zh=at_bound)}, **_faces()
+        )
+        with self.assertRaises(MonsterPlacementRegistryError):
+            registry.validate_monster_placement_registry(
+                {SITE: _site(individual_name_zh=at_bound + "合")}, **_faces()
+            )
 
 
 class EcologyDeclarationTests(unittest.TestCase):

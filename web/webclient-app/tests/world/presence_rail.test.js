@@ -270,8 +270,8 @@ describe("PresenceRail", () => {
     await slots(w)[3].trigger("mouseenter");
     await slots(w)[3].trigger("mouseleave");
     expect(w.emitted("hover")).toEqual([
-      [{ lead: "合成職員", text: "交談／公會服務", tone: "normal" }],
-      [{ lead: "任務板", text: "查看", tone: "normal" }],
+      [{ lead: "合成職員", text: "交談／公會服務", tone: "normal", tag: null, named: false }],
+      [{ lead: "任務板", text: "查看", tone: "normal", tag: null, named: false }],
       [null],
     ]);
   });
@@ -289,5 +289,91 @@ describe("PresenceRail", () => {
     const w = mountRail({ entries: entriesFor(ROOM) });
     rail(w).element.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
     expect(w.emitted("tab")[0][0].backward).toBe(true);
+  });
+});
+
+// monster-individual-names (design D6): a named individual's rank treatment
+// takes no layout space, keeps the full name, and leaves unnamed entries and
+// the focus cues as they were. Synthetic names only; jsdom has no layout, so
+// geometry is the box-affecting computed styles the component declares.
+describe("PresenceRail named individuals", () => {
+  let wrapper;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  const NAMED = { individual_name: "潮眠合成者", species_name: "合成鱷", variant_name: "合成型" };
+  const UNNAMED = { individual_name: null, species_name: "合成蟹類", variant_name: "合成型" };
+  const ENTRIES = () =>
+    ExplorationMenu.presenceEntries(
+      explorationPanelFixture({
+        targets: [
+          { identity: 41, name: "潮眠合成者", kind: "monster", monsterIdentity: NAMED, affordances: [AFFORDANCES.engage] },
+          { identity: 42, name: "合成蟹類甲", kind: "monster", affordances: [AFFORDANCES.engage] },
+          { identity: 43, name: "合成蟹類", kind: "monster", monsterIdentity: UNNAMED, affordances: [AFFORDANCES.engage] },
+        ],
+      }),
+    );
+  // jsdom keeps declared shorthands unexpanded, so both the shorthands and
+  // the longhands are compared.
+  const BOX = [
+    "width",
+    "height",
+    "max-width",
+    "box-sizing",
+    "padding",
+    "margin",
+    "border",
+    "border-width",
+    "font-size",
+    "line-height",
+    "letter-spacing",
+    "position",
+    "inset",
+  ];
+  const box = (el) => {
+    const style = getComputedStyle(el);
+    return Object.fromEntries(BOX.map((prop) => [prop, style.getPropertyValue(prop)]));
+  };
+
+  function mountNamed() {
+    wrapper = mount(PresenceRail, { attachTo: document.body, props: { motionLevel: "off", entries: ENTRIES() } });
+    return wrapper.findAll('[data-testid="presence-entry"]');
+  }
+
+  it("marks only the named individual, with its full five-code-point name", () => {
+    const [named, plain, unnamed] = mountNamed();
+    expect(named.attributes("data-named")).toBe("true");
+    expect(plain.attributes("data-named")).toBeUndefined();
+    expect(unnamed.attributes("data-named")).toBeUndefined();
+    expect(named.get('[data-testid="presence-entry-name"]').element.textContent).toBe("潮眠合成者");
+    expect(named.attributes("aria-label")).toBe("潮眠合成者");
+  });
+
+  it("gives a named and an unnamed entry of equal name length one geometry", () => {
+    const [named, plain] = mountNamed();
+    for (const selector of [".presence-rail__medal", ".presence-rail__name"]) {
+      const namedBox = box(named.get(selector).element);
+      expect(namedBox.width || namedBox.height).not.toBe("");
+      expect(namedBox).toEqual(box(plain.get(selector).element));
+    }
+    // The treatment swaps only colour and face on the name, and the name keeps
+    // its one fixed line box.
+    const namedName = getComputedStyle(named.get(".presence-rail__name").element);
+    const plainName = getComputedStyle(plain.get(".presence-rail__name").element);
+    expect(namedName.fontFamily).not.toBe(plainName.fontFamily);
+    expect(namedName.height).toBe("1.5em");
+  });
+
+  it("feeds the readout the variant tag and the named flag", async () => {
+    const [named, , unnamed] = mountNamed();
+    await named.trigger("mouseenter");
+    await unnamed.trigger("mouseenter");
+    expect(wrapper.emitted("hover")).toEqual([
+      [{ lead: "潮眠合成者", text: "戰鬥", tone: "normal", tag: "合成型合成鱷", named: true }],
+      [{ lead: "合成蟹類", text: "戰鬥", tone: "normal", tag: "合成型", named: false }],
+    ]);
   });
 });

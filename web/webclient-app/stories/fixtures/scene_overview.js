@@ -25,7 +25,9 @@ function exitRow(exit, index) {
 }
 
 // A synthesized available `exploration` panel at the current schema version
-// (v5). `targets` are interact descriptors (`{identity, name, affordances, services}`),
+// (v7). `targets` are interact descriptors (`{identity, name, affordances,
+// services, monsterIdentity}`; a target's `monsterIdentity` is the wire
+// `monster_identity` and its `name` must then be the identity's name),
 // `entities` extra present characters with no interact descriptor, `objects`
 // look-only things, and `portraits` maps an identity to the wire-valid
 // decimal `portrait_ref` the presenter would supply (null everywhere else).
@@ -40,7 +42,7 @@ export function explorationPanelFixture({
 } = {}) {
   const refFor = (identity) => (Object.hasOwn(portraits, identity) ? portraits[identity] : null);
   return {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "exploration",
     move: exits.map(exitRow),
@@ -52,12 +54,14 @@ export function explorationPanelFixture({
           display_name: target.name,
           kind: target.kind || "npc",
           portrait_ref: refFor(target.identity),
+          monster_identity: target.monsterIdentity || null,
         })),
         ...entities.map((entity) => ({
           identity: entity.identity,
           display_name: entity.name,
           kind: "character",
           portrait_ref: refFor(entity.identity),
+          monster_identity: null,
         })),
       ],
       objects: objects.map((object) => ({ identity: object.identity, display_name: object.name })),
@@ -66,6 +70,7 @@ export function explorationPanelFixture({
       identity: target.identity,
       display_name: target.name,
       portrait_ref: refFor(target.identity),
+      monster_identity: target.monsterIdentity || null,
       services: target.services || { state: "none", entries: [] },
       affordances: target.affordances || [],
     })),

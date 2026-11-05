@@ -5,6 +5,7 @@ import math
 from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
+from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from web.webclient.presentation.combat_panel import validate_context_actions
 from web.webclient.presentation.context import FrozenCard, OptionsSnapshot, PresentationContext
@@ -291,7 +292,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "exploration")
-        self.assertEqual(payload["schema_version"], 7)
+        self.assertEqual(payload["schema_version"], 8)
         self.assertNotIn("session", payload)
         self.assertNotIn("participants", payload)
         self.assertNotIn("root_actions", payload)
@@ -754,7 +755,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
-        self.assertEqual(payload["schema_version"], 7)
+        self.assertEqual(payload["schema_version"], 8)
         self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
         self.assertNotIn("affordances", payload)
         self.assertNotIn("suggestions", payload)
@@ -762,3 +763,108 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ContextActionsMonsterIdentityTests(BattlefieldIsolation, EvenniaTestCase):
+    """Schema-8 participant ``monster_identity`` (synthetic species rows only)."""
+
+    def setUp(self):
+        from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, SYNTH_MONSTER_VARIANTS
+
+        open_synthetic_scope(
+            self,
+            "skills",
+            "elements",
+            "sexual_acts",
+            "monster_species",
+            "monster_variants",
+            "monster_tiers",
+            extra=_presenter_scope_extra(),
+        )
+        super().setUp()
+        self.species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+        self.ordinary = SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"]
+        self.stronger = SYNTH_MONSTER_VARIANTS["t_whisper_quail_stronger"]
+        self.room = create_object(Room, key="名牌競技場")
+        self.player = _player()
+        self.player.location = self.room
+        self.registry = build_production_registry()
+
+    def _foe(self, variant, **kwargs):
+        from world.rules.monster_individual import construct_species_individual
+
+        monster = construct_species_individual(self.species.key, variant.key, **kwargs)
+        monster.location = self.room
+        return monster
+
+    def _render(self):
+        return self.registry.render(
+            "context_actions", PresentationContext(actor=self.player, protocol_version=1)
+        )
+
+    def test_participants_carry_identity_facts(self):
+        named = self._foe(self.stronger, individual_name="合成首領")
+        unnamed = self._foe(self.ordinary)
+        tier_only = create_object(Monster, key="合成散兵", location=self.room)
+        tier_only.threat_tier = "t_faint"
+        tier_only.apply_monster_tier("floor")
+        engage(self.player, named)
+        payload = self._render()
+        self.assertEqual(payload["schema_version"], 8)
+        rows = {p["identity"]: p for p in payload["participants"]}
+        self.assertIsNone(rows[self.player.pk]["monster_identity"])
+        self.assertEqual(rows[named.pk]["display_name"], "合成首領")
+        self.assertEqual(
+            rows[named.pk]["monster_identity"],
+            {
+                "individual_name": "合成首領",
+                "species_name": self.species.display_name_zh,
+                "variant_name": self.stronger.display_name_zh,
+            },
+        )
+        for row in payload["participants"]:
+            self.assertNotIn("variant_tag", row)
+        for other in (unnamed, tier_only):
+            if other.pk in rows:
+                expected = (
+                    None
+                    if other is tier_only
+                    else {
+                        "individual_name": None,
+                        "species_name": self.species.display_name_zh,
+                        "variant_name": self.ordinary.display_name_zh,
+                    }
+                )
+                self.assertEqual(rows[other.pk]["monster_identity"], expected)
+
+    def test_display_name_follows_identity_after_a_key_change(self):
+        unnamed = self._foe(self.ordinary)
+        engage(self.player, unnamed)
+        unnamed.key = "管理員改名"
+        rows = {p["identity"]: p for p in self._render()["participants"]}
+        self.assertEqual(rows[unnamed.pk]["display_name"], self.species.display_name_zh)
+        self.assertEqual(rows[unnamed.pk]["monster_identity"]["individual_name"], None)
+
+    def test_a_disagreeing_identity_is_rejected(self):
+        import copy
+
+        from web.webclient.presentation.protocol import ProtocolValidationError
+
+        named = self._foe(self.stronger, individual_name="合成首領")
+        engage(self.player, named)
+        payload = self._render()
+        index = next(
+            i for i, p in enumerate(payload["participants"]) if p["identity"] == named.pk
+        )
+        mutations = {
+            "display mismatch": lambda row: row.update(display_name=self.species.display_name_zh),
+            "empty variant": lambda row: row["monster_identity"].update(variant_name=""),
+            "missing": lambda row: row.pop("monster_identity"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(case=label):
+                candidate = copy.deepcopy(payload)
+                mutate(candidate["participants"][index])
+                with self.assertRaises(ProtocolValidationError):
+                    validate_context_actions(candidate)
+        validate_context_actions(copy.deepcopy(payload))

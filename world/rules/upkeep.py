@@ -153,6 +153,11 @@ def _stage_casualties(
         if species_key is not None:
             data["species_key"] = species_key
             data["variant_key"] = getattr(entity, "variant_key", None)
+            # The individual's own name, when it has one (monster-individual-names):
+            # a narrative fact beside the identity keys, never kill accounting.
+            individual_name = getattr(entity, "individual_name", None)
+            if isinstance(individual_name, str) and individual_name:
+                data["individual_name"] = individual_name
         if simulated:
             data["simulated"] = True
         entries.append(

@@ -1630,3 +1630,185 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         s = self._commit(page, "exploration", _exploration_panels())
         self.assertEqual(s["rows"], [])
         page.close()
+
+    # monster-individual-names: the identity facts ride the committed
+    # participants and interact targets; every name below is synthetic and the
+    # variant tag is composed by the client, never sent.
+    _NAMED_FOE = {"individual_name": "潮眠合成者", "species_name": "合成鱷", "variant_name": "合成型"}
+    _PLAIN_FOE = {"individual_name": None, "species_name": "合成蟹類甲", "variant_name": "合成型"}
+
+    def _identify_foes(self, panels: dict) -> dict:
+        """Make foe 11 a named individual and foe 12 an unnamed one (equal-length names)."""
+        for p in panels["context_actions"]["participants"]:
+            if p["identity"] == 11:
+                p["display_name"], p["monster_identity"] = "潮眠合成者", dict(self._NAMED_FOE)
+            elif p["identity"] == 12:
+                p["display_name"], p["monster_identity"] = "合成蟹類甲", dict(self._PLAIN_FOE)
+        return panels
+
+    @covers_requirement("webclient-combat-menu::a-figure-plate-marks-a-named-individual-without-moving")
+    def test_a_named_foe_plate_keeps_the_geometry_of_an_unnamed_plate(self):
+        page = self._page(REFERENCE)
+        self._commit(page, "combat", self._identify_foes(_combat_panels(3)))
+        # The controlled player carries no plate: three foes, three plates.
+        self._wait(page, "s.plates.length === 3")
+        plate = lambda identity: page.locator(
+            f'[data-anchor="plates"] [data-testid="figure-plate"][data-identity="{identity}"]'
+        )
+        named, plain, untagged = plate(11), plate(12), plate(13)
+        self.assertEqual(named.get_attribute("data-named"), "true")
+        self.assertIsNone(plain.get_attribute("data-named"))
+        self.assertIsNone(untagged.get_attribute("data-named"))
+        # The whole five-code-point name renders, and the variant tag reaches
+        # the title and the accessible name.
+        name = named.locator(".figure-plate__name")
+        self.assertEqual(name.inner_text(), "潮眠合成者")
+        self.assertTrue(name.evaluate("el => el.scrollWidth <= el.clientWidth"))
+        self.assertEqual(name.get_attribute("title"), "潮眠合成者（合成型合成鱷）")
+        self.assertIn("合成型合成鱷", named.get_attribute("aria-label"))
+        self.assertIn("合成型", plain.get_attribute("aria-label"))
+        # One geometry: the plate and its parts share size, and the rows share
+        # the line positions relative to the plate's own top.
+        parts = (None, ".figure-plate__name", ".figure-plate__line", ".figure-plate__stroke")
+        for selector in parts:
+            with self.subTest(part=selector):
+                a = (named.locator(selector) if selector else named).bounding_box()
+                b = (plain.locator(selector) if selector else plain).bounding_box()
+                self.assertAlmostEqual(a["width"], b["width"], delta=0.5)
+                self.assertAlmostEqual(a["height"], b["height"], delta=0.5)
+                top_a = a["y"] - named.bounding_box()["y"]
+                top_b = b["y"] - plain.bounding_box()["y"]
+                self.assertAlmostEqual(top_a, top_b, delta=0.5)
+        # The unmarked treatments still read: a named plate keeps its crown
+        # and carries no selection cue at rest.
+        self.assertEqual(named.locator('[data-testid="figure-plate-crest"]').count(), 1)
+        self.assertEqual(plain.locator('[data-testid="figure-plate-crest"]').count(), 0)
+        self.assertIsNone(named.get_attribute("data-target"))
+        page.close()
+
+    @covers_requirement("webclient-combat-menu::the-combat-target-prompt-shows-the-focused-monster-s-variant")
+    def test_the_target_prompt_tags_the_focused_monster_with_its_variant(self):
+        page = self._page(REFERENCE, companions=3)
+        self._commit(page, "combat", self._identify_foes(_stage_panels()))
+        self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 3")
+        page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
+        page.wait_for_function(
+            "() => (window.__elosernBridge.store.view.combatMenu?.items || []).some((i) => i.key === 'attack')",
+            timeout=15000,
+        )
+        focus_action_dock(page)
+        self._open_step(page, BASIC_ATTACK_KEY)
+        focus = page.locator('[data-testid="target-prompt-focus"]')
+        tag = focus.locator(".target-prompt__tag[data-tone='variant']")
+
+        def read() -> dict:
+            return {
+                "focus": page.evaluate("() => window.__elosernBridge.store.view.focus.key"),
+                "name": focus.locator('[data-testid="target-prompt-name"]').inner_text(),
+                "named": focus.get_attribute("data-named"),
+                "tags": tag.all_inner_texts(),
+                "box": focus.bounding_box(),
+            }
+
+        # Attack opens on the first listed foe, the named individual.
+        first = read()
+        self.assertEqual(first["focus"], "target-11")
+        self.assertIn("潮眠合成者", first["name"])
+        self.assertEqual(first["named"], "true")
+        self.assertEqual(first["tags"], ["合成型合成鱷"])
+        # The next foe is unnamed: the species name and the bare variant name.
+        # The arrows walk stage order (the party stands left of the foes), so
+        # the step is focused by item key, as the router's own focus does.
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-12')"))
+        second = read()
+        self.assertEqual(second["focus"], "target-12")
+        self.assertIn("合成蟹類甲", second["name"])
+        self.assertIsNone(second["named"])
+        self.assertEqual(second["tags"], ["合成型"])
+        # A foe without identity carries no variant tag.
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-13')"))
+        third = read()
+        self.assertEqual(third["focus"], "target-13")
+        self.assertEqual(third["tags"], [])
+        self.assertAlmostEqual(first["box"]["height"], third["box"]["height"], delta=0.5)
+        page.close()
+
+    def _rail_page(self):
+        page = self._page(REFERENCE)
+        targets = [
+            {**_interact_target(41, "潮眠合成者"), "monster_identity": dict(self._NAMED_FOE)},
+            {**_interact_target(42, "合成蟹類甲"), "monster_identity": dict(self._PLAIN_FOE)},
+            _interact_target(43, "合成旅人"),
+        ]
+        panels = _exploration_panels()
+        panels["exploration"] = _exploration_panel(targets)
+        self._commit(page, "exploration", panels)
+        entries = page.locator('[data-anchor="presence"] [data-testid="presence-entry"]')
+        entries.nth(2).wait_for(state="attached", timeout=15000)
+        return page, entries
+
+    @covers_requirement("webclient-presence-rail::the-rail-marks-a-named-individual-without-moving")
+    def test_a_named_rail_entry_keeps_the_geometry_of_an_unnamed_entry(self):
+        page, entries = self._rail_page()
+        named, plain, person = entries.nth(0), entries.nth(1), entries.nth(2)
+        self.assertEqual(named.get_attribute("data-named"), "true")
+        self.assertIsNone(plain.get_attribute("data-named"))
+        self.assertIsNone(person.get_attribute("data-named"))
+        name = named.locator('[data-testid="presence-entry-name"]')
+        self.assertEqual(name.inner_text(), "潮眠合成者")
+        self.assertTrue(name.evaluate("el => el.scrollWidth <= el.clientWidth"))
+        for selector in (None, '[data-testid="presence-entry-name"]', '[data-testid="presence-entry-initial"]'):
+            with self.subTest(part=selector):
+                a = (named.locator(selector) if selector else named).bounding_box()
+                b = (plain.locator(selector) if selector else plain).bounding_box()
+                self.assertAlmostEqual(a["width"], b["width"], delta=0.5)
+                self.assertAlmostEqual(a["height"], b["height"], delta=0.5)
+                self.assertAlmostEqual(a["y"], b["y"], delta=0.5)
+        page.mouse.move(2, 2)
+        # No selection cue at rest. The first entry is always the listbox's
+        # active descendant (aria-selected), but while the rail does not hold
+        # focus it shows neither the lift nor the focus underline.
+        self.assertFalse(page.evaluate(
+            "() => document.activeElement?.closest('[data-testid=\"presence-rail\"]') != null"
+        ))
+        rest = named.evaluate(
+            "el => ({ lift: getComputedStyle(el.querySelector('.presence-rail__medal')).transform,"
+            " underline: getComputedStyle(el.querySelector('.presence-rail__name')).boxShadow })"
+        )
+        self.assertEqual(rest, {"lift": "none", "underline": "none"})
+        page.close()
+
+    @covers_requirement("webclient-presence-rail::the-rail-readout-shows-a-monster-s-variant")
+    def test_the_rail_readout_tags_a_hovered_monster_with_its_variant(self):
+        page, entries = self._rail_page()
+        lead = page.locator('[data-testid="exploration-readout-lead"]')
+
+        def hover(index: int, name: str) -> dict:
+            box = entries.nth(index).bounding_box()
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            # Read only once the readout has followed the pointer.
+            expect(lead).to_contain_text(name)
+            return {
+                # The lead holds the name followed by the tag, nothing else;
+                # the two are separate flex items, so their rendered text is
+                # compared without the line break between them.
+                "lead": re.sub(r"\s+", "", lead.inner_text()),
+                "named": lead.get_attribute("data-named"),
+                "box": lead.bounding_box(),
+            }
+
+        page.mouse.move(2, 2)
+        plain = hover(1, "合成蟹類甲")
+        self.assertEqual(plain["lead"], "合成蟹類甲合成型")
+        self.assertIsNone(plain["named"])
+        named = hover(0, "潮眠合成者")
+        self.assertEqual(named["lead"], "潮眠合成者合成型合成鱷")
+        self.assertEqual(named["named"], "true")
+        person = hover(2, "合成旅人")
+        self.assertEqual(person["lead"], "合成旅人")
+        self.assertIsNone(person["named"])
+        # Switching entries never moves the readout's lead line.
+        for other in (plain, person):
+            self.assertAlmostEqual(named["box"]["y"], other["box"]["y"], delta=0.5)
+            self.assertAlmostEqual(named["box"]["height"], other["box"]["height"], delta=0.5)
+        page.close()

@@ -975,6 +975,25 @@ export const TargetOffStageFoe = {
   render: renderPlayer,
   args: { combat: 5, foeOverrides: { 35: { state: "fled" } }, combatPath: ["attack"], combatFocus: "target-35" },
 };
+// A named individual among unnamed same-species foes (monster-individual-
+// names): its plate carries the named treatment beside the target brackets,
+// the repeated species name takes session tokens, and the target prompt
+// shows the name with the variant-and-species tag.
+const NAMED_FOE = { individual_name: "潮眠守灣者", species_name: "吞潮鱷", variant_name: "守灣型" };
+const CRAB = (variant) => ({ individual_name: null, species_name: "潮燈蟹", variant_name: variant });
+export const TargetNamedIndividual = {
+  render: renderPlayer,
+  args: {
+    combat: 3,
+    foeOverrides: {
+      31: { display_name: "潮燈蟹", monster_identity: CRAB("守礁型") },
+      32: { display_name: "潮眠守灣者", monster_identity: NAMED_FOE },
+      33: { display_name: "潮燈蟹", monster_identity: CRAB("灘行型") },
+    },
+    combatPath: ["attack"],
+    combatFocus: "target-32",
+  },
+};
 // A knocked-out foe the server still lists keeps its fallen look and carries
 // the arrow; a defeated foe beside it is no candidate.
 export const TargetDefeatedCandidate = {

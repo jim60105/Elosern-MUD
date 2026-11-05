@@ -428,6 +428,39 @@ describe("the plates layer in the client", () => {
     expect(wrapper.get('[data-anchor="plates"]').findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert)).toHaveLength(0);
   });
 
+  it("passes a participant's monster identity to its plate as the named flag and the tag", async () => {
+    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 3);
+    const named = { individual_name: "合成首領", species_name: "合成鱷", variant_name: "合成型" };
+    const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+    const participants = [
+      { ...foeRow(201, "e1", "合成首領", 24), monster_identity: named },
+      { ...foeRow(202, "e2", "合成鶉", 20), monster_identity: unnamed },
+      foeRow(203, "e3", "合成散兵", 20),
+      { identity: 101, token: "a2", display_name: "蕾娜", team: "party", state: "active", hp_current: 42, hp_maximum: 120, portrait_ref: null, conditions: [] },
+    ];
+    const accepted = store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: {
+        status: fx.statusPanel(),
+        exploration: fx.explorationPanel(),
+        party: { ...PARTY_PANEL_FULL_SAMPLE, slots },
+        context_actions: fx.combatActions({ participants }),
+        art: ART_PANEL_SAMPLE,
+      },
+    })], {});
+    await nextTick();
+    await nextTick();
+    expect(accepted.accepted).toBe(true);
+    const plates = Object.fromEntries(
+      wrapper.get('[data-anchor="plates"]').findAll('[data-testid="figure-plate"]').map((p) => [p.attributes("data-identity"), p]),
+    );
+    expect(plates["201"].attributes("data-named")).toBe("true");
+    expect(plates["201"].get(".figure-plate__name").attributes("title")).toBe("合成首領（合成型合成鱷）");
+    expect(plates["202"].attributes("data-named")).toBeUndefined();
+    expect(plates["202"].attributes("aria-label")).toBe("合成鶉 e2，合成型，敵方，生命 20/24");
+    expect(plates["203"].get(".figure-plate__name").attributes("title")).toBe("合成散兵");
+  });
+
   // webclient-combat-stage-target-picking: in the stage target step the plates
   // are never dimmed (they carry the hit points the choice depends on); the
   // arrow markers stand at the candidates' marker slots in stage order with
@@ -616,5 +649,65 @@ describe("the plates layer in the client", () => {
       "party:101", "party:1", "foes:201",
     ]);
     expect(plates[1].attributes("aria-label")).toBe("測試主角 a1，我方，生命 80/100");
+  });
+});
+
+// monster-individual-names (design D6): a named individual's plate keeps an
+// unnamed plate's geometry, renders the whole five-code-point name, carries
+// the variant tag in its title and accessible name, and keeps the target,
+// acting and fallen cues. Synthetic names; jsdom has no layout, so geometry is
+// the box-affecting styles each part declares.
+describe("FigurePlate named individuals", () => {
+  const BOX = ["width", "height", "padding", "margin", "font-size", "line-height", "grid-template-rows", "position", "display"];
+  const box = (el) => {
+    const style = getComputedStyle(el);
+    return Object.fromEntries(BOX.map((prop) => [prop, style.getPropertyValue(prop)]));
+  };
+  const props = { token: "e2", side: "foes", hpCurrent: 30, hpMaximum: 60, form: "full" };
+  const mountPlate = (extra) => mount(FigurePlate, { attachTo: document.body, props: { ...props, ...extra } });
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("marks the named plate, keeps its full name and adds the tag to title and label", () => {
+    const named = mountPlate({ name: "潮眠合成者", named: true, tag: "合成型合成鱷" });
+    const plain = mountPlate({ name: "合成蟹類甲", tag: "合成型" });
+    const person = mountPlate({ name: "合成旅人", side: "party" });
+    expect(named.attributes("data-named")).toBe("true");
+    expect(plain.attributes("data-named")).toBeUndefined();
+    expect(named.find('[data-testid="figure-plate-crest"]').exists()).toBe(true);
+    expect(plain.find('[data-testid="figure-plate-crest"]').exists()).toBe(false);
+    expect(named.get(".figure-plate__name-text").element.textContent).toBe("潮眠合成者");
+    expect(named.get(".figure-plate__name").attributes("title")).toBe("潮眠合成者（合成型合成鱷）");
+    expect(plain.get(".figure-plate__name").attributes("title")).toBe("合成蟹類甲（合成型）");
+    expect(person.get(".figure-plate__name").attributes("title")).toBe("合成旅人");
+    expect(named.attributes("aria-label")).toBe("潮眠合成者 e2，合成型合成鱷，敵方，生命 30/60");
+    expect(person.attributes("aria-label")).toBe("合成旅人 e2，我方，生命 30/60");
+  });
+
+  it("gives a named and an unnamed plate one geometry in both forms", () => {
+    for (const form of ["full", "compact"]) {
+      const named = mountPlate({ name: "潮眠合成者", named: true, tag: "合成型合成鱷", form });
+      const plain = mountPlate({ name: "合成蟹類甲", tag: "合成型", form });
+      for (const selector of [null, ".figure-plate__name", ".figure-plate__line", ".figure-plate__stroke", ".figure-plate__glyphs"]) {
+        const a = selector ? named.get(selector).element : named.element;
+        const b = selector ? plain.get(selector).element : plain.element;
+        expect(box(a), `${form} ${selector}`).toEqual(box(b));
+      }
+      // The crest is an out-of-flow overlay, never a grid row.
+      expect(getComputedStyle(named.get('[data-testid="figure-plate-crest"]').element).position).toBe("absolute");
+    }
+  });
+
+  it("keeps the target, acting and fallen cues with the treatment", () => {
+    const target = mountPlate({ name: "潮眠合成者", named: true, tag: "合成型", target: true });
+    expect(target.attributes("data-target")).toBe("true");
+    expect(getComputedStyle(target.element).boxShadow).toContain("inset");
+    const acting = mountPlate({ name: "潮眠合成者", named: true, tag: "合成型", acting: true });
+    expect(acting.attributes("data-acting")).toBe("true");
+    const fallen = mountPlate({ name: "潮眠合成者", named: true, tag: "合成型", hpCurrent: 0, fallen: "defeated" });
+    expect(fallen.get('[data-testid="figure-plate-fallen"]').text()).toBe("✕已擊破");
+    expect(fallen.attributes("aria-label")).toContain("已擊破");
+    expect(fallen.attributes("data-named")).toBe("true");
   });
 });

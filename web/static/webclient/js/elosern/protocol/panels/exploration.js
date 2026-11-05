@@ -12,6 +12,7 @@ var requireString = core.requireString;
 var validateIdentifier = core.validateIdentifier;
 var requireNodeId = core.requireNodeId;
 var requireExitRef = core.requireExitRef;
+var validateMonsterIdentity = core.validateMonsterIdentity;
 
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
@@ -207,7 +208,7 @@ function validateExplorationLookEntity(value) {
   requireExactFields(
     value,
     "look entity",
-    ["identity", "display_name", "kind", "portrait_ref"],
+    ["identity", "display_name", "kind", "portrait_ref", "monster_identity"],
     []
   );
   requireIdentity(value.identity, "entity.identity");
@@ -219,6 +220,7 @@ function validateExplorationLookEntity(value) {
     throw new Error("entity kind is not a stable value");
   }
   validateExplorationPortraitRef(value.portrait_ref);
+  validateMonsterIdentity(value.monster_identity, displayName, EXPLORATION_MAX_DISPLAY_NAME);
   return value;
 }
 
@@ -394,7 +396,7 @@ function validateExplorationInteractTarget(value) {
   requireExactFields(
     value,
     "interact target",
-    ["identity", "display_name", "portrait_ref", "services", "affordances"],
+    ["identity", "display_name", "portrait_ref", "monster_identity", "services", "affordances"],
     []
   );
   requireIdentity(value.identity, "target.identity");
@@ -403,6 +405,7 @@ function validateExplorationInteractTarget(value) {
     throw new Error("target display_name must be non-empty");
   }
   validateExplorationPortraitRef(value.portrait_ref);
+  validateMonsterIdentity(value.monster_identity, targetName, EXPLORATION_MAX_DISPLAY_NAME);
   validateExplorationServices(value.services, value.identity);
   if (
     !Array.isArray(value.affordances) ||
@@ -450,7 +453,8 @@ function validateExplorationMoveRow(value) {
   return value;
 }
 
-// Exact available exploration panel v6 schema (design D10).
+// Exact available exploration panel v7 schema (design D10; v7 adds the
+// nullable monster_identity row field, monster-individual-names).
 function validateExplorationPanel(payload) {
   requireExactFields(
     payload,
@@ -469,7 +473,7 @@ function validateExplorationPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 6) {
+  if (payload.schema_version !== 7) {
     throw new Error("unsupported exploration schema_version");
   }
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -500,7 +504,7 @@ function validateExplorationPanel(payload) {
   validateExplorationAvailability(payload.inventory, "inventory");
 
   var result = {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "exploration",
     move: payload.move,

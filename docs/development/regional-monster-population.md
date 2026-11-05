@@ -365,9 +365,10 @@ outer grounds stays retreat-oriented; entering the defended extent admits an
 immediate hostile response. Each site declares one solitary individual, so the
 composition's own territorial binding governs and no site override is needed.
 
-**Labels are display facts.** 閉灣者 and 赤背 are display keys only. Each boss's
-identity remains its registered species/variant pair, and the site's authority
-over the individual is its saved persistent identity, never the label.
+**Names are not identity.** 閉灣者 and 赤背 are individual names
+(`individual_name_zh`, stored as the individual's `individual_name`). Each
+boss's identity remains its registered species/variant pair, and the site's
+authority over the individual is its saved persistent identity, never the name.
 
 **Escape and the crocodile trade-off.** The boar keeps its legacy `pack_hunter`
 flee threshold, so a real session can drive it to a legal adjacent departure. The

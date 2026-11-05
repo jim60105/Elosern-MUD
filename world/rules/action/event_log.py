@@ -233,8 +233,9 @@ def _defeated_entry(
 
     A species-backed monster additionally carries its registered
     ``species_key``/``variant_key`` (never inferred from a display key or a
-    tier); a tier-only target keeps exactly the fields it always had, so every
-    existing consumer stays byte-compatible.
+    tier), plus its ``individual_name`` when it has one; a tier-only target
+    keeps exactly the fields it always had, so every existing consumer stays
+    byte-compatible.
     """
     if amount <= 0:
         return None
@@ -261,6 +262,11 @@ def _defeated_entry(
         if species_key is not None:
             data["species_key"] = species_key
             data["variant_key"] = getattr(entity, "variant_key", None)
+            # The individual's own name, when it has one (monster-individual-names):
+            # a narrative fact beside the identity keys, never kill accounting.
+            individual_name = getattr(entity, "individual_name", None)
+            if isinstance(individual_name, str) and individual_name:
+                data["individual_name"] = individual_name
     if simulated:
         data["simulated"] = True
     return EventEntry(

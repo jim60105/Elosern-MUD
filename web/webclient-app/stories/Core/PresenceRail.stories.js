@@ -136,3 +136,25 @@ export const ObjectsOnly = {
     }),
   ),
 };
+
+// A named individual among unnamed same-shape monsters (monster-individual-
+// names design D6): the named entry's medallion carries the inner gold rule
+// and its name the gold display face between two fading hairlines, at the
+// unnamed entries' size and position; the longest legal name (five code
+// points) renders whole. Hover or focus it to see the lift and the focus
+// underline join the treatment. Synthetic names; the `monsterIdentity` is the
+// wire `monster_identity` the presenter sends.
+const NAMED_IDENTITY = { individual_name: "潮眠守灣者", species_name: "吞潮鱷", variant_name: "守灣型" };
+const UNNAMED_IDENTITY = (variant) => ({ individual_name: null, species_name: "潮燈蟹", variant_name: variant });
+export const NamedIndividual = {
+  render,
+  args: presenceArgs(
+    explorationPanelFixture({
+      targets: [
+        { identity: 61, name: "潮眠守灣者", kind: "monster", monsterIdentity: NAMED_IDENTITY, affordances: [AFFORDANCES.engage] },
+        { identity: 62, name: "潮燈蟹", kind: "monster", monsterIdentity: UNNAMED_IDENTITY("守礁型"), affordances: [AFFORDANCES.engage] },
+        { identity: 63, name: "潮燈蟹", kind: "monster", monsterIdentity: UNNAMED_IDENTITY("灘行型"), affordances: [AFFORDANCES.engage] },
+      ],
+    }),
+  ),
+};

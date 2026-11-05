@@ -92,7 +92,7 @@ The production exploration panel SHALL use exact schema7 fields and read-only ca
 
 #### Scenario: Bounded independent services field
 - **WHEN** an NPC interact descriptor is serialized; any asserted wilderness destination facts are revealed and location-identity permitted
-- **THEN** services has exact state none/ready/unreadable and at most 16 stable-key label/enabled/reason/route entries, independent of the eight general-affordance limit; Python and browser accept only schema 6
+- **THEN** services has exact state none/ready/unreadable and at most 16 stable-key label/enabled/reason/route entries, independent of the eight general-affordance limit; Python and browser accept only schema 7
 
 #### Scenario: Undisclosed directional target
 - **WHEN** a synthetic unvisited wilderness neighbour remains outside reveal

@@ -134,7 +134,11 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         # The version-4 combat fields: the same fixture without the version-6
         # participant ``conditions`` and skill ``hostile``/``beneficial``.
         v4_participants = [
-            {key: value for key, value in participant.items() if key != "conditions"}
+            {
+                key: value
+                for key, value in participant.items()
+                if key not in ("conditions", "monster_identity")
+            }
             for participant in version7["participants"]
         ]
         v4_skills = [
@@ -157,16 +161,24 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
             }
             for category in version7["choices"]["skills"]
         ]
-        self.assertEqual(version7["schema_version"], 7)
+        self.assertEqual(version7["schema_version"], 8)
         normalized = validate_context_actions(version7)
-        self.assertEqual(normalized["schema_version"], 7)
-        # Participant rows keep their v4 field set plus the v6 conditions.
+        self.assertEqual(normalized["schema_version"], 8)
+        # Participant rows keep their v4 field set plus the v6 conditions and
+        # the v8 monster identity.
         self.assertEqual(
             [
-                {key: value for key, value in row.items() if key != "conditions"}
+                {
+                    key: value
+                    for key, value in row.items()
+                    if key not in ("conditions", "monster_identity")
+                }
                 for row in normalized["participants"]
             ],
             v4_participants,
+        )
+        self.assertEqual(
+            [row["monster_identity"] for row in normalized["participants"]], [None]
         )
         self.assertEqual(
             [row["conditions"] for row in normalized["participants"]], [[]]
@@ -202,8 +214,10 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         )
         self.assertEqual(normalized["secondary_actions"], ["surrender"])
         self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
-        # A legacy top-level skills payload, a version-6 payload and a
-        # version-5 payload are all rejected by the v7 validator.
+        # A legacy top-level skills payload and a version-7, version-6 or
+        # version-5 payload are all rejected by the v8 validator.
+        with self.assertRaises((ProtocolValidationError, ContextActionsError)):
+            validate_context_actions({**version7, "schema_version": 7})
         with self.assertRaises((ProtocolValidationError, ContextActionsError)):
             validate_context_actions({**version7, "skills": v4_skills})
         with self.assertRaises((ProtocolValidationError, ContextActionsError)):

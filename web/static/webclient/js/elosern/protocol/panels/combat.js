@@ -116,7 +116,18 @@ function validateParticipant(value) {
   requireExactFields(
     value,
     "participant",
-    ["identity", "token", "display_name", "team", "state", "hp_current", "hp_maximum", "portrait_ref", "conditions"],
+    [
+      "identity",
+      "token",
+      "display_name",
+      "team",
+      "state",
+      "hp_current",
+      "hp_maximum",
+      "portrait_ref",
+      "conditions",
+      "monster_identity",
+    ],
     []
   );
   requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
@@ -146,6 +157,7 @@ function validateParticipant(value) {
     }
   }
   validateParticipantConditions(value.conditions);
+  core.validateMonsterIdentity(value.monster_identity, displayName, MAX_DISPLAY_NAME);
   return value;
 }
 

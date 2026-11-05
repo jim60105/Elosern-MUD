@@ -43,6 +43,7 @@ def _entity(**overrides):
         "display_name": "南門守衛",
         "kind": "npc",
         "portrait_ref": None,
+        "monster_identity": None,
     }
     value.update(overrides)
     return value
@@ -78,6 +79,7 @@ def _target(**overrides):
         "identity": identity,
         "display_name": "南門守衛",
         "portrait_ref": None,
+        "monster_identity": None,
         "services": _services(
             entries=[
                 _service_entry(

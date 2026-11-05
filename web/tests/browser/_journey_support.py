@@ -41,6 +41,7 @@ def _interact_target(identity: int, name: str) -> dict:
         "identity": identity,
         "display_name": name,
         "portrait_ref": None,
+        "monster_identity": None,
         "services": {"state": "none", "entries": []},
         "affordances": [],
     }
@@ -60,7 +61,7 @@ def _move_row(exit_ref: str, label: str, destination: str, enabled: bool = True)
 def _exploration_panel(interact_targets: list, move_rows: list | None = None) -> dict:
     """A schema-valid available exploration panel."""
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "exploration",
         "move": move_rows or [],
@@ -94,11 +95,11 @@ def _exploration_context_actions_panel(suggestions: dict) -> dict:
     """A schema-valid ``context_actions`` exploration form with a suggestions envelope.
 
     The panel's registered schema version is the live client mirror's
-    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (7 since the v7 party-combat protocol
+    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (8 since the monster-identity
     cutover), so an injected exploration form carries that exact version.
     """
     return {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "exploration",
         "affordances": [],
@@ -118,6 +119,7 @@ def _participant(identity, token, name, team, state, hp_current, hp_maximum, por
         "hp_maximum": hp_maximum,
         "portrait_ref": portrait_ref,
         "conditions": [],
+        "monster_identity": None,
     }
 
 
@@ -242,7 +244,7 @@ def _combat_panel() -> dict:
         ),
     ]
     return {
-        "schema_version": 7,
+        "schema_version": 8,
         "available": True,
         "kind": "combat",
         "session": {

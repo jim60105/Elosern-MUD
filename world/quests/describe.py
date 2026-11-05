@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from world.lore import anchors, wilderness_regions
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.items import ITEM_REGISTRY
+from world.lore.monster_placement import MONSTER_SITE_REGISTRY
 from world.lore.monster_species import (
     MONSTER_SPECIES_REGISTRY,
     MONSTER_VARIANT_REGISTRY,
@@ -94,6 +95,17 @@ def describe_objective_parts(objective: QuestObjective) -> tuple[str, str | None
         if objective.region_key is not None:
             return _describe_species_hunt(objective)
         if objective.requires_bound_targets:
+            # A bound site that names its one individual (monster-individual-
+            # names) renders that name; the site's (1, 1) composition makes a
+            # count redundant. Any other bound objective keeps the generic line.
+            site = (
+                MONSTER_SITE_REGISTRY.get(objective.site_key)
+                if objective.site_key is not None
+                else None
+            )
+            name = getattr(site, "individual_name_zh", None)
+            if isinstance(name, str) and name:
+                return f"討伐{name}", None
             return f"討伐綁定的目標 {objective.quantity} 個", None
         tier = MONSTER_TIER_REGISTRY.get(objective.monster_tier)
         if tier is None:

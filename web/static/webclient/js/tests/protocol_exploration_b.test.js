@@ -218,7 +218,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 });
 
 test("exploration and character are in the production panel allowlist", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 7);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 9);
   const envelope = {
     protocol_version: 1,
@@ -236,3 +236,47 @@ test("exploration and character are in the production panel allowlist", () => {
   assert.equal(accepted.reason, "invalid");
 });
 
+
+// v7 (monster-individual-names): the nullable monster_identity facts on
+// interact targets and look entities, with display_name fixed by a non-null
+// identity. Synthetic names only.
+test("exploration rows carry exact monster identity facts agreeing with display_name", () => {
+  const unnamed = { individual_name: null, species_name: "合成鶉", variant_name: "合成型" };
+  const named = { individual_name: "合成首領", species_name: "合成鶉", variant_name: "合成型" };
+  const panel = (identity, displayName, where) =>
+    validExplorationPanel(
+      where === "entity"
+        ? {
+            look: {
+              room: { identity: 3, display_name: "南門", room: true },
+              entities: [validExplorationLookEntity({ kind: "monster", display_name: displayName, monster_identity: identity })],
+              objects: [],
+            },
+          }
+        : { interact: [validExplorationTarget({ display_name: displayName, monster_identity: identity })] }
+    );
+  for (const where of ["entity", "target"]) {
+    assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel(unnamed, "合成鶉", where)));
+    assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel(named, "合成首領", where)));
+    assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel(null, "南門守衛", where)));
+    const rejected = [
+      [unnamed, "合成型"],
+      [named, "合成鶉"],
+      [Object.assign({}, named, { individual_name: "" }), ""],
+      [Object.assign({}, unnamed, { species_name: " " }), " "],
+      [Object.assign({}, unnamed, { variant_name: "" }), "合成鶉"],
+      [Object.assign({}, unnamed, { tag: "合成型" }), "合成鶉"],
+      [{ individual_name: null, species_name: "合成鶉" }, "合成鶉"],
+      ["合成鶉", "合成鶉"],
+    ];
+    for (const [identity, displayName] of rejected) {
+      assert.throws(() => Protocol.validateExplorationPanel(panel(identity, displayName, where)));
+    }
+  }
+  const missing = validExplorationTarget();
+  delete missing.monster_identity;
+  assert.throws(
+    () => Protocol.validateExplorationPanel(validExplorationPanel({ interact: [missing] })),
+    /monster_identity/
+  );
+});

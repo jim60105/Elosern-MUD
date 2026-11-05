@@ -69,9 +69,9 @@
 - `EcologyZone`，有界矩形與稀疏族群預算。
 - `EncounterComposition(key, activity_key, members)`，一筆完整遭遇。
 - `CompositionMember(variant_key, minimum, maximum)`，組成中的一個變體列。
-- `MonsterSite`，手動據點，欄位為 `key`、`kind`、`region_key`、`coordinates`、`composition_key`、`activity_key`、`capacity`、`one_shot`、`recover_after_ticks`、`individual_label_zh`。
+- `MonsterSite`，手動據點，欄位為 `key`、`kind`、`region_key`、`coordinates`、`composition_key`、`activity_key`、`capacity`、`one_shot`、`recover_after_ticks`、`individual_name_zh`。
 
-`one_shot=True` 的據點不得宣告回復條件。`individual_label_zh` 只用於「任何合法結果都恰好一名個體」的據點，它是顯示用的鍵，不是身分。高階變體不得納入常態區域池。
+`one_shot=True` 的據點不得宣告回復條件。`individual_name_zh` 只用於「任何合法結果都恰好一名個體」的據點，是據點在個體建構時給牠的個體名，不是身分，長度上限為 `MONSTER_NAME_MAX_CODE_POINTS`（5 個字元）。物種與變體的 `display_name_zh` 也受同一上限約束。未命名個體的 `key` 是物種名，變體名不再當作名字。高階變體不得納入常態區域池。
 
 ---
 
@@ -247,7 +247,7 @@ uv run --locked openspec validate <change> --strict
 
 圖鑑寫了段落但漏了 ` ```bestiary ` 索引，或索引寫了不存在的變體。雙向覆蓋會指名缺漏的鍵與關係。
 
-`individual_label_zh` 宣告在會產生多名個體的 composition 上。載入期驗證直接拒絕。
+`individual_name_zh` 宣告在會產生多名個體的 composition 上，或名字超過 5 個字元。載入期驗證直接拒絕。
 
 只改 seed 沒重生帳本，或手改帳本。`test_data_lint check` 以 `seed-mismatch` 失敗。
 

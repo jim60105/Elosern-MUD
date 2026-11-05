@@ -121,7 +121,7 @@ function renderScreen(args) {
                       h("span", { class: "exploration-pill__label" }, "建議"),
                       h("b", { class: "exploration-pill__count" }, ` ${SUGGESTIONS.cards.length}`),
                     ]),
-                    h(ExplorationReadout, { class: "exploration-root__readout", ...idleReadout(COMPASS.targets.cycle.length, 3) }),
+                    h(ExplorationReadout, { class: "exploration-root__readout", ...(args.readout || idleReadout(COMPASS.targets.cycle.length, 3)) }),
                   ]),
                 ]),
             },
@@ -166,4 +166,18 @@ export const DreamQuestion = {
 export const SuggestionsCard = {
   render: renderScreen,
   args: { focus: false, card: "suggestions" },
+};
+
+// The readout for a hovered monster (monster-individual-names): the species
+// name with its variant tag; the lead line keeps the idle readout's height.
+export const MonsterReadout = {
+  render: renderScreen,
+  args: { focus: false, readout: { lead: "霧狼", tag: "林行型", named: false, text: "戰鬥", tone: "normal" } },
+};
+
+// The readout for a focused named individual: the name in the named
+// treatment and a tag holding the variant followed by the species.
+export const NamedReadout = {
+  render: renderScreen,
+  args: { focus: false, readout: { lead: "潮眠守灣者", tag: "守灣型吞潮鱷", named: true, text: "戰鬥", tone: "normal" } },
 };

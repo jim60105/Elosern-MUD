@@ -509,7 +509,7 @@ def _populate(
         species_key = variant_species_key(variant_key)
         for _ in range(count):
             individual = construct_species_individual(
-                species_key, variant_key, key=site.individual_label_zh
+                species_key, variant_key, individual_name=site.individual_name_zh
             )
             individual.db.site_key = site.key
             created.append(individual)

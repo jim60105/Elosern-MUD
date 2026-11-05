@@ -512,12 +512,12 @@ class HighTierBossSiteTests(
                 state = site_state(site_key, wilderness=self.wilderness)
                 self.assertEqual(state.state, SITE_STATE_POPULATED)
                 members = monster_sites._members(self.wilderness, site)
-                # One persistent individual, keyed by the authored display
-                # label while identity stays the composition's species/variant
-                # pair: a label mistaken for identity, or a replaced row, fails.
+                # One persistent individual carrying the authored individual
+                # name while identity stays the composition's species/variant
+                # pair: a name mistaken for identity, or a replaced row, fails.
                 self.assertEqual(len(members), 1)
                 (boss,) = members
-                self.assertEqual(boss.key, site.individual_label_zh)
+                self.assertEqual(boss.individual_name, site.individual_name_zh)
                 self.assertEqual(boss.variant_key, composition.members[0].variant_key)
                 self.assertEqual(boss.species_key, variant_species_key(boss.variant_key))
                 self.assertEqual(boss.db.site_key, site_key)

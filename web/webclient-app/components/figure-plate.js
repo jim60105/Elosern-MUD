@@ -64,15 +64,18 @@ export function plateConditions(conditions, fallen) {
   return fallen === "defeated" || !Array.isArray(conditions) ? [] : conditions;
 }
 
-// "<name> <token>，<我方|敵方>，生命 <cur>/<max>[，危險][，狀態：<a>、<b>][，已擊破|倒地]":
+// "<name> <token>[，<tag>]，<我方|敵方>，生命 <cur>/<max>[，危險][，狀態：<a>、<b>][，已擊破|倒地]":
 // the session token is always part of the accessible name, even where the
-// plate does not show it; 危險 joins when low (never on a fallen figure,
+// plate does not show it; a monster's variant tag (monster-individual-names)
+// follows the name; 危險 joins when low (never on a fallen figure,
 // whose word says more), the conditions' shared labels next (none on a
 // defeated foe), and a fallen figure's word last.
-export function plateLabel({ name, token, side, current, maximum, conditions = [], fallen = null }) {
+export function plateLabel({ name, token, tag = null, side, current, maximum, conditions = [], fallen = null }) {
   const who = [name, token].filter((part) => typeof part === "string" && part.length > 0).join(" ");
   const hp = typeof current === "number" && typeof maximum === "number" ? `${current}/${maximum}` : "--";
-  const parts = [who, SIDE_LABEL[side] ?? SIDE_LABEL.foes, `生命 ${hp}`];
+  const parts = [who];
+  if (typeof tag === "string" && tag.length > 0) parts.push(tag);
+  parts.push(SIDE_LABEL[side] ?? SIDE_LABEL.foes, `生命 ${hp}`);
   const readout = FALLEN_READOUT[fallen] ?? null;
   if (!readout && isLowPlateHp(current, maximum)) parts.push("危險");
   const shown = plateConditions(conditions, fallen);
@@ -90,4 +93,10 @@ export function repeatedNames(names) {
     seen.set(name, (seen.get(name) || 0) + 1);
   }
   return new Set([...seen].filter(([, count]) => count > 1).map(([name]) => name));
+}
+
+// The plate name's `title`: the name, with a monster's variant tag in
+// full-width brackets when it has one.
+export function plateTitle(name, tag) {
+  return typeof tag === "string" && tag.length > 0 ? `${name}（${tag}）` : name;
 }

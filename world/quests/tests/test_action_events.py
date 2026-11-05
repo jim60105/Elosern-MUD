@@ -165,7 +165,8 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertEqual(defeated[0].data["target_id"], monster_b.pk)
 
     @covers_requirement(
-        "action-resolution-pipeline::the-defeat-entry-carries-species-and-variant-identity-for-species-backed-monsters"
+        "action-resolution-pipeline::the-defeat-entry-carries-species-and-variant-identity-for-species-backed-monsters",
+        "monster-individual-construction::defeat-evidence-carries-the-individual-name",
     )
     def test_a_species_backed_defeat_carries_its_registered_identity(self):
         _enter_monster_scope(self)
@@ -183,6 +184,26 @@ class TargetDefeatedEventTests(EvenniaTestCase):
         self.assertEqual(defeated[0].data["species_key"], species.key)
         self.assertEqual(defeated[0].data["variant_key"], variant.key)
         self.assertNotEqual(defeated[0].data["species_key"], species.display_name_zh)
+        # An unnamed individual carries no individual name field at all.
+        self.assertNotIn("individual_name", defeated[0].data)
+
+    @covers_requirement(
+        "monster-individual-construction::defeat-evidence-carries-the-individual-name"
+    )
+    def test_a_named_defeat_carries_the_individual_name(self):
+        _enter_monster_scope(self)
+        species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+        variant = SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"]
+        monster = construct_species_individual(
+            species.key, variant.key, individual_name="合成首領"
+        )
+        monster.traits.hp._data["current"] = 1
+        result = self._resolve([monster])
+        defeated = [entry for entry in result.event_log.entries if entry.kind == "target_defeated"]
+        self.assertEqual(len(defeated), 1)
+        self.assertEqual(defeated[0].data["individual_name"], "合成首領")
+        self.assertEqual(defeated[0].data["species_key"], species.key)
+        self.assertEqual(defeated[0].data["variant_key"], variant.key)
 
     @covers_requirement(
         "action-resolution-pipeline::the-defeat-entry-carries-species-and-variant-identity-for-species-backed-monsters"

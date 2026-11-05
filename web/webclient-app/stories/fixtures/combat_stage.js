@@ -99,14 +99,15 @@ export function foeParticipants(count, overrides = {}) {
     hp_maximum: max,
     portrait_ref: String(identity),
     conditions: [],
+    monster_identity: null,
     ...(overrides[identity] || {}),
   }));
 }
 
 // The player's side as the combat panel lists it.
 export const PARTY_PARTICIPANTS = Object.freeze([
-  { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [] },
-  { identity: 8, token: "a2", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
+  { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [], monster_identity: null },
+  { identity: 8, token: "a2", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [], monster_identity: null },
 ]);
 
 // The combat panel's committed skill categories for the stage stories

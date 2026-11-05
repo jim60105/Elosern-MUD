@@ -1084,3 +1084,126 @@ class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExplorationMonsterIdentityTests(BattlefieldIsolation, EvenniaTestCase):
+    """Schema-7 ``monster_identity`` facts on interact targets and look entities.
+
+    Synthetic species and variant rows only; no shipped name is asserted.
+    """
+
+    def setUp(self):
+        from world.tests.synthetic_data import (
+            SYNTH_MONSTER_SPECIES,
+            SYNTH_MONSTER_VARIANTS,
+            synthetic_registries,
+        )
+
+        super().setUp()
+        self.enterContext(
+            synthetic_registries("monster_species", "monster_variants", "monster_tiers")
+        )
+        self.species = SYNTH_MONSTER_SPECIES["t_whisper_quail"]
+        self.ordinary = SYNTH_MONSTER_VARIANTS["t_whisper_quail_ordinary"]
+        self.stronger = SYNTH_MONSTER_VARIANTS["t_whisper_quail_stronger"]
+        self.room = create_object(Room, key="合成林地")
+        self.player = create_object(PlayerCharacter, key="名牌測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.room
+
+    def _construct(self, variant, **kwargs):
+        from world.rules.monster_individual import construct_species_individual
+
+        monster = construct_species_individual(self.species.key, variant.key, **kwargs)
+        monster.location = self.room
+        return monster
+
+    def _render(self):
+        return build_production_registry().render("exploration", _context(self.player))
+
+    @staticmethod
+    def _rows(payload, pk):
+        target = next(t for t in payload["interact"] if t["identity"] == int(pk))
+        entity = next(e for e in payload["look"]["entities"] if e["identity"] == int(pk))
+        return target, entity
+
+    def test_rows_carry_identity_facts_and_no_composed_string(self):
+        unnamed = self._construct(self.ordinary)
+        named = self._construct(self.stronger, individual_name="合成首領")
+        tier_only = create_object(Monster, key="合成散兵", location=self.room)
+        tier_only.threat_tier = "t_faint"
+        npc = create_object(NPC, key="合成路人", location=self.room)
+        payload = self._render()
+        expectations = (
+            (unnamed, self.species.display_name_zh, {
+                "individual_name": None,
+                "species_name": self.species.display_name_zh,
+                "variant_name": self.ordinary.display_name_zh,
+            }),
+            (named, "合成首領", {
+                "individual_name": "合成首領",
+                "species_name": self.species.display_name_zh,
+                "variant_name": self.stronger.display_name_zh,
+            }),
+            (tier_only, "合成散兵", None),
+            (npc, "合成路人", None),
+        )
+        for entity, display_name, identity in expectations:
+            for row in (
+                next(e for e in payload["look"]["entities"] if e["identity"] == int(entity.pk)),
+                *(t for t in payload["interact"] if t["identity"] == int(entity.pk)),
+            ):
+                with self.subTest(entity=str(entity.key), row=sorted(row)):
+                    self.assertEqual(row["monster_identity"], identity)
+                    self.assertEqual(row["display_name"], display_name)
+                    self.assertNotIn("variant_tag", row)
+                    self.assertNotIn("tags", row)
+        # Every monster row is an interact target too.
+        self._rows(payload, unnamed.pk)
+        self._rows(payload, named.pk)
+
+    def test_display_name_follows_identity_after_a_key_change(self):
+        unnamed = self._construct(self.ordinary)
+        named = self._construct(self.stronger, individual_name="合成首領")
+        unnamed.key = "管理員改名"
+        named.key = "另一個改名"
+        payload = self._render()
+        for monster, expected in (
+            (unnamed, self.species.display_name_zh),
+            (named, "合成首領"),
+        ):
+            for row in self._rows(payload, monster.pk):
+                with self.subTest(expected=expected):
+                    self.assertEqual(row["display_name"], expected)
+        # The rendered panel passed the server validator, which agrees.
+        self.assertEqual(payload["schema_version"], 7)
+
+    def test_a_disagreeing_or_empty_identity_is_rejected(self):
+        from web.webclient.presentation.exploration import validate_exploration
+        from web.webclient.presentation.protocol import ProtocolValidationError
+
+        self._construct(self.ordinary)
+        payload = self._render()
+        cases = {
+            "display mismatch": lambda row: row.update(display_name="別的名字"),
+            "empty species": lambda row: row["monster_identity"].update(species_name=""),
+            "empty individual": lambda row: row["monster_identity"].update(individual_name=" "),
+            "extra field": lambda row: row["monster_identity"].update(tag="x"),
+            "missing field": lambda row: row.pop("monster_identity"),
+        }
+        import copy
+
+        for section in ("interact", "entities"):
+            for label, mutate in cases.items():
+                with self.subTest(section=section, case=label):
+                    candidate = copy.deepcopy(payload)
+                    rows = (
+                        candidate["interact"]
+                        if section == "interact"
+                        else candidate["look"]["entities"]
+                    )
+                    mutate(next(r for r in rows if r["monster_identity"] is not None))
+                    with self.assertRaises(ProtocolValidationError):
+                        validate_exploration(candidate)
+        validate_exploration(copy.deepcopy(payload))
