@@ -420,7 +420,13 @@ def web_server_settled(
 
 
 def process_is_alive(pid: int) -> bool:
-    """Return True when ``pid`` refers to a live process we may own."""
+    """Return True when ``pid`` refers to a live process we may own.
+
+    A zombie has already closed its descriptors and released its memory; only
+    its parent's ``wait()`` is outstanding, and a container's PID 1 need not
+    perform it, so the entry would otherwise read as alive forever. ``kill(0)``
+    cannot tell that state apart, so the kernel's own report decides it.
+    """
     if pid is None or pid <= 0:
         return False
     try:
@@ -429,4 +435,14 @@ def process_is_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True
-    return True
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8", errors="replace")
+    except (FileNotFoundError, ProcessLookupError):
+        # The PID left the table between the probe and the read; without
+        # procfs there is nothing to read, so the probe stands.
+        return not Path("/proc").is_dir()
+    except OSError:
+        return True
+    fields = stat.rsplit(")", 1)[-1].split()
+    # Z is a corpse no one reaped; X/x is one already fully dead.
+    return bool(fields) and fields[0] not in ("Z", "X", "x")

@@ -1033,6 +1033,7 @@
         "web.tests.browser.test_browser_actions.ActionLockingTest.test_submit_refused_while_mutations_locked",
         "web.tests.browser.test_harness.ManagedServerFastTests.test_a_pre_bootstrap_server_is_not_ready",
         "web.tests.browser.test_harness.ManagedServerFastTests.test_a_server_without_the_django_login_page_is_not_ready",
+        "web.tests.browser.test_harness.ManagedServerFastTests.test_a_zombie_is_not_a_live_owned_process",
         "web.tests.browser.test_harness.ManagedServerFastTests.test_boot_failure_raised",
         "web.tests.browser.test_harness.ManagedServerFastTests.test_clear_and_restore_pidfiles",
         "web.tests.browser.test_harness.ManagedServerFastTests.test_port_conflict_boot_is_retried_with_fresh_runtime",

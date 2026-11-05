@@ -349,6 +349,27 @@ class ManagedServerFastTests(unittest.TestCase):
         self.assertFalse(SERVER_PIDFILE.exists())
         self.assertTrue(PORTAL_PIDFILE.exists())
 
+    def test_a_zombie_is_not_a_live_owned_process(self):
+        """An exited child awaiting its parent's wait() owns nothing."""
+        child = subprocess.Popen(["true"])
+        self.addCleanup(child.wait)
+        state = ""
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                stat = Path(f"/proc/{child.pid}/stat").read_text(encoding="utf-8")
+            except OSError:
+                break
+            state = stat.rsplit(")", 1)[-1].split()[0]
+            if state == "Z":
+                break
+            time.sleep(0.02)
+        self.assertEqual(state, "Z", "the child never became a zombie")
+        # The kernel still accepts a signal probe for this PID, so the probe
+        # alone must not be what decides liveness.
+        os.kill(child.pid, 0)
+        self.assertFalse(fixtures.process_is_alive(child.pid))
+
     def test_stop_cleans_runtime_and_restores_pidfiles(self):
         """A full start+stop with fakes removes temp state and pidfiles."""
         SERVER_PIDFILE.write_text("15\n", encoding="utf-8")

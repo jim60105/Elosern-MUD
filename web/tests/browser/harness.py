@@ -481,6 +481,14 @@ class ManagedServer:
                 os.kill(pid, signal.SIGKILL)
             except (OSError, PermissionError):
                 pass
+        # The kernel takes a killed process down asynchronously; wait for the
+        # PIDs to leave the table so a caller's own teardown check is not
+        # racing the signal it just sent.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if self._pids_gone():
+                break
+            time.sleep(0.05)
 
     def _remove_pidfiles(self) -> None:
         """Delete pidfiles only when they still name a PID we recorded."""
