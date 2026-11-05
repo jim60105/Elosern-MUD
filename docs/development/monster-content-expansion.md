@@ -476,3 +476,20 @@ derived group-member test and were adopted before implementation:
 * The ledger row had to state the animal-level taxonomy explicitly, because
   the design requires the depiction to stay distinct from beastfolk. Adopted:
   the row states it in the ecology face.
+
+The final review over the landed diff raised one blocking finding, adopted:
+
+* The public bestiary section carried negative exclusions — a
+  "they are animals, not a people with language, writing or trade" contrast and
+  a "a missed grab leaves the opponent unaffected" sentence — plus the
+  rulebook-shaped phrase "movement and retreat are decided by the ordinary
+  rules". `docs/lore/monster-creation-guidelines.md` §8 requires public prose to
+  describe what the creature does and to keep exclusions in author-private or
+  developer text. Adopted: the section now states the group's calls, knocks and
+  learned object use affirmatively, states that the rhythm disruption follows a
+  grab that lands, and describes the withdrawal along rock faces and scrub as
+  observed behaviour. The taxonomy exclusion stays in `author_explanation_zh`,
+  the editorial ledger and this document.
+* Its suggestion to assert that the committed reload really returns fresh rows
+  was adopted as well: the derived member test now proves the cache eviction
+  happened instead of passing on an in-memory object.
