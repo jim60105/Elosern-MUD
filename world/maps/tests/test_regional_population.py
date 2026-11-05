@@ -645,9 +645,6 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(tuple(context["individual"]), created)
 
     @covers_requirement(
-        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
-    )
-    @covers_requirement(
         "monster-field-activity::due-activity-moves-bounded-complete-groups-globally"
     )
     def test_a_solitary_binding_disperses_the_birth_and_one_group_may_leave(self):
@@ -716,9 +713,6 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 self.assertEqual(after[group_id].sequence, 0)
                 self.assertEqual(after[group_id].member_ids, state.groups[group_id].member_ids)
 
-    @covers_requirement(
-        "regional-population::population-wave-commit-is-atomic-across-durable-and-live-surfaces"
-    )
     def test_a_cohesive_binding_keeps_the_whole_birth_in_one_group(self):
         self.compositions["t_cohesive_pair"] = _composition(
             "t_cohesive_pair", (1, 1), (1, 1)

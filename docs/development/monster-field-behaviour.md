@@ -1308,13 +1308,17 @@ contribute no idle decision and still create no durable state.
 
 The added requirement lives only in this change's delta
 (`openspec/changes/activity-group-formation/specs/monster-field-activity/spec.md`)
-and has no canonical ID until archive sync, so its tests carry the closest
-current canonical requirement instead of a hand-built ID. The modified
-requirement keeps
-`monster-field-activity::activity-declarations-publish-complete-validated-bindings`,
-and the atomicity, site-occurrence and forecast tests keep their existing
-canonical IDs. Re-attach the new `covers_requirement` IDs from
-`uv run --locked python -m tools.spec_traceability list` at archive.
+and has no canonical ID until archive sync. Following the repository rule, the
+tests written for it carry **no** `covers_requirement` annotation: a closest
+current requirement, borrowed ID or hand-built slug would be a false claim. The
+table below is the implementation-stage hand-off; the archive stage adds the
+tool-generated annotation after the sync. This branch predates the traceability
+gate's `--change` variant, so the handoff gate runs as
+`uv run --locked python -m tools.contract_gate` and os-archive forwards the
+change name after rebasing. Pre-existing annotations on tests this change did
+not add are unchanged; the one existing canonical claim kept on a new test is
+the wave's real due decision, which establishes
+`monster-field-activity::due-activity-moves-bounded-complete-groups-globally`.
 
 ### Evidence map
 
