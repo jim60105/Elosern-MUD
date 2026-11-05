@@ -1046,7 +1046,7 @@ class SupportAdapterTests(SupportFixture):
         self.bystander.traits.hp.base = 400
         self.bystander.traits.hp.current = 400
         self.monster = construct_species_individual(
-            SPECIES, VARIANT, key="t_sup_monster"
+            SPECIES, VARIANT, individual_name="t_sup_monster"
         )
         self.monster.location = self.room
         self.monster.traits.hp.base = 300

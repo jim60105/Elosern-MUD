@@ -1112,7 +1112,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.opponent.traits.hp.current = 200
 
     def _monster_row(self, key, skills=(STRIKE.key,)):
-        monster = construct_species_individual(SPECIES, VARIANT, key=key)
+        monster = construct_species_individual(SPECIES, VARIANT, individual_name=key)
         monster.location = self.room
         monster.traits.hp.base = 200
         monster.traits.hp.current = 200
@@ -1249,7 +1249,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.foe.location = self.room
         self.foe.traits.hp.base = 200
         self.foe.traits.hp.current = 200
-        self.monster = construct_species_individual(SPECIES, VARIANT, key="t_sel_foe")
+        self.monster = construct_species_individual(SPECIES, VARIANT, individual_name="t_sel_foe")
         self.monster.location = self.room
         self.monster.traits.hp.base = 300
         self.monster.traits.hp.current = 300
@@ -1475,7 +1475,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
 
     def _monster_row(self, key, *, species=SPECIES, variant=VARIANT):
         monster = (
-            construct_species_individual(species, variant, key=key)
+            construct_species_individual(species, variant, individual_name=key)
             if species is not None
             else _monster(key)
         )
@@ -1608,7 +1608,7 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
         super().setUp()
         self.open_tuning()
         self.room = create_object(Room, key="trace arena")
-        self.monster = construct_species_individual(SPECIES, VARIANT, key="t_sel_traced")
+        self.monster = construct_species_individual(SPECIES, VARIANT, individual_name="t_sel_traced")
         self.monster.location = self.room
         self.monster.traits.mp.base = 100
         self.monster.traits.mp.current = 100
@@ -1693,7 +1693,7 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.opponent.location = self.room
         self.opponent.traits.hp.base = 300
         self.opponent.traits.hp.current = 300
-        self.monster = construct_species_individual(SPECIES, VARIANT, key="t_sel_legacy")
+        self.monster = construct_species_individual(SPECIES, VARIANT, individual_name="t_sel_legacy")
         self.monster.location = self.room
         self.monster.traits.hp.base = 300
         self.monster.traits.hp.current = 300

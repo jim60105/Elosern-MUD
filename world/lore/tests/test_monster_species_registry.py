@@ -471,14 +471,14 @@ class MembershipValidationTests(unittest.TestCase):
         species = {"t_fixture_species": _species()}
         ordinary = {
             "t_fixture_ordinary": _variant(
-                "t_fixture_ordinary", display_name_zh="試製至尊霸主型", ordinary_variant=True
+                "t_fixture_ordinary", display_name_zh="至尊霸主型", ordinary_variant=True
             )
         }
         registry.validate_monster_species_registry(species, ordinary, **_faces())
 
         stronger = {
             "t_fixture_ordinary": _variant(
-                "t_fixture_ordinary", display_name_zh="試製至尊霸主型", ordinary_variant=False
+                "t_fixture_ordinary", display_name_zh="至尊霸主型", ordinary_variant=False
             )
         }
         with self.assertRaises(MonsterSpeciesRegistryError):
@@ -523,6 +523,42 @@ class MembershipValidationTests(unittest.TestCase):
         untyped = {"t_fixture_species": _species(ordinary_variant="yes")}
         with self.assertRaises(MonsterSpeciesRegistryError):
             registry.validate_monster_species_registry(untyped, variants, **_faces())
+
+
+class DisplayNameBoundTests(unittest.TestCase):
+    """Requirement: monster display names fit the narrow name slots."""
+
+    def test_names_at_the_bound_are_accepted(self):
+        species, variants = _valid_registry()
+        at_bound = "合" * registry.MONSTER_NAME_MAX_CODE_POINTS
+        species = {"t_fixture_species": _species(display_name_zh=at_bound)}
+        variants = dict(variants, t_fixture_ordinary=_variant(display_name_zh=at_bound))
+        registry.validate_monster_species_registry(species, variants, **_faces())
+
+    def test_an_over_long_species_or_variant_name_is_rejected(self):
+        over = "合" * (registry.MONSTER_NAME_MAX_CODE_POINTS + 1)
+        species, variants = _valid_registry()
+        cases = (
+            ("species", {"t_fixture_species": _species(display_name_zh=over)}, variants),
+            (
+                "variant",
+                species,
+                dict(variants, t_fixture_stronger=replace(
+                    variants["t_fixture_stronger"], display_name_zh=over
+                )),
+            ),
+            (
+                "empty variant",
+                species,
+                dict(variants, t_fixture_ordinary=_variant(display_name_zh="")),
+            ),
+        )
+        for label, case_species, case_variants in cases:
+            with self.subTest(case=label):
+                with self.assertRaises(MonsterSpeciesRegistryError):
+                    registry.validate_monster_species_registry(
+                        case_species, case_variants, **_faces()
+                    )
 
 
 class BalanceSlotTests(unittest.TestCase):
@@ -590,7 +626,7 @@ class BalanceSlotTests(unittest.TestCase):
         species, variants = _valid_registry()
         variants["t_fixture_ordinary"] = replace(
             variants["t_fixture_ordinary"],
-            display_name_zh="試製魔力暴風型",
+            display_name_zh="魔力暴風型",
             description_zh="以魔力與元素風暴吞噬一切的試製敘述。",
             combat_profile=None,
         )

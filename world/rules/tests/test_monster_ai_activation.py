@@ -280,7 +280,7 @@ class ActivationBindingTests(EvenniaTestCase):
         for key, intelligence in sorted(activated.items()):
             variant = MONSTER_VARIANT_REGISTRY[key]
             monster = construct_species_individual(
-                variant.species_key, key, key=f"activation {key}"
+                variant.species_key, key, individual_name=f"activation {key}"
             )
             with self.subTest(variant=key):
                 resolution = resolve_monster_ai(monster)
@@ -304,7 +304,7 @@ class ActivationBindingTests(EvenniaTestCase):
         for key in others:
             variant = MONSTER_VARIANT_REGISTRY[key]
             monster = construct_species_individual(
-                variant.species_key, key, key=f"legacy {key}"
+                variant.species_key, key, individual_name=f"legacy {key}"
             )
             with self.subTest(variant=key):
                 resolution = resolve_monster_ai(monster)
@@ -352,7 +352,7 @@ class ActivationBindingTests(EvenniaTestCase):
         )
         variant = MONSTER_VARIANT_REGISTRY[key]
         monster = construct_species_individual(
-            variant.species_key, key, key="activation retune probe"
+            variant.species_key, key, individual_name="activation retune probe"
         )
         surface = _authored_surface(monster)
         with patch.object(behaviour, "MONSTER_AI_TUNING", retuned):
@@ -406,7 +406,7 @@ class RealEncounterTests(EvenniaTestCase):
         self.variant_key = variant_key
         self.variant = variant
         self.monster = construct_species_individual(
-            variant.species_key, variant_key, key="activation decider"
+            variant.species_key, variant_key, individual_name="activation decider"
         )
         self.monster.location = self.room
         self.field = Battlefield(
@@ -512,7 +512,7 @@ class RollbackTests(EvenniaTestCase):
         self.variant_key = sorted(_activated())[0]
         self.variant = MONSTER_VARIANT_REGISTRY[self.variant_key]
         self.monster = construct_species_individual(
-            self.variant.species_key, self.variant_key, key="rollback decider"
+            self.variant.species_key, self.variant_key, individual_name="rollback decider"
         )
         self.monster.location = self.room
         self.weak = _defender("rollback weak", 50)
@@ -681,7 +681,7 @@ class RollbackTests(EvenniaTestCase):
         # the startup tuning this process already validated, and neither the
         # loaded rulebook nor the tuning object changes.
         new_session = construct_species_individual(
-            self.variant.species_key, self.variant_key, key="rollback new session"
+            self.variant.species_key, self.variant_key, individual_name="rollback new session"
         )
         before_restart = record_session_ai_tuning(SESSION, new_session)
         self.assertIs(before_restart.mode, DecisionMode.UTILITY)

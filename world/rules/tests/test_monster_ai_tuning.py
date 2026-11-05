@@ -1148,10 +1148,10 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
         self.patches.start()
         self.addCleanup(self.patches.stop)
         self.monster = construct_species_individual(
-            SPECIES, ORDINARY, key="t_ai_boundary"
+            SPECIES, ORDINARY, individual_name="t_ai_boundary"
         )
         self.opponent = construct_species_individual(
-            OTHER_SPECIES, OTHER_VARIANT, key="t_ai_opponent"
+            OTHER_SPECIES, OTHER_VARIANT, individual_name="t_ai_opponent"
         )
 
     def _battlefield(self):

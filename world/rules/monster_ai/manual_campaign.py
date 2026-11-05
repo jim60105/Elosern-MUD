@@ -703,7 +703,7 @@ class CampaignHarness:
         atk: int = _BOUNDED_MONSTER_ATK,
         skills: Sequence[str] = _ENCOUNTER_SKILL_KEYS,
     ) -> Any:
-        monster = construct_species_individual(SPECIES_KEY, variant_key, key=key)
+        monster = construct_species_individual(SPECIES_KEY, variant_key, individual_name=key)
         monster.location = self.room
         monster.traits.hp.base = hp if hp_max is None else hp_max
         monster.traits.hp.current = hp

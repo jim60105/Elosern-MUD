@@ -23,7 +23,9 @@ from world.lore.races import StaticBand
 from world.rules import traits as trait_rules
 from world.rules.monster_individual import (
     MonsterConstructionError,
+    MonsterIdentityView,
     construct_species_individual,
+    monster_identity_view,
 )
 from world.rules.traits import (
     NUMERIC_SOURCE_APPROVED_PROFILE,
@@ -210,7 +212,7 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
             # absence a tier-only individual carries.
             self.assertIsNone(individual.threat_tier)
             self.assertIsNone(individual.danger_grade)
-            self.assertEqual(str(individual.key), ORDINARY_ROW.display_name_zh)
+            self.assertEqual(str(individual.key), SPECIES_ROW.display_name_zh)
             self.assertEqual(_stored_values(individual), before)
         # The identity keys survive, so a registry repair restores the reads.
         self.assertEqual(individual.threat_tier, TIER)
@@ -352,17 +354,37 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
     )
     def test_identity_is_carried_by_keys_and_survives_a_reload(self):
-        individual = construct_species_individual(SPECIES, ORDINARY, key="標籤")
+        individual = construct_species_individual(SPECIES, ORDINARY, individual_name="標籤")
         self.assertEqual(str(individual.key), "標籤")
         reloaded = Monster.objects.get(pk=individual.pk)
         self.assertEqual(reloaded.species_key, SPECIES)
         self.assertEqual(reloaded.variant_key, ORDINARY)
-        # The default display label is the variant's approved text; identity is
-        # still the keys, never the name.
-        self.assertEqual(
-            str(construct_species_individual(SPECIES, ORDINARY).key),
-            ORDINARY_ROW.display_name_zh,
+        self.assertEqual(reloaded.individual_name, "標籤")
+
+    def test_an_unnamed_individual_is_keyed_by_its_species_name(self):
+        individual = construct_species_individual(SPECIES, ORDINARY)
+        self.assertEqual(str(individual.key), SPECIES_ROW.display_name_zh)
+        self.assertNotEqual(str(individual.key), ORDINARY_ROW.display_name_zh)
+        self.assertIsNone(individual.individual_name)
+        # The field is not autocreated: an unnamed individual stores nothing.
+        self.assertFalse(individual.attributes.has("individual_name"))
+
+    def test_a_named_individual_keeps_its_identity_keys(self):
+        individual = construct_species_individual(
+            SPECIES, STRONGER, individual_name="合成首領"
         )
+        self.assertEqual(str(individual.key), "合成首領")
+        self.assertEqual(individual.individual_name, "合成首領")
+        self.assertEqual(individual.species_key, SPECIES)
+        self.assertEqual(individual.variant_key, STRONGER)
+
+    def test_an_invalid_individual_name_builds_nothing(self):
+        before = _object_count()
+        for name in ("", "   ", 7, b"name"):
+            with self.subTest(name=name):
+                with self.assertRaises(MonsterConstructionError):
+                    construct_species_individual(SPECIES, ORDINARY, individual_name=name)
+        self.assertEqual(_object_count(), before)
 
     @covers_requirement(
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
@@ -629,3 +651,57 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@_SCOPE
+class MonsterIdentityViewTests(EvenniaTestCase):
+    """The lenient identity read: registry names plus the stored individual name."""
+
+    def test_an_unnamed_individual_reads_its_registry_names(self):
+        individual = construct_species_individual(SPECIES, ORDINARY)
+        self.assertEqual(
+            monster_identity_view(individual),
+            MonsterIdentityView(
+                individual_name=None,
+                species_name=SPECIES_ROW.display_name_zh,
+                variant_name=ORDINARY_ROW.display_name_zh,
+            ),
+        )
+
+    def test_a_named_individual_reads_its_stored_name(self):
+        individual = construct_species_individual(
+            SPECIES, STRONGER, individual_name="合成首領"
+        )
+        # The key is a search label, never a name source: renaming it does
+        # not change what the read returns.
+        individual.key = "改名標籤"
+        self.assertEqual(
+            monster_identity_view(individual),
+            MonsterIdentityView(
+                individual_name="合成首領",
+                species_name=SPECIES_ROW.display_name_zh,
+                variant_name=STRONGER_ROW.display_name_zh,
+            ),
+        )
+
+    def test_entities_without_a_resolvable_identity_read_none(self):
+        from evennia.utils.create import create_object
+        from typeclasses.characters import PlayerCharacter
+        from typeclasses.npcs import NPC
+
+        tier_only = create_object(Monster, key="合成散兵")
+        tier_only.threat_tier = TIER
+        player = create_object(PlayerCharacter, key="合成旅人")
+        npc = create_object(NPC, key="合成路人")
+        retired = construct_species_individual(SPECIES, ORDINARY)
+        for label, entity in (
+            ("tier-only", tier_only),
+            ("player", player),
+            ("npc", npc),
+            ("plain value", object()),
+            ("none", None),
+        ):
+            with self.subTest(entity=label):
+                self.assertIsNone(monster_identity_view(entity))
+        with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", {}):
+            self.assertIsNone(monster_identity_view(retired))

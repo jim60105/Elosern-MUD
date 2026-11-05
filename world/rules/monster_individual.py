@@ -31,6 +31,7 @@ documented ``interim_tier_band``). The event fires only on a durable commit
 (``transaction.on_commit``), so a rolled-back construction leaves no trace.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from world.lore.monster_species import (
@@ -247,18 +248,65 @@ def individual_danger_grade(individual: Any) -> str | None:
     return None if variant is None else variant.danger_grade
 
 
+@dataclass(frozen=True)
+class MonsterIdentityView:
+    """The name facts of one species-backed individual, each from its one source.
+
+    ``individual_name`` is the individual's own stored name (``None`` when it
+    has none); the species and variant names are read from the registries on
+    every call, so nothing here can drift from the authored rows.
+    """
+
+    individual_name: str | None
+    species_name: str
+    variant_name: str
+
+
+def monster_identity_view(entity: Any) -> MonsterIdentityView | None:
+    """Return an entity's monster identity, or ``None`` when it has none.
+
+    The lenient read every presenter, the combat view and the LLM situation
+    builder share: it never raises. A player, an NPC, a tier-only monster, or
+    an individual whose species/variant pair no longer resolves (a retired
+    variant record) reads as ``None``, so the caller degrades to the object's
+    key with no tag instead of failing a panel.
+    """
+    from typeclasses.monsters import Monster
+
+    if not isinstance(entity, Monster):
+        return None
+    species_key = getattr(entity, "species_key", None)
+    variant = _registered_variant(species_key, getattr(entity, "variant_key", None))
+    if variant is None:
+        return None
+    species = MONSTER_SPECIES_REGISTRY.get(species_key)
+    if species is None:
+        return None
+    individual_name = getattr(entity, "individual_name", None)
+    if not isinstance(individual_name, str) or not individual_name:
+        individual_name = None
+    return MonsterIdentityView(
+        individual_name=individual_name,
+        species_name=species.display_name_zh,
+        variant_name=variant.display_name_zh,
+    )
+
+
 def construct_species_individual(
     species_key: str,
     variant_key: str,
     *,
-    key: str | None = None,
+    individual_name: str | None = None,
     position: str = "floor",
 ) -> Any:
     """Create one species-backed ``Monster`` and return it.
 
-    ``key`` is the object's display label only (defaulting to the variant's
-    approved display text); identity is carried by the two registry keys and is
-    never derived from a display name. The signature accepts no player, level,
+    ``individual_name`` is the individual's own name, stored on its nullable
+    ``individual_name`` field; when absent the individual has no name and is
+    called by its species. The object ``key`` is written once as that name, or
+    else the species display name, and stays the engine's search label only: a
+    variant display name never names an individual. Identity is carried by the
+    two registry keys and is never derived from a name. The signature accepts no player, level,
     clock, or progression input at all, so no scaling can be threaded through
     this surface, and ``position`` only selects a documented point inside the
     declared tier band.
@@ -271,6 +319,12 @@ def construct_species_individual(
     error. A caller wrapping this in a larger transaction still governs the final
     commit; the boundary event is scheduled on that commit.
     """
+    if individual_name is not None and (
+        not isinstance(individual_name, str) or not individual_name.strip()
+    ):
+        raise MonsterConstructionError(
+            f"individual name {individual_name!r} must be a non-empty string"
+        )
     try:
         variant = resolve_variant(species_key, variant_key)
         config, numeric_source = initial_trait_config_for_variant(variant, position)
@@ -286,11 +340,19 @@ def construct_species_individual(
 
     try:
         with transaction.atomic():
+            species = MONSTER_SPECIES_REGISTRY[species_key]
             individual = create_object(
-                Monster, key=key if key is not None else variant.display_name_zh
+                Monster,
+                key=(
+                    individual_name
+                    if individual_name is not None
+                    else species.display_name_zh
+                ),
             )
             individual.variant_key = variant_key
             individual.species_key = species_key
+            if individual_name is not None:
+                individual.individual_name = individual_name
             individual._apply_trait_config(config)
             if variant.active_skill_keys or variant.passive_skill_keys:
                 individual.db.skills = {

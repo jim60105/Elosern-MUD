@@ -4,10 +4,10 @@ Follow `design.md`. Tests use synthetic fixtures and never pin a shipped name, s
 
 ## 1. Identity data and construction
 
-- [ ] 1.1 Add `Monster.individual_name`; replace `key=` with `individual_name=` in `construct_species_individual()`, defaulting the key to the species name and rejecting an invalid name before persistence. Update `manual_campaign.py` and every `key=` fixture. Replace the variant-label assertions in `world/rules/tests/test_monster_individual.py`. Check: construction tests cover the default, named and invalid cases, and `rg "construct_species_individual\(.*\bkey=" world tools` finds nothing.
-- [ ] 1.2 Add `MonsterIdentityView` and `monster_identity_view()` on the lenient path. Check: tests cover unnamed, named, tier-only, non-monster and retired-variant entities, with no raise.
-- [ ] 1.3 Add `MONSTER_NAME_MAX_CODE_POINTS` and enforce it in `validate_monster_species_registry()`. Rename `MonsterSite.individual_label_zh` to `individual_name_zh` and its check to `_check_individual_name()`, applying the bound. Pass the name through `world/maps/monster_sites.py`. Check: registry tests reject six code points and accept five, and the site test confirms the name on the individual and the marker fields equal an unnamed site's.
-- [ ] 1.4 Update `docs/development/adding-monsters.md` and `docs/development/monster-field-behaviour.md` for the renamed field and parameter. Check: `rg "individual_label" docs/development world tools` finds nothing.
+- [x] 1.1 Add `Monster.individual_name`; replace `key=` with `individual_name=` in `construct_species_individual()`, defaulting the key to the species name and rejecting an invalid name before persistence. Update `manual_campaign.py` and every `key=` fixture. Replace the variant-label assertions in `world/rules/tests/test_monster_individual.py`. Check: construction tests cover the default, named and invalid cases, and `rg "construct_species_individual\(.*\bkey=" world tools` finds nothing.
+- [x] 1.2 Add `MonsterIdentityView` and `monster_identity_view()` on the lenient path. Check: tests cover unnamed, named, tier-only, non-monster and retired-variant entities, with no raise.
+- [x] 1.3 Add `MONSTER_NAME_MAX_CODE_POINTS` and enforce it in `validate_monster_species_registry()`. Rename `MonsterSite.individual_label_zh` to `individual_name_zh` and its check to `_check_individual_name()`, applying the bound. Pass the name through `world/maps/monster_sites.py`. Check: registry tests reject six code points and accept five, and the site test confirms the name on the individual and the marker fields equal an unnamed site's.
+- [x] 1.4 Update `docs/development/adding-monsters.md` and `docs/development/monster-field-behaviour.md` for the renamed field and parameter. Check: `rg "individual_label" docs/development world tools` finds nothing.
 
 ## 2. Panels and protocol
 

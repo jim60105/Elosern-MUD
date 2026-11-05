@@ -57,6 +57,12 @@ from .monsters import MONSTER_TIER_REGISTRY, MonsterTier
 from .registry_refs import ref
 
 
+#: The longest species, variant or site individual name, in code points: the
+#: longest name the presence rail and the figure plate render without an
+#: ellipsis (monster-individual-names). Registry validation enforces it.
+MONSTER_NAME_MAX_CODE_POINTS = 5
+
+
 class MonsterSpeciesRegistryError(ValueError):
     """A species or variant registry row violates the registry contract."""
 
@@ -401,6 +407,11 @@ def validate_monster_species_registry(
             raise MonsterSpeciesRegistryError(
                 f"species {mapping_key!r} has no display name"
             )
+        if len(row.display_name_zh) > MONSTER_NAME_MAX_CODE_POINTS:
+            raise MonsterSpeciesRegistryError(
+                f"species {mapping_key!r} display name exceeds "
+                f"{MONSTER_NAME_MAX_CODE_POINTS} code points"
+            )
         if not isinstance(row.default_variant_key, str) or not row.default_variant_key:
             raise MonsterSpeciesRegistryError(
                 f"species {mapping_key!r} declares no default variant"
@@ -426,6 +437,15 @@ def validate_monster_species_registry(
                 )
 
     for mapping_key, row in variants.items():
+        if not isinstance(row.display_name_zh, str) or not row.display_name_zh:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} has no display name"
+            )
+        if len(row.display_name_zh) > MONSTER_NAME_MAX_CODE_POINTS:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} display name exceeds "
+                f"{MONSTER_NAME_MAX_CODE_POINTS} code points"
+            )
         if row.species_key not in species:
             raise MonsterSpeciesRegistryError(
                 f"variant {mapping_key!r} declares unknown species "

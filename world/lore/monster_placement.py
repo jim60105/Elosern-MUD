@@ -30,7 +30,11 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Callable, TypeVar
 
-from .monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
+from .monster_species import (
+    MONSTER_NAME_MAX_CODE_POINTS,
+    MONSTER_SPECIES_REGISTRY,
+    MONSTER_VARIANT_REGISTRY,
+)
 from .monster_activity import (
     MONSTER_ACTIVITY_REGISTRY,
     MonsterActivity,
@@ -82,9 +86,9 @@ class MonsterSite:
     from the closed :data:`RECOVERY_CONDITION_FIELDS` vocabulary.
     ``activity_key`` is the site's optional override: ``None`` declares none, so
     every member resolves its row's binding, else the composition's.
-    ``individual_label_zh`` is one authored display label for a site whose every
-    legal outcome is exactly one individual; it is the constructed object's
-    display key only and never its identity.
+    ``individual_name_zh`` is the individual name a site gives the one
+    individual every legal outcome of its composition places, at birth; after
+    construction the individual owns that name. It is never identity.
     """
 
     key: str
@@ -100,7 +104,7 @@ class MonsterSite:
     capacity: int
     one_shot: bool
     recover_after_ticks: int | None = None
-    individual_label_zh: str | None = None
+    individual_name_zh: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -400,22 +404,27 @@ def _check_site_activity(
     return activity
 
 
-def _check_individual_label(
+def _check_individual_name(
     site: MonsterSite,
     composition: EncounterComposition,
     what: str,
 ) -> None:
-    """Reject an empty label or one on a site that can place several individuals."""
-    label = site.individual_label_zh
-    if label is None:
+    """Reject an empty or over-long name, or one on a site that can place several."""
+    name = site.individual_name_zh
+    if name is None:
         return
-    if not isinstance(label, str) or not label:
+    if not isinstance(name, str) or not name:
         raise MonsterPlacementRegistryError(
-            f"{what} declares an empty individual label"
+            f"{what} declares an empty individual name"
+        )
+    if len(name) > MONSTER_NAME_MAX_CODE_POINTS:
+        raise MonsterPlacementRegistryError(
+            f"{what} declares individual name {name!r} longer than "
+            f"{MONSTER_NAME_MAX_CODE_POINTS} code points"
         )
     if composition_bounds(composition) != (1, 1):
         raise MonsterPlacementRegistryError(
-            f"{what} declares individual label {label!r}, but composition "
+            f"{what} declares individual name {name!r}, but composition "
             f"{composition.key!r} can place several individuals"
         )
 
@@ -792,7 +801,7 @@ def validate_monster_placement_registry(
             composition, activity_rows, f"{what} composition {composition.key!r}"
         )
         _check_site_activity(site, activity_rows, what)
-        _check_individual_label(site, composition, what)
+        _check_individual_name(site, composition, what)
         if not isinstance(site.one_shot, bool):
             raise MonsterPlacementRegistryError(
                 f"{what} must author its one-shot/recoverable life cycle as a "
@@ -912,7 +921,7 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         None,
         1,
         True,
-        individual_label_zh="閉灣者",
+        individual_name_zh="閉灣者",
     ),
     # A remote dry western woodland consistent with the boar's authored old
     # charcoal-kiln and reused-den ecology, also clear of maintained
@@ -927,7 +936,7 @@ _SITE_DECLARATIONS: tuple[MonsterSite, ...] = (
         None,
         1,
         True,
-        individual_label_zh="赤背",
+        individual_name_zh="赤背",
     ),
 )
 

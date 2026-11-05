@@ -1413,18 +1413,20 @@ unknown activity key. The row check runs even when a site override would mask
 the row at construction, so an authored typo cannot hide behind an override. A
 `None` site override is lawful.
 
-### The designated-individual label
+### The designated-individual name
 
-`MonsterSite.individual_label_zh` is optional. Publication accepts it only when
+`MonsterSite.individual_name_zh` is optional. Publication accepts it only when
 `composition_bounds(composition) == (1, 1)` — every legal outcome of the site's
-composition is exactly one individual — and rejects an empty label or a label on
-any wider composition. The site owner passes the label as
-`construct_species_individual(..., key=label)`, i.e. the constructed object's
-display key; `None` keeps the variant's display name. Species key, variant key,
-the `db.site_key` ownership marker, group ownership and defeat credit are
-unchanged, and a recovered labelled site's members are new persistent
-identities carrying the same display label. No naming tradition, nickname
-generator or shipped label lives in this change.
+composition is exactly one individual — and rejects an empty name, a name longer
+than `MONSTER_NAME_MAX_CODE_POINTS`, or a name on any wider composition. The
+site owner passes the name as
+`construct_species_individual(..., individual_name=name)`: it is stored on the
+individual's nullable `individual_name` field, and the object key is written
+once as that name; `None` leaves the individual unnamed and keyed by its
+species display name. Species key, variant key, the `db.site_key` ownership
+marker, group ownership and defeat credit are unchanged, and a recovered named
+site's members are new persistent identities carrying the same individual name.
+No naming tradition, nickname generator or shipped name lives in this change.
 
 ### Evidence map
 

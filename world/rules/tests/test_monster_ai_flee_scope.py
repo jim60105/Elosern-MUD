@@ -132,7 +132,7 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
             intelligence={VARIANT: 50},
         )
         monster = construct_species_individual(
-            SPECIES, VARIANT, key=f"t_flee_scope_{mode.value}_{hp}"
+            SPECIES, VARIANT, individual_name=f"t_flee_scope_{mode.value}_{hp}"
         )
         monster.location = self.room
         monster.traits.hp.base = MAX_HP

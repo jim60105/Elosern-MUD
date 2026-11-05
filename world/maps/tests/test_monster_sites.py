@@ -109,7 +109,7 @@ MIXED_KEY = "t_probe_mixed"
 OVERRIDE_KEY = "t_probe_override"
 LABELLED_KEY = "t_probe_labelled"
 UNLABELLED_KEY = "t_probe_unlabelled"
-LABEL = "t_probe_designated_name"
+LABEL = "探針首領"
 HOUR = 3600
 SEED = 11
 
@@ -314,7 +314,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
                 None,
                 1,
                 True,
-                individual_label_zh=LABEL,
+                individual_name_zh=LABEL,
             ),
             UNLABELLED_KEY: MonsterSite(
                 UNLABELLED_KEY,
@@ -697,7 +697,9 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         self.assertEqual(len(unlabelled_members), 1)
         named, plain = labelled_members[0], unlabelled_members[0]
 
+        self.assertEqual(named.individual_name, LABEL)
         self.assertEqual(named.key, LABEL)
+        self.assertIsNone(plain.individual_name)
         self.assertNotEqual(plain.key, LABEL)
         self.assertEqual(named.species_key, plain.species_key)
         self.assertEqual(named.variant_key, plain.variant_key)
@@ -727,7 +729,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
             1,
             False,
             HOUR,
-            individual_label_zh=LABEL,
+            individual_name_zh=LABEL,
         )
         self.enterContext(
             synthetic_registries(
@@ -763,6 +765,7 @@ class MonsterSiteLifecycleTests(BattlefieldIsolation, RegistryIsolationMixin, Ev
         # display label; identity stays keyed by species, variant and site.
         self.assertNotEqual(recovered[0].pk, first_pk)
         self.assertEqual(recovered[0].key, LABEL)
+        self.assertEqual(recovered[0].individual_name, LABEL)
         self.assertEqual(recovered[0].db.site_key, ward.key)
         group = activity_owner.read_monster_activity(self.wilderness).groups[
             f"site:{ward.key}:1#0"
