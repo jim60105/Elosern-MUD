@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c17f29703fdbccca785aa1dac96875f4dd82a8cb73966197fbadcdb72f00debb",
+  "fingerprint": "2f18c1b36417e507adf74bdf9f6866600794f4dd8dcd8d74172498ea46b4649a",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1093,7 +1093,7 @@
     "world/rules/combat_session/records.py": "fe04ecf1853e5332e3f968856b99a49b688cd16bc3a8dbcf6feb1d2f2f7407eb",
     "world/rules/combat_session/rounds.py": "21e21680fa6a97a5814c06ec7e1fa622864393224f21f6acb83d94ddd4c1860a",
     "world/rules/combat_session/scans.py": "a151939a6e9aae8cca57618bd10ec98535975d051f78ddc6a9afa89d3d13cfde",
-    "world/rules/combat_session/settlement.py": "13393c047f9e91881b9f2a0ab7f31c2d2da6ca52c59198febda7a51f3a4c676f",
+    "world/rules/combat_session/settlement.py": "75e8d82b2e6c17370d05912aadd21131af443818a522757ce6581012c2974728",
     "world/rules/combat_session/snapshot.py": "25a360b3fdbce4c469e84f8bfde68af4c56442133b7ee44d8b87baf272dee51a",
     "world/rules/combat_session/targeting.py": "14762c5d774e027c4453a291b4d05dbb316df4db410cc70a51330f1d67c2e0cb",
     "world/rules/combat_session/writer.py": "37459aaf3af537ffba58a786e4238e7b5d09785edab989fef8fd209f20b4bf18",

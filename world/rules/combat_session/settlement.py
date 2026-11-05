@@ -1675,6 +1675,11 @@ def _exam_session_coherent(actor: Any, record: CombatSessionRecord) -> bool:
     host = _find_exam_opponent(actor, record)
     if host is None or stable_actor_id(host) == stable_actor_id(actor):
         return False
+    if str(host.key) == str(actor.key):
+        # The persistent host is never renamed, and admission refuses a
+        # same-keyed candidate: a session carrying that collision was started
+        # before the rename, so it cannot resume under the host's display key.
+        return False
     try:
         exam = next((r for r in _read_exams(actor) if r.exam_id == record.exam_id), None)
         restriction = exam_restriction(host)
