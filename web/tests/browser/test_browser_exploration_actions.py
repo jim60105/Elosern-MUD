@@ -158,8 +158,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The rest entry's wait form (redesign-rest-entry): 等待直到黎明
         # dispatches its daypart wait directly — a no-op at the fixture's
         # midnight clock — so the 等待 tile's duration input is used instead.
-        # Confirm the form's default one-hour wait so the SKIP advance moves
-        # the fixture clock off midnight.
+        # Three minutes is enough to move the clock off midnight: the skip
+        # settles one 30-second boundary per monster-activity tick, and this
+        # journey runs the full shipped catalog on a shared runner, so the
+        # form's default hour would settle 120 boundaries for one clock check.
         activate_wait_row(page, "wait-rest")
         wait_for_store_state(
             page,
@@ -174,7 +176,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "description": "wait form's duration input focused",
             },
         )
-        _press(page, "Enter")  # confirm the default one-hour wait
+        page.fill(WAIT_FORM_INPUT, "0.05")
+        _press(page, "Enter")  # submit the three-minute wait
         # Wait for THIS wait's recorded outcome. The recorded result still
         # holds the previous move's answer ("moved"), so the wait is keyed by
         # the dispatched request id rather than by any recorded code; the
