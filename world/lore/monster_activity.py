@@ -661,6 +661,52 @@ _ACTIVITY_AREA_DECLARATIONS: tuple[ActivityArea, ...] = (
     ActivityArea("ridge_burrow_nest_home", home_radius=0),
     ActivityArea("cliff_echo_camp_home", home_radius=0),
     ActivityArea("tide_mouth_boss_home", home_radius=0),
+    # The three weak species of the content expansion keep one ground per
+    # authored habitat. A ground repeats its zone's birth rectangle because the
+    # zone model is the single geometry authority; the goblin nest and both rat
+    # caches add a small defended sub-area inside their own ground, so ordinary
+    # foraging ranges over the whole patch while only the defended area admits
+    # an unprompted hostile response.
+    ActivityArea(
+        "eastern_mudbank_grounds",
+        "eastern_plains",
+        ((2060, 2079, 820, 839),),
+    ),
+    ActivityArea(
+        "western_mudbank_grounds",
+        "western_hills_valleys",
+        ((300, 319, 840, 859),),
+    ),
+    ActivityArea(
+        "western_quarry_grounds",
+        "western_hills_valleys",
+        ((620, 639, 560, 579),),
+    ),
+    ActivityArea(
+        "eastern_cache_grounds",
+        "eastern_plains",
+        ((1580, 1599, 520, 539),),
+    ),
+    ActivityArea(
+        "western_cache_grounds",
+        "western_hills_valleys",
+        ((820, 839, 720, 739),),
+    ),
+    ActivityArea(
+        "western_quarry_nest",
+        "western_hills_valleys",
+        ((627, 632, 567, 572),),
+    ),
+    ActivityArea(
+        "eastern_cache_store",
+        "eastern_plains",
+        ((1587, 1592, 527, 532),),
+    ),
+    ActivityArea(
+        "western_cache_store",
+        "western_hills_valleys",
+        ((827, 832, 727, 732),),
+    ),
 )
 
 _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
@@ -803,6 +849,45 @@ _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
         "tide_mouth_boss_home",
         120,
         AggressionCondition("passive"),
+    ),
+    # A mud-film slime is passive: approaching footsteps make it retreat, and
+    # it answers only after engagement. The goblins and the rats forage as one
+    # cohesive group but defend only inside their authored nest or cache, so an
+    # ordinary group met away from that cell stays retreat-oriented.
+    MonsterActivity(
+        "eastern_mudbank_dweller_activity",
+        "solitary_roaming",
+        "eastern_mudbank_grounds",
+        60,
+        AggressionCondition("passive"),
+    ),
+    MonsterActivity(
+        "western_mudbank_dweller_activity",
+        "solitary_roaming",
+        "western_mudbank_grounds",
+        60,
+        AggressionCondition("passive"),
+    ),
+    MonsterActivity(
+        "western_quarry_nest_forager_activity",
+        "cohesive_group",
+        "western_quarry_grounds",
+        90,
+        AggressionCondition("defended_area", "western_quarry_nest"),
+    ),
+    MonsterActivity(
+        "eastern_cache_forager_activity",
+        "cohesive_group",
+        "eastern_cache_grounds",
+        90,
+        AggressionCondition("defended_area", "eastern_cache_store"),
+    ),
+    MonsterActivity(
+        "western_cache_forager_activity",
+        "cohesive_group",
+        "western_cache_grounds",
+        90,
+        AggressionCondition("defended_area", "western_cache_store"),
     ),
 )
 

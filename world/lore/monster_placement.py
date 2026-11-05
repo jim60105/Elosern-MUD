@@ -972,6 +972,36 @@ _ENCOUNTER_COMPOSITION_DECLARATIONS: tuple[EncounterComposition, ...] = (
             CompositionMember("cliff_stepper", 1, 1),
         ),
     ),
+    # The sparse weak-species habitats of the content expansion: one complete
+    # composition per zone, so automatic birth can never select a species
+    # outside its authored patch. The slime's members disperse into their own
+    # movement units under the solitary binding; the goblin group and the rat
+    # family stay cohesive.
+    EncounterComposition(
+        "eastern_mudbank_dweller",
+        "eastern_mudbank_dweller_activity",
+        (CompositionMember("mudbank_dweller", 1, 3),),
+    ),
+    EncounterComposition(
+        "western_mudbank_dweller",
+        "western_mudbank_dweller_activity",
+        (CompositionMember("mudbank_dweller", 1, 3),),
+    ),
+    EncounterComposition(
+        "western_quarry_nest_forager",
+        "western_quarry_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 4),),
+    ),
+    EncounterComposition(
+        "eastern_cache_forager",
+        "eastern_cache_forager_activity",
+        (CompositionMember("wax_cache_forager", 2, 5),),
+    ),
+    EncounterComposition(
+        "western_cache_forager",
+        "western_cache_forager_activity",
+        (CompositionMember("wax_cache_forager", 2, 5),),
+    ),
     # Complete compositions of the three authored manual sites. They are not
     # pooled into any ecology zone: an explicit site names its own composition,
     # so its membership never depends on automatic birth selection.
@@ -1064,6 +1094,71 @@ _ECOLOGY_ZONE_DECLARATIONS: tuple[EcologyZone, ...] = (
         3600,
         600,
         3,
+    ),
+    # Sparse weak-species habitats. Each one keeps the shared density interval,
+    # delayed recovery and home-owned ceiling of the zones above; only the
+    # per-cell capacity and wave budget widen, to the largest group the pool's
+    # single composition can place, so one complete birth always fits one cell
+    # and one wave. No stronger variant joins any of these ordinary pools.
+    EcologyZone(
+        "eastern_mudbank_habitat",
+        "eastern_plains",
+        ((2060, 2079, 820, 839),),
+        (WeightedComposition("eastern_mudbank_dweller", 1),),
+        1,
+        3,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "western_mudbank_habitat",
+        "western_hills_valleys",
+        ((300, 319, 840, 859),),
+        (WeightedComposition("western_mudbank_dweller", 1),),
+        1,
+        3,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "western_quarry_habitat",
+        "western_hills_valleys",
+        ((620, 639, 560, 579),),
+        (WeightedComposition("western_quarry_nest_forager", 1),),
+        1,
+        3,
+        4,
+        3600,
+        600,
+        4,
+    ),
+    EcologyZone(
+        "eastern_cache_habitat",
+        "eastern_plains",
+        ((1580, 1599, 520, 539),),
+        (WeightedComposition("eastern_cache_forager", 1),),
+        1,
+        3,
+        5,
+        3600,
+        600,
+        5,
+    ),
+    EcologyZone(
+        "western_cache_habitat",
+        "western_hills_valleys",
+        ((820, 839, 720, 739),),
+        (WeightedComposition("western_cache_forager", 1),),
+        1,
+        3,
+        5,
+        3600,
+        600,
+        5,
     ),
 )
 
