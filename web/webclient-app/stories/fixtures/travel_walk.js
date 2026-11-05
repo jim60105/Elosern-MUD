@@ -103,7 +103,7 @@ export function walkCapacity({
 }
 
 /**
- * A schema-3 wilderness window centred on `(cx, cy)`: a revealed square block
+ * A schema-4 wilderness window centred on `(cx, cy)`: a revealed square block
  * of `reveal` cells around the party (default 1: the 3 x 3 neighbourhood).
  */
 export function walkArea(cx, cy, { reveal = 1 } = {}) {
@@ -131,7 +131,7 @@ export function walkArea(cx, cy, { reveal = 1 } = {}) {
     nodes.push({ id, label: "合成荒原", x: cx + dx + 0.5, y: cy + dy + 0.5, visibility: "seen", visited: false, gateway: null, action: { kind: "move", exit_ref: `e_wild_${dir}`, destination: id }, landmark: null });
   }
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -142,6 +142,7 @@ export function walkArea(cx, cy, { reveal = 1 } = {}) {
     edges: nodes.slice(1).map((n) => ({ source: current, destination: n.id })),
     quest_markers: [],
     district_name: "合成東麓",
+    district: null,
     cell_km: 1,
     window: { min_x: cx - 20, min_y: cy - 20, width, height: width },
     rows,

@@ -33,6 +33,7 @@ data and never mutates anything. The exact wire schema lives in
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
+from functools import cache
 import hashlib
 import math
 from typing import Any
@@ -57,6 +58,11 @@ from web.webclient.presentation.map_panels import (
     AREA_MAX_NODES,
     AREA_MAX_QUEST_MARKERS,
     AREA_TERRAIN_CLASSES,
+    DISTRICT_OVERVIEW_CELL_KM,
+    DISTRICT_OVERVIEW_MAX_BYTES,
+    DISTRICT_OVERVIEW_MAX_CELLS,
+    DISTRICT_OVERVIEW_MAX_RUNS,
+    DISTRICT_OVERVIEW_TERRAIN_CLASSES,
     MAP_MAX_LABEL,
     MAP_MAX_TITLE,
     WILDERNESS_MAP_ID,
@@ -544,6 +550,274 @@ def encode_rows(
     return rows
 
 
+def _coarse_sample(cell: tuple[int, int], cell_km: int) -> tuple[int, int]:
+    """The one-kilometre sample of coarse cell ``cell``: ``cell_km // 2`` in."""
+
+    return (cell[0] * cell_km + cell_km // 2, cell[1] * cell_km + cell_km // 2)
+
+
+def _overview_fact(facts: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The three coarse facts of one owned cell, or ``None`` for no disclosure.
+
+    A coarse run carries exactly terrain, band and passability: no display
+    label, district, settlement identity, tier, road or ford. ``sea`` can never
+    be an owned cell's fact, so it is withheld rather than published.
+    """
+
+    if facts is None:
+        return None
+    terrain = facts["terrain"]
+    if terrain not in DISTRICT_OVERVIEW_TERRAIN_CLASSES:
+        return None
+    return {
+        "terrain": terrain,
+        "band": int(facts["band"]),
+        "passable": bool(facts["passable"]),
+    }
+
+
+def _merged_run(runs: list[dict[str, Any]], run: dict[str, Any]) -> None:
+    """Append ``run`` (without length), merging an equal adjacent run."""
+
+    if runs and {key: value for key, value in runs[-1].items() if key != "length"} == {
+        key: value for key, value in run.items() if key != "length"
+    }:
+        runs[-1]["length"] += 1
+    else:
+        runs.append({"length": 1, **run})
+
+
+def _encode_overview_rows(
+    origin: tuple[int, int],
+    width: int,
+    height: int,
+    facts_at: Callable[[tuple[int, int]], dict[str, Any] | None],
+    force: tuple[tuple[int, int], dict[str, Any]] | None,
+) -> list[list[dict[str, Any]]]:
+    """South-to-north coarse rows of merged unknown/terrain runs."""
+
+    rows: list[list[dict[str, Any]]] = []
+    for row in range(height):
+        runs: list[dict[str, Any]] = []
+        for column in range(width):
+            cell = (origin[0] + column, origin[1] + row)
+            facts = force[1] if force is not None and force[0] == cell else facts_at(cell)
+            run = {"kind": "unknown"} if facts is None else {"kind": "terrain", **facts}
+            _merged_run(runs, run)
+        rows.append(runs)
+    return rows
+
+
+def _overview_within_bounds(section: dict[str, Any]) -> bool:
+    runs = sum(len(row) for row in section["rows"])
+    return (
+        section["window"]["width"] * section["window"]["height"] <= DISTRICT_OVERVIEW_MAX_CELLS
+        and runs <= DISTRICT_OVERVIEW_MAX_RUNS
+        and json_byte_size(section) <= DISTRICT_OVERVIEW_MAX_BYTES
+    )
+
+
+def _build_district_overview(
+    partition: Any,
+    district_key: str,
+    name: str,
+    oracle: Any,
+    current_cell: tuple[int, int],
+    current_facts: dict[str, Any] | None,
+    *,
+    force_party: bool,
+) -> dict[str, Any] | None:
+    """The finest ladder rung whose exact-ownership window fits every cap.
+
+    The coarse window is aligned to the coarse grid and clamped to the frame;
+    each coarse cell samples the one-kilometre cell ``cell_km // 2`` from its
+    origin. Only cells the district exactly owns disclose terrain. When
+    ``force_party`` is set and the party's coarse cell would sample another
+    owner, the party's own facts fill that cell so no hole opens under it.
+    """
+
+    bounds = partition.district_bounds(district_key)
+    if bounds is None:
+        return None
+    min_km_x, min_km_y, max_km_x, max_km_y = bounds
+    last: tuple[int, int, int] | None = None
+    for cell_km in DISTRICT_OVERVIEW_CELL_KM:
+        frame = partition.frame_cells // cell_km
+        min_x = max(0, min_km_x // cell_km)
+        min_y = max(0, min_km_y // cell_km)
+        max_x = min(frame, (max_km_x + cell_km - 1) // cell_km)
+        max_y = min(frame, (max_km_y + cell_km - 1) // cell_km)
+        width, height = max_x - min_x, max_y - min_y
+        if width <= 0 or height <= 0:
+            continue
+        cells = width * height
+        if cells > DISTRICT_OVERVIEW_MAX_CELLS:
+            last = (cell_km, cells, 0)
+            continue
+        force = None
+        if force_party and current_facts is not None:
+            party = (current_cell[0] // cell_km, current_cell[1] // cell_km)
+            if min_x <= party[0] < max_x and min_y <= party[1] < max_y:
+                if partition.district_at(_coarse_sample(party, cell_km)) != district_key:
+                    force = (party, current_facts)
+
+        def facts_at(cell: tuple[int, int]) -> dict[str, Any] | None:
+            sample = _coarse_sample(cell, cell_km)
+            if partition.district_at(sample) != district_key:
+                return None
+            return _overview_fact(oracle.facts(sample))
+
+        rows = _encode_overview_rows((min_x, min_y), width, height, facts_at, force)
+        section = {
+            "key": district_key,
+            "name_zh": name,
+            "cell_km": cell_km,
+            "window": {"min_x": min_x, "min_y": min_y, "width": width, "height": height},
+            "rows": rows,
+        }
+        runs = sum(len(row) for row in rows)
+        last = (cell_km, cells, runs)
+        if _overview_within_bounds(section):
+            return section
+    log_warn(
+        "area_map_district_overview_over_bound",
+        context={
+            "layer": "wilderness",
+            "district": district_key,
+            "cell_km": None if last is None else last[0],
+            "cells": None if last is None else last[1],
+            "runs": None if last is None else last[2],
+        },
+    )
+    return None
+
+
+@cache
+def _district_overview_base(
+    district_key: str,
+    binding: str,
+    partition_fingerprint: str,
+    elevation_fingerprint: str,
+    policy_id: int,
+) -> dict[str, Any] | None:
+    """The centre-sampled overview, cached on every dependency it reads.
+
+    The party's own cell is applied by :func:`district_overview` on a copy, so
+    this cache stays keyed by the district and its dependencies only. The
+    fingerprints (not just the binding signature) invalidate it: tests and a
+    reload can change the partition, elevation or sight policy in place.
+    """
+
+    from world.maps.district_partition import frozen_partition
+
+    row = _district_rows().get(district_key)
+    if row is None:
+        return None
+    return _build_district_overview(
+        frozen_partition(),
+        district_key,
+        row.district_name_zh,
+        _TerrainOracle(),
+        (0, 0),
+        None,
+        force_party=False,
+    )
+
+
+def _force_party_cell(
+    base: dict[str, Any],
+    partition: Any,
+    district_key: str,
+    current_cell: tuple[int, int],
+    current_facts: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """A copy of ``base`` with the party's coarse cell forced, or ``None``.
+
+    ``None`` means either no patch is needed (the centre sample is already
+    owned) or the patched section would exceed a cap; the caller then either
+    keeps the base or rebuilds from the next rung.
+    """
+
+    if current_facts is None:
+        return None
+    cell_km = base["cell_km"]
+    window = base["window"]
+    party = (current_cell[0] // cell_km, current_cell[1] // cell_km)
+    if not (
+        window["min_x"] <= party[0] < window["min_x"] + window["width"]
+        and window["min_y"] <= party[1] < window["min_y"] + window["height"]
+    ):
+        return None
+    if partition.district_at(_coarse_sample(party, cell_km)) == district_key:
+        return None
+    row_index = party[1] - window["min_y"]
+    column = party[0] - window["min_x"]
+    cells: list[dict[str, Any]] = []
+    for run in base["rows"][row_index]:
+        cells.extend(
+            {"kind": "unknown"} if run["kind"] == "unknown" else {k: v for k, v in run.items() if k != "length"}
+            for _ in range(run["length"])
+        )
+    cells[column] = {"kind": "terrain", **current_facts}
+    runs: list[dict[str, Any]] = []
+    for cell in cells:
+        _merged_run(runs, cell)
+    rows = list(base["rows"])
+    rows[row_index] = runs
+    patched = {**base, "rows": rows}
+    return patched if _overview_within_bounds(patched) else None
+
+
+def district_overview(
+    cell: tuple[int, int],
+    district_key: str,
+    current_facts: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """The current lit district's bounded coarse overview, or ``None``.
+
+    The base overview is cached per district and its dependencies; the
+    party's coarse cell is then forced on a copy when the deterministic sample
+    would leave a hole under the party. The forced copy is re-checked against
+    every cap, and a pathological overflow rebuilds from the ladder with the
+    force applied inside the rung search.
+    """
+
+    from world.maps import elevation
+    from world.maps.district_partition import frozen_partition
+    from world.maps.static_references import binding_signature
+    from world.rules import sight
+
+    partition = frozen_partition()
+    base = _district_overview_base(
+        district_key,
+        binding_signature(),
+        partition.fingerprint,
+        elevation.current().fingerprint,
+        id(sight.POLICY),
+    )
+    if base is None:
+        return None
+    patched = _force_party_cell(base, partition, district_key, cell, current_facts)
+    if patched is not None:
+        return patched
+    if current_facts is None:
+        return base
+    party = (cell[0] // base["cell_km"], cell[1] // base["cell_km"])
+    if partition.district_at(_coarse_sample(party, base["cell_km"])) == district_key:
+        return base
+    # The forced cell pushed the chosen rung over a cap: search again with the
+    # force applied inside the rung decision.
+    return _build_district_overview(
+        partition,
+        district_key,
+        base["name_zh"],
+        _TerrainOracle(),
+        cell,
+        current_facts,
+        force_party=True,
+    )
+
+
 def _lit_landmarks(visited: Callable[[str], bool]) -> dict[str, str]:
     """The lit districts' landmark node ids, read by exact landmark membership.
 
@@ -777,6 +1051,11 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
     oracle = _TerrainOracle()
     current_district = _district_key((cx, cy))
     district_rows = _district_rows()
+    overview = None
+    if current_district is not None and current_district in lit:
+        overview = district_overview(
+            (cx, cy), current_district, _overview_fact(oracle.facts((cx, cy)))
+        )
 
     def facts_at(cell: tuple[int, int]) -> dict[str, Any] | None:
         if cell not in revealed:
@@ -847,6 +1126,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
         "nodes": nodes,
         "edges": edges,
         "district_name": _district_name((cx, cy))[:MAP_MAX_TITLE],
+        "district": overview,
         "cell_km": km,
         "window": {"min_x": min_x, "min_y": min_y, "width": WILDERNESS_WINDOW, "height": WILDERNESS_WINDOW},
         "rows": rows,
@@ -982,7 +1262,7 @@ def area_map_presenter(context: PresentationContext) -> dict[str, Any]:
         ),
     }
     if body["layer"] == "wilderness":
-        for key in ("district_name", "cell_km", "window", "rows", "light_phase", "ground_radius", "entities", "sightings"):
+        for key in ("district_name", "district", "cell_km", "window", "rows", "light_phase", "ground_radius", "entities", "sightings"):
             payload[key] = body[key]
     try:
         _check_payload_size(body["layer"], body["map_id"], payload)

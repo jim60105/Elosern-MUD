@@ -20,7 +20,7 @@ import { companionFigures } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
 import { artworkDescriptor, artworkEntry, artworkResource, fixtureDigest, sceneBundledResource, sceneDescriptor } from "../fixtures/art_panels.js";
 import { wildernessArea } from "../fixtures/area_map.js";
-import { DUSK_GRID, MORNING_AREA, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID } from "../fixtures/travel_grid.js";
+import { DUSK_GRID, MORNING_AREA, MORNING_GRID, NIGHT_GRID, WOODLAND_GRID, travelGridFixture } from "../fixtures/travel_grid.js";
 import { decodeTravelGrid } from "../../lib/travel-grid.js";
 import { STATUS_PANEL_SAMPLE } from "../fixtures/status_panels.js";
 
@@ -223,6 +223,51 @@ const MORNING = {
 // river, road and ford, a wolf pack in live sight, three distant sightings
 // and the eastern neighbour aimed; the whole party fresh.
 export const Morning = { args: MORNING };
+
+// The symbolic whole-district fit (wilderness-district-overview): the coarse
+// lit-district overview behind the window, the eight neighbour targets and
+// click stepping suppressed, and a readable far scale step.
+const nextFrames = (count = 2) =>
+  new Promise((resolve) => {
+    let left = count;
+    const step = () => (--left <= 0 ? resolve() : requestAnimationFrame(step));
+    requestAnimationFrame(step);
+  });
+
+export const DistrictFit = {
+  name: "District Fit",
+  args: { ...MORNING, aim: null },
+  play: async ({ canvasElement }) => {
+    await nextFrames(2);
+    const map = canvasElement.querySelector('[data-testid="travel-map"]');
+    const button = canvasElement.querySelector(".tm-district-fit");
+    if (!button) throw new Error("DistrictFit: the district-fit control is missing");
+    if (map.getAttribute("data-district-fit") !== "false") throw new Error("DistrictFit: the fit must start off");
+    button.click();
+    await nextFrames(2);
+    if (map.getAttribute("data-district-fit") !== "true") throw new Error("DistrictFit: the fit must engage");
+    if (canvasElement.querySelectorAll('[data-testid="travel-map__neighbour"]').length) {
+      throw new Error("DistrictFit: neighbour targets must be suppressed");
+    }
+    if (!canvasElement.querySelector(".travel-map__district-canvas")) throw new Error("DistrictFit: the overview canvas is missing");
+    const scale = canvasElement.querySelector(".tm-legend__scale")?.textContent ?? "";
+    if (!/^\d+ 公里$/.test(scale.trim())) throw new Error(`DistrictFit: unreadable scale step ${scale}`);
+  },
+};
+
+// An unlit district: no overview canvas content and no fit control; the fine
+// window keeps its own sight and explored grades.
+const UNLIT_GRID = travelGridFixture({ overview: null });
+export const DistrictUnlit = {
+  name: "District Unlit",
+  args: { ...MORNING, grid: UNLIT_GRID, aim: null, ...placeOf(UNLIT_GRID, "春 3 日 ‧ 07:20") },
+  play: async ({ canvasElement }) => {
+    await nextFrames(2);
+    if (canvasElement.querySelector(".tm-district-fit")) throw new Error("DistrictUnlit: no fit control without an overview");
+    const canvas = canvasElement.querySelector(".travel-map__district-canvas");
+    if (canvas && canvas.style.visibility !== "hidden") throw new Error("DistrictUnlit: the overview canvas must stay hidden");
+  },
+};
 
 // The day wears on: stages lower each face's colour and carry their label,
 // the sleeper wears the crescent, and the dock shows the damaged gauges.

@@ -124,6 +124,38 @@ export function fitRouteCamera({ points, cellPx, minCellPx, safe, margin = 1.5 }
   return { tx: c.x - bx, ty: c.y - by, cellPx: size };
 }
 
+/**
+ * The symbolic whole-district fit: the union of the coarse overview and the
+ * fine window, centred in the safe rectangle at a cell size that may fall
+ * below the local 18 px ladder (it is not a zoom rung and is never clamped).
+ * `bounds` is the fine window in cell units; the overview's kilometres are
+ * converted by the panel's own `cellKm` (default 1). Returns null when there
+ * is no overview or the safe rectangle is unusable, so the caller keeps its
+ * normal camera.
+ */
+export function districtFitCamera({ district, bounds, safe, cellKm = 1, margin = 1.5 }) {
+  if (!district || !safe) return null;
+  const edges = [safe.left, safe.top, safe.right, safe.bottom];
+  if (!edges.every(Number.isFinite) || safe.right - safe.left <= 0 || safe.bottom - safe.top <= 0) {
+    return null;
+  }
+  const scale = district.cellKm / cellKm;
+  const minX = Math.min(bounds.minX, district.origin.x * scale);
+  const minY = Math.min(bounds.minY, district.origin.y * scale);
+  const maxX = Math.max(bounds.maxX, (district.origin.x + district.width) * scale);
+  const maxY = Math.max(bounds.maxY, (district.origin.y + district.height) * scale);
+  const spanX = maxX - minX + margin * 2;
+  const spanY = maxY - minY + margin * 2;
+  const cellPx = Math.min((safe.right - safe.left) / spanX, (safe.bottom - safe.top) / spanY);
+  if (!(cellPx > 0)) return null;
+  const centre = centreOf(safe);
+  return {
+    tx: centre.x - ((minX + maxX) / 2) * cellPx,
+    ty: centre.y + ((minY + maxY) / 2) * cellPx,
+    cellPx,
+  };
+}
+
 /** The bearing's screen angle in radians, clockwise from north, or null. */
 export function bearingAngle(bearing) {
   const sector = SIGHTING_BEARINGS.indexOf(bearing);

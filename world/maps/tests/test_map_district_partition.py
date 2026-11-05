@@ -140,6 +140,30 @@ class ShippedDistrictPartitionTests(unittest.TestCase):
         for x, y in cells:
             self.assertEqual(frozen.district_at((x, y)), self.partition.owner_at((x, y)), (x, y))
 
+    def test_every_owned_cell_lies_inside_its_exact_district_bounds(self):
+        # Data-contract evidence for the coarse overview's exact ownership
+        # bounds: the tile-inflated box contains every owned cell and never
+        # leaves the 2,700 frame. The smoothed outlines are not consulted.
+        frozen = district_partition.frozen_partition()
+        owner = self.partition.owner
+        frame = frozen.frame_cells
+        self.assertEqual(frame, 2700)
+        for code, key in enumerate(self.partition.keys, start=1):
+            ys, xs = np.nonzero(owner == code)
+            self.assertGreater(xs.size, 0, key)
+            bounds = frozen.district_bounds(key)
+            self.assertIsNotNone(bounds, key)
+            min_x, min_y, max_x, max_y = bounds
+            self.assertLessEqual(min_x, int(xs.min()), key)
+            self.assertLessEqual(min_y, int(ys.min()), key)
+            self.assertGreater(max_x, int(xs.max()), key)
+            self.assertGreater(max_y, int(ys.max()), key)
+            self.assertGreaterEqual(min_x, 0, key)
+            self.assertGreaterEqual(min_y, 0, key)
+            self.assertLessEqual(max_x, frame, key)
+            self.assertLessEqual(max_y, frame, key)
+        self.assertIsNone(frozen.district_bounds("no_such_district"))
+
     @covers_requirement(
         "map-district-partition::offline-partition-assigns-every-land-cell-once-without-crossing-barriers"
     )

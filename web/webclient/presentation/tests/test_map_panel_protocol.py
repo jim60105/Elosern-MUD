@@ -94,6 +94,9 @@ class MapSchemaParityTests(unittest.TestCase):
     @covers_requirement(
         "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
     )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
     def test_bidirectional_schema_parity(self):
         def text(value):
             return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -128,6 +131,8 @@ class MapSchemaParityTests(unittest.TestCase):
             ("leading-zero node id", "area_map", variant(grid, lambda v: v.update(current_node="grid:t_map:01:1"))),
             ("current not visited", "area_map", variant(wild, lambda v: v["nodes"][0].update(visited=False))),
             ("wild schema 1", "area_map", variant(wild, lambda v: v.update(schema_version=1))),
+            ("wild schema 2", "area_map", variant(wild, lambda v: v.update(schema_version=2))),
+            ("wild schema 3", "area_map", variant(wild, lambda v: v.update(schema_version=3))),
             ("unknown run metadata", "area_map", variant(wild, lambda v: v["rows"][0][0].update(terrain="sea"))),
             ("row total 40", "area_map", variant(wild, lambda v: v["rows"][0].__setitem__(0, {"length": 40, "kind": "unknown"}))),
             ("unmerged runs", "area_map", variant(wild, lambda v: v["rows"].__setitem__(0, [{"length": 1, "kind": "unknown"}, {"length": 40, "kind": "unknown"}]))),
@@ -160,6 +165,23 @@ class MapSchemaParityTests(unittest.TestCase):
             ("semantic entity id", "area_map", variant(wild, lambda v: v["entities"][0].update(id="object:9"))),
             ("sighting cell", "area_map", variant(wild, lambda v: v["sightings"][0].update(cell=[1, 2]))),
             ("sighting 7 km", "area_map", variant(wild, lambda v: v["sightings"][0].update(distance_km=7))),
+            # Schema 4 district overview (wilderness-district-overview).
+            ("overview unknown field", "area_map", variant(wild, lambda v: v["district"].update(extra=1))),
+            ("overview off-ladder cell_km", "area_map", variant(wild, lambda v: v["district"].update(cell_km=3))),
+            ("overview long name", "area_map", variant(wild, lambda v: v["district"].update(name_zh="名" * 129))),
+            ("overview blank name", "area_map", variant(wild, lambda v: v["district"].update(name_zh=""))),
+            ("overview window misses current", "area_map", variant(wild, lambda v: v["district"]["window"].update(min_x=v["district"]["window"]["min_x"] + 3))),
+            ("overview window off frame", "area_map", variant(wild, lambda v: v["district"]["window"].update(min_x=536))),
+            ("overview cells over bound", "area_map", variant(wild, lambda v: v["district"]["window"].update(width=4096, height=4096))),
+            ("overview sea terrain", "area_map", variant(wild, lambda v: v["district"]["rows"][2][1].update(terrain="sea"))),
+            ("overview unmerged runs", "area_map", variant(wild, lambda v: v["district"]["rows"][0].__setitem__(0, [{"length": 1, "kind": "unknown"}, {"length": 4, "kind": "unknown"}]))),
+            ("overview zero length", "area_map", variant(wild, lambda v: v["district"]["rows"][0][0].update(length=0))),
+            ("overview wrong row count", "area_map", variant(wild, lambda v: v["district"]["rows"].pop())),
+            ("overview wrong row total", "area_map", variant(wild, lambda v: v["district"]["rows"][0][0].update(length=4))),
+            ("overview band 16", "area_map", variant(wild, lambda v: v["district"]["rows"][2][1].update(band=16))),
+            ("overview missing passable", "area_map", variant(wild, lambda v: v["district"]["rows"][2][1].pop("passable"))),
+            ("overview run enrichment", "area_map", variant(wild, lambda v: v["district"]["rows"][2][1].update(tier=1))),
+            ("overview non-ladder float", "area_map", variant(wild, lambda v: v["district"].update(cell_km=1.5))),
             ("bearing 360", "area_map", variant(grid, lambda v: v["quest_markers"][1]["destination"].update(bearing_deg=360))),
             ("tagged both", "area_map", variant(grid, lambda v: v["quest_markers"][0]["destination"].update(bearing_deg=1))),
             ("unlit enriched", "world_map", variant(world, lambda v: v["districts"][0].update(name="秘"))),
@@ -245,6 +267,67 @@ class MapSchemaParityTests(unittest.TestCase):
         self.assertEqual(len(wild["rows"]), map_panels.WILDERNESS_WINDOW)
         world = validate_world_map(_copy("world"))
         self.assertEqual(set(world["districts"][0]), {"id", "lit", "outline"})
+
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
+    def test_a_valid_district_overview_is_accepted_exactly(self):
+        wild = validate_area_map(_copy("wild"))
+        overview = wild["district"]
+        self.assertEqual(
+            set(overview), {"key", "name_zh", "cell_km", "window", "rows"}
+        )
+        self.assertEqual(overview["key"], "t_east")
+        self.assertEqual(overview["cell_km"], 5)
+        self.assertEqual(overview["window"], {"min_x": 22, "min_y": 22, "width": 5, "height": 5})
+        self.assertEqual(
+            [sum(run["length"] for run in row) for row in overview["rows"]],
+            [5, 5, 5, 5, 5],
+        )
+        # A coarse run carries exactly terrain, band and passability: no
+        # display label, settlement identity, node, entity or landmark.
+        terrain_runs = [run for row in overview["rows"] for run in row if run["kind"] == "terrain"]
+        self.assertTrue(terrain_runs)
+        for run in terrain_runs:
+            self.assertEqual(set(run), {"length", "kind", "terrain", "band", "passable"})
+        self.assertNotIn("sea", {run["terrain"] for run in terrain_runs})
+        # A null overview is the exact unlit/no-district form.
+        self.assertIsNone(validate_area_map({**_copy("wild"), "district": None})["district"])
+
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
+    def test_an_over_capacity_overview_is_rejected_by_both_validators(self):
+        wild = _copy("wild")
+        size = 65
+        rows = []
+        for _ in range(size):
+            runs = []
+            for column in range(size):
+                if column % 2 == 0:
+                    runs.append(
+                        {"length": 1, "kind": "terrain", "terrain": "hills", "band": 3, "passable": True}
+                    )
+                else:
+                    runs.append({"length": 1, "kind": "unknown"})
+            rows.append(runs)
+        wild["district"] = {
+            "key": "t_east",
+            "name_zh": "合成東區",
+            "cell_km": 1,
+            "window": {"min_x": 0, "min_y": 0, "width": size, "height": size},
+            "rows": rows,
+        }
+        text = json.dumps(wild, ensure_ascii=False, separators=(",", ":"))
+        with self.assertRaises(ProtocolValidationError):
+            validate_area_map(wild)
+        self.assertEqual(_js_decisions([("oversized overview", "area_map", text)]), [False])
 
 
 class MapPartCodecTests(unittest.TestCase):

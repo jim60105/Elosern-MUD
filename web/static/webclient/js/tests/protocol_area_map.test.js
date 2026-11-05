@@ -242,6 +242,30 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
     "phase noon": (a) => (a.light_phase = "noon"),
     "schema 1": (a) => (a.schema_version = 1),
     "schema 2": (a) => (a.schema_version = 2),
+    "schema 3": (a) => (a.schema_version = 3),
+    // Schema 4 district overview (wilderness-district-overview).
+    "overview missing": (a) => delete a.district,
+    "overview extra field": (a) => (a.district.extra = 1),
+    "overview off-ladder": (a) => (a.district.cell_km = 3),
+    "overview fractional rung": (a) => (a.district.cell_km = 1.5),
+    "overview long name": (a) => (a.district.name_zh = "名".repeat(C.MAP_MAX_TITLE + 1)),
+    "overview blank name": (a) => (a.district.name_zh = " "),
+    "overview window misses current": (a) => (a.district.window.min_x += 3),
+    "overview window off frame": (a) => (a.district.window.min_x = 536),
+    "overview cells over bound": (a) => {
+      a.district.window.width = 91;
+      a.district.window.height = 91;
+      a.district.rows = [];
+    },
+    "overview sea terrain": (a) => (a.district.rows[2][1].terrain = "sea"),
+    "overview unmerged runs": (a) => (a.district.rows[0] = [{ length: 1, kind: "unknown" }, { length: 4, kind: "unknown" }]),
+    "overview zero length": (a) => (a.district.rows[0][0].length = 0),
+    "overview short rows": (a) => a.district.rows.pop(),
+    "overview wrong row total": (a) => (a.district.rows[0][0].length = 4),
+    "overview band 16": (a) => (a.district.rows[2][1].band = 16),
+    "overview missing passable": (a) => delete a.district.rows[2][1].passable,
+    "overview run enrichment": (a) => (a.district.rows[2][1].tier = 1),
+    "overview unknown enrichment": (a) => (a.district.rows[0][0].terrain = "open_ground"),
     // Schema 3 display annotations (wilderness-travel-window-ui).
     "terrain run without display": (a) => delete a.rows[20].find((r) => r.kind === "terrain").display,
     "unknown with display": (a) => (a.rows[0] = [{ length: 41, kind: "unknown", display: null }]),
@@ -291,6 +315,17 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
   annotated.entities[0].threat = "危".repeat(C.WILDERNESS_MAX_THREAT);
   annotated.entities[0].count = 3;
   assert.equal(accepts(annotated), true);
+  // The district overview normalizes to its exact five-field record; a null
+  // overview is the exact unlit/no-district form.
+  const normalized = Protocol.validateMapPanel("area_map", F.wildernessArea());
+  assert.deepEqual(Object.keys(normalized.district).sort(), ["cell_km", "key", "name_zh", "rows", "window"]);
+  assert.equal(normalized.district.cell_km, 5);
+  assert.deepEqual(normalized.district.window, { min_x: 22, min_y: 22, width: 5, height: 5 });
+  assert.equal(normalized.district.rows.length, 5);
+  const unlit = clone(F.wildernessArea());
+  unlit.district = null;
+  assert.equal(accepts(unlit), true);
+  assert.equal(Protocol.validateMapPanel("area_map", unlit).district, null);
   // A window hanging over the frame's west edge keeps negative origins and
   // unknown padding.
   const shift = 110;
@@ -299,6 +334,9 @@ test("wilderness rows are exact, merged and frame-bounded", () => {
   edge.current_node = moveId(edge.current_node);
   edge.window.min_x -= shift;
   edge.window.min_y -= shift;
+  // This case is about the fine window's frame-edge origin; the synthetic
+  // overview is not shifted with it, so it is not published here.
+  edge.district = null;
   assert.ok(edge.window.min_x < 0);
   for (const node of edge.nodes) {
     node.id = moveId(node.id);

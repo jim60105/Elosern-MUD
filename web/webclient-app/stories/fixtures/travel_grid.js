@@ -1,5 +1,5 @@
 // Synthetic full-fact wilderness windows for the wilderness travel stories
-// (wilderness-travel-map-ui; converted to exact schema-3 bodies by
+// (wilderness-travel-map-ui; converted to exact schema-4 bodies by
 // wilderness-travel-window-ui). Each fixture is an `area_map` body that the
 // real wire validator accepts and the real decoder (lib/travel-grid.js)
 // turns into the painted grid, so the stories show the production path:
@@ -133,11 +133,50 @@ function sameFacts(a, b) {
   return JSON.stringify({ ...a, length: 0 }) === JSON.stringify({ ...b, length: 0 });
 }
 
+// A synthetic 5 km coarse overview of the district around the party: every
+// sampled owned cell carries terrain, band and passability, the rest is
+// unknown. Fixture data only; the server owns ownership.
+const OVERVIEW_KM = 5;
+function overviewFor(party) {
+  const cellKm = OVERVIEW_KM;
+  const centreX = Math.floor(party.x / cellKm);
+  const centreY = Math.floor(party.y / cellKm);
+  const minX = centreX - 4;
+  const minY = centreY - 4;
+  const size = 9;
+  const rows = [];
+  for (let row = 0; row < size; row += 1) {
+    const runs = [];
+    for (let col = 0; col < size; col += 1) {
+      const sampleX = (minX + col) * cellKm + Math.floor(cellKm / 2);
+      const sampleY = (minY + row) * cellKm + Math.floor(cellKm / 2);
+      const terrain = sampleX >= 82 && sampleX <= 130 ? terrainOf(sampleX, sampleY) : null;
+      const run =
+        terrain && terrain !== "sea"
+          ? { kind: "terrain", terrain, band: band(sampleX, sampleY), passable: !BLOCKED.has(terrain) }
+          : { kind: "unknown" };
+      const entry = { length: 1, ...run };
+      const last = runs[runs.length - 1];
+      if (last && sameFacts(last, entry)) last.length += 1;
+      else runs.push(entry);
+    }
+    rows.push(runs);
+  }
+  return {
+    key: "synthetic_east",
+    name_zh: "合成東麓",
+    cell_km: cellKm,
+    window: { min_x: minX, min_y: minY, width: size, height: size },
+    rows,
+  };
+}
+
 /**
- * One synthetic schema-3 wilderness `area_map` body centred on the party at
+ * One synthetic schema-4 wilderness `area_map` body centred on the party at
  * `party` (default the morning camp on the road), at `lightPhase` with
  * `groundRadius`, carrying `entities` and `sightings` as given. `landmarks`
- * name lit landmark cells (each must be revealed by a visit).
+ * name lit landmark cells (each must be revealed by a visit); `overview` is
+ * the coarse district record (a synthetic one by default, `null` for none).
  */
 export function travelAreaFixture({
   party = { x: 100, y: 200 },
@@ -147,6 +186,7 @@ export function travelAreaFixture({
   entities = [],
   sightings = [],
   landmarks = [{ x: 108, y: 207, name: "合成石標" }],
+  overview = undefined,
 } = {}) {
   const origin = { x: party.x - HALF, y: party.y - HALF };
   const inWindow = (x, y) => x >= origin.x && x < origin.x + SIZE && y >= origin.y && y < origin.y + SIZE;
@@ -204,7 +244,7 @@ export function travelAreaFixture({
   }
   const sorted = [...nodes.values()].sort((a, b) => a.y - b.y || a.x - b.x);
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -215,6 +255,7 @@ export function travelAreaFixture({
     edges,
     quest_markers: [],
     district_name: displayOf(party.x, party.y, terrainOf(party.x, party.y)).district_name,
+    district: overview === undefined ? overviewFor(party) : overview,
     cell_km: 1,
     window: { min_x: origin.x, min_y: origin.y, width: SIZE, height: SIZE },
     rows,

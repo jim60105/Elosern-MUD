@@ -14,6 +14,7 @@ import {
   cellCentre,
   cellSize,
   clampZoom,
+  districtFitCamera,
   fitRouteCamera,
   followCamera,
   openStage,
@@ -124,6 +125,45 @@ describe("fitRouteCamera", () => {
     const wide = fitRouteCamera({ points, cellPx: 30, minCellPx: 14, safe: { left: 0, top: 0, right: 1400, bottom: 500 } });
     const narrow = fitRouteCamera({ points, cellPx: 30, minCellPx: 14, safe: { left: 400, top: 0, right: 1000, bottom: 500 } });
     expect(narrow.cellPx).toBeLessThan(wide.cellPx);
+  });
+});
+
+describe("districtFitCamera", () => {
+  const safe = { left: 392, top: 48, right: 1129, bottom: 570 };
+  // A coarse 5 km overview at coarse origin (12, 14), and the fine 41-cell
+  // window at (60, 80): the union spans x 60..101 and y 70..121.
+  const overview = { origin: { x: 12, y: 14 }, width: 5, height: 5, cellKm: 5 };
+  const window = { minX: 60, minY: 80, maxX: 101, maxY: 121 };
+  const box = (cam) => ({
+    left: 60 * cam.cellPx + cam.tx,
+    right: 101 * cam.cellPx + cam.tx,
+    top: -121 * cam.cellPx + cam.ty,
+    bottom: -70 * cam.cellPx + cam.ty,
+  });
+
+  it("fits the overview and window union inside the safe rectangle", () => {
+    const cam = districtFitCamera({ district: overview, bounds: window, safe });
+    const fitted = box(cam);
+    expect(fitted.left).toBeGreaterThanOrEqual(safe.left - 1e-6);
+    expect(fitted.right).toBeLessThanOrEqual(safe.right + 1e-6);
+    expect(fitted.top).toBeGreaterThanOrEqual(safe.top - 1e-6);
+    expect(fitted.bottom).toBeLessThanOrEqual(safe.bottom + 1e-6);
+    // The 1.5-cell margin on each side is inside the safe rectangle too.
+    expect(fitted.left - 1.5 * cam.cellPx).toBeGreaterThanOrEqual(safe.left - 1e-6);
+    expect(fitted.right + 1.5 * cam.cellPx).toBeLessThanOrEqual(safe.right + 1e-6);
+  });
+
+  it("does not pass the fit through the 18 px local ladder or the UI scale twice", () => {
+    // spanX = 41 + 3, spanY = 51 + 3: the cell size is the safe rectangle's
+    // own ratio, already in CSS pixels.
+    const cam = districtFitCamera({ district: overview, bounds: window, safe });
+    expect(cam.cellPx).toBeCloseTo(Math.min(737 / 44, 522 / 54), 9);
+    expect(cam.cellPx).toBeLessThan(ZOOM.min);
+  });
+
+  it("returns null without an overview or with an unusable safe rectangle", () => {
+    expect(districtFitCamera({ district: null, bounds: window, safe })).toBeNull();
+    expect(districtFitCamera({ district: overview, bounds: window, safe: { left: 0, top: 0, right: 0, bottom: 0 } })).toBeNull();
   });
 });
 
@@ -316,5 +356,77 @@ describe("TravelMap overlay consumers", () => {
     expect(card.text()).toContain("北北東");
     expect(card.text()).toMatch(/\b25\b/);
     expect(card.text()).toContain("合成石塔");
+  });
+
+  const district = (extra = {}) => ({
+    key: "t_district",
+    cellKm: 5,
+    origin: { x: -2, y: -2 },
+    width: 8,
+    height: 8,
+    rows: [],
+    cells: [],
+    ...extra,
+  });
+
+  it("fits the district symbolically, suppresses targets and returns to 18 px", async () => {
+    const w = mount(TravelMapView, { props: { grid: grid({ district: district() }), status: "ready" } });
+    const stage = w.get('[data-testid="travel-map"]');
+    expect(stage.attributes("data-district-fit")).toBe("false");
+    const before = Number(stage.attributes("data-cell-px"));
+    expect(before).toBeGreaterThanOrEqual(18);
+    const button = w.get('[data-testid="travel-map__district-fit"]');
+    expect(button.attributes("aria-pressed")).toBe("false");
+    await button.trigger("click");
+    expect(stage.attributes("data-district-fit")).toBe("true");
+    const fitted = Number(stage.attributes("data-cell-px"));
+    expect(fitted).toBeLessThan(before);
+    expect(fitted).toBeLessThan(18);
+    // The eight neighbour targets and single-click stepping are suppressed.
+    expect(w.findAll('[data-testid="travel-map__neighbour"]')).toHaveLength(0);
+    await stage.trigger("click", { clientX: 10, clientY: 10 });
+    expect(w.emitted("pick")).toBeUndefined();
+    // Leaving fit returns to the local ladder's floor.
+    await button.trigger("click");
+    expect(stage.attributes("data-district-fit")).toBe("false");
+    expect(Number(stage.attributes("data-cell-px"))).toBeCloseTo(ZOOM.min, 6);
+  });
+
+  it("resets to 18 when the committed overview disappears or changes district", async () => {
+    const w = mount(TravelMapView, { props: { grid: grid({ district: district() }), status: "ready" } });
+    const stage = w.get('[data-testid="travel-map"]');
+    const button = w.get('[data-testid="travel-map__district-fit"]');
+    await button.trigger("click");
+    expect(stage.attributes("data-district-fit")).toBe("true");
+    await w.setProps({ grid: grid({ district: null }) });
+    expect(stage.attributes("data-district-fit")).toBe("false");
+    expect(Number(stage.attributes("data-cell-px"))).toBeCloseTo(ZOOM.min, 6);
+    // A different district while at the fit also resets.
+    await w.setProps({ grid: grid({ district: district({ key: "t_other" }) }) });
+    await button.trigger("click");
+    expect(stage.attributes("data-district-fit")).toBe("true");
+    await w.setProps({ grid: grid({ district: district({ key: "t_third" }) }) });
+    expect(stage.attributes("data-district-fit")).toBe("false");
+    expect(Number(stage.attributes("data-cell-px"))).toBeCloseTo(ZOOM.min, 6);
+  });
+
+  it("keeps a locked route authoritative over the district fit", async () => {
+    const plan = { steps: [{ cell: { x: 4, y: 4 } }], destination: { x: 6, y: 6 }, stop_index: 0 };
+    const w = mount(TravelMapView, {
+      props: { grid: grid({ district: district() }), status: "ready", plan, locked: true },
+    });
+    const stage = w.get('[data-testid="travel-map"]');
+    const routeCell = Number(stage.attributes("data-cell-px"));
+    await w.get('[data-testid="travel-map__district-fit"]').trigger("click");
+    expect(stage.attributes("data-district-fit")).toBe("true");
+    expect(Number(stage.attributes("data-cell-px"))).toBeCloseTo(routeCell, 6);
+  });
+
+  it("states a readable far scale step at a large district fit", async () => {
+    const w = mount(TravelMapView, {
+      props: { grid: grid({ district: district({ origin: { x: -20, y: -20 }, width: 40, height: 40 }) }), status: "ready" },
+    });
+    await w.get('[data-testid="travel-map__district-fit"]').trigger("click");
+    expect(w.find(".tm-legend__scale").text()).toBe("50 公里");
   });
 });

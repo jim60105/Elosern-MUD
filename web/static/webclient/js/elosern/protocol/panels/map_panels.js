@@ -1,6 +1,6 @@
 "use strict";
 
-// Exact area_map (schema 3) / world_map (schema 1) logical schemas (OpenSpec change
+// Exact area_map (schema 4) / world_map (schema 1) logical schemas (OpenSpec change
 // define-map-panel-protocol). Mirror of web/webclient/presentation/map_panels.py:
 // every constant, vocabulary and rule below must stay equal to the server
 // validator; a bidirectional Python/Node parity test pins them.
@@ -13,6 +13,7 @@
 var core = require("../core.js");
 
 var codePoints = core.codePoints;
+var jsonByteSize = core.jsonByteSize;
 var isPlainObject = core.isPlainObject;
 var validateIdentifier = core.validateIdentifier;
 var validateMessage = core.validateMessage;
@@ -23,7 +24,7 @@ var MAX_DEPTH = 12;
 var MAX_FIELDS = 64;
 var MAX_STRING_CODE_POINTS = 2048;
 
-var AREA_MAP_SCHEMA_VERSION = 3;
+var AREA_MAP_SCHEMA_VERSION = 4;
 var WORLD_MAP_SCHEMA_VERSION = 1;
 var MAP_PANEL_SCHEMAS = { area_map: AREA_MAP_SCHEMA_VERSION, world_map: WORLD_MAP_SCHEMA_VERSION };
 
@@ -68,6 +69,17 @@ var SIGHTING_BEARINGS = [
   "北", "北北東", "東北", "東北東", "東", "東南東", "東南", "南南東",
   "南", "南南西", "西南", "西南西", "西", "西北西", "西北", "北北西",
 ];
+
+// Wilderness schema 4 district overview (wilderness-district-overview): the
+// coarse current-district view beside the 41-cell window. Mirrored exactly;
+// the bidirectional parity test pins every value.
+var DISTRICT_OVERVIEW_CELL_KM = [1, 2, 5, 10, 20, 25, 50];
+var DISTRICT_OVERVIEW_MAX_CELLS = 8192;
+var DISTRICT_OVERVIEW_MAX_RUNS = 4096;
+var DISTRICT_OVERVIEW_MAX_BYTES = 65536;
+var DISTRICT_OVERVIEW_TERRAIN_CLASSES = AREA_TERRAIN_CLASSES.filter(function (terrain) {
+  return terrain !== "sea";
+});
 
 var WORLD_MAX_BYTES = 2097152;
 var WORLD_MAX_POLYGON_POINTS = 8192;
@@ -264,6 +276,7 @@ var AREA_COMMON_FIELDS = [
 ];
 var AREA_WILDERNESS_FIELDS = AREA_COMMON_FIELDS.concat([
   "district_name",
+  "district",
   "cell_km",
   "window",
   "rows",
@@ -275,6 +288,10 @@ var AREA_WILDERNESS_FIELDS = AREA_COMMON_FIELDS.concat([
 var UNKNOWN_RUN_FIELDS = ["length", "kind"];
 var TERRAIN_RUN_FIELDS = ["length", "kind", "terrain", "passable", "band", "tier", "road", "ford", "display"];
 var RUN_DISPLAY_FIELDS = ["terrain_label", "district_key", "district_name", "settlement", "ford_label"];
+var DISTRICT_OVERVIEW_FIELDS = ["key", "name_zh", "cell_km", "window", "rows"];
+var DISTRICT_OVERVIEW_WINDOW_FIELDS = ["min_x", "min_y", "width", "height"];
+var DISTRICT_OVERVIEW_UNKNOWN_RUN_FIELDS = ["length", "kind"];
+var DISTRICT_OVERVIEW_TERRAIN_RUN_FIELDS = ["length", "kind", "terrain", "band", "passable"];
 
 function areaGateway(value) {
   if (value === null) {
@@ -544,7 +561,116 @@ function wildSighting(value) {
   };
 }
 
-// The schema-3 wilderness fields, checked against the already-valid nodes.
+// The coarse window: on-frame, bounded and containing the current cell.
+function districtOverviewWindow(value, cellKm, currentCell) {
+  exact(value, "district.window", DISTRICT_OVERVIEW_WINDOW_FIELDS);
+  var frame = Math.floor(TRAIL_FRAME_CELLS / cellKm);
+  var window = {
+    min_x: int(value.min_x, "district.window.min_x", 0, frame),
+    min_y: int(value.min_y, "district.window.min_y", 0, frame),
+    width: int(value.width, "district.window.width", 1, DISTRICT_OVERVIEW_MAX_CELLS),
+    height: int(value.height, "district.window.height", 1, DISTRICT_OVERVIEW_MAX_CELLS),
+  };
+  if (window.min_x + window.width > frame || window.min_y + window.height > frame) {
+    fail("district.window must stay inside the 0..2700 frame");
+  }
+  if (window.width * window.height > DISTRICT_OVERVIEW_MAX_CELLS) {
+    fail("district.window must hold at most " + DISTRICT_OVERVIEW_MAX_CELLS + " coarse cells");
+  }
+  var col = Math.floor(currentCell.x / cellKm);
+  var row = Math.floor(currentCell.y / cellKm);
+  if (col < window.min_x || col >= window.min_x + window.width || row < window.min_y || row >= window.min_y + window.height) {
+    fail("district.window must contain the current cell");
+  }
+  return window;
+}
+
+// One coarse run: an unknown marker or exactly terrain/band/passable.
+function districtOverviewRun(value, width) {
+  if (!isPlainObject(value)) {
+    fail("a district run must be a JSON object");
+  }
+  if (value.kind === "unknown") {
+    exact(value, "district unknown run", DISTRICT_OVERVIEW_UNKNOWN_RUN_FIELDS);
+    return { length: int(value.length, "district.run.length", 1, width), kind: "unknown" };
+  }
+  if (value.kind !== "terrain") {
+    fail("district run.kind is not a stable value");
+  }
+  exact(value, "district terrain run", DISTRICT_OVERVIEW_TERRAIN_RUN_FIELDS);
+  if (DISTRICT_OVERVIEW_TERRAIN_CLASSES.indexOf(value.terrain) === -1) {
+    fail("district run.terrain is not a disclosed owned terrain");
+  }
+  return {
+    length: int(value.length, "district.run.length", 1, width),
+    kind: "terrain",
+    terrain: value.terrain,
+    band: int(value.band, "district.run.band", 0, WILDERNESS_MAX_BAND),
+    passable: bool(value.passable, "district.run.passable"),
+  };
+}
+
+function sameDistrictRun(a, b) {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "unknown") return true;
+  return a.terrain === b.terrain && a.band === b.band && a.passable === b.passable;
+}
+
+function districtOverviewRows(value, window) {
+  var width = window.width;
+  var height = window.height;
+  var runsTotal = 0;
+  var rows = list(value, "district.rows", height, height).map(function (row) {
+    var runs = list(row, "district row", 1, width).map(function (run) {
+      return districtOverviewRun(run, width);
+    });
+    var column = 0;
+    runs.forEach(function (run, index) {
+      if (index > 0 && sameDistrictRun(run, runs[index - 1])) {
+        fail("equal adjacent district runs must be merged");
+      }
+      column += run.length;
+    });
+    if (column !== width) {
+      fail("a district row's run lengths must sum to " + width);
+    }
+    runsTotal += runs.length;
+    return runs;
+  });
+  if (runsTotal > DISTRICT_OVERVIEW_MAX_RUNS) {
+    fail("district overview must hold at most " + DISTRICT_OVERVIEW_MAX_RUNS + " runs");
+  }
+  return rows;
+}
+
+// null or the exact bounded coarse overview of the current district.
+function districtOverview(value, currentCell) {
+  if (value === null) {
+    return null;
+  }
+  exact(value, "district", DISTRICT_OVERVIEW_FIELDS);
+  if (typeof value.key !== "string" || !DISTRICT_KEY_RE.test(value.key)) {
+    fail("district.key must be 1.." + WILDERNESS_MAX_DISTRICT_KEY + " printable ASCII characters");
+  }
+  var cellKm = int(value.cell_km, "district.cell_km", 1, Math.max.apply(null, DISTRICT_OVERVIEW_CELL_KM));
+  if (DISTRICT_OVERVIEW_CELL_KM.indexOf(cellKm) === -1) {
+    fail("district.cell_km is not on the overview ladder");
+  }
+  var window = districtOverviewWindow(value.window, cellKm, currentCell);
+  var result = {
+    key: value.key,
+    name_zh: text(value.name_zh, "district.name_zh", MAP_MAX_TITLE),
+    cell_km: cellKm,
+    window: window,
+    rows: districtOverviewRows(value.rows, window),
+  };
+  if (jsonByteSize(result) > DISTRICT_OVERVIEW_MAX_BYTES) {
+    fail("district overview exceeds " + DISTRICT_OVERVIEW_MAX_BYTES + " canonical bytes");
+  }
+  return result;
+}
+
+// The schema-4 wilderness fields, checked against the already-valid nodes.
 function wildernessBody(payload, nodes, current) {
   var cellKm = number(payload.cell_km, "cell_km", 0, AREA_MAX_CELL_KM);
   if (cellKm <= 0) {
@@ -557,6 +683,9 @@ function wildernessBody(payload, nodes, current) {
   var parts = current.split(":");
   var cx = Number(parts[2]);
   var cy = Number(parts[3]);
+  // The current node's one-kilometre cell (the overview's frame), independent
+  // of the panel's own cell size.
+  var currentCell = { x: Math.floor((cx + 0.5) * cellKm), y: Math.floor((cy + 0.5) * cellKm) };
   if (cx - minX !== WILDERNESS_HALF_WINDOW || cy - minY !== WILDERNESS_HALF_WINDOW) {
     fail("the wilderness window must be centred on the current cell");
   }
@@ -601,6 +730,7 @@ function wildernessBody(payload, nodes, current) {
   var sightings = list(payload.sightings, "sightings", 0, WILDERNESS_MAX_SIGHTINGS).map(wildSighting);
   return {
     district_name: text(payload.district_name, "district_name", MAP_MAX_TITLE),
+    district: districtOverview(payload.district, currentCell),
     cell_km: cellKm,
     window: window,
     rows: decoded.rows,
@@ -1088,6 +1218,11 @@ module.exports = {
     AREA_LIGHT_PHASES: AREA_LIGHT_PHASES,
     AREA_ENTITY_KINDS: AREA_ENTITY_KINDS,
     SIGHTING_BEARINGS: SIGHTING_BEARINGS,
+    DISTRICT_OVERVIEW_CELL_KM: DISTRICT_OVERVIEW_CELL_KM,
+    DISTRICT_OVERVIEW_MAX_CELLS: DISTRICT_OVERVIEW_MAX_CELLS,
+    DISTRICT_OVERVIEW_MAX_RUNS: DISTRICT_OVERVIEW_MAX_RUNS,
+    DISTRICT_OVERVIEW_MAX_BYTES: DISTRICT_OVERVIEW_MAX_BYTES,
+    DISTRICT_OVERVIEW_TERRAIN_CLASSES: DISTRICT_OVERVIEW_TERRAIN_CLASSES,
     AREA_MAX_CELL_KM: AREA_MAX_CELL_KM,
     WORLD_MAX_BYTES: WORLD_MAX_BYTES,
     WORLD_MAX_POLYGON_POINTS: WORLD_MAX_POLYGON_POINTS,

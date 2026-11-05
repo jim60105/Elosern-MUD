@@ -240,12 +240,12 @@ export const CrowdedNames = {
   },
 };
 
-// The wilderness neighbourhood (schema 2): the revealed ground of a short
-// trail and a lone old camp decoded from the run-length rows over the fog of
-// the 41 x 41 window, walked cells brighter than remembered ones, the
-// daylight sight ring with two wolves and a traveller inside it, distant
-// sightings on the frame rim, the town gate replacing the north-east step,
-// and the district with its light and sight caption.
+// The wilderness neighbourhood (schema 4): the revealed ground of a short
+// trail decoded over the fog of the 41 x 41 window, one explored grade for
+// walked and district-revealed cells outside sight, the coarse district
+// overview cut out of the fine window, the daylight sight ring with two
+// wolves and a traveller inside it, distant sightings on the frame rim, the
+// town gate replacing the north-east step, and the light and sight caption.
 export const Wilderness = {
   render,
   args: { area: wildernessArea() },
@@ -254,7 +254,11 @@ export const Wilderness = {
     await frames(3);
     const nodes = canvasElement.querySelectorAll('[data-testid="area-map__node"]').length;
     if (nodes !== wildernessArea().nodes.length) fail("Wilderness", `expected sparse nodes, got ${nodes}`);
-    if (!canvasElement.querySelector('[data-testid="area-map__terrain"].is-remembered')) fail("Wilderness", "remembered ground must be drawn");
+    if (!canvasElement.querySelector('[data-testid="area-map__terrain"].is-explored')) fail("Wilderness", "explored ground must be drawn");
+    if (!canvasElement.querySelector('[data-testid="area-map__terrain"].is-sighted')) fail("Wilderness", "live-sight ground must stay bright");
+    if (!canvasElement.querySelector('[data-testid="area-map__overview"]')) fail("Wilderness", "the district overview must be drawn");
+    if (!canvasElement.querySelector("mask")) fail("Wilderness", "the fine window must be cut out of the overview");
+    if (!canvasElement.querySelectorAll('[data-testid="area-map__overview-terrain"]').length) fail("Wilderness", "coarse terrain must be drawn");
     if (canvasElement.querySelectorAll('[data-testid="area-map__entity"]').length !== 3) fail("Wilderness", "three live-sight entities");
     if (canvasElement.querySelectorAll('[data-testid="area-map__sighting"]').length !== 3) fail("Wilderness", "three distant sightings");
     if (canvasElement.querySelector('[data-testid="area-map__district"]')?.textContent !== "灰鬃荒原東麓") {
@@ -264,6 +268,48 @@ export const Wilderness = {
     assertLabelsLegible(canvasElement, "Wilderness");
     await clickNode(canvasElement, WILD_GATE_ID);
     if (!canvasElement.querySelector('[data-testid="area-map-detail__go"]')) fail("Wilderness", "the gate step must offer 前往");
+  },
+};
+
+// The coarse lit-district overview behind the fine window: every overview
+// rect is explored grade, the mask cuts the 41-cell window out of it, and no
+// node, road, label or action comes from the coarse layer.
+export const WildernessDistrict = {
+  render,
+  args: { area: wildernessArea() },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    const overview = canvasElement.querySelector('[data-testid="area-map__overview"]');
+    if (!overview) fail("WildernessDistrict", "the overview group must be drawn");
+    const cells = overview.querySelectorAll('[data-testid="area-map__overview-terrain"]');
+    if (!cells.length) fail("WildernessDistrict", "coarse terrain must be drawn");
+    for (const cell of cells) {
+      if (!cell.classList.contains("is-explored")) fail("WildernessDistrict", "coarse terrain must use the explored grade");
+      if (cell.hasAttribute("data-node-id")) fail("WildernessDistrict", "the overview must add no node");
+    }
+    if (overview.querySelector("[data-node-id], text, button, a")) fail("WildernessDistrict", "the overview must add no label or control");
+    const cut = canvasElement.querySelector("mask rect:last-of-type");
+    const frame = canvasElement.querySelector(".area-map__window-frame");
+    for (const attribute of ["x", "y", "width", "height"]) {
+      if (Number(cut.getAttribute(attribute)) !== Number(frame.getAttribute(attribute))) {
+        fail("WildernessDistrict", "the mask must cut exactly the fine window");
+      }
+    }
+  },
+};
+
+// An unlit district (or none): no overview, no mask, and the fine window
+// keeps its own explored and sighted grades.
+export const WildernessUnlit = {
+  render,
+  args: { area: wildernessArea({ district: null }) },
+  ...atReference,
+  play: async ({ canvasElement }) => {
+    await frames(3);
+    if (canvasElement.querySelector('[data-testid="area-map__overview"]')) fail("WildernessUnlit", "no overview is published");
+    if (canvasElement.querySelector("mask")) fail("WildernessUnlit", "no overview clip exists");
+    if (!canvasElement.querySelector('[data-testid="area-map__terrain"].is-explored')) fail("WildernessUnlit", "the fine explored grade must remain");
   },
 };
 

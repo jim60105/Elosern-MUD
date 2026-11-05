@@ -10,8 +10,11 @@ import {
   PHASE_LOOK,
   SAMPLES_PER_CELL,
   buildField,
+  districtFineWindowRect,
+  districtPaintSignature,
   districtEdges,
   paintSignature,
+  paintDistrictOverview,
   paintTravelMap,
   strokeChains,
   summitCells,
@@ -317,6 +320,140 @@ describe("paintSignature", () => {
     expect(textureHash(12, -7, 3)).not.toBe(textureHash(13, -7, 3));
     expect(textureHash(0, 0)).toBeGreaterThanOrEqual(0);
     expect(textureHash(0, 0)).toBeLessThan(1);
+  });
+});
+
+describe("paintDistrictOverview", () => {
+  const over = {
+    key: "t_district",
+    cellKm: 5,
+    origin: { x: 8, y: 10 },
+    width: 6,
+    height: 6,
+    rows: [],
+    cells: [],
+  };
+  for (let row = 0; row < 6; row += 1) {
+    for (let column = 0; column < 6; column += 1) {
+      over.cells.push(
+        (row + column) % 3 === 0
+          ? null
+          : { x: 8 + column, y: 10 + row, terrain: row < 3 ? "hills" : "water", band: 4, passable: true },
+      );
+    }
+  }
+  over.cells = Object.freeze(over.cells);
+
+  function fineGrid(lightPhase = "day") {
+    return { ...makeGrid({ w: 10, h: 10, origin: { x: 42, y: 52 }, fact: open, lightPhase }), cellKm: 1, district: over };
+  }
+
+  function paint(grid) {
+    const factory = fakeCanvasFactory();
+    const { ctx, log } = recorder(over.width * 3, over.height * 3);
+    const cache = {};
+    paintDistrictOverview(ctx, grid, { cache, createCanvas: factory.createCanvas });
+    return { ctx, log, factory, cache };
+  }
+
+  function alphaAt(data, column, row, samples = 3) {
+    const top = (over.height - 1 - row) * samples;
+    const offset = ((top + 1) * over.width * samples + column * samples + 1) * 4;
+    return data.slice(offset, offset + 4);
+  }
+
+  it("paints owned coarse terrain and leaves unknown cells transparent", () => {
+    const { factory } = paint(fineGrid());
+    const layer = factory.made[0];
+    const image = layer.rec.log.find((entry) => entry.call === "putImageData").args[0];
+    expect(image.width).toBe(over.width * 3);
+    expect(image.height).toBe(over.height * 3);
+    // Row 0, column 0 is unknown; row 0, column 1 is hills.
+    expect(alphaAt(image.data, 0, 0)[3]).toBe(0);
+    expect(alphaAt(image.data, 1, 0)[3]).toBe(255);
+    expect(alphaAt(image.data, 1, 0).slice(0, 3)).toEqual(
+      alphaAt(image.data, 2, 0).slice(0, 3),
+    );
+  });
+
+  it("grades the overview with the supplied light phase's memory and wash", () => {
+    const day = paint(fineGrid("day"));
+    const night = paint(fineGrid("night"));
+    const dayImage = day.factory.made[0].rec.log.find((entry) => entry.call === "putImageData").args[0];
+    const nightImage = night.factory.made[0].rec.log.find((entry) => entry.call === "putImageData").args[0];
+    const dayPixel = alphaAt(dayImage.data, 1, 0);
+    const nightPixel = alphaAt(nightImage.data, 1, 0);
+    expect(nightPixel[0]).toBeLessThan(dayPixel[0]);
+    expect(nightPixel[1]).toBeLessThan(dayPixel[1]);
+    // The phase wash is applied source-atop on the overview layer only.
+    expect(night.factory.made[0].rec.log.some((entry) => entry.value === PHASE_LOOK.night.wash)).toBe(true);
+    expect(day.factory.made[0].rec.log.some((entry) => entry.value === PHASE_LOOK.day.wash)).toBe(false);
+  });
+
+  it("clears the fine window out of the overview with whole coarse pixels", () => {
+    const grid = fineGrid();
+    const rect = districtFineWindowRect(grid);
+    // x = 42 / 5 - 8 = 0.4, y = 52 / 5 - 10 = 0.4, width/height = 2.
+    expect(rect.x).toBeCloseTo(0.4, 9);
+    expect(rect.y).toBeCloseTo(0.4, 9);
+    expect(rect.width).toBeCloseTo(2, 9);
+    const { log, factory } = paint(grid);
+    const clears = factory.made[0].rec.log.filter((entry) => entry.call === "clearRect");
+    expect(clears.at(-1).args).toEqual([1, 10, 7, 7]);
+    // The stage draws the cleared overview layer.
+    expect(log.filter((entry) => entry.call === "drawImage")).toHaveLength(1);
+    expect(log.filter((entry) => entry.call === "clearRect")[0].args).toEqual([0, 0, 18, 18]);
+  });
+
+  it("does not count as a fine-map paint", () => {
+    const before = travelPaintStats().count;
+    paint(fineGrid());
+    expect(travelPaintStats().count).toBe(before);
+  });
+});
+
+describe("districtPaintSignature", () => {
+  const baseGrid = () => {
+    const district = {
+      key: "t_district",
+      cellKm: 5,
+      origin: { x: 8, y: 10 },
+      width: 2,
+      height: 2,
+      rows: [],
+      cells: [
+        { x: 8, y: 10, terrain: "hills", band: 4, passable: true },
+        { x: 9, y: 10, terrain: "hills", band: 4, passable: true },
+        null,
+        { x: 9, y: 11, terrain: "water", band: 1, passable: false },
+      ],
+    };
+    return { ...makeGrid({ w: 4, h: 4, fact: open, lightPhase: "day" }), cellKm: 1, district };
+  };
+
+  it("is empty without an overview and stable for equal facts", () => {
+    const plain = makeGrid({ fact: open });
+    expect(districtPaintSignature(plain)).toBe("");
+    expect(districtPaintSignature(baseGrid())).toBe(districtPaintSignature(baseGrid()));
+  });
+
+  it("changes with the phase, the fine window and any coarse fact", () => {
+    const base = baseGrid();
+    const signature = districtPaintSignature(base);
+    const variants = [
+      { ...base, lightPhase: "night" },
+      { ...base, origin: { x: 43, y: 52 } },
+      { ...base, width: 3 },
+      { ...base, district: { ...base.district, cellKm: 2 } },
+      {
+        ...base,
+        district: {
+          ...base.district,
+          cells: [{ x: 8, y: 10, terrain: "hills", band: 5, passable: true }, ...base.district.cells.slice(1)],
+        },
+      },
+    ];
+    for (const grid of variants) expect(districtPaintSignature(grid)).not.toBe(signature);
   });
 });
 

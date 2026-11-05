@@ -59,11 +59,27 @@ function cellWindow(cells) {
   return { minX: -half, minY: -half, maxX: half, maxY: half };
 }
 
-/** Wilderness stops in cell units: 全區 (the 41-cell window), 周邊 and 近處. */
-export function wildernessStops(frame, { marginPx = DEFAULT_MARGIN_PX } = {}) {
-  return orderedStops([
+/**
+ * Wilderness stops in cell units: 全區 (the 41-cell window), 周邊, 近處 and,
+ * only when a lit district overview is supplied, the wider 地區 stop fitting
+ * the union of that overview and the 41-cell window. The opening view keeps
+ * 周邊; without an overview the stops and their limits are unchanged.
+ */
+export function wildernessStops(frame, { marginPx = DEFAULT_MARGIN_PX, overviewBounds = null } = {}) {
+  const stops = [];
+  if (overviewBounds) {
+    stops.push(createStop("district", "地區", fitBounds(overviewBounds, frame, { marginPx }).span));
+  }
+  stops.push(
     createStop("window", "全區", fitBounds(cellWindow(WILDERNESS_WINDOW_CELLS), frame, { marginPx }).span),
     createStop("surroundings", "周邊", fitBounds(cellWindow(WILDERNESS_SURROUNDINGS_CELLS), frame, { marginPx }).span),
     createStop("nearby", "近處", fitBounds(cellWindow(WILDERNESS_NEARBY_CELLS), frame, { marginPx }).span),
-  ]);
+  );
+  // The caller may supply an overview narrower than the window; order here so
+  // the dedupe never drops the wider 全區 window. On an equal span the window
+  // label wins over the district stop, which is then redundant.
+  const priority = { window: 0, surroundings: 1, nearby: 2, district: 3 };
+  return orderedStops(
+    stops.sort((a, b) => b.span - a.span || priority[a.key] - priority[b.key]),
+  );
 }

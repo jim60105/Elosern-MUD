@@ -88,6 +88,11 @@ class DistrictPartition:
     coarse: tuple[tuple[int, ...], ...]
     exceptions: Mapping[tuple[int, int], tuple[int, ...]]
     outlines: Mapping[str, tuple[tuple[int, ...], ...]]
+    #: Per district key, the tile-inflated exact-ownership box
+    #: ``(min_x, min_y, max_x, max_y)`` in one-kilometre cells (exclusive
+    #: maxima), clamped to the frame. Derived from ``coarse``/``exceptions``,
+    #: never from the smoothed ``outlines``.
+    bounds: Mapping[str, tuple[int, int, int, int]]
     is_land: Callable[[tuple[int, int]], bool]
 
     def owner_code(self, cell: tuple[int, int]) -> int:
@@ -109,6 +114,17 @@ class DistrictPartition:
             return None
         code = self.owner_code((x, y))
         return self.district_keys[code - 1] if code > 0 else None
+
+    def district_bounds(self, key: str) -> tuple[int, int, int, int] | None:
+        """The exact-ownership box of ``key``, or ``None`` for an unknown key.
+
+        The box is the union of every coarse tile carrying the district's
+        owner code, inflated to the whole tile and clamped to the frame. It
+        contains every owned cell; it is deliberately not the smoothed
+        display outline, which can be a kilometre narrower.
+        """
+
+        return self.bounds.get(key)
 
 
 def _document(source: Mapping | str) -> Mapping:
@@ -232,6 +248,49 @@ def _expand(runs, length: int, what: str) -> tuple[int, ...]:
     return tuple(values)
 
 
+def _district_bounds(
+    coarse: tuple[tuple[int, ...], ...],
+    exceptions: Mapping[tuple[int, int], tuple[int, ...]],
+    keys: tuple[str, ...],
+    tile: int,
+    frame: int,
+) -> Mapping[str, tuple[int, int, int, int]]:
+    """Union every owner-carrying coarse tile into one exact-ownership box.
+
+    A tile contributes its whole ``tile``-sized box (inflated on purpose: the
+    box only has to contain every owned cell), clamped to the frame. Mixed
+    tiles contribute the codes their exception raster actually lists.
+    """
+
+    extents: dict[int, list[int]] = {}
+
+    def add(code: int, tx: int, ty: int) -> None:
+        x0 = tx * tile
+        y0 = ty * tile
+        x1 = min(frame, x0 + tile)
+        y1 = min(frame, y0 + tile)
+        box = extents.get(code)
+        if box is None:
+            extents[code] = [x0, y0, x1, y1]
+        else:
+            box[0] = min(box[0], x0)
+            box[1] = min(box[1], y0)
+            box[2] = max(box[2], x1)
+            box[3] = max(box[3], y1)
+
+    for ty, row in enumerate(coarse):
+        for tx, code in enumerate(row):
+            if code == MIXED:
+                for value in set(exceptions[(tx, ty)]):
+                    if value > 0:
+                        add(value, tx, ty)
+            elif code > 0:
+                add(code, tx, ty)
+    return MappingProxyType(
+        {keys[code - 1]: tuple(box) for code, box in extents.items()}
+    )
+
+
 def decode_partition(
     source: Mapping | str,
     is_land: Callable[[tuple[int, int]], bool],
@@ -319,6 +378,7 @@ def decode_partition(
         outlines=MappingProxyType(
             {key: tuple(tuple(ring) for ring in outlines[key]) for key in keys}
         ),
+        bounds=_district_bounds(coarse, exceptions, keys, tile, frame),
         is_land=is_land,
     )
 

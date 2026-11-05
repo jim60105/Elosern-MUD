@@ -185,6 +185,14 @@ class AreaViewContracts(VitestContractMixin, unittest.TestCase):
         self.assert_block_passed("area rendering uses truthful geometry and server fog")
 
     @covers_requirement(
+        "webclient-area-map-view::explored-wilderness-uses-one-sight-based-style"
+    )
+    def test_explored_wilderness_uses_one_sight_based_style(self):
+        # Walked and district-revealed cells outside sight share one explored
+        # grade, and only the supplied ground disc is bright.
+        self.assert_block_passed("explored wilderness uses one sight-based style")
+
+    @covers_requirement(
         "webclient-area-map-view::area-selection-offers-travel-only-for-an-authoritative-adjacent-exit"
     )
     def test_adjacent_only_travel(self):

@@ -17,10 +17,11 @@ import {
   ABSENT_DUNGEON_ROOMS,
   DUNGEON_IDS,
   TOWN_IDS,
+  WILD_EXPLORED_CELL,
+  WILD_EXPLORED_WALKED_CELL,
   WILD_GATE_ID,
   WILD_QUEST_CELL,
-  WILD_REMEMBERED_CELL,
-  WILD_TRAIL_CELL,
+  WILD_SIGHTED_CELL,
   crowdedTownArea,
   dungeonArea,
   interiorArea,
@@ -163,21 +164,91 @@ describe("area rendering uses truthful geometry and server fog", () => {
     expect(gate.text().replace(/\s+/g, "")).toBe("河岸碼頭通往灰岩鎮");
   });
 
-  it("keeps a visited cell's visit styling and dims an identical reveal-only cell", () => {
-    // Two cells of identical revealed terrain; only one carries a visited node.
+  it("draws the lit district overview behind the window, cut out of it", () => {
     const area = wildernessArea();
     const w = mountMap(area);
-    const cellEl = (x, y) => w.findAll('[data-testid="area-map__terrain"]').find((c) => c.attributes("data-cell") === `${x}:${y}`);
-    const trail = cellEl(WILD_TRAIL_CELL.x, WILD_TRAIL_CELL.y);
-    const remembered = cellEl(WILD_REMEMBERED_CELL.x, WILD_REMEMBERED_CELL.y);
-    expect(trail.attributes("data-terrain")).toBe(remembered.attributes("data-terrain"));
-    expect(trail.classes()).toContain("is-visited");
-    expect(remembered.classes()).toContain("is-remembered");
-    expect(Number(remembered.attributes("fill-opacity"))).toBeLessThan(Number(trail.attributes("fill-opacity")));
-    // The visited cell is its own node with the walked state; the reveal-only
-    // cell has no node at all.
-    expect(nodeEl(w, `wild:elosern:${WILD_TRAIL_CELL.x}:${WILD_TRAIL_CELL.y}`).classes()).toContain("is-visited");
-    expect(nodeEl(w, `wild:elosern:${WILD_REMEMBERED_CELL.x}:${WILD_REMEMBERED_CELL.y}`)).toBeUndefined();
+    const group = w.find('[data-testid="area-map__overview"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("mask")).toMatch(/^url\(#area-map-\d+-[a-z0-9]+-overview-clip\)$/);
+    const cells = w.findAll('[data-testid="area-map__overview-terrain"]');
+    expect(cells.length).toBeGreaterThan(0);
+    // Coarse terrain carries the shared class palette at one explored style
+    // and no node, road, label or actionable control.
+    for (const cell of cells) {
+      expect(cell.classes()).toContain("area-map__terrain");
+      expect(cell.classes()).toContain("is-explored");
+      expect(cell.attributes("data-terrain")).toMatch(/^(open_ground|hills|mountain|woodland|water|ridge|settlement)$/);
+    }
+    // Each coarse cell spans exactly its coarse width/height in screen cells:
+    // no extra fine row from the inclusive cellRect convention.
+    const boxes = cells.map((cell) => ({
+      key: cell.attributes("data-cell"),
+      x: Number(cell.attributes("x")),
+      y: Number(cell.attributes("y")),
+      width: Number(cell.attributes("width")),
+      height: Number(cell.attributes("height")),
+    }));
+    for (const box of boxes) expect(box.width).toBeCloseTo(box.height, 6);
+    const byKey = new Map(boxes.map((box) => [box.key, box]));
+    let stacked = 0;
+    for (const box of boxes) {
+      const [x, y] = box.key.split(":").map(Number);
+      const south = byKey.get(`${x}:${y - 1}`);
+      if (!south) continue;
+      stacked += 1;
+      expect(south.y).toBeCloseTo(box.y + box.height, 6);
+    }
+    expect(stacked).toBeGreaterThan(0);
+    expect(w.findAll('[data-testid="area-map__overview"] [data-node-id]')).toHaveLength(0);
+    // The mask cuts exactly the fine 41-cell window out of the overview layer.
+    const mask = w.find("mask");
+    const cut = mask.findAll("rect")[1];
+    const frameRect = w.find(".area-map__window-frame");
+    for (const attribute of ["x", "y", "width", "height"]) {
+      expect(Number(cut.attributes(attribute))).toBeCloseTo(Number(frameRect.attributes(attribute)), 6);
+    }
+    // Without an overview the fine window renders exactly as before.
+    const unlit = mountMap(wildernessArea({ district: null }));
+    expect(unlit.find('[data-testid="area-map__overview"]').exists()).toBe(false);
+    expect(unlit.find("mask").exists()).toBe(false);
+    expect(unlit.findAll('[data-testid="area-map__terrain"]').length).toBeGreaterThan(0);
+  });
+
+  it("widens the wilderness stops only when the payload supplies an overview", () => {
+    const w = mountMap(wildernessArea());
+    const keys = w.vm.stops.map((stop) => stop.key);
+    expect(keys[0]).toBe("district");
+    expect(keys).toContain("surroundings");
+    const district = w.vm.stops.find((stop) => stop.key === "district");
+    const surroundings = w.vm.stops.find((stop) => stop.key === "surroundings");
+    const opening = w.emitted("update:view")[0][0];
+    expect(opening.span).toBeLessThan(district.span);
+    expect(opening.span).toBeGreaterThanOrEqual(surroundings.span * (1 - 1e-9));
+    const plain = mountMap(wildernessArea({ district: null }));
+    expect(plain.vm.stops.map((stop) => stop.key)).not.toContain("district");
+    expect(plain.vm.stops.map((stop) => stop.key)).toEqual(["window", "surroundings", "nearby"]);
+    // A compact overview inside the 41-cell window must not drop 全區.
+    const compact = wildernessArea();
+    compact.district = {
+      key: "story_east_foothills",
+      name_zh: "灰鬃荒原東麓",
+      cell_km: 5,
+      window: { min_x: 19, min_y: 39, width: 3, height: 3 },
+      rows: [
+        [{ length: 3, kind: "unknown" }],
+        [
+          { length: 1, kind: "unknown" },
+          { length: 1, kind: "terrain", terrain: "hills", band: 4, passable: true },
+          { length: 1, kind: "unknown" },
+        ],
+        [{ length: 3, kind: "unknown" }],
+      ],
+    };
+    const small = mountMap(compact);
+    expect(small.vm.stops.map((stop) => stop.key)).toContain("window");
+    expect(small.vm.stops.find((stop) => stop.key === "window").span).toBeGreaterThanOrEqual(
+      small.vm.stops[0].span,
+    );
   });
 
   it("draws only the server's live-sight entities and rim sightings", () => {
@@ -356,6 +427,57 @@ describe("area rendering uses truthful geometry and server fog", () => {
     for (const role of ["halo", "paper", "current", "node", "accent", "accent-muted", "selection"]) {
       expect(glyph).toContain(`var(--map-view-${role}`);
     }
+  });
+});
+
+describe("explored wilderness uses one sight-based style", () => {
+  it("renders walked and district-revealed cells outside sight identically", () => {
+    const area = wildernessArea();
+    const w = mountMap(area);
+    const cellEl = (x, y) =>
+      w.findAll('[data-testid="area-map__terrain"]').find((c) => c.attributes("data-cell") === `${x}:${y}`);
+    const walked = cellEl(WILD_EXPLORED_WALKED_CELL.x, WILD_EXPLORED_WALKED_CELL.y);
+    const revealed = cellEl(WILD_EXPLORED_CELL.x, WILD_EXPLORED_CELL.y);
+    const sighted = cellEl(WILD_SIGHTED_CELL.x, WILD_SIGHTED_CELL.y);
+    // Both outside sight: the same terrain, the same explored class set.
+    expect(walked.attributes("data-terrain")).toBe(revealed.attributes("data-terrain"));
+    expect(walked.classes()).toContain("is-explored");
+    expect(revealed.classes()).toContain("is-explored");
+    expect(walked.classes()).toEqual(revealed.classes());
+    // Only relief (band) may differ between the two explored cells.
+    const walkedOpacity = Number(walked.attributes("fill-opacity"));
+    const revealedOpacity = Number(revealed.attributes("fill-opacity"));
+    expect(Math.abs(walkedOpacity - revealedOpacity)).toBeLessThanOrEqual(0.061);
+    // Inside live sight is the bright grade, never explored.
+    expect(sighted.classes()).toContain("is-sighted");
+    expect(Number(sighted.attributes("fill-opacity"))).toBeGreaterThan(
+      Math.max(walkedOpacity, revealedOpacity),
+    );
+    // A visit is still a node record (the trail), but it no longer brightens
+    // terrain, and a reveal-only cell has no node at all.
+    expect(
+      nodeEl(w, `wild:elosern:${WILD_EXPLORED_WALKED_CELL.x}:${WILD_EXPLORED_WALKED_CELL.y}`).classes(),
+    ).toContain("is-visited");
+    expect(nodeEl(w, `wild:elosern:${WILD_EXPLORED_CELL.x}:${WILD_EXPLORED_CELL.y}`)).toBeUndefined();
+  });
+
+  it("uses the exact supplied ground disc for sight on diagonals and edges", () => {
+    const w = mountMap(wildernessArea({ district: null }));
+    const cells = w.findAll('[data-testid="area-map__terrain"]');
+    const here = w.findAll('[data-testid="area-map__terrain"]').find((c) => c.attributes("data-cell") === "100:200");
+    const sighted = cells.filter((c) => c.classes().includes("is-sighted"));
+    expect(here.classes()).toContain("is-current");
+    for (const cell of sighted) {
+      const [x, y] = cell.attributes("data-cell").split(":").map(Number);
+      const dx = x - 100;
+      const dy = y - 200;
+      expect(dx * dx + dy * dy).toBeLessThanOrEqual((4 + 0.5) ** 2);
+    }
+    // The disc's edge and diagonal cells are included, not a square.
+    const key = (x, y) => cells.find((c) => c.attributes("data-cell") === `${x}:${y}`);
+    expect(key(104, 200).classes()).toContain("is-sighted");
+    expect(key(103, 203).classes()).toContain("is-sighted");
+    expect(key(98, 195).classes()).toContain("is-explored");
   });
 });
 

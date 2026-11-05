@@ -1,4 +1,4 @@
-"""Exact ``area_map`` (schema 3) / ``world_map`` (schema 1) wire schemas and bounds.
+"""Exact ``area_map`` (schema 4) / ``world_map`` (schema 1) wire schemas and bounds.
 
 The on-demand map panels (world-map drawer design §5.2/§5.3, OpenSpec change
 define-map-panel-protocol) share one fixed wire contract between the server
@@ -37,7 +37,7 @@ from web.webclient.presentation.protocol import (
 
 AREA_MAP_PANEL = "area_map"
 WORLD_MAP_PANEL = "world_map"
-AREA_MAP_SCHEMA_VERSION = 3
+AREA_MAP_SCHEMA_VERSION = 4
 WORLD_MAP_SCHEMA_VERSION = 1
 
 #: The on-demand map panels and their registered schema versions. Only these
@@ -128,6 +128,19 @@ SIGHTING_BEARINGS = (
     "西北西",
     "西北",
     "北北西",
+)
+
+# Wilderness schema 4 district overview (wilderness-district-overview): a
+# bounded coarse view of the current lit district beside the 41-cell window.
+# The rung is chosen finest-first; the caps reject rather than truncate.
+DISTRICT_OVERVIEW_CELL_KM = (1, 2, 5, 10, 20, 25, 50)
+DISTRICT_OVERVIEW_MAX_CELLS = 8_192
+DISTRICT_OVERVIEW_MAX_RUNS = 4_096
+DISTRICT_OVERVIEW_MAX_BYTES = 65_536
+#: Terrain classes a coarse overview run may carry. ``sea`` is excluded: an
+#: owned cell is land, so a sea fact is never a disclosed district fact.
+DISTRICT_OVERVIEW_TERRAIN_CLASSES = tuple(
+    terrain for terrain in AREA_TERRAIN_CLASSES if terrain != "sea"
 )
 
 # Measured production geometry plus the full 5 km checkerboard trail.
@@ -305,6 +318,7 @@ _AREA_COMMON_FIELDS = (
 )
 _AREA_WILDERNESS_FIELDS = _AREA_COMMON_FIELDS + (
     "district_name",
+    "district",
     "cell_km",
     "window",
     "rows",
@@ -316,6 +330,10 @@ _AREA_WILDERNESS_FIELDS = _AREA_COMMON_FIELDS + (
 _UNKNOWN_RUN_FIELDS = ("length", "kind")
 _TERRAIN_RUN_FIELDS = ("length", "kind", "terrain", "passable", "band", "tier", "road", "ford", "display")
 _RUN_DISPLAY_FIELDS = ("terrain_label", "district_key", "district_name", "settlement", "ford_label")
+_DISTRICT_OVERVIEW_FIELDS = ("key", "name_zh", "cell_km", "window", "rows")
+_DISTRICT_OVERVIEW_WINDOW_FIELDS = ("min_x", "min_y", "width", "height")
+_DISTRICT_OVERVIEW_UNKNOWN_RUN_FIELDS = ("length", "kind")
+_DISTRICT_OVERVIEW_TERRAIN_RUN_FIELDS = ("length", "kind", "terrain", "band", "passable")
 _DISTRICT_KEY_RE = re.compile(r"[\x21-\x7e]{1,128}")
 
 
@@ -549,8 +567,116 @@ def _wild_sighting(value: Any) -> dict[str, Any]:
     }
 
 
+def _district_overview_window(
+    value: Any, cell_km: int, current_cell: tuple[int, int]
+) -> dict[str, int]:
+    """The coarse window: on-frame, bounded and containing the current cell."""
+
+    _exact(value, "district.window", _DISTRICT_OVERVIEW_WINDOW_FIELDS)
+    frame = TRAIL_FRAME_CELLS // cell_km
+    window = {
+        "min_x": _int(value["min_x"], "district.window.min_x", 0, frame),
+        "min_y": _int(value["min_y"], "district.window.min_y", 0, frame),
+        "width": _int(value["width"], "district.window.width", 1, DISTRICT_OVERVIEW_MAX_CELLS),
+        "height": _int(value["height"], "district.window.height", 1, DISTRICT_OVERVIEW_MAX_CELLS),
+    }
+    if window["min_x"] + window["width"] > frame or window["min_y"] + window["height"] > frame:
+        raise MapPanelError("district.window must stay inside the 0..2700 frame")
+    if window["width"] * window["height"] > DISTRICT_OVERVIEW_MAX_CELLS:
+        raise MapPanelError(
+            f"district.window must hold at most {DISTRICT_OVERVIEW_MAX_CELLS} coarse cells"
+        )
+    cx, cy = current_cell
+    col, row = cx // cell_km, cy // cell_km
+    if not (window["min_x"] <= col < window["min_x"] + window["width"]):
+        raise MapPanelError("district.window must contain the current cell")
+    if not (window["min_y"] <= row < window["min_y"] + window["height"]):
+        raise MapPanelError("district.window must contain the current cell")
+    return window
+
+
+def _district_overview_run(value: Any, width: int) -> dict[str, Any]:
+    """One coarse run: an unknown marker or exactly terrain/band/passable."""
+
+    if not isinstance(value, dict):
+        raise MapPanelError("a district run must be a JSON object")
+    kind = value.get("kind")
+    if kind == "unknown":
+        _exact(value, "district unknown run", _DISTRICT_OVERVIEW_UNKNOWN_RUN_FIELDS)
+        return {"length": _int(value["length"], "district.run.length", 1, width), "kind": "unknown"}
+    if kind != "terrain":
+        raise MapPanelError("district run.kind is not a stable value")
+    _exact(value, "district terrain run", _DISTRICT_OVERVIEW_TERRAIN_RUN_FIELDS)
+    if value["terrain"] not in DISTRICT_OVERVIEW_TERRAIN_CLASSES:
+        raise MapPanelError("district run.terrain is not a disclosed owned terrain")
+    return {
+        "length": _int(value["length"], "district.run.length", 1, width),
+        "kind": "terrain",
+        "terrain": value["terrain"],
+        "band": _int(value["band"], "district.run.band", 0, WILDERNESS_MAX_BAND),
+        "passable": _bool(value["passable"], "district.run.passable"),
+    }
+
+
+def _district_overview_rows(value: Any, window: dict[str, int]) -> list[list[dict[str, Any]]]:
+    """Exact south-to-north rows: merged runs totalling the window width."""
+
+    width, height = window["width"], window["height"]
+    rows = []
+    runs_total = 0
+    for row in _list(value, "district.rows", minimum=height, maximum=height):
+        runs = [
+            _district_overview_run(run, width)
+            for run in _list(row, "district row", minimum=1, maximum=width)
+        ]
+        column = 0
+        for index, run in enumerate(runs):
+            previous = runs[index - 1] if index else None
+            if previous is not None and {**run, "length": 0} == {**previous, "length": 0}:
+                raise MapPanelError("equal adjacent district runs must be merged")
+            column += run["length"]
+        if column != width:
+            raise MapPanelError(f"a district row's run lengths must sum to {width}")
+        runs_total += len(runs)
+        rows.append(runs)
+    if runs_total > DISTRICT_OVERVIEW_MAX_RUNS:
+        raise MapPanelError(
+            f"district overview must hold at most {DISTRICT_OVERVIEW_MAX_RUNS} runs"
+        )
+    return rows
+
+
+def _district_overview(value: Any, current_cell: tuple[int, int]) -> dict[str, Any] | None:
+    """``null`` or the exact bounded coarse overview of the current district."""
+
+    if value is None:
+        return None
+    _exact(value, "district", _DISTRICT_OVERVIEW_FIELDS)
+    key = value["key"]
+    if not isinstance(key, str) or not _DISTRICT_KEY_RE.fullmatch(key):
+        raise MapPanelError(
+            f"district.key must be 1..{WILDERNESS_MAX_DISTRICT_KEY} printable ASCII characters"
+        )
+    cell_km = _int(value["cell_km"], "district.cell_km", 1, max(DISTRICT_OVERVIEW_CELL_KM))
+    if cell_km not in DISTRICT_OVERVIEW_CELL_KM:
+        raise MapPanelError("district.cell_km is not on the overview ladder")
+    window = _district_overview_window(value["window"], cell_km, current_cell)
+    result = {
+        "key": key,
+        "name_zh": _text(value["name_zh"], "district.name_zh", MAP_MAX_TITLE),
+        "cell_km": cell_km,
+        "window": window,
+        "rows": _district_overview_rows(value["rows"], window),
+    }
+    if json_byte_size(result) > DISTRICT_OVERVIEW_MAX_BYTES:
+        raise MapPanelError(
+            f"district overview exceeds {DISTRICT_OVERVIEW_MAX_BYTES} canonical bytes"
+        )
+    return result
+
+
 def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], current: str) -> dict[str, Any]:
-    """Validate the schema-3 wilderness fields against the already-valid nodes."""
+    """Validate the schema-4 wilderness fields against the already-valid nodes."""
     cell_km = _number(payload["cell_km"], "cell_km", 0, AREA_MAX_CELL_KM)
     if cell_km <= 0:
         raise MapPanelError("cell_km must be positive")
@@ -561,6 +687,9 @@ def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], curre
     cx, cy = int(current_parts[2]), int(current_parts[3])
     if (cx - min_x, cy - min_y) != (WILDERNESS_HALF_WINDOW, WILDERNESS_HALF_WINDOW):
         raise MapPanelError("the wilderness window must be centred on the current cell")
+    # The current node's one-kilometre cell (the overview's frame), independent
+    # of the panel's own cell size.
+    current_km = (math.floor((cx + 0.5) * cell_km), math.floor((cy + 0.5) * cell_km))
     for node in nodes:
         col, row = _wild_cell_of(node, cell_km)
         offset = (col - min_x, row - min_y)
@@ -596,6 +725,7 @@ def _wilderness_body(payload: dict[str, Any], nodes: list[dict[str, Any]], curre
     ]
     return {
         "district_name": _text(payload["district_name"], "district_name", MAP_MAX_TITLE),
+        "district": _district_overview(payload["district"], current_km),
         "cell_km": cell_km,
         "window": window,
         "rows": rows,

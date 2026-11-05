@@ -240,7 +240,7 @@ autocreating `origin_room` descriptor during a read-only request.
 | --- | --- | --- |
 | `grid` | The settlement's declared sparse graph (the live XYMap for a builder map), never rooms spawned on demand. Roads count in both directions. `x`/`y` are the node's integer metres. | The authored street name, also for seen nodes (the minimap also names them). A registered gate room carries `{leads_to: <wilderness region>}`. Wilderness gate exits are not grid nodes. |
 | `instance`, `interior` | The connected rooms of the current family (`InstanceRoom`, or a plain `Room`), walked through exits in both directions. `map_id` is `instance:<lowest dbref>` or `room:<lowest dbref>`, which does not depend on where the player stands or what they know. The walk stops at 4,096 rooms. | A seen room is `未探索` and never shows its name or its exits. An exit from a visited room into another family is one gateway node, `room:<dbref>` with `{leads_to: <room name>}`, and is never traversed further. |
-| `wilderness` | Schema 2 (wilderness-area-map-reveal; display annotations in schema 3, wilderness-travel-window-ui): the 41 × 41 window centred on the player (`window.min_x/min_y` = current − 20, negative near the frame edge). Terrain is published as run-length rows only for revealed cells (permanent reveal, an actual visit, or the current cell); everything else, including out-of-frame positions, is an exact unknown run. Nodes are sparse: the current cell, every actually visited cell (`visited: true`), and revealed cells that carry a legal step or disclosed location metadata. `x`/`y` are cell-centre kilometres. | The region name, or the settlement name for a disclosed gate's approach cell (gateway `null`, as on the minimap). A revealed neighbour step that resolves to a disclosed grid gate room replaces that cell with the room, carrying `{leads_to: <settlement>}`; a hidden entry needs its gate room's visit. `district_name` comes from the frozen district partition. |
+| `wilderness` | Schema 4 (wilderness-area-map-reveal; display annotations from schema 3, wilderness-travel-window-ui; coarse district overview from wilderness-district-overview): the 41 × 41 window centred on the player (`window.min_x/min_y` = current − 20, negative near the frame edge). Terrain is published as run-length rows only for revealed cells (permanent reveal, an actual visit, or the current cell); everything else, including out-of-frame positions, is an exact unknown run. Nodes are sparse: the current cell, every actually visited cell (`visited: true`), and revealed cells that carry a legal step or disclosed location metadata. `x`/`y` are cell-centre kilometres. | The region name, or the settlement name for a disclosed gate's approach cell (gateway `null`, as on the minimap). A revealed neighbour step that resolves to a disclosed grid gate room replaces that cell with the room, carrying `{leads_to: <settlement>}`; a hidden entry needs its gate room's visit. `district_name` comes from the frozen district partition; `district` carries the lit district's coarse overview. |
 
 Quest markers come from `map_quest_destinations`, with tracking flags taken
 from the same quest-log read. A marker carries the node identity when the
@@ -299,7 +299,7 @@ node, entity or sighting caps, or a schema-valid body above the logical byte
 ceiling, becomes the `map_unavailable` panel. The publisher logs
 `area_map_over_bound` and never truncates the graph.
 
-## Logical wire forms (`area_map` schema version 3, `world_map` schema version 1)
+## Logical wire forms (`area_map` schema version 4, `world_map` schema version 1)
 
 Every object below is exact: unknown keys, wrong types, booleans in number
 fields and non-finite numbers are rejected. Integer fields accept any JSON
@@ -328,7 +328,7 @@ duplicated. `gateway` is `null` or `{leads_to}`. `action` is `null` or
 | `wilderness` | `"elosern"`; `{key: "elosern", unit: "km"}` | `{id, label, x, y, visibility, visited, gateway, action, landmark}`, cell-centre kilometres; at most 1,681 nodes (41 × 41); `landmark` is `null` or exactly `{name}` and only a `wild:` node may carry one; a `wild:` node's position is its own cell and lies on a revealed cell inside the window; a non-`wild:` node must be a gateway on a revealed cell one step from the current cell; the current node must be visited |
 
 `visibility` is `current`, `visited` or `seen`. A wilderness payload adds
-`district_name`, `cell_km` (positive, at most 1000) and:
+`district_name`, `district`, `cell_km` (positive, at most 1000) and:
 
 - `window`: exactly `{min_x, min_y, width: 41, height: 41}`, centred on the
   current cell.
@@ -354,6 +354,36 @@ duplicated. `gateway` is `null` or `{leads_to}`. `action` is `null` or
   be set only on a ford run and is the generic `淺灘` (no waterway declares a
   name).
 - `light_phase` (`day`, `dusk`, `night`, `dawn`) and `ground_radius` (0..8).
+- `district` (schema 4, wilderness-district-overview): `null`, or exactly
+  `{key, name_zh, cell_km, window, rows}` — the current lit district's coarse
+  overview.
+  - `key` is 1..128 printable ASCII characters; `name_zh` is the authored
+    district name (1..128 code points). No display label, node, entity,
+    landmark, place or action is carried.
+  - `cell_km` is one rung of the fixed `(1, 2, 5, 10, 20, 25, 50)` km ladder,
+    chosen finest first so the section stays within 8,192 coarse cells, 4,096
+    runs and 65,536 canonical UTF-8 bytes. When no rung fits, the server logs
+    `area_map_district_overview_over_bound` and publishes `district: null`
+    while the visible window still publishes.
+  - `window` is exactly `{min_x, min_y, width, height}` in coarse cells: it
+    stays inside `0..2700 // cell_km`, holds at least one cell, contains the
+    current one-kilometre cell (`current_x // cell_km`), and its cell count is
+    at most 8,192.
+  - `rows` is exactly `height` rows south to north; each row is 1..`width`
+    runs west to east whose lengths sum to `width`, and equal adjacent runs are
+    merged. An unknown run is exactly `{length, kind: "unknown"}`. A terrain
+    run is exactly `{length, kind: "terrain", terrain, band, passable}`:
+    `terrain` is one of the released classes except `sea` (an owned cell is
+    land, so a sea fact is never a disclosed district fact), `band` is 0..15
+    and `passable` is a boolean.
+  - The overview is published only when the current cell's district is lit;
+    an unlit district, sea or an ownerless cell publishes `null`. Each coarse
+    cell samples the one-kilometre cell `cell_km // 2` from its origin and
+    discloses terrain only when that sample is owned by the published
+    district. The bounds come from the exact ownership raster (`coarse` tiles
+    plus `exceptions`, inflated to whole tiles and clamped to the frame), never
+    from the smoothed display outlines; the coarse cell containing the party
+    is forced to terrain when the party's own cell is owned.
 - `entities`: at most 4,096 exact `{id, cell: {x, y}, kind, hostile, label, count, threat}`
   with a 16-hex-digit keyed, non-semantic `id`, `kind` `hostile`, `npc` or
   `character`, standing on a revealed cell inside the current ground disc
@@ -383,14 +413,20 @@ It draws only the validated body. `grid` nodes are projected from their
 metres at one uniform scale. `instance` and `interior` rooms reuse the
 minimap's radial placement and are labelled `示意圖 · 不依實際距離`.
 `wilderness` rows decode into ephemeral display cells over a fog wash
-(`decodeWindow`): a cell with a visited node draws as walked, a revealed cell
-without one is dimmed as remembered. The live-sight ring uses the server's
-`ground_radius`, entities draw at their cells and sightings sit on the frame
-rim along their compass word; the client derives no sight, eligibility,
-route or clock. Nodes are placed by each cell-centre kilometre divided by
-`cell_km`. Metric views draw a dot field on round world multiples. Its
-`格距` caption and the scale bar use one formatter, so they always state the
-same distance.
+(`decodeWindow`): a cell inside the supplied ground disc
+(`dx² + dy² ≤ (ground_radius + 0.5)²`) is `sighted`, and every other revealed
+cell is `explored`, whether it was walked before or only revealed by the lit
+district. A visit still records its node and trail but no longer brightens
+terrain. `district.rows` decode through the same module
+(`decodeDistrictOverview`) into coarse cells; the drawer draws them behind the
+fine window inside an SVG mask that cuts the 41-cell window out, and the
+travel stage clears the same rectangle from its overview canvas. The
+live-sight ring uses the server's `ground_radius`, entities draw at their
+cells and sightings sit on the frame rim along their compass word; the client
+derives no sight, eligibility, route or clock. Nodes are placed by each
+cell-centre kilometre divided by `cell_km`. Metric views draw a dot field on
+round world multiples. Its `格距` caption and the scale bar use one formatter,
+so they always state the same distance.
 
 A quest marker is pinned only when its `node_id` is a presented node, and
 bearing markers are never pinned. `前往` appears only when a node's `action`
@@ -618,7 +654,7 @@ All numeric ceilings are finite and mirrored in both validators:
 
 | Panel | Ceilings | Owner of the measured values |
 | --- | --- | --- |
-| `area_map` | 512 graph nodes, 2,048 edges, 32 markers, 393,216 logical bytes (measured); wilderness: 1,681 nodes, 4,096 entities, 256 sightings | `publish-area-map-panel`; wilderness caps `wilderness-area-map-reveal` |
+| `area_map` | 512 graph nodes, 2,048 edges, 32 markers, 393,216 logical bytes (measured); wilderness: 1,681 nodes, 4,096 entities, 256 sightings; the district overview: 8,192 coarse cells, 4,096 runs, 65,536 section bytes | `publish-area-map-panel`; wilderness caps `wilderness-area-map-reveal` |
 | `world_map` | 2,097,152 logical bytes (measured) plus the per-collection limits in `map_panels.py` | `publish-world-map-panel` |
 
 The owning change replaces the constants in both files together and records
@@ -629,12 +665,21 @@ the measurements here.
 - Shipped settlement membership and road counts follow their authored modules.
   Payload size depends on that data and the player's explored set; it is not
   a fixed settlement contract.
-- The wilderness window (schema 3) is 41 × 41 cells. Its edge list is at
+- The wilderness window (schema 4) is 41 × 41 cells. Its edge list is at
   most the eight neighbour steps. Its RLE rows hold at most 1,681 runs, and
   a dense window with every cell visited stays well under the byte ceiling
-  (fully revealed schema-3 windows at spread positions measure about 30–41 KB;
+  (fully revealed schema-4 windows at spread positions measure about 30–41 KB;
   `test_area_map.WildernessAreaTests.test_dense_real_windows_stay_inside_the_byte_ceiling`);
   larger bodies travel as bounded parts like any map.
+- The district overview is capped independently of the window: the ladder
+  picks the finest rung with at most 8,192 coarse cells, 4,096 merged runs and
+  65,536 canonical section bytes. Measured worst cases are 2,208 cells / 431
+  runs / ~31 KiB for a 228 × 220 km district at 5 km and 714 cells / 286 runs
+  / ~22 KiB for the 1,992 × 725 km region district at 50 km. A future district
+  that fits no rung publishes `district: null` with
+  `area_map_district_overview_over_bound`; the visible window is unaffected.
+  A one-cell force at the party's coarse cell can add at most two runs, and the
+  publication re-checks every cap after it.
 - Wilderness benchmark (wilderness-area-map-reveal): a synthetic record of
   20,000 wilderness visits (a dense block around the window plus a frame-wide
   scatter), warmed presenter, 20 timed samples with setup excluded: median

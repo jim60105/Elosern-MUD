@@ -38,6 +38,9 @@
 /** Field samples per cell; the canvas backing follows it exactly. */
 export const SAMPLES_PER_CELL = 12;
 
+/** Field samples per coarse overview cell (2-4: the overview is far context). */
+export const DISTRICT_SAMPLES_PER_CELL = 3;
+
 /**
  * The light look per supplied phase (interface design §4.2 starting values;
  * cosmetic, open to human tuning). `memory` is the dim outside live sight,
@@ -836,4 +839,139 @@ export function paintTravelMap(ctx, grid, { samplesPerCell = SAMPLES_PER_CELL, c
   stats.count += 1;
   stats.lastMs = ended - started;
   return stats.lastMs;
+}
+
+// ── the district overview ────────────────────────────────────────────────
+
+/**
+ * The content signature that decides a district-overview repaint: every
+ * overview fact plus the fine window it must stay cut out of and the supplied
+ * light phase. Camera, zoom, aim and hover are not part of it.
+ */
+export function districtPaintSignature(grid) {
+  const district = grid?.district;
+  if (!district) return "";
+  const parts = [
+    district.key,
+    district.cellKm,
+    district.origin.x,
+    district.origin.y,
+    district.width,
+    district.height,
+    grid.origin.x,
+    grid.origin.y,
+    grid.width,
+    grid.height,
+    grid.cellKm,
+    grid.lightPhase ?? "-",
+  ];
+  for (const cell of district.cells) {
+    parts.push(cell ? `${cell.terrain}/${cell.band ?? "-"}` : "?");
+  }
+  return parts.join("|");
+}
+
+/**
+ * The fine-window rectangle in coarse overview cells: its x/y/size, possibly
+ * fractional at a coarse rung. `null` without an overview.
+ */
+export function districtFineWindowRect(grid) {
+  const district = grid?.district;
+  if (!district) return null;
+  const scale = (Number.isFinite(grid.cellKm) ? grid.cellKm : 1) / district.cellKm;
+  return {
+    x: grid.origin.x * scale - district.origin.x,
+    y: grid.origin.y * scale - district.origin.y,
+    width: grid.width * scale,
+    height: grid.height * scale,
+  };
+}
+
+function overviewPixel(terrain, look) {
+  const base = TERRAIN_RGB[terrain] ?? OPEN_RGB;
+  const lum = base[0] * 0.3 + base[1] * 0.59 + base[2] * 0.11;
+  // One explored grade: the same colour drain and memory dim the fine painter
+  // applies outside live sight.
+  return [0, 1, 2].map((channel) =>
+    mix(mix(base[channel], lum, look.desat), 8, look.memory),
+  );
+}
+
+/**
+ * Paints one decoded district overview (lib/travel-grid.js `district`) onto
+ * `ctx`, whose canvas is `width * samplesPerCell` by `height * samplesPerCell`
+ * coarse pixels. Unknown coarse cells stay fully transparent. The supplied
+ * light phase's desaturation, memory dim and wash grade every pixel, and the
+ * fine window rectangle is cleared out so no coarse terrain bleeds into an
+ * unrevealed one-kilometre cell.
+ */
+export function paintDistrictOverview(
+  ctx,
+  grid,
+  { samplesPerCell = DISTRICT_SAMPLES_PER_CELL, cache = {}, createCanvas = defaultCanvas } = {},
+) {
+  const district = grid?.district;
+  if (!district) return;
+  const s = samplesPerCell;
+  const fw = district.width * s;
+  const fh = district.height * s;
+  const layer = sized(cache, "districtCanvas", fw, fh, createCanvas);
+  const lctx = layer.getContext("2d");
+  const rgba =
+    cache.districtRgba?.length === fw * fh * 4
+      ? cache.districtRgba
+      : new Uint8ClampedArray(fw * fh * 4);
+  rgba.fill(0);
+  const look = PHASE_LOOK[grid.lightPhase] ?? PHASE_LOOK.day;
+  const colours = new Map();
+  for (let row = 0; row < district.height; row += 1) {
+    for (let column = 0; column < district.width; column += 1) {
+      const cell = district.cells[row * district.width + column];
+      if (!cell) continue;
+      let colour = colours.get(cell.terrain);
+      if (!colour) {
+        colour = overviewPixel(cell.terrain, look);
+        colours.set(cell.terrain, colour);
+      }
+      // The canvas runs north-up; coarse row 0 is the southern edge.
+      const top = (district.height - 1 - row) * s;
+      for (let y = 0; y < s; y += 1) {
+        for (let x = 0; x < s; x += 1) {
+          const offset = ((top + y) * fw + column * s + x) * 4;
+          rgba[offset] = colour[0];
+          rgba[offset + 1] = colour[1];
+          rgba[offset + 2] = colour[2];
+          rgba[offset + 3] = 255;
+        }
+      }
+    }
+  }
+  cache.districtRgba = rgba;
+  const image =
+    cache.districtImage?.width === fw && cache.districtImage?.height === fh
+      ? cache.districtImage
+      : lctx.createImageData(fw, fh);
+  image.data.set(rgba);
+  cache.districtImage = image;
+  lctx.globalCompositeOperation = "source-over";
+  lctx.clearRect(0, 0, fw, fh);
+  lctx.putImageData(image, 0, 0);
+  if (look.wash) {
+    lctx.globalCompositeOperation = "source-atop";
+    lctx.fillStyle = look.wash;
+    lctx.fillRect(0, 0, fw, fh);
+    lctx.globalCompositeOperation = "source-over";
+  }
+  const clip = districtFineWindowRect(grid);
+  if (clip) {
+    // Floor the start and ceil the end: a coarse pixel straddling the window
+    // edge is cleared whole, so no partial alpha remains inside it.
+    const left = Math.max(0, Math.floor(clip.x * s));
+    const top = Math.max(0, Math.floor((district.height - clip.y - clip.height) * s));
+    const right = Math.min(fw, Math.ceil((clip.x + clip.width) * s));
+    const bottom = Math.min(fh, Math.ceil((district.height - clip.y) * s));
+    lctx.clearRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+  }
+  ctx.clearRect(0, 0, fw, fh);
+  ctx.drawImage(layer, 0, 0);
 }

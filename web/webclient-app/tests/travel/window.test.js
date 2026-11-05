@@ -8,7 +8,7 @@ import { createPinia, setActivePinia } from "pinia";
 import { mount } from "@vue/test-utils";
 import MapPanels from "../../../static/webclient/js/elosern/protocol/panels/map_panels.js";
 import TravelMap from "../../components/travel/TravelMap.vue";
-import { decodeWildernessGrid, wildernessCellAt } from "../../lib/wilderness-grid.js";
+import { decodeDistrictOverview, decodeWildernessGrid, wildernessCellAt } from "../../lib/wilderness-grid.js";
 import { decodeTravelGrid, travelCellAt } from "../../lib/travel-grid.js";
 import { LIGHT_PHASE_NAMES, decodeWindow } from "../../lib/area_map_view.js";
 import { paintSignature } from "../../lib/travel-paint.js";
@@ -87,7 +87,7 @@ function body({ phase = "dusk", radius = 3 } = {}) {
   });
   const gate = "grid:t_town:1:1";
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     layer: "wilderness",
     map_id: "elosern",
@@ -107,6 +107,23 @@ function body({ phase = "dusk", radius = 3 } = {}) {
     ],
     quest_markers: [],
     district_name: "合成t_east區",
+    district: {
+      key: "t_east",
+      name_zh: "合成東區",
+      cell_km: 5,
+      window: { min_x: 10, min_y: 14, width: 5, height: 5 },
+      rows: [
+        [{ length: 5, kind: "unknown" }],
+        [{ length: 5, kind: "unknown" }],
+        [
+          { length: 1, kind: "unknown" },
+          { length: 1, kind: "terrain", terrain: "hills", band: 5, passable: true },
+          { length: 3, kind: "unknown" },
+        ],
+        [{ length: 5, kind: "unknown" }],
+        [{ length: 5, kind: "unknown" }],
+      ],
+    },
     cell_km: 1,
     window: { min_x: minX, min_y: minY, width: WINDOW, height: WINDOW },
     rows,
@@ -142,7 +159,35 @@ describe("one decoder for both map consumers", () => {
     }
     expect(travelCellAt(grid, CX, CY - 1).band).toBe(6);
     expect(drawer.get(`${CX}:${CY}`).state).toBe("current");
-    expect(drawer.get(`${CX}:${CY + 1}`).state).toBe("visited");
+    expect(drawer.get(`${CX}:${CY + 1}`).state).toBe("sighted");
+  });
+
+  it("decodes the coarse district overview and carries it on the travel grid", () => {
+    const area = validateAreaMapPanel(body());
+    const overview = decodeDistrictOverview(area);
+    expect([overview.key, overview.cellKm, overview.origin, overview.width, overview.height]).toEqual([
+      "t_east",
+      5,
+      { x: 10, y: 14 },
+      5,
+      5,
+    ]);
+    expect(overview.rows).toHaveLength(5);
+    expect(overview.cells.filter(Boolean)).toHaveLength(1);
+    expect(overview.cells.find(Boolean)).toMatchObject({
+      x: 11,
+      y: 16,
+      terrain: "hills",
+      band: 5,
+      passable: true,
+    });
+    expect(decodeTravelGrid(area).district).toBe(overview);
+    // A null record is the exact unlit/no-district form; the fine window
+    // still decodes.
+    const plain = clone(body());
+    plain.district = null;
+    expect(decodeDistrictOverview(plain)).toBeNull();
+    expect(decodeWildernessGrid(plain)).not.toBeNull();
   });
 
   it("keeps sparse nodes verbatim and invents nothing on unknown ground", () => {
@@ -166,6 +211,8 @@ describe("one decoder for both map consumers", () => {
     ["a revealed run without display", (a) => delete a.rows[20].find((r) => r.kind === "terrain").display],
     ["a display with a private key", (a) => (a.rows[20].find((r) => r.kind === "terrain").display.source_key = "x")],
     ["a schema-2 body", (a) => (a.schema_version = 2)],
+    ["a schema-3 body", (a) => (a.schema_version = 3)],
+    ["a malformed district section", (a) => (a.district.rows[0][0].length = 4)],
     ["a node-form wilderness body", (a) => delete a.rows],
   ])("refuses %s in the validator and in both consumers", (_name, mutate) => {
     const area = clone(body());
