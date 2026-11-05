@@ -505,6 +505,14 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（monster-content-expansion §5，泥膜史萊姆泥膜收束）：每次已結算且
+# 具合法目標的施放都收緊體表泥膜，防禦 +3 資料在 combat_modifiers.yaml 的
+# mudfilm_shell_defense 列（ridge_brace_defense 的 defense 先例）。
+- key: mudfilm_shell
+  duration: 20
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，

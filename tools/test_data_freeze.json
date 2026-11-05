@@ -349,6 +349,10 @@
    "reason": "authored-kit composition grouping and representative wiring contract"
   },
   {
+   "path": "world/rules/tests/test_mudfilm_slime_resource_skill.py",
+   "reason": "slime representative-composition production smoke over the generic self-support/lifetime contracts"
+  },
+  {
    "path": "world/rules/tests/test_npc_roster_validation.py",
    "reason": "registry-derived NPC roster completeness and fault-diagnostic contract"
   },

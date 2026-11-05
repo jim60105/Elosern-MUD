@@ -208,6 +208,7 @@ class SkillCategoryClassificationTests(unittest.TestCase):
                 "dual_blade_waltz",
                 "shadow_veil_execution",
                 "shadow_dance_finale",
+                "mudfilm_guard",
             },
             SkillCategory.ENHANCEMENT: {
                 "body_enhancement",

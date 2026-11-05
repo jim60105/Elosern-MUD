@@ -598,7 +598,12 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
                     for resource, amount in skill.cost.items():
                         self.assertIs(type(amount), int, resource)
                         self.assertGreater(amount, 0, resource)
-                    self.assertTrue(spell_tier_for(skill))
+                    if skill.element is not None and "mp" in skill.cost:
+                        # An elemental MP kit skill must classify into a magic tier.
+                        self.assertTrue(spell_tier_for(skill))
+                    else:
+                        # A body action without element or MP cost carries no magic tier.
+                        self.assertIsNone(spell_tier_for(skill))
                 # Every declared effect string resolves to a typed effect in
                 # the shared effect model, and the policy tuple stays
                 # positionally parallel with the declarations.

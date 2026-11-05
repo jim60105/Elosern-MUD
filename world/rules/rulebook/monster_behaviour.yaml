@@ -32,6 +32,10 @@ variant_intelligence:
   # 獵道型: repeats one probing rule (avoid a formed line) with the least
   # decision depth of the set.
   trail_hunter: 44
+  # 濕岸型: only tightens its film when pressed and bumps back at short
+  # range; reflexive self-protection is the least decision depth of any
+  # activated variant.
+  mudbank_dweller: 20
 
 # Per-variant mode override; an absent entry uses the resolved archetype's
 # decision_mode. This is the rollback seam: editing one entry back to `legacy`
@@ -43,6 +47,7 @@ variant_decision_mode:
   flock_leader: utility
   reef_warden: utility
   trail_hunter: utility
+  mudbank_dweller: utility
 
 archetypes:
   instinctive:
