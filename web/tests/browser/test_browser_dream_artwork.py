@@ -19,16 +19,25 @@ wait card's 睡眠 row, the server-owned sleep handoff, and the owner-only
 
 from __future__ import annotations
 
+import time
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import activate_wait_row, narrative_log_text, store_state
+from .browser_helpers import (
+    activate_wait_row,
+    install_outbound_recorder,
+    narrative_log_text,
+    sent_action_count,
+    store_state,
+)
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
 
 PANEL = '[data-testid="dream-panel"]'
+AWAKEN_ROW = "[data-row='awaken']"
 ART_IMAGE = '[data-testid="dream-scene-art"]'
 ART_FAILURE = '[data-testid="dream-art-failure"]'
 ART_CONTROL = '[data-testid="dream-art-control"]'
@@ -211,7 +220,26 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.assertTrue(reply.is_enabled())
         self.assertTrue(page2.locator(REPLY_SEND).is_enabled())
         reply.fill("")
-        page2.locator("[data-row='awaken']").click()
+        # A narrative beat locks the transport and the control's refusal is
+        # silent, so an activation that lands in the instant the lock appears
+        # never crosses the wire; the enabled check and the handler's guard are
+        # two different reads of that lock. The recorder proves the dispatch,
+        # so activate again while nothing has crossed instead of assuming the
+        # first click landed outside that window.
+        install_outbound_recorder(page2)
+        awaken_row = page2.locator(AWAKEN_ROW)
+        dispatched = sent_action_count(page2, "dream.awaken")
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if sent_action_count(page2, "dream.awaken") > dispatched:
+                break
+            awaken_row.click()
+            page2.wait_for_timeout(250)
+        self.assertEqual(
+            sent_action_count(page2, "dream.awaken"),
+            dispatched + 1,
+            "the awakening never left the client",
+        )
         page2.wait_for_selector(PANEL, state="detached", timeout=60000)
         # Nothing was queued for the physical room across either phase.
         self.assertEqual(self.art_scene(page2), art_before2)
