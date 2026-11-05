@@ -17,7 +17,7 @@ SHALL emit no live object or filesystem reference.
 #### Scenario: The unavailable form differs only in schema version
 - **WHEN** the active puppet is creation-pending or has no location
 - **THEN** `context_actions` reports its registered unavailable form with the same field set,
-  reason, and semantics as the version-4 form, its `schema_version` equals 7, and no
+  reason, and semantics as the version-4 form, its `schema_version` equals 8, and no
   affordance, session, participant, skill, or suggestions data is present
 
 #### Scenario: The exploration form no longer forbids suggestions
@@ -51,7 +51,7 @@ SHALL emit no live object or filesystem reference.
 
 #### Scenario: The unavailable form field set stays exact at version 5
 - **WHEN** the unavailable form is serialized
-- **THEN** its exact field set SHALL remain `schema_version`, `available`, and `reason` — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (7) like every other form
+- **THEN** its exact field set SHALL remain `schema_version`, `available`, and `reason` — it SHALL NOT carry `suggestions` — and its `schema_version` SHALL equal the panel version (8) like every other form
 
 #### Scenario: Every validation is server-side with a strict closed schema
 - **WHEN** a candidate payload carries unknown keys, wrong kinds, unpresent fields, underepresent fields, or out-of-bound values

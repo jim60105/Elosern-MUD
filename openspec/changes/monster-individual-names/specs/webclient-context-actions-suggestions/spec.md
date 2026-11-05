@@ -15,7 +15,7 @@ validation SHALL reject unknown statuses, missing or extra fields, and cards und
 
 #### Scenario: The unavailable form carries no suggestions
 - **WHEN** the active puppet is creation-pending or has no location
-- **THEN** `context_actions` uses the common unavailable form whose field set and reason are identical to the version-4 form, whose `schema_version` equals 7, and which contains no `suggestions` object
+- **THEN** `context_actions` uses the common unavailable form whose field set and reason are identical to the version-4 form, whose `schema_version` equals 8, and which contains no `suggestions` object
 
 #### Scenario: A generating state carries no cards
 - **WHEN** the exploration snapshot reports `status` `"generating"`
@@ -31,7 +31,7 @@ validation SHALL reject unknown statuses, missing or extra fields, and cards und
 
 #### Scenario: The common unavailable form keeps its version-4 semantics
 - **WHEN** the registered common unavailable form is built at version 8
-- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 7
+- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 8
 
 #### Scenario: Combat never consults suggestion state
 - **WHEN** the combat form is rendered
