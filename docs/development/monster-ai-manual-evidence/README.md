@@ -18,9 +18,10 @@ tuning, which the staged activation does not enter. `selector-check.json` /
 `0970ab84a61732037cdce478c05854c66e81057c`), because that operation records the
 process's *startup* fingerprint and the activation moved it; the recorded
 measurements are unchanged. They were regenerated once more for
-`mudfilm-slime-species`, because that content change adds a buff definition and
-a modifier rule and therefore moves the process's startup fingerprint; the
-recorded measurements are unchanged again.
+`mudfilm-slime-species` (baseline commit
+`1eae071df88683ae28c20c77b2b59b63342ad2f4`), because that content change adds a
+buff definition and a modifier rule and therefore moves the process's startup
+fingerprint; the recorded measurements are unchanged again.
 
 ## Exact operations
 
