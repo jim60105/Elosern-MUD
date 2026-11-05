@@ -206,7 +206,23 @@ class FreeformEligibilityTests(unittest.TestCase):
         self.assertFalse(is_freeform_eligible(skill))
 
 
-class FreeformScalesForTests(EvenniaTestCase):
+class _GhostFreeCase(EvenniaTestCase):
+    """A case that never inherits a previous module's idmapper ghosts.
+
+    A wilderness-entering test in the same worker leaves ndb-stamped rows
+    cached that Evennia's non-forced teardown flush cannot evict; creating an
+    object then resolves DEFAULT_HOME through the ghost and writes a dangling
+    foreign key. Same documented remedy as ``WildernessDefeatMixin``.
+    """
+
+    def setUp(self):
+        from evennia.objects.models import ObjectDB
+
+        ObjectDB.flush_instance_cache(force=True)
+        super().setUp()
+
+
+class FreeformScalesForTests(_GhostFreeCase):
     """Mastery entitlement plus the cast skill's own proficiency ladder."""
 
     def setUp(self):
@@ -271,7 +287,7 @@ class FreeformScalesForTests(EvenniaTestCase):
             freeform_mastery_entitled(self.entity, "not_an_element")
 
 
-class FreeformScaleEntriesForTests(EvenniaTestCase):
+class FreeformScaleEntriesForTests(_GhostFreeCase):
     """The relocated ``freeform_scale_entries_for`` behaves as the old combat-view helper did."""
 
     def setUp(self):
@@ -356,7 +372,7 @@ def _ceiling_row():
     )
 
 
-class FreeformLadderForTests(EvenniaTestCase):
+class FreeformLadderForTests(_GhostFreeCase):
     """The advertised ladder lists every canonical rung, locked or priced."""
 
     def setUp(self):
@@ -478,7 +494,7 @@ class FreeformLadderForTests(EvenniaTestCase):
                     self.assertEqual(rung.unlock_level, levels[rung.scale])
 
 
-class FreeformMasteryClosureTests(EvenniaTestCase):
+class FreeformMasteryClosureTests(_GhostFreeCase):
     """Entitlement is lawful only through the mastery's whole closure (D2).
 
     Every case runs on the file-local synthetic mastery whose single declared

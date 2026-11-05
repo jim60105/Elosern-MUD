@@ -83,6 +83,14 @@ _ATTACHED_ITEMS = (_ACCESSORY, _ARMOR_HEAVY, _ARMOR_LIGHT)
 
 class _AttachedBuffScope(EvenniaTestCase):
     def setUp(self):
+        # A wilderness-entering test in the same worker leaves ndb-stamped
+        # rows cached that Evennia's non-forced teardown flush cannot evict;
+        # creating an object then resolves DEFAULT_HOME through the ghost and
+        # writes a dangling foreign key. Same documented remedy as
+        # ``WildernessDefeatMixin``.
+        from evennia.objects.models import ObjectDB
+
+        ObjectDB.flush_instance_cache(force=True)
         super().setUp()
         open_synthetic_scope(
             self, "items", extra={"items": {d.key: d for d in _ATTACHED_ITEMS}}

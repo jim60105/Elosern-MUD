@@ -359,6 +359,14 @@ class PresetActivationCommittedReloadTests(TransactionTestCase):
     """
 
     def setUp(self):
+        # A wilderness-entering test in the same worker leaves ndb-stamped
+        # rows cached that Evennia's non-forced teardown flush cannot evict;
+        # creating a character then resolves its home through the ghost and
+        # writes a dangling reference. Same documented remedy as
+        # ``WildernessDefeatMixin``.
+        from evennia.objects.models import ObjectDB
+
+        ObjectDB.flush_instance_cache(force=True)
         super().setUp()
         self.room = create_object(Room, key="preset_reload_room")
         self.account = create_account(
