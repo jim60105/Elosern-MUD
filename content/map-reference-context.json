@@ -177,7 +177,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b8d4d98cb726eb2d4faca9bc31110129f073416744411609ab3e812bbf60aebe",
+  "fingerprint": "3fb05363babc09a79c4f0605be269f99b8fb2822d7dbfb92122c0596cbd6aa93",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1221,7 +1221,7 @@
     "world/rules/rulebook/guild_exam_restrictions.yaml": "60a7df45d0db574d08b0974b75f75512a5e44c74024918a8e27114414a255c8a",
     "world/rules/rulebook/instance.yaml": "aa73bc6238b00771288efd3f6dabc179cf827e547df7f0327c83062cb0b486e4",
     "world/rules/rulebook/item_effects.yaml": "0bf7b086d8c6f0d48b37b74811f04c19c4aeeda725a6d3f9ba94649694137c31",
-    "world/rules/rulebook/monster_behaviour.yaml": "b657db5250799f82829bb2fba05e7a8e640fba68b0a09b0cfc9b63d6f2c26269",
+    "world/rules/rulebook/monster_behaviour.yaml": "339fc00ff666ad2e9246df4b2d9a072e6202fa611f4b736dadcfd2556ab017af",
     "world/rules/rulebook/movement.yaml": "072a1054db3806316e0ce384d326e5c60e14611a039dd1c22cedde5fb26eab37",
     "world/rules/rulebook/npc_schedules.yaml": "4807e4f54107f3e4a8941ee1ce1988088a74ff914d46037e32c8254e5d347b50",
     "world/rules/rulebook/overwhelm.yaml": "1720d632316b91c292a5809a43a479050251d792b7d2b56f3f04dd6b68128e3d",

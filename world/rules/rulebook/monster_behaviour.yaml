@@ -30,7 +30,7 @@ variant_intelligence:
   # 守礁型: reads the terrain and the group it is shielding, then holds ground.
   reef_warden: 66
   # 獵道型: repeats one probing rule (avoid a formed line) with the least
-  # decision depth of the set.
+  # decision depth of the original three.
   trail_hunter: 44
   # 濕岸型: only tightens its film when pressed and bumps back at short
   # range; reflexive self-protection is the least decision depth of any

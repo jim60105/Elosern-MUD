@@ -114,7 +114,7 @@ and `.md`; the six archetype campaigns and the performance report were *not*
 rerun, because their harness builds the campaign's own synthetic variant pairs
 and copies only the archetypes from the shipped rulebook, so the shipped
 variant maps do not enter their tuning or their recorded fingerprint
-(`e40c071e...`, unchanged).
+(`497df2c1...`, unchanged).
 
 ## Seeds
 
@@ -173,9 +173,9 @@ To activate more variants, or to retune one of these:
   makes no difficulty claim: the manual evidence establishes exercised
   boundaries, verified preconditions, decision shares, replay inputs and a
   timing envelope.
-* Three variants of one archetype pair is a first small set, not a policy for
-  the whole bestiary; the remaining registered variants stay legacy until their
-  own evidence exists.
+* Four activated variants are a first small set, not a policy for the whole
+  bestiary; the remaining registered variants stay legacy until their own
+  evidence exists.
 * The utility decision samples with a temperature derived from intelligence, so
   a single encounter is one draw, not a deterministic script; the recorded
   decision scope, tuning fingerprint and trace are what make a decision
@@ -183,8 +183,11 @@ To activate more variants, or to retune one of these:
 * An activated variant no longer takes the legacy flee action: the utility
   decision proposes owned, modelable actions only, and the flee thresholds,
   `FLEE_SKILL_KEY` and the flee priority stay with the permanent legacy mode.
-  All three activated variants are low- and mid-tier monsters whose own lore
-  keeps them in the fight (a flock leader coordinating, a reef warden holding
-  its narrow mouth, a trail hunter probing the edge), and rollback restores the
-  legacy flee priority for them immediately.
+  The original three activated variants are low- and mid-tier monsters whose
+  own lore keeps them in the fight (a flock leader coordinating, a reef warden
+  holding its narrow mouth, a trail hunter probing the edge); the slime's
+  retreat orientation is expressed instead through passive field aggression,
+  the known deviation recorded in design §12.4 and
+  `docs/development/monster-content-expansion.md`. Rollback restores the legacy
+  flee priority for all four immediately.
 * Reaching production does not add a player command or a browser action.
