@@ -179,6 +179,26 @@ describe("area rendering uses truthful geometry and server fog", () => {
       expect(cell.classes()).toContain("is-explored");
       expect(cell.attributes("data-terrain")).toMatch(/^(open_ground|hills|mountain|woodland|water|ridge|settlement)$/);
     }
+    // Each coarse cell spans exactly its coarse width/height in screen cells:
+    // no extra fine row from the inclusive cellRect convention.
+    const boxes = cells.map((cell) => ({
+      key: cell.attributes("data-cell"),
+      x: Number(cell.attributes("x")),
+      y: Number(cell.attributes("y")),
+      width: Number(cell.attributes("width")),
+      height: Number(cell.attributes("height")),
+    }));
+    for (const box of boxes) expect(box.width).toBeCloseTo(box.height, 6);
+    const byKey = new Map(boxes.map((box) => [box.key, box]));
+    let stacked = 0;
+    for (const box of boxes) {
+      const [x, y] = box.key.split(":").map(Number);
+      const south = byKey.get(`${x}:${y - 1}`);
+      if (!south) continue;
+      stacked += 1;
+      expect(south.y).toBeCloseTo(box.y + box.height, 6);
+    }
+    expect(stacked).toBeGreaterThan(0);
     expect(w.findAll('[data-testid="area-map__overview"] [data-node-id]')).toHaveLength(0);
     // The mask cuts exactly the fine 41-cell window out of the overview layer.
     const mask = w.find("mask");
@@ -207,6 +227,28 @@ describe("area rendering uses truthful geometry and server fog", () => {
     const plain = mountMap(wildernessArea({ district: null }));
     expect(plain.vm.stops.map((stop) => stop.key)).not.toContain("district");
     expect(plain.vm.stops.map((stop) => stop.key)).toEqual(["window", "surroundings", "nearby"]);
+    // A compact overview inside the 41-cell window must not drop 全區.
+    const compact = wildernessArea();
+    compact.district = {
+      key: "story_east_foothills",
+      name_zh: "灰鬃荒原東麓",
+      cell_km: 5,
+      window: { min_x: 19, min_y: 39, width: 3, height: 3 },
+      rows: [
+        [{ length: 3, kind: "unknown" }],
+        [
+          { length: 1, kind: "unknown" },
+          { length: 1, kind: "terrain", terrain: "hills", band: 4, passable: true },
+          { length: 1, kind: "unknown" },
+        ],
+        [{ length: 3, kind: "unknown" }],
+      ],
+    };
+    const small = mountMap(compact);
+    expect(small.vm.stops.map((stop) => stop.key)).toContain("window");
+    expect(small.vm.stops.find((stop) => stop.key === "window").span).toBeGreaterThanOrEqual(
+      small.vm.stops[0].span,
+    );
   });
 
   it("draws only the server's live-sight entities and rim sightings", () => {

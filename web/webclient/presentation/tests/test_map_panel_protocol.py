@@ -291,6 +291,35 @@ class MapSchemaParityTests(unittest.TestCase):
         # A null overview is the exact unlit/no-district form.
         self.assertIsNone(validate_area_map({**_copy("wild"), "district": None})["district"])
 
+    @covers_requirement(
+        "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
+    def test_an_over_capacity_overview_is_rejected_by_both_validators(self):
+        wild = _copy("wild")
+        size = 65
+        rows = []
+        for _ in range(size):
+            runs = []
+            for column in range(size):
+                if column % 2 == 0:
+                    runs.append(
+                        {"length": 1, "kind": "terrain", "terrain": "hills", "band": 3, "passable": True}
+                    )
+                else:
+                    runs.append({"length": 1, "kind": "unknown"})
+            rows.append(runs)
+        wild["district"] = {
+            "key": "t_east",
+            "name_zh": "合成東區",
+            "cell_km": 1,
+            "window": {"min_x": 0, "min_y": 0, "width": size, "height": size},
+            "rows": rows,
+        }
+        text = json.dumps(wild, ensure_ascii=False, separators=(",", ":"))
+        with self.assertRaises(ProtocolValidationError):
+            validate_area_map(wild)
+        self.assertEqual(_js_decisions([("oversized overview", "area_map", text)]), [False])
+
 
 class MapPartCodecTests(unittest.TestCase):
     @covers_requirement(

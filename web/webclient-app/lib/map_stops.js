@@ -75,5 +75,11 @@ export function wildernessStops(frame, { marginPx = DEFAULT_MARGIN_PX, overviewB
     createStop("surroundings", "周邊", fitBounds(cellWindow(WILDERNESS_SURROUNDINGS_CELLS), frame, { marginPx }).span),
     createStop("nearby", "近處", fitBounds(cellWindow(WILDERNESS_NEARBY_CELLS), frame, { marginPx }).span),
   );
-  return orderedStops(stops);
+  // The caller may supply an overview narrower than the window; order here so
+  // the dedupe never drops the wider 全區 window. On an equal span the window
+  // label wins over the district stop, which is then redundant.
+  const priority = { window: 0, surroundings: 1, nearby: 2, district: 3 };
+  return orderedStops(
+    stops.sort((a, b) => b.span - a.span || priority[a.key] - priority[b.key]),
+  );
 }

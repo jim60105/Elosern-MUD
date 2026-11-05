@@ -365,6 +365,11 @@ describe("map zoom stops and fit follow scope and aspect ratio", () => {
     // The narrower stops and the inward limit are unchanged.
     expect(widened.slice(1).map((stop) => stop.span)).toEqual(plain.map((stop) => stop.span));
     expect(widenedLimits.min).toBe(plainLimits.min);
+    // An overview narrower than the 41-cell window never drops the 全區 stop.
+    const compact = wildernessStops(FRAME, {
+      overviewBounds: { minX: -7.5, minY: -7.5, maxX: 7.5, maxY: 7.5 },
+    });
+    expect(compact.map((stop) => stop.key)).toEqual(["window", "surroundings", "nearby"]);
   });
 
 

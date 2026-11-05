@@ -428,7 +428,7 @@ const canvasStyle = computed(() => {
 const districtCanvasStyle = computed(() => {
   const p = paintedDistrict.value;
   if (!p) return { visibility: "hidden" };
-  const cell = p.cellKm * c.value;
+  const cell = (p.cellKm / (props.grid?.cellKm || 1)) * c.value;
   return {
     left: `${p.origin.x * cell}px`,
     top: `${-(p.origin.y + p.height) * cell}px`,
@@ -773,7 +773,7 @@ const scaleBar = computed(() => {
       [50, 100].find((candidate) => {
         const px = (candidate / km) * c.value;
         return px >= 48 && px <= 180;
-      }) ?? 100;
+      }) ?? 50;
     return { px: (step / km) * c.value, km: step };
   }
   return { px: (5 / km) * c.value, km: 5 };

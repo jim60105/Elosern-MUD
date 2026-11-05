@@ -412,14 +412,14 @@ const districtDraws = computed(() => {
     const startX = cell.x * scale;
     const startY = cell.y * scale;
     const sw = screenRect(startX, startY);
-    const ne = screenRect(startX + scale, startY + scale);
-    if (ne.left < 0 || sw.left > width || sw.bottom < 0 || ne.top > height) continue;
+    const ne = screenRect(startX + scale - 1, startY + scale - 1);
+    if (ne.right < 0 || sw.left > width || sw.bottom < 0 || ne.top > height) continue;
     out.push({
       key: `${cell.x}:${cell.y}`,
       terrain: cell.terrain,
       x: sw.left,
       y: ne.top,
-      width: Math.max(0.5, ne.left - sw.left),
+      width: Math.max(0.5, ne.right - sw.left),
       height: Math.max(0.5, sw.bottom - ne.top),
     });
   }

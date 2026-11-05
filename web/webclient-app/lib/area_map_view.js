@@ -146,7 +146,9 @@ export function areaStops(area, placed, frame) {
     return settlementStops(boundsOfPoints(placed), nearbyBounds(area, placed), frame, { marginPx: OPENING_MARGIN_PX });
   }
   if (area.layer === "wilderness") {
-    return wildernessStops(frame, { overviewBounds: districtOverviewBounds(area) });
+    return wildernessStops(frame, {
+      overviewBounds: decodeDistrictOverview(area) ? wildernessFitBounds(area) : null,
+    });
   }
   // The widest radial stop is the graph seen from the current room, so the
   // centred opening never needs to exceed the zoom limits.

@@ -987,6 +987,92 @@ class WildernessAreaTests(EvenniaTest):
             sample = (cx * 2 + 1, cy * 2 + 1)
             self.assertEqual(facts["band"], (sample[0] + sample[1]) % 16)
 
+    def test_the_party_cell_is_forced_without_mutating_the_cached_base(self):
+        class _Partition:
+            frame_cells = 2700
+
+            def district_bounds(self, key):
+                return (0, 0, 60, 60)
+
+            def district_at(self, cell):
+                x, y = cell
+                # Every 2 km centre sample is owned except a 2 x 2 unknown
+                # block around the party's coarse sample; the party cell
+                # (4, 4) itself is owned.
+                if cell == (4, 4):
+                    return "t_owner"
+                blocked = {(5, 5), (5, 7), (7, 5), (7, 7)}
+                return "t_owner" if x % 2 == 1 and y % 2 == 1 and cell not in blocked else None
+
+        class _Oracle:
+            def facts(self, cell):
+                return {"terrain": "open_ground", "band": 2, "passable": True}
+
+        current = {"terrain": "hills", "band": 7, "passable": True}
+        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1_000), mock.patch.object(
+            area_map_module, "DISTRICT_OVERVIEW_MAX_BYTES", 10_000_000
+        ):
+            base = area_map_module._build_district_overview(
+                _Partition(), "t_owner", "合成領地", _Oracle(), (4, 4), current, force_party=False
+            )
+            self.assertEqual(base["cell_km"], 2)
+            # The party cell (4, 4) is owned but its coarse centre sample
+            # (5, 5) is not: the base has a hole that the force fills.
+            self.assertIsNone(_decode_overview({"district": base})[(2, 2)])
+            patched = area_map_module._force_party_cell(base, _Partition(), "t_owner", (4, 4), current)
+            self.assertEqual(_decode_overview({"district": patched})[(2, 2)], current)
+            self.assertIsNone(_decode_overview({"district": base})[(2, 2)])
+            forced = area_map_module._build_district_overview(
+                _Partition(), "t_owner", "合成領地", _Oracle(), (4, 4), current, force_party=True
+            )
+            self.assertEqual(_decode_overview({"district": forced})[(2, 2)], current)
+
+    def test_the_forced_party_cell_respects_the_run_cap(self):
+        class _Partition:
+            frame_cells = 2700
+
+            def district_bounds(self, key):
+                return (0, 0, 60, 60)
+
+            def district_at(self, cell):
+                x, y = cell
+                if cell == (4, 4):
+                    return "t_owner"
+                blocked = {(5, 5), (5, 7), (7, 5), (7, 7)}
+                return "t_owner" if x % 2 == 1 and y % 2 == 1 and cell not in blocked else None
+
+        class _Oracle:
+            def facts(self, cell):
+                return {"terrain": "hills", "band": (cell[0] + cell[1]) % 16, "passable": True}
+
+        current = {"terrain": "open_ground", "band": 3, "passable": True}
+        # Measure the unforced run count, then make it the exact cap: forcing
+        # the party cell splits its row and pushes the forced copy to a
+        # coarser rung.
+        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1_000), mock.patch.object(
+            area_map_module, "DISTRICT_OVERVIEW_MAX_RUNS", 10_000
+        ), mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_BYTES", 10_000_000):
+            probe = area_map_module._build_district_overview(
+                _Partition(), "t_owner", "合成領地", _Oracle(), (4, 4), current, force_party=False
+            )
+        self.assertEqual(probe["cell_km"], 2)
+        runs = sum(len(row) for row in probe["rows"])
+        self.assertGreater(runs, 0)
+        with mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_CELLS", 1_000), mock.patch.object(
+            area_map_module, "DISTRICT_OVERVIEW_MAX_RUNS", runs
+        ), mock.patch.object(area_map_module, "DISTRICT_OVERVIEW_MAX_BYTES", 10_000_000):
+            base = area_map_module._build_district_overview(
+                _Partition(), "t_owner", "合成領地", _Oracle(), (4, 4), current, force_party=False
+            )
+            self.assertEqual(base["cell_km"], 2)
+            self.assertEqual(sum(len(row) for row in base["rows"]), runs)
+            forced = area_map_module._build_district_overview(
+                _Partition(), "t_owner", "合成領地", _Oracle(), (4, 4), current, force_party=True
+            )
+        self.assertEqual(forced["cell_km"], 5)
+        # The forced party cell is terrain at the coarser rung too.
+        self.assertIsNotNone(_decode_overview({"district": forced})[(0, 0)])
+
     def test_every_shipped_district_fits_a_rung_with_terrain(self):
         from world.lore import map_districts
 
