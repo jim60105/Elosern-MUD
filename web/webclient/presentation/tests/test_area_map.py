@@ -842,6 +842,9 @@ class WildernessAreaTests(EvenniaTest):
         self._pin({start: radius}, visited_grid=(landmark,))
         return key, _render(self.char1)
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::a-lit-current-district-publishes-a-coarse-overview"
+    )
     def test_a_lit_current_district_publishes_a_bounded_overview(self):
         start = self._away()
         self._at_wild(start)
@@ -876,6 +879,10 @@ class WildernessAreaTests(EvenniaTest):
         )
         self.assertTrue(_js_accepts(payload))
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::a-lit-current-district-publishes-a-coarse-overview",
+        "wilderness-area-map-reveal::the-overview-reveals-only-the-lit-district-s-cells",
+    )
     def test_the_overview_spans_exact_ownership_and_the_party(self):
         start = self._away()
         self._at_wild(start)
@@ -907,6 +914,9 @@ class WildernessAreaTests(EvenniaTest):
                 )
                 self.assertNotEqual(facts["terrain"], "sea")
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::a-lit-current-district-publishes-a-coarse-overview"
+    )
     def test_an_unowned_current_cell_publishes_no_overview(self):
         start = self._away()
         self._at_wild(start)
@@ -915,6 +925,9 @@ class WildernessAreaTests(EvenniaTest):
         self.assertIsNone(payload["district"])
         self.assertTrue(payload["rows"])
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::the-overview-reveals-only-the-lit-district-s-cells"
+    )
     def test_an_adjacent_owner_and_a_hidden_anchor_never_leak(self):
         class _Partition:
             frame_cells = 2700
@@ -953,6 +966,9 @@ class WildernessAreaTests(EvenniaTest):
                     {"length", "kind", "terrain", "band", "passable"},
                 )
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::the-overview-is-bounded-by-an-adaptive-kilometre-ladder"
+    )
     def test_even_rung_sampling_uses_cell_km_over_two(self):
         class _Partition:
             frame_cells = 2700
@@ -1027,6 +1043,9 @@ class WildernessAreaTests(EvenniaTest):
             )
             self.assertEqual(_decode_overview({"district": forced})[(2, 2)], current)
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::the-overview-is-bounded-by-an-adaptive-kilometre-ladder"
+    )
     def test_the_forced_party_cell_respects_the_run_cap(self):
         class _Partition:
             frame_cells = 2700
@@ -1073,6 +1092,9 @@ class WildernessAreaTests(EvenniaTest):
         # The forced party cell is terrain at the coarser rung too.
         self.assertIsNotNone(_decode_overview({"district": forced})[(0, 0)])
 
+    @covers_requirement(
+        "wilderness-area-map-reveal::the-overview-is-bounded-by-an-adaptive-kilometre-ladder"
+    )
     def test_every_shipped_district_fits_a_rung_with_terrain(self):
         from world.lore import map_districts
 
@@ -1135,6 +1157,9 @@ class WildernessAreaTests(EvenniaTest):
                 misses = cached.cache_info().misses
         cached.cache_clear()
 
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
     def test_an_over_bound_overview_is_null_and_the_window_still_publishes(self):
         start = self._away()
         self._at_wild(start)

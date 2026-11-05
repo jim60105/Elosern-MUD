@@ -94,6 +94,9 @@ class MapSchemaParityTests(unittest.TestCase):
     @covers_requirement(
         "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
     )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
     def test_bidirectional_schema_parity(self):
         def text(value):
             return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -268,6 +271,9 @@ class MapSchemaParityTests(unittest.TestCase):
     @covers_requirement(
         "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
     )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
+    )
     def test_a_valid_district_overview_is_accepted_exactly(self):
         wild = validate_area_map(_copy("wild"))
         overview = wild["district"]
@@ -293,6 +299,9 @@ class MapSchemaParityTests(unittest.TestCase):
 
     @covers_requirement(
         "webclient-map-panel-protocol::map-panels-use-exact-layer-and-precision-discriminators"
+    )
+    @covers_requirement(
+        "webclient-map-panel-protocol::district-overview-records-have-an-exact-bounded-shape"
     )
     def test_an_over_capacity_overview_is_rejected_by_both_validators(self):
         wild = _copy("wild")
