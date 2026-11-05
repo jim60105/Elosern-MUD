@@ -197,7 +197,9 @@ def set_trait_base(target, trait, value):
     lower, upper = _base_band(entity, trait)
     integer(value, minimum=lower, maximum=upper)
     before = snapshot_traits(entity)
-    was_alive = selected.current > 0
+    # Only an HP base write can cross the live/dead boundary. Every other
+    # non-gauge trait is a static base with no ``current`` at all.
+    was_alive = trait == "hp" and selected.current > 0
     guard = _population_guard(entity)
     try:
         with transaction.atomic():
