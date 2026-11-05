@@ -713,9 +713,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         return {
             "context_actions": {
                 # The registered ``context_actions`` schema version
-                # (CONTEXT_ACTIONS_SCHEMA_VERSION in the client mirror): v7
-                # since the party-combat protocol cutover. The exploration
-                # form's exact field set is unchanged.
+                # (CONTEXT_ACTIONS_SCHEMA_VERSION in the client mirror): v8
+                # since the monster-identity cutover. The exploration form's
+                # exact field set is unchanged.
                 "schema_version": 8,
                 "available": True,
                 "kind": "exploration",

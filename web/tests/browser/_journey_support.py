@@ -95,7 +95,7 @@ def _exploration_context_actions_panel(suggestions: dict) -> dict:
     """A schema-valid ``context_actions`` exploration form with a suggestions envelope.
 
     The panel's registered schema version is the live client mirror's
-    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (7 since the v7 party-combat protocol
+    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (8 since the monster-identity
     cutover), so an injected exploration form carries that exact version.
     """
     return {

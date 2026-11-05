@@ -639,9 +639,9 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         # Drive the store to an active session through the stable test hook
         # (the live OOB delivery of these envelopes is C3's transport work).
         context_actions = {
-            # The registered ``context_actions`` version (v7 since the
-            # party-combat protocol cutover); the exploration form's exact
-            # field set is unchanged.
+            # The registered ``context_actions`` version (v8 since the
+            # monster-identity cutover); the exploration form's exact field
+            # set is unchanged.
             "schema_version": 8,
             "available": True,
             "kind": "exploration",
