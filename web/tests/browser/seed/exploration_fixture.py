@@ -5,6 +5,11 @@ every body ships verbatim."""
 
 import os
 
+#: The terminal-fatigue journey's enemy fights alone against a sleeping party;
+#: these authored magnitudes down a member inside a few enemy-only rounds.
+TERMINAL_FATIGUE_ENEMY_ATTACK = 200
+TERMINAL_FATIGUE_ENEMY_HP = 1200
+
 
 def _settle_admitted_portrait(entity, stable_key: str) -> None:
     """Give one present entity a named policy and an admitted DONE portrait.
@@ -335,6 +340,16 @@ def _exploration_fixture(character) -> None:
     )
     hostile.threat_tier = first_live_monster_tier_key()
     hostile.apply_monster_tier("floor")
+    if os.environ.get("ELOSERN_BROWSER_TERMINAL_FATIGUE") == "1":
+        # That journey's whole party is forced asleep, so only this enemy acts:
+        # the kit tier's floor attack needs far more than the round cap to down
+        # four sleeping members, so the opt-in encounter carries the decided
+        # advantage the journey asserts instead of stalling at the cap.
+        hostile.traits.atk_phys.base = TERMINAL_FATIGUE_ENEMY_ATTACK
+        hostile.traits.atk_phys.current = TERMINAL_FATIGUE_ENEMY_ATTACK
+        hostile.traits.hp.base = TERMINAL_FATIGUE_ENEMY_HP
+        hostile.traits.hp.current = TERMINAL_FATIGUE_ENEMY_HP
+        hostile.save()
 
     # A second, defeated monster in the same room renders as a disabled
     # affordance row in the action dock (webclient-pointer-activation):
