@@ -30,8 +30,13 @@ Follow `design.md`. Tests use synthetic fixtures and never pin a shipped name, s
 
 ## 5. Integration checks
 
-- [ ] 5.1 Run the focused suites from `design.md`'s capabilities, then `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`, `pnpm test` and `openspec validate monster-individual-names --strict`. Check: all exit zero, and new requirements have traceability annotations.
-- [ ] 5.2 Rebuild a development database and confirm in the running client that a wilderness monster shows its species name, a boss site individual shows the named treatment, and `engage` matches both names. Check: record the result in the change notes.
+- [x] 5.1 Run the focused suites from `design.md`'s capabilities, then `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`, `pnpm test` and `openspec validate monster-individual-names --strict`. Check: all exit zero, and new requirements have traceability annotations.
+- [x] 5.2 Rebuild a development database and confirm in the running client that a wilderness monster shows its species name, a boss site individual shows the named treatment, and `engage` matches both names. Check: record the result in the change notes.
+
+## Change notes
+
+- 5.1: the gates exit zero. Tests for the ADDED and RENAMED requirements stay unannotated: their requirement IDs exist only after archive sync, so the archive step adds those annotations. Tests for MODIFIED requirements that keep their IDs carry them now.
+- 5.2: a fresh disposable database (`server.conf.monster_population_smoke_settings`, migrated from empty) built the first shipped named site's individual and an ordinary individual of a shipped species. The exploration v7 panel showed the named individual's own name with identity facts, and the ordinary monster's key and `display_name` were its species name. `caller.search`, which `engage` uses, matched both names. The client side was checked in Storybook's AppShell, which runs the real AppClient, at 1451x790 and 2560x1440. The named plate kept the target brackets with an unnamed plate's geometry, and the target prompt showed the name with its variant-and-species tag. The shared development database was not rebuilt, because the developer's running container owns it.
 
 ## Workflow follow-up
 
