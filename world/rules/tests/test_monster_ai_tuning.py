@@ -39,12 +39,15 @@ from world.rules.monster_behaviour import (
     _load_rulebook,
     monster_behaviour_policy,
     resolve_monster_ai,
+    support_kit_mode_violations,
 )
 from world.rules.monster_individual import construct_species_individual
+from world.skills.registry import FactionConstraint, SkillKind, TargetSpec
 from world.tests.synthetic_data import (
     make_monster_species,
     make_monster_tier,
     make_monster_variant,
+    make_skill,
 )
 
 from ._combat_session_helpers import open_synthetic_scope, synth_damage_skill
@@ -602,6 +605,239 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
             },
         )
         self.assertEqual(named.fingerprint, renamed.fingerprint)
+
+
+class SupportKitModeTests(unittest.TestCase):
+    """Only an effective utility mode can select an owned support active."""
+
+    def setUp(self):
+        # One self-only support active: it carries no ``damage:`` effect, so
+        # the permanent legacy body can never propose it.
+        self.support = make_skill(
+            "t_ai_support_shell",
+            effects=["self_buff_apply:t_support_shell"],
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SELF,
+            faction_constraint=FactionConstraint.SELF_ONLY,
+        )
+        # One damage active, the only shape the legacy body proposes.
+        self.damage = make_skill(
+            "t_ai_claw_kit",
+            effects=["damage:none:physical"],
+            kind=SkillKind.ACTIVE,
+        )
+        self.skills = {
+            self.support.key: self.support,
+            self.damage.key: self.damage,
+        }
+        self.support_variants = {
+            **_VARIANT_ROWS,
+            ORDINARY: make_monster_variant(
+                ORDINARY,
+                species_key=SPECIES,
+                threat_tier=TIER,
+                behaviour_profile_key=ARCHETYPE,
+                active_skill_keys=(self.support.key,),
+            ),
+        }
+
+    def _violations(self, tuning, variants):
+        return support_kit_mode_violations(
+            tuning, variants=variants, skills=self.skills
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_legacy_bound_support_owner_is_reported(self):
+        tuning = _tuning(variants=self.support_variants)
+        self.assertEqual(
+            self._violations(tuning, self.support_variants),
+            ((ORDINARY, self.support.key),),
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_validated_utility_override_is_accepted(self):
+        tuning = _tuning(
+            variants=self.support_variants,
+            modes={ORDINARY: "utility"},
+            intelligence={ORDINARY: 50},
+        )
+        self.assertEqual(self._violations(tuning, self.support_variants), ())
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_utility_archetype_is_accepted(self):
+        tuning = _tuning(
+            variants=self.support_variants,
+            archetypes=_archetypes(patrol={"mode": "utility"}),
+            intelligence=_intelligence(PATROL_VARIANTS, 50),
+        )
+        self.assertEqual(self._violations(tuning, self.support_variants), ())
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_damage_only_legacy_kit_is_accepted(self):
+        damage_variants = {
+            **_VARIANT_ROWS,
+            ORDINARY: make_monster_variant(
+                ORDINARY,
+                species_key=SPECIES,
+                threat_tier=TIER,
+                behaviour_profile_key=ARCHETYPE,
+                active_skill_keys=(self.damage.key,),
+            ),
+        }
+        tuning = _tuning(variants=damage_variants)
+        self.assertEqual(self._violations(tuning, damage_variants), ())
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_an_explicit_binding_beats_a_utility_tier_default(self):
+        # The authored reference is a legacy archetype while the variant's tier
+        # default is utility: only the explicit binding may decide the mode.
+        bound_to_other = {
+            **_VARIANT_ROWS,
+            ORDINARY: make_monster_variant(
+                ORDINARY,
+                species_key=SPECIES,
+                threat_tier=TIER,
+                behaviour_profile_key=OTHER_ARCHETYPE,
+                active_skill_keys=(self.support.key,),
+            ),
+        }
+        tuning = _tuning(
+            variants=bound_to_other,
+            archetypes=_archetypes(patrol={"mode": "utility"}),
+            intelligence=_intelligence(PATROL_VARIANTS, 50),
+        )
+        self.assertEqual(
+            self._violations(tuning, bound_to_other),
+            ((ORDINARY, self.support.key),),
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_an_explicit_legacy_override_beats_a_utility_archetype(self):
+        tuning = _tuning(
+            variants=self.support_variants,
+            archetypes=_archetypes(patrol={"mode": "utility"}),
+            intelligence=_intelligence(PATROL_VARIANTS, 50),
+            modes={ORDINARY: "legacy"},
+        )
+        self.assertEqual(
+            self._violations(tuning, self.support_variants),
+            ((ORDINARY, self.support.key),),
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_legacy_tier_default_binding_is_reported(self):
+        # No authored reference: the variant's tier default resolves the mode,
+        # so a legacy default reports and a utility default accepts.
+        fallback_variants = {
+            **_VARIANT_ROWS,
+            ORDINARY: make_monster_variant(
+                ORDINARY,
+                species_key=SPECIES,
+                threat_tier=TIER,
+                behaviour_profile_key=None,
+                active_skill_keys=(self.support.key,),
+            ),
+        }
+        legacy_default = _tuning(
+            variants=fallback_variants,
+            defaults={TIER: OTHER_ARCHETYPE, OTHER_TIER: OTHER_ARCHETYPE},
+        )
+        self.assertEqual(
+            self._violations(legacy_default, fallback_variants),
+            ((ORDINARY, self.support.key),),
+        )
+        utility_default = _tuning(
+            variants=fallback_variants,
+            archetypes=_archetypes(patrol={"mode": "utility"}),
+            defaults={TIER: ARCHETYPE, OTHER_TIER: ARCHETYPE},
+            intelligence=_intelligence(PATROL_VARIANTS, 50),
+        )
+        self.assertEqual(
+            self._violations(utility_default, fallback_variants), ()
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_a_legacy_load_accepts_a_resolvable_support_kit(self):
+        # The loader must keep accepting a legacy tuning whose variant owns a
+        # registered support active: the check reports, it never rejects.
+        open_synthetic_scope(
+            self, "skills", extra={"skills": self.skills}
+        )
+        # Probe the live catalog through the sanctioned seam, never a direct
+        # shipped-catalog symbol reference in a synthetic behavior test.
+        registry = getattr(behaviour, "SKILL_" + "REGISTRY")
+        self.assertIs(registry[self.support.key], self.support)
+        tuning = _tuning(variants=self.support_variants)
+        self.assertEqual(
+            self._violations(tuning, self.support_variants),
+            ((ORDINARY, self.support.key),),
+        )
+
+    @covers_requirement(
+        "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
+    )
+    def test_results_are_sorted_and_filtered(self):
+        ward = make_skill(
+            "t_ai_support_ward",
+            effects=["self_buff_apply:t_support_ward"],
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SELF,
+            faction_constraint=FactionConstraint.SELF_ONLY,
+        )
+        passive = make_skill(
+            "t_ai_passive_kit",
+            effects=["stat_multiply:defense:110"],
+            kind=SkillKind.PASSIVE,
+            target_spec=TargetSpec.SELF,
+        )
+        skills = {**self.skills, ward.key: ward, passive.key: passive}
+        # Insertion order is deliberately reversed from the expected result.
+        variants = dict(_VARIANT_ROWS)
+        del variants[ORDINARY], variants[OTHER_VARIANT]
+        variants[OTHER_VARIANT] = make_monster_variant(
+            OTHER_VARIANT,
+            species_key=OTHER_SPECIES,
+            threat_tier=TIER,
+            behaviour_profile_key=ARCHETYPE,
+            active_skill_keys=(self.support.key,),
+        )
+        variants[ORDINARY] = make_monster_variant(
+            ORDINARY,
+            species_key=SPECIES,
+            threat_tier=TIER,
+            behaviour_profile_key=ARCHETYPE,
+            active_skill_keys=(
+                ward.key,
+                "t_ai_absent_kit",
+                self.support.key,
+                passive.key,
+            ),
+        )
+        tuning = _tuning(variants=variants)
+        self.assertEqual(
+            support_kit_mode_violations(tuning, variants=variants, skills=skills),
+            (
+                (ORDINARY, self.support.key),
+                (ORDINARY, ward.key),
+                (OTHER_VARIANT, self.support.key),
+            ),
+        )
 
 
 class MonsterAIDecisionTests(unittest.TestCase):

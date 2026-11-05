@@ -820,6 +820,11 @@ def _stored_binding(monster: Any) -> Any:
     return attributes.get("behaviour_tree", default=None)
 
 
+def _has_damage_effect(skill: SkillDef) -> bool:
+    """Return whether one skill definition carries a damage effect."""
+    return any(effect.startswith("damage:") for effect in skill.effects)
+
+
 def _owned_damage_skills(entity: Any) -> list[SkillDef]:
     """Return affordable active damage skills in owned-key order."""
     return [
@@ -828,15 +833,58 @@ def _owned_damage_skills(entity: Any) -> list[SkillDef]:
         if key in SKILL_REGISTRY
         and SKILL_REGISTRY[key].kind is SkillKind.ACTIVE
         and can_use_skill(entity, SKILL_REGISTRY[key])
-        and any(
-            effect.startswith("damage:")
-            for effect in SKILL_REGISTRY[key].effects
-        )
+        and _has_damage_effect(SKILL_REGISTRY[key])
         and all(
             _stored_trait_value(getattr(entity.traits, resource)) >= amount
             for resource, amount in SKILL_REGISTRY[key].cost.items()
         )
     ]
+
+
+def support_kit_mode_violations(
+    tuning: MonsterAITuning,
+    variants: Mapping[str, Any] | None = None,
+    skills: Mapping[str, SkillDef] | None = None,
+) -> tuple[tuple[str, str], ...]:
+    """Report owned support actives an effective mode can never select.
+
+    The permanent legacy decision body proposes only affordable actives that
+    carry a ``damage:`` effect, so a variant whose effective decision mode is
+    not ``utility`` can never select an owned active without one. This reads
+    the same damage predicate the legacy body applies and returns every
+    ``(variant_key, skill_key)`` pair in sorted order.
+
+    It is a production integrity check over a resolved tuning, never a loader
+    rejection: an edited legacy rollback tuning must still load, and its
+    support-kit variants simply keep their innate attack while rolled back.
+    """
+    variant_rows = MONSTER_VARIANT_REGISTRY if variants is None else variants
+    skill_rows = SKILL_REGISTRY if skills is None else skills
+    violations: list[tuple[str, str]] = []
+    for key in sorted(variant_rows):
+        variant = variant_rows[key]
+        reference = variant.behaviour_profile_key
+        archetype_key = (
+            reference
+            if reference is not None
+            else tuning.tier_defaults.get(variant.threat_tier)
+        )
+        profile = tuning.behaviour_profiles.get(archetype_key)
+        if profile is None:
+            # A missing archetype is a startup error owned by the loader.
+            continue
+        mode = tuning.variant_decision_mode.get(key, profile.decision_mode)
+        if mode is DecisionMode.UTILITY:
+            continue
+        for skill_key in variant.active_skill_keys:
+            skill = skill_rows.get(skill_key)
+            if (
+                skill is not None
+                and skill.kind is SkillKind.ACTIVE
+                and not _has_damage_effect(skill)
+            ):
+                violations.append((key, skill_key))
+    return tuple(sorted(violations))
 
 
 def _damage_school(skill: SkillDef) -> str:
