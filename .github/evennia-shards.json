@@ -1,23 +1,24 @@
 {
   "shards": [
     {
+      "index": 0,
       "name": "rules-0",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_account_roster",
         "world.rules.tests.test_human_guild_hosts"
-      ],
-      "index": 0
+      ]
     },
     {
+      "index": 1,
       "name": "rules-1",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_human_combat_calibration"
-      ],
-      "index": 1
+      ]
     },
     {
+      "index": 2,
       "name": "rules-2",
       "workers": 4,
       "labels": [
@@ -58,10 +59,10 @@
         "world.rules.tests.test_combat_modifiers_matched",
         "world.rules.tests.test_combat_modifiers_self_arming",
         "world.rules.tests.test_combat_party"
-      ],
-      "index": 2
+      ]
     },
     {
+      "index": 3,
       "name": "rules-2-1",
       "workers": 4,
       "labels": [
@@ -89,20 +90,20 @@
         "world.rules.tests.test_hostile_incapacitated_rounds",
         "world.rules.tests.test_combat_view",
         "world.rules.tests.test_field_contact_boundaries"
-      ],
-      "index": 3
+      ]
     },
     {
+      "index": 4,
       "name": "rules-3",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_conferral_cast",
         "world.rules.tests.test_conferral_revocation",
         "world.rules.tests.test_creation_messages"
-      ],
-      "index": 4
+      ]
     },
     {
+      "index": 5,
       "name": "rules-4",
       "workers": 4,
       "labels": [
@@ -142,10 +143,10 @@
         "world.rules.tests.test_disengage",
         "world.rules.tests.test_disengage_integration",
         "world.rules.tests.test_disguise_boundary"
-      ],
-      "index": 5
+      ]
     },
     {
+      "index": 6,
       "name": "rules-4-1",
       "workers": 4,
       "labels": [
@@ -191,18 +192,18 @@
         "world.rules.tests.test_dialogue_progression_conditions",
         "world.rules.tests.test_dialogue_refresh_physical",
         "world.rules.tests.test_dialogue_refresh_lifecycle"
-      ],
-      "index": 6
+      ]
     },
     {
+      "index": 7,
       "name": "rules-5",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_dialogue_reading_completion"
-      ],
-      "index": 7
+      ]
     },
     {
+      "index": 8,
       "name": "rules-6",
       "workers": 4,
       "labels": [
@@ -219,10 +220,10 @@
         "world.rules.tests.test_tide_lamp_crab_resource_skill",
         "world.rules.tests.test_ember_bristle_boar_resource_skill",
         "world.rules.tests.test_travel_plan"
-      ],
-      "index": 8
+      ]
     },
     {
+      "index": 9,
       "name": "rules-6-1",
       "workers": 4,
       "labels": [
@@ -235,7 +236,14 @@
         "world.rules.tests.test_gauge_transfer.test_restore_and_audience_conditions",
         "world.rules.tests.test_gm",
         "world.rules.tests.test_church",
-        "world.rules.tests.test_church_hosts",
+        "world.rules.tests.test_church_hosts"
+      ]
+    },
+    {
+      "index": 10,
+      "name": "rules-6-1-1",
+      "workers": 4,
+      "labels": [
         "world.rules.tests.test_golden_combat",
         "world.rules.tests.test_guild_config.test_assortment_shop_rules",
         "world.rules.tests.test_guild_config.test_catalog_loading",
@@ -250,10 +258,10 @@
         "world.rules.tests.test_guild_economy_sync.test_altoria_adornments_remedies",
         "world.rules.tests.test_guild_economy_sync.test_altoria_crown_watch",
         "world.rules.tests.test_guild_economy_sync.test_altoria_hospitality"
-      ],
-      "index": 9
+      ]
     },
     {
+      "index": 11,
       "name": "rules-7",
       "workers": 4,
       "labels": [
@@ -263,26 +271,26 @@
         "world.rules.tests.test_guild_economy_sync.test_ciaran_village_commerce",
         "world.rules.tests.test_guild_economy_sync.test_service_content_sync",
         "world.rules.tests.test_guild_economy_sync.test_service_host_attendant"
-      ],
-      "index": 10
+      ]
     },
     {
+      "index": 12,
       "name": "rules-8",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_guild_economy_sync.test_service_host_batch_rollback"
-      ],
-      "index": 11
+      ]
     },
     {
+      "index": 13,
       "name": "rules-9",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_guild_economy_sync.test_service_host_identity"
-      ],
-      "index": 12
+      ]
     },
     {
+      "index": 14,
       "name": "rules-10",
       "workers": 4,
       "labels": [
@@ -312,15 +320,29 @@
         "world.rules.tests.test_lore_knowledge",
         "world.rules.tests.test_map_district_lighting",
         "world.rules.tests.test_map_knowledge"
-      ],
-      "index": 13
+      ]
     },
     {
+      "index": 15,
       "name": "rules-11",
       "workers": 4,
       "labels": [
-        "world.rules.tests.test_map_knowledge_integration",
-        "world.rules.tests.test_ground_reveal",
+        "world.rules.tests.test_map_knowledge_integration"
+      ]
+    },
+    {
+      "index": 16,
+      "name": "rules-11-1",
+      "workers": 4,
+      "labels": [
+        "world.rules.tests.test_ground_reveal"
+      ]
+    },
+    {
+      "index": 17,
+      "name": "rules-11-2",
+      "workers": 4,
+      "labels": [
         "world.rules.tests.test_church_lamb_seal",
         "world.rules.tests.test_monster_ai_candidates",
         "world.rules.tests.test_monster_ai_activation",
@@ -346,18 +368,18 @@
         "world.rules.tests.test_monster_sexual_baseline",
         "world.rules.tests.test_monster_timed_effect_mechanisms",
         "world.rules.tests.test_movement"
-      ],
-      "index": 14
+      ]
     },
     {
+      "index": 18,
       "name": "rules-12",
       "workers": 4,
       "labels": [
         "world.rules.tests.test_movement_edges"
-      ],
-      "index": 15
+      ]
     },
     {
+      "index": 19,
       "name": "rules-12-1",
       "workers": 4,
       "labels": [
@@ -367,7 +389,14 @@
         "world.rules.tests.test_namegen",
         "world.rules.tests.test_no_combat_branching",
         "world.rules.tests.test_npc_identity",
-        "world.rules.tests.test_npc_intents.test_acquire_rollback_and_applier_boundaries",
+        "world.rules.tests.test_npc_intents.test_acquire_rollback_and_applier_boundaries"
+      ]
+    },
+    {
+      "index": 20,
+      "name": "rules-12-1-1",
+      "workers": 4,
+      "labels": [
         "world.rules.tests.test_npc_intents.test_exam_and_item_intents",
         "world.rules.tests.test_npc_intents.test_offer_quest_intents",
         "world.rules.tests.test_npc_intents.test_relation_and_party_intents",
@@ -388,10 +417,10 @@
         "world.rules.tests.test_service_windows",
         "world.rules.tests.test_npc_persona_fresh_bootstrap",
         "world.rules.tests.test_service_targets"
-      ],
-      "index": 16
+      ]
     },
     {
+      "index": 21,
       "name": "rules-13",
       "workers": 4,
       "labels": [
@@ -404,10 +433,10 @@
         "world.rules.tests.test_party",
         "world.rules.tests.test_party_follow",
         "world.rules.tests.test_party_follow_possession"
-      ],
-      "index": 17
+      ]
     },
     {
+      "index": 22,
       "name": "rules-13-1",
       "workers": 4,
       "labels": [
@@ -418,7 +447,14 @@
         "world.rules.tests.test_party_offline_loop",
         "world.rules.tests.test_party_practice_booking",
         "world.rules.tests.test_party_scope",
-        "world.rules.tests.test_party_time_settlement",
+        "world.rules.tests.test_party_time_settlement"
+      ]
+    },
+    {
+      "index": 23,
+      "name": "rules-13-1-1",
+      "workers": 4,
+      "labels": [
         "world.rules.tests.test_persona",
         "world.rules.tests.test_persona_edit",
         "world.rules.tests.test_player_control",
@@ -436,10 +472,10 @@
         "world.rules.tests.test_recovery_profiles",
         "world.rules.tests.test_rule_id_test_correspondence",
         "world.rules.tests.test_rulebook_schema"
-      ],
-      "index": 18
+      ]
     },
     {
+      "index": 24,
       "name": "rules-14",
       "workers": 4,
       "labels": [
@@ -509,10 +545,10 @@
         "world.rules.tests.test_sleep_receipt",
         "world.rules.tests.test_sleep_control",
         "world.rules.tests.test_camping"
-      ],
-      "index": 19
+      ]
     },
     {
+      "index": 25,
       "name": "quests-15",
       "workers": 4,
       "labels": [
@@ -544,10 +580,10 @@
         "world.quests.tests.test_pipeline_scenarios",
         "world.quests.tests.test_planner",
         "world.quests.tests.test_quests_observability"
-      ],
-      "index": 20
+      ]
     },
     {
+      "index": 26,
       "name": "quests-15-1",
       "workers": 4,
       "labels": [
@@ -566,10 +602,10 @@
         "world.quests.tests.test_scene_smoke",
         "world.quests.tests.test_settlement",
         "world.quests.tests.test_site_clear_out_acceptance"
-      ],
-      "index": 21
+      ]
     },
     {
+      "index": 27,
       "name": "quests-16",
       "workers": 4,
       "labels": [
@@ -654,10 +690,10 @@
         "world.art.tests.test_worker.test_gallery_worker",
         "world.art.tests.test_worker.test_output_format_pipeline",
         "world.art.tests.test_worker.test_publication_gate"
-      ],
-      "index": 22
+      ]
     },
     {
+      "index": 28,
       "name": "quests-17",
       "workers": 4,
       "labels": [
@@ -665,10 +701,10 @@
         "world.art.tests.test_worker.test_translate_stage",
         "world.narrative.tests.test_dialogue_memory",
         "world.narrative.tests.test_gm"
-      ],
-      "index": 23
+      ]
     },
     {
+      "index": 29,
       "name": "quests-18",
       "workers": 4,
       "labels": [
@@ -769,10 +805,10 @@
         "world.lore.tests.test_wilderness_regions",
         "world.narrative.tests.test_dialogue_reading",
         "world.narrative.tests.test_dialogue_unread"
-      ],
-      "index": 24
+      ]
     },
     {
+      "index": 30,
       "name": "commands-19",
       "workers": 4,
       "labels": [
@@ -800,7 +836,14 @@
         "commands.tests.test_localized.test_surface_and_quickbar",
         "commands.tests.test_localized.test_xyz_grid_and_help",
         "commands.tests.test_lore_command",
-        "commands.tests.test_npc_services",
+        "commands.tests.test_npc_services"
+      ]
+    },
+    {
+      "index": 31,
+      "name": "commands-19-1",
+      "workers": 4,
+      "labels": [
         "commands.tests.test_party_commands",
         "commands.tests.test_party_transfer_commands",
         "commands.tests.test_party_views",
@@ -820,14 +863,21 @@
         "typeclasses.tests.test_entities",
         "typeclasses.tests.test_epithet_nomination_triggers",
         "typeclasses.tests.test_exit_movement_cost"
-      ],
-      "index": 25
+      ]
     },
     {
+      "index": 32,
       "name": "commands-20",
       "workers": 4,
       "labels": [
-        "typeclasses.tests.test_exits",
+        "typeclasses.tests.test_exits"
+      ]
+    },
+    {
+      "index": 33,
+      "name": "commands-20-1",
+      "workers": 4,
+      "labels": [
         "typeclasses.tests.test_instance_room",
         "typeclasses.tests.test_map_discovery",
         "typeclasses.tests.test_monster_identity",
@@ -835,10 +885,10 @@
         "typeclasses.tests.test_npcs",
         "typeclasses.tests.test_rooms",
         "typeclasses.tests.test_subclasses"
-      ],
-      "index": 26
+      ]
     },
     {
+      "index": 34,
       "name": "webclient-21",
       "workers": 4,
       "labels": [
@@ -867,7 +917,14 @@
         "web.webclient.actions.tests.test_exploration_actions.test_dialogue_completion",
         "web.webclient.actions.tests.test_exploration_actions.test_dialogue_leave",
         "web.webclient.actions.tests.test_exploration_actions.test_dialogue_session_recording",
-        "web.webclient.actions.tests.test_exploration_actions.test_dialogue_talk",
+        "web.webclient.actions.tests.test_exploration_actions.test_dialogue_talk"
+      ]
+    },
+    {
+      "index": 35,
+      "name": "webclient-21-1",
+      "workers": 4,
+      "labels": [
         "web.webclient.actions.tests.test_exploration_actions.test_move_and_look",
         "web.webclient.actions.tests.test_exploration_actions.test_party_and_engage",
         "web.webclient.actions.tests.test_exploration_actions.test_practice_and_wait",
@@ -882,10 +939,10 @@
         "web.webclient.actions.tests.test_options_actions",
         "web.webclient.actions.tests.test_party_actions",
         "web.webclient.actions.tests.test_party_management_acceptance_fixture"
-      ],
-      "index": 27
+      ]
     },
     {
+      "index": 36,
       "name": "webclient-21-1",
       "workers": 4,
       "labels": [
@@ -894,7 +951,14 @@
         "web.webclient.actions.tests.test_services_open",
         "web.webclient.actions.tests.test_skill_use_actions",
         "web.webclient.actions.tests.test_title_actions",
-        "web.webclient.actions.tests.test_travel_actions",
+        "web.webclient.actions.tests.test_travel_actions"
+      ]
+    },
+    {
+      "index": 37,
+      "name": "webclient-21-1-1",
+      "workers": 4,
+      "labels": [
         "web.gm.tests.test_access",
         "web.gm.tests.test_api",
         "web.gm.tests.test_console_api",
@@ -918,10 +982,10 @@
         "web.gm.tests.test_saves_api",
         "web.gm.tests.test_spa_evidence",
         "web.gm.tests.test_state_api"
-      ],
-      "index": 28
+      ]
     },
     {
+      "index": 38,
       "name": "webclient-22",
       "workers": 4,
       "labels": [
@@ -929,28 +993,28 @@
         "web.gm.tests.test_writer_contract",
         "world.tests.test_prototypes",
         "world.tests.test_synthetic_data"
-      ],
-      "index": 29
+      ]
     },
     {
+      "index": 39,
       "name": "webclient-23",
       "workers": 1,
       "labels": [
         "web.webclient.tests.test_ansi_palette",
         "web.webclient.tests.test_art_media",
         "web.webclient.tests.test_narrative_markup_contract"
-      ],
-      "index": 30
+      ]
     },
     {
+      "index": 40,
       "name": "webclient-24",
       "workers": 1,
       "labels": [
         "web.webclient.tests.test_node_suite_evidence"
-      ],
-      "index": 31
+      ]
     },
     {
+      "index": 41,
       "name": "webclient-25",
       "workers": 1,
       "labels": [
@@ -962,19 +1026,19 @@
         "web.webclient.tests.test_vue_image_loading_evidence",
         "web.webclient.tests.test_vue_showcase_action_evidence",
         "web.webclient.tests.test_vue_showcase_data_evidence"
-      ],
-      "index": 32
+      ]
     },
     {
+      "index": 42,
       "name": "webclient-26",
       "workers": 1,
       "labels": [
         "web.webclient.tests.test_vue_showcase_evidence",
         "web.webclient.tests.test_vue_showcase_overlays_evidence"
-      ],
-      "index": 33
+      ]
     },
     {
+      "index": 43,
       "name": "webclient-27",
       "workers": 1,
       "labels": [
@@ -982,54 +1046,61 @@
         "web.webclient.tests.test_vue_store_evidence",
         "web.webclient.tests.test_vue_window_primitives_evidence",
         "web.webclient.tests.test_webclient_contract"
-      ],
-      "index": 34
+      ]
     },
     {
+      "index": 44,
       "name": "maps-28",
       "workers": 4,
       "labels": [
-        "world.maps.tests.test_altoria_capital",
-        "world.maps.tests.test_bootstrap"
-      ],
-      "index": 35
+        "world.maps.tests.test_altoria_capital"
+      ]
     },
     {
+      "index": 45,
+      "name": "maps-28-1",
+      "workers": 4,
+      "labels": [
+        "world.maps.tests.test_bootstrap"
+      ]
+    },
+    {
+      "index": 46,
       "name": "maps-28-1",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_city_movement_cost",
         "world.maps.tests.test_city_walkthrough",
         "world.maps.tests.test_city_wilderness_roundtrip"
-      ],
-      "index": 36
+      ]
     },
     {
+      "index": 47,
       "name": "maps-29",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_bootstrap_sync"
-      ],
-      "index": 37
+      ]
     },
     {
+      "index": 48,
       "name": "maps-30",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_editor_final_yaml_adoption"
-      ],
-      "index": 38
+      ]
     },
     {
+      "index": 49,
       "name": "maps-31",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_editor_final_yaml_moved_location",
         "world.maps.tests.test_editor_final_yaml_rejection"
-      ],
-      "index": 39
+      ]
     },
     {
+      "index": 50,
       "name": "maps-32",
       "workers": 4,
       "labels": [
@@ -1041,94 +1112,101 @@
         "world.maps.tests.test_instance_stage_wiring",
         "world.maps.tests.test_interior_sources",
         "world.maps.tests.test_population_geometry"
-      ],
-      "index": 40
+      ]
     },
     {
+      "index": 51,
       "name": "maps-33",
       "workers": 4,
       "labels": [
-        "world.maps.tests.test_limbo_room",
-        "world.maps.tests.test_map_district_partition",
-        "world.maps.tests.test_map_elevation"
-      ],
-      "index": 41
+        "world.maps.tests.test_limbo_room"
+      ]
     },
     {
+      "index": 52,
+      "name": "maps-33-1",
+      "workers": 4,
+      "labels": [
+        "world.maps.tests.test_map_district_partition",
+        "world.maps.tests.test_map_elevation"
+      ]
+    },
+    {
+      "index": 53,
       "name": "maps-34",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_content_expansion_sites"
-      ],
-      "index": 42
+      ]
     },
     {
+      "index": 54,
       "name": "maps-34-1",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_monster_activity"
-      ],
-      "index": 43
+      ]
     },
     {
+      "index": 55,
       "name": "maps-34-2",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_monster_journeys"
-      ],
-      "index": 44
+      ]
     },
     {
+      "index": 56,
       "name": "maps-34-3",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_monster_sites"
-      ],
-      "index": 45
+      ]
     },
     {
+      "index": 57,
       "name": "maps-34-4",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_movement_roundtrip"
-      ],
-      "index": 46
+      ]
     },
     {
+      "index": 58,
       "name": "maps-34-5",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_regional_population"
-      ],
-      "index": 47
+      ]
     },
     {
+      "index": 59,
       "name": "maps-34-6",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_regional_population_recovery",
         "world.maps.tests.test_retention_reclamation",
         "world.maps.tests.test_room_art_metadata"
-      ],
-      "index": 48
+      ]
     },
     {
+      "index": 60,
       "name": "maps-35",
       "workers": 4,
       "labels": [
         "world.maps.tests.test_runtime_adoption"
-      ],
-      "index": 49
+      ]
     },
     {
+      "index": 61,
       "name": "maps-36",
       "workers": 1,
       "labels": [
         "world.maps.tests.test_runtime_adoption_rollback"
-      ],
-      "index": 50
+      ]
     },
     {
+      "index": 62,
       "name": "maps-37",
       "workers": 4,
       "labels": [
@@ -1142,10 +1220,10 @@
         "world.maps.tests.test_wilderness_destination",
         "world.maps.tests.test_wilderness_geography_contract",
         "world.maps.tests.test_wilderness_population"
-      ],
-      "index": 51
+      ]
     },
     {
+      "index": 63,
       "name": "maps-39",
       "workers": 4,
       "labels": [
@@ -1173,10 +1251,10 @@
         "world.observability.tests.test_render",
         "world.observability.tests.test_sanitize",
         "world.observability.tests.test_transcript"
-      ],
-      "index": 52
+      ]
     },
     {
+      "index": 64,
       "name": "webclient-40",
       "workers": 4,
       "labels": [
@@ -1206,50 +1284,57 @@
         "web.webclient.presentation.tests.test_local_map.test_gate_capacity",
         "web.webclient.presentation.tests.test_local_map.test_gateway_resolution",
         "web.webclient.presentation.tests.test_local_map.test_grid_gateways"
-      ],
-      "index": 53
+      ]
     },
     {
+      "index": 65,
       "name": "webclient-40-1",
       "workers": 4,
       "labels": [
         "web.webclient.presentation.tests.test_local_map.test_grid_helpers",
         "web.webclient.presentation.tests.test_local_map.test_per_gate_footprint",
         "web.webclient.presentation.tests.test_local_map.test_presenter",
-        "web.webclient.presentation.tests.test_local_map.test_schema",
+        "web.webclient.presentation.tests.test_local_map.test_schema"
+      ]
+    },
+    {
+      "index": 66,
+      "name": "webclient-40-1-1",
+      "workers": 4,
+      "labels": [
         "web.webclient.presentation.tests.test_local_map.test_wilderness",
         "web.webclient.presentation.tests.test_map_quest_destinations",
         "web.webclient.presentation.tests.test_map_panel_protocol",
         "web.webclient.presentation.tests.test_publication_parts"
-      ],
-      "index": 54
+      ]
     },
     {
+      "index": 67,
       "name": "webclient-41",
       "workers": 4,
       "labels": [
         "web.webclient.presentation.tests.test_area_map"
-      ],
-      "index": 55
+      ]
     },
     {
+      "index": 68,
       "name": "webclient-42",
       "workers": 1,
       "labels": [
         "web.webclient.presentation.tests.test_world_map_measurement"
-      ],
-      "index": 56
+      ]
     },
     {
+      "index": 69,
       "name": "webclient-43",
       "workers": 4,
       "labels": [
         "web.webclient.presentation.tests.test_world_map_transport",
         "web.webclient.presentation.tests.test_world_map"
-      ],
-      "index": 57
+      ]
     },
     {
+      "index": 70,
       "name": "webclient-44",
       "workers": 4,
       "labels": [
@@ -1265,10 +1350,10 @@
         "web.webclient.presentation.tests.test_services_panel.test_schema_edges",
         "web.webclient.presentation.tests.test_title_codex_panel",
         "web.webclient.presentation.tests.test_dialogue_reading_projection"
-      ],
-      "index": 58
+      ]
     },
     {
+      "index": 71,
       "name": "webclient-45",
       "workers": 4,
       "labels": [
@@ -1305,8 +1390,7 @@
         "web.webclient.presentation.tests.test_roster",
         "web.webclient.presentation.tests.test_title_ballot_panel",
         "web.webclient.presentation.tests.test_watchers"
-      ],
-      "index": 59
+      ]
     }
   ]
 }

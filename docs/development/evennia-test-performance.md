@@ -553,3 +553,40 @@ recovery 重試節奏**相乘的結果，不是分片能解決的問題。
 6 分鐘預算，下一步必須降低 `_settle_population_at` 的每次成本或讓 blocked
 recovery 不要在每 30 秒重試，再把 `day`-skip 的邊界數從 2,880 降下來；繼續切
 分片不會有幫助。
+
+### 2026-11-05：run 42037867084 的實測——長尾是每 job 的瀏覽器安裝，不是測試
+
+run 42037867084（`0311a245`）的 84 個瀏覽器 job 中，測試步驟本身的中位數是 205 秒、
+最大值 295 秒；但**整個 job 的中位數是 295 秒、最大值 1,548 秒**，差額全部落在
+`Install Chromium and Firefox for browser acceptance`：
+
+| 步驟 | 一般 job | 被節流的 job |
+|---|---:|---:|
+| Check out repository workspace A/B | 6–15 s | 6–15 s |
+| Sync locked environment（兩個 workspace） | 3–5 s | 3–5 s |
+| Build Vue dist in browser workspaces | 21–31 s | 21–31 s |
+| **Install Chromium and Firefox** | **29 s** | **1,253–1,320 s** |
+| Run browser shard | 132–295 s | 130–223 s |
+
+84 個 job 同時向 apt 與 Playwright CDN 各拉一份 Chromium、Firefox、
+chrome-headless-shell 與約 30 個系統套件；被節流的 job 就把 30 秒變成 20 分鐘。
+同一段時間內 `top-level-5` 連 `Check out repository` 都花了 30 分鐘，是同一波
+網路壅塞。這才是「一次 run 跑一小時」的原因；在這個前提下切更多分片只會更嚴重。
+
+**修正**：`browser` job 改在 `mcr.microsoft.com/playwright/python:v1.62.0-noble`
+容器內執行——瀏覽器與系統相依套件都已在映像內，job 只跑一次
+`Verify the container's browser bundle`（真啟動 chromium 與 firefox，約 1 秒）。
+並為 `evennia`、`browser`、`top-level` 三個 matrix job 加上 `timeout-minutes: 20`：
+病態 runner 會明確失敗，不會再把整條 run 拖過一小時。
+
+**整天 skip 的成本**：`world/maps/population_lifecycle.settle_population_lifecycle`
+在一次 86,400 秒的 skip 裡走過 **1,921 個邊界**（本機 385 秒、CI 約 1,362 秒），
+平均每次邊界 0.17 秒；節奏由 `monster_activity` 的 30 秒移動刻決定，換算一天
+2,880 次。三個驗收測試原本都以「整天」為跨度，但 `monster-site-placement` 的需求
+只要求「in-game clock advances」，因此改為 **4 小時**（可恢復 camp 的 1 小時視窗
+的 4 倍：同一次 advance 會讓可恢復的站恢復、一次性站仍清空）。斷言一條未減，
+單一測試從 1,362 秒降到約 250 秒。
+
+**重新打包**：evennia 60 → **72** 個分片、browser 84 → **89** 個分片，兩者都以
+本次 run 的實測 `Run … shard` 步驟時間為依據（evennia 只切 > 240 秒、browser 只切
+> 250 秒的分片），且保證兩個行程清單都非空、沒有任何標籤遺失。
