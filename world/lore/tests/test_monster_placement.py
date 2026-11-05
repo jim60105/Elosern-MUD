@@ -339,20 +339,21 @@ class PlacementValidationTests(unittest.TestCase):
     @covers_requirement(
         "monster-field-activity::activity-declarations-publish-complete-validated-bindings"
     )
-    def test_a_solitary_site_override_must_fit_every_composition_outcome(self):
+    def test_a_solitary_site_override_accepts_a_multi_member_composition(self):
+        # Publication never lets a member count select or reject a policy: a
+        # solitary override of a two-member composition is lawful, and
+        # construction disperses the members into one-member groups.
         group = _composition(
             COMPOSITION, (_member(ORDINARY, 1, 1), _member(STRONGER, 1, 1))
         )
         solitary = _activity(OTHER_ACTIVITY, "solitary_roaming")
-        with self.assertRaises(MonsterPlacementRegistryError) as captured:
-            registry.validate_monster_placement_registry(
-                {SITE: _site(capacity=2, activity_key=OTHER_ACTIVITY)},
-                **_faces(
-                    compositions={COMPOSITION: group},
-                    activities={ACTIVITY: _activity(), OTHER_ACTIVITY: solitary},
-                ),
-            )
-        self.assertIn("requires every legal outcome", str(captured.exception))
+        registry.validate_monster_placement_registry(
+            {SITE: _site(capacity=2, activity_key=OTHER_ACTIVITY)},
+            **_faces(
+                compositions={COMPOSITION: group},
+                activities={ACTIVITY: _activity(), OTHER_ACTIVITY: solitary},
+            ),
+        )
 
     def test_a_stationary_site_override_accepts_a_complete_group(self):
         group = _composition(
