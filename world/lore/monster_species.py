@@ -673,6 +673,26 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "mudbank_dweller",
         True,
     ),
+    MonsterSpecies(
+        "wax_pouch_rat",
+        "蠟囊鼠",
+        "蠟囊鼠是約家貓大小的鼠類，活動於平原田界、荒廢糧站與丘陵運糧道旁。"
+        "牠的頰囊分泌薄蠟，把收集的穀粒裹成小團，藏在潮濕巢穴中。",
+        "灰褐毛皮貼著圓身，鼓起的頰側帶著細亮蠟痕。"
+        "腹側毛略顯光滑，長尾在鑽縫時貼向身後；巢邊常留著帶齒痕的蠟封穀團。",
+        "小型家族共同覓食與搬運穀粒，蠟膜替巢中的穀團提供短期防潮。"
+        "牠們也把少量蠟抹在腹側毛上，沿濕窄縫隙滑行。"
+        "遇人時多半退避，藏糧巢口遭到封堵時便聚集自衛。"
+        "待運穀物、破損糧袋與廢棄倉底提供覓食和築巢機會；"
+        "妥善封存糧食、清理舊巢，能減少反覆接觸。近身時，牠靠咬擊與靈巧翻身應對威脅。",
+        ("eastern_plains", "western_hills_valleys"),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；頰囊薄蠟的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階家族型鼠類：頰囊薄蠟為穀團短期防潮、"
+        "腹側蠟層支持窄縫滑行，連結荒廢糧站與運糧道；戰鬥呈現為咬擊與自身短暫敏捷提升。",
+        "（作者私有：尚未證實的猜想）糧站工人相信蠟封穀團能保存一整季，這種說法尚未證實。",
+        "wax_cache_forager",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -875,6 +895,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "F",
         True,
         active_skill_keys=("mudfilm_guard",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "wax_cache_forager",
+        "wax_pouch_rat",
+        "藏穀型",
+        "普通版本，以頰囊蠟膜裹住穀粒，藏進潮濕巢穴。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=45, mp=0, sp=14, atk_phys=6, agility=9, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("wax_pouch_slip",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),

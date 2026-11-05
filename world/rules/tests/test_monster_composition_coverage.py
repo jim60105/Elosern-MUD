@@ -275,15 +275,36 @@ class RepresentativeCoverageTests(unittest.TestCase):
                         for keyword in call.keywords
                         if keyword.arg == "variant_key"
                     ] or call.args[1:2]
+                    # A constructed variant is either the declared
+                    # representative itself or a value derived from the
+                    # registry (a member of the declared group); a literal
+                    # key would be a second, stale copy of the choice.
                     self.assertTrue(
-                        any(
-                            isinstance(argument, ast.Name)
-                            and argument.id == REPRESENTATIVE_DECLARATION
+                        arguments
+                        and not any(
+                            isinstance(argument, ast.Constant)
                             for argument in arguments
                         ),
                         "construct_species_individual must take the declared "
-                        "representative, not a copied variant key",
+                        "representative or a registry-derived variant, never a "
+                        "literal variant key",
                     )
+                self.assertTrue(
+                    any(
+                        isinstance(argument, ast.Name)
+                        and argument.id == REPRESENTATIVE_DECLARATION
+                        for call in calls
+                        for argument in (
+                            [
+                                keyword.value
+                                for keyword in call.keywords
+                                if keyword.arg == "variant_key"
+                            ]
+                            or call.args[1:2]
+                        )
+                    ),
+                    "the smoke never constructs its declared representative",
+                )
                 # A declaration plus an empty or skipped test would satisfy
                 # every wiring rule above while contributing no evidence, so
                 # the module also has to carry a non-skipped test that

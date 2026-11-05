@@ -9,6 +9,8 @@ The crab contact ability is assembled the same way with light physical damage
 plus a self-mounted defense guard granted by every resolved attempt.
 The slime body action is assembled the same way with a self-only defense guard
 and no damage occurrence at all.
+The rat body action is assembled the same way with a self-only agility
+improvement and no damage occurrence at all.
 """
 
 from world.skills.effects import (
@@ -259,6 +261,32 @@ ROWS: tuple[SkillDef, ...] = (
         eligibility=SkillEligibility(
             allowed_actor_kinds=("monster",),
             allowed_species=("mudfilm_slime",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.SELF,
+            ),
+        ),
+    ),
+    _skill(
+        "wax_pouch_slip",
+        "滑蠟翻身",
+        "把腹側薄蠟抹勻後靈巧翻身，短暫提高自身敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SELF,
+        cost={"sp": 6},
+        # A body action with no damage occurrence: this support shape has no
+        # field use, so it stays combat-only (the damage-carrying monster
+        # abilities above remain selectable outside combat).
+        usable_out_of_combat=False,
+        effects=["self_buff_apply:wax_slip"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.SELF_ONLY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("wax_pouch_rat",),
         ),
         prerequisites=(),
         effect_policies=(

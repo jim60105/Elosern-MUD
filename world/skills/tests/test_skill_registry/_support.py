@@ -65,5 +65,9 @@ _MASTERY_KEYS = frozenset(
 #: combat use is exactly opening a fight, which the damaging-action gate
 #: (skill-field-availability) then confines to a battlefield. A new skill
 #: that omits a decision falls outside this set by the helpers' False
-#: default and fails the inventory assertion.
-USABLE_OUT_OF_COMBAT_FALSE_KEYS = frozenset({"flee"})
+#: default and fails the inventory assertion. The monster body actions are
+#: combat-context-only support shapes: they carry no damage occurrence, so a
+#: cast with no fight in progress has no recipient to help.
+USABLE_OUT_OF_COMBAT_FALSE_KEYS = frozenset(
+    {"flee", "mudfilm_guard", "wax_pouch_slip"}
+)

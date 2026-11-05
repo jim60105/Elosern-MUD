@@ -8,7 +8,7 @@ record still describes the tuning the process loads.
 
 ## What is activated
 
-Four registered variants are switched from the permanent legacy decision to the
+Five registered variants are switched from the permanent legacy decision to the
 utility decision by `variant_decision_mode` in
 `world/rules/rulebook/monster_behaviour.yaml`, each with its own explicitly
 authored intelligence:
@@ -19,6 +19,7 @@ authored intelligence:
 | `mudbank_dweller` | 濕岸型 | low | instinctive | 20 | Its own lore has it tighten its film only when pressed and bump back at short range, so reflexive self-protection is the least decision depth of the activated set. |
 | `reef_warden` | 守礁型 | low | instinctive | 66 | Its own lore has it pick and hold the narrowest reef mouth that shields its group: it reads the terrain and the group it protects before acting. |
 | `trail_hunter` | 獵道型 | mid | ambush_predator | 44 | Its own lore is one repeated rule -- probe the party's edge, avoid a formed line -- which is the least decision depth of the earlier three. |
+| `wax_cache_forager` | 藏穀型 | low | instinctive | 30 | Its own lore has it time its slip around a defended cache and family foraging, a little more situational reading than the slime's reflexive film. |
 
 The values are read from each row's authored bestiary lore, never from its
 threat tier, ordinary/stronger rank, combat numbers or archetype: the low-tier
@@ -28,7 +29,7 @@ its archetype's legacy mode; nothing supplies intelligence or a mode by tier,
 species, rank, stat or archetype.
 
 Tuning fingerprint of the activated configuration (algorithm version 5):
-`3ee653b92c6865128e8e6a3d3bbfb7ea486286aafdc9c0d9c607392a22f3323d`.
+`e583cb956f90c0827c6c04526c6001238b93a85673d4a0bce941fa9b48e535f4`.
 
 ## Evidence linkage
 
@@ -133,7 +134,7 @@ variant maps do not enter their tuning or their recorded fingerprint
 
 The activation is a rulebook mode map, so rollback is an edit plus a restart:
 
-1. Set `variant_decision_mode: {}` (the four named entries removed;
+1. Set `variant_decision_mode: {}` (the five named entries removed;
    `variant_intelligence` is kept and remains validated).
 2. Restart the process. Startup validation is the only path that loads a
    changed on-disk mode; there is no hot reload, and a new *session* in the
@@ -145,8 +146,8 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
    tuning and the observation memory).
 
 Rollback fingerprint of the edited configuration:
-`04f7f6b6050b4886dcc0a3290782b806fe5a5ec0b78c3457fc850b7d0c67ddea`. Recorded
-acceptance claims made under `3ee653b9...` do not describe it, which is exactly
+`06d9d2a82b7c0ccd35df05f86deeb6557445cc068a1af2f2cb9b884099784b7d`. Recorded
+acceptance claims made under `e583cb95...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce.
 
 ## Expansion and retuning
@@ -173,7 +174,7 @@ To activate more variants, or to retune one of these:
   makes no difficulty claim: the manual evidence establishes exercised
   boundaries, verified preconditions, decision shares, replay inputs and a
   timing envelope.
-* Four activated variants are a first small set, not a policy for the whole
+* Five activated variants are a first small set, not a policy for the whole
   bestiary; the remaining registered variants stay legacy until their own
   evidence exists.
 * The utility decision samples with a temperature derived from intelligence, so
@@ -185,9 +186,9 @@ To activate more variants, or to retune one of these:
   `FLEE_SKILL_KEY` and the flee priority stay with the permanent legacy mode.
   The original three activated variants are low- and mid-tier monsters whose
   own lore keeps them in the fight (a flock leader coordinating, a reef warden
-  holding its narrow mouth, a trail hunter probing the edge); the slime's
-  retreat orientation is expressed instead through passive field aggression,
-  the known deviation recorded in design §12.4 and
+  holding its narrow mouth, a trail hunter probing the edge); the slime's and
+  the rat's retreat orientation are expressed instead through passive field
+  aggression, the known deviation recorded in design §12.4 and
   `docs/development/monster-content-expansion.md`. Rollback restores the legacy
-  flee priority for all four immediately.
+  flee priority for all five immediately.
 * Reaching production does not add a player command or a browser action.
