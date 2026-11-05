@@ -175,22 +175,40 @@ dream or creation surface owns the stage. There is no server travel mode.
   through `store.setTravelMap`; the walking queue waits while refreshing and
   stops on a failed read. In travel the drawer offers only 世界 and never asks
   for the area.
-- One decoder (wilderness-travel-window-ui): `lib/wilderness-grid.js`
-  `decodeWildernessGrid` lays out the schema-3 window's run-length rows
+- One decoder (wilderness-travel-window-ui, extended by
+  wilderness-district-overview): `lib/wilderness-grid.js`
+  `decodeWildernessGrid` lays out the schema-4 window's run-length rows
   (south-to-north, exact totals, unknown cells `null` with no fact) and
   refuses any body it cannot lay out exactly (older schemas and node-form
-  wilderness included). Both consumers read it: the drawer's
+  wilderness included). `decodeDistrictOverview` decodes the schema-4
+  `district` record into a coarse origin/size/`cellKm`, frozen RLE rows and
+  expanded terrain cells; a `null` district is the exact unlit form. Both
+  consumers read it: the drawer's
   `area_map_view.decodeWindow` and `lib/travel-grid.js` `decodeTravelGrid`,
   whose cells carry each run's band/tier/flags and `display` annotation and
   whose grid carries the window's own phase, radius, entities (`count`,
   nullable `threat`), sightings, `title`, `cellKm` and body-level
-  `districtName`. The browser computes no phase, radius or label: chips and
+  `districtName`, plus the decoded `district` overview. The browser computes
+  no phase, radius or label: chips and
   readouts use `display.terrain_label`/`ford_label` and a node's
   `landmark.name`; a hostile without a supplied threat says 威脅不明 and
   unknown ground 未探明. While the layout is shown the place card states
   `components/travel/travel-model.js` `travelPlace`: the party cell's
   disclosed `<district>・<terrain>` (else the window's caption) and the
   server's time line with the supplied phase word.
+- Wilderness fine cells have one sight-based grade: `sighted` inside the
+  supplied ground disc (`dx*dx + dy*dy <= (ground_radius + 0.5)**2`) and
+  `explored` for every other revealed cell, walked or district-revealed
+  alike. A visit still records its node and trail but never brightens
+  terrain; the client derives no sight, eligibility or clock.
+- The coarse overview is a second, clipped layer: `AreaMapView` draws its
+  `t-<terrain>` cells at one explored opacity behind the fine window and
+  masks them with an SVG `<mask>` (white frame minus the `windowDraw`
+  rectangle); `TravelMap` paints `paintDistrictOverview` onto a second,
+  lower canvas and clears the fine-window rectangle (floor/ceil to whole
+  coarse pixels) before drawing. Coarse terrain therefore never bleeds into
+  an unrevealed fine cell or double-blends with the window fog. Neither
+  layer adds a node, road, label, place or action from the overview.
 - `TravelMap` paints that grid (wilderness-travel-map-ui; design §4.2–4.4):
   `lib/travel-paint.js` `paintTravelMap` draws onto a canvas of exactly
   `width × 12` by `height × 12` pixels (terrain field, brushed reveal mask
@@ -204,15 +222,25 @@ dream or creation surface owns the stage. There is no server travel mode.
   interpolation coordinates out of its pixel loops per rebuild; that cache
   must keep full-canvas pixels identical across moving windows, flat/nonflat
   transitions and reused-cache size changes.
-  Repaint keys: only `paintSignature(grid)` (map, origin, size, party,
-  phase, radius and every cell's painted facts) repaints, once per
-  animation frame; camera, zoom, UI scale, aim, hover, walking, plan and
+  Repaint keys: `paintSignature(grid)` (map, origin, size, party, phase,
+  radius and every fine cell's painted facts) and
+  `districtPaintSignature(grid)` (overview facts, the fine window it is cut
+  out of, and the phase) each repaint their own canvas independently, once
+  per animation frame; the district painter never increments
+  `travelPaintStats`. Camera, zoom, UI scale, aim, hover, walking, plan and
   status move transforms or overlays only. `lib/travel-camera.js` follows
   the party between the measured header and band, fits a locked plan
   between the measured side columns (minimum 14 px × scale), steps zoom
   18..46 by 4 × scale (wheel, `+`/`-` on the focused map) and projects
-  bearing-only sighting cards onto the safe rectangle's inset edge. The map
-  emits pointer `hover`/`pick` and `zoom`, and its keyboard intents.
+  bearing-only sighting cards onto the safe rectangle's inset edge.
+  `districtFitCamera` adds one symbolic whole-district state: with a
+  supplied overview, the 全區 control fits the union of the overview and
+  the 41-cell window inside the already-scaled safe rectangle at an
+  unclamped cell size, suppresses the eight neighbour targets and
+  single-click stepping, chooses a readable far scale step, and returns to
+  18 px/km when left or when the committed district disappears or changes.
+  A locked route keeps `fitRouteCamera` authoritative. The map emits
+  pointer `hover`/`pick` and `zoom`, and its keyboard intents.
   `window.__elosernBridge.travelPaint` exposes the painter and its call
   record for the managed repaint-budget test.
 - Walking (wilderness-travel-walking-ui): the store owns the aim, the 400 ms

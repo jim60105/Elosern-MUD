@@ -184,6 +184,44 @@ Markers are recomputed on each read and never stored.
 - The payload also carries live-sight entities, distant-sighting markers, the current light phase, and the current ground radius.
 - Estimated encoded cell data is about 2 KB. The payload uses the existing publication chunking.
 
+**Amendment (wilderness-district-overview, 2026-11-05).** The 41 × 41
+one-kilometre window remains the live-sight frame; every fine cell, node,
+entity, action and route stays defined on it. Reaching a district's authored
+landmark also lights the rest of that district, so the wilderness body gains a
+second, coarse layer:
+
+- A required nullable `district` record carries the current lit district's
+  exact-ownership bounding box as run-length rows, aligned to a coarse grid and
+  clamped to the 0..2,700 frame. `district` is `null` for an unlit district,
+  open sea, or a cell with no owner.
+- The coarse cell size is chosen from the fixed `(1, 2, 5, 10, 20, 25, 50)` km
+  ladder, finest first, so the section stays within 8,192 coarse cells, 4,096
+  runs and 65,536 canonical bytes. Each coarse cell samples the one-kilometre
+  cell `cell_km // 2` from its origin, and the coarse cell containing the party
+  is terrain whenever the party's cell belongs to the published district.
+- The bounds come from the exact ownership raster (`coarse` tiles plus
+  `exceptions`, tile-inflated and frame-clamped), never from the smoothed
+  display outlines. Only cells the published district owns disclose terrain;
+  every other in-window cell is an unknown run with no fact, identity, label,
+  entity or place.
+- The coarse layer is drawn behind the fine window and is clipped out of it:
+  the drawer masks it with the 41-cell window rectangle, and the travel stage
+  clears that rectangle from its overview canvas. Coarse terrain therefore
+  never bleeds into an unrevealed fine cell or double-blends with the window
+  fog.
+- The fine window's styling distinguishes live sight from memory: cells inside
+  the supplied ground disc (`dx*dx + dy*dy <= (ground_radius + 0.5)**2`) are
+  bright, and every other revealed cell — walked or only revealed by the lit
+  district — uses one explored grade. Visiting a cell still records its node
+  and trail; it no longer brightens terrain.
+- The wilderness area view gains a `district` stop (only when the payload
+  supplies an overview) that fits the union of the overview and the 41-cell
+  window; the opening view stays on the surrounding neighbourhood. The travel
+  camera gains a symbolic whole-district fit state that fits the same union in
+  the safe rectangle, suppresses neighbour targets and single-click stepping,
+  and returns to the 18 px/km local ladder when it is left or the committed
+  district changes.
+
 ### 7.2 `travel.plan` (read-only)
 
 Input:
