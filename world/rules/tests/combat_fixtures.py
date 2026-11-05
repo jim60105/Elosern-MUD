@@ -22,11 +22,16 @@ class BattlefieldIsolation:
     registers battlefields restores the registry in teardown, and the
     restoration is registered via ``addCleanup`` so a failing ``setUp`` cannot
     leak either.
+
+    The registry starts empty for every such test: a registration a previous
+    module leaked is not this test's state, and describing it as the test's own
+    would make "this action left no trace" assertions depend on shard order.
     """
 
     def setUp(self):
         super().setUp()
-        self.addCleanup(self._restore_battlefields, dict(_BATTLEFIELDS))
+        _BATTLEFIELDS.clear()
+        self.addCleanup(self._restore_battlefields, {})
 
     def _restore_battlefields(self, snapshot):
         _BATTLEFIELDS.clear()
