@@ -53,22 +53,6 @@ from world.maps.tests._bootstrap_fixtures import (
 )
 
 
-from ._support import (  # noqa: F401 -- shared with the sibling module
-    ALPHA,
-    BETA,
-    DELTA,
-    GAMMA,
-    OLD_COORDINATES,
-    SYNTHETIC_MAP_KEY,
-    _SynchronizerSpy,
-    _plaza_key,
-    _synthetic_graph,
-    _synthetic_graph_for,
-    _synthetic_node,
-    _synthetic_registry,
-)
-
-
 class GridBootstrapTests(_GridBootstrapCase):
     """Spawn, update and first-pass convergence cases."""
 

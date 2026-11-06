@@ -1,7 +1,7 @@
 """Shared fixtures and helpers for the bootstrap test package.
 
 Not discovered as tests (the file is not named ``test*``): it holds the
-synthetic graphs, spies and constants the grid and settlement modules share.
+synchronizer spy the settlement cases drive.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -56,62 +56,6 @@ from world.maps.tests._bootstrap_fixtures import (
 )
 
 
-SYNTHETIC_MAP_KEY = "t_sparse_settlement"
-
-
-def _synthetic_node(node_id, coordinate, key):
-    from elosern_map_core.sparse import SparseNode
-
-    return SparseNode(
-        node_id=node_id,
-        x=coordinate[0],
-        y=coordinate[1],
-        prototype={"prototype_parent": "grid_room", "key": key},
-    )
-
-
-def _synthetic_graph(start_coordinate, north_coordinate):
-    from elosern_map_core.sparse import SparseRoad, SparseSettlementGraph
-
-    return SparseSettlementGraph(
-        SYNTHETIC_MAP_KEY,
-        [
-            _synthetic_node("start", start_coordinate, "測試起點"),
-            _synthetic_node("north", north_coordinate, "測試北端"),
-        ],
-        [
-            SparseRoad("start>north", "start", "north"),
-            SparseRoad("north>start", "north", "start"),
-        ],
-        exit_prototype={
-            "prototype_parent": "xyz_exit",
-            "typeclass": "typeclasses.exits.CostedXYZExit",
-        },
-    )
-
-
-def _synthetic_graph_for(map_id, start_coordinate, north_coordinate):
-    """One invented sparse graph in its own map coordinate space."""
-
-    from elosern_map_core.sparse import SparseRoad, SparseSettlementGraph
-
-    return SparseSettlementGraph(
-        map_id,
-        [
-            _synthetic_node("start", start_coordinate, f"測試{map_id}起點"),
-            _synthetic_node("north", north_coordinate, f"測試{map_id}北端"),
-        ],
-        [
-            SparseRoad("start>north", "start", "north"),
-            SparseRoad("north>start", "north", "start"),
-        ],
-        exit_prototype={
-            "prototype_parent": "xyz_exit",
-            "typeclass": "typeclasses.exits.CostedXYZExit",
-        },
-    )
-
-
 class _SynchronizerSpy:
     """Record which graphs reach the real planner and writer, keeping them real."""
 
@@ -146,59 +90,5 @@ class _SynchronizerSpy:
         self._apply_patch.stop()
         self._plan_patch.stop()
         return False
-
-
-OLD_COORDINATES = {
-    "capital_altoria": {
-        "south_gate": (3, 0),
-        "quay": (1, 1),
-        "riverbank_road": (2, 1),
-        "south_avenue": (3, 1),
-        "inn_lane": (4, 1),
-        "bath_forecourt": (5, 1),
-        "old_wall_ruins": (2, 2),
-        "north_avenue": (3, 2),
-        "craft_alley": (1, 3),
-        "market_street": (2, 3),
-        "central_plaza": (3, 3),
-        "guild_forecourt": (4, 3),
-        "east_market": (5, 3),
-        "east_gate": (6, 3),
-        "training_ground": (2, 4),
-        "holy_steps": (3, 4),
-        "great_temple": (4, 4),
-        "noble_quarter": (3, 5),
-        "upper_gate": (4, 5),
-        "academy": (5, 5),
-        "palace_forecourt": (4, 6),
-    },
-    "village_ciaran": {
-        "hidden_path": (0, 1),
-        "village_plaza": (1, 1),
-        "stream_path": (1, 0),
-        "stream_bend": (2, 0),
-        "training_clearing": (2, 1),
-        "herb_garden": (3, 1),
-        "old_tree_north": (1, 2),
-        "elder_tree": (1, 3),
-        "weaving_slope": (2, 2),
-        "silver_leaf_slope": (2, 3),
-    },
-}
-
-
-def _plaza_key():
-    x, y = SETTLEMENT_GRAPHS["capital_altoria"].node("central_plaza").coordinate
-    return f"grid:capital_altoria:{x}:{y}"
-
-
-ALPHA = "t_selected_alpha"
-BETA = "t_selected_beta"
-GAMMA = "t_selected_gamma"
-DELTA = "t_selected_delta"
-
-
-def _synthetic_registry(*graphs):
-    return {graph.map_id: graph for graph in graphs}
 
 
