@@ -61,7 +61,14 @@ from world.quests.tests.test_scene_builder._support import (
 )
 from world.quests.tests._fixtures import accept
 from world.rules.tests.combat_fixtures import grant_lineage
-from world.tests.synthetic_data import SYNTH_ANCHORS
+from world.lore.sex import DEFAULT_SEX
+from world.tests.synthetic_data import (
+    SYNTH_ANCHORS,
+    SYNTH_NPC_TIERS,
+    SYNTH_RACES,
+    synthetic_registries,
+)
+from dataclasses import replace
 from world.ai.scenario_director import QuestBlueprint
 
 from tools.spec_traceability import covers_requirement
@@ -574,6 +581,64 @@ class SceneOccupantProvenanceTests(SceneBuilderIsolation, EvenniaTest):
         self.assertFalse(npc.attributes.has(NPC_PROFILE_PROVENANCE_ATTRIBUTE))
         with patch.object(official_refs, "NPC_PROFILE_REGISTRY", {stray_key: object()}):
             self.assertIsNone(official_content_reference_for_entity(npc))
+
+
+class SceneSpawnSexTests(SceneBuilderIsolation, EvenniaTest):
+    """The shared spawn seam resolves the sex from the tier's race."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(InstanceRoom, key="sex scene")
+
+    def _requirement(self):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            index=0,
+            archetype=_T_ARCHETYPE,
+            characterizations=(
+                StageNpcCharacterization(
+                    display_name="性別探測者", persona=occupant_card()
+                ),
+            ),
+        )
+
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_an_elf_scene_npc_lands_on_the_permitted_sex(self):
+        elf = replace(
+            SYNTH_RACES["t_duskmari"], key="elf", allowed_sexes=("female",)
+        )
+        elf_tier = replace(
+            SYNTH_NPC_TIERS[_T_NPC_TIER],
+            key="t_elf_scene_tier",
+            race_key="elf",
+            static_tier_key=None,
+        )
+        with synthetic_registries(
+            "races",
+            "npc_tiers",
+            extra={
+                "races": {"elf": elf},
+                "npc_tiers": {elf_tier.key: elf_tier},
+            },
+        ):
+            npc = _spawn_npc(
+                self.room,
+                self._requirement(),
+                "bandit",
+                elf_tier.key,
+                None,
+                0,
+                "t_quest_key",
+            )
+        self.assertEqual(npc.sex, "female")
+
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_a_human_scene_npc_keeps_its_default_sex(self):
+        npc = _spawn_npc(
+            self.room, self._requirement(), "bandit", _T_NPC_TIER, None, 0, "t_quest_key"
+        )
+        self.assertEqual(npc.sex, DEFAULT_SEX)
 
 
 if __name__ == "__main__":

@@ -109,6 +109,7 @@
       "workers": 4,
       "labels": [
         "world.rules.tests.test_creation_wizard",
+        "world.rules.tests.test_identity",
         "world.rules.tests.test_conditional_damage",
         "world.rules.tests.test_damage_bands",
         "world.rules.tests.test_damage_effect_handler",

@@ -12,6 +12,8 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
+from world.lore.sex import SEX_VALUES
+from world.lore.starting_kits import SubraceStartingKit
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -111,6 +113,23 @@ class CreationWizardTests(EvenniaTest):
         }
         values.update(overrides)
         return CharacterCreationRequest(**values)
+
+    def elf_scope(self):
+        """A borrowed elf race row, its subrace, and its starting kit."""
+        elf = replace(SYNTH_RACES["t_duskmari"], key="elf", allowed_sexes=("female",))
+        branch = make_subrace("t_dawn_herald_kin", race_key="elf")
+        kit = SubraceStartingKit(branch.key, (("t_thorn_knife", 1),))
+        scope = synthetic_registries(
+            "races",
+            "subraces",
+            "starting_kits",
+            extra={
+                "races": {"elf": elf},
+                "subraces": {branch.key: branch},
+                "starting_kits": {branch.key: kit},
+            },
+        )
+        return elf, branch, scope
 
     # -- read model ----------------------------------------------------------
 
@@ -674,6 +693,50 @@ class CreationWizardTests(EvenniaTest):
             )
         self.assertEqual(rejection_code(ctx.exception), "unknown_sex")
         self.assertEqual(read_draft(self.character), before)
+
+    @covers_requirement(
+        "webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft"
+    )
+    def test_elf_draft_without_sex_stores_the_race_permitted_default(self):
+        elf, branch, scope = self.elf_scope()
+        with scope:
+            save_custom_draft(
+                self.account,
+                self.character,
+                self.custom_request(
+                    race="elf",
+                    subrace=branch.key,
+                    allocations=balanced_allocations("elf", branch.key),
+                ),
+            )
+            self.assertEqual(
+                read_draft(self.character)["sex"], elf.allowed_sexes[0]
+            )
+
+    @covers_requirement(
+        "webclient-character-creation-ui::the-server-owns-the-persisted-creation-wizard-draft"
+    )
+    def test_elf_draft_with_a_forbidden_sex_is_rejected_leaving_prior_draft(self):
+        elf, branch, scope = self.elf_scope()
+        forbidden = next(member for member in SEX_VALUES if member not in elf.allowed_sexes)
+        with scope:
+            save_custom_draft(self.account, self.character, self.custom_request())
+            before = read_draft(self.character)
+            with self.assertRaises(CharacterCreationError) as ctx:
+                save_custom_draft(
+                    self.account,
+                    self.character,
+                    self.custom_request(
+                        race="elf",
+                        subrace=branch.key,
+                        allocations=balanced_allocations("elf", branch.key),
+                        sex=forbidden,
+                    ),
+                )
+            self.assertEqual(
+                rejection_code(ctx.exception), "sex_not_allowed_for_race"
+            )
+            self.assertEqual(read_draft(self.character), before)
 
     def test_v2_custom_draft_without_sex_loads_as_absent(self):
         # Hard cutover: the sex-carrying version 3 gate makes every stored v2

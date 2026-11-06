@@ -22,12 +22,15 @@ from world.imports.validate import (
     _check_disguised_stats_race,
     _check_disguised_stats_subset,
     _check_race_subrace,
+    _check_sex_for_race,
     _check_skills,
     _check_stats_band,
     collect_degraded_checks,
     validate_batch,
     validate_character,
 )
+from typeclasses.npcs import NPC
+from world.lore.sex import SEX_VALUES
 from world.tests.synthetic_data import (
     SYNTH_RACES,
     SYNTH_SKILLS,
@@ -106,6 +109,61 @@ class SemanticValidationTests(TestCase):
             # A non-matching row under a missing race still fails existence.
             record["race"] = "missing"
             self.assertTrue(_check_race_subrace(record))
+
+    def test_a_non_female_elf_record_is_rejected(self):
+        # The race declares exactly one permitted sex; the forbidden member is
+        # derived from that row, never a literal pair.
+        race = make_race("t_single_sex_race", allowed_sexes=("female",))
+        forbidden = next(member for member in SEX_VALUES if member not in race.allowed_sexes)
+        with synthetic_registries("races", "subraces", extra={"races": {race.key: race}}):
+            record = _kit_record()
+            record["race"] = race.key
+            record["sex"] = forbidden
+            issues = _check_sex_for_race(record)
+        self.assertEqual(len(issues), 1)
+        self.assertEqual(issues[0].field, "sex")
+
+    def test_a_permitted_sex_produces_no_sex_issue(self):
+        race = make_race("t_single_sex_race", allowed_sexes=("female",))
+        with synthetic_registries("races", "subraces", extra={"races": {race.key: race}}):
+            record = _kit_record()
+            record["race"] = race.key
+            record["sex"] = race.allowed_sexes[0]
+            self.assertEqual(_check_sex_for_race(record), [])
+
+    def test_races_that_permit_the_value_produce_no_sex_issue(self):
+        with synthetic_registries("races", "subraces"):
+            record = _kit_record()
+            for member in SEX_VALUES:
+                with self.subTest(member=member):
+                    record["sex"] = member
+                    self.assertEqual(_check_sex_for_race(record), [])
+
+    def test_an_unresolvable_race_leaves_the_sex_judgement_to_the_race_check(self):
+        record = _kit_record()
+        record["race"] = "t_absent_race"
+        record["sex"] = "male"
+        self.assertEqual(_check_sex_for_race(record), [])
+
+    def test_the_sex_check_applies_to_npc_targets_too(self):
+        race = make_race("t_single_sex_race", allowed_sexes=("female",))
+        branch = make_subrace("t_single_sex_branch", race_key=race.key)
+        forbidden = next(member for member in SEX_VALUES if member not in race.allowed_sexes)
+        with synthetic_registries(
+            "races",
+            "subraces",
+            extra={
+                "races": {race.key: race},
+                "subraces": {branch.key: branch},
+            },
+        ):
+            record = _kit_record()
+            record["race"] = race.key
+            record["subrace"] = branch.key
+            record["sex"] = forbidden
+            report = validate_character(record, NPC)
+        self.assertFalse(report.is_valid)
+        self.assertTrue(any(issue.field == "sex" for issue in report.rejections))
 
     @covers_requirement("import-validation::race-and-subrace-must-resolve-in-the-lore-registries-with-subrace-cross-checked-against-race")
     def test_a_character_without_a_subrace_is_rejected(self):

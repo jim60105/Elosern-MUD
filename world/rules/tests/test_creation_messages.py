@@ -88,6 +88,7 @@ class CreationRejectionMappingTests(unittest.TestCase):
             "character is not owned by this account": "ownership_rejected",
             "no creation draft saved": "no_draft",
             "creation mode must be 'preset' or 'custom'": "malformed_request",
+            "sex 'male' is not available for race 'elf'": "sex_not_allowed_for_race",
         }
         for message, expected in cases.items():
             with self.subTest(message=message):

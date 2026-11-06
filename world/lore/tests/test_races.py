@@ -73,6 +73,21 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertEqual(len(STATIC_TIER_REGISTRY), 11)
         self.assertEqual(len(SUBRACE_REGISTRY), 15)
 
+    @covers_requirement("lore-registries::raceprofile-encodes-the-three-race-power-gap")
+    def test_every_race_declares_a_non_empty_sex_subset_and_the_elf_declares_only_female(self):
+        from world.lore.sex import SEX_VALUES
+
+        self.assertEqual(SEX_VALUES, ("female", "male", "other"))
+        for key, race in RACE_REGISTRY.items():
+            with self.subTest(race=key):
+                self.assertIsInstance(race.allowed_sexes, tuple)
+                self.assertTrue(race.allowed_sexes)
+                for sex in race.allowed_sexes:
+                    self.assertIn(sex, SEX_VALUES)
+        self.assertEqual(RACE_REGISTRY["elf"].allowed_sexes, ("female",))
+        self.assertEqual(RACE_REGISTRY["human"].allowed_sexes, SEX_VALUES)
+        self.assertEqual(RACE_REGISTRY["beastfolk"].allowed_sexes, SEX_VALUES)
+
     def test_affinity_input_bounds_cover_every_shipped_race(self):
         # Relocated from the py<->js parity contract: the concrete per-race
         # affinity maxima are shipped content; the parity tests only pin that

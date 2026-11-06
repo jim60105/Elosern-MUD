@@ -150,6 +150,19 @@ class ServiceHostIdentityTests(ServiceContentIsolation, EvenniaTestCase):
         ]
         self.assertEqual(len(late), 25)
 
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_an_elf_host_sync_writes_the_permitted_sex(self):
+        place = _place_by_kind("guild_hall")
+        elf_place = dataclasses.replace(
+            place, host_race="elf", host_subrace=None, host_sex="female"
+        )
+        with patch.dict(_places(), {place.key: elf_place}):
+            sync_service_content()
+        host = self._guild_host()
+        self.assertIsNotNone(host)
+        self.assertEqual(host.race, "elf")
+        self.assertEqual(host.sex, "female")
+
     @covers_requirement("place-driven-service-sync::a-newly-created-service-host-receives-its-authored-card")
     def test_created_host_carries_profile_card_at_version_1(self):
         from world.rules.npc_persona import read_npc_persona, current_persona_version, provenance_profile_key

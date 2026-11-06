@@ -165,6 +165,43 @@ class BatchTests(BatchFileHarness, EvenniaTestCase):
             ["human_reference", "second_reference"],
         )
 
+    def test_a_non_female_elf_record_persists_nothing_from_the_batch(self):
+        import importlib
+
+        from world.lore.sex import SEX_VALUES
+
+        races = importlib.import_module("world.lore.races")
+        registry = getattr(races, "RACE" + "_REGISTRY")
+        subraces = getattr(races, "SUBRACE" + "_REGISTRY")
+        forbidden = next(
+            member for member in SEX_VALUES if member not in registry["elf"].allowed_sexes
+        )
+        elf_subrace = next(
+            key for key, row in subraces.items() if row.race_key == "elf"
+        )
+        bad = example_record()
+        bad["key"] = "t_elf_batch_bad"
+        bad["race"], bad["subrace"] = "elf", elf_subrace
+        bad.pop("affinity_elements", None)
+        bad["sex"] = forbidden
+        bad_path = self.write("bad_elf.json", bad)
+        valid_path = self.write("valid_sibling.json", example_record())
+
+        report = validate_batch([bad_path, valid_path])
+        self.assertFalse(report.all_valid)
+        bad_report = next(
+            item
+            for item in report.records
+            if item.record and item.record.get("key") == "t_elf_batch_bad"
+        )
+        self.assertTrue(
+            any(issue.field == "sex" for issue in bad_report.rejections)
+        )
+        with patch("world.imports.loader._instantiate_validated_character") as instantiate:
+            with self.assertRaises(ImportRejected):
+                load_batch([bad_path, valid_path])
+        instantiate.assert_not_called()
+
 
 class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
     """npc-title-import-pipeline: the import face keeps NPC names world-unique."""

@@ -12,7 +12,7 @@ from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from world.lore.races import StatModifiers
 from world.lore.starting_kits import SubraceStartingKit
-from world.lore.sex import DEFAULT_SEX
+from world.lore.sex import DEFAULT_SEX, SEX_VALUES
 from world.rules.character_creation import (
     ALLOCATABLE_AXES,
     MAX_PERSONA_FIELD_LENGTH,
@@ -24,6 +24,7 @@ from world.rules.character_creation import (
     resolve_preset_values,
     resolve_starting_profile,
 )
+from world.rules.creation_messages import CREATION_REASON_MESSAGES, creation_reason
 from world.skills.equipment import EquipmentSlot
 from world.tests.synthetic_data import (
     SYNTH_ITEMS,
@@ -386,6 +387,7 @@ class SexCreationTests(EvenniaTest):
         self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
         self.assertEqual(self.character.traits.all(), [])
 
+
     @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
     @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
     def test_preset_activation_persists_the_declared_sex(self):
@@ -423,3 +425,162 @@ class SexCreationTests(EvenniaTest):
         # AttributeProperty default, not the rejected write's "male".
         self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
         self.assertEqual(self.character.traits.all(), [])
+
+
+class RaceBoundedSexTests(EvenniaTest):
+    """The race-bounded sex rule on the player-creation paths.
+
+    The elf case borrows the kit race profile under the production key: the
+    rule keys off the registry row, so the whole activation path resolves
+    through the scoped catalog.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.elf = replace(
+            SYNTH_RACES["t_duskmari"], key="elf", allowed_sexes=("female",)
+        )
+        self.elf_subrace = make_subrace("t_dawn_herald_kin", race_key="elf")
+        kit = SubraceStartingKit(self.elf_subrace.key, (("t_thorn_knife", 1),))
+        open_synthetic_scope(
+            self,
+            "races",
+            "static_tiers",
+            "subraces",
+            "starting_kits",
+            "presets",
+            "skills",
+            "items",
+            "prices",
+            "elements",
+            extra={
+                "races": {"elf": self.elf},
+                "subraces": {self.elf_subrace.key: self.elf_subrace},
+                "starting_kits": {self.elf_subrace.key: kit},
+            },
+        )
+        self.account = create_account(
+            "creator", "creator@example.test", "testpassword", typeclass=Account
+        )
+        self.character = create_object(PlayerCharacter, key="creator-shell")
+        self.account.at_post_create_character(self.character)
+
+    def request(self, **overrides):
+        values = {
+            "mode": "custom",
+            "display_name": "新角色",
+            "age": 20,
+            "apparent_age": 20,
+            "race": "elf",
+            "subrace": self.elf_subrace.key,
+            "allocations": balanced_allocations("elf", self.elf_subrace.key),
+        }
+        values.update(overrides)
+        return CharacterCreationRequest(**values)
+
+    def _new_character(self, key):
+        character = create_object(PlayerCharacter, key=key)
+        self.account.at_post_create_character(character)
+        return character
+
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
+    def test_elf_custom_rejects_a_non_female_sex_before_persistence(self):
+        for sex in (member for member in SEX_VALUES if member not in self.elf.allowed_sexes):
+            with self.subTest(sex=sex):
+                with self.assertRaisesRegex(
+                    CharacterCreationError, "is not available for race"
+                ):
+                    activate_player_character(
+                        self.account, self.character, self.request(sex=sex)
+                    )
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+        self.assertEqual(self.character.attributes.get("sex"), DEFAULT_SEX)
+
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
+    def test_elf_custom_accepts_female_and_persists_it(self):
+        activate_player_character(
+            self.account, self.character, self.request(sex="female")
+        )
+        self.assertEqual(self.character.sex, "female")
+        self.assertEqual(self.character.attributes.get("sex"), "female")
+
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
+    def test_race_permitting_the_sex_still_accepts_male(self):
+        subrace = next(iter(SYNTH_SUBRACES))
+        race = _race_key()
+        character = self._new_character("shell-male")
+        activate_player_character(
+            self.account,
+            character,
+            CharacterCreationRequest(
+                mode="custom",
+                display_name="男性角色",
+                age=20,
+                apparent_age=20,
+                race=race,
+                subrace=subrace,
+                allocations=balanced_allocations(race, subrace),
+                sex="male",
+            ),
+        )
+        self.assertEqual(character.sex, "male")
+        # An omitted sex on a full-vocabulary race still normalizes to DEFAULT_SEX.
+        other = self._new_character("shell-default")
+        checked = preflight_character_creation(
+            self.account,
+            other,
+            CharacterCreationRequest(
+                mode="custom",
+                display_name="預設角色",
+                age=20,
+                apparent_age=20,
+                race=race,
+                subrace=subrace,
+                allocations=balanced_allocations(race, subrace),
+            ),
+        )
+        self.assertEqual(checked.sex, DEFAULT_SEX)
+
+    @covers_requirement("player-character-creation::character-creation-offers-preset-and-custom-modes")
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_elf_omitted_sex_normalizes_to_female(self):
+        checked = preflight_character_creation(
+            self.account, self.character, self.request()
+        )
+        self.assertEqual(checked.sex, "female")
+        activate_player_character(self.account, self.character, self.request())
+        self.assertEqual(self.character.sex, "female")
+        self.assertEqual(self.character.attributes.get("sex"), "female")
+
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_elf_preset_declaring_a_forbidden_sex_is_rejected_before_activation(self):
+        base = next(iter(_live_presets().values()))
+        forbidden = next(
+            member for member in SEX_VALUES if member not in self.elf.allowed_sexes
+        )
+        card = replace(
+            base,
+            key="t_elf_card",
+            race="elf",
+            subrace=self.elf_subrace.key,
+            sex=forbidden,
+        )
+        with patch.dict(_live_presets(), {"t_elf_card": card}):
+            with self.assertRaises(CharacterCreationError) as ctx:
+                preflight_character_creation(
+                    self.account,
+                    self.character,
+                    CharacterCreationRequest(mode="preset", preset_key="t_elf_card"),
+                )
+        self.assertEqual(
+            creation_reason(ctx.exception),
+            (
+                "sex_not_allowed_for_race",
+                CREATION_REASON_MESSAGES["sex_not_allowed_for_race"],
+            ),
+        )
+        self.assertTrue(self.character.creation_pending)
+        self.assertEqual(self.character.traits.all(), [])
+

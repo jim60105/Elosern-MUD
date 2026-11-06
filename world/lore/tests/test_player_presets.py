@@ -473,6 +473,34 @@ class PlayerPresetTests(unittest.TestCase):
             with self.subTest(preset=key):
                 self.assertIn(preset.sex, SEX_VALUES)
                 self.assertEqual(preset.sex, "female")
+                self.assertIn(
+                    preset.sex, RACE_REGISTRY[preset.race].allowed_sexes
+                )
+
+    @covers_requirement("player-character-creation::preset-activation-persists-the-preset-s-declared-sex")
+    def test_an_elf_preset_declaring_a_forbidden_sex_is_rejected_at_load(self):
+        from world.lore.player_presets import _validate_preset_sex
+        from world.lore.sex import SEX_VALUES
+
+        elf = RACE_REGISTRY["elf"]
+        forbidden = next(
+            member for member in SEX_VALUES if member not in elf.allowed_sexes
+        )
+
+        def make(**overrides):
+            values = dict(
+                key="x", display_name="x", age=18, apparent_age=18, race="elf",
+                subrace="fionnen", allocations=(), emphasis="e", sex="female",
+            )
+            values.update(overrides)
+            return PlayerPreset(**values)
+
+        with self.assertRaises(ValueError) as ctx:
+            _validate_preset_sex({"x": make(sex=forbidden)})
+        message = str(ctx.exception)
+        self.assertIn("'x'", message)
+        self.assertIn("'elf'", message)
+        self.assertIn(repr(forbidden), message)
 
     @covers_requirement("player-character-creation::the-preset-registry-declares-a-full-persona-in-import-card-shape")
     def test_persona_validation_rejects_malformed_structures(self):
