@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "08b3c26385c8e4f98afdbbcbc2baf35c7639350e96cc84f765e3a5cb2526c1ed",
+  "fingerprint": "57b304f7a9275f177bb2f1bc8835815b4ca697bd64e5267471989b8285317ef4",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -887,7 +887,643 @@
       }
     ]
   },
-  "schema_version": 1,
+  "monster_spawns": {
+    "sites": [
+      {
+        "capacity": 3,
+        "composition_key": "abandoned_transfer_station_group",
+        "coordinates": [
+          1290,
+          990
+        ],
+        "individual_name_zh": null,
+        "key": "abandoned_transfer_station_encounter",
+        "kind": "encounter",
+        "members": [
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "sticky_palm_goblin",
+            "species_name_zh": "膠掌小鬼",
+            "variant_key": "hanging_nest_forager",
+            "variant_name_zh": "懸巢型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "wax_pouch_rat",
+            "species_name_zh": "蠟囊鼠",
+            "variant_key": "wax_cache_forager",
+            "variant_name_zh": "藏穀型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "western_hills_valleys"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "cliff_echo_camp_group",
+        "coordinates": [
+          760,
+          1150
+        ],
+        "individual_name_zh": null,
+        "key": "cliff_echo_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "rock_echo_goat",
+            "species_name_zh": "岩響山羊",
+            "variant_key": "cliff_stepper",
+            "variant_name_zh": "踏崖型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "rock_echo_goat",
+            "species_name_zh": "岩響山羊",
+            "variant_key": "pass_warden",
+            "variant_name_zh": "守隘型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "western_hills_valleys"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "ember_bristle_boss",
+        "coordinates": [
+          710,
+          530
+        ],
+        "individual_name_zh": "赤背",
+        "key": "ember_bristle_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ember_bristle_boar",
+            "species_name_zh": "焙鬃野豬",
+            "variant_key": "warm_den_boar",
+            "variant_name_zh": "焙窩型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "western_hills_valleys"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "reservoir_crocodile_boss",
+        "coordinates": [
+          2076,
+          381
+        ],
+        "individual_name_zh": "閉灣者",
+        "key": "reservoir_crocodile_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "tide_devouring_crocodile",
+            "species_name_zh": "吞潮鱷",
+            "variant_key": "reservoir_warden",
+            "variant_name_zh": "蓄潮型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "southeast_coast"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "ridge_burrow_nest_group",
+        "coordinates": [
+          700,
+          1000
+        ],
+        "individual_name_zh": null,
+        "key": "ridge_burrow_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ridge_burrow_hare",
+            "species_name_zh": "築埂兔",
+            "variant_key": "burrow_maker",
+            "variant_name_zh": "掘巢型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ridge_burrow_hare",
+            "species_name_zh": "築埂兔",
+            "variant_key": "nest_guard",
+            "variant_name_zh": "護巢型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "western_hills_valleys"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "tide_mouth_boss",
+        "coordinates": [
+          2100,
+          300
+        ],
+        "individual_name_zh": null,
+        "key": "tide_mouth_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "tide_devouring_crocodile",
+            "species_name_zh": "吞潮鱷",
+            "variant_key": "bay_warden",
+            "variant_name_zh": "守灣型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "southeast_coast"
+      }
+    ],
+    "zones": [
+      {
+        "cell_capacity": 5,
+        "key": "eastern_cache_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_cache_forager",
+            "members": [
+              {
+                "maximum": 5,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1580,
+            1599,
+            520,
+            539
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 5
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_field_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_field_grain_pecker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_field_flock_leader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "flock_leader",
+                "variant_name_zh": "領群型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_field_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_field_nest_guard",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "nest_guard",
+                "variant_name_zh": "護巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_field_grain_and_burrow",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              },
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1520,
+            1539,
+            520,
+            539
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_mudbank_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2060,
+            2079,
+            820,
+            839
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_forest_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_trail_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "trail_hunter",
+                "variant_name_zh": "獵道型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            200,
+            219,
+            1320,
+            1339
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_shore_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_reef_warden",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "reef_warden",
+                "variant_name_zh": "守礁型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            280,
+            299,
+            480,
+            499
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 5,
+        "key": "western_cache_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_cache_forager",
+            "members": [
+              {
+                "maximum": 5,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            820,
+            839,
+            720,
+            739
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 5
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_mudbank_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            300,
+            319,
+            840,
+            859
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 4,
+        "key": "western_quarry_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_quarry_nest_forager",
+            "members": [
+              {
+                "maximum": 4,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            620,
+            639,
+            560,
+            579
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 4
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_rockland_habitat",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_rockland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_rockland_nest_guard",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "nest_guard",
+                "variant_name_zh": "護巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_rockland_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_rockland_pass_warden",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "pass_warden",
+                "variant_name_zh": "守隘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_rockland_burrow_and_cliff",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              },
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            200,
+            219,
+            760,
+            779
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      }
+    ]
+  },
+  "schema_version": 2,
   "source_manifest": {
     "packages/map-core/elosern_map_core/__init__.py": "59b3cecd4635134b52d8cbdcde36495ed1bcc96ea4a827e7b6e7880e83faea75",
     "packages/map-core/elosern_map_core/__main__.py": "13613e2202d4caa31c5ec535d8cd34392f04058a9fcf1f8f54df1a737deb0528",
@@ -901,13 +1537,13 @@
     "packages/map-core/elosern_map_core/inspection.py": "9d1f51ba9449840c4c1bd38e929a4c9a0c569a8a512b40ae9a03e69ffc1f4040",
     "packages/map-core/elosern_map_core/partition.py": "18d27b8e97a958185ac49eaead8ab66050f9464ef92bd426dfacfeecbc256031",
     "packages/map-core/elosern_map_core/partition_codec.py": "6a2d59655609b72110dd342531c9669d44dd7a824d8671e23c273f5f4bb526ca",
-    "packages/map-core/elosern_map_core/reference_context.py": "23b290c95e6a94f281bc8281c075a1074dab0e7aebb061237640de759607cd13",
+    "packages/map-core/elosern_map_core/reference_context.py": "60b4adf2eb8dbe8ab31d539d826b850c8c511cee679e83a78a4658d97edef468",
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/schema.py": "0458f4a076803766c035487c74bed8739123e44f6910be8ddb0ad517ebeda6ba",
     "packages/map-core/elosern_map_core/sources.py": "b0e4642835cac8ce8ffdf22e00092fef5af91a1c693fbbf083b21ab8e9469fff",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
-    "tools/map_reference_context.py": "c379dde7cef91d8f8cb2bc48cd1074ca867124109cb937f8327ab5bc436c7cfc",
+    "tools/map_reference_context.py": "02082f1a95fee6c3e594b75876a44818a28378fd6fa791da495996471689bf66",
     "world/lore/__init__.py": "7fb8ceb1f6bd963e0f574afdfa86b79e34c57d7d30cfc56ad6330d2f536bf28b",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",

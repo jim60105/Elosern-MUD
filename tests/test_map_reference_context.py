@@ -7,7 +7,9 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import random
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -26,7 +28,9 @@ from elosern_map_core.reference_context import (
     STATUS_INCOMPATIBLE,
     STATUS_MEMBERSHIP_MISMATCH,
     STATUS_MISSING,
+    MONSTER_SITE_KINDS,
     ReferenceContextDocument,
+    ReferenceContextError,
     ReferenceContextFreshness,
     check_reference_context_freshness,
     check_workspace_freshness,
@@ -97,6 +101,225 @@ print("SUBPROCESS_SUCCESS")
         )
         self.assertIn("SUBPROCESS_SUCCESS", result.stdout, msg=f"stdout={result.stdout}\nstderr={result.stderr}")
         self.assertEqual(result.returncode, 0)
+
+
+def _ns_member(variant_key: str, minimum: int, maximum: int) -> SimpleNamespace:
+    return SimpleNamespace(variant_key=variant_key, minimum=minimum, maximum=maximum)
+
+
+def _synthetic_registries():
+    """Synthetic placement and species rows (attribute stand-ins only)."""
+
+    species = {
+        "synthetic_species_a": SimpleNamespace(display_name_zh="合成甲"),
+        "synthetic_species_b": SimpleNamespace(display_name_zh="合成乙"),
+    }
+    variants = {
+        "synthetic_variant_a": SimpleNamespace(species_key="synthetic_species_a", display_name_zh="合成甲變種"),
+        "synthetic_variant_b": SimpleNamespace(species_key="synthetic_species_b", display_name_zh="合成乙變種"),
+    }
+    compositions = {
+        "synthetic_group_pair": SimpleNamespace(
+            members=(_ns_member("synthetic_variant_b", 1, 2), _ns_member("synthetic_variant_a", 1, 1))
+        ),
+        "synthetic_group_single": SimpleNamespace(members=(_ns_member("synthetic_variant_a", 2, 3),)),
+    }
+
+    def zone(key, rectangles):
+        return SimpleNamespace(
+            key=key,
+            region_key="synthetic_region",
+            rectangles=rectangles,
+            pool=(
+                SimpleNamespace(composition_key="synthetic_group_single", weight=3),
+                SimpleNamespace(composition_key="synthetic_group_pair", weight=1),
+            ),
+            lower_density=1,
+            upper_density=2,
+            cell_capacity=3,
+            wave_budget=4,
+            recovery_delay=3600,
+            replenishment_interval=600,
+        )
+
+    def site(key, **values):
+        return SimpleNamespace(
+            key=key,
+            kind=values.get("kind", "camp"),
+            region_key="synthetic_region",
+            coordinates=(5, 6),
+            capacity=2,
+            one_shot=values["one_shot"],
+            recover_after_ticks=values["recover"],
+            individual_name_zh=values["name"],
+            composition_key="synthetic_group_pair",
+        )
+
+    zones = {
+        "synthetic_zone_b": zone("synthetic_zone_b", ((0, 1, 0, 1),)),
+        "synthetic_zone_a": zone("synthetic_zone_a", ((2, 3, 4, 5), (6, 7, 8, 9))),
+    }
+    sites = {
+        "synthetic_site_once": site("synthetic_site_once", kind="boss_site", one_shot=True, recover=None, name="合成個體"),
+        "synthetic_site_again": site("synthetic_site_again", one_shot=False, recover=86400, name=None),
+    }
+    return {"zones": zones, "sites": sites, "compositions": compositions, "variants": variants, "species": species}
+
+
+def _shuffled(registries, seed: int):
+    rng = random.Random(seed)
+    shuffled = {}
+    for name, rows in registries.items():
+        items = list(rows.items())
+        rng.shuffle(items)
+        shuffled[name] = dict(items)
+    return shuffled
+
+
+def _document_with(section) -> ReferenceContextDocument:
+    return ReferenceContextDocument(
+        schema_version=SCHEMA_VERSION,
+        exporter_version=EXPORTER_VERSION,
+        external_identifiers={},
+        incoming_references={},
+        source_manifest={},
+        discovery_rules=(),
+        fingerprint="synthetic",
+        monster_spawns=section,
+    )
+
+
+class MonsterSpawnExportTests(unittest.TestCase):
+    """The monster spawn section is exported deterministically with resolved names."""
+
+    def setUp(self):
+        self.registries = _synthetic_registries()
+        self.section = exporter.build_monster_spawn_section(**self.registries)
+        self.encoded = self.section.to_dict()
+
+    def test_shuffled_registries_encode_byte_identically(self):
+        expected = encode_reference_context(_document_with(self.section))
+        for seed in (1, 2, 3):
+            section = exporter.build_monster_spawn_section(**_shuffled(self.registries, seed))
+            self.assertEqual(encode_reference_context(_document_with(section)), expected)
+
+    def test_rows_sort_by_key_and_keep_authored_pool_and_member_order(self):
+        self.assertEqual([row["key"] for row in self.encoded["zones"]], ["synthetic_zone_a", "synthetic_zone_b"])
+        self.assertEqual([row["key"] for row in self.encoded["sites"]], ["synthetic_site_again", "synthetic_site_once"])
+        zone = self.encoded["zones"][0]
+        self.assertEqual(
+            [entry["composition_key"] for entry in zone["pool"]], ["synthetic_group_single", "synthetic_group_pair"]
+        )
+        self.assertEqual([entry["weight"] for entry in zone["pool"]], [3, 1])
+        self.assertEqual(
+            [member["variant_key"] for member in zone["pool"][1]["members"]],
+            ["synthetic_variant_b", "synthetic_variant_a"],
+        )
+        self.assertEqual(zone["rectangles"], [[2, 3, 4, 5], [6, 7, 8, 9]])
+
+    def test_member_names_resolve_and_regions_stay_keys(self):
+        member = self.encoded["sites"][0]["members"][1]
+        self.assertEqual(
+            member,
+            {
+                "variant_key": "synthetic_variant_a",
+                "variant_name_zh": "合成甲變種",
+                "species_key": "synthetic_species_a",
+                "species_name_zh": "合成甲",
+                "minimum": 1,
+                "maximum": 1,
+            },
+        )
+        for row in [*self.encoded["zones"], *self.encoded["sites"]]:
+            self.assertEqual(row["region_key"], "synthetic_region")
+            self.assertNotIn("region_name_zh", row)
+
+    def test_one_shot_and_recoverable_site_fields(self):
+        sites = {row["key"]: row for row in self.encoded["sites"]}
+        once, again = sites["synthetic_site_once"], sites["synthetic_site_again"]
+        self.assertEqual(
+            (once["one_shot"], once["recover_after_ticks"], once["individual_name_zh"]), (True, None, "合成個體")
+        )
+        self.assertEqual(
+            (again["one_shot"], again["recover_after_ticks"], again["individual_name_zh"]), (False, 86400, None)
+        )
+        self.assertEqual(once["coordinates"], [5, 6])
+
+    def test_placement_and_species_sources_are_in_the_source_manifest(self):
+        doc = exporter.build_reference_context_document()
+        self.assertIn("world/lore/monster_placement.py", doc.source_manifest)
+        self.assertIn("world/lore/monster_species.py", doc.source_manifest)
+
+
+def _valid_payload() -> dict:
+    section = exporter.build_monster_spawn_section(**_synthetic_registries())
+    return json.loads(encode_reference_context(_document_with(section)))
+
+
+class MonsterSpawnDecodeTests(unittest.TestCase):
+    """Decoding accepts only schema 2 documents with a well-formed section."""
+
+    def assertRefused(self, mutate):
+        payload = _valid_payload()
+        mutate(payload["monster_spawns"])
+        with self.assertRaises(ReferenceContextError):
+            decode_reference_context(json.dumps(payload))
+
+    def test_encode_decode_round_trip(self):
+        section = exporter.build_monster_spawn_section(**_synthetic_registries())
+        encoded = encode_reference_context(_document_with(section))
+        decoded = decode_reference_context(encoded)
+        self.assertEqual(decoded.monster_spawns, section)
+        self.assertEqual(encode_reference_context(decoded), encoded)
+
+    def test_refused_section_shapes(self):
+        cases = {
+            "unknown section key": lambda s: s.update(extra=[]),
+            "unknown zone key": lambda s: s["zones"][0].update(region_name_zh="x"),
+            "missing site key": lambda s: s["sites"][0].pop("capacity"),
+            "missing member key": lambda s: s["zones"][0]["pool"][0]["members"][0].pop("minimum"),
+            "rectangle of three": lambda s: s["zones"][0]["rectangles"].__setitem__(0, [1, 2, 3]),
+            "rectangle of strings": lambda s: s["zones"][0]["rectangles"].__setitem__(0, ["1", 2, 3, 4]),
+            "rectangle min above max": lambda s: s["zones"][0]["rectangles"].__setitem__(0, [5, 4, 0, 1]),
+            "zone without rectangles": lambda s: s["zones"][0].update(rectangles=[]),
+            "zero weight": lambda s: s["zones"][0]["pool"][0].update(weight=0),
+            "negative weight": lambda s: s["zones"][0]["pool"][0].update(weight=-1),
+            "member min above max": lambda s: s["sites"][0]["members"][0].update(minimum=3, maximum=2),
+            "unknown site kind": lambda s: s["sites"][0].update(kind="synthetic_kind"),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name):
+                self.assertRefused(mutate)
+
+    def test_wrong_typed_values_raise_the_reference_context_error(self):
+        cases = {
+            "pool not a list": lambda s: s["zones"][0].update(pool={}),
+            "rectangles not a list": lambda s: s["zones"][0].update(rectangles="0,1,0,1"),
+            "members not a list": lambda s: s["sites"][0].update(members=None),
+            "one_shot not a bool": lambda s: s["sites"][0].update(one_shot=1),
+            "region_key not a str": lambda s: s["zones"][0].update(region_key=7),
+            "bool weight": lambda s: s["zones"][0]["pool"][0].update(weight=True),
+            "zone not a mapping": lambda s: s["zones"].__setitem__(0, []),
+            "zones not a list": lambda s: s.update(zones={}),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name):
+                self.assertRefused(mutate)
+
+    def test_schema_version_one_and_missing_section_are_refused(self):
+        payload = _valid_payload()
+        with self.assertRaises(ReferenceContextError):
+            decode_reference_context(json.dumps(dict(payload, schema_version=1)))
+        with self.assertRaises(ReferenceContextError):
+            decode_reference_context(json.dumps(dict(payload, monster_spawns=[])))
+        payload.pop("monster_spawns")
+        with self.assertRaises(ReferenceContextError):
+            decode_reference_context(json.dumps(payload))
+
+    def test_site_kind_vocabulary_matches_the_game(self):
+        from world.lore.monster_placement import MONSTER_SITE_KINDS as GAME_KINDS
+
+        self.assertEqual(GAME_KINDS, MONSTER_SITE_KINDS)
 
 
 class DeterministicExportTests(unittest.TestCase):

@@ -5,7 +5,8 @@ service hosts, nations, titles, places, etc.) without querying or serializing
 live database state, and generates content/map-reference-context.json deterministically.
 
 Regenerate after adding, removing, or changing any external static registry entry,
-quest definition, service host, or reference declaration::
+quest definition, service host, reference declaration, or monster placement row
+(the export also carries the map editor's read-only monster spawn section)::
 
     uv run --locked python -m tools.map_reference_context
 
@@ -20,13 +21,18 @@ import hashlib
 import os
 from pathlib import Path
 import sys
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.reference_context import (
     EXPORTER_VERSION,
     SCHEMA_VERSION,
     IncomingReference,
+    MonsterPoolEntry,
+    MonsterSiteRow,
+    MonsterSpawnMember,
+    MonsterSpawnSection,
+    MonsterZoneRow,
     ReferenceContextDocument,
     compute_dependency_fingerprint,
     discover_external_sources,
@@ -91,6 +97,77 @@ def _find_place_source_file(place_key: str, repo_root: Path) -> str:
     return "world/lore/settlements/places.py"
 
 
+def build_monster_spawn_section(
+    *,
+    zones: Mapping[str, Any],
+    sites: Mapping[str, Any],
+    compositions: Mapping[str, Any],
+    variants: Mapping[str, Any],
+    species: Mapping[str, Any],
+) -> MonsterSpawnSection:
+    """Build the read-only monster spawn section from placement and species rows.
+
+    Rows are read by attribute only, so tests may pass synthetic stand-ins.
+    Variant and species names resolve here; regions stay keys. Zones and sites
+    sort by key; pool and member rows keep their authored order.
+    """
+
+    def members(composition_key: str) -> tuple[MonsterSpawnMember, ...]:
+        rows = []
+        for member in compositions[composition_key].members:
+            variant = variants[member.variant_key]
+            rows.append(
+                MonsterSpawnMember(
+                    variant_key=member.variant_key,
+                    variant_name_zh=variant.display_name_zh,
+                    species_key=variant.species_key,
+                    species_name_zh=species[variant.species_key].display_name_zh,
+                    minimum=member.minimum,
+                    maximum=member.maximum,
+                )
+            )
+        return tuple(rows)
+
+    zone_rows = tuple(
+        MonsterZoneRow(
+            key=zone.key,
+            region_key=zone.region_key,
+            rectangles=tuple(tuple(rectangle) for rectangle in zone.rectangles),
+            lower_density=zone.lower_density,
+            upper_density=zone.upper_density,
+            cell_capacity=zone.cell_capacity,
+            wave_budget=zone.wave_budget,
+            recovery_delay=zone.recovery_delay,
+            replenishment_interval=zone.replenishment_interval,
+            pool=tuple(
+                MonsterPoolEntry(
+                    composition_key=entry.composition_key,
+                    weight=entry.weight,
+                    members=members(entry.composition_key),
+                )
+                for entry in zone.pool
+            ),
+        )
+        for zone in sorted(zones.values(), key=lambda row: row.key)
+    )
+    site_rows = tuple(
+        MonsterSiteRow(
+            key=site.key,
+            kind=site.kind,
+            region_key=site.region_key,
+            coordinates=tuple(site.coordinates),
+            capacity=site.capacity,
+            one_shot=site.one_shot,
+            recover_after_ticks=site.recover_after_ticks,
+            individual_name_zh=site.individual_name_zh,
+            composition_key=site.composition_key,
+            members=members(site.composition_key),
+        )
+        for site in sorted(sites.values(), key=lambda row: row.key)
+    )
+    return MonsterSpawnSection(zones=zone_rows, sites=site_rows)
+
+
 def build_reference_context_document(repo_root: Path | None = None) -> ReferenceContextDocument:
     """Build the complete, deterministic reference-context document."""
     root = (repo_root or REPOSITORY_ROOT).resolve()
@@ -98,7 +175,12 @@ def build_reference_context_document(repo_root: Path | None = None) -> Reference
     from world.lore.elements import ELEMENT_REGISTRY
     from world.lore.magic import MAGIC_TIER_REGISTRY
     from world.lore.monsters import MONSTER_TIER_REGISTRY
-    from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
+    from world.lore.monster_placement import (
+        ECOLOGY_ZONE_REGISTRY,
+        ENCOUNTER_COMPOSITION_REGISTRY,
+        MONSTER_SITE_REGISTRY,
+    )
+    from world.lore.monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
     from world.lore.nations import NATION_REGISTRY
     from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
     from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
@@ -203,6 +285,15 @@ def build_reference_context_document(repo_root: Path | None = None) -> Reference
             hasher.update(full_path.read_bytes())
             source_manifest[rel_path] = hasher.hexdigest()
 
+    # 4. Read-only monster spawn section for the map editor layer
+    monster_spawns = build_monster_spawn_section(
+        zones=ECOLOGY_ZONE_REGISTRY,
+        sites=MONSTER_SITE_REGISTRY,
+        compositions=ENCOUNTER_COMPOSITION_REGISTRY,
+        variants=MONSTER_VARIANT_REGISTRY,
+        species=MONSTER_SPECIES_REGISTRY,
+    )
+
     fingerprint = compute_dependency_fingerprint(
         source_manifest,
         SCHEMA_VERSION,
@@ -218,6 +309,7 @@ def build_reference_context_document(repo_root: Path | None = None) -> Reference
         source_manifest=source_manifest,
         discovery_rules=DISCOVERY_RULES,
         fingerprint=fingerprint,
+        monster_spawns=monster_spawns,
     )
 
 
