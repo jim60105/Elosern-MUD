@@ -52,9 +52,9 @@ function point([x, y]) {
 // derived, non-selectable rings on the 分區 layer. Outlines that belong to
 // older inputs carry `older` so the canvas labels them persistently.
 //
-// `monsterSpawns` is the exported monster spawn section, drawn last on the
-// read-only monster layer (zone polygons above the land, then zone and site
-// marks). The capture path never passes it.
+// `monsterSpawns` is the exported monster spawn section, drawn after the base
+// shapes and marks on the read-only monster layer (zone polygons above the
+// land, then zone and site marks). The capture path never passes it.
 export function continentScene(world, selection = [], partition = null, monsterSpawns = null) {
   const continent = world.continent;
   const preview = continent.terrain_preview?.status === "current" ? continent.terrain_preview : null;
