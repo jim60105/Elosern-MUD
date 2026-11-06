@@ -100,6 +100,10 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         "dream_surface_rejected",
         "owner_sleep_continuation_deferred",
         "ui_action_refused",
+        "presentation_publish_failed",
+        "presentation_unavailable",
+        "action_result_delivery_failed",
+        "action_adapter_failed",
     )
 
     def events(self) -> str:
@@ -267,22 +271,38 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             dispatched + 1,
             "the awakening never left the client",
         )
-        # The committed dream is what the awakening ends: the panel keeps its
-        # snapshot entry while the ending settles, so the open flag is the fact
-        # to wait on, and the surface must then leave the player's view.
+        # The committed dream is what the awakening ends. The presenter always
+        # publishes the panel and states a closed dream as ``state: null`` once
+        # the association is gone, or as ``open: False`` while the ending
+        # settles; both are closed, and the surface assertion below states the
+        # same thing to a player. A wholly missing entry is only the client's
+        # own loss, so it counts solely when the committed mode already left
+        # the dream and nothing is still recovering.
+        def dream_closed(state):
+            dream = ((state.get("panels") or {}).get("dream") or {})
+            if not dream:
+                return (
+                    state.get("mode") == "exploration"
+                    and (state.get("recovery") or {}).get("status") in (None, "idle")
+                )
+            presented = dream.get("state")
+            return True if presented is None else presented.get("open") is False
+
         try:
-            wait_for_store_state(
-                page2,
-                lambda state: (
-                    ((state.get("panels") or {}).get("dream") or {})
-                    .get("state", {})
-                    .get("open")
-                    is False
-                ),
-                timeout=60000,
-            )
+            wait_for_store_state(page2, dream_closed, timeout=60000)
         except AssertionError as error:
-            raise AssertionError(f"{error}\n\n{self.events()}") from None
+            state = store_state(page2)
+            raise AssertionError(
+                "{error}\n\nmode={mode} recovery={recovery} revision={revision}\n"
+                "dream={dream}\n\n{events}".format(
+                    error=error,
+                    mode=state.get("mode"),
+                    recovery=state.get("recovery"),
+                    revision=state.get("revision"),
+                    dream=(state.get("panels") or {}).get("dream"),
+                    events=self.events(),
+                )
+            ) from None
         self.assertFalse(
             page2.locator(PANEL).is_visible(),
             "the dream surface stayed in front of the player",
