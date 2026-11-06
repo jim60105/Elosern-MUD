@@ -291,16 +291,103 @@ def write_workspace(root: str | Path) -> Path:
     return root
 
 
+def _member(letter: str, name: str, variant: str, minimum: int, maximum: int) -> dict:
+    return {
+        "variant_key": f"synthetic_variant_{variant}",
+        "variant_name_zh": f"{name}{variant}型",
+        "species_key": f"synthetic_species_{letter}",
+        "species_name_zh": name,
+        "minimum": minimum,
+        "maximum": maximum,
+    }
+
+
+def _site(key: str, kind: str, cell: list[int], member: dict, *, one_shot=False, recover=86400, name=None) -> dict:
+    return {
+        "key": key,
+        "kind": kind,
+        "region_key": "synthetic_region",
+        "coordinates": cell,
+        "capacity": 2,
+        "one_shot": one_shot,
+        "recover_after_ticks": recover,
+        "individual_name_zh": name,
+        "composition_key": f"synthetic_group_{key}",
+        "members": [member],
+    }
+
+
+#: A synthetic monster spawn section in canonical encoded form (zones and
+#: sites sorted by key). ``synthetic_species_alpha`` is spawned by exactly one
+#: zone (``synthetic_zone_ash``, two rectangles, listing the species twice) and
+#: one site (``synthetic_site_camp``); every site kind appears once.
+MONSTER_SPAWNS = {
+    "zones": [
+        {
+            "key": "synthetic_zone_ash",
+            "region_key": "synthetic_region",
+            "rectangles": [[30, 33, 12, 14], [35, 36, 15, 16]],
+            "lower_density": 1,
+            "upper_density": 3,
+            "cell_capacity": 2,
+            "wave_budget": 4,
+            "recovery_delay": 3600,
+            "replenishment_interval": 600,
+            "pool": [
+                {
+                    "composition_key": "synthetic_group_pair",
+                    "weight": 2,
+                    "members": [_member("alpha", "合成甲獸", "pup", 1, 2), _member("beta", "合成乙獸", "pup", 1, 1)],
+                },
+                {
+                    "composition_key": "synthetic_group_elder",
+                    "weight": 1,
+                    "members": [_member("alpha", "合成甲獸", "elder", 1, 1)],
+                },
+            ],
+        },
+        {
+            "key": "synthetic_zone_fen",
+            "region_key": "synthetic_region",
+            "rectangles": [[2, 5, 24, 27]],
+            "lower_density": 2,
+            "upper_density": 4,
+            "cell_capacity": 3,
+            "wave_budget": 2,
+            "recovery_delay": 7200,
+            "replenishment_interval": 900,
+            "pool": [
+                {
+                    "composition_key": "synthetic_group_fen",
+                    "weight": 1,
+                    "members": [_member("gamma", "合成丙獸", "pup", 2, 3)],
+                },
+            ],
+        },
+    ],
+    "sites": [
+        _site("synthetic_site_boss", "boss_site", [33, 6], _member("gamma", "合成丙獸", "elder", 1, 1),
+              one_shot=True, recover=None, name="合成首領"),
+        _site("synthetic_site_camp", "camp", [31, 18], _member("alpha", "合成甲獸", "pup", 2, 3)),
+        _site("synthetic_site_encounter", "encounter", [12, 15], _member("delta", "合成丁獸", "pup", 1, 2)),
+        _site("synthetic_site_nest", "nest", [8, 26], _member("delta", "合成丁獸", "elder", 1, 1)),
+        _site("synthetic_site_stray", "stray", [20, 33], _member("delta", "合成丁獸", "pup", 1, 1)),
+    ],
+}
+
+
 def write_reference_context(
     root: str | Path,
     *,
     rules: tuple[str, ...] = ("external/**/*.txt",),
     incoming: dict[str, list[dict]] | None = None,
+    monster_spawns: dict | None = None,
 ) -> Path:
     """Write one external source plus a current reference context for it.
 
     ``incoming`` maps canonical target keys (``interior_room:hall:front``) to
-    incoming static reference records.
+    incoming static reference records. ``monster_spawns`` is the encoded monster
+    spawn section (for example :data:`MONSTER_SPAWNS`); it defaults to empty.
     """
 
     root = Path(root)
@@ -309,20 +396,21 @@ def write_reference_context(
     external.write_text("synthetic external declaration\n", encoding="utf-8")
     manifest = {"external/declarations.txt": hashlib.sha256(external.read_bytes()).hexdigest()}
     digest = hashlib.sha256()
-    digest.update(b"schema_version=1\n")
+    digest.update(b"schema_version=2\n")
     digest.update(b"exporter_version=1\n")
     for rule in sorted(rules):
         digest.update(f"rule:{rule}\n".encode("utf-8"))
     for path, file_hash in sorted(manifest.items()):
         digest.update(f"{path}:{file_hash}\n".encode("utf-8"))
     document = {
-        "schema_version": 1,
+        "schema_version": 2,
         "exporter_version": 1,
         "external_identifiers": {},
         "incoming_references": incoming or {},
         "source_manifest": manifest,
         "discovery_rules": list(rules),
         "fingerprint": digest.hexdigest(),
+        "monster_spawns": monster_spawns or {"zones": [], "sites": []},
     }
     target = root / "content" / "map-reference-context.json"
     target.parent.mkdir(parents=True, exist_ok=True)

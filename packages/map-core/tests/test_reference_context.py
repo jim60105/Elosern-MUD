@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import pytest
@@ -19,6 +20,11 @@ from elosern_map_core.reference_context import (
     STATUS_MEMBERSHIP_MISMATCH,
     STATUS_MISSING,
     IncomingReference,
+    MonsterPoolEntry,
+    MonsterSiteRow,
+    MonsterSpawnMember,
+    MonsterSpawnSection,
+    MonsterZoneRow,
     ReferenceContextDocument,
     ReferenceContextError,
     ReferenceContextFreshness,
@@ -95,6 +101,73 @@ def test_encode_and_decode_roundtrip():
     assert incoming[0].source == "city_gate:altoria_north"
     assert incoming[0].source_domain == "city_gates"
     assert incoming[0].target == target_ref
+
+
+def _member(variant: str, species: str, minimum: int, maximum: int) -> MonsterSpawnMember:
+    return MonsterSpawnMember(
+        variant_key=variant,
+        variant_name_zh=f"{variant}-名",
+        species_key=species,
+        species_name_zh=f"{species}-名",
+        minimum=minimum,
+        maximum=maximum,
+    )
+
+
+def _zone(key: str, rectangles) -> MonsterZoneRow:
+    return MonsterZoneRow(
+        key=key,
+        region_key="synthetic_region",
+        rectangles=rectangles,
+        lower_density=1,
+        upper_density=3,
+        cell_capacity=2,
+        wave_budget=4,
+        recovery_delay=3600,
+        replenishment_interval=600,
+        pool=(
+            MonsterPoolEntry("synthetic_group_b", 2, (_member("synthetic_variant_b", "synthetic_species_b", 1, 2),)),
+            MonsterPoolEntry("synthetic_group_a", 1, (_member("synthetic_variant_a", "synthetic_species_a", 1, 1),)),
+        ),
+    )
+
+
+def test_monster_spawn_section_round_trips_sorted_and_byte_identical():
+    section = MonsterSpawnSection(
+        zones=(
+            _zone("synthetic_zone_z", ((0, 1, 0, 1),)),
+            _zone("synthetic_zone_a", ((2, 3, 4, 5), (6, 6, 7, 7))),
+        ),
+        sites=(
+            MonsterSiteRow(
+                key="synthetic_site",
+                kind="camp",
+                region_key="synthetic_region",
+                coordinates=(3, 4),
+                capacity=2,
+                one_shot=False,
+                recover_after_ticks=86400,
+                individual_name_zh=None,
+                composition_key="synthetic_group_a",
+                members=(_member("synthetic_variant_a", "synthetic_species_a", 1, 3),),
+            ),
+        ),
+    )
+    doc = replace(_sample_document(), monster_spawns=section)
+    encoded = encode_reference_context(doc)
+    decoded = decode_reference_context(encoded)
+
+    # Encoding sorts by key, so the decoded rows come back in key order.
+    assert [zone.key for zone in decoded.monster_spawns.zones] == ["synthetic_zone_a", "synthetic_zone_z"]
+    assert [row["key"] for row in section.to_dict()["zones"]] == ["synthetic_zone_a", "synthetic_zone_z"]
+    assert {zone.key: zone for zone in decoded.monster_spawns.zones} == {zone.key: zone for zone in section.zones}
+    assert decoded.monster_spawns.sites == section.sites
+    # Pool order is the authored order, not a sort.
+    assert [entry.composition_key for entry in decoded.monster_spawns.zones[0].pool] == [
+        "synthetic_group_b",
+        "synthetic_group_a",
+    ]
+    assert encode_reference_context(decoded) == encoded
 
 
 def test_malformed_document_rejections():
