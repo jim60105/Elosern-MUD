@@ -208,7 +208,7 @@ _HOLD_MAPS = """() => {
   if (window.__travelHold) return;
   const sender = store.getSender();
   const original = sender.sendAction.bind(sender);
-  window.__travelHold = { views: [] };
+  window.__travelHold = { views: [], answered: [] };
   sender.sendAction = (env) => {
     if (env && env.action_id === 'map.view') {
       window.__travelHold.views.push(env);
@@ -217,6 +217,19 @@ _HOLD_MAPS = """() => {
     return original(env);
   };
 }"""
+
+# Every read the stage sent and this journey has not answered yet: the owner
+# asks again whenever a cause it has not covered arrives while a read is in
+# flight, so a real server answers more than the read the journey started.
+_PENDING_VIEWS = """() => {
+  const hold = window.__travelHold;
+  if (!hold) return [];
+  return hold.views
+    .map((env, index) => (hold.answered[index] ? null : index))
+    .filter((index) => index !== null);
+}"""
+
+_READY = '[data-testid="travel-map"][data-map-status="ready"]'
 
 _ANSWER = """([area, order, requestIndex]) => {
   const store = window.__elosernBridge.store;
@@ -233,6 +246,7 @@ _ANSWER = """([area, order, requestIndex]) => {
     server_time: v.serverTime,
   }], {});
   const outcomes = order === 'result-first' ? [result(), body()] : [body(), result()];
+  window.__travelHold.answered[requestIndex] = true;
   return outcomes.map((o) => !!o.accepted);
 }"""
 
@@ -261,16 +275,35 @@ class _TravelStage(BrowserAcceptanceTest):
         self.assertEqual(accepted, [True, True])
 
     def _wait_ready(self, page) -> None:
-        try:
-            page.wait_for_selector('[data-testid="travel-map"][data-map-status="ready"]', timeout=15000)
-        except Exception as error:  # observability: ignore R2: test diagnostics re-raised with the live state
-            state = page.evaluate(
-                "() => { const v = window.__elosernBridge.store.view; return JSON.stringify({"
-                " status: v.travel.mapStatus, layout: v.travel.layout, revision: v.revision,"
-                " pub: v.mapPublications, inFlight: v.dispatch.inFlight, result: v.lastActionResult,"
-                " held: window.__travelHold.views.map((e) => e.request_id) }); }"
-            )
-            raise AssertionError(f"travel map not ready: {state}") from error
+        # The stage's owner asks again whenever a cause it has not covered
+        # arrives while a read is in flight (a recovery signal, or a canonical
+        # place and time committed while the read was out). A real server
+        # answers each of those, so this harness answers every read the stage
+        # sent, not only the one the journey started -- and answers it before
+        # waiting, since a held read is exactly what keeps the stage from
+        # becoming ready.
+        for _ in range(3):
+            for index in page.evaluate(_PENDING_VIEWS):
+                self._answer(page, index)
+            try:
+                page.wait_for_selector(_READY, timeout=15000)
+                return
+            except Exception as error:  # observability: ignore R2: test diagnostics re-raised with the live state
+                pending = page.evaluate(_PENDING_VIEWS)
+                if not pending:
+                    raise AssertionError(
+                        f"travel map not ready: {self._stage_state(page)}"
+                    ) from error
+        raise AssertionError(f"travel map not ready: {self._stage_state(page)}")
+
+    def _stage_state(self, page) -> str:
+        """The live stage state, printed with a failed readiness wait."""
+        return page.evaluate(
+            "() => { const v = window.__elosernBridge.store.view; return JSON.stringify({"
+            " status: v.travel.mapStatus, layout: v.travel.layout, revision: v.revision,"
+            " pub: v.mapPublications, inFlight: v.dispatch.inFlight, result: v.lastActionResult,"
+            " held: (window.__travelHold.views || []).map((e) => e.request_id) }); }"
+        )
 
     def _shoot(self, page, name: str) -> None:
         os.makedirs(SHOTS, exist_ok=True)
