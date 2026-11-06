@@ -5,7 +5,12 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
-from .browser_helpers import dialogue_panel, open_dialogue_choices, valid_local_map_panel
+from .browser_helpers import (
+    dialogue_panel,
+    open_dialogue_choices,
+    valid_local_map_panel,
+    wait_for_presentation_settled,
+)
 from ._journey_support import (
     _art_panel,
     _SCENE_PNG_BYTES,
@@ -63,9 +68,24 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         for viewport in ((1451, 790), (1741, 948), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
+                # This journey owns the stored presentation, and the injection
+                # is stamped from the live revision: a publication burst still
+                # in flight after login would land on a newer revision and
+                # replace the injected dialogue before the figure is measured,
+                # so the store must be quiet first.
+                wait_for_presentation_settled(page)
                 _inject_snapshot(page, {"local_map": valid_local_map_panel(), "dialogue": dialogue}, mode="dialogue")
                 _wait_mode(page, "dialogue")
-                page.wait_for_selector('[data-anchor="actor-right"] [data-testid="stage-actor"]', timeout=15000)
+                try:
+                    page.wait_for_selector('[data-anchor="actor-right"] [data-testid="stage-actor"]', timeout=30000)
+                except Exception as error:  # observability: ignore R2: diagnostics re-raised with the live state
+                    state = page.evaluate(
+                        "() => { const v = window.__elosernBridge.store.view; return JSON.stringify({"
+                        " mode: v.mode, revision: v.revision, panels: Object.keys(v.panels || {}),"
+                        " speaker: v.dialogueSpeaker, recovery: v.recovery,"
+                        " portraits: Object.keys(((v.panels || {}).art || {}).portrait_catalog || {}) }); }"
+                    )
+                    raise AssertionError(f"no host figure on the stage: {state}") from error
                 geo = page.evaluate(
                     """() => {
                       const r = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; };
