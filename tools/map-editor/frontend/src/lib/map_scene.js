@@ -31,6 +31,7 @@ import { bendRef, compassLabel, parseSettlementRef, roadLabel, roadRef } from ".
 import { connectionLabels, connectionRef, reverseOf, roomName } from "./interior.js";
 import { exteriorCardPosition, exteriorRef, relationshipView } from "./relationships.js";
 import { cityGateRef, gateRef, linkRef } from "./relationship_refs.js";
+import { monsterMarks, monsterShapes } from "./monster_spawns.js";
 
 export { INTERIOR_COLUMNS } from "./layout_edit.js";
 
@@ -50,7 +51,11 @@ function point([x, y]) {
 // ({ outlines: {district: [[x0, y0, x1, y1, ...], ...]}, older }), drawn as
 // derived, non-selectable rings on the 分區 layer. Outlines that belong to
 // older inputs carry `older` so the canvas labels them persistently.
-export function continentScene(world, selection = [], partition = null) {
+//
+// `monsterSpawns` is the exported monster spawn section, drawn last on the
+// read-only monster layer (zone polygons above the land, then zone and site
+// marks). The capture path never passes it.
+export function continentScene(world, selection = [], partition = null, monsterSpawns = null) {
   const continent = world.continent;
   const preview = continent.terrain_preview?.status === "current" ? continent.terrain_preview : null;
   const cell = cellMetres(world);
@@ -129,6 +134,7 @@ export function continentScene(world, selection = [], partition = null) {
         selected: chosen.has(footprintRef(settlement.id)),
       })),
     ),
+    ...monsterShapes(world, monsterSpawns, chosen),
   ];
   const marks = [
     ...(world.districts ?? [])
@@ -180,6 +186,7 @@ export function continentScene(world, selection = [], partition = null) {
       draggable: false,
       ...centre(pass.centre),
     })),
+    ...monsterMarks(world, monsterSpawns),
   ];
   const featureLayers = { mainland: "terrain", forest_edge: "terrain", waterway: "water", ridge_route: "ridge" };
   for (const featureRef of active) {
@@ -412,9 +419,9 @@ function districtOutlines(world, partition) {
   );
 }
 
-export function sceneFor(world, domain, mapId, selection = [], { partition = null } = {}) {
+export function sceneFor(world, domain, mapId, selection = [], { partition = null, monsterSpawns = null } = {}) {
   if (!world) return null;
-  if (domain === "continent") return continentScene(world, selection, partition);
+  if (domain === "continent") return continentScene(world, selection, partition, monsterSpawns);
   if (domain === "settlement") {
     const settlement = world.settlements.find((item) => item.id === mapId);
     return settlement ? settlementScene(settlement, selection) : null;

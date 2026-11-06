@@ -2,6 +2,7 @@
 // only: hiding a layer never changes a document. Every continent drawable
 // names its layer; the partition layer holds derived, read-only output (the
 // national borders; partition districts are drawn by the partition jobs).
+// The monster layer holds the exported, read-only monster spawn section.
 
 export const CONTINENT_LAYERS = Object.freeze([
   { key: "terrain", label: "地形與通行", visible: true },
@@ -11,6 +12,7 @@ export const CONTINENT_LAYERS = Object.freeze([
   { key: "landmarks", label: "地標", visible: false },
   { key: "footprint", label: "據點佔地", visible: false },
   { key: "partition", label: "分區（衍生・唯讀）", visible: true },
+  { key: "monsters", label: "怪物生成（匯出・唯讀）", visible: false },
 ]);
 
 export function defaultHiddenLayers() {

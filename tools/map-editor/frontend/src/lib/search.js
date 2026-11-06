@@ -1,9 +1,10 @@
 // Name and ID search over the object catalog. Every result carries its parent
 // map and owning source document, and how many results share its label, so
-// equal names in different maps are always told apart.
+// equal names in different maps are always told apart. Optional
+// `searchTerms` (monster species and variant names and keys) also match.
 
 function rank(entry, needle) {
-  const fields = [entry.label, entry.id, entry.ref].map((value) => String(value ?? "").toLowerCase());
+  const fields = [entry.label, entry.id, entry.ref, ...(entry.searchTerms ?? [])].map((value) => String(value ?? "").toLowerCase());
   if (fields.some((value) => value === needle)) return 0;
   if (fields.some((value) => value.startsWith(needle))) return 1;
   if (fields.some((value) => value.includes(needle))) return 2;

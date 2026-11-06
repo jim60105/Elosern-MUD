@@ -24,10 +24,13 @@ import {
 import { bendRef, compassLabel, roadLabel, roadRef } from "./settlement.js";
 import { connectionRef, reverseOf } from "./interior.js";
 import { ownerMap, relationshipRefs, relationshipView } from "./relationships.js";
+import { monsterCatalogEntries } from "./monster_spawns.js";
 
 export const DOMAIN_LABELS = Object.freeze({ continent: "大陸", settlement: "據點", interior: "室內" });
 
-export function objectCatalog(world) {
+// `monsterSpawns` is the exported, read-only monster spawn section; its zones
+// and sites join the catalog on the monster layer.
+export function objectCatalog(world, monsterSpawns = null) {
   const catalog = new Map();
   if (!world) return catalog;
   const locations = new Map(world.locations.map((location) => [location.id, location]));
@@ -132,6 +135,7 @@ export function objectCatalog(world) {
     }
   }
   relationshipEntries(world, catalog, locations, settlements);
+  for (const entry of monsterCatalogEntries(monsterSpawns)) catalog.set(entry.ref, entry);
   return catalog;
 }
 
