@@ -13,6 +13,13 @@ Format layout:
 * ``source_manifest`` -- mapping of workspace-relative file paths to SHA-256 digests.
 * ``discovery_rules`` -- allowlisted root directories / glob patterns for discovering external sources.
 * ``fingerprint`` -- aggregate SHA-256 digest over schema/exporter versions, source manifest, and discovery rules.
+* ``monster_spawns`` -- the read-only monster spawn section (:class:`MonsterSpawnSection`):
+  ``zones`` (ecology zones with inclusive ``[x_min, x_max, y_min, y_max]`` cell
+  rectangles, density and timing values and a weighted ``pool`` of compositions)
+  and ``sites`` (manual sites with a kind from :data:`MONSTER_SITE_KINDS`, a
+  cell ``coordinates`` pair and one composition). Every member row carries its
+  variant and species keys and names, resolved at export; regions are named by
+  key only. Rows sort by ``key``; pool and member rows keep their authored order.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ from .documents import QualifiedRef
 from .references import _describe
 
 #: Supported reference-context document schema version.
-SCHEMA_VERSION: int = 1
+SCHEMA_VERSION: int = 2
 
 #: Current exporter implementation version.
 EXPORTER_VERSION: int = 1
@@ -45,6 +52,10 @@ STATUS_INCOMPATIBLE = "incompatible"
 DELETION_ALLOWED = "allowed"
 DELETION_REFUSED_UNAVAILABLE = "unavailable"
 DELETION_REFUSED_REFERENCED = "referenced"
+
+#: Closed site-kind vocabulary. Mirrors world.lore.monster_placement.MONSTER_SITE_KINDS;
+#: a parity test holds them equal because the core may not import the game.
+MONSTER_SITE_KINDS: tuple[str, ...] = ("camp", "nest", "boss_site", "stray", "encounter")
 
 @dataclass(frozen=True, slots=True)
 class GuardedExecutionResult:
@@ -121,6 +132,274 @@ class IncomingReference:
         )
 
 
+def _exact_keys(data: Any, keys: Sequence[str], what: str) -> Mapping[str, Any]:
+    """Return ``data`` when it is a mapping holding exactly ``keys``."""
+    if not isinstance(data, Mapping):
+        raise ReferenceContextError(f"{what} must be a mapping")
+    actual = set(data.keys())
+    expected = set(keys)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unknown = sorted(str(key) for key in actual - expected)
+        raise ReferenceContextError(f"{what} keys differ: missing {missing}, unknown {unknown}")
+    return data
+
+
+def _integer(value: Any, what: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ReferenceContextError(f"{what} must be an integer")
+    return value
+
+
+def _string(value: Any, what: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ReferenceContextError(f"{what} must be a non-empty string")
+    return value
+
+
+def _boolean(value: Any, what: str) -> bool:
+    if not isinstance(value, bool):
+        raise ReferenceContextError(f"{what} must be a boolean")
+    return value
+
+
+def _rows(value: Any, what: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise ReferenceContextError(f"{what} must be a list")
+    return value
+
+
+_MEMBER_KEYS = ("variant_key", "variant_name_zh", "species_key", "species_name_zh", "minimum", "maximum")
+_POOL_KEYS = ("composition_key", "weight", "members")
+_ZONE_KEYS = (
+    "key", "region_key", "rectangles", "lower_density", "upper_density", "cell_capacity",
+    "wave_budget", "recovery_delay", "replenishment_interval", "pool",
+)
+_SITE_KEYS = (
+    "key", "kind", "region_key", "coordinates", "capacity", "one_shot", "recover_after_ticks",
+    "individual_name_zh", "composition_key", "members",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterSpawnMember:
+    """One composition member: a variant with its species and a count range."""
+
+    variant_key: str
+    variant_name_zh: str
+    species_key: str
+    species_name_zh: str
+    minimum: int
+    maximum: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "variant_key": self.variant_key,
+            "variant_name_zh": self.variant_name_zh,
+            "species_key": self.species_key,
+            "species_name_zh": self.species_name_zh,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any, what: str) -> MonsterSpawnMember:
+        row = _exact_keys(data, _MEMBER_KEYS, what)
+        minimum = _integer(row["minimum"], f"{what} minimum")
+        maximum = _integer(row["maximum"], f"{what} maximum")
+        if minimum > maximum:
+            raise ReferenceContextError(f"{what} minimum {minimum} exceeds maximum {maximum}")
+        return cls(
+            variant_key=_string(row["variant_key"], f"{what} variant_key"),
+            variant_name_zh=_string(row["variant_name_zh"], f"{what} variant_name_zh"),
+            species_key=_string(row["species_key"], f"{what} species_key"),
+            species_name_zh=_string(row["species_name_zh"], f"{what} species_name_zh"),
+            minimum=minimum,
+            maximum=maximum,
+        )
+
+
+def _members(value: Any, what: str) -> tuple[MonsterSpawnMember, ...]:
+    return tuple(
+        MonsterSpawnMember.from_dict(row, f"{what} member {index}")
+        for index, row in enumerate(_rows(value, f"{what} members"))
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterPoolEntry:
+    """One weighted composition in an ecology zone's pool."""
+
+    composition_key: str
+    weight: int
+    members: tuple[MonsterSpawnMember, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "composition_key": self.composition_key,
+            "weight": self.weight,
+            "members": [member.to_dict() for member in self.members],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any, what: str) -> MonsterPoolEntry:
+        row = _exact_keys(data, _POOL_KEYS, what)
+        weight = _integer(row["weight"], f"{what} weight")
+        if weight <= 0:
+            raise ReferenceContextError(f"{what} weight must be positive")
+        return cls(
+            composition_key=_string(row["composition_key"], f"{what} composition_key"),
+            weight=weight,
+            members=_members(row["members"], what),
+        )
+
+
+def _rectangle(value: Any, what: str) -> tuple[int, int, int, int]:
+    bounds = _rows(value, what)
+    if len(bounds) != 4:
+        raise ReferenceContextError(f"{what} must hold four integers")
+    x_min, x_max, y_min, y_max = (_integer(bound, what) for bound in bounds)
+    if x_min > x_max or y_min > y_max:
+        raise ReferenceContextError(f"{what} has a minimum above its maximum")
+    return (x_min, x_max, y_min, y_max)
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterZoneRow:
+    """One ecology zone: inclusive cell rectangles and a weighted pool."""
+
+    key: str
+    region_key: str
+    rectangles: tuple[tuple[int, int, int, int], ...]  # (x_min, x_max, y_min, y_max)
+    lower_density: int
+    upper_density: int
+    cell_capacity: int
+    wave_budget: int
+    recovery_delay: int
+    replenishment_interval: int
+    pool: tuple[MonsterPoolEntry, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "region_key": self.region_key,
+            "rectangles": [list(rectangle) for rectangle in self.rectangles],
+            "lower_density": self.lower_density,
+            "upper_density": self.upper_density,
+            "cell_capacity": self.cell_capacity,
+            "wave_budget": self.wave_budget,
+            "recovery_delay": self.recovery_delay,
+            "replenishment_interval": self.replenishment_interval,
+            "pool": [entry.to_dict() for entry in self.pool],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> MonsterZoneRow:
+        row = _exact_keys(data, _ZONE_KEYS, "monster zone")
+        key = _string(row["key"], "monster zone key")
+        what = f"monster zone {key!r}"
+        rectangles = tuple(
+            _rectangle(rectangle, f"{what} rectangle {index}")
+            for index, rectangle in enumerate(_rows(row["rectangles"], f"{what} rectangles"))
+        )
+        if not rectangles:
+            raise ReferenceContextError(f"{what} has no rectangles")
+        return cls(
+            key=key,
+            region_key=_string(row["region_key"], f"{what} region_key"),
+            rectangles=rectangles,
+            lower_density=_integer(row["lower_density"], f"{what} lower_density"),
+            upper_density=_integer(row["upper_density"], f"{what} upper_density"),
+            cell_capacity=_integer(row["cell_capacity"], f"{what} cell_capacity"),
+            wave_budget=_integer(row["wave_budget"], f"{what} wave_budget"),
+            recovery_delay=_integer(row["recovery_delay"], f"{what} recovery_delay"),
+            replenishment_interval=_integer(row["replenishment_interval"], f"{what} replenishment_interval"),
+            pool=tuple(
+                MonsterPoolEntry.from_dict(entry, f"{what} pool {index}")
+                for index, entry in enumerate(_rows(row["pool"], f"{what} pool"))
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterSiteRow:
+    """One manual monster site: a kind, a cell and one composition."""
+
+    key: str
+    kind: str
+    region_key: str
+    coordinates: tuple[int, int]
+    capacity: int
+    one_shot: bool
+    recover_after_ticks: int | None
+    individual_name_zh: str | None
+    composition_key: str
+    members: tuple[MonsterSpawnMember, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key,
+            "kind": self.kind,
+            "region_key": self.region_key,
+            "coordinates": list(self.coordinates),
+            "capacity": self.capacity,
+            "one_shot": self.one_shot,
+            "recover_after_ticks": self.recover_after_ticks,
+            "individual_name_zh": self.individual_name_zh,
+            "composition_key": self.composition_key,
+            "members": [member.to_dict() for member in self.members],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> MonsterSiteRow:
+        row = _exact_keys(data, _SITE_KEYS, "monster site")
+        key = _string(row["key"], "monster site key")
+        what = f"monster site {key!r}"
+        kind = _string(row["kind"], f"{what} kind")
+        if kind not in MONSTER_SITE_KINDS:
+            raise ReferenceContextError(f"{what} kind {kind!r} is outside {MONSTER_SITE_KINDS}")
+        coordinates = _rows(row["coordinates"], f"{what} coordinates")
+        if len(coordinates) != 2:
+            raise ReferenceContextError(f"{what} coordinates must hold two integers")
+        x, y = (_integer(value, f"{what} coordinates") for value in coordinates)
+        recover = row["recover_after_ticks"]
+        name = row["individual_name_zh"]
+        return cls(
+            key=key,
+            kind=kind,
+            region_key=_string(row["region_key"], f"{what} region_key"),
+            coordinates=(x, y),
+            capacity=_integer(row["capacity"], f"{what} capacity"),
+            one_shot=_boolean(row["one_shot"], f"{what} one_shot"),
+            recover_after_ticks=None if recover is None else _integer(recover, f"{what} recover_after_ticks"),
+            individual_name_zh=None if name is None else _string(name, f"{what} individual_name_zh"),
+            composition_key=_string(row["composition_key"], f"{what} composition_key"),
+            members=_members(row["members"], what),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterSpawnSection:
+    """The read-only monster spawn section: every ecology zone and manual site."""
+
+    zones: tuple[MonsterZoneRow, ...] = ()
+    sites: tuple[MonsterSiteRow, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "zones": [zone.to_dict() for zone in sorted(self.zones, key=lambda row: row.key)],
+            "sites": [site.to_dict() for site in sorted(self.sites, key=lambda row: row.key)],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> MonsterSpawnSection:
+        section = _exact_keys(data, ("zones", "sites"), "monster_spawns")
+        return cls(
+            zones=tuple(MonsterZoneRow.from_dict(row) for row in _rows(section["zones"], "monster_spawns zones")),
+            sites=tuple(MonsterSiteRow.from_dict(row) for row in _rows(section["sites"], "monster_spawns sites")),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class ReferenceContextFreshness:
     """The result of evaluating reference-context freshness against current sources."""
@@ -183,6 +462,7 @@ class ReferenceContextDocument:
     source_manifest: Mapping[str, str]
     discovery_rules: tuple[str, ...]
     fingerprint: str
+    monster_spawns: MonsterSpawnSection = MonsterSpawnSection()
 
     def incoming_references_for(self, target: QualifiedRef | str) -> tuple[IncomingReference, ...]:
         """Return incoming static external references pointing to ``target``."""
@@ -271,6 +551,7 @@ class ReferenceContextDocument:
             "source_manifest": sorted_manifest,
             "discovery_rules": list(self.discovery_rules),
             "fingerprint": self.fingerprint,
+            "monster_spawns": self.monster_spawns.to_dict(),
         }
 
 
@@ -348,6 +629,8 @@ def decode_reference_context(source: str | Mapping[str, Any]) -> ReferenceContex
     if not isinstance(fingerprint, str) or not fingerprint:
         raise ReferenceContextError("fingerprint must be a non-empty string")
 
+    monster_spawns = MonsterSpawnSection.from_dict(data.get("monster_spawns"))
+
     return ReferenceContextDocument(
         schema_version=schema_version,
         exporter_version=exporter_version,
@@ -356,6 +639,7 @@ def decode_reference_context(source: str | Mapping[str, Any]) -> ReferenceContex
         source_manifest=source_manifest,
         discovery_rules=discovery_rules,
         fingerprint=fingerprint,
+        monster_spawns=monster_spawns,
     )
 
 

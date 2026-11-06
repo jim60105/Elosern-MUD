@@ -80,6 +80,10 @@ def _refusal(relative_path: str, code: str, message: str) -> Diagnostic:
     )
 
 
+def _empty_monster_spawns() -> dict[str, Any]:
+    return {"zones": [], "sites": []}
+
+
 @dataclass(frozen=True, slots=True)
 class WorkspaceRead:
     """The outcome of one disk read (loaded or structurally rejected)."""
@@ -103,6 +107,10 @@ class WorkspaceRead:
     #: External identifier sets the editor offers as options (only the
     #: ``scene_archetypes`` family), present only while the index is current.
     external_identifiers: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: The decoded monster spawn section of the reference context (encoded
+    #: form), read-only and informative: present whenever the index decoded,
+    #: even when it is not current; empty zones and sites otherwise.
+    monster_spawns: dict[str, Any] = field(default_factory=_empty_monster_spawns)
     #: The loaded immutable authoring world behind ``world`` (read-only
     #: previews such as the route endpoint). Not part of the observable
     #: digest: it is derived from the same documents.
@@ -119,7 +127,7 @@ class WorkspaceRead:
         payload = json.dumps(
             [self.loaded, self.documents, self.world, self.diagnostics,
              self.external_context_status, self.partition_status, self.fingerprints,
-             self.external_incoming_references, self.external_identifiers],
+             self.external_incoming_references, self.external_identifiers, self.monster_spawns],
             sort_keys=True,
             ensure_ascii=False,
             default=str,
@@ -710,6 +718,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
             external_context_status=external,
             partition_status=partition,
             fingerprints=load.fingerprints,
+            monster_spawns=_monster_spawns(context),
         )
     world = load.world
     partition, freshness = _partition_status(workspace, limits, world)
@@ -739,6 +748,7 @@ def read_workspace(workspace: ConfinedWorkspace, limits: Limits) -> WorkspaceRea
         fingerprints=load.fingerprints,
         external_incoming_references=incoming,
         external_identifiers=identifiers,
+        monster_spawns=_monster_spawns(context),
         authoring=world,
     )
 
@@ -779,6 +789,14 @@ def _scene_statuses(context: ExternalContext, projection: dict[str, Any]):
         else:
             item["scene_status"] = "valid" if scene in scenes else "invalid"
     return ((SCENE_FAMILY, tuple(sorted(scenes))),) if scenes is not None else ()
+
+
+def _monster_spawns(context: ExternalContext) -> dict[str, Any]:
+    """The decoded monster spawn section, or an empty one when none decoded."""
+
+    if context.document is None:
+        return _empty_monster_spawns()
+    return context.document.monster_spawns.to_dict()
 
 
 def _incoming_references(context: ExternalContext, projection: Mapping[str, Any]):

@@ -49,6 +49,22 @@ DISTRICTS = "content/maps/districts.yaml"
 SETTLEMENT = f"content/maps/settlements/{synthetic.SETTLEMENT_ID}.yaml"
 PARTITION = "world/maps/data/district_partition.json"
 RIVER = "continent:waterway:synthetic_river"
+MONSTER_MARKS = '[data-kind="monster"]'
+ZONE_REFS = [f"monster_zone:{row['key']}" for row in synthetic.MONSTER_SPAWNS["zones"]]
+SITE_REFS = [f"monster_site:{row['key']}" for row in synthetic.MONSTER_SPAWNS["sites"]]
+SPECIES = "synthetic_species_alpha"
+
+#: Reads the computed font size of every element matching a selector.
+FONT_SIZES = "(selector) => [...document.querySelectorAll(selector)].map((el) => parseFloat(getComputedStyle(el).fontSize))"
+
+
+def _with_monsters(root: Path) -> None:
+    synthetic.write_reference_context(root, monster_spawns=synthetic.MONSTER_SPAWNS)
+
+
+def _with_stale_monsters(root: Path) -> None:
+    _with_monsters(root)
+    (root / "external/declarations.txt").write_text("changed synthetic declaration\n", encoding="utf-8")
 
 
 class MapEditorGeographyBrowserTest(unittest.TestCase):
@@ -461,3 +477,131 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         )
         self.assertEqual(self.changed(), {CONTINENT})
         self.assertEqual(self.names(), ["move_control_point"])
+
+    # -- monster spawn layer (read-only) -------------------------------------
+    def polygons(self, page) -> int:
+        return sum(page.locator(f'[data-shape-ref="{ref}"]').count() for ref in ZONE_REFS)
+
+    def show_monsters(self, page) -> None:
+        page.check('[data-layer="monsters"]')
+        self.wait_for(lambda: page.locator(MONSTER_MARKS).count() > 0, "the monster layer did not draw")
+
+    @covers_requirement("map-editor-geography::monster-spawn-layer-draws-zones-and-sites-on-the-continent")
+    def test_the_monster_layer_is_hidden_until_shown_and_draws_without_labels(self):
+        self.start(_with_monsters)
+        spawns = synthetic.MONSTER_SPAWNS
+        polygons = sum(len(zone["rectangles"]) for zone in spawns["zones"])
+        marks = len(spawns["zones"]) + len(spawns["sites"])
+        for viewport in (REFERENCE, LARGE):
+            page = self.open(viewport)
+            self.assertEqual(page.locator(MONSTER_MARKS).count(), 0)
+            for ref in ZONE_REFS + SITE_REFS:
+                self.assertEqual(page.locator(f'[data-qualified-ref="{ref}"]').count(), 0)
+            self.assertEqual(self.polygons(page), 0)
+            self.assertFalse(page.is_checked('[data-layer="monsters"]'))
+            self.show_monsters(page)
+            self.assertEqual(page.locator(MONSTER_MARKS).count(), marks)
+            self.assertEqual(self.polygons(page), polygons)
+            for ref in ZONE_REFS + SITE_REFS:
+                self.assertEqual(page.locator(f'[data-qualified-ref="{ref}"]').count(), 1)
+            self.assertEqual(page.locator(f"{MONSTER_MARKS} text").count(), 0)
+            self.assertEqual(page.locator(f"{MONSTER_MARKS} > title").count(), marks)
+            titled = sum(page.locator(f'[data-shape-ref="{ref}"] > title').count() for ref in ZONE_REFS)
+            self.assertEqual(titled, polygons)
+            page.context.close()
+        self.assertEqual(self.posts, [])
+        self.assertEqual(self.changed(), set())
+
+    @covers_requirement("map-editor-interaction::monster-spawn-objects-are-selectable-searchable-and-read-only")
+    @covers_requirement("map-editor-interaction::monster-spawn-inspector-shows-what-a-place-spawns")
+    def test_a_species_search_reaches_a_read_only_monster_inspector(self):
+        self.start(_with_monsters)
+        owners = {
+            f"monster_zone:{row['key']}" for row in synthetic.MONSTER_SPAWNS["zones"]
+            if any(m["species_key"] == SPECIES for entry in row["pool"] for m in entry["members"])
+        } | {
+            f"monster_site:{row['key']}" for row in synthetic.MONSTER_SPAWNS["sites"]
+            if any(m["species_key"] == SPECIES for m in row["members"])
+        }
+        for viewport in (REFERENCE, LARGE):
+            page = self.open(viewport)
+            page.fill("[data-search]", SPECIES)
+            results = page.locator("[data-search-result]")
+
+            def monster_results():
+                listed = [results.nth(i).get_attribute("data-search-result") for i in range(results.count())]
+                return [ref for ref in listed if ref.startswith("monster_")]
+
+            self.wait_for(lambda: set(monster_results()) == owners, "the species search did not list exactly its owners")
+            self.assertEqual(len(monster_results()), len(owners))
+            ref = monster_results()[0]
+            page.click(f'[data-search-result="{ref}"]')
+            self.wait_for(
+                lambda: page.locator("[data-inspector-ref]").count() == 1
+                and page.locator("[data-inspector-ref]").inner_text() == ref,
+                "the monster object was not inspected",
+            )
+            self.assertTrue(page.is_checked('[data-layer="monsters"]'))
+            self.assertEqual(page.locator(f'[data-qualified-ref="{ref}"]').count(), 1)
+            self.assertGreaterEqual(page.locator("[data-monster-composition]").count(), 1)
+            self.assertGreaterEqual(page.locator("[data-monster-member]").count(), 1)
+            self.assertEqual(page.locator("[data-monster-stale]").count(), 0)
+            for selector in ("[data-monster-composition]", "[data-monster-composition] *", "[data-monster-member]", "[data-field]"):
+                sizes = page.evaluate(FONT_SIZES, selector)
+                self.assertTrue(sizes, selector)
+                self.assertGreaterEqual(min(sizes), 16, (viewport, selector))
+            # No drag, nudge or delete path: nothing is sent and nothing is written.
+            mark = page.locator(f'[data-qualified-ref="{ref}"]')
+            self.assertIsNone(mark.get_attribute("data-draggable"))
+            placed = mark.get_attribute("transform")
+            self.drag(mark, 60, 40)
+            page.wait_for_timeout(200)
+            self.assertEqual(mark.get_attribute("transform"), placed)
+            page.click(f'[data-object="{ref}"]')
+            mark.focus()
+            self.assertTrue(page.evaluate("(ref) => document.activeElement?.dataset.qualifiedRef === ref", ref))
+            for key in ("ArrowRight", "ArrowUp", "Shift+ArrowLeft"):
+                page.keyboard.press(key)
+            page.wait_for_timeout(200)
+            self.assertEqual(mark.get_attribute("transform"), placed)
+            self.assertEqual(page.locator("[data-inspector-ref]").inner_text(), ref)
+            page.click(f'[data-object="{ref}"]')
+            page.click('[data-action="delete"]')
+            self.wait_for(lambda: page.locator("[data-delete-refusal]").count() == 1, "no delete explanation")
+            page.click(f'[data-object="{ref}"]')
+            page.keyboard.press("Delete")
+            self.assertEqual(page.locator("[data-delete-refusal]").count(), 1)
+            page.wait_for_timeout(300)
+            page.context.close()
+        self.assertEqual(self.posts, [])
+        self.assertEqual(self.changed(), set())
+
+    @covers_requirement("map-editor-interaction::monster-spawn-layer-reports-the-artifact-state")
+    def test_the_monster_layer_reports_stale_and_unavailable_artifacts(self):
+        self.start(_with_stale_monsters)
+        page = self.open()
+        self.assertFalse(self.editor.workspace_state()["external_context_status"]["current"])
+        self.show_monsters(page)
+        self.assertEqual(page.locator('[data-layer-note="monsters"]').count(), 0)
+        site = f"monster_site:{synthetic.MONSTER_SPAWNS['sites'][0]['key']}"
+        page.click(f'[data-object="{site}"]')
+        self.wait_for(lambda: page.locator("[data-monster-stale]").count() == 1, "the stale notice did not show")
+        # Without the artifact the layer is empty and explains why; editing stays available.
+        (self.workspace / "content/map-reference-context.json").unlink()
+        session = self.editor.session()
+        self.editor.reload(session["token"], session["session_generation"])
+        self.wait_for(lambda: page.locator('[data-layer-note="monsters"]').count() == 1, "no unavailable note")
+        # The selected site is absent from the newer snapshot: cleared and reported as removed.
+        self.wait_for(lambda: page.locator("[data-selection-removed]").count() == 1, "the removed selection was not reported")
+        self.assertEqual(page.locator("[data-monster-stale]").count(), 0)
+        self.assertEqual(page.locator(MONSTER_MARKS).count(), 0)
+        self.assertEqual(self.polygons(page), 0)
+        self.assertTrue(page.is_checked('[data-layer="monsters"]'))
+        location = f"location:{synthetic.LOCATION_ID}"
+        page.click(f'[data-object="{location}"]')
+        self.wait_for(
+            lambda: page.locator("[data-inspector-ref]").count() == 1
+            and page.locator("[data-inspector-ref]").inner_text() == location,
+            "a location was not selectable",
+        )
+        self.assertEqual(self.posts, [])

@@ -23,6 +23,8 @@ import ContinentInspector from "./components/ContinentInspector.vue";
 import SettlementInspector from "./components/SettlementInspector.vue";
 import InteriorInspector from "./components/InteriorInspector.vue";
 import RelationshipInspector from "./components/RelationshipInspector.vue";
+import MonsterSpawnInspector from "./components/MonsterSpawnInspector.vue";
+import { monsterDetail, monsterLayerState, monsterRecord } from "./lib/monster_spawns.js";
 import { entranceRequest, isRelationshipRef, relationshipRemoval } from "./lib/relationships.js";
 import {
   KM,
@@ -152,7 +154,9 @@ const inspectorToggle = ref(null);
 
 const workspace = computed(() => displayed.value);
 const world = computed(() => workspace.value?.world ?? null);
-const catalog = computed(() => objectCatalog(world.value));
+// The exported, read-only monster spawn section (paired with the status it is judged by).
+const monsterSpawns = computed(() => workspace.value?.monster_spawns ?? null);
+const catalog = computed(() => objectCatalog(world.value, monsterSpawns.value));
 const selected = computed(() => (selection.value.length === 1 ? selection.value[0] : null));
 
 let workspaceClient = null;
@@ -306,7 +310,10 @@ const olderPartitionShown = computed(
   () => domain.value === "continent" && Boolean(partitionView.value?.older) && !hiddenLayers.value.includes("partition"),
 );
 const fullScene = computed(() =>
-  sceneFor(world.value, domain.value, currentMapId.value, selection.value, { partition: partitionView.value }),
+  sceneFor(world.value, domain.value, currentMapId.value, selection.value, {
+    partition: partitionView.value,
+    monsterSpawns: monsterSpawns.value,
+  }),
 );
 const scene = computed(() => visibleScene(fullScene.value, hiddenLayers.value));
 const title = computed(() => crumbFor(domain.value, currentMapId.value));
@@ -314,7 +321,9 @@ const sourcePath = computed(() => sourcePathFor(world.value, domain.value, curre
 const frameLabel = computed(() => [FRAMES[domain.value], sourcePath.value].filter(Boolean).join(" · "));
 const tree = computed(() => worldTree(world.value));
 const objects = computed(() => scene.value?.items ?? scene.value?.marks ?? []);
-const record = computed(() => inspect(world.value, selected.value));
+const record = computed(() => monsterRecord(monsterSpawns.value, selected.value, world.value) ?? inspect(world.value, selected.value));
+const monsterInspection = computed(() => monsterDetail(monsterSpawns.value, selected.value));
+const monsterLayer = computed(() => monsterLayerState(workspace.value));
 const summary = computed(() => selectionSummary(catalog.value, selection.value));
 const relations = computed(() =>
   relationsOf(world.value, workspace.value?.external_incoming_references ?? {}, selected.value),
@@ -1407,6 +1416,7 @@ async function onChip(key) {
         :results="results"
         :map-options="domain === 'settlement' ? settlementOptions : interiorOptions"
         :current-map-id="currentMapId"
+        :layer-notes="monsterLayer.note ? { monsters: monsterLayer.note } : {}"
         @layer="toggleLayer"
         @tree="openTreeEntry"
         @choose="choose"
@@ -1528,6 +1538,7 @@ async function onChip(key) {
           @drafts="interiorLeadDrafts = $event"
         />
         </template>
+        <MonsterSpawnInspector v-if="monsterInspection" :detail="monsterInspection" :notice="monsterLayer.notice ?? ''" />
         <RelationshipInspector
           v-if="selectedRelationship"
           :key="`${formEpoch}:${selectedRelationship}`"

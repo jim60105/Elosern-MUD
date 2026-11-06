@@ -194,6 +194,8 @@ uv run --locked python -m tools.test_data_lint check
 
 `content/map-reference-context.json` 記錄 `world/lore` 與 `world/rules` 每個檔案的雜湊。改過這兩個目錄的任何檔案後重生。
 
+重生也會一併更新地圖編輯器的怪物生成圖層，讓它顯示最新的生態區與生成點。
+
 ```sh
 uv run --locked python -m tools.map_reference_context
 ```

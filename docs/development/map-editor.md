@@ -124,7 +124,7 @@ contains no authored payload — the runner calls
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `partition_status` (artifact freshness, its `artifact_fingerprint`, input and expected signatures, and `game_ready`), `partition_job` (§3.12), `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
+| `GET /api/workspace` | One complete replacement of the authoritative state: `session_generation`, `snapshot_revision`, `write_pause`, `preview_state` (`current`/`stale`/`unavailable`), `snapshot_read_at`, `checked_at`, `schema` (the core schema), `documents` (path, kind, id, fingerprint, values), `world` (the core-derived projection), `diagnostics`, `candidate_diagnostics` (the failing read while stale or unavailable), `external_context_status`, `monster_spawns` (the decoded read-only monster spawn section from the same read as `external_context_status`; empty `zones` and `sites` when the index is missing or undecodable; §3.14), `partition_status` (artifact freshness, its `artifact_fingerprint`, input and expected signatures, and `game_ready`), `partition_job` (§3.12), `history`, `pending_intent`, `uncertain_outcome`, `external_change` (`sequence`, `at` and the changed `documents` of the last adopted external change; §3.4) and `following` (`active`, reconciled `batches`, the last watcher `error`). `write_pause` is only the explicit pause of an uncertain publication; the stale or unavailable preview is the separate `preview_state`. |
 | `GET /api/events` | Server-sent events: `status` on connect and `invalidate` after a published change, each carrying only `session_generation`, `snapshot_revision` and `preview_state`. A client refetches `/api/workspace` on every invalidation and on a reconnect status that names another session or revision. Nothing is patched or merged. |
 | `POST /api/reload` | Authenticated explicit reread of the current disk files. A loadable read publishes and is the only way to resolve an uncertain publication. A structural failure keeps the last preview and marks it `stale`. An identical read publishes nothing. It never writes a file. |
 | `POST /api/commands/<name>` | One named single-document command (the layout commands of §3.1, the geography commands of §3.8, the settlement commands of §3.9, the interior commands of §3.10, the entrance commands of §3.11) or `undo`/`redo` of the current segment (see §3). |
@@ -1001,6 +1001,64 @@ id is `unknown_map`, an id of the other view is `wrong_view`) and that a
 continent request names none. The capture command above it owns the layer
 vocabulary, bounds, sizes and output format.
 
+### 3.14 Monster spawn layer
+
+The continent view has a read-only layer, `monsters` (怪物生成（匯出・唯讀）),
+hidden by default and absent from the settlement and interior views. It shows
+where monsters are born and which monsters each place can produce. Spawn data
+stays authored in `world/lore/monster_placement.py` and is edited through git;
+the editor never writes it.
+
+#### 3.14.1 Data and references
+
+- `tools/map_reference_context.py` exports every ecology zone and manual site
+  into the `monster_spawns` section of `content/map-reference-context.json`
+  (§6), with variant and species names resolved at export. Regions are
+  exported by key only: the inspector reads their display names from
+  `content/maps/continent.yaml`, so a rename shows at once, and an unknown key
+  shows as the raw key.
+- The service publishes the decoded section as `monster_spawns` in
+  `GET /api/workspace`. The frontend (`lib/monster_spawns.js`) only arranges it.
+- A zone is `monster_zone:<key>`: one translucent polygon per inclusive cell
+  rectangle plus one fixed-size mark at the centre of its first rectangle, all
+  sharing the reference. A site is `monster_site:<key>`: one fixed-size mark at
+  its cell centre, with a glyph per site kind. No permanent text labels; labels
+  appear in hover titles and lists.
+- Both forms are selectable and listed in the object catalog on the
+  `monsters` layer. Choosing a search result opens the continent and reveals
+  the layer. Neither form is draggable and neither has an edit or delete
+  command; a delete request shows the existing explanation and writes nothing.
+  No service route accepts these references.
+- Catalog entries carry `searchTerms` (each member's species and variant names
+  and keys), so a species or variant search returns every zone and site that
+  can spawn it, each as its own result.
+- The inspector shows the label, reference, region, source file and spawn
+  facts: density, capacities, budgets and times (game seconds in readable
+  units) for a zone, kind, coordinates, capacity, recovery and individual name
+  for a site, then one row per composition (a zone's chance is
+  `weight / total weight`, display-only) with species, variant and count range.
+
+#### 3.14.2 Artifact states
+
+| Index status | Layer |
+|---|---|
+| current | Draws normally. |
+| stale (not current, section has rows) | Still draws the exported rows; the inspector shows a notice with the regeneration command `uv run --locked python -m tools.map_reference_context`. |
+| unavailable (missing or undecodable, section empty) | Draws nothing; the layer row in the navigation states the reason. Map editing is unaffected. |
+
+A selected monster object that a newer snapshot no longer holds is cleared and
+reported as removed by the usual selection rule.
+
+#### 3.14.3 Human review record
+
+Not test-established; record the manual browser check here. Reviewer and date:
+_pending_.
+
+- Zone colour legibility over the terrain raster (1451×790): _pending_
+- Glyph readability at full-continent zoom (1451×790 and 2560×1440): _pending_
+- Site kind words read naturally (營地, 巢穴, 首領點, 游蕩, 遭遇): _pending_
+- Ink-and-gold theme fit and 16 px text floor at 1451×790 and 2560×1440: _pending_
+
 ## 4. Security Model and Limitations
 
 - **Bind address and Host.** `--host` takes an IP address or `localhost` and
@@ -1084,12 +1142,13 @@ The standalone map editor is an independent authoring tool that runs outside the
 - Core Codec & Freshness Checker: `elosern_map_core.reference_context`
 
 The reference context records:
-- Supported `schema_version` (1) and `exporter_version` (1).
+- Supported `schema_version` (2) and `exporter_version` (1). Schema 1 documents are refused; there is no compatibility path.
 - External identifier sets (`scene_archetypes`, `quest_definitions`, `nations`, `wilderness_regions`, `titles`, `service_hosts`, `races`, `subraces`, `elements`, `magic_tiers`, `monster_tiers`, `monster_species`, `settlements`, `shops`, `assortments`).
 - Incoming external static references to qualified map objects (such as `places` in `world/lore/settlements/` joining interior rooms, or `service_hosts` spawning in interior rooms).
 - Workspace-relative source paths for diagnostic location reporting.
 - A manifest of source file paths and SHA-256 digests covering the complete transitive external static source closure.
 - Allowlisted discovery rules and an aggregate dependency fingerprint.
+- The `monster_spawns` section: every ecology zone and manual monster site from `world/lore/monster_placement.py`, with resolved variant and species names and region keys, sorted by key. Decoding refuses the whole document when the section is missing or malformed (§3.14).
 
 ## 7. Exporter and Freshness Commands
 

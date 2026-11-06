@@ -266,7 +266,7 @@ defineExpose({ element, ready });
       :data-district="shape.district ?? null"
       :data-older-input="shape.older ? 'true' : null"
     >
-      <title v-if="shape.derived && shape.label && shape.showLabel !== false">{{ shape.label }}</title>
+      <title v-if="(shape.derived || shape.hoverTitle) && shape.label && shape.showLabel !== false">{{ shape.label }}</title>
     </path>
     <g
       v-for="link in links"
@@ -329,6 +329,12 @@ defineExpose({ element, ready });
         <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
         <path d="M0 -7 L7 0 L0 7 L-7 0 Z" class="map-mark__landmark" />
         <text v-if="mark.showLabel !== false" y="-14" class="map-mark__label">{{ mark.label }}</text>
+      </template>
+      <template v-else-if="mark.kind === 'monster'">
+        <title>{{ mark.label }}</title>
+        <circle r="16" class="map-mark__hit" />
+        <circle v-if="chosen.has(mark.id)" r="14" class="map-mark__ring" />
+        <path :d="mark.glyph" class="map-mark__monster" data-monster-glyph />
       </template>
       <template v-else>
         <circle r="16" class="map-mark__hit" />

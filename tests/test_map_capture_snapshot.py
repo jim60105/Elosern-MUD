@@ -141,7 +141,7 @@ def _write_overlapping_context(root: Path, paths) -> None:
         **{path: _sha(root / path) for path in paths},
     }
     digest = hashlib.sha256()
-    digest.update(b"schema_version=1\n")
+    digest.update(b"schema_version=2\n")
     digest.update(b"exporter_version=1\n")
     for rule in sorted(document["discovery_rules"]):
         digest.update(f"rule:{rule}\n".encode("utf-8"))

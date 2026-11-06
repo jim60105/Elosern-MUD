@@ -10,6 +10,10 @@ from conftest import make_config
 from elosern_map_core import load_authoring_world, make_source_document
 from elosern_map_editor.app import EditorService
 from elosern_map_editor.config import Limits
+from elosern_map_editor.confinement import ConfinedWorkspace
+from elosern_map_editor.snapshot import read_workspace
+
+EMPTY_SPAWNS = {"zones": [], "sites": []}
 
 
 def _state(workspace, **kwargs):
@@ -147,6 +151,45 @@ def test_reference_context_freshness_follows_its_external_sources(workspace):
     changed = _state(workspace)["external_context_status"]
     assert changed["status"] == "changed"
     assert changed["current"] is False
+
+
+def test_the_monster_spawn_section_follows_the_reference_context_read(workspace):
+    fixture.write_reference_context(workspace, monster_spawns=fixture.MONSTER_SPAWNS)
+    state = _state(workspace)
+    assert state["external_context_status"]["current"] is True
+    assert state["monster_spawns"] == fixture.MONSTER_SPAWNS
+    # A stale index still carries the section it decoded.
+    (workspace / "external/declarations.txt").write_text("changed\n", encoding="utf-8")
+    stale = _state(workspace)
+    assert stale["external_context_status"]["current"] is False
+    assert stale["monster_spawns"] == fixture.MONSTER_SPAWNS
+    assert stale["world"] is not None
+
+
+def test_a_missing_or_schema_one_index_publishes_an_empty_section(workspace):
+    assert _state(workspace)["monster_spawns"] == EMPTY_SPAWNS
+    target = fixture.write_reference_context(workspace, monster_spawns=fixture.MONSTER_SPAWNS)
+    document = json.loads(target.read_text(encoding="utf-8"))
+    target.write_text(json.dumps(dict(document, schema_version=1)), encoding="utf-8")
+    state = _state(workspace)
+    assert state["external_context_status"]["current"] is False
+    assert state["monster_spawns"] == EMPTY_SPAWNS
+    assert state["world"] is not None
+    target.unlink()
+    state = _state(workspace)
+    assert state["external_context_status"]["status"] == "missing"
+    assert state["monster_spawns"] == EMPTY_SPAWNS
+
+
+def test_a_section_only_change_changes_the_read_digest(workspace):
+    fixture.write_reference_context(workspace, monster_spawns=fixture.MONSTER_SPAWNS)
+    first = read_workspace(ConfinedWorkspace(workspace), Limits())
+    smaller = {"zones": fixture.MONSTER_SPAWNS["zones"][:1], "sites": []}
+    fixture.write_reference_context(workspace, monster_spawns=smaller)
+    second = read_workspace(ConfinedWorkspace(workspace), Limits())
+    assert first.external_context_status == second.external_context_status
+    assert second.monster_spawns == smaller
+    assert first.digest != second.digest
 
 
 def test_reference_context_rules_cannot_escape_the_workspace(workspace, tmp_path):

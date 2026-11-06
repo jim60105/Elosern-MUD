@@ -1175,6 +1175,28 @@ select {
   stroke-width: 1;
 }
 
+/* Read-only monster spawn layer: translucent zone rectangles and fixed-size
+ * zone and site glyphs (selection still wins through the rule below). */
+.map-shape--monster-zone {
+  fill: rgba(207, 68, 68, 0.18);
+  stroke: var(--seal-400);
+  stroke-width: 1;
+}
+
+.map-mark__monster {
+  fill: var(--seal-500);
+  stroke: var(--paper-300);
+  stroke-width: 1;
+}
+
+.monster-inspector p {
+  margin: 0;
+}
+
+.monster-inspector__composition {
+  margin-top: calc(8px * var(--ui-scale));
+}
+
 .map-shape--selected {
   stroke: var(--gold-300);
   stroke-width: 3.5;
