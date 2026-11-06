@@ -1289,21 +1289,10 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         )
 
     def _round(self) -> dict:
-        submitted = submit_player_action(
-            self.player, self.skill, [self.combatant]
-        )
-        from world.rules import combat as combat_package
-        from world.rules.combat import damage
-
-        real_apply = damage._apply_hp_delta
-        combatant_pk = int(self.combatant.pk)
-
-        def apply_hp(entity, delta):
-            if getattr(entity, "pk", None) == combatant_pk:
-                entity.traits.hp.current = 0
-                return
-            real_apply(entity, delta)
-
+        # A solo party's submission is the confirmation that completes the
+        # draft, so it resolves the round itself: the fixed rolls and the idle
+        # enemy must already be in force when it is submitted, or the round
+        # runs on live dice and the scripted hit can miss.
         with (
             patch(self.ROUND_PATCHES[0], return_value=100),
             patch(self.ROUND_PATCHES[1], return_value=100),
@@ -1314,9 +1303,10 @@ class RealSessionRecoveryTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
                 "world.rules.combat_session.policies._enemy_policy",
                 lambda *a, **k: None,
             ),
-            patch.object(damage, "_apply_hp_delta", apply_hp),
-            patch.object(combat_package, "_apply_hp_delta", apply_hp),
         ):
+            submitted = submit_player_action(
+                self.player, self.skill, [self.combatant]
+            )
             return complete_party_draft(
                 self.player, self.combatant, submitted
             )
