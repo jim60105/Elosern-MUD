@@ -13,6 +13,7 @@ with synthetic ``NamePack`` values, fallback-candidate tests drive
 """
 
 from random import Random
+from typing import Any
 
 from world.lore.names import (
     NAME_PACK_BY_RACE,
@@ -20,6 +21,7 @@ from world.lore.names import (
     NamePack,
     compose_display_name,
 )
+from world.lore.races import RACE_REGISTRY
 
 # sex -> given-name pool (design D2). Values outside this table — including
 # "" and None — are treated exactly like an unspecified sex: pick a pool at
@@ -77,7 +79,25 @@ def _pick_pack_for_race(race_key: str | None, rng: Random) -> NamePack:
 def roll_name_for_race(race_key: str | None, sex: str | None, rng: Random) -> str:
     """Roll a display name for a race key; None/unknown → random bound pack."""
 
-    return _roll_from_pack(_pick_pack_for_race(race_key, rng), sex, rng)
+    return _roll_from_pack(
+        _pick_pack_for_race(race_key, rng), _resolve_race_bounded_sex(race_key, sex), rng
+    )
+
+
+def _resolve_race_bounded_sex(race_key: str | None, sex: Any) -> Any:
+    """Bound a requested sex by the race's declared set (design D8).
+
+    A race declaring exactly one permitted sex pins the pool for every input
+    — including ``None``, ``""``, an unrecognised string, or a member the
+    race forbids — so a female-only race is never named from the male or
+    unisex pool. Every other race (and an unresolvable ``race_key``) passes
+    the value through unchanged.
+    """
+    if isinstance(race_key, str):
+        race = RACE_REGISTRY.get(race_key)
+        if race is not None and len(race.allowed_sexes) == 1:
+            return race.allowed_sexes[0]
+    return sex
 
 
 __all__ = ["roll_name", "roll_name_for_race"]

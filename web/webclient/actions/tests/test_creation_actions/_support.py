@@ -63,7 +63,7 @@ _T_PRESET = "t_pale_wren"
 # ``elf`` race; borrow the kit profile's bands under that production key so
 # the whole custom path still resolves through the scoped registry (the
 # world/rules/tests affinity-suite idiom).
-_T_ELF = replace(SYNTH_RACES[_T_RACE], key="elf")
+_T_ELF = replace(SYNTH_RACES[_T_RACE], key="elf", allowed_sexes=("female",))
 _T_ELF_SUBRACE = make_subrace(
     "t_dawn_herald_kin", race_key="elf", affinity_elements=(_SYNTH_ELEMENT,)
 )

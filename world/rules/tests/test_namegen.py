@@ -11,6 +11,7 @@ KeyError propagation, and the empty-pool fallback.
 
 import inspect
 import unittest
+from dataclasses import replace
 from random import Random
 from unittest import TestCase
 from unittest.mock import patch
@@ -19,7 +20,7 @@ from tools.spec_traceability import covers_requirement
 import world.rules.namegen as namegen
 from world.lore.names import FrozenDict, NAME_SEPARATOR, NamePack, NamePart
 from world.rules.namegen import _pick_pack_for_race, _roll_from_pack, roll_name, roll_name_for_race
-from world.tests.synthetic_data import synthetic_registries
+from world.tests.synthetic_data import SYNTH_RACES, synthetic_registries
 
 from ._knowledge_probes import live_name_pack_registry, live_registry
 
@@ -309,6 +310,55 @@ class RollNameForRaceTest(TestCase):
                 self.assertIn(surname, bound_surnames)
                 self.assertNotIn(given, spare_only_given)
                 self.assertNotIn(surname, spare_only_surnames)
+
+    @covers_requirement("npc-name-generation::roll-name-for-race-resolves-via-name-pack-by-race-with-a-bound-packs-only-random-fallback")
+    def test_a_single_declared_sex_pins_the_pool_for_every_forbidden_member(self):
+        from world.lore.sex import SEX_VALUES
+
+        race = replace(SYNTH_RACES[_RACE_A], allowed_sexes=("female",))
+        pack = _PACK_A
+        female_pool = _pool_zh(pack, "f")
+        inputs = (None, "", "unspecified") + tuple(
+            member for member in SEX_VALUES if member != "female"
+        )
+        with synthetic_registries("races", extra={"races": {race.key: race}}):
+            for sex in inputs:
+                with self.subTest(sex=sex):
+                    for seed in range(6):
+                        recorder = RecordingRandom(seed)
+                        given, surname = _segments(
+                            roll_name_for_race(_RACE_A, sex, recorder)
+                        )
+                        self.assertIn(given, female_pool)
+                        self.assertIn(surname, _surname_zh(pack))
+                        self.assertNotIn(("m", "f", "u"), recorder.choice_calls)
+
+    @covers_requirement("npc-name-generation::roll-name-for-race-resolves-via-name-pack-by-race-with-a-bound-packs-only-random-fallback")
+    def test_a_multi_sex_race_keeps_the_random_pool(self):
+        race = replace(SYNTH_RACES[_RACE_A], key=_RACE_B)
+        pack = _PACK_B
+        with synthetic_registries("races", extra={"races": {race.key: race}}):
+            for sex in (None, "", "unspecified"):
+                with self.subTest(sex=sex):
+                    recorder = RecordingRandom(5)
+                    given, surname = _segments(
+                        roll_name_for_race(_RACE_B, sex, recorder)
+                    )
+                    self.assertEqual(recorder.choice_calls[0], ("m", "f", "u"))
+                    self.assertIn(given, _all_given_zh(pack))
+                    self.assertIn(surname, _surname_zh(pack))
+            # An unresolvable/unbound race key also keeps the random pool offer.
+            recorder = RecordingRandom(6)
+            _, _ = _segments(roll_name_for_race(None, None, recorder))
+            self.assertIn(("m", "f", "u"), recorder.choice_calls)
+            # An explicit permitted member still selects its own pool.
+            for sex, pool in (("female", "f"), ("male", "m"), ("other", "u")):
+                with self.subTest(sex=sex):
+                    recorder = RecordingRandom(7)
+                    given, _ = _segments(
+                        roll_name_for_race(_RACE_B, sex, recorder)
+                    )
+                    self.assertIn(given, _pool_zh(pack, pool))
 
 
 class ErrorSemanticsTest(TestCase):

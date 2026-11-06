@@ -32,6 +32,7 @@ from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from world.lore.settlements.places import PLACE_REGISTRY
 from world.maps.bootstrap import sync_interiors
 from world.rules.guild_config import get_catalog, load_catalog_into_cache
+from world.rules.identity import ensure_entity_sex
 from world.rules.npc_capabilities import (
     COMPONENT_TYPES,
     CapabilityValidationError,
@@ -199,7 +200,7 @@ def _create_and_initialize_host(
         )
     host.race = place.host_race
     host.subrace = place.host_subrace
-    host.sex = place.host_sex
+    ensure_entity_sex(host, place.host_sex)
     host.apply_race_baseline()
     if profile is None:
         profile = NPC_PROFILE_REGISTRY[row.profile_key]

@@ -247,17 +247,27 @@ def _validate_preset_starting_equipment(registry: dict[str, PlayerPreset]) -> No
 
 
 def _validate_preset_sex(registry: dict[str, PlayerPreset]) -> None:
-    """Reject a preset whose declared sex is outside the canonical vocabulary.
+    """Reject a preset whose declared sex its race does not permit.
 
     Mirrors the identity validator's load-time stance: ``sex`` must be an
     exact ``SEX_VALUES`` member, so a mistyped card raises at import instead
     of shipping a value the sexual-state model, dialogue prompts, and namegen
-    would later consume as the character's sex.
+    would later consume as the character's sex. A member the card's race does
+    not declare in ``RaceProfile.allowed_sexes`` (an elf declaring anything
+    but ``female``) is likewise rejected at import. ``.get`` keeps the
+    function standalone-testable; in the import-time chain
+    ``_validate_preset_identities`` has already proven the race resolves.
     """
     for preset in registry.values():
         if preset.sex not in SEX_VALUES:
             raise ValueError(
                 f"preset {preset.key!r} declares unknown sex {preset.sex!r}"
+            )
+        race = RACE_REGISTRY.get(preset.race)
+        if race is not None and preset.sex not in race.allowed_sexes:
+            raise ValueError(
+                f"preset {preset.key!r} declares sex {preset.sex!r} that race "
+                f"{preset.race!r} does not permit"
             )
 
 

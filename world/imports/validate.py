@@ -293,6 +293,23 @@ def _check_race_subrace(record: dict[str, Any]) -> list[Issue]:
     return []
 
 
+def _check_sex_for_race(record: dict[str, Any]) -> list[Issue]:
+    """Reject a sex the record's race does not declare.
+
+    Race-unresolvable records are left to ``_check_race_subrace``. The check
+    runs for every character record regardless of target typeclass: the
+    world's canon admits no male elf at all. The structural phase already
+    proved ``race`` and ``sex`` are strings, so no lookup raises.
+    """
+    race = RACE_REGISTRY.get(record.get("race"))
+    if race is None:
+        return []
+    sex = record.get("sex")
+    if sex in race.allowed_sexes:
+        return []
+    return [Issue("sex", f"sex {sex!r} is not available for race {race.key!r}")]
+
+
 def _check_stats_band(record: dict[str, Any]) -> list[Issue]:
     race = RACE_REGISTRY.get(record.get("race"))
     if race is None:
@@ -692,6 +709,7 @@ def validate_character(
     report.rejections.extend(_check_disguised_stats_subset(record))
     report.rejections.extend(_check_disguised_stats_race(record))
     report.rejections.extend(_check_race_subrace(record))
+    report.rejections.extend(_check_sex_for_race(record))
     magic_rejections, magic_warnings = _check_magic_power_band(record)
     report.rejections.extend(magic_rejections)
     report.warnings.extend(magic_warnings)

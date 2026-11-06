@@ -10,6 +10,8 @@ from unittest import mock
 
 from world.lore.anchors import anchors
 from elosern_map_core.references import interior_room_ref
+from world.lore.races import RACE_REGISTRY
+from world.lore.sex import SEX_VALUES
 from world.lore.settlements.places import (
     PLACE_REGISTRY,
     place_capabilities,
@@ -472,6 +474,41 @@ class PlaceRegistryTests(unittest.TestCase):
 
     def test_unknown_host_sex_is_rejected(self):
         self._assert_rejected(self._plant(self.store, host_sex="unknown"))
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-s-authored-host-sex-must-be-permitted-by-the-host-s-race"
+    )
+    def test_an_elf_host_with_a_forbidden_sex_fails_load(self):
+        forbidden = next(
+            member for member in SEX_VALUES
+            if member not in RACE_REGISTRY["elf"].allowed_sexes
+        )
+        self._assert_rejected(
+            self._plant(
+                self.store,
+                host_race="elf",
+                host_subrace=None,
+                host_sex=forbidden,
+            ),
+            forbidden,
+        )
+
+    @covers_requirement(
+        "settlement-place-registry::a-place-s-authored-host-sex-must-be-permitted-by-the-host-s-race"
+    )
+    def test_a_permitted_host_sex_still_loads(self):
+        permitted = RACE_REGISTRY["elf"].allowed_sexes[0]
+        place = self._plant(
+            self.store, host_race="elf", host_subrace=None, host_sex=permitted
+        )
+        with mock.patch.dict(PLACE_REGISTRY, {"t_offense_place": place}, clear=True):
+            validate_place_registry(PLACE_REGISTRY)
+
+    def test_a_hostless_place_is_untouched_by_the_sex_check(self):
+        with mock.patch.dict(
+            PLACE_REGISTRY, {"t_plaza_place": self._hostless()}, clear=True
+        ):
+            validate_place_registry(PLACE_REGISTRY)
 
     def test_subrace_belonging_to_another_race_is_rejected(self):
         self._assert_rejected(

@@ -337,6 +337,14 @@ def validate_place_registry(
                     f"place {place.key!r} host_subrace {place.host_subrace!r} belongs to "
                     f"race {subrace.race_key!r}, not {place.host_race!r}"
                 )
+        if (
+            not hostless
+            and place.host_sex not in RACE_REGISTRY[place.host_race].allowed_sexes
+        ):
+            raise ValueError(
+                f"place {place.key!r} names host_sex {place.host_sex!r} that host_race "
+                f"{place.host_race!r} does not permit"
+            )
         if not isinstance(place.room, QualifiedRef) or place.room.domain != "interior_room":
             raise ValueError(
                 f"place {place.key!r} room must be an interior_room reference, "

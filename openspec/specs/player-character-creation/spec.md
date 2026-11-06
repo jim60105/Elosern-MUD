@@ -83,12 +83,12 @@ The pending character's creation command SHALL offer exactly two activation mode
 - **THEN** activation is rejected and the account-owned shell retains its existing key and pending state
 
 #### Scenario: An invalid sex is rejected before activation
-- **WHEN** custom creation supplies a sex value that is not a `SEX_VALUES` member
+- **WHEN** custom creation supplies a sex value that is not a `SEX_VALUES` member, or one the selected race does not permit
 - **THEN** preflight rejects the request with a stable reason before any persistence, and the account-owned shell retains its existing key and pending state
 
 #### Scenario: An omitted sex normalizes to the default
 - **WHEN** custom creation omits the sex (or the creation flow carries no sex channel at all, as on Telnet)
-- **THEN** preflight normalizes it to `DEFAULT_SEX` and activation persists that member value on the character
+- **THEN** preflight normalizes it to `DEFAULT_SEX` when the selected race permits that member and otherwise to the race's single permitted sex, and activation persists that member value on the character
 
 #### Scenario: Invalid draft input changes no character state
 - **WHEN** a custom creation draft is cancelled, disconnected, or rejected for an invalid field before confirmation
@@ -108,7 +108,7 @@ The pending character's creation command SHALL offer exactly two activation mode
 
 #### Scenario: The accepted sex follows the shared vocabulary
 - **WHEN** custom creation accepts a sex value
-- **THEN** it is one of the `SEX_VALUES` members, and an omitted or null sex is normalized to `DEFAULT_SEX`
+- **THEN** it is one of the `SEX_VALUES` members the selected race declares, and an omitted or null sex is normalized to the race-permitted default
 
 #### Scenario: Custom mode refuses player-supplied power channels
 - **WHEN** a custom creation request carries player-supplied raw magic level, guild merit, skills, equipment, or trait caps
@@ -135,7 +135,7 @@ The pending character's creation command SHALL offer exactly two activation mode
 - **THEN** those values survive a reconnect on the draft, and are cleared atomically with the draft at activation
 
 ### Requirement: Character creation enforces canonical identity and registry compatibility
-Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values within the 0..10000 reasonable range. The selected race SHALL exist in `RACE_REGISTRY`. A subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race. Successful activation SHALL persist the accepted age, apparent age, race, subrace, display name, and sex on the player character.
+Both preset and custom activation SHALL require `age` and `apparent_age` to be independent integer values within the 0..10000 reasonable range. The selected race SHALL exist in `RACE_REGISTRY` and SHALL bound the resolved sex to the race's declared sex set. A subrace SHALL exist in `SUBRACE_REGISTRY` and belong to that race. Successful activation SHALL persist the accepted age, apparent age, race, subrace, display name, and sex on the player character.
 
 #### Scenario: Actual age below the range floor is rejected
 - **WHEN** custom creation supplies `age=-1` with an in-range apparent age
@@ -171,7 +171,27 @@ Both preset and custom activation SHALL require `age` and `apparent_age` to be i
 
 #### Scenario: Sex sourcing and validation differ by creation mode
 - **WHEN** creation resolves the sex
-- **THEN** in custom mode a supplied sex SHALL be a `SEX_VALUES` member or omitted/null, the latter normalizing to `DEFAULT_SEX`, while in preset mode the sex comes from the preset's own declared `sex` field and SHALL NOT fall back to `DEFAULT_SEX`
+- **THEN** in custom mode a supplied sex SHALL be a `SEX_VALUES` member or omitted/null, while in preset mode the sex comes from the preset's own declared `sex` field and SHALL NOT fall back to `DEFAULT_SEX`; both modes then resolve that value through the same race-aware validator before persistence
+
+#### Scenario: A custom elf request with a non-female sex is rejected before persistence
+- **WHEN** custom creation chooses `race == "elf"` and supplies `sex="male"` or `sex="other"`
+- **THEN** activation is rejected before any write, the character remains pending with no traits, and the rejection is the single deterministic sex/race error the WebClient adapter maps to its stable code and shared Traditional Chinese message
+
+#### Scenario: A custom elf request with a female sex activates
+- **WHEN** custom creation chooses `race == "elf"` and supplies `sex="female"`
+- **THEN** activation commits and the activated character's `entity.sex` is `"female"`
+
+#### Scenario: An omitted sex on an elf resolves to the race's sole permitted sex
+- **WHEN** custom creation chooses `race == "elf"` and omits `sex` (or supplies `null`), as the Telnet wizard always does
+- **THEN** the resolved sex is `"female"`, activation commits, and the stored draft carries that same concrete value
+
+#### Scenario: Human and beastfolk keep the full vocabulary
+- **WHEN** custom creation chooses `race == "human"` or `race == "beastfolk"` and supplies `sex="male"`, `"female"`, or `"other"`
+- **THEN** activation commits with that exact member, and an omitted sex on either race still normalizes to `DEFAULT_SEX`
+
+#### Scenario: An elf preset declaring a non-female sex is rejected
+- **WHEN** a preset card declares `race == "elf"` and a `sex` other than `"female"`
+- **THEN** the preset-mode preflight rejects it before any write with the same stable code and message the custom path uses, instead of activating a character the race forbids
 
 #### Scenario: Persisted sex converges creation and import paths
 - **WHEN** activation persists the accepted sex on the player character
@@ -563,9 +583,7 @@ its own canonical identity attributes, and its own creation-gate cmdset resoluti
 - **THEN** the slot check SHALL refuse it without creating a character object, and the refusal SHALL be reported to the caller rather than raised
 
 ### Requirement: Preset activation persists the preset's declared sex
-Every `PlayerPreset` SHALL declare a `sex` field holding exactly one
-`SEX_VALUES` member, and preset-mode activation SHALL persist that value as the
-activated character's `sex`.
+Every `PlayerPreset` SHALL declare a `sex` field holding exactly one `SEX_VALUES` member permitted by the preset's race, and preset-mode activation SHALL persist that value as the activated character's `sex`.
 
 #### Scenario: A preset activation persists the preset's declared sex
 - **WHEN** a pending player activates a shipped preset declaring `sex="female"`
@@ -577,11 +595,15 @@ activated character's `sex`.
 
 #### Scenario: Custom activation still uses the request's sex
 - **WHEN** a pending player activates a custom draft carrying a `SEX_VALUES` member
-- **THEN** the activated character's `sex` equals that value, and a custom draft with a null sex still normalizes to `DEFAULT_SEX`
+- **THEN** the activated character's `sex` equals that value, and a custom draft with a null sex still normalizes to the race's permitted default
 
 #### Scenario: A preset with an out-of-vocabulary sex is rejected at load
 - **WHEN** a preset declares a `sex` that is not a `SEX_VALUES` member
 - **THEN** importing `world.lore.player_presets` raises, so the invalid value can never reach a player's activation
+
+#### Scenario: A preset whose sex its race forbids is rejected at load
+- **WHEN** a preset declares a `sex` that is a `SEX_VALUES` member but is absent from its race's `allowed_sexes` — for example an elf card declaring `"male"` or `"other"`
+- **THEN** the preset load validator raises naming the card, its race and its sex, so the card can never reach a player's activation
 
 #### Scenario: A preset omitting sex fails at construction
 - **WHEN** a `PlayerPreset` is constructed without the `sex` keyword argument
@@ -589,23 +611,23 @@ activated character's `sex`.
 
 #### Scenario: Every shipped preset declares a concrete sex
 - **WHEN** `PLAYER_PRESET_REGISTRY` is inspected
-- **THEN** every entry declares a `SEX_VALUES` member, and the eight shipped cards all declare `"female"`
+- **THEN** every entry declares a `SEX_VALUES` member its race permits, and the eight shipped cards all declare `"female"`
 
 #### Scenario: Preflight resolves sex in the existing mode branch
 - **WHEN** `preflight_character_creation` resolves the sex
-- **THEN** it resolves in the same mode branch that resolves the display name, ages, race, and subrace: preset mode takes `preset.sex` and custom mode keeps `request.sex`, with both branches still normalized through the single `_validate_sex` validator before persistence, and a preset-mode request SHALL NOT fall back to `DEFAULT_SEX`
+- **THEN** it resolves in the same mode branch that resolves the display name, ages, race, and subrace: preset mode takes `preset.sex` and custom mode keeps `request.sex`, with both branches still normalized through the single race-aware validator before persistence, and a preset-mode request SHALL NOT fall back to `DEFAULT_SEX`
 
 #### Scenario: The sex field is keyword-only from declaration onward
 - **WHEN** the `PlayerPreset` dataclass is declared
 - **THEN** `sex` is a required keyword argument (the dataclass declares `dataclasses.KW_ONLY` from this field onward), so a card that omits it fails at construction rather than silently inheriting the default
 
 #### Scenario: The sex validator matches the other preset validators' timing
-- **WHEN** a preset declares a value outside `SEX_VALUES`
+- **WHEN** a preset declares a value outside `SEX_VALUES`, or inside it but outside its race's declared set
 - **THEN** it fails at registry load, never at player activation, matching the existing skill-kit, identity, affinity, and starting-item validators
 
 #### Scenario: Surrounding surfaces are unchanged
 - **WHEN** this requirement is implemented
-- **THEN** custom creation, the WebClient creation action payload schemas, the Telnet wizard, and the import path are unchanged
+- **THEN** `SEX_VALUES`, `DEFAULT_SEX`, the WebClient creation action payload schemas, the `creation` panel descriptor and both of its client renderers, and the Telnet wizard's prompts are unchanged; the one new constraint is that the resolved sex must lie in the selected race's declared set
 
 ### Requirement: The preset registry declares a full persona in import-card shape
 Every `PlayerPreset` SHALL declare a keyword-only `persona` field holding a

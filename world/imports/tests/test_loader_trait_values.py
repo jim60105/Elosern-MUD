@@ -134,8 +134,15 @@ class LoaderTraitTests(EvenniaTestCase):
         from world.imports import loader
 
         source = loader.__loader__.get_source(loader.__name__)
-        self.assertIn('entity.sex = record["sex"]', source)
+        # The loader delegates the race-bounded rule to the single seam, which
+        # owns the AttributeProperty write; neither module writes entity.db.sex.
+        self.assertIn('ensure_entity_sex(entity, record["sex"])', source)
         self.assertNotIn("entity.db.sex =", source)
+        from world.rules import identity
+
+        seam_source = identity.__loader__.get_source(identity.__name__)
+        self.assertIn("entity.sex = resolved", seam_source)
+        self.assertNotIn("entity.db.sex =", seam_source)
 
     def test_explicit_nonzero_guild_merit_is_stored_literally(self):
         record = example_record()

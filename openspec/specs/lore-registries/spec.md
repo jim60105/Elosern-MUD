@@ -5,7 +5,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 ## Requirements
 
 ### Requirement: RaceProfile encodes the three-race power gap
-`world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields `key`, `lifespan`, `vital_baseline`, `static_baseline`, `learning_multiplier`, and `can_use_divine_arts`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
+`world/lore/races.py` SHALL define a frozen `RaceProfile` dataclass with exactly the fields `key`, `lifespan`, `vital_baseline`, `static_baseline`, `learning_multiplier`, `can_use_divine_arts`, `description`, `display_name_zh`, and `allowed_sexes`, and a module-level `RACE_REGISTRY: dict[str, RaceProfile]` containing exactly three entries keyed `"human"`, `"beastfolk"`, and `"elf"`.
 
 #### Scenario: Registry has exactly the three documented races
 - **WHEN** `RACE_REGISTRY` is inspected
@@ -55,6 +55,15 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 #### Scenario: The former magic fields do not exist and the fourth axis is the only bound
 - **WHEN** `RaceProfile` is inspected
 - **THEN** the former `magic_cap` and `starting_magic_level` fields SHALL NOT exist ;  the fourth `static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic average survives
+
+#### Scenario: Every race declares a non-empty permitted-sex subset
+- **WHEN** every `RaceProfile.allowed_sexes` value is inspected
+- **THEN** each is a non-empty tuple whose every member is a member of `SEX_VALUES`, and
+  `SEX_VALUES` itself is unchanged at exactly `("female", "male", "other")`
+
+#### Scenario: The elf declares female as its only permitted sex
+- **WHEN** `RACE_REGISTRY["elf"].allowed_sexes` is inspected
+- **THEN** it equals `("female",)`, while `"human"` and `"beastfolk"` each permit `SEX_VALUES` in full
 
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
 `world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`, `display_name_zh`, `order`, `band: tuple[int, int | None]`, `magic_band: tuple[int, int]`, `guild_rank_hint`, and `description`, and a module-level `STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers, and two elf tiers.

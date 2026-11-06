@@ -23,7 +23,7 @@
 | 同行夥伴 | `world/rules/starting_companions.py::build_starting_companion` | 預設卡 `starting_companions` 宣告的夥伴 | `LLMNPC`（`invite` 只收 `LLMNPC`） |
 | 已發表場景包相遇 | `world/quests/encounters.py::publish_scene_package` 發表不可變的場景包，`world/quests/encounter_activation.py::activate_scene_encounter` 在玩家實際所在的房間具現化 | 驗收任務前即可遇見的具名故事角色；任務完成、失敗或放棄後仍保留身分、人格與記憶 | `scene_llm_npc` 原型（白名單限定，型別為 `LLMNPC`） |
 
-五條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
+五條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。五條路徑也都透過 `world/rules/identity.py::ensure_entity_sex` 解析並寫入角色的 `sex`：種族在 `world/lore/races.py::RaceProfile.allowed_sexes` 宣告自己允許的性別集合，宣告剛好一個成員的種族（例如精靈只有 `female`）在沒有宣告性別時一律落到該成員，而任何路徑宣告種族不允許的成員都會在寫入前以具名 `IdentityError` 拒收。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
 
 已發表場景包的持久化屬於 `world/quests`：它是一個正式的 Django app（`world.quests.apps.QuestsConfig`，列於 `server/conf/settings.py` 的 `INSTALLED_APPS`），擁有不可變的 `ScenePackage` 已發表定義，以及角色綁定、相遇啟動、對話階段與委託授權等執行期資料表。資料庫唯一鍵是其契約的一部分：一個（場景包，角色）只綁定一個實際角色，一個（場景包，場景，玩家）只有一個啟動身分，因此重啟不會產生第二個角色。新增或調整資料表時，在 `world/quests/migrations/` 宣告遷移；已發表的 payload 永不改寫。
 
@@ -43,7 +43,7 @@
 
 ## 2. 事前決定：寫卡之前要回答的五個問題
 
-1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_race`／`host_subrace`／`host_sex`／`host_profile_key` 與 `components`（直接能力宣告），啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝能力。**不要**用匯入卡建永久主人。
+1. **這是永久服務主人嗎？** 是 → 走地點登錄表：在 `world/lore/settlements/places.py` 的 `PlaceDefinition` 宣告 `host_name`／`host_race`／`host_subrace`／`host_sex`／`host_profile_key` 與 `components`（直接能力宣告），啟動 `sync_service_content` 依登錄表推導名冊、find-or-create 主人並組裝能力。**不要**用匯入卡建永久主人。主人的 `host_sex` 受 `host_race` 的 `RaceProfile.allowed_sexes` 限制：精靈主人只能宣告 `female`，宣告該種族不允許的性別會在載入 `PLACE_REGISTRY` 時以 `ValueError` 拒收，訊息點名地點、種族與性別，因此永遠不會被啟動同步具現化。
 
    主人的身分是 **canonical authored identity**：名冊列（`ServiceHostRow.host_key`）與活體 NPC 身上的 `npc_profile_key` 取自同一個 `host_profile_key`。同步只憑這個鍵找人，**不再**看元件的排列順序、元件的 `service_id`、顯示名或位置；因此調換／增減能力、或改寫 `service_id`，都不會生出第二個人。同一個 host key 若被兩個活體 NPC 或兩列名冊同時宣稱，整批在寫入前就以具名完整性錯誤拒收；若該身分屬於常駐冒險者（`guild_adventurer_person_key`），同步也拒收、絕不接管。
 
@@ -94,12 +94,13 @@ for declaration semantics.
 
 ### Step 1 — 寫 JSON 角色卡
 
-複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的四條規則：
+複製 `world/imports/examples/example_character.json`，欄位語意見[角色建立與匯入](/gm/characters)。NPC 特有的五條規則：
 
 - **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列、`看` 標題、探索面板、對話、隊伍與 GM 檢視一律只顯示這個純姓名。角色定位請寫在 `persona` 與描述文字裡，沒有獨立的 NPC 稱號欄位。
 - **GM 檢視不代替玩家。** GM 執行期頁的「服務」區塊列出與遊戲相同的服務項目與開啟路徑，但沒有選定玩家角色，所以可用性一律顯示 `context_required`；「能力設定診斷」另外列出綁定、錨點、元件設定與對話來源關聯。兩者都唯讀，不會提供任何玩家權限，也不會把設定問題誤報成沒有服務。詳見 [GM 執行期狀態檢視](/development/gm-portal-runtime-inspection)。
 - **`age`／`apparent_age` 各自獨立**，0–10000 整數（拒絕布林值）。常駐 host 與考官由 `NpcProfile` 作者宣告明確定案數值（`age` 與 `apparent_age` 必填），落庫與同步時優先使用 profile 定義的年齡；未指定 profile 或無作者年齡的路徑由 `ensure_npc_canonical_age` 獨立補 `NPC_DEFAULT_AGE`（18）。既有欄位值永不覆寫，重用與重啟時保留玩家編輯的 persona 與既有年齡。既有開發世界若需完整套用作者年齡，請依照 reset runbook 重設資料庫。
 - **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，不只是欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
+- **`sex` 由 `race` 界定。** 卡上的 `sex` 必須是該種族 `RACE_REGISTRY[race].allowed_sexes` 的成員：精靈卡只能宣告 `female`，宣告 `male` 或 `other` 會在 `world/imports/validate.py` 以 `sex` 欄位具名拒收，訊息為 `sex '<值>' is not available for race '<種族>'`，整批在寫入前即回滾。沒有宣告性別的路徑（例如夢境／情境導演產生的場景角色，其藍圖本身不含性別欄位）由具現化器依角色的 `race` 決定；對單一允許性別的種族即落到該成員。
 - **`disguised_stats` 非空時種族必須能用神之秘法**，同[新增角色模板指南](/development/adding-player-presets) §4 的不變式；`_check_disguised_stats_subset` 另要求偽裝鍵是 `stats` 子集。
 
 服務 NPC 再加選填的職業三欄：
@@ -139,7 +140,7 @@ for declaration semantics.
 uv run --locked -m world.imports.validate content/characters/old_pike.json
 ```
 
-CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與資料庫既有 NPC 的重名由載入器把關**，CLI 不回報。批次全綠才進入載入。CLI 以 NPC 為目標，角色卡違規以 `persona.<欄位>` 加穩定原因碼（`missing_field`、`unknown_field`、`not_text`、`required_empty`、`leaf_too_long`、`identity_section_too_long`、`card_too_long`）回報；契約遇到第一個違規就停，一次只會看到一個角色卡問題。
+CLI 只檢查檔案本身與批次內一致性（含批次內重名）；**與資料庫既有 NPC 的重名由載入器把關**，CLI 不回報。批次全綠才進入載入。CLI 以 NPC 為目標，角色卡違規以 `persona.<欄位>` 加穩定原因碼（`missing_field`、`unknown_field`、`not_text`、`required_empty`、`leaf_too_long`、`identity_section_too_long`、`card_too_long`）回報；契約遇到第一個違規就停，一次只會看到一個角色卡問題。宣告種族不允許的 `sex` 則以 `sex` 欄位具名回報（`sex '<值>' is not available for race '<種族>'`），與角色卡契約分開列出。
 
 ### Step 3 — 劇本對話（需要時）
 

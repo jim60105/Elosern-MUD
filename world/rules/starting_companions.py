@@ -37,6 +37,7 @@ from world.lore.npc_card import NpcCardError, normalize_card
 from world.lore.races import SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules.fatigue import initialize_fatigue_state
+from world.rules.identity import ensure_entity_sex
 from world.rules.npc_identity import live_key_taken_by_other
 from world.rules.affinity import NATURAL_CAP, seed_affinity
 # The lineage state and portrait finalization are consumed from their sole
@@ -164,7 +165,7 @@ def build_starting_companion(player: Any, declaration: StartingCompanion) -> LLM
         initialize_fatigue_state(npc)
         npc.race = preset.race
         npc.subrace = preset.subrace
-        npc.sex = preset.sex
+        ensure_entity_sex(npc, preset.sex)
         npc._apply_trait_config(
             trait_config_for_values(resolve_preset_values(preset))
         )

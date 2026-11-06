@@ -18,6 +18,7 @@ from world.lore.npc_card import normalize_card
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.observability import log_info, log_warn
 from world.rules.fatigue import initialize_fatigue_state
+from world.rules.identity import ensure_entity_sex
 
 from world.rules.npc_capabilities import (
     CapabilityValidationError,
@@ -233,7 +234,7 @@ def _instantiate_validated_character(
 
     entity.race = record["race"]
     entity.subrace = record.get("subrace")
-    entity.sex = record["sex"]
+    ensure_entity_sex(entity, record["sex"])
     entity._apply_trait_config(_trait_config(_resolve_trait_values(record)))
     entity.db.disguised_stats = record["disguised_stats"] or None
     if isinstance(entity, NPC):

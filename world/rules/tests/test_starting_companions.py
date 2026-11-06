@@ -371,6 +371,44 @@ class CompanionBuildTests(_BuilderCase):
             _live_presets()[_T_PARTNER].persona.greeting,
         )
 
+    @covers_requirement("living-entity-hierarchy::livingentity-carries-sex-as-a-bounded-vocabulary-attribute-defaulting-to-other")
+    def test_an_elf_companion_card_lands_on_the_permitted_sex(self):
+        from dataclasses import replace
+
+        from world.lore.starting_kits import SubraceStartingKit
+
+        elf = replace(SYNTH_RACES["t_duskmari"], key="elf", allowed_sexes=("female",))
+        branch = replace(
+            SYNTH_SUBRACES["t_duskmari_evensong"],
+            key="t_elf_companion_branch",
+            race_key="elf",
+        )
+        kit = SubraceStartingKit(branch.key, (("t_thorn_knife", 1),))
+        with synthetic_registries(
+            "races",
+            "subraces",
+            "starting_kits",
+            extra={
+                "races": {"elf": elf},
+                "subraces": {branch.key: branch},
+                "starting_kits": {branch.key: kit},
+            },
+        ):
+            card = _register_probe(
+                self,
+                _probe_preset(
+                    key="t_elf_companion_card",
+                    display_name="精靈夥伴",
+                    race="elf",
+                    subrace=branch.key,
+                    sex="female",
+                ),
+            )
+            companion = build_starting_companion(
+                self.owner, StartingCompanion(card.key, 40, "夥伴")
+            )
+        self.assertEqual(companion.sex, "female")
+
     @covers_requirement("starting-companions::a-companion-is-built-from-its-partner-preset-as-a-live-llmnpc")
     def test_the_companion_is_an_llmnpc_beside_its_owner(self):
         companion = build_starting_companion(

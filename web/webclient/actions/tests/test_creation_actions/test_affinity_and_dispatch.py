@@ -12,6 +12,7 @@ from web.webclient.actions.creation_actions import (
     validate_creation_reset_payload,
 )
 from tools.spec_traceability import covers_requirement
+from world.rules.creation_messages import CREATION_REASON_MESSAGES
 from world.rules.creation_wizard import draft_fingerprint, read_draft, save_custom_draft
 import unittest
 from ._support import (
@@ -79,6 +80,26 @@ class CreationAffinityBindingTests(CreationActionBase):
             self.character.db.affinity_elements,
             list(_T_ELF_SUBRACE.affinity_elements),
         )
+
+    @covers_requirement("player-character-creation::character-creation-enforces-canonical-identity-and-registry-compatibility")
+    def test_elf_male_custom_save_rejects_with_the_shared_code_and_message(self):
+        result = _creation_custom_adapter(
+            self.character,
+            custom_payload(
+                race="elf",
+                subrace=_T_ELF_SUBRACE.key,
+                allocations=balanced_allocations("elf", _T_ELF_SUBRACE.key),
+                affinity_elements=[],
+                sex="male",
+            ),
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "sex_not_allowed_for_race")
+        self.assertEqual(
+            result["message"], CREATION_REASON_MESSAGES["sex_not_allowed_for_race"]
+        )
+        self.assertIsNone(read_draft(self.character))
+        self.assertTrue(self.character.creation_pending)
 
 
 class CreationDispatchTests(CreationActionBase):
