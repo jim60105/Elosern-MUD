@@ -39,8 +39,8 @@ Run commands from the repository root unless a task says otherwise. `<env>` is a
 
 ## 7. Regeneration and final checks
 
-- [ ] 7.1 After all code edits, rerun `uv run --locked python -m tools.map_reference_context` and commit `content/map-reference-context.json`. Verify: `uv run --locked python -m tools.map_reference_context --check` exits 0.
-- [ ] 7.2 Verify the whole change, each as its own command: `uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb tests.test_map_reference_context tests.test_map_capture_snapshot tests.test_map_editor_service`; `cd packages/map-core && uv run --locked --extra generation python -m pytest tests`; `cd tools/map-editor && uv run --locked python -m pytest tests`; `pnpm --dir tools/map-editor/frontend test`; `uv run --locked python -m tools.contract_gate --change map-editor-monster-spawn-layer`; `openspec validate map-editor-monster-spawn-layer --strict`. All pass.
+- [x] 7.1 After all code edits, rerun `uv run --locked python -m tools.map_reference_context` and commit `content/map-reference-context.json`. Verify: `uv run --locked python -m tools.map_reference_context --check` exits 0.
+- [x] 7.2 Verify the whole change, each as its own command: `uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb tests.test_map_reference_context tests.test_map_capture_snapshot tests.test_map_editor_service`; `cd packages/map-core && uv run --locked --extra generation python -m pytest tests`; `cd tools/map-editor && uv run --locked python -m pytest tests`; `pnpm --dir tools/map-editor/frontend test`; `uv run --locked python -m tools.contract_gate --change map-editor-monster-spawn-layer`; `openspec validate map-editor-monster-spawn-layer --strict`. All pass.
 - [ ] 7.3 List the handoff mapping from each new test to its delta requirement and scenario in the change report, because `covers_requirement` annotations are added only after archive sync. Verify: every requirement in the four delta specs has at least one Python test named in the report.
 
 ## Workflow follow-up

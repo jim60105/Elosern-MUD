@@ -50,7 +50,8 @@ SETTLEMENT = f"content/maps/settlements/{synthetic.SETTLEMENT_ID}.yaml"
 PARTITION = "world/maps/data/district_partition.json"
 RIVER = "continent:waterway:synthetic_river"
 MONSTER_MARKS = '[data-kind="monster"]'
-MONSTER_POLYGONS = '[data-shape-ref^="monster_zone:"]'
+ZONE_REFS = [f"monster_zone:{row['key']}" for row in synthetic.MONSTER_SPAWNS["zones"]]
+SITE_REFS = [f"monster_site:{row['key']}" for row in synthetic.MONSTER_SPAWNS["sites"]]
 SPECIES = "synthetic_species_alpha"
 
 #: Reads the computed font size of every element matching a selector.
@@ -478,6 +479,9 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertEqual(self.names(), ["move_control_point"])
 
     # -- monster spawn layer (read-only) -------------------------------------
+    def polygons(self, page) -> int:
+        return sum(page.locator(f'[data-shape-ref="{ref}"]').count() for ref in ZONE_REFS)
+
     def show_monsters(self, page) -> None:
         page.check('[data-layer="monsters"]')
         self.wait_for(lambda: page.locator(MONSTER_MARKS).count() > 0, "the monster layer did not draw")
@@ -489,19 +493,20 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         marks = len(spawns["zones"]) + len(spawns["sites"])
         for viewport in (REFERENCE, LARGE):
             page = self.open(viewport)
-            self.assertEqual(page.locator('[data-qualified-ref^="monster_"]').count(), 0)
-            self.assertEqual(page.locator('[data-shape-ref^="monster_"]').count(), 0)
+            self.assertEqual(page.locator(MONSTER_MARKS).count(), 0)
+            for ref in ZONE_REFS + SITE_REFS:
+                self.assertEqual(page.locator(f'[data-qualified-ref="{ref}"]').count(), 0)
+            self.assertEqual(self.polygons(page), 0)
             self.assertFalse(page.is_checked('[data-layer="monsters"]'))
             self.show_monsters(page)
             self.assertEqual(page.locator(MONSTER_MARKS).count(), marks)
-            self.assertEqual(page.locator(MONSTER_POLYGONS).count(), polygons)
-            for zone in spawns["zones"]:
-                self.assertEqual(page.locator(f'[data-qualified-ref="monster_zone:{zone["key"]}"]').count(), 1)
-            for site in spawns["sites"]:
-                self.assertEqual(page.locator(f'[data-qualified-ref="monster_site:{site["key"]}"]').count(), 1)
+            self.assertEqual(self.polygons(page), polygons)
+            for ref in ZONE_REFS + SITE_REFS:
+                self.assertEqual(page.locator(f'[data-qualified-ref="{ref}"]').count(), 1)
             self.assertEqual(page.locator(f"{MONSTER_MARKS} text").count(), 0)
             self.assertEqual(page.locator(f"{MONSTER_MARKS} > title").count(), marks)
-            self.assertEqual(page.locator(f"{MONSTER_POLYGONS} > title").count(), polygons)
+            titled = sum(page.locator(f'[data-shape-ref="{ref}"] > title').count() for ref in ZONE_REFS)
+            self.assertEqual(titled, polygons)
             page.context.close()
         self.assertEqual(self.posts, [])
         self.assertEqual(self.changed(), set())
@@ -518,11 +523,16 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         for viewport in (REFERENCE, LARGE):
             page = self.open(viewport)
             page.fill("[data-search]", SPECIES)
-            results = page.locator('[data-search-result^="monster_"]')
-            self.wait_for(lambda: results.count() == len(owners), "the species search did not list every owner")
-            self.assertEqual({results.nth(i).get_attribute("data-search-result") for i in range(results.count())}, owners)
-            ref = results.first.get_attribute("data-search-result")
-            results.first.click()
+            results = page.locator("[data-search-result]")
+
+            def monster_results():
+                listed = [results.nth(i).get_attribute("data-search-result") for i in range(results.count())]
+                return [ref for ref in listed if ref.startswith("monster_")]
+
+            self.wait_for(lambda: set(monster_results()) == owners, "the species search did not list exactly its owners")
+            self.assertEqual(len(monster_results()), len(owners))
+            ref = monster_results()[0]
+            page.click(f'[data-search-result="{ref}"]')
             self.wait_for(
                 lambda: page.locator("[data-inspector-ref]").count() == 1
                 and page.locator("[data-inspector-ref]").inner_text() == ref,
@@ -570,7 +580,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.editor.reload(session["token"], session["session_generation"])
         self.wait_for(lambda: page.locator('[data-layer-note="monsters"]').count() == 1, "no unavailable note")
         self.assertEqual(page.locator(MONSTER_MARKS).count(), 0)
-        self.assertEqual(page.locator(MONSTER_POLYGONS).count(), 0)
+        self.assertEqual(self.polygons(page), 0)
         self.assertTrue(page.is_checked('[data-layer="monsters"]'))
         location = f"location:{synthetic.LOCATION_ID}"
         page.click(f'[data-object="{location}"]')
