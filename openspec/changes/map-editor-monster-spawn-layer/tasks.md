@@ -34,8 +34,8 @@ Run commands from the repository root unless a task says otherwise. `<env>` is a
 
 ## 6. Documentation
 
-- [ ] 6.1 In `docs/development/map-editor.md`, add `### 3.14 Monster spawn layer` before `## 4.` with subsections `#### 3.14.1 Data and references` (the export flow, both reference forms, read-only status and `searchTerms`), `#### 3.14.2 Artifact states` (the three states), and `#### 3.14.3 Human review record` (an empty dated template for the checks in `design.md` "Human review document"). Add `monster_spawns` to the `GET /api/workspace` payload keys in the §2 API table. Update §6: schema version 2 and a bullet for the `monster_spawns` section. Verify: `grep -n "3.14.3" docs/development/map-editor.md` finds the heading.
-- [ ] 6.2 In `docs/development/adding-monsters.md` Step 8, add one sentence in 正體中文 stating that regenerating also refreshes the map editor's monster spawn layer. Verify: `git diff --stat -- docs/development/adding-monsters.md` shows only that file's addition.
+- [x] 6.1 In `docs/development/map-editor.md`, add `### 3.14 Monster spawn layer` before `## 4.` with subsections `#### 3.14.1 Data and references` (the export flow, both reference forms, read-only status and `searchTerms`), `#### 3.14.2 Artifact states` (the three states), and `#### 3.14.3 Human review record` (an empty dated template for the checks in `design.md` "Human review document"). Add `monster_spawns` to the `GET /api/workspace` payload keys in the §2 API table. Update §6: schema version 2 and a bullet for the `monster_spawns` section. Verify: `grep -n "3.14.3" docs/development/map-editor.md` finds the heading.
+- [x] 6.2 In `docs/development/adding-monsters.md` Step 8, add one sentence in 正體中文 stating that regenerating also refreshes the map editor's monster spawn layer. Verify: `git diff --stat -- docs/development/adding-monsters.md` shows only that file's addition.
 
 ## 7. Regeneration and final checks
 
