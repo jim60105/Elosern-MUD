@@ -101,7 +101,8 @@ class MonsterSpawnSection:
 - `ReferenceContextDocument` gains a last field `monster_spawns: MonsterSpawnSection = MonsterSpawnSection()`. The default keeps the existing constructor calls in tests valid. Decoding still requires the key.
 - `to_dict` includes `"monster_spawns": self.monster_spawns.to_dict()`.
 - `MonsterSpawnSection.to_dict` sorts `zones` and `sites` by `key`, and keeps `pool` and `members` order. JSON key names are exactly the dataclass field names, and the shape matches the approved design's example. Rectangles and coordinates encode as lists.
-- `from_dict` uses one private helper, `_exact_keys(data, keys, what)`, which raises `ReferenceContextError` when `data` is not a mapping or its key set differs in either direction. A private `_integer(value, what)` rejects `bool` and non-`int`.
+- `from_dict` uses one private helper, `_exact_keys(data, keys, what)`, which raises `ReferenceContextError` when `data` is not a mapping or its key set differs in either direction. Private `_integer(value, what)` rejects `bool` and non-`int`, `_string(value, what)` rejects anything but a non-empty `str`, `_boolean(value, what)` rejects anything but `bool`, and `_rows(value, what)` rejects anything but a `list`.
+- Every field read in `from_dict` goes through one of those helpers, with `None` allowed only for `recover_after_ticks` and `individual_name_zh`. Every malformed value must therefore raise `ReferenceContextError`, never `TypeError`, `KeyError` or `AttributeError`, because `snapshot.read_external_context` catches only `ReferenceContextError` and `UnicodeDecodeError`.
 - Beyond the approved list, decoding also refuses a zone with an empty `rectangles` list, because the zone mark is drawn from the first rectangle. The game's `_check_rectangles` already refuses that.
 - `decode_reference_context` reads `monster_spawns` after `fingerprint`, so the existing error messages for partial documents stay reachable. A non-mapping value raises `ReferenceContextError`. It reads through `MonsterSpawnSection.from_dict`, not `data.get(..., {})`.
 - Update the module docstring's format layout.
@@ -124,7 +125,13 @@ def build_monster_spawn_section(
 ```
 
 - Rows may be real registry rows or `types.SimpleNamespace` stand-ins; it reads attributes only. A member row is built from `compositions[key].members`, `variants[member.variant_key]` and `species[variant.species_key]`.
-- `build_reference_context_document` calls it with `ECOLOGY_ZONE_REGISTRY`, `MONSTER_SITE_REGISTRY`, `ENCOUNTER_COMPOSITION_REGISTRY`, `MONSTER_VARIANT_REGISTRY`, `MONSTER_SPECIES_REGISTRY`, and `{key: row.display_name_zh for key, row in regions().items()}`, and passes the result as `monster_spawns=`.
+- It reads exactly these attributes, and test stand-ins must use the same names:
+  - `EcologyZone`: `key`, `region_key`, `rectangles`, `pool`, `lower_density`, `upper_density`, `cell_capacity`, `wave_budget`, `recovery_delay`, `replenishment_interval`.
+  - `WeightedComposition`: `composition_key`, `weight`.
+  - `MonsterSite`: `key`, `kind`, `region_key`, `coordinates`, `capacity`, `one_shot`, `recover_after_ticks`, `individual_name_zh`, `composition_key`.
+  - `EncounterComposition`: `members`. `CompositionMember`: `variant_key`, `minimum`, `maximum`.
+  - `MonsterVariant`: `species_key`, `display_name_zh`. `MonsterSpecies`: `display_name_zh`.
+- `build_reference_context_document` calls it with `ECOLOGY_ZONE_REGISTRY`, `MONSTER_SITE_REGISTRY` and `ENCOUNTER_COMPOSITION_REGISTRY` from `world.lore.monster_placement`, `MONSTER_VARIANT_REGISTRY` and `MONSTER_SPECIES_REGISTRY` from `world.lore.monster_species`, and `{key: row.display_name_zh for key, row in regions().items()}`, and passes the result as `monster_spawns=`. Add those imports to the existing lazy import block inside the function, because `world.*` must not load at module import.
 - `DISCOVERY_RULES` stays unchanged.
 
 ### D3. Service
@@ -182,8 +189,8 @@ export function monsterLayerState(workspace) {}  // { state, note, notice }
 Rules:
 
 - Species names come from the member rows in pool order, then member order, deduplicated by first appearance.
-- `monsterShapes`: for each zone and each rectangle at `index`, a shape `{ id: `monster-zone:${key}:${index}`, ref, role: "monster-zone", type: "polygon", points, label, layer: MONSTER_LAYER, selectable: true, hoverTitle: true, selected: chosen.has(ref) }`. `points` are the four corners in the footprint order, with `west = x_min * cell`, `east = (x_max + 1) * cell`, `south = y_min * cell`, `north = (y_max + 1) * cell`, where `cell = cellMetres(world)`.
-- `monsterMarks`: a zone mark `{ id: ref, kind: "monster", role: "monster-zone", glyph: ZONE_GLYPH, label, layer: MONSTER_LAYER, draggable: false, x, y }` at `x = (x_min + x_max + 1) / 2 * cell` and `y = (y_min + y_max + 1) / 2 * cell` of the first rectangle. A site mark has `role: "monster-site"`, `glyph: SITE_KIND_GLYPHS[site.kind]`, and sits at `x = (cx + 0.5) * cell`, `y = (cy + 0.5) * cell`.
+- `monsterShapes`: for each zone and each rectangle at `index`, a shape `{ id: `monster-zone:${key}:${index}`, ref, role: "monster-zone", type: "polygon", points, label, layer: MONSTER_LAYER, selectable: true, hoverTitle: true, selected: chosen.has(ref) }`. `points` are four `{ x, y }` objects in the footprint order SW, SE, NE, NW, with `west = x_min * cell`, `east = (x_max + 1) * cell`, `south = y_min * cell`, `north = (y_max + 1) * cell`, where `cell = cellMetres(world)`.
+- `monsterMarks`: a zone mark `{ id: ref, kind: "monster", role: "monster-zone", glyph: ZONE_GLYPH, label, layer: MONSTER_LAYER, draggable: false, x, y }` at `x = (x_min + x_max + 1) / 2 * cell` and `y = (y_min + y_max + 1) / 2 * cell` of the first rectangle. A site mark has `id: monsterSiteRef(site.key)`, `kind: "monster"`, `role: "monster-site"`, `glyph: SITE_KIND_GLYPHS[site.kind]`, `label`, `layer: MONSTER_LAYER`, `draggable: false`, and sits at `x = (cx + 0.5) * cell`, `y = (cy + 0.5) * cell`.
 - `monsterCatalogEntries` returns `{ ref, kind: "monster_zone" | "monster_site", domain: "continent", mapId: null, id: ref, label, parentLabel: "大陸", relativePath: MONSTER_SOURCE_PATH, layer: MONSTER_LAYER, frame, searchTerms }`.
   - Zone `frame`: `生態區矩形（1 km 格，含端點）：` followed by `x ${x_min}–${x_max}, y ${y_min}–${y_max}` per rectangle, joined with `；`.
   - Site `frame`: `座標：格 (${x}, ${y})（1 km 格）`.
@@ -211,7 +218,7 @@ return { state: "unavailable", note: `匯出資料不可用：${status.reasons?.
 
 - `lib/layers.js`: append `{ key: "monsters", label: "怪物生成（匯出・唯讀）", visible: false }` to `CONTINENT_LAYERS`.
 - `lib/search.js`: in `rank`, use `[entry.label, entry.id, entry.ref, ...(entry.searchTerms ?? [])]`.
-- `lib/objects.js`: `objectCatalog(world, monsterSpawns = null)` sets `monsterCatalogEntries(monsterSpawns)` after `relationshipEntries`.
+- `lib/objects.js`: `objectCatalog(world, monsterSpawns = null)` keeps its `if (!world) return catalog` guard and, after `relationshipEntries`, runs `for (const entry of monsterCatalogEntries(monsterSpawns)) catalog.set(entry.ref, entry);`. A mark's `id` must equal its catalog `ref`, because `toggleLayer`, the click path and `data-qualified-ref` all rely on it.
 - `lib/map_scene.js`: `continentScene(world, selection = [], partition = null, monsterSpawns = null)` appends `monsterShapes(world, monsterSpawns, chosen)` last in `shapes`, so polygons sit above the land and take clicks, and `monsterMarks(world, monsterSpawns)` last in `marks`. `sceneFor` gains `{ partition = null, monsterSpawns = null }`. `items` picks the marks up unchanged. `capture.js` keeps calling without the fourth argument.
 - `components/MapSurface.vue`:
   - The shape title condition becomes `(shape.derived || shape.hoverTitle) && shape.label && shape.showLabel !== false`.
@@ -281,7 +288,7 @@ Every new browser test method must be added to exactly one list in `.github/brow
 
 - [Region names come from `content/maps/continent.yaml`, which the source manifest excludes, and the editor can change one through `set_region_field`] → After such an edit the editor still reports the index as current and shows the old region name, while CI `--check` fails until the artifact is regenerated. This is kept as the approved design specifies, documented in `docs/development/map-editor.md`, and reported to the user as an open conflict. It affects only the region name row.
 - [A new site kind in the game would make the regenerated artifact undecodable, emptying the layer] → The vocabulary parity test fails in CI at the same change.
-- [Every later edit to `packages/map-core/**` or `tools/map_reference_context.py` makes the artifact stale] → Regeneration is the last implementation task, and `--check` runs after it.
+- [Every edit to `packages/map-core/**` or `tools/map_reference_context.py` makes the artifact stale, and the schema bump makes it undecodable] → Task 2.1 regenerates as soon as the exporter exists, the task list requires a rerun after any later edit to those paths, and task 7.1 runs it a final time before `--check`.
 - [Polygons above the land take clicks meant for the mainland] → The layer is hidden by default, and the mainland stays selectable from the object list.
 
 ## Migration Plan
