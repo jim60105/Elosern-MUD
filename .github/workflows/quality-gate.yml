@@ -475,6 +475,9 @@ jobs:
         # which loads the file-loadable capture page and renders it in
         # headless Chromium from the editor's own capture environment
         # (capture.py::build_missing and ::SETUP_GUIDANCE name both halves).
+        # No other top-level shard reaches that toolchain, so only the shard
+        # that owns the test pays for it.
+        if: contains(matrix.labels, 'tests.test_map_image_capture')
         run: |
           pnpm --dir tools/map-editor/frontend install --frozen-lockfile
           pnpm --dir tools/map-editor/frontend run build:capture
