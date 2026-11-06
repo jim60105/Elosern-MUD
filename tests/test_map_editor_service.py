@@ -15,6 +15,7 @@ import hashlib
 import json
 import shutil
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from tools.spec_traceability import covers_requirement
@@ -146,6 +147,44 @@ class EditorHttpBoundaryTests(_EditorCase):
             self.assertEqual(editor.workspace_state()["snapshot_revision"], 1)
             status, body = editor.reload(new["token"], new["session_generation"])
             self.assertEqual((status, body["changed"]), (200, False))
+
+
+class MonsterSpawnSectionTests(_EditorCase):
+    def _settled(self, editor, predicate):
+        """Reload, then poll the state until ``predicate`` holds (the file follower may publish first)."""
+
+        session = editor.session()
+        status, _ = editor.reload(session["token"], session["session_generation"])
+        self.assertEqual(status, 200)
+        deadline = time.monotonic() + 15
+        state = editor.workspace_state()
+        while not predicate(state) and time.monotonic() < deadline:
+            time.sleep(0.1)
+            state = editor.workspace_state()
+        return state
+
+    def test_the_workspace_state_publishes_the_section_and_its_rewrites(self):
+        target = synthetic.write_reference_context(self.workspace, monster_spawns=synthetic.MONSTER_SPAWNS)
+        with harness.EditorProcess(self.workspace) as editor:
+            state = editor.workspace_state()
+            self.assertTrue(state["external_context_status"]["current"])
+            self.assertEqual(state["monster_spawns"], synthetic.MONSTER_SPAWNS)
+            revision = state["snapshot_revision"]
+
+            # Only the section's bytes change: the fingerprint stays the same.
+            smaller = {"zones": synthetic.MONSTER_SPAWNS["zones"][:1], "sites": []}
+            synthetic.write_reference_context(self.workspace, monster_spawns=smaller)
+            state = self._settled(editor, lambda row: row["monster_spawns"] == smaller)
+            self.assertGreater(state["snapshot_revision"], revision)
+            self.assertEqual(state["monster_spawns"], smaller)
+            self.assertTrue(state["external_context_status"]["current"])
+
+            target.unlink()
+            empty = {"zones": [], "sites": []}
+            state = self._settled(editor, lambda row: row["monster_spawns"] == empty)
+            self.assertEqual(state["monster_spawns"], empty)
+            self.assertFalse(state["external_context_status"]["current"])
+            self.assertIsNotNone(state["world"])
 
 
 class RepositoryWorkspaceTests(_EditorCase):
