@@ -197,12 +197,14 @@ class MonsterSpawnExportTests(unittest.TestCase):
         self.section = exporter.build_monster_spawn_section(**self.registries)
         self.encoded = self.section.to_dict()
 
+    @covers_requirement("map-external-reference-context::reference-export-carries-the-monster-spawn-section")
     def test_shuffled_registries_encode_byte_identically(self):
         expected = encode_reference_context(_document_with(self.section))
         for seed in (1, 2, 3):
             section = exporter.build_monster_spawn_section(**_shuffled(self.registries, seed))
             self.assertEqual(encode_reference_context(_document_with(section)), expected)
 
+    @covers_requirement("map-external-reference-context::reference-export-carries-the-monster-spawn-section")
     def test_rows_sort_by_key_and_keep_authored_pool_and_member_order(self):
         self.assertEqual([row["key"] for row in self.encoded["zones"]], ["synthetic_zone_a", "synthetic_zone_b"])
         self.assertEqual([row["key"] for row in self.encoded["sites"]], ["synthetic_site_again", "synthetic_site_once"])
@@ -217,6 +219,7 @@ class MonsterSpawnExportTests(unittest.TestCase):
         )
         self.assertEqual(zone["rectangles"], [[2, 3, 4, 5], [6, 7, 8, 9]])
 
+    @covers_requirement("map-external-reference-context::reference-export-carries-the-monster-spawn-section")
     def test_member_names_resolve_and_regions_stay_keys(self):
         member = self.encoded["sites"][0]["members"][1]
         self.assertEqual(
@@ -234,6 +237,7 @@ class MonsterSpawnExportTests(unittest.TestCase):
             self.assertEqual(row["region_key"], "synthetic_region")
             self.assertNotIn("region_name_zh", row)
 
+    @covers_requirement("map-external-reference-context::reference-export-carries-the-monster-spawn-section")
     def test_one_shot_and_recoverable_site_fields(self):
         sites = {row["key"]: row for row in self.encoded["sites"]}
         once, again = sites["synthetic_site_once"], sites["synthetic_site_again"]
@@ -245,6 +249,7 @@ class MonsterSpawnExportTests(unittest.TestCase):
         )
         self.assertEqual(once["coordinates"], [5, 6])
 
+    @covers_requirement("map-external-reference-context::reference-export-carries-the-monster-spawn-section")
     def test_placement_and_species_sources_are_in_the_source_manifest(self):
         doc = exporter.build_reference_context_document()
         self.assertIn("world/lore/monster_placement.py", doc.source_manifest)
@@ -265,6 +270,7 @@ class MonsterSpawnDecodeTests(unittest.TestCase):
         with self.assertRaises(ReferenceContextError):
             decode_reference_context(json.dumps(payload))
 
+    @covers_requirement("map-external-reference-context::reference-decoding-refuses-a-malformed-monster-spawn-section")
     def test_encode_decode_round_trip(self):
         section = exporter.build_monster_spawn_section(**_synthetic_registries())
         encoded = encode_reference_context(_document_with(section))
@@ -272,6 +278,7 @@ class MonsterSpawnDecodeTests(unittest.TestCase):
         self.assertEqual(decoded.monster_spawns, section)
         self.assertEqual(encode_reference_context(decoded), encoded)
 
+    @covers_requirement("map-external-reference-context::reference-decoding-refuses-a-malformed-monster-spawn-section")
     def test_refused_section_shapes(self):
         cases = {
             "unknown section key": lambda s: s.update(extra=[]),
@@ -291,6 +298,7 @@ class MonsterSpawnDecodeTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertRefused(mutate)
 
+    @covers_requirement("map-external-reference-context::reference-decoding-refuses-a-malformed-monster-spawn-section")
     def test_wrong_typed_values_raise_the_reference_context_error(self):
         cases = {
             "pool not a list": lambda s: s["zones"][0].update(pool={}),
@@ -306,6 +314,7 @@ class MonsterSpawnDecodeTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertRefused(mutate)
 
+    @covers_requirement("map-external-reference-context::reference-decoding-refuses-a-malformed-monster-spawn-section")
     def test_schema_version_one_and_missing_section_are_refused(self):
         payload = _valid_payload()
         with self.assertRaises(ReferenceContextError):

@@ -163,6 +163,7 @@ class MonsterSpawnSectionTests(_EditorCase):
             state = editor.workspace_state()
         return state
 
+    @covers_requirement("map-editor-service::workspace-state-publishes-the-monster-spawn-section")
     def test_the_workspace_state_publishes_the_section_and_its_rewrites(self):
         target = synthetic.write_reference_context(self.workspace, monster_spawns=synthetic.MONSTER_SPAWNS)
         with harness.EditorProcess(self.workspace) as editor:

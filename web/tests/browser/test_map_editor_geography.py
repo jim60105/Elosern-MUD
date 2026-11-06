@@ -486,6 +486,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         page.check('[data-layer="monsters"]')
         self.wait_for(lambda: page.locator(MONSTER_MARKS).count() > 0, "the monster layer did not draw")
 
+    @covers_requirement("map-editor-geography::monster-spawn-layer-draws-zones-and-sites-on-the-continent")
     def test_the_monster_layer_is_hidden_until_shown_and_draws_without_labels(self):
         self.start(_with_monsters)
         spawns = synthetic.MONSTER_SPAWNS
@@ -511,6 +512,8 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertEqual(self.posts, [])
         self.assertEqual(self.changed(), set())
 
+    @covers_requirement("map-editor-interaction::monster-spawn-objects-are-selectable-searchable-and-read-only")
+    @covers_requirement("map-editor-interaction::monster-spawn-inspector-shows-what-a-place-spawns")
     def test_a_species_search_reaches_a_read_only_monster_inspector(self):
         self.start(_with_monsters)
         owners = {
@@ -573,6 +576,7 @@ class MapEditorGeographyBrowserTest(unittest.TestCase):
         self.assertEqual(self.posts, [])
         self.assertEqual(self.changed(), set())
 
+    @covers_requirement("map-editor-interaction::monster-spawn-layer-reports-the-artifact-state")
     def test_the_monster_layer_reports_stale_and_unavailable_artifacts(self):
         self.start(_with_stale_monsters)
         page = self.open()
