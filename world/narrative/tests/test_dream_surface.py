@@ -325,6 +325,19 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(physical, self.physical())
         self.assertEqual(service.dream_state(self.actor)["sleep"]["seconds"], 10)
 
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
+    )
+    def test_a_departure_result_always_republishes_the_dream_panel(self):
+        """The client learns the dream ended even with no continuation to run."""
+        self.enter()
+        result = self.request("awaken").result
+        self.assertEqual(result["outcome"], "success")
+        # The retained-sleep settlement publishes only when it is authorized
+        # for this receipt; the departure's own result is what must name the
+        # surface it changed, or a client keeps showing an open dream forever.
+        self.assertEqual(tuple(result["affected_panels"]), ("dream",))
+
     @covers_requirement('observability-logging::llm-and-narrative-diagnostic-correlation')
     def test_generation_failure_event_names_the_actual_call_and_player_input(self):
         self.enter(tick_from=90, tick_to=100, requested_seconds=10)

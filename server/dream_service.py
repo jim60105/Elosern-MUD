@@ -425,16 +425,12 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                 text = state["ending"] or "故事方向已存為私人草稿。"
                 actor.msg(text)
                 log_info("dream_surface_action", context={**boundary, "completed": state["completed"], "tick": tick})
-                return _result(
-                    "success",
-                    "dream_" + action,
-                    text,
-                    panels=(
-                        ()
-                        if action in {"confirm", "awaken"}
-                        else ("dream",)
-                    ),
-                )
+                # The departure changes the dream surface itself, so its result
+                # always names that panel. The retained-sleep settlement runs
+                # as a continuation that only publishes when it is authorized
+                # for this receipt; when it is not, naming the panel here is
+                # the only thing that tells the client the dream ended.
+                return _result("success", "dream_" + action, text)
     except lifecycle.DreamInputRejected as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": error.code}, exc=error)
         text = "交流文字不可空白。" if error.code == lifecycle.REASON_EMPTY_INPUT else "交流文字上限為 4000 字。"
