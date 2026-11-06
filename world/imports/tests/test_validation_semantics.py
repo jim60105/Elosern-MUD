@@ -110,6 +110,7 @@ class SemanticValidationTests(TestCase):
             record["race"] = "missing"
             self.assertTrue(_check_race_subrace(record))
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_a_non_female_elf_record_is_rejected(self):
         # The race declares exactly one permitted sex; the forbidden member is
         # derived from that row, never a literal pair.
@@ -123,6 +124,7 @@ class SemanticValidationTests(TestCase):
         self.assertEqual(len(issues), 1)
         self.assertEqual(issues[0].field, "sex")
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_a_permitted_sex_produces_no_sex_issue(self):
         race = make_race("t_single_sex_race", allowed_sexes=("female",))
         with synthetic_registries("races", "subraces", extra={"races": {race.key: race}}):
@@ -131,6 +133,7 @@ class SemanticValidationTests(TestCase):
             record["sex"] = race.allowed_sexes[0]
             self.assertEqual(_check_sex_for_race(record), [])
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_races_that_permit_the_value_produce_no_sex_issue(self):
         with synthetic_registries("races", "subraces"):
             record = _kit_record()
@@ -139,12 +142,14 @@ class SemanticValidationTests(TestCase):
                     record["sex"] = member
                     self.assertEqual(_check_sex_for_race(record), [])
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_an_unresolvable_race_leaves_the_sex_judgement_to_the_race_check(self):
         record = _kit_record()
         record["race"] = "t_absent_race"
         record["sex"] = "male"
         self.assertEqual(_check_sex_for_race(record), [])
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_the_sex_check_applies_to_npc_targets_too(self):
         race = make_race("t_single_sex_race", allowed_sexes=("female",))
         branch = make_subrace("t_single_sex_branch", race_key=race.key)

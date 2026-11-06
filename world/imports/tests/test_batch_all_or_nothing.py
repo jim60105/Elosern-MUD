@@ -165,6 +165,7 @@ class BatchTests(BatchFileHarness, EvenniaTestCase):
             ["human_reference", "second_reference"],
         )
 
+    @covers_requirement("import-validation::a-character-record-s-sex-must-be-permitted-by-its-race")
     def test_a_non_female_elf_record_persists_nothing_from_the_batch(self):
         import importlib
 

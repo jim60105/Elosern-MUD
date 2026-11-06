@@ -171,7 +171,9 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
 
 #### Scenario: An omitted sex is normalized into the draft
 - **WHEN** a custom draft saves with a payload that omits `sex` or sends it null
-- **THEN** the persisted draft stores `DEFAULT_SEX` as a concrete `SEX_VALUES` member and the panel rebuild carries that value
+- **THEN** the persisted draft stores the race-permitted default — `DEFAULT_SEX` when the selected race
+  permits that member, otherwise that race's single permitted sex — as a concrete `SEX_VALUES`
+  member, and the panel rebuild carries that value
 
 #### Scenario: Activation clears the draft atomically
 - **WHEN** `creation.activate` commits successfully
@@ -186,7 +188,7 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
 - **THEN** the first commit flips `creation_pending` to false and clears the draft, the second fails its re-checked pending or ownership validation, and the character activates exactly once
 
 #### Scenario: Invalid draft input is rejected without mutation
-- **WHEN** a custom draft is saved with a name containing a markup delimiter, an out-of-range age value, an unknown race, an incompatible or missing subrace, an over-bound background, a malformed persona block, allocations outside the profile bounds or budget, an affinity set that violates the race-dependent maximum, or a `sex` outside `SEX_VALUES`
+- **WHEN** a custom draft is saved with a name containing a markup delimiter, an out-of-range age value, an unknown race, an incompatible or missing subrace, an over-bound background, a malformed persona block, allocations outside the profile bounds or budget, an affinity set that violates the race-dependent maximum, or a `sex` outside `SEX_VALUES` or outside the selected race's declared set
 - **THEN** the save is rejected with a stable reason, no value is persisted, and the character remains pending with its prior draft unchanged
 
 #### Scenario: A pre-version draft is treated as absent
@@ -210,9 +212,10 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
   bounded text fields) accepted only through the custom-save payload, and the accepted `sex`
 
 #### Scenario: An unknown sex member is rejected at save time
-- **WHEN** a custom draft saves with a `sex` that names a member outside `SEX_VALUES`
-- **THEN** the save rejects — normalization at save time only maps an absent or null value to
-  `DEFAULT_SEX`, yielding a concrete `SEX_VALUES` member
+- **WHEN** a custom draft saves with a `sex` that names a member outside `SEX_VALUES`, or a
+  `SEX_VALUES` member the selected race does not permit
+- **THEN** the save rejects — normalization at save time only maps an absent or null value to the
+  race-permitted default, yielding a concrete `SEX_VALUES` member
 
 #### Scenario: No concept stage exists
 - **WHEN** the draft stages are enumerated
@@ -221,7 +224,7 @@ The deterministic core SHALL provide a creation-wizard draft service that is the
 #### Scenario: Preflight covers every accepted custom value
 - **WHEN** a custom draft save runs its preflight validation
 - **THEN** it checks a required, registered, race-compatible subrace, a bounded optional
-  background, the nullable persona block, and the sex normalization before persisting
+  background, the nullable persona block, and the race-aware sex normalization before persisting
 
 #### Scenario: The persona is stored verbatim with no carry-over
 - **WHEN** a custom draft saves a persona block after an earlier draft held a different one

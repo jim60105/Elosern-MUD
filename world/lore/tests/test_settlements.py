@@ -475,6 +475,9 @@ class PlaceRegistryTests(unittest.TestCase):
     def test_unknown_host_sex_is_rejected(self):
         self._assert_rejected(self._plant(self.store, host_sex="unknown"))
 
+    @covers_requirement(
+        "settlement-place-registry::a-place-s-authored-host-sex-must-be-permitted-by-the-host-s-race"
+    )
     def test_an_elf_host_with_a_forbidden_sex_fails_load(self):
         forbidden = next(
             member for member in SEX_VALUES
@@ -490,6 +493,9 @@ class PlaceRegistryTests(unittest.TestCase):
             forbidden,
         )
 
+    @covers_requirement(
+        "settlement-place-registry::a-place-s-authored-host-sex-must-be-permitted-by-the-host-s-race"
+    )
     def test_a_permitted_host_sex_still_loads(self):
         permitted = RACE_REGISTRY["elf"].allowed_sexes[0]
         place = self._plant(

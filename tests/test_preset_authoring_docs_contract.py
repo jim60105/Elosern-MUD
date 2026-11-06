@@ -131,6 +131,9 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         documented = synthesized + "另有 `key` 成對。\n"
         self.assertEqual(undocumented_field_names(documented, ["key"]), [])
 
+    @covers_requirement(
+        "preset-authoring-docs::the-preset-guide-documents-the-race-bounded-sex-rule"
+    )
     def test_the_validator_table_documents_the_race_bounded_sex_rule(self):
         guide = GUIDE_PATH.read_text(encoding="utf-8")
         rows = [
@@ -143,6 +146,9 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         self.assertIn("allowed_sexes", row)
         self.assertIn("does not permit", row)
 
+    @covers_requirement(
+        "preset-authoring-docs::the-preset-guide-documents-the-race-bounded-sex-rule"
+    )
     def test_the_mistake_table_carries_the_elf_sex_case(self):
         guide = GUIDE_PATH.read_text(encoding="utf-8")
         self.assertIn("## 5. 常見錯誤", guide)
