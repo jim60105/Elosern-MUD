@@ -93,8 +93,17 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.webclient_url = server.runtime.webclient_url
         return server
 
-    def refusals(self) -> str:
-        """Every dream-surface refusal the live servers logged, newest last."""
+    #: The events that say what the service did with the departure: one of the
+    #: dream-surface outcomes, or an admission refusal before the adapter ran.
+    EVENT_NAMES = (
+        "dream_surface_action",
+        "dream_surface_rejected",
+        "owner_sleep_continuation_deferred",
+        "ui_action_refused",
+    )
+
+    def events(self) -> str:
+        """The service's own account of the departure, newest last."""
         found: list[str] = []
         for server in self.servers:
             log = server.runtime.log_dir / "server.log"
@@ -105,9 +114,9 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
                 for line in log.read_text(
                     encoding="utf-8", errors="replace"
                 ).splitlines()
-                if "dream_surface_rejected" in line
+                if any(name in line for name in self.EVENT_NAMES)
             )
-        return "\n".join(found[-5:]) or "(the server logged no refusal)"
+        return "\n".join(found[-8:]) or "(the server logged nothing about it)"
 
     def enter_dream(self, page) -> None:
         """Enter the committed dream through the wait card's sleep question."""
@@ -237,12 +246,13 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.assertTrue(reply.is_enabled())
         self.assertTrue(page2.locator(REPLY_SEND).is_enabled())
         reply.fill("")
-        # A narrative beat locks the transport and the control's refusal is
-        # silent, so an activation that lands in the instant the lock appears
-        # never crosses the wire; the enabled check and the handler's guard are
-        # two different reads of that lock. The recorder proves the dispatch,
-        # so activate again while nothing has crossed instead of assuming the
-        # first click landed outside that window.
+        # A narrative beat locks the transport, and the control's refusal is
+        # silent: the enabled state Playwright checks and the lock the handler
+        # reads are two different reads of the same guard, so an activation
+        # landing in the instant the lock appears never crosses the wire. The
+        # recorder proves the crossing, so activate again while nothing has
+        # crossed -- and stop at the first crossing, so a late publication can
+        # never be masked by a second attempt.
         install_outbound_recorder(page2)
         awaken_row = page2.locator(AWAKEN_ROW)
         dispatched = sent_action_count(page2, "dream.awaken")
@@ -257,10 +267,9 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
             dispatched + 1,
             "the awakening never left the client",
         )
-        # The committed dream is what the awakening ends, so the journey waits
-        # for that fact and then for the surface to leave the player's view.
-        # The panel keeps its snapshot entry while the ending settles, so
-        # neither that key nor its detachment is the thing to wait on.
+        # The committed dream is what the awakening ends: the panel keeps its
+        # snapshot entry while the ending settles, so the open flag is the fact
+        # to wait on, and the surface must then leave the player's view.
         try:
             wait_for_store_state(
                 page2,
@@ -272,13 +281,8 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
                 ),
                 timeout=60000,
             )
-        except AssertionError:
-            # The service logs why it refused the request, and that reason is
-            # what separates a stale surface from a control change or a lost
-            # ownership check.
-            raise AssertionError(
-                "the awakening was refused:\n" + self.refusals()
-            ) from None
+        except AssertionError as error:
+            raise AssertionError(f"{error}\n\n{self.events()}") from None
         self.assertFalse(
             page2.locator(PANEL).is_visible(),
             "the dream surface stayed in front of the player",
