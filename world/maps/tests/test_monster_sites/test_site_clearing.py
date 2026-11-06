@@ -53,14 +53,14 @@ class MonsterSiteClearingTests(_MonsterSiteFixture):
         # interval end the advance happened to stop at.
         self.assertEqual(state.cleared_at_tick, 0)
 
-        # Four in-game hours later -- four times the recoverable camp's own
-        # one-hour window, so the same advance recovers what may recover --
-        # and on re-entry the one-shot site creates nothing: the defeated rows
-        # stay dead in place. The span is bounded by the authored recovery
-        # windows rather than an arbitrary day: a skipped day settles 2,880
-        # ambient movement boundaries and costs minutes of runner time without
-        # observing one more site decision.
-        self.clock.advance(4 * HOUR, AdvanceSource.SKIP, [])
+        # One in-game hour later -- the recoverable camp's own window, so the
+        # advance settles every recovery decision a site can make -- and on
+        # re-entry the one-shot site creates nothing: the defeated rows stay
+        # dead in place. The span is the authored window rather than a multiple
+        # of it, because the boundaries beyond the first deciding one settle
+        # the same decision again: each costs seconds of runner time and
+        # observes nothing the test states.
+        self.clock.advance(HOUR, AdvanceSource.SKIP, [])
         self.wilderness.mapprovider.at_prepare_room(PROBE, self.char1, self.room)
         self.assertEqual(
             site_state(NEST_KEY, wilderness=self.wilderness).state,
