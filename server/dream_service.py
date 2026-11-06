@@ -421,6 +421,13 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                         surface.store_direction(actor, summary)
                     lifecycle.awaken_session(session_id, owner, tick=tick)
                     authorize_departure_continuation(actor)
+                    # The departure is only durable once this transaction
+                    # commits, so the surface it changed is published after
+                    # that: the retained-sleep continuation publishes only when
+                    # this receipt authorizes one for the moment of departure,
+                    # and a client that is told nothing keeps showing the dream
+                    # it has already left.
+                    on_publication_commit(lambda: _refresh(actor, session))
                 state = dream_state(actor)
                 text = state["ending"] or "故事方向已存為私人草稿。"
                 actor.msg(text)
