@@ -25,8 +25,10 @@ from ._support import (
     _coordinator,
     _presenter_registry,
     _proof_spec,
+    _registry,
     _sequence_state_for_test,
 )
+from web.webclient.presentation.registry import PresenterSpec
 
 
 class DispatcherTests(unittest.TestCase):
@@ -244,6 +246,60 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual(update_rev, result_rev)
         self.assertEqual(results[-1]["ui_action_result"][0][0]["outcome"], "success")
         self.assertFalse(getattr(session.ndb, "elosern_dispatch", None).in_flight)
+
+    @covers_requirement(
+        "webclient-action-dispatch::admitted-action-completion-publishes-canonical-state-before-unlocking"
+    )
+    def test_a_departure_republishes_the_panel_it_declares(self):
+        """The panel a departure emptied reaches its client.
+
+        A departure is the case where a panel's whole state disappears: the
+        ended dream publishes no state rather than a closed one. The adapter
+        declares the panel it changed, so the completion compares that panel
+        and transmits its new value; a completion that published nothing here
+        would leave the client showing a dream its player has already left.
+        """
+        canonical = {"state": {"open": True, "revision": 1}}
+        presentation = _registry(
+            PresenterSpec(
+                name="dream",
+                schema_version=3,
+                unavailable_reason=("dream_unavailable", "夢境目前無法顯示"),
+                presenter=lambda context: {
+                    "schema_version": 3,
+                    "available": True,
+                    "state": canonical["state"],
+                },
+            )
+        )
+        session = self._session_with_coordinator(presentation)
+        registry = ActionRegistry("test")
+        registry.register(
+            _proof_spec(
+                adapter=lambda actor, payload, session=None: {
+                    "outcome": "success",
+                    "code": "dream_awakened",
+                    "message": "你醒了。",
+                    "affected_panels": ("dream",),
+                }
+            )
+        )
+        coordinator = session.ndb.elosern_coordinator
+        coordinator.full_snapshot(
+            SimpleNamespace(actor=session.puppet, protocol_version=1)
+        )
+        canonical["state"] = None
+        envelope = self._envelope(
+            epoch=coordinator.epoch,
+            base_revision=coordinator.revision,
+            action_id="proof.noop",
+        )
+        handle_ui_action(session, session.puppet, envelope, registry, presentation)
+        updates = [call for call in session.sent if "ui_update" in call]
+        self.assertTrue(updates, "the departure published nothing for its client")
+        published = updates[-1]["ui_update"][0][0]["panels"]
+        self.assertEqual(sorted(published), ["dream"])
+        self.assertIsNone(published["dream"]["state"])
 
     @covers_requirement(
         "webclient-combat-menu::terminal-combat-outcomes-refresh-all-mode-relevant-panels"
