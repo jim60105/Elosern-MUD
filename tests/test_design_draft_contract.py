@@ -1,7 +1,7 @@
 """Repository-wide contract for the committed Vue-migration design draft (設計稿).
 
 The validated static single-screen showcase is committed verbatim under
-``docs/design/elosern-redesign/`` with its self-hosted woff2 set under
+``docs/design/legacy-design/elosern-redesign/`` with its self-hosted woff2 set under
 ``docs/design/fonts-dl/`` (roadmap A1, change
 ``webclient-vue-00-audit-and-design-docs``). It is the design reference the
 B-wave component changes build against, so it must stay a self-contained,
@@ -17,10 +17,10 @@ import unittest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DESIGN_ROOT = REPO_ROOT / "docs" / "design"
-DESIGN_DIR = DESIGN_ROOT / "elosern-redesign"
+DESIGN_DIR = DESIGN_ROOT / "legacy-design" / "elosern-redesign"
 SIDEBAR = REPO_ROOT / "docs" / "_sidebar.md"
 
-SIDEBAR_LINK_TARGET = "/design/elosern-redesign/index"
+SIDEBAR_LINK_TARGET = "/design/legacy-design/elosern-redesign/index"
 REMOTE_SCHEMES = ("http://", "https://")
 REMOTE_REFERENCE = re.compile(r"""(?:src|href)\s*=\s*["']\s*//|url\(\s*["']?//""")
 CSS_URL = re.compile(r"url\(\s*['\"]?([^'\")]+?)['\"]?\s*\)")

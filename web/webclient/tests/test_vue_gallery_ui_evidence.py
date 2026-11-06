@@ -32,7 +32,7 @@ GALLERY_COMPONENTS = TESTS_DIR / "components" / "gallery.test.js"
 GALLERY_STAGE = TESTS_DIR / "components" / "stage_transform.test.js"
 GALLERY_APP_CLIENT = TESTS_DIR / "app_client_gallery.test.js"
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
-FRAME_GUIDE = REPO_ROOT / "docs/design/elosern-redesign2/gallery-storyboard.md"
+FRAME_GUIDE = REPO_ROOT / "docs/design/legacy-design/elosern-redesign2/gallery-storyboard.md"
 
 # Every gallery story family registered in the frozen component manifest: the
 # five component families plus the interactive Storyboard export.
