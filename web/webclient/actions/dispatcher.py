@@ -31,7 +31,7 @@ from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
 from web.webclient.actions.registry import ActionRegistry
-from world.observability import log_error, log_warn
+from world.observability import log_error, log_info, log_warn
 from world.rules.combat_beats import RoundRecord
 
 from web.webclient.presentation.context import PresentationContext
@@ -237,10 +237,20 @@ def handle_ui_action(
 
     # Epoch and base revision must equal the newest values issued to the live
     # sequence before any action-specific validation or adapter invocation.
+    # Every admission refusal is reported here: an action refused before its
+    # adapter runs leaves no trace anywhere else, so a journey that watches for
+    # "the service answered" cannot tell a refusal from a lost request.
+    refusal = {
+        "char": str(getattr(getattr(session, "puppet", None), "pk", "?")),
+        "request": request_id,
+        "action": action["action_id"],
+    }
     if action["presentation_epoch"] != coordinator.epoch:
+        log_info("ui_action_refused", context={**refusal, "reason": "stale_epoch"})
         _send_stale(session, coordinator, state, request_id)
         return
     if action["base_revision"] != coordinator.revision:
+        log_info("ui_action_refused", context={**refusal, "reason": "stale_revision"})
         _send_stale(session, coordinator, state, request_id)
         return
 
@@ -264,6 +274,7 @@ def handle_ui_action(
         return
 
     if state.in_flight:
+        log_info("ui_action_refused", context={**refusal, "reason": "busy"})
         _send_action_result(
             session, coordinator.epoch, request_id, _safe_busy_result(), coordinator.revision
         )
