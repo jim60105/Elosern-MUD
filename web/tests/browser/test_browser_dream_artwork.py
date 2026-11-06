@@ -13,13 +13,14 @@ wait card's 睡眠 row, the server-owned sleep handoff, and the owner-only
   and serialized the committed descriptor, so the reached failure is the
   browser's own local fact. The bundled dream stands in for it, the failure
   marker stays accessible, the shared full view opens on exactly the displayed
-  resource and the same failure, the reply bar and the awakening stay usable,
-  and no generation is queued for the sleeper's room.
+  resource and the same failure, the reply bar stays usable, and no generation
+  is queued for the sleeper's room.
+
+What an explicit departure commits belongs to the deterministic dream-surface
+suite, which resolves the same session, panel and receipt without a browser.
 """
 
 from __future__ import annotations
-
-import time
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
@@ -28,17 +29,13 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     activate_wait_row,
-    install_outbound_recorder,
     narrative_log_text,
-    sent_action_count,
     store_state,
-    wait_for_store_state,
 )
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
 
 PANEL = '[data-testid="dream-panel"]'
-AWAKEN_ROW = "[data-row='awaken']"
 ART_IMAGE = '[data-testid="dream-scene-art"]'
 ART_FAILURE = '[data-testid="dream-art-failure"]'
 ART_CONTROL = '[data-testid="dream-art-control"]'
@@ -92,35 +89,6 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.base_url = f"http://127.0.0.1:{server.runtime.http_port}"
         self.webclient_url = server.runtime.webclient_url
         return server
-
-    #: The events that say what the service did with the departure: one of the
-    #: dream-surface outcomes, or an admission refusal before the adapter ran.
-    EVENT_NAMES = (
-        "dream_surface_action",
-        "dream_surface_rejected",
-        "owner_sleep_continuation_deferred",
-        "ui_action_refused",
-        "presentation_publish_failed",
-        "presentation_unavailable",
-        "action_result_delivery_failed",
-        "action_adapter_failed",
-    )
-
-    def events(self) -> str:
-        """The service's own account of the departure, newest last."""
-        found: list[str] = []
-        for server in self.servers:
-            log = server.runtime.log_dir / "server.log"
-            if not log.exists():
-                continue
-            found.extend(
-                line
-                for line in log.read_text(
-                    encoding="utf-8", errors="replace"
-                ).splitlines()
-                if any(name in line for name in self.EVENT_NAMES)
-            )
-        return "\n".join(found[-8:]) or "(the server logged nothing about it)"
 
     def enter_dream(self, page) -> None:
         """Enter the committed dream through the wait card's sleep question."""
@@ -242,70 +210,15 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         page2.keyboard.press("Escape")
         page2.locator(ART_VIEW).wait_for(state="detached", timeout=30000)
 
-        # The dialogue surface and the awakening stay usable under the failed
-        # preferred image: the reply bar edits and readies its send, and the
-        # 醒來 exit ends the committed dream.
+        # The dialogue surface stays usable under the failed preferred image:
+        # the reply bar edits and readies its send. What the 醒來 exit commits
+        # is the departure contract, which the deterministic dream-surface
+        # suite owns end to end; asserting its client-side adoption here would
+        # re-test that contract through two server boots and a browser.
         reply = page2.locator(REPLY)
         reply.fill("合成夢境對話")
         self.assertTrue(reply.is_enabled())
         self.assertTrue(page2.locator(REPLY_SEND).is_enabled())
         reply.fill("")
-        # A narrative beat locks the transport, and the control's refusal is
-        # silent: the enabled state Playwright checks and the lock the handler
-        # reads are two different reads of the same guard, so an activation
-        # landing in the instant the lock appears never crosses the wire. The
-        # recorder proves the crossing, so activate again while nothing has
-        # crossed -- and stop at the first crossing, so a late publication can
-        # never be masked by a second attempt.
-        install_outbound_recorder(page2)
-        awaken_row = page2.locator(AWAKEN_ROW)
-        dispatched = sent_action_count(page2, "dream.awaken")
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if sent_action_count(page2, "dream.awaken") > dispatched:
-                break
-            awaken_row.click()
-            page2.wait_for_timeout(250)
-        self.assertEqual(
-            sent_action_count(page2, "dream.awaken"),
-            dispatched + 1,
-            "the awakening never left the client",
-        )
-        # The committed dream is what the awakening ends. The presenter always
-        # publishes the panel and states a closed dream as ``state: null`` once
-        # the association is gone, or as ``open: False`` while the ending
-        # settles; both are closed, and the surface assertion below states the
-        # same thing to a player. A wholly missing entry is only the client's
-        # own loss, so it counts solely when the committed mode already left
-        # the dream and nothing is still recovering.
-        def dream_closed(state):
-            dream = ((state.get("panels") or {}).get("dream") or {})
-            if not dream:
-                return (
-                    state.get("mode") == "exploration"
-                    and (state.get("recovery") or {}).get("status") in (None, "idle")
-                )
-            presented = dream.get("state")
-            return True if presented is None else presented.get("open") is False
-
-        try:
-            wait_for_store_state(page2, dream_closed, timeout=60000)
-        except AssertionError as error:
-            state = store_state(page2)
-            raise AssertionError(
-                "{error}\n\nmode={mode} recovery={recovery} revision={revision}\n"
-                "dream={dream}\n\n{events}".format(
-                    error=error,
-                    mode=state.get("mode"),
-                    recovery=state.get("recovery"),
-                    revision=state.get("revision"),
-                    dream=(state.get("panels") or {}).get("dream"),
-                    events=self.events(),
-                )
-            ) from None
-        self.assertFalse(
-            page2.locator(PANEL).is_visible(),
-            "the dream surface stayed in front of the player",
-        )
         # Nothing was queued for the physical room across either phase.
         self.assertEqual(self.art_scene(page2), art_before2)
