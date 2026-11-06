@@ -17,6 +17,8 @@ const props = defineProps({
   results: { type: Array, default: () => [] },
   mapOptions: { type: Array, default: () => [] },
   currentMapId: { type: String, default: null },
+  // Per-layer explanation under its row (the unavailable monster export).
+  layerNotes: { type: Object, default: () => ({}) },
 });
 const emit = defineEmits(["layer", "tree", "choose", "result", "query", "map"]);
 
@@ -60,6 +62,7 @@ function selectMap(event) {
             />
             {{ layer.label }}
           </label>
+          <p v-if="layerNotes[layer.key]" class="inspector__muted" :data-layer-note="layer.key">{{ layerNotes[layer.key] }}</p>
         </li>
       </ul>
     </template>
