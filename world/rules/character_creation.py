@@ -11,9 +11,10 @@ from world.imports.schema import MAX_ENTITY_KEY_LENGTH
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, PlayerPreset
 from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY, StatModifiers
-from world.lore.sex import DEFAULT_SEX, SEX_VALUES
+from world.lore.sex import DEFAULT_SEX
 from world.lore.starting_kits import SUBRACE_STARTING_KIT_REGISTRY
 from world.rules.equipment import toggle_equipment
+from world.rules.identity import IdentityError, resolve_sex
 from world.rules.progression import (
     lineage_ownership_closure,
     seed_lineage_proficiency,
@@ -282,24 +283,20 @@ def _validate_age(value: Any, field: str) -> int:
     return value
 
 
-def _validate_sex(value: Any) -> str:
-    """Validate the optional creation sex channel into one concrete member.
+def _validate_sex(value: Any, race_key: str) -> str:
+    """Validate the sex channel against the race's declared set.
 
-    An omitted or ``None`` sex normalizes to ``DEFAULT_SEX`` (the same
-    accept-the-default convention as the optional background); any other
-    value must be an exact ``SEX_VALUES`` member. Membership is checked here,
-    not at the wire layer (namegen-creation-ui design D2): the WebClient
-    adapter forwards bounded strings verbatim so every entry point --
-    including the Telnet wizard, which never collects a sex -- converges on
-    this single normalizer before persistence.
+    Delegates the whole rule to ``world.rules.identity``: an omitted or
+    ``None`` sex normalizes to the race-permitted default (``DEFAULT_SEX``
+    when the race permits it, otherwise the race's single permitted member),
+    and a declared member the race forbids is refused with the same named
+    error. The identity seam is the only implementation of the rule; this
+    wrapper preserves the player creation error surface.
     """
-    if value is None:
-        return DEFAULT_SEX
-    if not isinstance(value, str) or value not in SEX_VALUES:
-        raise CharacterCreationError(
-            "sex must be one of: " + ", ".join(SEX_VALUES)
-        )
-    return value
+    try:
+        return resolve_sex(race_key, value)
+    except IdentityError as error:
+        raise CharacterCreationError(str(error)) from error
 
 
 def _validate_allocations(profile: StartingProfile, allocations: Any) -> dict[str, int]:
@@ -477,7 +474,7 @@ def preflight_character_creation(
         if request.mode == "custom"
         else None
     )
-    checked_sex = _validate_sex(sex)
+    checked_sex = _validate_sex(sex, race)
     nation = request.nation
     if nation is None:
         nation = getattr(character, "nation", None)

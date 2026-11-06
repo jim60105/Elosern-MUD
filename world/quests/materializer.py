@@ -32,6 +32,7 @@ from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
 from world.quests.compile.contracts import StageNpcCharacterization
+from world.rules.identity import ensure_entity_sex
 from world.rules.npc_identity import validate_npc_name
 from world.rules.npc_persona import NpcPersonaStorageError, initialize_npc_persona
 from world.rules.progression import apply_lineage_auto_seed
@@ -270,6 +271,7 @@ def spawn_role_actor(
             f"spawned object {npc!r} is not an NPC; rejecting it"
         )
     npc.race = tier.race_key
+    ensure_entity_sex(npc)  # no declared sex on this path: the race decides
     npc.db.npc_tier_key = spawn_spec.tier
     npc._apply_trait_config(config)
     npc.db.disposition = spawn_spec.disposition

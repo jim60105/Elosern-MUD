@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from world.lore.sex import SEX_VALUES
+
 
 @dataclass(frozen=True)
 class Vitals:
@@ -41,6 +43,8 @@ class RaceProfile:
     # The player-facing race name (the codex title and every display surface
     # that names a race); the ``key`` stays the opaque identifier.
     display_name_zh: str
+    # The sex vocabulary members this race may carry; the elf is female-only.
+    allowed_sexes: tuple[str, ...] = SEX_VALUES
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,7 @@ RACE_REGISTRY: dict[str, RaceProfile] = {
         can_use_divine_arts=True,
         description="壽命數百年的精靈族，魔力深厚、體質超凡，與森林和魔法息息相關。",
         display_name_zh="精靈",
+        allowed_sexes=("female",),
     ),
 }
 

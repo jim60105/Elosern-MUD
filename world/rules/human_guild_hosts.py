@@ -25,6 +25,7 @@ from world.rules.fatigue import (
     RESERVE_ATTRIBUTE,
     initialize_fatigue_state,
 )
+from world.rules.identity import ensure_entity_sex
 from world.rules.npc_identity import live_key_taken_by_other, validate_npc_name
 from world.rules.npc_persona import initialize_npc_persona
 from world.rules.npc_schedules import get_rulebook, resolve_schedule, set_npc_schedule
@@ -210,7 +211,8 @@ def sync_persistent_adventurers(
                     host = create_object(LLMNPC, key=person.name, location=rooms["home"])
                     host.attributes.add(PERSON_ATTRIBUTE, key)
                     host.attributes.add(NPC_PROFILE_PROVENANCE_ATTRIBUTE, person.profile_key)
-                    host.race, host.subrace, host.sex = "human", person.subrace, "other"
+                    host.race, host.subrace = "human", person.subrace
+                    ensure_entity_sex(host, "other")
                     host.db.guild_rank = person.rank
                     host._apply_trait_config(_trait_config({
                         **dict(zip(_BASE_KEYS, person.bases, strict=True)), "guild_merit": 0,
