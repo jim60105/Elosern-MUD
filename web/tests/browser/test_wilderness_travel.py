@@ -264,6 +264,7 @@ class _TravelStage(BrowserAcceptanceTest):
 
     def _enter(self, page, panels: dict) -> None:
         page.evaluate(_HOLD_MAPS)
+        self._answered_area = None
         inject_snapshot(page, panels)
         wait_for_store_state(page, lambda s: (s.get("panels") or {}).get("art", {}).get("available") is True)
 
@@ -273,6 +274,10 @@ class _TravelStage(BrowserAcceptanceTest):
     def _answer(self, page, index: int, order: str = "body-first", area: dict | None = None) -> None:
         accepted = page.evaluate(_ANSWER, [area or _area(), order, index])
         self.assertEqual(accepted, [True, True])
+        # A later read the stage asks for is the same request the journey
+        # answered here, so it must be answered with the same map: a stage
+        # served a different area would draw another place's annotations.
+        self._answered_area = area
 
     def _wait_ready(self, page) -> None:
         # The stage's owner asks again whenever a cause it has not covered
@@ -284,7 +289,7 @@ class _TravelStage(BrowserAcceptanceTest):
         # becoming ready.
         for _ in range(3):
             for index in page.evaluate(_PENDING_VIEWS):
-                self._answer(page, index)
+                self._answer(page, index, area=self._answered_area)
             try:
                 page.wait_for_selector(_READY, timeout=15000)
                 return
