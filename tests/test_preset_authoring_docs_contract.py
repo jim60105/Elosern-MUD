@@ -131,6 +131,32 @@ class PresetAuthoringGuideContractTests(unittest.TestCase):
         documented = synthesized + "另有 `key` 成對。\n"
         self.assertEqual(undocumented_field_names(documented, ["key"]), [])
 
+    def test_the_validator_table_documents_the_race_bounded_sex_rule(self):
+        guide = GUIDE_PATH.read_text(encoding="utf-8")
+        rows = [
+            line
+            for line in guide.splitlines()
+            if line.startswith("| `_validate_preset_sex` |")
+        ]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertIn("allowed_sexes", row)
+        self.assertIn("does not permit", row)
+
+    def test_the_mistake_table_carries_the_elf_sex_case(self):
+        guide = GUIDE_PATH.read_text(encoding="utf-8")
+        self.assertIn("## 5. 常見錯誤", guide)
+        mistakes = guide.split("## 5. 常見錯誤", 1)[1]
+        elf_sex_rows = [
+            line
+            for line in mistakes.splitlines()
+            if line.startswith("|") and "精靈" in line and "sex" in line
+        ]
+        self.assertEqual(len(elf_sex_rows), 1, elf_sex_rows)
+        self.assertIn("lore 匯入即爆", elf_sex_rows[0])
+        # Distinct from the omitting-sex row, which is about construction.
+        self.assertNotIn("漏寫", elf_sex_rows[0])
+
 
 if __name__ == "__main__":
     unittest.main()

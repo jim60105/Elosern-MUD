@@ -49,7 +49,7 @@
 
 ## 2. 事前決定：寫卡之前要回答的四個問題
 
-1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。
+1. 種族與亞種選哪個？`race` 必須在 `RACE_REGISTRY`、`subrace` 必須在 `SUBRACE_REGISTRY` 且屬於該種族，每張模板卡都必須帶亞種（沒有「無亞種」卡）。先用 `resolve_starting_profile()` 看清這個配對的預算與邊界。卡上的 `sex` 也受 `RACE_REGISTRY[race].allowed_sexes` 限制：精靈只有 `female`，精靈卡宣告 `male` 或 `other` 會在載入期被 `_validate_preset_sex` 拒收，因此種族與性別要一起決定。
 2. 配點怎麼分？預算由設定檔決定（人類設定檔目前是 224），七軸各在 0～跨度內取，總和不許差一。`allocations` 記的是**對該軸下限的增量，不是最終值**：啟動時最終值 = 該軸下界 + 配點，物理三軸（`atk_phys`／`agility`／`defense`）再乘上亞種的靜態修正，`magic_power` 可配但無修正（成長重設計 D-A5 已刪除種族平均取樣器，因此魔力仍完全由作者手寫決定）。作者不要把配點當成絕對值：精靈卡寫 `("magic_power", 377)`，開局實際魔力是 477。
 3. 技能組牽涉哪些血脈前置？宣告的 kit 在啟動時由 `lineage_ownership_closure()` 補齊前置鏈、再由 `seed_lineage_proficiency()` 把未滿足的前置邊播到恰好達標。作者只需宣告核心技能，前置交給閉包；要改變某條邊的練習值，才需要 `skill_proficiency`。技能若宣告必要種族能力 `can_use_divine_arts`，種族設定檔就必須提供該能力，否則載入時拒絕。
 4. 這張卡需不需要隱藏身分層與夥伴？`persona` 的 `identity` 有公開／隱秘兩層，隱秘層供 PersonaStore 渲染；`starting_companions` 的每筆指向夥伴**自己**的 registry 卡，所以夥伴得先作為一張可選卡存在（雙胞胎互宣告就是這個形）。
@@ -145,7 +145,7 @@ uv run --locked python -m tools.spec_traceability check
 | `_validate_preset_affinity_elements` | lore 匯入 | 未知屬性、重複屬性、精靈宣告非空親附集 | `declares unknown affinity element`／`elf preset ... must declare an empty affinity set` |
 | `_validate_preset_starting_items` | lore 匯入 | 條目形狀壞、未知物品、同鍵重複、數量非正整數 | `malformed starting-item entry`／`declares unknown item`／`declares duplicate item`／`non-positive quantity` |
 | `_validate_preset_starting_equipment` | lore 匯入 | 穿戴鍵不在 `starting_items`、重複、非裝備、單例槽相衝、飾品逾 5 | `absent from its starting_items`／`that is not equipment`／`claiming the same ... slot`／`more than 5 starting accessories` |
-| `_validate_preset_sex` | lore 匯入 | `sex` 不在 `SEX_VALUES`（`female`／`male`／`other`） | `declares unknown sex` |
+| `_validate_preset_sex` | lore 匯入 | `sex` 不在 `SEX_VALUES`（`female`／`male`／`other`），或是 `SEX_VALUES` 成員但不在該卡 `race` 的 `allowed_sexes` 內（精靈只允許 `female`） | `declares unknown sex`／`declares sex ... that race ... does not permit` |
 | `_validate_preset_personas` | lore 匯入 | 散文欄非文字、identity／appearance 型別壞、`social_connection` 非成對文字、關係名重複 | `persona.<欄> that is not text`／`is not a PresetIdentity`／`not a (name, relationship) pair` |
 | `_validate_preset_skill_proficiency` | lore 匯入 | 未知技能、重複條目、值非有限非負數（`bool` 拒） | `proficiency for unknown skill`／`duplicate proficiency`／`non-numeric or negative proficiency` |
 | `_validate_preset_disguised_stats` | lore 匯入 | 條目形狀壞、軸名非文字、同鍵重複、值非恰好 `int`、非空宣告落在無神性或無法解析的種族 | `malformed disguised_stats entry`／`duplicate disguised_stats key`／`non-integer disguise value`／`on a race without divine affinity` |
@@ -194,6 +194,7 @@ must also qualify for intended `npc` identity before any companion is created.
 | 同一物品在 `starting_items` 寫兩筆 | lore 匯入即爆，多份請用數量 |
 | 兩件裝備宣告同一單例槽、或第六件飾品 | lore 匯入即爆（見 §4 `starting_equipment` 列） |
 | `sex` 漏寫或企圖用位置引數傳 | 構造直接 `TypeError`（KW_ONLY 標記），這是 change 1 故意留的防呆 |
+| 精靈卡宣告 `male`／`other` 等非 `female` 的 `sex` | lore 匯入即爆；該卡的種族只允許 `female`，`_validate_preset_sex` 點名卡、種族與性別（見 §4） |
 | 夥伴宣告指向自己或未登錄的鍵 | lore 匯入即爆；夥伴必須是 registry 裡另一張卡 |
 | 拿匯入卡的規則套模板（例如要求 `disguised_stats` 的鍵是 `stats` 子集） | 模板路徑沒有絕對 `stats`，該規則是匯入路徑專屬；兩套語意見 §1 對照表 |
 
