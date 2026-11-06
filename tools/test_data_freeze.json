@@ -201,7 +201,11 @@
    "reason": "capital settlement document contract"
   },
   {
-   "path": "world/maps/tests/test_bootstrap.py",
+   "path": "world/maps/tests/test_bootstrap/test_bootstrap_grid.py",
+   "reason": "map bootstrap/gate data contract"
+  },
+  {
+   "path": "world/maps/tests/test_bootstrap/test_bootstrap_selection.py",
    "reason": "map bootstrap/gate data contract"
   },
   {
