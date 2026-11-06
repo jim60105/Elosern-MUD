@@ -57,8 +57,11 @@ source rule.
 
 ### Exported shape
 
-Rows are sorted by key. Names are resolved at export time, so the editor never
-needs a species registry. Only fields the layer, search or inspector use are
+Rows are sorted by key. Species and variant names are resolved at export time,
+so the editor never needs a species registry. Region names are not exported:
+`content/maps/continent.yaml` owns them, the editor can edit them, and the source
+manifest excludes that file. The frontend resolves `region_key` against
+`world.continent.regions` and falls back to the key when no region matches. Only fields the layer, search or inspector use are
 exported.
 
 ```json
@@ -68,7 +71,6 @@ exported.
       {
         "key": "example_habitat",
         "region_key": "example_region",
-        "region_name_zh": "範例地形區",
         "rectangles": [[100, 119, 200, 219]],
         "lower_density": 1,
         "upper_density": 3,
@@ -99,7 +101,6 @@ exported.
         "key": "example_site",
         "kind": "camp",
         "region_key": "example_region",
-        "region_name_zh": "範例地形區",
         "coordinates": [100, 200],
         "capacity": 2,
         "one_shot": false,

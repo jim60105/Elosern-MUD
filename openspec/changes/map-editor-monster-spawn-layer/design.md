@@ -62,7 +62,6 @@ class MonsterPoolEntry:
 class MonsterZoneRow:
     key: str
     region_key: str
-    region_name_zh: str
     rectangles: tuple[tuple[int, int, int, int], ...]  # (x_min, x_max, y_min, y_max)
     lower_density: int
     upper_density: int
@@ -78,7 +77,6 @@ class MonsterSiteRow:
     key: str
     kind: str
     region_key: str
-    region_name_zh: str
     coordinates: tuple[int, int]
     capacity: int
     one_shot: bool
@@ -120,7 +118,6 @@ def build_monster_spawn_section(
     compositions: Mapping[str, Any],
     variants: Mapping[str, Any],
     species: Mapping[str, Any],
-    region_names: Mapping[str, str],
 ) -> MonsterSpawnSection:
 ```
 
@@ -131,7 +128,7 @@ def build_monster_spawn_section(
   - `MonsterSite`: `key`, `kind`, `region_key`, `coordinates`, `capacity`, `one_shot`, `recover_after_ticks`, `individual_name_zh`, `composition_key`.
   - `EncounterComposition`: `members`. `CompositionMember`: `variant_key`, `minimum`, `maximum`.
   - `MonsterVariant`: `species_key`, `display_name_zh`. `MonsterSpecies`: `display_name_zh`.
-- `build_reference_context_document` calls it with `ECOLOGY_ZONE_REGISTRY`, `MONSTER_SITE_REGISTRY` and `ENCOUNTER_COMPOSITION_REGISTRY` from `world.lore.monster_placement`, `MONSTER_VARIANT_REGISTRY` and `MONSTER_SPECIES_REGISTRY` from `world.lore.monster_species`, and `{key: row.display_name_zh for key, row in regions().items()}`, and passes the result as `monster_spawns=`. Add those imports to the existing lazy import block inside the function, because `world.*` must not load at module import.
+- `build_reference_context_document` calls it with `ECOLOGY_ZONE_REGISTRY`, `MONSTER_SITE_REGISTRY` and `ENCOUNTER_COMPOSITION_REGISTRY` from `world.lore.monster_placement` and `MONSTER_VARIANT_REGISTRY` and `MONSTER_SPECIES_REGISTRY` from `world.lore.monster_species`, and passes the result as `monster_spawns=`. Add those imports to the existing lazy import block inside the function, because `world.*` must not load at module import.
 - `DISCOVERY_RULES` stays unchanged.
 
 ### D3. Service
@@ -149,7 +146,7 @@ def _monster_spawns(context: ExternalContext) -> dict[str, Any]:
     return context.document.monster_spawns.to_dict()
 ```
 
-- `WorkspaceRead` gains `monster_spawns: dict[str, Any] = field(default_factory=_empty_monster_spawns)` after `external_identifiers`, and it joins the `digest` payload list. Without that, a section-only change would never publish: the fingerprint hashes sources, not the section, so re-exporting after a region rename leaves `external_context_status` identical.
+- `WorkspaceRead` gains `monster_spawns: dict[str, Any] = field(default_factory=_empty_monster_spawns)` after `external_identifiers`, and it joins the `digest` payload list. Without that, a section-only change would never publish: the fingerprint hashes sources, not the section, so a rewrite of only the section leaves `external_context_status` identical.
 - Both `WorkspaceRead(...)` returns in `read_workspace` pass `monster_spawns=_monster_spawns(context)`, including the `load.world is None` branch.
 - `_workspace_state` in `app.py` adds `"monster_spawns": latest.monster_spawns` directly after `external_context_status`. Reading from `latest` pairs the section with the status it is judged by.
 
@@ -181,7 +178,7 @@ export function gameDuration(seconds) {}  // "1 天 2 小時"; 0 -> "0 秒"
 export function monsterShapes(world, spawns, chosen) {} // chosen is a Set of refs
 export function monsterMarks(world, spawns) {}
 export function monsterCatalogEntries(spawns) {}
-export function monsterRecord(spawns, ref) {}    // { title, qualifiedRef, relativePath, fields } | null
+export function monsterRecord(spawns, ref, world) {}    // { title, qualifiedRef, relativePath, fields } | null
 export function monsterDetail(spawns, ref) {}    // { compositions: [...] } | null
 export function monsterLayerState(workspace) {}  // { state, note, notice }
 ```
@@ -195,7 +192,7 @@ Rules:
   - Zone `frame`: `生態區矩形（1 km 格，含端點）：` followed by `x ${x_min}–${x_max}, y ${y_min}–${y_max}` per rectangle, joined with `；`.
   - Site `frame`: `座標：格 (${x}, ${y})（1 km 格）`.
   - `searchTerms` holds each member's `species_name_zh`, `species_key`, `variant_name_zh` and `variant_key`, deduplicated.
-- `monsterRecord` returns `fields` built as `{ label, value }` strings, `—` for null.
+- `monsterRecord` returns `fields` built as `{ label, value }` strings, `—` for null. Region display names are not exported. `content/maps/continent.yaml` owns them and the editor can edit them, so the frontend resolves `region_key` against `world.continent.regions`. The 地形區 value is the matching region's `display_name_zh`, or `region_key` when `world` has no such region.
   - Zone rows: 地形區, 密度（每 100 格）as `${lower}–${upper}`, 單格上限, 波次預算, 恢復延遲, 補充間隔.
   - Site rows: 種類 (the kind word), 地形區, 座標, 容量, 重生, 個體名稱. 重生 is `一次性` for a one-shot site, else `gameDuration(recover_after_ticks)` when that is not null.
   - 恢復延遲, 補充間隔 and 重生 render through `gameDuration`.
@@ -241,7 +238,7 @@ return { state: "unavailable", note: `匯出資料不可用：${status.reasons?.
 - `App.vue`:
   - `const monsterSpawns = computed(() => workspace.value?.monster_spawns ?? null);`
   - `catalog` passes it as the second argument, and `fullScene` passes `monsterSpawns: monsterSpawns.value`.
-  - `record` becomes `monsterRecord(monsterSpawns.value, selected.value) ?? inspect(world.value, selected.value)`.
+  - `record` becomes `monsterRecord(monsterSpawns.value, selected.value, world.value) ?? inspect(world.value, selected.value)`.
   - Add `monsterInspection = computed(() => monsterDetail(monsterSpawns.value, selected.value))` and `monsterLayer = computed(() => monsterLayerState(workspace.value))`.
   - Pass `:layer-notes="monsterLayer.note ? { monsters: monsterLayer.note } : {}"` to `NavigationPanel`.
   - Render `<MonsterSpawnInspector v-if="monsterInspection" :detail="monsterInspection" :notice="monsterLayer.notice ?? ''" />` in the default slot of `InspectorPanel`, before the existing `ContinentInspector` block. Do not change `requestDelete`, `onCanvasMove` or any command path.
@@ -286,7 +283,7 @@ Every new browser test method must be added to exactly one list in `.github/brow
 
 ## Risks / Trade-offs
 
-- [Region names come from `content/maps/continent.yaml`, which the source manifest excludes, and the editor can change one through `set_region_field`] → After such an edit the editor still reports the index as current and shows the old region name, while CI `--check` fails until the artifact is regenerated. This is kept as the approved design specifies, documented in `docs/development/map-editor.md`, and reported to the user as an open conflict. It affects only the region name row.
+- [A region key in the artifact can stop matching `world.continent.regions`, for example after a region is removed from `content/maps/continent.yaml`] → The 地形區 row shows the raw key instead of a name. Game publication validation still rejects a zone or site naming an unknown region. Region display names are read live, so a rename shows at once and needs no re-export.
 - [A new site kind in the game would make the regenerated artifact undecodable, emptying the layer] → The vocabulary parity test fails in CI at the same change.
 - [Every edit to `packages/map-core/**` or `tools/map_reference_context.py` makes the artifact stale, and the schema bump makes it undecodable] → Task 2.1 regenerates as soon as the exporter exists, the task list requires a rerun after any later edit to those paths, and task 7.1 runs it a final time before `--check`.
 - [Polygons above the land take clicks meant for the mainland] → The layer is hidden by default, and the mainland stays selectable from the object list.

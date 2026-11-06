@@ -26,6 +26,10 @@ Each zone and site SHALL be a catalog object with a `monster_zone:<key>` or `mon
 ### Requirement: Monster spawn inspector shows what a place spawns
 Selecting a zone or site SHALL show its label, reference, region, source file and read-only spawn facts, including one row per composition with its chance for a zone and one row per member with species, variant and count range.
 
+#### Scenario: Region name follows the map document
+- **WHEN** a synthetic region's display name changes in the workspace without a re-export, or a row names a region the world does not have
+- **THEN** the inspector shows the current display name, or the region key when no region matches
+
 #### Scenario: Zone chance
 - **WHEN** a synthetic zone has pool weights that sum to more than one row's weight
 - **THEN** each composition row shows `weight / total weight`, displayed only and never written

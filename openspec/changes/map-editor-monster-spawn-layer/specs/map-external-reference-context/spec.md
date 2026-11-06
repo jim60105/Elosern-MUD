@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Reference export carries the monster spawn section
-The reference export SHALL include a monster spawn section listing every authored ecology zone and manual monster site, with region, species and variant names resolved at export and without reading live database state.
+The reference export SHALL include a monster spawn section listing every authored ecology zone and manual monster site, with species and variant names resolved at export, each row naming its region by key only, and without reading live database state.
 
 #### Scenario: Deterministic rows
 - **WHEN** synthetic zones and sites are exported twice from registries given in different orders
@@ -9,7 +9,7 @@ The reference export SHALL include a monster spawn section listing every authore
 
 #### Scenario: Names resolve from the registries
 - **WHEN** a synthetic zone and a synthetic site each name a composition whose member names a synthetic variant
-- **THEN** each member row carries that variant's key and name and its species' key and name, and each zone and site row carries its region's key and name
+- **THEN** each member row carries that variant's key and name and its species' key and name, and each zone and site row carries its region's key and no region name
 
 #### Scenario: Site individual and recovery fields
 - **WHEN** one synthetic site is one-shot with an individual name and another recovers after a delay with none
