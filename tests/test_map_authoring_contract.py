@@ -214,6 +214,7 @@ class InspectionEntryPointTests(unittest.TestCase):
                 "continent",
                 "locations",
                 "districts",
+                "road_network",
                 "settlement",
                 "interior",
                 "layout",
