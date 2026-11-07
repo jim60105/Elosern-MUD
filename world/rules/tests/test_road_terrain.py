@@ -29,7 +29,9 @@ from world.rules.travel_plan import plan_travel
 #: replaces it in ``setUp``; the planner case must exercise the real function.
 _PRODUCTION_TERRAIN = travel_cost.wilderness_terrain
 
-_SYNTHETIC_TERRAIN = {"t_open": "open_ground", "t_woodland": "woodland"}
+_FAST_TERRAIN = max(travel_cost.TERRAIN_SPEEDS, key=travel_cost.TERRAIN_SPEEDS.get)
+_SLOW_TERRAIN = min(travel_cost.TERRAIN_SPEEDS, key=travel_cost.TERRAIN_SPEEDS.get)
+_SYNTHETIC_TERRAIN = {"t_open": _FAST_TERRAIN, "t_woodland": _SLOW_TERRAIN}
 
 
 def _network(cells) -> RoadNetwork:
@@ -94,7 +96,7 @@ class RoadTerrainTests(_RoadTerrainCase):
         for source, destination in (((0, 0), (1, 0)), ((1, 0), (0, 0))):
             with self.subTest(source=source, destination=destination):
                 self.assertEqual(
-                    wilderness_terrain(source, destination), "woodland"
+                    wilderness_terrain(source, destination), _SLOW_TERRAIN
                 )
 
     def test_a_road_cell_queried_with_itself_answers_road(self):
@@ -102,14 +104,14 @@ class RoadTerrainTests(_RoadTerrainCase):
         road_network._install(_network({(0, 0)}))
 
         self.assertEqual(wilderness_terrain((0, 0), (0, 0)), ROAD_TERRAIN)
-        self.assertEqual(wilderness_terrain((5, 5), (5, 5)), "woodland")
+        self.assertEqual(wilderness_terrain((5, 5), (5, 5)), _SLOW_TERRAIN)
 
     def test_no_published_network_keeps_the_regional_terrain(self):
         self.fill([(0, 0), (1, 0)], "t_open")
         self.regions[(1, 0)] = "t_woodland"
         road_network._install(None)
 
-        self.assertEqual(wilderness_terrain((0, 0), (1, 0)), "woodland")
+        self.assertEqual(wilderness_terrain((0, 0), (1, 0)), _SLOW_TERRAIN)
 
 
 class PlannerRoadTerrainTests(PlannerTestCase):
@@ -125,13 +127,11 @@ class PlannerRoadTerrainTests(PlannerTestCase):
                 "region_for_coordinates",
                 side_effect=lambda x, y: self.terrain[(x, y)],
             ),
-            mock.patch.dict(
-                travel_cost.WILDERNESS_TERRAIN, {"open_ground": "open_ground"}
-            ),
+            mock.patch.dict(travel_cost.WILDERNESS_TERRAIN, {_OPEN: _OPEN}),
             # This case must run the production join, not the regional pick the
             # shared planner fixture installs.
             mock.patch.object(
-                travel_cost, "wilderness_terrain", new=_PRODUCTION_TERRAIN
+                travel_cost, _PRODUCTION_TERRAIN.__name__, new=_PRODUCTION_TERRAIN
             ),
         )
         for patch in patches:
