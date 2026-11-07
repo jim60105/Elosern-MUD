@@ -26,10 +26,10 @@ Do not add `covers_requirement` in any task here; see D9.
 ## 4. Documentation and hand-off
 
 - [x] 4.1 Create `docs/development/road-network.md` covering the regeneration command, the regeneration order after a terrain change, and a "Human review record" section with a dated row saying the preview is pending review. Add the road commands after the partition and elevation lines in `.agents/skills/map-data-authoring/references/verification.md`. Verify: `uv run --locked python -m tools.road_network --check` runs as documented.
-- [ ] 4.2 List each new test with the delta requirement and scenario it establishes in the change report. Verify: every requirement in `specs/road-network-generation/spec.md` has at least one test.
+- [x] 4.2 List each new test with the delta requirement and scenario it establishes in the change report. Verify: every requirement in `specs/road-network-generation/spec.md` has at least one test.
 - [x] 4.3 Run `uv run --locked python -m tools.observability_lint check` and `uv run --locked python -m tools.test_data_lint check`. Verify: both exit 0.
-- [ ] 4.4 After the last source edit, run `uv run --locked python -m tools.map_reference_context` and commit `content/map-reference-context.json`. Verify: the same command with `--check` exits 0.
-- [ ] 4.5 Run `uv run --locked python -m tools.contract_gate --change road-network-generation` and `openspec validate road-network-generation --strict`. Verify: both exit 0.
+- [x] 4.4 After the last source edit, run `uv run --locked python -m tools.map_reference_context` and commit `content/map-reference-context.json`. Verify: the same command with `--check` exits 0.
+- [x] 4.5 Run `uv run --locked python -m tools.contract_gate --change road-network-generation` and `openspec validate road-network-generation --strict`. Verify: both exit 0.
 
 ## Workflow follow-up
 
