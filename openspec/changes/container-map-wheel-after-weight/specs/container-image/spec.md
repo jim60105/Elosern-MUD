@@ -49,7 +49,7 @@
   without fetching it again
 
 #### Scenario: Map-package source edits reuse model acquisition
-- **WHEN** only files under `packages/map-core/` change, while neither `pyproject.toml` nor `uv.lock` changes
+- **WHEN** only the map package's source files change, while the root `pyproject.toml`, `uv.lock`, and `packages/map-core/pyproject.toml` stay unchanged
 - **THEN** the build reuses the layer containing the already-acquired default weight and rebuilds and installs exactly that one package
 
 #### Scenario: A rebuilt image carries the current map-package code
