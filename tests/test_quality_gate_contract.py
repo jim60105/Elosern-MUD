@@ -243,6 +243,21 @@ class QualityGateContractTests(unittest.TestCase):
             msg="quality-gate.yml 'Install OpenSpec' drifted from the pinned OpenSpec CLI version",
         )
 
+    def test_preflight_checks_the_road_network_after_the_reference_context(self):
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
+        )
+        names = [step["name"] for step in workflow["jobs"]["preflight"]["steps"]]
+        steps = {step["name"]: step for step in workflow["jobs"]["preflight"]["steps"]}
+        self.assertEqual(
+            steps["Validate road network freshness"]["run"],
+            "uv run --locked python -m tools.road_network --check",
+        )
+        self.assertEqual(
+            names.index("Validate road network freshness"),
+            names.index("Validate map reference context freshness") + 1,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

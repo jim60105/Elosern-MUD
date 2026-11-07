@@ -21,7 +21,7 @@ Do not add `covers_requirement` in any task here; see D9.
 - [x] 3.1 Implement `tools/road_network.py` per D7. Verify: `uv run --locked python -m tools.road_network --help` lists `--check`, `--output` and `--preview`.
 - [x] 3.2 Create `world/maps/tests/test_road_network_command.py`, a `unittest.TestCase` with `_bootstrap`, `build_input` and `artifact_text` patched, covering "The regeneration command reports stale artifacts" with temporary output paths and a tiny synthetic raster for the preview. Register `world.maps.tests.test_road_network_command` in shard `maps-33-1` of `.github/evennia-shards.json`. Verify with the shared command on that label and on `tests.test_evennia_test_optimization_contract`.
 - [x] 3.3 Run `uv run --locked python -m tools.road_network --preview <scratch>/roads.png`, with `<scratch>` outside the repository, and commit `world/maps/data/road_network.json`. Report the preview's absolute path in the hand-off. Verify: `uv run --locked python -m tools.road_network --check` exits 0 and `git status` shows no image. If a self-check problem names a shipped node or road, stop and report it; do not weaken the check.
-- [ ] 3.4 Add the D8 step to `.github/workflows/quality-gate.yml`. Verify with the shared command on `tests.test_quality_gate_contract`.
+- [x] 3.4 Add the D8 step to `.github/workflows/quality-gate.yml`. Verify with the shared command on `tests.test_quality_gate_contract`.
 
 ## 4. Documentation and hand-off
 
