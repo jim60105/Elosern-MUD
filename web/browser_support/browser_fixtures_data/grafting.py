@@ -198,9 +198,11 @@ def graft_synth_wilderness_terrain() -> None:
     # publication pointer, so the grafted geography is installed together with
     # the settlements, districts and interiors it is joined with.
     _runtime.publish(
-        replace(_runtime.current(), geography=replace(
-            snapshot, regions=MappingProxyType(regions)
-        ))
+        replace(
+            _runtime.current(),
+            geography=replace(snapshot, regions=MappingProxyType(regions)),
+            roads=None,
+        )
     )
 
     # Every live region needs a terrain row: the grafted partition keys keep

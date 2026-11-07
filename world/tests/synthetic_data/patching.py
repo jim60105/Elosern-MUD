@@ -249,7 +249,11 @@ def _apply_geography(
         content.update(extra.get(logical, {}))
         overrides[GEOGRAPHY_TARGETS[logical]] = MappingProxyType(content)
     runtime_module.publish(
-        replace(previous, geography=replace(previous.geography, **overrides))
+        replace(
+            previous,
+            geography=replace(previous.geography, **overrides),
+            roads=None,
+        )
     )
     stack.callback(runtime_module.publish, previous)
 
@@ -284,6 +288,7 @@ def _apply_settlements(
         replace(
             previous,
             settlements=replace(previous.settlements, **overrides),
+            roads=None,
         )
     )
     stack.callback(runtime_module.publish, previous)

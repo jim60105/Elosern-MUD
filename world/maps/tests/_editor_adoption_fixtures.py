@@ -19,6 +19,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from ruamel.yaml import YAML
 
 from elosern_map_core.documents import QualifiedRef
+from elosern_map_core.roads_codec import ROAD_ALGORITHM_VERSION, RoadFreshness
 from tools.spec_traceability import covers_requirement
 
 from typeclasses.characters import PlayerCharacter
@@ -149,7 +150,13 @@ class _CandidateCase(EvenniaTestCase):
         signed = dataclasses.replace(
             committed, source_signature=district_partition.current_source_signature(self.root)
         )
-        with patch.object(district_partition, "artifact_metadata", return_value=signed):
+        with patch.object(
+            district_partition, "artifact_metadata", return_value=signed
+        ), patch.object(
+            runtime,
+            "road_freshness_for",
+            return_value=RoadFreshness(ROAD_ALGORITHM_VERSION, "t", True),
+        ):
             yield
 
     @contextmanager
@@ -179,6 +186,10 @@ class _CandidateCase(EvenniaTestCase):
             district_partition,
             "artifact_metadata",
             return_value=read_partition_metadata(text),
+        ), patch.object(
+            runtime,
+            "road_freshness_for",
+            return_value=RoadFreshness(ROAD_ALGORITHM_VERSION, "t", True),
         ):
             yield text
 
