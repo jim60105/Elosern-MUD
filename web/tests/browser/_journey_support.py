@@ -77,20 +77,6 @@ def _exploration_panel(interact_targets: list, move_rows: list | None = None) ->
     }
 
 
-def _suggestions_ready(card_labels: list) -> dict:
-    """A schema-valid ``ready`` suggestions envelope (status + cards)."""
-    cards = [
-        {
-            "kind": "known_action",
-            "action_code": "explore.look",
-            "label": label,
-            "params": {"room": True},
-        }
-        for label in card_labels
-    ]
-    return {"status": "ready", "cards": cards}
-
-
 def _exploration_context_actions_panel(suggestions: dict) -> dict:
     """A schema-valid ``context_actions`` exploration form with a suggestions envelope.
 

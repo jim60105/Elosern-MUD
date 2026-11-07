@@ -14,9 +14,8 @@
 // presence rail, which owns the exploration root's digits — a digit picks
 // the Nth visible rail slot, a digit past the slots is claimed and does
 // nothing, an empty rail claims none, and none falls through to the footer
-// chips. The rail keeps the digits while the dock's waiting or suggestions
-// frame is open too; a card owns them while it is open; every other family
-// keeps the router's digit picks.
+// chips. A card owns the digits while it is open; every other family keeps
+// the router's digit picks.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -57,7 +56,7 @@ function sixSkillCategory() {
 }
 
 // A room with two people and one object on the rail, three exits on the
-// compass, and the three footer chips (查看房間 ‧ 等待／休息 ‧ 建議).
+// compass, and the place card's room actions.
 const SIX_CHIP_OVERRIDES = {
   move: [
     { exit_ref: "east", label: "東", destination: "room:43", enabled: true, disabled_reason: null },
@@ -242,7 +241,7 @@ describe("dock digit row picks (1–9)", () => {
 
   it("an open room card claims the digits so none reaches the rail beneath it", () => {
     openSession();
-    openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
+    openOverview(undefined, fx.explorationActions());
     expect(store.openRoomCard("wait")).toBe(true);
     expect(store.view.railVisible).toBe(false);
     // `2` is the wait card's (its own keydown handles it), never the rail's

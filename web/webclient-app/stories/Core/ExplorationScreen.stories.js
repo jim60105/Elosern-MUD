@@ -18,7 +18,6 @@ import {
   compassArgs,
   explorationPanelFixture,
   presenceArgs,
-  suggestionsCardArgs,
   timeChoiceArgs,
   verbCardArgs,
 } from "../fixtures/scene_overview.js";
@@ -27,12 +26,13 @@ import {
 // redesign §2): the stage with the presence rail on its floor, the place
 // card with its 查看房間 and 休息 buttons and the minimap in the right-hand
 // island column, and the command panel holding the exit compass beside the
-// 建議 pill and the shared readout (exploration-room-actions). `PersonFocus`
+// shared readout (exploration-room-actions). `PersonFocus`
 // is the same room with the guild clerk in focus: the rail gone, the clerk's
 // standee in `actor-right`, the verb card centred, the map column stepped
 // away, and the command panel inert and dimmed. `WaitCard` (the rest entry's
-// first layer, TimeChoiceCard), `DreamQuestion`, and `SuggestionsCard` open
-// the room cards and the sleep handoff question over the stage. Every surface is bound to the real builders over one
+// first layer, TimeChoiceCard) and `DreamQuestion` open the room cards and
+// the sleep handoff question over the stage. Every surface is bound to the
+// real builders over one
 // synthesized room.
 
 const ROOM = explorationPanelFixture({
@@ -60,16 +60,6 @@ const LOCAL_MAP = localMapAround({
 
 const COMPASS = compassArgs(ROOM, LOCAL_MAP);
 
-const SUGGESTIONS = {
-  status: "ready",
-  cards: [
-    { kind: "known_action", label: "查看任務板", action_code: "explore.look", params: { target_id: 31 } },
-    { kind: "known_action", label: "等到天亮再出發", action_code: "explore.wait", params: { daypart: "dawn" }, hint: "夜裡的北岸大道不太平。" },
-    { kind: "freeform", label: "問問葛里安最近的委託", action_code: "explore.talk_freeform", params: { npc_id: 11 } },
-    { kind: "known_action", label: "看看旅人艾拉", action_code: "explore.look", params: { target_id: 21 } },
-  ],
-};
-
 function centredCard(card, focus) {
   if (focus) {
     return h(ChoiceCard, { ...verbCardArgs(ROOM, 11), testId: "presence-card", trapFocus: true });
@@ -83,9 +73,6 @@ function centredCard(card, focus) {
       closeLabel: "不進入夢境，繼續睡眠",
       testId: "dream-question",
     });
-  }
-  if (card === "suggestions") {
-    return h(ChoiceCard, { ...suggestionsCardArgs(SUGGESTIONS), trapFocus: true });
   }
   return null;
 }
@@ -117,10 +104,6 @@ function renderScreen(args) {
                 h("div", { style: { display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", gap: "10px", height: "100%" } }, [
                   h("div", { style: { height: "100%", aspectRatio: "1 / 1" } }, [h(ExitCompass, { ...compassProps, active: !cardOpen })]),
                   h("div", { class: "exploration-root__side" }, [
-                    h("button", { type: "button", class: "exploration-pill", "data-testid": "suggestions-pill" }, [
-                      h("span", { class: "exploration-pill__label" }, "建議"),
-                      h("b", { class: "exploration-pill__count" }, ` ${SUGGESTIONS.cards.length}`),
-                    ]),
                     h(ExplorationReadout, { class: "exploration-root__readout", ...(args.readout || idleReadout(COMPASS.targets.cycle.length, 3)) }),
                   ]),
                 ]),
@@ -160,12 +143,6 @@ export const WaitCard = {
 export const DreamQuestion = {
   render: renderScreen,
   args: { focus: false, card: "dream" },
-};
-
-// The 建議 pill: the suggestions card over the stage.
-export const SuggestionsCard = {
-  render: renderScreen,
-  args: { focus: false, card: "suggestions" },
 };
 
 // The readout for a hovered monster (monster-individual-names): the species

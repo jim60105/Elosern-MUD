@@ -1,9 +1,8 @@
 // exploration-room-actions; redesign-rest-entry: the AppClient composition
 // contract for the room actions — the place card's 查看房間 and 休息, the
 // two-layer rest entry (the TimeChoiceCard tiles, then the shared shell
-// around the wait or sleep form), the 建議 pill and the suggestions card,
-// focus return, the readout feed, and the focus home (webclient-room-actions,
-// webclient-exploration-menu, webclient-context-actions-suggestions).
+// around the wait or sleep form), focus return, the readout feed, and the
+// focus home (webclient-room-actions, webclient-exploration-menu).
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -12,35 +11,6 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
-
-// A ready envelope with one card of each kind (and a hint), as the validator
-// commits it.
-const READY = {
-  status: "ready",
-  cards: [
-    { kind: "known_action", action_code: "explore.look", label: "看看木箱", params: { target_id: 3 }, hint: null },
-    {
-      kind: "known_action",
-      action_code: "explore.wait",
-      label: "等到黃昏",
-      params: { daypart: "dusk" },
-      hint: "先休息一會兒再行動",
-    },
-    { kind: "freeform", action_code: "explore.talk_freeform", label: "我們聊聊好嗎？", params: { npc_id: 7 }, hint: null },
-    { kind: "known_action", action_code: "explore.look", label: "環顧四周", params: { room: true }, hint: null },
-  ],
-};
-
-// The envelope the retired OptionCard emitted for each card kind (its
-// `activate` intent, recorded before it was deleted): a known_action card
-// carries its params unchanged; a freeform card is `explore.talk_freeform`
-// whose speech is its label.
-const FORMER_OPTION_CARD_INTENTS = [
-  { action_id: "explore.look", payload: { target_id: 3 } },
-  { action_id: "explore.wait", payload: { daypart: "dusk" } },
-  { action_id: "explore.talk_freeform", payload: { npc_id: 7, speech: "我們聊聊好嗎？" } },
-  { action_id: "explore.look", payload: { room: true } },
-];
 
 describe("AppClient room actions (exploration-room-actions)", () => {
   let store;
@@ -54,7 +24,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
     }
   }
 
-  async function mountWith({ suggestions = undefined, mode = "exploration", status = fx.statusPanel() } = {}) {
+  async function mountWith({ mode = "exploration", status = fx.statusPanel() } = {}) {
     wrapper = mount(AppClient, { attachTo: document.body });
     store.beginTransport(1);
     store.setConnected(true);
@@ -71,7 +41,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
             status,
             exploration: fx.explorationPanel(),
             local_map: fx.localMapPanel(),
-            context_actions: fx.explorationActions(suggestions ? { suggestions } : undefined),
+            context_actions: fx.explorationActions(),
           },
         }),
       ],
@@ -88,20 +58,13 @@ describe("AppClient room actions (exploration-room-actions)", () => {
     await settle();
   }
 
-  async function suggestionsCommit(suggestions) {
-    await commit({ context_actions: fx.explorationActions({ suggestions }) });
-  }
-
   const lookButton = () => wrapper.find('[data-anchor="map"] [data-testid="place-card-look"]');
   const waitButton = () => wrapper.find('[data-anchor="map"] [data-testid="place-card-wait"]');
-  const pill = () => wrapper.find('#action-dock [data-testid="suggestions-pill"]');
   const waitCard = () => wrapper.find('[data-anchor="choices"] [data-testid="wait-card"]');
   const tile = (key) => wrapper.find(`[data-anchor="choices"] [data-testid="wait-card-tile"][data-tile="${key}"]`);
   const waitShell = () => wrapper.find('[data-anchor="choices"] [data-testid="wait-form-card"]');
   const sleepShell = () => wrapper.find('[data-anchor="choices"] [data-testid="sleep-card"]');
   const shellInput = (shell) => shell.element.querySelector('input[type="number"]');
-  const sugCard = () => wrapper.find('[data-anchor="choices"] [data-testid="suggestions-card"]');
-  const rowsOf = (card) => card.findAll('[role="menuitem"]');
   const readout = () => ({
     lead: wrapper.get('[data-testid="exploration-readout-lead"]').text(),
     text: wrapper.get('[data-testid="exploration-readout-text"]').text(),
@@ -168,7 +131,6 @@ describe("AppClient room actions (exploration-room-actions)", () => {
       });
       expect(lookButton().exists()).toBe(false);
       expect(waitButton().exists()).toBe(false);
-      expect(pill().exists()).toBe(false);
       expect(wrapper.find('#action-dock [data-testid="exit-compass"]').exists()).toBe(false);
     });
 
@@ -510,178 +472,6 @@ describe("AppClient room actions (exploration-room-actions)", () => {
       await settle();
       expect(shellInput(sleepShell()).disabled).toBe(true);
       expect(document.activeElement).toBe(sleepShell().get('[data-testid="rest-step-back"]').element);
-    });
-  });
-
-  describe("the 建議 pill and the suggestions card", () => {
-    it("labels the pill by status: 建議 while generating, 建議 N when ready, absent when unavailable", async () => {
-      await mountWith();
-      expect(pill().text()).toBe("建議");
-      expect(pill().attributes("aria-label")).toBe("建議");
-      await suggestionsCommit(READY);
-      expect(pill().text()).toBe("建議 4");
-      expect(pill().attributes("aria-label")).toBe("建議 4");
-      await suggestionsCommit({ status: "degraded", cards: [] });
-      expect(pill().text()).toBe("建議");
-      await suggestionsCommit({ status: "unavailable" });
-      expect(pill().exists()).toBe(false);
-    });
-
-    it("opens the card locally and Escape returns focus to the pill", async () => {
-      await mountWith({ suggestions: READY });
-      pill().element.focus();
-      await pill().trigger("click");
-      await settle();
-      expect(sender.sent.actions).toHaveLength(0);
-      expect(sugCard().exists()).toBe(true);
-      key(sugCard().element, "Escape");
-      await settle();
-      expect(sugCard().exists()).toBe(false);
-      expect(document.activeElement).toBe(pill().element);
-    });
-
-    it("the generating card shows the muted state and no card row", async () => {
-      await mountWith();
-      await pill().trigger("click");
-      await settle();
-      expect(sugCard().get('[data-testid="choice-card-note"]').text()).toBe("AI 正在構思建議…");
-      expect(sugCard().findAll('[data-testid="suggestions-card-row"]')).toHaveLength(0);
-      expect(sugCard().find('[data-testid="suggestions-card-dismiss"]').exists()).toBe(false);
-      expect(sugCard().find('[data-testid="choice-card-back"]').exists()).toBe(true);
-    });
-
-    it("ready replaces the muted state in place with rows carrying label and hint, then 清除建議 above ✕ 返回", async () => {
-      await mountWith();
-      await pill().trigger("click");
-      await settle();
-      const cardEl = sugCard().element;
-      await suggestionsCommit(READY);
-      expect(sugCard().element).toBe(cardEl);
-      expect(sugCard().find('[data-testid="choice-card-note"]').exists()).toBe(false);
-      const rows = rowsOf(sugCard());
-      expect(rows.map((row) => row.attributes("data-testid"))).toEqual([
-        "suggestions-card-row",
-        "suggestions-card-row",
-        "suggestions-card-row",
-        "suggestions-card-row",
-        "suggestions-card-dismiss",
-        "choice-card-back",
-      ]);
-      expect(rows[1].get('[data-testid="choice-card-hint"]').text()).toBe("先休息一會兒再行動");
-      expect(rows[0].find('[data-testid="choice-card-hint"]').exists()).toBe(false);
-      const dismiss = rows[4];
-      expect(dismiss.text()).toBe("清除建議");
-      expect(dismiss.find('svg[data-icon="trash"]').exists()).toBe(true);
-      expect(dismiss.text()).not.toContain("✕");
-      expect(dismiss.classes()).toContain("choice-card__row--trailing");
-    });
-
-    it("degraded shows the rule cards with the muted note, or the empty line", async () => {
-      await mountWith({ suggestions: { status: "degraded", cards: [READY.cards[0]] } });
-      await pill().trigger("click");
-      await settle();
-      expect(sugCard().findAll('[data-testid="choice-card-note"]').map((n) => n.text())).toEqual(["AI 建議目前不可用"]);
-      expect(sugCard().findAll('[data-testid="suggestions-card-row"]')).toHaveLength(1);
-      await suggestionsCommit({ status: "degraded", cards: [] });
-      expect(sugCard().findAll('[data-testid="choice-card-note"]').map((n) => n.text())).toEqual([
-        "AI 建議目前不可用",
-        "現在沒有什麼值得做的動作",
-      ]);
-      expect(sugCard().find('[data-testid="suggestions-card-dismiss"]').exists()).toBe(true);
-    });
-
-    it("each card kind dispatches the former OptionCard envelope, once, and the card closes", async () => {
-      for (let index = 0; index < FORMER_OPTION_CARD_INTENTS.length; index += 1) {
-        wrapper?.unmount();
-        document.body.innerHTML = "";
-        setActivePinia(createPinia());
-        store = useElosernStore();
-        sender = fx.createFakeSender();
-        store.setSender(sender);
-        await mountWith({ suggestions: READY });
-        await pill().trigger("click");
-        await settle();
-        await rowsOf(sugCard())[index].trigger("click");
-        await settle();
-        expect(sender.sent.actions).toHaveLength(1);
-        const { action_id, payload } = sender.sent.actions[0];
-        expect({ action_id, payload }).toEqual(FORMER_OPTION_CARD_INTENTS[index]);
-        expect(sugCard().exists()).toBe(false);
-      }
-    });
-
-    it("a freeform card echoes exactly one input line", async () => {
-      await mountWith({ suggestions: READY });
-      const before = store.narrative.filter((line) => line.kind === "in").length;
-      await pill().trigger("click");
-      await settle();
-      await rowsOf(sugCard())[2].trigger("click");
-      const echoes = store.narrative.filter((line) => line.kind === "in").length - before;
-      expect(echoes).toBe(1);
-    });
-
-    it("清除建議 dispatches options.dismiss, and nothing while locked", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("click");
-      await settle();
-      store.dispatchAction("explore.look", { room: true });
-      await settle();
-      await sugCard().get('[data-testid="suggestions-card-dismiss"]').trigger("click");
-      expect(sender.sent.actions.map((a) => a.action_id)).toEqual(["explore.look"]);
-      expect(sugCard().exists()).toBe(true);
-    });
-
-    it("清除建議 sends the dismiss envelope when free", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("click");
-      await settle();
-      await sugCard().get('[data-testid="suggestions-card-dismiss"]').trigger("click");
-      expect(sender.sent.actions).toHaveLength(1);
-      expect(sender.sent.actions[0]).toMatchObject({ action_id: "options.dismiss", payload: {} });
-    });
-
-    it("keeps the active row on a surviving card across a suggestions-only update", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("click");
-      await settle();
-      key(sugCard().element, "ArrowDown");
-      await settle();
-      expect(sugCard().get('[data-active="true"]').text()).toContain("等到黃昏");
-      // The cards reorder: the focused card survives at another index.
-      await suggestionsCommit({ status: "ready", cards: [READY.cards[3], READY.cards[2], READY.cards[1]] });
-      expect(sugCard().get('[data-active="true"]').text()).toContain("等到黃昏");
-      // The same set again: nothing moves.
-      await suggestionsCommit({ status: "ready", cards: [READY.cards[3], READY.cards[2], READY.cards[1]] });
-      expect(sugCard().get('[data-active="true"]').text()).toContain("等到黃昏");
-    });
-
-    it("an unavailable envelope closes the card and drops the pill; focus falls back to the compass", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("click");
-      await settle();
-      await suggestionsCommit({ status: "unavailable" });
-      expect(sugCard().exists()).toBe(false);
-      expect(pill().exists()).toBe(false);
-      expect(document.activeElement).toBe(wrapper.get('[data-testid="exit-compass"]').element);
-    });
-
-    it("a transport reset retires the card before the first new snapshot", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("click");
-      await settle();
-      store.beginTransport(2);
-      await settle();
-      expect(store.view.roomCard).toBeNull();
-      expect(sugCard().exists()).toBe(false);
-      expect(sender.sent.actions).toHaveLength(0);
-    });
-
-    it("feeds the readout while hovered", async () => {
-      await mountWith({ suggestions: READY });
-      await pill().trigger("mouseenter");
-      expect(readout()).toEqual({ lead: "建議", text: "4 個可行的下一步" });
-      await pill().trigger("mouseleave");
-      expect(readout().text).toMatch(/^出口/);
     });
   });
 

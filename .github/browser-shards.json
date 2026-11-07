@@ -75,16 +75,6 @@
       "index": 5,
       "name": "packed-5",
       "files_a": [
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_degraded_rule_cards_render_in_dock_only",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_dismiss_control_hides_the_section",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_freeform_card_sends_speech_label",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_known_card_click_dispatches_the_exact_envelope",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_locked_client_rejects_card_clicks_without_side_effects",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_login_shows_generating_line_then_ready_cards",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_move_into_room_shows_generating_then_ready",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_section_gated_while_the_character_sub_dock_owns_the_surface",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_suggestions_only_update_rerenders_section_without_dock_rebuild",
-        "web.tests.browser.test_browser_options_surface.OptionsSurfaceBrowserTest.test_zero_card_degraded_renders_the_defined_empty_state",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_bundle_blocked_keeps_text_playable",
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest.test_dispatch_via_bridge"
       ],
@@ -984,8 +974,7 @@
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_actor_selector_chrome_returns_to_root_without_a_command"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution",
-        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_suggestions_frame_is_status_driven"
+        "web.tests.browser.test_browser_exploration_state.ExplorationBrowserTest.test_focus_follows_the_item_key_across_committed_re_resolution"
       ]
     },
     {

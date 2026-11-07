@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): focus and stack-loss resilience across committed re-resolution, the suggestions frame, and reconnect without replay.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): focus and stack-loss resilience across committed re-resolution and reconnect without replay.
 """
 
 from __future__ import annotations
@@ -8,7 +8,6 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     CARD_SELECTOR,
     dialogue_panel,
-    SUGGESTIONS_CARD_SELECTOR,
     WAIT_CARD_SELECTOR,
     activate_card_row,
     activate_first_compass_exit,
@@ -707,101 +706,122 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @staticmethod
-    def _ready_context(*cards) -> dict:
-        """A ready suggestions envelope carrying ``cards`` (each
-        ``(action_code, label, params)``), on an affordance-free panel."""
+    def _verb_target(*affordances) -> dict:
+        """One fabricated interact target carrying exactly ``affordances``."""
         return {
-            "context_actions": {
-                # The registered ``context_actions`` schema version
-                # (CONTEXT_ACTIONS_SCHEMA_VERSION in the client mirror): v8
-                # since the monster-identity cutover. The exploration form's
-                # exact field set is unchanged.
-                "schema_version": 8,
-                "available": True,
-                "kind": "exploration",
-                "affordances": [],
-                "suggestions": {
-                    "status": "ready",
-                    "cards": [
-                        {"kind": "known_action", "action_code": code, "label": label, "params": params}
-                        for code, label, params in cards
-                    ],
-                },
-            },
+            "identity": 9001,
+            "display_name": "哨衛士兵",
+            "portrait_ref": None,
+            "monster_identity": None,
+            "services": {"state": "none", "entries": []},
+            "affordances": list(affordances),
         }
 
-    def _card_active_label(self, page) -> str | None:
-        """The label of the suggestions card's active row."""
+    def _card_active_key(self, page) -> str | None:
+        """The key of the open centred card's active row."""
         return page.evaluate(
             """(selector) => {
               const card = document.querySelector(selector);
               const id = card && card.getAttribute('aria-activedescendant');
               const row = id ? document.getElementById(id) : null;
-              const label = row && row.querySelector('.choice-card__label');
-              return label ? label.textContent : null;
+              return row ? row.getAttribute('data-row-key') : null;
             }""",
-            SUGGESTIONS_CARD_SELECTOR,
+            CARD_SELECTOR,
         )
 
     @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
-        """The suggestions card (exploration-room-actions) keeps its active
-        row on the same card across committed updates: a commit that
-        REORDERS the cards keeps the active row on that card at its new
-        index, and a commit that drops it lands on a surviving row — never on
-        a frozen copy's old row. Activation then submits the NEW committed
-        payload. The card is client-local, so the router stays at its root."""
+        """The client-local verb card (exploration-room-actions) keeps its
+        active row on the same keyed row across committed updates: a commit
+        that REORDERS the target's affordances keeps the active row at its
+        new index, and a commit that drops it lands on a surviving row —
+        never on a frozen copy's old row. Activation then submits the NEW
+        committed payload. The card is client-local, so the router stays at
+        its root."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        look = ("explore.look", "看看石碑", {"target_id": 9102})
-        wait = ("explore.wait", "等到天亮", {"daypart": "dawn"})
-        talk = ("explore.talk_open", "找哨衛聊聊", {"npc_id": 9001})
-        scripted = (
-            "explore.talk_scripted",
-            "問候哨衛",
-            {"npc_id": 9001, "topic_id": "哨衛.問候", "context_id": None},
+        invite = {
+            "kind": "action",
+            "action_id": "explore.party_invite",
+            "label": "邀請同行",
+            "enabled": True,
+            "disabled_reason": None,
+        }
+        engage = {
+            "kind": "action",
+            "action_id": "explore.engage",
+            "label": "戰鬥",
+            "enabled": True,
+            "disabled_reason": None,
+        }
+        possess = {
+            "kind": "action",
+            "action_id": "explore.possess",
+            "label": "附身",
+            "enabled": True,
+            "disabled_reason": None,
+        }
+        accepted = self._inject_panels(
+            page,
+            {
+                "exploration": self._fabricated_exploration_panel(
+                    interact=[self._verb_target(invite, engage, possess)]
+                ),
+            },
         )
-        accepted = self._inject_panels(page, self._ready_context(look, wait, talk))
         self.assertTrue(accepted["accepted"], accepted)
 
-        activate_overview_chip(page, "suggestions")
-        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
-        self.assertEqual(self._depth(page), 1, "the suggestions card is not a router frame")
-        page.locator(SUGGESTIONS_CARD_SELECTOR).focus()
+        activate_overview_chip(page, "target-9001")
+        page.locator(CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(self._depth(page), 1, "the verb card is not a router frame")
+        page.locator(CARD_SELECTOR).focus()
         page.keyboard.press("ArrowDown")
-        self.assertEqual(self._card_active_label(page), "等到天亮")
+        self.assertEqual(self._card_active_key(page), "engage")
 
-        # Reordered + extended commit: the same card survives at a new index.
-        accepted = self._inject_panels(page, self._ready_context(talk, scripted, wait, look))
+        # Reordered commit: the same row survives at a new index.
+        accepted = self._inject_panels(
+            page,
+            {
+                "exploration": self._fabricated_exploration_panel(
+                    interact=[self._verb_target(engage, invite, possess)]
+                ),
+            },
+        )
         self.assertTrue(accepted["accepted"], accepted)
         page.wait_for_timeout(120)
         self.assertEqual(
-            self._card_active_label(page),
-            "等到天亮",
-            "the active card did not survive the re-resolution",
+            self._card_active_key(page),
+            "engage",
+            "the active row did not survive the re-resolution",
         )
 
-        # The active card vanishes: the active row lands on a SURVIVING row.
-        accepted = self._inject_panels(page, self._ready_context(talk, look, scripted))
+        # The active row vanishes: the active row lands on a SURVIVING row.
+        accepted = self._inject_panels(
+            page,
+            {
+                "exploration": self._fabricated_exploration_panel(
+                    interact=[self._verb_target(invite, possess)]
+                ),
+            },
+        )
         self.assertTrue(accepted["accepted"], accepted)
         page.wait_for_timeout(120)
-        landed = self._card_active_label(page)
+        landed = self._card_active_key(page)
         self.assertIn(
             landed,
-            ("找哨衛聊聊", "看看石碑", "問候哨衛", "清除建議"),
-            "the lost-card fallback did not land on a surviving row",
+            ("party-invite", "possess", "look-target"),
+            "the lost-row fallback did not land on a surviving row",
         )
 
         # Activating the active row submits the NEW committed row's action.
         expected_action = {
-            "找哨衛聊聊": "explore.talk_open",
-            "看看石碑": "explore.look",
-            "問候哨衛": "explore.talk_scripted",
-            "清除建議": "options.dismiss",
+            "party-invite": "explore.party_invite",
+            "possess": "explore.possess",
+            "look-target": "explore.look",
         }[landed]
-        page.locator(SUGGESTIONS_CARD_SELECTOR).focus()
+        page.locator(CARD_SELECTOR).focus()
         page.keyboard.press("Enter")
         # The proof is the OUTBOUND envelope only: the fabricated identity
         # cannot be accepted by the server (its own result/lock behaviour is
@@ -901,64 +921,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(self._pane_keys(page), [])
         page.locator('[data-anchor="map"] [data-testid="place-card-wait"]').wait_for(state="visible", timeout=15000)
         self.assertEqual(compass_target_refs(page), ["ex-a"])
-
-    @covers_requirement("webclient-frame-resolution::suggestions-frames-are-status-driven-generating-never-pops-unavailable-exits-to-the-root")
-    def test_suggestions_frame_is_status_driven(self):
-        """The status split on the suggestions card: `generating`/`degraded`
-        commits keep the open card and its content follows the commit (no
-        close, no timer); `unavailable` — the options-surface no-pane rule —
-        closes the card and drops the 建議 pill WITHOUT any reason row."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        self._wait_exploration_available(page)
-
-        def context_actions(suggestions: dict) -> dict:
-            return {
-                "context_actions": {
-                    "schema_version": 8,
-                    "available": True,
-                    "kind": "exploration",
-                    "affordances": [],
-                    "suggestions": suggestions,
-                },
-            }
-
-        note = SUGGESTIONS_CARD_SELECTOR + ' [data-testid="choice-card-note"]'
-        # A known `generating` envelope, then the 建議 pill opens the card.
-        accepted = self._inject_panels(page, context_actions({"status": "generating"}))
-        self.assertTrue(accepted["accepted"], accepted)
-        activate_overview_chip(page, "suggestions")
-        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
-        self.assertEqual(self._depth(page), 1)
-        self.assertEqual(page.locator(note).all_inner_texts(), ["AI 正在構思建議…"])
-
-        # A fresh `generating` commit: the card STAYS with its muted note.
-        accepted = self._inject_panels(page, context_actions({"status": "generating"}))
-        self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(store_state(page)["roomCard"], {"kind": "suggestions"})
-        self.assertEqual(page.locator(note).all_inner_texts(), ["AI 正在構思建議…"])
-
-        # `degraded` with zero cards: the card stays and its CONTENT follows
-        # the commit (the dismiss row appears).
-        accepted = self._inject_panels(
-            page, context_actions({"status": "degraded", "cards": []})
-        )
-        self.assertTrue(accepted["accepted"], accepted)
-        page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="suggestions-card-dismiss"]').wait_for(
-            state="visible", timeout=15000
-        )
-        self.assertEqual(store_state(page)["roomCard"], {"kind": "suggestions"})
-
-        # `unavailable`: no card and no pill may exist, and NO degraded
-        # marker/reason row is rendered.
-        accepted = self._inject_panels(page, context_actions({"status": "unavailable"}))
-        self.assertTrue(accepted["accepted"], accepted)
-        state = store_state(page)
-        self.assertIsNone(state["roomCard"])
-        self.assertIsNone(state["degradedRoot"], "the close rendered a reason row")
-        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="detached", timeout=15000)
-        self.assertEqual(page.locator('#action-dock [data-testid="suggestions-pill"]').count(), 0)
-        self.assertEqual(self._pane_keys(page), [])
 
     @covers_requirement("webclient-exploration-menu::exploration-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
     def test_reconnect_rebuilds_exploration_without_replay(self):

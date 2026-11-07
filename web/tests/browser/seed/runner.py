@@ -21,7 +21,6 @@ from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.image_editor_fixture import _image_editor_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
 from web.tests.browser.seed.npc_persona_fixture import _npc_persona_fixture
-from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
 from web.tests.browser.seed.scene_fixture import _scene_fixture
 from web.tests.browser.seed.services_fixture import _services_fixture
 from web.tests.browser.seed.titles_fixture import _titles_fixture
@@ -302,7 +301,6 @@ def main() -> None:
     _image_editor_fixture(character)
     _dream_art_fixture(character)
     _exploration_fixture(character)
-    _options_surface_fixture(character)
     _titles_fixture(character)
     _npc_persona_fixture(character, account=account)
 

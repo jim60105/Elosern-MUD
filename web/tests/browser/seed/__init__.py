@@ -20,8 +20,8 @@ The single-module history is split into modules of a shared surface (the
 here): ``identity`` holds the deterministic fixture identity and the valid
 PNG payload; ``minimap_fixture``, ``art_fixture``, ``services_fixture``
 (with the ``services_synth`` synthetic-install variant),
-``exploration_fixture``, ``options_surface_fixture`` and ``titles_fixture``
-the flag-gated seeding fixtures; ``runner`` the ``main()`` entry point.
+``exploration_fixture`` and ``titles_fixture`` the flag-gated seeding
+fixtures; ``runner`` the ``main()`` entry point.
 
 Every name resolves through this package's namespace exactly as the single
 ``web/tests/browser/seed.py`` module exported it: consumers keep importing
@@ -49,7 +49,6 @@ from web.tests.browser.seed.identity import (
 from web.tests.browser.seed.art_fixture import _art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
-from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
 from web.tests.browser.seed.party_management_acceptance_fixture import (
     _acceptance_fixture as _party_management_acceptance_fixture,
 )

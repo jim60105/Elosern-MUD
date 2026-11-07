@@ -29,7 +29,6 @@ function makeStubStore() {
       connectionStatus: "connecting",
       statusSlice: { connected: false, locationLabel: null, timeLabel: null },
       panels: {},
-      suggestions: null,
       localMapModel: null,
       prompt: "",
     },

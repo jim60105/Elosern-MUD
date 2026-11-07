@@ -357,28 +357,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         # The finite table: the exploration root resolves against the live
-        # committed snapshot to an empty menu, the retired wait and
+        # committed snapshot to an empty menu, and the retired wait and
         # suggestions frames are unregistered (exploration-room-actions: they
-        # are client-local cards), and the suggestions card's content exists
-        # iff its envelope status is not `unavailable` (the no-pane rule).
-        # Resolution is pure: two calls agree deeply and nothing else in the
-        # committed state moved. The status read and every resolve must share
-        # ONE evaluate round-trip: a ui_update committing between separate
-        # CDP calls can flip the suggestions envelope to `unavailable` after
-        # its status was sampled. Inside one synchronous evaluate the store
-        # cannot commit, so each verdict pairs with the exact committed state
-        # its resolver saw.
+        # are client-local cards). Resolution is pure: two calls agree deeply
+        # and nothing else in the committed state moved. Every resolve shares
+        # ONE evaluate round-trip, so each verdict pairs with the exact
+        # committed state its resolver saw.
         table = page.evaluate(
             """() => {
               const bridge = window.__elosernBridge;
               const state = bridge.store.view;
-              const suggestions =
-                ((state.panels.context_actions || {}).suggestions) || {};
               return {
-                status: suggestions.status,
-                explorationAvailable: Boolean(
-                  (state.panels.exploration || {}).available
-                ),
                 identities: ((state.panels.exploration || {}).interact) || [],
                 menus: [
                   "exploration.root",
@@ -388,16 +377,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   (source) =>
                     [source, bridge.resolveFrame({ source })]
                 ),
-                suggestionsCard: state.suggestionsCard,
               };
             }"""
         )
-        status = table["status"]
         for source, menu in table["menus"]:
             if source == "exploration.root":
                 self.assertFalse(
                     menu.get("unresolvable", False),
-                    f"{source} (status {status}) did not resolve: {menu}",
+                    f"{source} did not resolve: {menu}",
                 )
                 self.assertEqual(menu.get("items"), [], "the exploration root carries no item")
             else:
@@ -406,10 +393,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     {"unresolvable": True, "reason": None},
                     f"{source} is retired and must stay unregistered",
                 )
-        if status in (None, "unavailable") or not table["explorationAvailable"]:
-            self.assertIsNone(table["suggestionsCard"], "the suggestions card exists despite the no-pane condition")
-        else:
-            self.assertEqual(table["suggestionsCard"]["status"], status)
         identities = [row["identity"] for row in table["identities"]]
         if identities:
             # A person's verbs are the client-local verb card's, never a frame

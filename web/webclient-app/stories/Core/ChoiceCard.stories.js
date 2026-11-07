@@ -5,7 +5,6 @@ import {
   serviceFixture,
   explorationPanelFixture,
   overflowCardArgs,
-  suggestionsCardArgs,
   verbCardArgs,
 } from "../fixtures/scene_overview.js";
 
@@ -15,12 +14,11 @@ import {
 // hairline rule before the trailing `✕ 返回`; the active row's fill and
 // caret; one tab stop (ArrowUp / ArrowDown wrap, Home / End, digits 1–N,
 // Enter / Space, Escape emits back); the staggered entrance. Props: rows
-// (each with an optional second `hint` line, and an optional `icon`: close,
-// keyboard, or trash), notes (muted lines above the rows, never selectable),
-// viewKey, trailingIndex, caption, ariaLabel, testId, entrance, escapeBack,
-// digitRows, claimDigits, trapFocus, autofocus, block. Events: pick(key),
-// back. Every story's rows come from the real exploration-menu builders
-// through the shared derived-shape helpers.
+// (each with an optional `icon`: close or keyboard), viewKey, trailingIndex,
+// caption, ariaLabel, testId, entrance, escapeBack, digitRows, claimDigits,
+// trapFocus, autofocus, block. Events: pick(key), back. Every story's rows
+// come from the real exploration-menu builders through the shared
+// derived-shape helpers.
 
 const stageBox = (story) => ({
   render: () =>
@@ -73,42 +71,6 @@ const GUILD_HALL = explorationPanelFixture({
 export const Verbs = {
   render,
   args: { ...verbCardArgs(GUILD_HALL, 11), autofocus: true, trapFocus: true },
-};
-
-// The suggestions card: the ready cards (one with its hint), 清除建議 with its
-// trash-can badge, then `✕ 返回`.
-export const Suggestions = {
-  render,
-  args: {
-    ...suggestionsCardArgs({
-      status: "ready",
-      cards: [
-        { kind: "known_action", label: "查看任務板", action_code: "explore.look", params: { target_id: 31 } },
-        {
-          kind: "known_action",
-          label: "等到天亮再出發",
-          action_code: "explore.wait",
-          params: { daypart: "dawn" },
-          hint: "夜裡的北岸大道不太平。",
-        },
-        { kind: "freeform", label: "問問葛里安最近的委託", action_code: "explore.talk_freeform", params: { npc_id: 11 } },
-      ],
-    }),
-    autofocus: true,
-    trapFocus: true,
-  },
-};
-
-// The suggestions card while the AI composes: the muted note, no card row.
-export const SuggestionsGenerating = {
-  render,
-  args: { ...suggestionsCardArgs({ status: "generating" }), autofocus: true, trapFocus: true },
-};
-
-// The AI offline with no rule card: the unavailable note and the empty line.
-export const SuggestionsDegradedEmpty = {
-  render,
-  args: { ...suggestionsCardArgs({ status: "degraded", cards: [] }), autofocus: true, trapFocus: true },
 };
 
 // The presence overflow card: the entries the rail folded into `＋2`, the

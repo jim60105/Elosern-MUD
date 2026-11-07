@@ -94,8 +94,7 @@ describe("frame resolver — committed-state following and purity", () => {
     // The root is the empty exploration root (exploration-room-actions
     // design D2): no hidden model state participates.
     expect(second).toEqual({ items: [], focusKey: null, title: "場景" });
-    // The room accessors are pure too.
-    expect(resolver.explorationSuggestions()).toEqual(resolver.explorationSuggestions());
+    // The room accessor is pure too.
     expect(resolver.explorationRoomLook()).toEqual(resolver.explorationRoomLook());
   });
 
@@ -119,7 +118,6 @@ describe("frame resolver — committed-state following and purity", () => {
     });
     expect(resolver.explorationRoomLook()).toBeNull();
     expect(resolver.explorationWait).toBeUndefined();
-    expect(resolver.explorationSuggestions()).toBeNull();
     // The guard converts every call over the poisoned panel; deleting the
     // poison restores resolution (the marker is not sticky).
     delete state.panels.exploration.available;
@@ -178,13 +176,12 @@ describe("frame resolver — the finite exploration table", () => {
     const resolver = resolverFor(state);
     const direct = ExplorationMenu.buildMenus(state.panels.exploration, {
       currentNode: state.panels.local_map.current_node,
-      suggestions: state.panels.context_actions.suggestions,
     });
     // The root frame is the empty exploration root (exploration-room-actions
     // design D2): every exploration row lives outside the router. The
     // move/look/interact frames are retired
-    // (webclient-retire-exploration-submenus), and so are the wait and
-    // suggestions frames (exploration-room-actions).
+    // (webclient-retire-exploration-submenus), and so is the wait frame
+    // (exploration-room-actions).
     const root = resolver.resolve({ source: "exploration.root" });
     expect(root).toEqual({ items: [], focusKey: null, title: "場景" });
     expect(root.geometry).toBeUndefined();
@@ -213,18 +210,12 @@ describe("frame resolver — the finite exploration table", () => {
     expect(verbMenu.items[verbMenu.items.length - 1].goBack).toBe(true);
     expect(verbMenu.items.map((i) => i.key)).toContain("look-target");
     expect(verbMenu.grid).toBeUndefined();
-    // The room actions resolve through the shipped builders, outside the
-    // router (exploration-room-actions): the place card's room look row and
-    // the suggestions card's rows, without the builder's back row (the rest
-    // entry reads no builder rows, redesign-rest-entry).
+    // The room action resolves through the shipped builder, outside the
+    // router (exploration-room-actions): the place card's room look row (the
+    // rest entry reads no builder rows, redesign-rest-entry).
     expect(resolver.explorationRoomLook()).toEqual(
       ExplorationMenu.lookItems(state.panels.exploration).find((item) => item.key === "look-room"),
     );
-    const menu = ExplorationMenu.suggestionsMenu(state.panels.context_actions.suggestions);
-    expect(resolver.explorationSuggestions()).toEqual({
-      status: state.panels.context_actions.suggestions.status,
-      items: menu.items.filter((item) => !item.goBack),
-    });
   });
 
   it("an unregistered source (including a reserved later-wave row) degrades to the marker", () => {
@@ -245,8 +236,8 @@ describe("frame resolver — the finite exploration table", () => {
     // webclient-talk-open-dock retires the scripted-keyword frame the same
     // way: nothing reaches its source once the v3 panel carries no keyword
     // list and 交談 dispatches `explore.talk_open` in one step.
-    // exploration-room-actions retires the waiting and suggestions frames:
-    // the wait and suggestions cards are client-local, outside the router.
+    // exploration-room-actions retires the waiting frame: the wait card is
+    // client-local, outside the router.
     const FORMER_EXPLORATION_SOURCES = [
       "exploration.move",
       "exploration.look",
@@ -261,25 +252,6 @@ describe("frame resolver — the finite exploration table", () => {
     }
   });
 
-  it("the suggestions card is absent on unavailable/absent and present on generating/ready/degraded", () => {
-    const state = committedState();
-    const resolver = resolverFor(state);
-    // The store fixture's default envelope is `generating`.
-    const generating = resolver.explorationSuggestions();
-    expect(generating.status).toBe("generating");
-    expect(generating.items.map((i) => i.label)).toContain("AI 正在構思建議…");
-    state.panels.context_actions = explorationActions({
-      suggestions: { status: "degraded", cards: [] },
-    });
-    expect(resolver.explorationSuggestions().items.map((i) => i.key)).toEqual([
-      "suggestions-empty",
-      "action-options.dismiss",
-    ]);
-    state.panels.context_actions = explorationActions({ suggestions: { status: "unavailable" } });
-    expect(resolver.explorationSuggestions()).toBeNull();
-    delete state.panels.context_actions;
-    expect(resolver.explorationSuggestions()).toBeNull();
-  });
 });
 
 describe("frame resolver — verbatim domain rows, reproduced navigation rows", () => {
@@ -422,8 +394,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     const root = resolver.resolve({ source: "exploration.root" });
     // The exits are the exit compass's (exploration-exit-compass), the people
     // and objects the presence rail's (exploration-presence-rail), and the
-    // room actions the place card's and the 建議 pill's
-    // (exploration-room-actions).
+    // room actions the place card's (exploration-room-actions).
     expect(root.items).toEqual([]);
     expect(root.unresolvable).toBeUndefined();
   });
@@ -432,20 +403,6 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
 describe("frame resolver — ownership isolation", () => {
   it("mutating a resolved menu never writes back into committed state or later resolves", () => {
     const state = committedState();
-    state.panels.context_actions = explorationActions({
-      suggestions: {
-        status: "ready",
-        cards: [
-          {
-            label: "進入酒館",
-            action_id: "explore.move",
-            params: { exit_ref: "east" },
-            source: "llm",
-          },
-        ],
-        dismissed_labels: [],
-      },
-    });
     const resolver = resolverFor(state);
     const target = resolver.explorationVerbs(7);
     const cleanTargetJson = JSON.stringify(target);
@@ -455,10 +412,6 @@ describe("frame resolver — ownership isolation", () => {
     const exits = resolver.explorationExits().rows;
     const disabledChip = exits.find((i) => i.disabledReason);
     if (disabledChip) disabledChip.disabledReason.message = "POISONED";
-    const suggestions = resolver.explorationSuggestions();
-    suggestions.items.forEach((item) => {
-      if (item.payload && item.payload.exit_ref) item.payload.exit_ref = "POISONED";
-    });
     expect(JSON.stringify(state.panels, (k, v) => v)).toBe(before);
     // A subsequent resolve derives from untouched committed state — the
     // poisoned copy is the caller's own, not the registry's.
@@ -489,32 +442,6 @@ describe("frame resolver — the degradation marker", () => {
     }).toThrow();
   });
 
-  it("suggestions belong to the exploration family: an unavailable exploration panel offers none even with a live envelope", () => {
-    const state = committedState();
-    state.panels.exploration = {
-      schema_version: 1,
-      available: false,
-      reason: { code: "scene_lost", message: "這片區域已不可用。" },
-    };
-    // context_actions still carries a live envelope.
-    const resolver = resolverFor(state);
-    expect(resolver.explorationSuggestions()).toBeNull();
-    expect(resolver.explorationRoomLook()).toBeNull();
-  });
-
-  it("an unavailable context_actions envelope offers no suggestions card", () => {
-    const state = committedState();
-    state.panels.context_actions = {
-      schema_version: 6,
-      available: false,
-      kind: "exploration",
-      reason: { code: "ai_offline", message: "建議服務目前離線。" },
-      actions: [],
-      items: [],
-    };
-    const resolver = resolverFor(state);
-    expect(resolver.explorationSuggestions()).toBeNull();
-  });
 });
 
 describe("frame resolver — (legacy) the degradation marker", () => {

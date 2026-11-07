@@ -172,34 +172,6 @@ describe("ChoiceCard", () => {
     expect(card(w).classes()).toContain("choice-card--still");
   });
 
-  // exploration-room-actions (design D4): a row's second `hint` line, the
-  // muted notes above the rows, the trash-can badge, and the active row kept
-  // by key across a committed update.
-  it("renders a row hint, muted notes that are not rows, and a trash-can badge", () => {
-    wrapper = mount(ChoiceCard, {
-      attachTo: document.body,
-      props: {
-        rows: [
-          { key: "a", label: "看看木箱", hint: "可能藏著什麼", badge: "1", kind: "verb", enabled: true },
-          { key: "dismiss", label: "清除建議", icon: "trash", badge: "", kind: "dismiss", enabled: true },
-          ROWS[4],
-        ],
-        notes: ["AI 建議目前不可用"],
-      },
-    });
-    const rows = wrapper.findAll('[role="menuitem"]');
-    expect(rows).toHaveLength(3);
-    expect(rows[0].get('[data-testid="choice-card-hint"]').text()).toBe("可能藏著什麼");
-    expect(wrapper.get('[data-testid="choice-card-note"]').text()).toBe("AI 建議目前不可用");
-    expect(wrapper.get('[data-testid="choice-card-note"]').attributes("role")).toBeUndefined();
-    expect(rows[1].find('svg[data-icon="trash"]').exists()).toBe(true);
-    expect(rows[1].text()).toBe("清除建議");
-    // The digits address the rows only.
-    wrapper.element.focus();
-    wrapper.element.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true, cancelable: true }));
-    expect(wrapper.emitted("pick")[0]).toEqual(["a"]);
-  });
-
   it("keeps the active row by key when the rows update, else keeps it in range", async () => {
     const first = [
       { key: "a", label: "A", badge: "1", kind: "verb", enabled: true },

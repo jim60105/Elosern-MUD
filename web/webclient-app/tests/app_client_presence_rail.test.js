@@ -6,7 +6,7 @@
 // card closing on Escape, on 返回, on 查看, on a departure (with the readout
 // flash), and on a move, focus returning to the opener, the one StageActor
 // element surviving the 交談 commit, the overflow card, the rail digits, the
-// Tab chain compass → rail → footer, and the compass walk stopping when a
+// Tab chain compass → rail → place-card actions, and the compass walk stopping when a
 // card opens.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -569,22 +569,17 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(compass.classes()).not.toContain("exit-compass--inactive");
   });
 
-  it("Tab walks compass → rail → 查看房間 → 休息 → 建議, and Shift+Tab walks back", async () => {
+  it("Tab walks compass → rail → 查看房間 → 休息, and Shift+Tab walks back", async () => {
     await mountWith();
     const compass = wrapper.get('[data-testid="exit-compass"]').element;
     const look = wrapper.get('[data-anchor="map"] [data-testid="place-card-look"]').element;
     const wait = wrapper.get('[data-anchor="map"] [data-testid="place-card-wait"]').element;
-    const pill = wrapper.get('#action-dock [data-testid="suggestions-pill"]').element;
     compass.focus();
     key(compass, "Tab");
     expect(document.activeElement).toBe(rail().element);
     key(rail().element, "Tab");
     expect(document.activeElement).toBe(look);
     key(look, "Tab");
-    expect(document.activeElement).toBe(wait);
-    key(wait, "Tab");
-    expect(document.activeElement).toBe(pill);
-    key(pill, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(wait);
     key(wait, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(look);
@@ -606,16 +601,15 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(document.activeElement).toBe(look);
     key(look, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(compass);
-    // An inert map anchor (person focus takes the place card away): the
-    // chain skips the place card's buttons.
-    wrapper.get('[data-anchor="map"]').element.setAttribute("inert", "");
-    const pill = wrapper.get('#action-dock [data-testid="suggestions-pill"]').element;
+    // An inert 查看房間 control: the chain skips it and lands on 休息.
+    look.setAttribute("inert", "");
+    const wait = wrapper.get('[data-anchor="map"] [data-testid="place-card-wait"]').element;
     compass.focus();
     key(compass, "Tab");
-    expect(document.activeElement).toBe(pill);
-    key(pill, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(wait);
+    key(wait, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(compass);
-    wrapper.get('[data-anchor="map"]').element.removeAttribute("inert");
+    look.removeAttribute("inert");
   });
 });
 

@@ -569,81 +569,6 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-options-surface::one-shared-card-component-renders-every-suggestion-card"
-    )
-    def test_option_cards_node_suite_passes(self):
-        result = subprocess.run(
-            [
-                "node",
-                "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/option_cards.test.js"),
-            ],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        self.assertEqual(
-            result.returncode,
-            0,
-            "option-cards Node suite failed:\n" + result.stdout + result.stderr,
-        )
-        self.assertIn("pass", result.stdout)
-
-    @covers_requirement(
-        "webclient-options-surface::the-exploration-dock-renders-the-suggestions-section-from-the-validated-v5-panel",
-        "webclient-options-surface::a-degraded-payload-with-zero-cards-renders-the-defined-empty-state",
-    )
-    def test_options_view_node_suite_passes(self):
-        result = subprocess.run(
-            [
-                "node",
-                "--test",
-                str(REPO_ROOT / "web/static/webclient/js/tests/options_view.test.js"),
-            ],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        self.assertEqual(
-            result.returncode,
-            0,
-            "options-view Node suite failed:\n" + result.stdout + result.stderr,
-        )
-        self.assertIn("pass", result.stdout)
-
-    @covers_requirement(
-        "webclient-context-actions-suggestions::the-suggestions-card-is-the-single-suggestion-surface",
-        "webclient-room-actions::the-建議-pill-opens-the-suggestions-card",
-    )
-    def test_choicepoint_node_suite_passes(self):
-        # The single suggestion surface is the centred suggestions card the
-        # 建議 pill opens (app_client_room_actions.test.js: generating, ready,
-        # degraded, and unavailable present only on the card, whose rows own
-        # the intents; action_dock.test.js keeps the retired dock pane down).
-        result = subprocess.run(
-            [
-                "npx",
-                "--no-install",
-                "vitest",
-                "run",
-                str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
-                str(REPO_ROOT / "web/webclient-app/tests/app_client_room_actions.test.js"),
-            ],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        self.assertEqual(
-            result.returncode,
-            0,
-            "choice-point Vitest evidence failed:\n" + result.stdout + result.stderr,
-        )
-        self.assertIn("pass", result.stdout)
-
-    @covers_requirement(
         "webclient-contextual-hud::narrative-lines-carry-the-reference-s-semantic-classes",
     )
     def test_choicepoint_block_node_suite_passes(self):
@@ -1884,10 +1809,10 @@ class PresenceRailEvidenceTest(unittest.TestCase):
 
 
 class RoomActionsEvidenceTest(unittest.TestCase):
-    """exploration-room-actions; redesign-rest-entry: the rest entry and the
-    suggestions card are the AppClient's room-actions composition contract;
-    the Vitest files are their executed evidence (the browser journeys cover
-    the live client's geometry and the retired surfaces)."""
+    """exploration-room-actions; redesign-rest-entry: the rest entry is the
+    AppClient's room-actions composition contract; the Vitest files are its
+    executed evidence (the browser journeys cover the live client's geometry
+    and the retired surfaces)."""
 
     @covers_requirement(
         "webclient-room-actions::休息-opens-a-two-layer-rest-entry",
