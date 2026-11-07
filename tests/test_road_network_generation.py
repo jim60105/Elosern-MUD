@@ -8,9 +8,6 @@ test says otherwise, and tests that compare costs disable the noise. On uniform
 ground many cheapest paths tie, so assertions check legality, ends and costs,
 never an exact cell sequence, unless the geometry makes the cheapest path
 unique (a pure straight line).
-
-Requirement annotations are added when the archive sync gives the change's
-requirements canonical identifiers.
 """
 
 from __future__ import annotations
@@ -36,6 +33,7 @@ from elosern_map_core.roads_codec import decode_road_network, read_road_metadata
 from elosern_map_core.schema import LOCATION_KINDS
 from elosern_map_core.sources import make_source_document
 from elosern_map_core.terrain import REGION_KEYS
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_TESTS = REPO_ROOT / "packages" / "map-core" / "tests"
@@ -196,6 +194,9 @@ def _authored_input(world) -> RoadInput:
 class RoadNodeTests(unittest.TestCase):
     """Road nodes are the gated settlements of the configured kinds."""
 
+    @covers_requirement(
+        "road-network-generation::road-nodes-are-the-gated-settlements-of-the-configured-kinds"
+    )
     def test_only_gated_settlements_of_configured_kinds_are_nodes(self):
         world = _world(
             {
@@ -218,12 +219,18 @@ class RoadNodeTests(unittest.TestCase):
         self.assertNotIn((3, 5), inp.blocked)
         self.assertEqual(inp.point_gateways[(3, 5)], frozenset({(2, 5)}))
 
+    @covers_requirement(
+        "road-network-generation::road-nodes-are-the-gated-settlements-of-the-configured-kinds"
+    )
     def test_absent_parameter_document_names_it(self):
         world = _world({}, {}, road=False)
         with self.assertRaises(RoadGenerationError) as caught:
             _authored_input(world)
         self.assertIn(ROAD_PATH, str(caught.exception))
 
+    @covers_requirement(
+        "road-network-generation::road-nodes-are-the-gated-settlements-of-the-configured-kinds"
+    )
     def test_new_settlement_document_joins_with_no_other_change(self):
         locations = {
             "first": _location(NODE_KIND, (3, 5)),
@@ -241,6 +248,9 @@ class RoadNodeTests(unittest.TestCase):
 class RoadCostFieldTests(_Legality, unittest.TestCase):
     """The road cost field admits only legal walkable steps."""
 
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
     def test_river_is_crossed_only_at_its_ford(self):
         walkable = _open(21)
         walkable[:, 10] = False
@@ -250,6 +260,9 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
         self.assertLegalRoad(inp, road, walkable)
         self.assertEqual([cell for cell in road.cells if cell[0] == 10], [(10, 2)])
 
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
     def test_corners_are_not_cut(self):
         walkable = _open(12)
         for k in range(2, 9):
@@ -274,6 +287,9 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
         (road,) = compute_roads(inp)
         return road, hill
 
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
     def test_steep_steps_cost_more_in_both_directions(self):
         # Climbing the hill costs eleven flat steps each way; the detour round
         # its north end costs only a few extra diagonals.
@@ -282,6 +298,9 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
                 road, hill = self._hill_road(low, high)
                 self.assertFalse(any(hill[y, x] for x, y in road.cells))
 
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
     def test_forbidden_region_separates_networks(self):
         walkable = _open(21)
         region = np.full((21, 21), 2, dtype=np.uint8)
@@ -302,6 +321,9 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
         self.assertEqual(pairs, {("west_a", "west_b"), ("east_a", "east_b")})
         self.assertFalse(any(9 <= x <= 11 for x, _ in network.cells))
 
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
     def test_roads_stay_off_footprints_and_hidden_gateways(self):
         footprint = {
             "shape": ["###", "###", "###"],
@@ -336,6 +358,9 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
 class RoadTopologyTests(unittest.TestCase):
     """Road topology is a relative neighbourhood graph with detour repair."""
 
+    @covers_requirement(
+        "road-network-generation::road-topology-is-a-relative-neighbourhood-graph-with-detour-repair"
+    )
     def test_middle_settlement_removes_the_long_pair(self):
         inp = _input(
             np.ones((21, 21), dtype=bool),
@@ -347,6 +372,9 @@ class RoadTopologyTests(unittest.TestCase):
 
     TRIANGLE = {"node_a": [(2, 2)], "node_b": [(20, 2)], "node_c": [(11, 13)]}
 
+    @covers_requirement(
+        "road-network-generation::road-topology-is-a-relative-neighbourhood-graph-with-detour-repair"
+    )
     def test_large_detour_adds_a_road(self):
         direct = _octile(18, 0)
         through = _octile(9, 11) * 2
@@ -360,6 +388,9 @@ class RoadTopologyTests(unittest.TestCase):
                 inp = _input(_open(23), self.TRIANGLE, detour_limit=limit)
                 self.assertEqual(_pairs(compute_roads(inp)), expected)
 
+    @covers_requirement(
+        "road-network-generation::road-topology-is-a-relative-neighbourhood-graph-with-detour-repair"
+    )
     def test_terrain_changes_the_neighbourhood(self):
         open_ground = _open(23)
         walled = _open(23)
@@ -381,6 +412,9 @@ class RoadRoutingTests(_Legality, unittest.TestCase):
         roads = compute_roads(_input(_open(44), self.TRUNK, reuse_factor=reuse))
         return {(road.first, road.second): road for road in roads}
 
+    @covers_requirement(
+        "road-network-generation::roads-are-routed-cheapest-first-and-reuse-earlier-cells"
+    )
     def test_later_roads_merge_into_a_trunk(self):
         shared = {}
         for reuse in (1.0, 0.4):
@@ -393,6 +427,9 @@ class RoadRoutingTests(_Legality, unittest.TestCase):
         self.assertEqual(shared[1.0], 0)
         self.assertGreater(shared[0.4], shared[1.0])
 
+    @covers_requirement(
+        "road-network-generation::roads-are-routed-cheapest-first-and-reuse-earlier-cells"
+    )
     def test_roads_end_at_gates_and_a_gate_serves_several_roads(self):
         inp = _input(_open(44), self.TRUNK, reuse_factor=0.4)
         roads = compute_roads(inp)
@@ -410,6 +447,9 @@ class RoadRoutingTests(_Legality, unittest.TestCase):
 class RoadRefusalTests(unittest.TestCase):
     """Generation refuses an invalid network."""
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_isolated_node_is_named(self):
         walkable = _open(20)
         walkable[:, 14] = False
@@ -418,6 +458,9 @@ class RoadRefusalTests(unittest.TestCase):
             generate_road_network(inp)
         self.assertIn("node node_c: has no road", caught.exception.problems)
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_unusable_gate_approach_is_named(self):
         walkable = _open(12)
         walkable[3, 3] = False
@@ -438,6 +481,9 @@ class RoadRefusalTests(unittest.TestCase):
             "node node_b: gate approach (9, 9) is off the cost field", caught.exception.problems
         )
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_undeclared_region_code_is_refused(self):
         region = np.full((8, 8), 2, dtype=np.uint8)
         region[0, 0] = 3  # only two region names are declared
@@ -448,6 +494,9 @@ class RoadRefusalTests(unittest.TestCase):
             "a region code lies outside the declared region names", caught.exception.problems
         )
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_shared_gate_approach_is_named(self):
         inp = _input(_open(8), {"node_a": [(2, 2)], "node_b": [(2, 2), (5, 5)]})
         with self.assertRaises(RoadGenerationError) as caught:
@@ -456,6 +505,9 @@ class RoadRefusalTests(unittest.TestCase):
             "node node_b: gate approach (2, 2) is shared with node_a", caught.exception.problems
         )
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_self_check_names_every_hand_built_fault(self):
         walkable = _open(12)
         walkable[:, 6] = False  # two networks: x < 6 and x > 6
@@ -498,6 +550,9 @@ class RoadRefusalTests(unittest.TestCase):
         for problem in expected:
             self.assertIn(problem, problems)
 
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
     def test_self_check_names_a_split_network(self):
         inp = _input(
             _open(12),
@@ -539,9 +594,15 @@ class RoadDeterminismTests(unittest.TestCase):
             reuse_factor=0.5,
         )
 
+    @covers_requirement(
+        "road-network-generation::generation-is-deterministic"
+    )
     def test_repeat_runs_match_byte_for_byte(self):
         self.assertEqual(generate_road_network(self._noisy()), generate_road_network(self._noisy()))
 
+    @covers_requirement(
+        "road-network-generation::generation-is-deterministic"
+    )
     def test_artifact_decodes_to_the_result(self):
         inp = self._noisy()
         text = generate_road_network(inp)

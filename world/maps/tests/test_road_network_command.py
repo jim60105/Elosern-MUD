@@ -4,9 +4,6 @@ Every test patches the Evennia bootstrap, the input builder and the artifact
 text, so no shipped world is composed and no network is computed: the command's
 own behaviour (check mode, failure handling and the explicit preview) is what
 is established. Temporary output paths keep the committed artifact untouched.
-
-Requirement annotations are added when the archive sync gives the change's
-requirements canonical identifiers.
 """
 
 from __future__ import annotations
@@ -24,6 +21,7 @@ from PIL import Image
 from elosern_map_core.roads import RoadGenerationError, RoadInput, RoadNode
 from elosern_map_core.roads_codec import encode_road_document
 from tools import road_network as command
+from tools.spec_traceability import covers_requirement
 
 SIZE = 9
 
@@ -83,6 +81,9 @@ class RoadNetworkCommandTests(unittest.TestCase):
             status = command.main(list(argv))
         return status, output.getvalue()
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_check_mode_reports_a_stale_file_and_accepts_an_identical_one(self):
         stale = self.directory / "stale.json"
         stale.write_text("{}\n", encoding="utf-8")
@@ -98,12 +99,18 @@ class RoadNetworkCommandTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(current.read_text(encoding="utf-8"), TEXT)
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_check_mode_reports_a_missing_file_without_writing_it(self):
         missing = self.directory / "missing.json"
         status, _ = self._run("--check", "--output", str(missing))
         self.assertEqual(status, 1)
         self.assertFalse(missing.exists())
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_generation_writes_the_artifact(self):
         target = self.directory / "roads.json"
         target.write_text("old\n", encoding="utf-8")
@@ -111,6 +118,9 @@ class RoadNetworkCommandTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(target.read_text(encoding="utf-8"), TEXT)
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_failed_generation_leaves_the_artifact(self):
         target = self.directory / "roads.json"
         target.write_text("previous bytes\n", encoding="utf-8")
@@ -121,6 +131,9 @@ class RoadNetworkCommandTests(unittest.TestCase):
         self.assertIn("node node_b: has no road", report)
         self.assertEqual(target.read_text(encoding="utf-8"), "previous bytes\n")
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_failed_input_assembly_is_reported_without_writing(self):
         target = self.directory / "roads.json"
         target.write_text("previous bytes\n", encoding="utf-8")
@@ -136,6 +149,9 @@ class RoadNetworkCommandTests(unittest.TestCase):
         self.assertIn("content/maps/road_network.yaml: missing", output.getvalue())
         self.assertEqual(target.read_text(encoding="utf-8"), "previous bytes\n")
 
+    @covers_requirement(
+        "road-network-generation::the-regeneration-command-reports-stale-artifacts"
+    )
     def test_preview_is_written_only_when_requested(self):
         target = self.directory / "roads.json"
         status, _ = self._run("--output", str(target))
