@@ -39,6 +39,7 @@ from elosern_map_core.roads_codec import (
     decode_road_network,
     encode_road_document,
     read_road_metadata,
+    road_fingerprint,
     road_freshness,
     road_source_signature,
 )
@@ -102,6 +103,19 @@ def _network_text(
     )
 
 
+def _recompute_fingerprint(document: dict) -> None:
+    """Re-sign a hand-edited document so only its ordering can be wrong."""
+    rows = [
+        (
+            row["first"],
+            row["second"],
+            tuple(zip(row["cells"][::2], row["cells"][1::2])),
+        )
+        for row in document["roads"]
+    ]
+    document["fingerprint"] = road_fingerprint(document["nodes"], rows)
+
+
 class RoadParameterDocumentTests(unittest.TestCase):
     def test_invalid_content_is_rejected(self):
         cases = (
@@ -140,6 +154,22 @@ class RoadParameterDocumentTests(unittest.TestCase):
         world = _world(forbidden_regions=[declared])
         self.assertEqual(world.diagnostics, ())
         self.assertEqual(world.road_network.forbidden_regions, (declared,))
+
+    def test_a_missing_field_has_no_default(self):
+        data = road_network_data()
+        del data["reuse_factor"]
+        sources = fixtures.source_documents() + (
+            make_source_document(ROAD_PATH, fixtures.yaml_text(data)),
+        )
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(sources)
+        diagnostic = next(
+            item
+            for item in captured.exception.diagnostics
+            if item.code == "missing_field"
+        )
+        self.assertEqual(diagnostic.field_path, "reuse_factor")
+        self.assertEqual(diagnostic.relative_path, ROAD_PATH)
 
     def test_an_absent_document_loads(self):
         world = fixtures.loaded_world()
@@ -329,6 +359,18 @@ class RoadCodecTests(unittest.TestCase):
                 with self.assertRaises(RoadDocumentError):
                     decode_road_network(candidate)
 
+        unsorted_nodes = copy.deepcopy(document)
+        unsorted_nodes["nodes"] = list(reversed(unsorted_nodes["nodes"]))
+        _recompute_fingerprint(unsorted_nodes)
+        with self.assertRaises(RoadDocumentError):
+            decode_road_network(unsorted_nodes)
+
+        unsorted_roads = copy.deepcopy(document)
+        unsorted_roads["roads"] = list(reversed(unsorted_roads["roads"]))
+        _recompute_fingerprint(unsorted_roads)
+        with self.assertRaises(RoadDocumentError):
+            decode_road_network(unsorted_roads)
+
         with self.assertRaises(RoadDocumentError):
             decode_road_network("{ not json")
         with self.assertRaises(RoadDocumentError):
@@ -340,6 +382,23 @@ class RoadCodecTests(unittest.TestCase):
                 nodes=["bravo", "charlie"],
                 roads=[("charlie", "bravo", ((0, 0),))],
             )
+        for name, kwargs in (
+            ("boolean frame", {"frame_cells": True}),
+            ("empty signature", {"source_signature": ""}),
+            ("non-string node", {"nodes": [1]}),
+            ("out-of-frame cell", {"roads": [("alpha", "charlie", ((8, 0),))]}),
+            ("boolean coordinate", {"roads": [("alpha", "charlie", ((True, 0),))]}),
+        ):
+            with self.subTest(invalid_encode=name):
+                arguments = {
+                    "frame_cells": 8,
+                    "source_signature": "signature",
+                    "nodes": ["bravo", "alpha"],
+                    "roads": [("alpha", "bravo", ((0, 0),))],
+                }
+                arguments.update(kwargs)
+                with self.assertRaises(RoadDocumentError):
+                    encode_road_document(**arguments)
 
 
 def run_with_numpy_blocked(source: str) -> subprocess.CompletedProcess:

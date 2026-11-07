@@ -226,16 +226,23 @@ def encode_road_document(
     roads: Sequence[tuple[str, str, Sequence[tuple[int, int]]]],
 ) -> str:
     """Encode one network as the canonical artifact text."""
-    ordered_nodes = sorted(str(node) for node in nodes)
+    if isinstance(frame_cells, bool) or not isinstance(frame_cells, int) or frame_cells < 1:
+        raise RoadDocumentError("road frame_cells is missing")
+    if not isinstance(source_signature, str) or not source_signature:
+        raise RoadDocumentError("road source_signature is missing")
+    if any(not isinstance(node, str) for node in nodes):
+        raise RoadDocumentError("road nodes is not a list of settlement keys")
+    ordered_nodes = sorted(nodes)
     ordered_roads: list[tuple[str, str, Sequence[tuple[int, int]]]] = []
     for first, second, cells in roads:
         if not isinstance(first, str) or not isinstance(second, str) or first >= second:
             raise RoadDocumentError(
                 f"road endpoints {first!r} and {second!r} are not in canonical order"
             )
-        if not cells:
+        checked = tuple(_require_cell(cell, frame_cells) for cell in cells)
+        if not checked:
             raise RoadDocumentError("a road has no cells")
-        ordered_roads.append((first, second, cells))
+        ordered_roads.append((first, second, checked))
     ordered_roads.sort(key=lambda row: (row[0], row[1]))
     fingerprint = road_fingerprint(ordered_nodes, ordered_roads)
     rows = [
@@ -287,22 +294,29 @@ def _require_nodes(document: Mapping) -> tuple[str, ...]:
     return tuple(nodes)
 
 
+def _require_cell(value: Any, frame: int) -> tuple[int, int]:
+    try:
+        x, y = value
+    except (TypeError, ValueError) as error:
+        raise RoadDocumentError("a road cell is not a coordinate pair") from error
+    for coordinate in (x, y):
+        if isinstance(coordinate, bool) or not isinstance(coordinate, int):
+            raise RoadDocumentError("a road cell coordinate is not an integer")
+    if not (0 <= x < frame and 0 <= y < frame):
+        raise RoadDocumentError(
+            f"road cell ({x}, {y}) outside the legal frame 0..{frame - 1}"
+        )
+    return (x, y)
+
+
 def _require_cells(row: Mapping, frame: int) -> tuple[tuple[int, int], ...]:
     raw = row.get("cells")
     if not isinstance(raw, list) or not raw or len(raw) % 2:
         raise RoadDocumentError("a road's cells is not a non-empty cell list")
-    cells: list[tuple[int, int]] = []
-    for index in range(0, len(raw), 2):
-        x, y = raw[index], raw[index + 1]
-        for value in (x, y):
-            if isinstance(value, bool) or not isinstance(value, int):
-                raise RoadDocumentError("a road cell coordinate is not an integer")
-            if not 0 <= value < frame:
-                raise RoadDocumentError(
-                    f"road cell ({x}, {y}) outside the legal frame 0..{frame - 1}"
-                )
-        cells.append((x, y))
-    return tuple(cells)
+    return tuple(
+        _require_cell((raw[index], raw[index + 1]), frame)
+        for index in range(0, len(raw), 2)
+    )
 
 
 def decode_road_network(source: Mapping | str) -> RoadNetwork:
@@ -311,6 +325,8 @@ def decode_road_network(source: Mapping | str) -> RoadNetwork:
     metadata = read_road_metadata(document)
     frame = _require_frame(document)
     nodes = _require_nodes(document)
+    if list(nodes) != sorted(nodes):
+        raise RoadDocumentError("road nodes are not sorted")
     entries = document.get("roads")
     if not isinstance(entries, list):
         raise RoadDocumentError("roads is not a list")
@@ -326,12 +342,14 @@ def decode_road_network(source: Mapping | str) -> RoadNetwork:
                 f"road endpoints {first!r} and {second!r} are not in canonical order"
             )
         decoded.append((first, second, _require_cells(row, frame)))
+    if decoded != sorted(decoded, key=lambda row: (row[0], row[1])):
+        raise RoadDocumentError("roads are not sorted")
     if metadata.fingerprint != road_fingerprint(nodes, decoded):
         raise RoadDocumentError("road fingerprint does not match its roads")
     return RoadNetwork(
         fingerprint=metadata.fingerprint,
-        nodes=tuple(sorted(nodes)),
-        roads=tuple(sorted(decoded, key=lambda row: (row[0], row[1]))),
+        nodes=nodes,
+        roads=tuple(decoded),
         cells=frozenset(cell for _, _, cells in decoded for cell in cells),
     )
 
