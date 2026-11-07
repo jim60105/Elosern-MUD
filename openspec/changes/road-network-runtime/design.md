@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` for motivation. `docs/superpowers/specs/2026-11-07-official-roads-design.md` is the approved design. `road-network-generation` provides `elosern_map_core.roads_codec`, `world/maps/data/road_network.json`, `AuthoringWorld.road_network` and `travel_cost.region_speeds_m_per_hour`.
+See `proposal.md` for motivation. `docs/superpowers/specs/2026-11-07-official-roads-design.md` is the approved design. `road-network-format` provides `elosern_map_core.roads_codec`, `AuthoringWorld.road_network` and `travel_cost.region_speeds_m_per_hour`, and `road-network-generation` provides `world/maps/data/road_network.json`.
 
 Code facts that shape this design:
 
@@ -94,7 +94,7 @@ def wilderness_terrain(source_xy, destination_xy):
     ...  # existing body unchanged
 ```
 
-Add `ROAD_TERRAIN` to `__all__`. The rulebook's `road` row already exists, and `terrain_speed_m_per_hour` still rejects a missing row. `_route` already prices through this function, so `world/rules/travel_plan.py` needs no edit.
+Keep the import inside the function, like `wilderness_cell_size_m`: `world.rules` never imports `world.maps` at module scope. Add `ROAD_TERRAIN` to `__all__`. The rulebook's `road` row already exists, and `terrain_speed_m_per_hour` still rejects a missing row. `_route` already prices through this function, so `world/rules/travel_plan.py` needs no edit.
 
 Two side effects are accepted and recorded here. `wilderness_terrain(origin, origin)` on a road cell makes the capacity estimate in `travel_capacity.py:263` use road speed for the whole estimate, which suits a party standing on a road. Two road cells that touch without being consecutive on one road also count as a road step, which is the design's "both ends" rule.
 
@@ -103,7 +103,7 @@ Two side effects are accepted and recorded here. `wilderness_terrain(origin, ori
 `web/webclient/presentation/area_map.py`, `_TerrainOracle`:
 
 - `__init__`: import `road_network`, set `self._roads = road_network.road_cells()`.
-- Cache key: add the road fingerprint as a third element of `key`, using `None` when `road_network.current()` is `None`.
+- Cache owners: `owners = (definition, sight.POLICY, road_network.current())`. The existing comparison is by identity and keeps the object alive, so a republished network never reuses cached facts, even when a synthetic network repeats a fingerprint. `None` compares equal to `None`.
 - `_facts`: `"road": cell in self._roads`, and delete the stale comment above it.
 
 Disclosure needs no code: unrevealed cells publish no facts, and `_overview_fact` keeps its own coarse fields.
@@ -114,6 +114,7 @@ Add `roads=None` to these `replace(...)` publications:
 
 - `world/tests/geography_fixture.py`: `publish_geography`, `publish_settlements`.
 - `world/tests/synthetic_data/install.py`: the `runtime.publish(` call that installs the kit.
+- `world/tests/synthetic_data/patching.py`: `_apply_geography` and `_apply_settlements`.
 - `web/browser_support/browser_fixtures_data/grafting.py`: the `_runtime.publish(` call in the graft.
 
 Do not change `publish_districts`, `publish_interiors` or the restore paths: they do not alter terrain or gates, and restore paths must return the saved bundle unchanged.
@@ -123,9 +124,15 @@ Adoption tests that edit a settlement or location gain a matching road stub:
 - `world/maps/tests/_editor_adoption_fixtures.py`: in both `regenerated_partition` and `generated_partition`, add `patch.object(runtime, "road_freshness_for", return_value=RoadFreshness(ROAD_ALGORITHM_VERSION, "t", True))` around the `yield`.
 - `world/maps/tests/test_runtime_adoption.py` and `test_runtime_adoption_rollback.py`: wherever `partition_freshness_for` is patched to accept a candidate with an edited road input, patch `road_freshness_for` the same way. A test rejecting through an earlier gate needs no stub.
 
+### D6. Traceability
+
+Do **not** add `covers_requirement` in this change: `tools/spec_traceability.py` knows only IDs in `openspec/specs/`, so an annotation on an active-change requirement fails the gate. The hand-off lists the test-to-requirement mapping, and archive adds the annotations after sync.
+
 ## Risks / Trade-offs
 
-- [A shipped-world test assumed regional terrain on a cell that is now a road] → Task 4.2 runs the non-browser suite once. Fix each failure by publishing that test's bundle with `roads=None` or by moving it to synthetic data, never by asserting shipped road cells.
+- [A shipped-world test assumed regional terrain on a cell that is now a road] → Task 4.3 runs the non-browser suite once. Fix each failure by publishing that test's bundle with `roads=None` or by moving it to synthetic data, never by asserting shipped road cells.
+- [Browser tests are not run by task 4.2] → Browser fixtures publish through the graft with `roads=None`, and CI owns the full browser suite.
+- [`content/map-reference-context.json` hashes `world/rules/**/*.py`, so it goes stale here] → Task 4.2 regenerates it.
 - [Editor saves make the artifact stale, and startup then refuses] → The rejection names the command. Editor regeneration is out of scope, matching the approved design. Authors follow `docs/development/road-network.md`.
 - [Startup decodes the artifact on each process start] → It is a small JSON file, cached with `functools.cache`, as the partition is.
 

@@ -27,8 +27,9 @@ None. `wilderness-travel-planning` and `movement-cost-charging` already specify 
 ## Impact
 
 - Code: new `world/maps/road_network.py`; `world/maps/runtime.py`; `world/rules/travel_cost.py`; `web/webclient/presentation/area_map.py`.
-- Test fixtures: `world/tests/geography_fixture.py`, `world/tests/synthetic_data/install.py`, `web/browser_support/browser_fixtures_data/grafting.py`, `world/maps/tests/_editor_adoption_fixtures.py`, `world/maps/tests/test_runtime_adoption.py`, `world/maps/tests/test_runtime_adoption_rollback.py`.
-- Tests: new `world/maps/tests/test_road_network_runtime.py`, `world/rules/tests/test_road_terrain.py`; `web/webclient/presentation/tests/test_area_map/test_wilderness_content.py`; new independence case in `tests/test_road_network_generation.py`.
+- Test fixtures: `world/tests/geography_fixture.py`, `world/tests/synthetic_data/install.py`, `world/tests/synthetic_data/patching.py`, `web/browser_support/browser_fixtures_data/grafting.py`, `world/maps/tests/_editor_adoption_fixtures.py`, `world/maps/tests/test_runtime_adoption.py`, `world/maps/tests/test_runtime_adoption_rollback.py`.
+- Tests: new `world/maps/tests/test_road_network_runtime.py`, `world/rules/tests/test_road_terrain.py`; `web/webclient/presentation/tests/test_area_map/test_wilderness_content.py`; new independence case in `tests/test_road_network_format.py`.
+- Generated data: `content/map-reference-context.json` is regenerated, because its manifest hashes `world/rules/` sources.
 - CI manifest: `.github/evennia-shards.json`.
 - Dependencies: none added.
 - Player impact: a road cell step now takes road time, and adoption fails until a stale artifact is regenerated.
@@ -40,4 +41,4 @@ Part of the official roads batch.
 
 depends-on: road-network-generation
 
-Code-conflict notes: requires the codec, `world/maps/data/road_network.json` and `travel_cost.region_speeds_m_per_hour` from `road-network-generation`. Both changes touch `.github/evennia-shards.json` and `world/rules/travel_cost.py`, in different places, so apply them in order.
+Code-conflict notes: requires `world/maps/data/road_network.json` from `road-network-generation`, and through it the codec and `travel_cost.region_speeds_m_per_hour` from `road-network-format`. All three regenerate `content/map-reference-context.json`, so apply them in order.

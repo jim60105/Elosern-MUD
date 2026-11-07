@@ -64,7 +64,7 @@ Wilderness terrain SHALL be the road travel context when both ends of a step are
 - **THEN** it answers road, and a non-road cell answers its regional terrain
 
 #### Scenario: Planner takes the road at equal distance
-- **WHEN** two synthetic routes have equal step counts and only one runs on road cells
+- **WHEN** two synthetic cardinal-only routes have equal length and only one runs on road cells
 - **THEN** the planner picks the road, and its prediction equals the sequential charge
 
 ### Requirement: Map facts publish the road fact within disclosure
@@ -79,5 +79,5 @@ Area and travel map cell facts SHALL publish whether a disclosed cell is a road 
 - **THEN** the panel publishes it as unknown with no road field
 
 #### Scenario: A republished network is not read from cache
-- **WHEN** a world with a different road network is published over the same terrain, elevation and footprints
+- **WHEN** a different road network object is published over the same terrain, elevation and footprints
 - **THEN** the next panel publishes the new road facts
