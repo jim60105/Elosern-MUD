@@ -44,25 +44,44 @@ ENV UV_LINK_MODE=copy \
 WORKDIR /build
 
 COPY --chown=root:0 pyproject.toml uv.lock ./
-# The pure map package is a locked local path dependency; its source must be
-# present for the wheel build. `--no-editable` installs it into /venv, so the
-# runtime image needs no package source of its own.
-COPY --chown=root:0 packages/map-core/ packages/map-core/
+# The pure map package is a locked local path dependency. Only its manifest is
+# copied here: `--locked` lock validation reads it, but its wheel is
+# deliberately NOT installed yet (`--no-install-package`), because building that
+# wheel needs the package source, and every input above the removal-weight fetch
+# invalidates that download. The wheel is installed after the fetch, below.
+COPY --chown=root:0 packages/map-core/pyproject.toml packages/map-core/
 RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-install-project --no-editable
+    uv sync --locked --no-dev --no-install-project --no-editable \
+    --no-install-package elosern-map-core
 
 # The sole background-removal weight — the locked rembg default `bria-rmbg`
 # (BRIA RMBG-2.0) — is acquired HERE, in the reusable locked-dependency layer:
 # the runtime container must never fetch a model, and no volume may hide it.
-# The fetch runs BEFORE any application source is copied, so a code-only rebuild
-# reuses this layer. Upstream checksum verification stays enabled (no
-# MODEL_CHECKSUM_DISABLED, no error suppression) and both model-home variables
-# point at a plain stage output directory; a failed download, a checksum
-# mismatch, or an absent/empty artifact fails the build. No inference session is
-# constructed and no model-selection argument exists.
+# The fetch runs BEFORE any application source — including `packages/map-core/`
+# — is copied, so a code-only rebuild (game code or map package) reuses this
+# layer. Upstream checksum verification stays enabled (no MODEL_CHECKSUM_DISABLED,
+# no error suppression) and both model-home variables point at a plain stage
+# output directory; a failed download, a checksum mismatch, or an absent/empty
+# artifact fails the build. No inference session is constructed and no
+# model-selection argument exists.
 RUN U2NET_HOME=/rembg REMBG_HOME=/rembg \
     /venv/bin/python -c "from rembg.sessions.bria_rmbg import BriaRmBgSession; BriaRmBgSession.download_models()" && \
     test -s /rembg/models/bria-rmbg/bria-rmbg.onnx
+
+# The map package wheel lands only now, above the cached weight: a
+# `packages/map-core/` edit rebuilds this source copy plus one single-package
+# sync (`uv sync` reports exactly one package to install, everything else is
+# already satisfied) while the model layer stays cached. `--no-editable` keeps
+# the wheel in /venv, so the runtime image needs no package source of its own.
+# `--refresh-package` is required, not cosmetic: uv keys a local directory
+# dependency's built wheel in its cache mount and otherwise reinstalls the stale
+# wheel after a source edit (verified: no rebuild line, old file contents in
+# site-packages). Refreshing only this package keeps the layer delta to that one
+# wheel.
+COPY --chown=root:0 packages/map-core/ packages/map-core/
+RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-install-project --no-editable \
+    --refresh-package elosern-map-core
 
 ########################################
 # Vue dist build stage (webclient-vue-01-foundation)

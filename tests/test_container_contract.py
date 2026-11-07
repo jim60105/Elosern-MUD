@@ -262,8 +262,43 @@ class ContainerContractTests(unittest.TestCase):
         self.assertNotIn("new_session", fetch)
         self.assertNotIn("model_name", fetch)
         # Application source is copied only by the app-layout stage, which
-        # CONSUMES this builder, so the fetch always precedes it.
-        self.assertNotIn("COPY", builder[builder.index("BriaRmBgSession"):])
+        # CONSUMES this builder, so the fetch always precedes it. The single
+        # build-time exception is the local map package's wheel source: it feeds
+        # /venv only and never reaches the runtime tree, and it MUST stay after
+        # the fetch — anything copied above it would invalidate the acquired
+        # weight on every edit under `packages/map-core/` and re-download the
+        # full payload.
+        self.assertEqual(
+            [
+                line
+                for line in builder[builder.index("BriaRmBgSession"):].splitlines()
+                if line.startswith("COPY")
+            ],
+            ["COPY --chown=root:0 packages/map-core/ packages/map-core/"],
+            "only the build-time map package source may follow the weight fetch",
+        )
+
+    def test_the_map_package_wheel_is_rebuilt_after_the_weight_is_acquired(self):
+        # `packages/map-core/` is a locked local path dependency installed as a
+        # wheel (`--no-editable`) into /venv, above the acquired weight layer so
+        # a map-source edit never re-downloads the model. uv also keys that
+        # wheel in its cache mount, and a plain re-sync after a source edit
+        # reinstalls the PREVIOUS contents (observed: no build step, stale file
+        # in site-packages), so the sync must refresh this package explicitly.
+        builder = _stage(_read("Containerfile"), "builder")
+        source_copy = builder.index(
+            "COPY --chown=root:0 packages/map-core/ packages/map-core/"
+        )
+        self.assertLess(
+            builder.index("BriaRmBgSession.download_models()"),
+            source_copy,
+            "the map package source copy must stay above the acquired weight",
+        )
+        self.assertIn(
+            "--refresh-package elosern-map-core",
+            builder[source_copy:],
+            "the post-fetch sync must rebuild the map wheel instead of reusing it",
+        )
 
     @covers_requirement(
         "container-image::the-default-background-removal-model-is-acquired-during-image-build"
