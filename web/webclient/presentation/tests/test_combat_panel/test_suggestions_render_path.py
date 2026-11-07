@@ -244,9 +244,6 @@ class SuggestionsRenderPathTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(payload["available"])
         validate_context_actions(payload)
 
-    @covers_requirement(
-        "action-options-trigger-service::current-situation-freshness-gates-session-backed-suggestions"
-    )
     def test_stale_non_unavailable_snapshots_fail_closed_to_unavailable(self):
         """A snapshot whose fingerprint no longer matches the current
         situation renders unavailable with a bounded diagnostic and never
@@ -296,9 +293,6 @@ class SuggestionsRenderPathTests(BattlefieldIsolation, EvenniaTestCase):
                     logged.assert_called_once()
                     self.assertNotIn("cards", payload["suggestions"])
 
-    @covers_requirement(
-        "action-options-trigger-service::current-situation-freshness-gates-session-backed-suggestions"
-    )
     def test_absent_current_fingerprint_fails_closed_to_unavailable(self):
         """A context without a derivable exploration situation can never
         render a session-backed state: the gate emits unavailable even for a

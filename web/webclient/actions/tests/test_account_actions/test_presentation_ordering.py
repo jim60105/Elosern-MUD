@@ -251,7 +251,6 @@ class AccountActionsIntegrationTests(EvenniaTest):
                 }
             ],
         }
-        self.session.ndb.options_barriers = {"char1_barrier": 1}
         self.session.ndb.concept_proposal = {
             "owner_actor_id": str(self.char1.pk),
             "revision": 1,
@@ -285,16 +284,15 @@ class AccountActionsIntegrationTests(EvenniaTest):
             # If reconnect trigger initialized state for char2, verify it's char2's
             self.assertEqual(options_state.get("owner_actor_id"), str(self.char2.pk))
             self.assertNotEqual(options_state.get("fingerprint"), "fp_char1")
-        self.assertIsNone(getattr(self.session.ndb, "options_barriers", None))
         self.assertIsNone(getattr(self.session.ndb, "concept_proposal", None))
 
         # ---------------------------------------------------------------------
-        # An in-flight generation or settlement for char1 settling after switch
-        # publishes nothing into char2's sequence
+        # A settlement for char1 completing after the switch publishes nothing
+        # into char2's sequence
         # ---------------------------------------------------------------------
         self.session.sent.clear()
 
-        # 1. Dispatcher action completion from char1's epoch
+        # Dispatcher action completion from char1's epoch
         from web.webclient.actions.dispatcher import _publish_completion
         _publish_completion(
             self.session,
@@ -306,13 +304,6 @@ class AccountActionsIntegrationTests(EvenniaTest):
         )
         self.assertEqual(len([c for c in self.session.sent if "ui_action_result" in c]), 0)
         self.assertEqual(len([c for c in self.session.sent if "ui_update" in c]), 0)
-
-        # 2. Options proposal subscriber from char1's epoch
-        from server.option_proposal_service import _deliver_guarded, _PendingSubscriber
-        sub = _PendingSubscriber(self.session, token=1, captured_epoch=char1_epoch, fingerprint="fp_char1")
-        _deliver_guarded(sub, self.char1, "ready", None)
-        self.assertEqual(len([c for c in self.session.sent if "ui_update" in c]), 0)
-        self.assertEqual(len([c for c in self.session.sent if "ui_snapshot" in c]), 0)
 
         # char1 persistent state is completely intact
         self.assertTrue(self.char1.tags.has("veteran", category="status"))

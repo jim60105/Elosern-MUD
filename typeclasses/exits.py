@@ -57,10 +57,9 @@ def after_successful_movement(
     movement-settlement boundary (movement-settlement-atomicity design D1)
     compensates that failure — and ``record_arrival``/``follow_companions``
     are exception-isolated, so the helper is safe to call on any successful
-    traversal from any path. The action-options trigger is owned by
-    ``PlayerCharacter.at_post_move`` (the shared post-move lifecycle), which
-    every successful hooks-enabled relocation — ordinary traversal and direct
-    ``move_to()`` alike — reaches (action-options-wiring-hardening design D2).
+    traversal from any path. The post-move lifecycle is owned by
+    ``PlayerCharacter.at_post_move``, which every successful hooks-enabled
+    relocation — ordinary traversal and direct ``move_to()`` alike — reaches.
 
     The tail additionally runs the one-way-gate home re-anchor
     (limbo-one-way-gates design D7): a successful arrival at a

@@ -366,11 +366,10 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
 
     The publication is the coordinator's serialized own batch: the Deferred
     resolves with the actual :class:`PublicationReceipt` once every frame has
-    sent and this helper has registered the watcher and scheduled the options
-    trigger, or ``None`` when the sequence retired before it ran (nothing is
-    registered or scheduled then). A failure — the world clock absent, or any
-    publication error — is reported through the safe protocol error and never
-    raises into text play.
+    sent and this helper has registered the watcher, or ``None`` when the
+    sequence retired before it ran (nothing is registered then). A failure —
+    the world clock absent, or any publication error — is reported through the
+    safe protocol error and never raises into text play.
 
     An explicit synchronization is an independent queue entry: it never joins
     the causal group of a command that happens to be executing, so it cannot
@@ -386,17 +385,16 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
     def _published(receipt: Any) -> Any:
         if receipt is None:
             # The captured sequence retired before execution: this session is
-            # no longer a watcher of ``actor`` and nothing may be scheduled.
+            # no longer a watcher of ``actor``.
             return None
         # The snapshot is on the wire; this session is a live watcher of its
-        # puppet for the room-entry hook (idempotent per session). A
+        # puppet for every targeted push (idempotent per session). A
         # function-local import keeps the ingress importable while a worker is
         # under development and avoids a module cycle (watchers imports the
         # ingress predicate).
         from web.webclient.presentation.watchers import register_watcher
 
         register_watcher(session)
-        _schedule_on_reconnect(session, actor, coordinator)
         return receipt
 
     def _failed(failure: Failure) -> None:
@@ -455,31 +453,6 @@ def synchronize_session(session: Any, actor: Any) -> Deferred:
     return deferred
 
 
-def _schedule_on_reconnect(
-    session: Any,
-    actor: Any,
-    coordinator: Any,
-) -> None:
-    """Fire-and-forget the action-options trigger after a successful sync.
-
-    The requesting session is the sole watcher; whether a generation actually
-    starts is decided by the service's stale predicate (absent options state,
-    changed fingerprint, or a non-ready/non-cached state), never by this hook.
-    Covers both ``ui_sync`` and post-command refresh with one seam. Fire-and-
-    forget: any synchronous failure is logged and swallowed so the snapshot
-    path is never altered.
-    """
-    try:
-        from server.option_proposal_service import schedule_action_options
-
-        schedule_action_options(actor, watchers=((session, coordinator.epoch),))
-    except Exception:
-        log_unavailable(
-            getattr(session, "sessid", "?"),
-            "reconnect trigger scheduling failed (swallowed)",
-        )
-
-
 def refresh_after_command(session: Any, actor: Any) -> Deferred:
     """Best-effort comparison refresh after a WebClient command settles.
 
@@ -511,7 +484,6 @@ def refresh_after_command(session: Any, actor: Any) -> Deferred:
         from web.webclient.presentation.watchers import register_watcher
 
         register_watcher(session)
-        _schedule_on_reconnect(session, actor, coordinator)
         return receipt
 
     def _failed(failure: Failure) -> None:

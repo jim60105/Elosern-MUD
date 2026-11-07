@@ -140,13 +140,10 @@ class ActivationTests(EncounterDispatchTestBase):
         with patch(
             "web.webclient.presentation.watchers.watchers_for", return_value=watchers
         ) as watchers_for, patch(
-            "server.option_proposal_service.schedule_action_options"
-        ) as schedule, patch(
             "web.webclient.presentation.ingress.refresh_after_command"
         ) as refresh:
             _schedule_projection_refresh_after_activation(self.player)
         watchers_for.assert_called_once_with(self.player)
-        schedule.assert_called_once_with(self.player, watchers=watchers)
         refresh.assert_called_once_with(session, self.player)
 
     @covers_requirement(
