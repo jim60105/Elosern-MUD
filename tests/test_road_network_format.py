@@ -520,5 +520,64 @@ class IndependentDecodingTests(unittest.TestCase):
         self.assertEqual(result.stdout.strip(), "[]")
 
 
+_RUNTIME_INDEPENDENCE_PROBE = textwrap.dedent(
+    """
+    import json
+    import sys
+
+    BLOCKED = {"numpy", "scipy", "tools", "elosern_map_core.roads"}
+
+    class Blocker:
+        def find_spec(self, name, path=None, target=None):
+            root = (
+                name
+                if name == "elosern_map_core.roads"
+                else name.split(".")[0]
+            )
+            if root in BLOCKED:
+                raise AssertionError(f"road runtime imported forbidden namespace {name}")
+            return None
+
+    sys.meta_path.insert(0, Blocker())
+
+    from elosern_map_core.roads_codec import decode_road_network, encode_road_document
+    from world.maps import road_network
+
+    assert road_network.current() is None
+    assert road_network.is_road_cell((0, 0)) is False
+    assert road_network.road_cells() == frozenset()
+
+    network = decode_road_network(
+        encode_road_document(
+            frame_cells=4,
+            source_signature="t",
+            nodes=["alpha", "bravo"],
+            roads=[("alpha", "bravo", ((0, 0), (1, 0)))],
+        )
+    )
+    road_network._install(network)
+    assert road_network.current() is network
+    assert road_network.is_road_cell((0, 0)) is True
+    assert road_network.is_road_cell((9, 9)) is False
+    assert road_network.road_cells() == frozenset({(0, 0), (1, 0)})
+
+    leaked = sorted(
+        name
+        for name in sys.modules
+        if name.split(".")[0] in {"numpy", "scipy", "tools"}
+        or name == "elosern_map_core.roads"
+    )
+    print(json.dumps(leaked))
+    """
+)
+
+
+class IndependentRuntimeTests(unittest.TestCase):
+    def test_the_read_view_imports_and_looks_up_without_numpy_or_scipy(self):
+        result = run_with_numpy_blocked(_RUNTIME_INDEPENDENCE_PROBE)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "[]")
+
+
 if __name__ == "__main__":
     unittest.main()

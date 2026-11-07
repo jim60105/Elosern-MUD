@@ -12,8 +12,8 @@ Every static map authority is discovered YAML (``content/maps/continent.yaml``,
    room joins, the registered scene catalog, the quest destination bindings and
    the district diagnostics — so nothing is approved against the previously
    published world,
-4. requires the committed district partition to describe these exact inputs,
-   and
+4. requires the committed district partition and the committed road network to
+   describe these exact inputs, and
 5. only then installs one immutable :class:`MapWorld` bundle.
 
 Publication is all-or-nothing: a rejected candidate raises and leaves the
@@ -51,6 +51,7 @@ from elosern_map_core.authoring import (
 from elosern_map_core.diagnostics import blocking
 from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.partition_codec import PartitionFreshness, partition_freshness
+from elosern_map_core.roads_codec import RoadFreshness, road_freshness
 from elosern_map_core.sources import SourceDocument, discover_source_documents
 
 from world.maps.interiors import InteriorError, InteriorSnapshot, build_interiors
@@ -104,6 +105,7 @@ class MapWorld:
     snapshot: RuntimeMapSnapshot | None
     partition: PartitionFreshness | None
     elevation: Any | None = None
+    roads: Any | None = None
 
     @property
     def identity(self) -> str:
@@ -120,6 +122,9 @@ class MapWorld:
             digest.update(b"\0")
         if self.elevation is not None:
             digest.update(self.elevation.fingerprint.encode("utf-8"))
+            digest.update(b"\0")
+        if self.roads is not None:
+            digest.update(self.roads.fingerprint.encode("utf-8"))
             digest.update(b"\0")
         return digest.hexdigest()
 
@@ -146,6 +151,7 @@ class ComposedWorld:
             snapshot=None,
             partition=None,
             elevation=None,
+            roads=None,
         )
 
 
@@ -215,6 +221,19 @@ def partition_freshness_for(world: AuthoringWorld) -> PartitionFreshness:
     )
 
 
+def road_freshness_for(
+    world: AuthoringWorld, elevation_fingerprint: str
+) -> RoadFreshness:
+    """The committed road artifact's freshness against this candidate's inputs."""
+
+    from world.maps import road_network
+
+    return road_freshness(
+        road_network.artifact_metadata(),
+        road_network.source_signature(world, elevation_fingerprint),
+    )
+
+
 def compose_settlements(root: str | Path | None = None) -> SettlementSnapshot:
     """Compose one settlement candidate from an explicit root, publishing nothing.
 
@@ -263,13 +282,14 @@ def _uninstall() -> None:
     """Forget the published world in every map reader (the not-loaded state)."""
 
     from world.lore import map_districts
-    from world.maps import elevation, geography, interiors, map_data
+    from world.maps import elevation, geography, interiors, map_data, road_network
 
     geography._PUBLISHED = None
     map_data._PUBLISHED = None
     map_districts._PUBLISHED = None
     interiors._PUBLISHED = None
     elevation._install(None)
+    road_network._install(None)
     global _BUNDLE
     _BUNDLE = None
 
@@ -395,7 +415,7 @@ def compose(root: str | Path | None = None) -> ComposedWorld:
 
 
 def load_candidate(root: str | Path | None = None) -> MapWorld:
-    """Compose one candidate and accept it only with external + partition evidence."""
+    """Compose one candidate and accept it only with external, partition and artifact evidence."""
 
     composed = compose(root)
     world = composed.world
@@ -428,6 +448,21 @@ def load_candidate(root: str | Path | None = None) -> MapWorld:
     except ElevationDocumentError as error:
         raise MapWorldError([f"elevation artifact rejected: {error}"]) from error
 
+    from elosern_map_core.roads_codec import RoadDocumentError
+    from world.maps import road_network
+
+    try:
+        if not road_freshness_for(world, elevation_runtime.fingerprint).current:
+            raise MapWorldError(
+                [
+                    "road network artifact is not current; run: "
+                    "uv run --locked python -m tools.road_network"
+                ]
+            )
+        roads = road_network.frozen_network()
+    except (OSError, RoadDocumentError) as error:
+        raise MapWorldError([f"road network artifact rejected: {error}"]) from error
+
     return MapWorld(
         geography=composed.geography,
         settlements=composed.settlements,
@@ -436,6 +471,7 @@ def load_candidate(root: str | Path | None = None) -> MapWorld:
         snapshot=snapshot,
         partition=freshness,
         elevation=elevation_runtime,
+        roads=roads,
     )
 
 
@@ -450,13 +486,14 @@ def _install(world: MapWorld) -> None:
     """Point every map reader at one bundle (the single publication step)."""
 
     from world.lore import map_districts
-    from world.maps import elevation, geography, interiors, map_data
+    from world.maps import elevation, geography, interiors, map_data, road_network
 
     geography._install(world.geography)
     map_data._install(world.settlements)
     map_districts._install(world.districts)
     interiors._install(world.interiors)
     elevation._install(world.elevation)
+    road_network._install(world.roads)
     global _BUNDLE
     _BUNDLE = world
 
