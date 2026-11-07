@@ -12,8 +12,8 @@ silently recomputed. That claim is only meaningful in a fresh interpreter with
 the forbidden namespaces blocked before they are imported, so it runs in its own
 subprocess.
 
-Requirement annotations belong to the archive sync: the delta requirements are
-not in ``openspec/specs`` yet, so tests here carry none.
+Requirement annotations name the two requirements the archive sync added to
+``openspec/specs/road-network-artifact/spec.md``.
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ from elosern_map_core.roads_codec import (
 from elosern_map_core.schema import LOCATION_KINDS
 from elosern_map_core.sources import SourceDocument, make_source_document
 from elosern_map_core.terrain import REGION_KEYS
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_TESTS = REPO_ROOT / "packages" / "map-core" / "tests"
@@ -117,6 +118,9 @@ def _recompute_fingerprint(document: dict) -> None:
 
 
 class RoadParameterDocumentTests(unittest.TestCase):
+    @covers_requirement(
+        "road-network-artifact::road-parameters-are-a-validated-authored-document"
+    )
     def test_invalid_content_is_rejected(self):
         cases = (
             ({"mystery": 1}, "unknown_field", "mystery"),
@@ -137,6 +141,9 @@ class RoadParameterDocumentTests(unittest.TestCase):
                 self.assertEqual(naming.category, "structure")
                 self.assertEqual(naming.relative_path, ROAD_PATH)
 
+    @covers_requirement(
+        "road-network-artifact::road-parameters-are-a-validated-authored-document"
+    )
     def test_unknown_forbidden_region_is_rejected(self):
         with self.assertRaises(AuthoringError) as captured:
             _world(forbidden_regions=["no_such_region"])
@@ -155,6 +162,9 @@ class RoadParameterDocumentTests(unittest.TestCase):
         self.assertEqual(world.diagnostics, ())
         self.assertEqual(world.road_network.forbidden_regions, (declared,))
 
+    @covers_requirement(
+        "road-network-artifact::road-parameters-are-a-validated-authored-document"
+    )
     def test_a_missing_field_has_no_default(self):
         data = road_network_data()
         del data["reuse_factor"]
@@ -171,6 +181,9 @@ class RoadParameterDocumentTests(unittest.TestCase):
         self.assertEqual(diagnostic.field_path, "reuse_factor")
         self.assertEqual(diagnostic.relative_path, ROAD_PATH)
 
+    @covers_requirement(
+        "road-network-artifact::road-parameters-are-a-validated-authored-document"
+    )
     def test_an_absent_document_loads(self):
         world = fixtures.loaded_world()
         self.assertEqual(world.diagnostics, ())
@@ -190,6 +203,9 @@ class RoadParameterDocumentTests(unittest.TestCase):
         self.assertIsInstance(road.detour_limit, float)
         self.assertIsInstance(road.reuse_factor, float)
 
+    @covers_requirement(
+        "road-network-artifact::road-parameters-are-a-validated-authored-document"
+    )
     def test_tuning_leaves_other_artifacts_current(self):
         baseline = _world(detour_limit=1.5)
         tuned = _world(detour_limit=1.7)
@@ -225,6 +241,9 @@ class RoadCodecTests(unittest.TestCase):
             fingerprint="0" * 64,
         )
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_round_trip_is_canonical(self):
         text = _network_text()
         network = decode_road_network(text)
@@ -258,6 +277,9 @@ class RoadCodecTests(unittest.TestCase):
             sum(1 for line in text.splitlines() if line.startswith("    {")), 2
         )
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_changed_input_reads_as_stale(self):
         sources = self._sources()
         speeds = {REGION_A: 1000}
@@ -296,6 +318,9 @@ class RoadCodecTests(unittest.TestCase):
             ).current
         )
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_unrelated_sources_stay_current(self):
         sources = self._sources()
         signature = road_source_signature(
@@ -316,11 +341,17 @@ class RoadCodecTests(unittest.TestCase):
         self.assertEqual(unchanged, signature)
         self.assertTrue(road_freshness(self._metadata(signature), unchanged).current)
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_a_missing_signature_is_never_current(self):
         metadata = self._metadata("signature")
         self.assertFalse(road_freshness(metadata, None).current)
         self.assertFalse(road_freshness(metadata, "").current)
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_corrupt_artifact_is_rejected(self):
         document = json.loads(_network_text())
 
@@ -480,6 +511,9 @@ _INDEPENDENCE_PROBE = textwrap.dedent(
 
 
 class IndependentDecodingTests(unittest.TestCase):
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-decodes-and-reports-freshness-without-generation-dependencies"
+    )
     def test_the_codec_decodes_and_reports_freshness_without_numpy_or_scipy(self):
         result = run_with_numpy_blocked(_INDEPENDENCE_PROBE)
         self.assertEqual(result.returncode, 0, result.stderr)
