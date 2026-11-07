@@ -35,6 +35,10 @@ uv run --locked --project tools/map-editor python .agents/skills/map-data-author
 uv run --locked python -m tools.map_district_partition [--check]
 uv run --locked python -m tools.map_reference_context [--check]
 
+# 4. Regenerate the wilderness road network after the partition and elevation (game environment; about a minute)
+uv run --locked python -m tools.road_network [--check]
+uv run --locked python -m tools.road_network --preview /tmp/roads.png   # review image, never committed
+
 # Settlement site context, size budget and terrain fit (read-only)
 uv run --locked python -m tools.settlement_synthesis site <location_id>
 uv run --locked python -m tools.settlement_synthesis budget <location_id>
