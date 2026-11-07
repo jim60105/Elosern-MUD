@@ -236,6 +236,15 @@ def terrain_speed_m_per_hour(terrain: str) -> int:
         raise TravelRulebookError(f"unknown travel terrain {terrain!r}") from error
 
 
+def region_speeds_m_per_hour() -> dict[str, int]:
+    """Each wilderness region's authored speed, the road generator's terrain price."""
+
+    return {
+        region: terrain_speed_m_per_hour(terrain)
+        for region, terrain in WILDERNESS_TERRAIN.items()
+    }
+
+
 def _fatigue_state(member: Any) -> FatigueState | None:
     """Return one present member's validated fatigue state, or refuse.
 
@@ -1025,6 +1034,7 @@ __all__ = [
     "preflight_movement_cost",
     "refuse_pre_destination_depletion",
     "refuse_sleeping_party",
+    "region_speeds_m_per_hour",
     "resolve_traversal_cost",
     "settlement_edge_cost",
     "source_present_members",
