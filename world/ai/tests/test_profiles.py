@@ -488,5 +488,3 @@ class GetProfileTests(unittest.TestCase):
         with override_settings(LLM_PROFILES=raw):
             self.assertFalse(get_profile("narrator").enabled)
             self.assertTrue(get_profile("scene_builder").enabled)
-
-
