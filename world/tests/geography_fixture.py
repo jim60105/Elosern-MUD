@@ -41,7 +41,7 @@ def publish_geography(snapshot):
     from world.maps import runtime
 
     runtime.ensure_published()
-    return runtime.publish(replace(runtime.current(), geography=snapshot))
+    return runtime.publish(replace(runtime.current(), geography=snapshot, roads=None))
 
 
 def publish_settlements(snapshot):
@@ -52,7 +52,7 @@ def publish_settlements(snapshot):
     from world.maps import runtime
 
     runtime.ensure_published()
-    return runtime.publish(replace(runtime.current(), settlements=snapshot))
+    return runtime.publish(replace(runtime.current(), settlements=snapshot, roads=None))
 
 
 def publish_districts(snapshot):

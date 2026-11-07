@@ -221,6 +221,7 @@ def _publish_kit_world(*, borrow_authored_world: bool):
             previous,
             geography=geography,
             settlements=settlements,
+            roads=None,
             interiors=build_interiors(
                 MappingProxyType(documents),
                 fingerprints={

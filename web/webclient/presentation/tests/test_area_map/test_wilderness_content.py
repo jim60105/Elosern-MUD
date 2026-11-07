@@ -238,6 +238,90 @@ class WildernessContentTests(_WildernessFixture):
         parts = encode_map_parts("area_map", payload)
         self.assertEqual(decode_map_parts("area_map", parts), payload)
 
+    def _publish_network(self, cells, fingerprint="t_synthetic_road"):
+        """Publish one synthetic road network over the live bundle."""
+        from dataclasses import replace
+
+        from elosern_map_core.roads_codec import RoadNetwork
+        from world.maps import runtime
+
+        previous = runtime.current()
+        self.addCleanup(runtime.publish, previous)
+        runtime.publish(
+            replace(
+                previous,
+                roads=RoadNetwork(
+                    fingerprint=fingerprint,
+                    nodes=(),
+                    roads=(),
+                    cells=frozenset(tuple(cell) for cell in cells),
+                ),
+            )
+        )
+
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
+    def test_road_cells_publish_the_road_fact_within_disclosure(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 2})
+        neighbour = (start[0] + 1, start[1])
+        self._publish_network({start, neighbour})
+
+        payload = _render(self.char1)
+        cells = _decode_rows(payload)
+
+        self.assertTrue(cells[start]["road"])
+        self.assertTrue(cells[neighbour]["road"])
+        other = (start[0] + 2, start[1])
+        self.assertIsNotNone(cells[other])
+        self.assertFalse(cells[other]["road"])
+        self.assertTrue(_js_accepts(payload))
+
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
+    def test_an_unrevealed_road_cell_publishes_nothing(self):
+        from world.maps import road_network
+
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 2})
+        hidden_road = (start[0] + 15, start[1])
+        self._publish_network({hidden_road})
+
+        payload = _render(self.char1)
+        cells = _decode_rows(payload)
+
+        self.assertTrue(road_network.is_road_cell(hidden_road))
+        self.assertIsNone(cells[hidden_road])
+        for runs in payload["rows"]:
+            for run in runs:
+                if run["kind"] == "unknown":
+                    self.assertEqual(set(run), {"length", "kind"})
+
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
+    def test_a_republished_network_is_not_read_from_cache(self):
+        start = self._away()
+        self._at_wild(start)
+        self._pin({start: 2})
+        neighbour = (start[0] + 1, start[1])
+
+        self._publish_network({start}, fingerprint="t_same_fingerprint")
+        first = _decode_rows(_render(self.char1))
+        self.assertTrue(first[start]["road"])
+        self.assertFalse(first[neighbour]["road"])
+
+        # A different network object over the same terrain, elevation and
+        # footprints must invalidate the cached facts even with one fingerprint.
+        self._publish_network({neighbour}, fingerprint="t_same_fingerprint")
+        second = _decode_rows(_render(self.char1))
+        self.assertFalse(second[start]["road"])
+        self.assertTrue(second[neighbour]["road"])
+
     @unittest.skipUnless(os.environ.get("MUD_AREA_MAP_BENCHMARK") == "1", "timing benchmark: set MUD_AREA_MAP_BENCHMARK=1")
     def test_warmed_window_with_twenty_thousand_visits_is_within_fifty_ms(self):
         start = self._away()

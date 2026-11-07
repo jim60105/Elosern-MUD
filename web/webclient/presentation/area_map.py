@@ -449,13 +449,14 @@ class _TerrainOracle:
 
     def __init__(self) -> None:
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-        from world.maps import elevation, wilderness_provider
+        from world.maps import elevation, road_network, wilderness_provider
         from world.rules import sight
         from world.rules.wilderness_disclosure import anchor_is_hidden
 
         self._provider = wilderness_provider
         self._elevation = elevation
         self._sight = sight
+        self._roads = road_network.road_cells()
         definition = wilderness_provider.terrain_definition()
         self._fords = frozenset(
             tuple(cell) for cells in definition.waterway_fords.values() for cell in cells
@@ -470,7 +471,7 @@ class _TerrainOracle:
         # The terrain definition and sight policy are compared by identity and
         # kept alive by the cache, so a republished world never reuses a freed
         # object's id.
-        owners = (definition, sight.POLICY)
+        owners = (definition, sight.POLICY, road_network.current())
         key = (elevation.current().fingerprint, frozenset(self._footprints.items()))
         cached_owners = _TerrainOracle._cache_definition
         if (
@@ -523,9 +524,7 @@ class _TerrainOracle:
             "passable": bool(provider.is_valid_wilderness_cell(cell)),
             "band": band,
             "tier": tier,
-            # No wilderness road exists in the published geography or the
-            # movement pricing (movement.yaml prices regions only).
-            "road": False,
+            "road": cell in self._roads,
             "ford": cell in self._fords,
         }
 

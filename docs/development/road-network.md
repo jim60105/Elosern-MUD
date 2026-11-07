@@ -59,6 +59,35 @@ that has nothing to update rewrites identical bytes):
 
 Commit the regenerated artifacts with the source change that caused them.
 
+## Runtime adoption
+
+`world/maps/road_network.py` is the read view over the committed artifact. It
+decodes the file once per process and answers road-cell lookups; it never
+computes a road and never imports the generator, so the game runs without the
+generation extra.
+
+The startup step `map_world_adoption` calls `world.maps.runtime.adopt()`, which
+accepts a candidate only when the committed artifact is current: its source
+signature must match the candidate's own continent, location, settlement and
+road-parameter documents, the committed elevation fingerprint and the authored
+region speeds. Interiors and districts cannot move a road, so editing them
+never invalidates the artifact. When the gate accepts, the decoded network is
+published with the map bundle; `world.rules.travel_cost.wilderness_terrain`
+then prices a step at road speed when both of its ends are road cells, and the
+area and travel maps publish `road: true` for a disclosed road cell.
+
+A rejected startup means the artifact is missing, corrupt or stale. A stale
+artifact's error names the regeneration command; run it and commit the result.
+A missing or corrupt artifact is reported as a read or decode rejection.
+
+```console
+uv run --locked python -m tools.road_network
+```
+
+Saving a settlement move in the map editor therefore needs a regeneration
+before the game will adopt the new world. Editor-driven regeneration is not
+part of this flow.
+
 ## What a node is
 
 A location is a node when its kind is in `node_kinds` and its settlement
@@ -245,3 +274,4 @@ tests. This record is not a gate: an open row blocks no change and no archive.
 | Date | Parameters | Preview | Reviewer | Verdict |
 | --- | --- | --- | --- | --- |
 | 2026-11-07 | Initial values (detour limit 1.8, reuse factor 0.4, noise amplitude 0.15) | Generated, uncommitted | Pending | Pending review |
+| 2026-11-07 | Runtime publication (road cells drawn on the travel and area maps) | Not yet reviewed at 1451x790 and 2560x1440 | Pending | Pending review |
