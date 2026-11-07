@@ -7,14 +7,14 @@ Do not add `covers_requirement` in any task here; see D9.
 
 ## 1. Inputs
 
-- [ ] 1.1 Confirm `road-network-format` is merged: `uv run --locked python -c "from elosern_map_core.roads_codec import road_source_signature"` exits 0 and `content/maps/road_network.yaml` exists. If not, stop and report.
-- [ ] 1.2 Add `RoadGenerationError`, `RoadNode`, `RoadInput`, `Road` and `road_input` to new `packages/map-core/elosern_map_core/roads.py` per D2. Create `tests/test_road_network_generation.py` with the scenarios of "Road nodes are the gated settlements of the configured kinds", importing `authoring_fixtures` per D9. Register `tests.test_road_network_generation` in `top-level-4` of `.github/top-level-shards.json`. Verify with the shared command on that label and on `tests.test_evennia_test_optimization_contract`.
+- [x] 1.1 Confirm `road-network-format` is merged: `uv run --locked python -c "from elosern_map_core.roads_codec import road_source_signature"` exits 0 and `content/maps/road_network.yaml` exists. If not, stop and report.
+- [x] 1.2 Add `RoadGenerationError`, `RoadNode`, `RoadInput`, `Road` and `road_input` to new `packages/map-core/elosern_map_core/roads.py` per D2. Create `tests/test_road_network_generation.py` with the scenarios of "Road nodes are the gated settlements of the configured kinds", importing `authoring_fixtures` per D9. Register `tests.test_road_network_generation` in `top-level-4` of `.github/top-level-shards.json`. Verify with the shared command on that label and on `tests.test_evennia_test_optimization_contract`.
 
 ## 2. Algorithm
 
-- [ ] 2.1 Implement the D3 cost field and `compute_roads` per D4. Add tests for "The road cost field admits only legal walkable steps", "Road topology is a relative neighbourhood graph with detour repair" and "Roads are routed cheapest first and reuse earlier cells" on synthetic rasters of at most 64 cells a side. Use a `noise_amplitude` of 0 where a test compares costs. Assert legality, ends and cost, not exact cell sequences on uniform ground. Verify with the shared command.
-- [ ] 2.2 Implement `verify_roads` and `_check_input` per D5, feeding hand-built `Road` values to cover "Generation refuses an invalid network". Verify with the shared command.
-- [ ] 2.3 Implement `encode_roads` and `generate_road_network`. Add tests for "Generation is deterministic". Verify with the shared command, and from `packages/map-core` with `uv run --locked --extra generation python -m pytest tests -q`.
+- [x] 2.1 Implement the D3 cost field and `compute_roads` per D4. Add tests for "The road cost field admits only legal walkable steps", "Road topology is a relative neighbourhood graph with detour repair" and "Roads are routed cheapest first and reuse earlier cells" on synthetic rasters of at most 64 cells a side. Use a `noise_amplitude` of 0 where a test compares costs. Assert legality, ends and cost, not exact cell sequences on uniform ground. Verify with the shared command.
+- [x] 2.2 Implement `verify_roads` and `_check_input` per D5, feeding hand-built `Road` values to cover "Generation refuses an invalid network". Verify with the shared command.
+- [x] 2.3 Implement `encode_roads` and `generate_road_network`. Add tests for "Generation is deterministic". Verify with the shared command, and from `packages/map-core` with `uv run --locked --extra generation python -m pytest tests -q`.
 
 ## 3. Game adapter and artifact
 
