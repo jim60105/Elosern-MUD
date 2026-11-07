@@ -182,8 +182,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     started = time.monotonic()
     _bootstrap()
-    inp = build_input()
     try:
+        inp = build_input()
         text = artifact_text(inp)
     except RoadGenerationError as error:
         print("road network generation failed:")

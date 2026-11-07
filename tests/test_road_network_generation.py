@@ -438,6 +438,16 @@ class RoadRefusalTests(unittest.TestCase):
             "node node_b: gate approach (9, 9) is off the cost field", caught.exception.problems
         )
 
+    def test_undeclared_region_code_is_refused(self):
+        region = np.full((8, 8), 2, dtype=np.uint8)
+        region[0, 0] = 3  # only two region names are declared
+        inp = _input(_open(8), {"node_a": [(2, 2)], "node_b": [(5, 5)]}, region=region)
+        with self.assertRaises(RoadGenerationError) as caught:
+            generate_road_network(inp)
+        self.assertIn(
+            "a region code lies outside the declared region names", caught.exception.problems
+        )
+
     def test_shared_gate_approach_is_named(self):
         inp = _input(_open(8), {"node_a": [(2, 2)], "node_b": [(2, 2), (5, 5)]})
         with self.assertRaises(RoadGenerationError) as caught:

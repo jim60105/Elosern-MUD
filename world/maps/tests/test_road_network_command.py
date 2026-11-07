@@ -121,6 +121,21 @@ class RoadNetworkCommandTests(unittest.TestCase):
         self.assertIn("node node_b: has no road", report)
         self.assertEqual(target.read_text(encoding="utf-8"), "previous bytes\n")
 
+    def test_failed_input_assembly_is_reported_without_writing(self):
+        target = self.directory / "roads.json"
+        target.write_text("previous bytes\n", encoding="utf-8")
+        failure = RoadGenerationError(["content/maps/road_network.yaml: missing"])
+        output = io.StringIO()
+        with (
+            mock.patch.object(command, "_bootstrap"),
+            mock.patch.object(command, "build_input", side_effect=failure),
+            contextlib.redirect_stdout(output),
+        ):
+            status = command.main(["--output", str(target)])
+        self.assertEqual(status, 1)
+        self.assertIn("content/maps/road_network.yaml: missing", output.getvalue())
+        self.assertEqual(target.read_text(encoding="utf-8"), "previous bytes\n")
+
     def test_preview_is_written_only_when_requested(self):
         target = self.directory / "roads.json"
         status, _ = self._run("--output", str(target))

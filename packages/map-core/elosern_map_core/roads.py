@@ -252,6 +252,9 @@ def _check_input(inp: RoadInput) -> list[str]:
         return problems
     if inp.bands.size and (inp.bands.min() < 0 or inp.bands.max() > ELEVATION_BAND_MAX):
         problems.append(f"an elevation band lies outside 0..{ELEVATION_BAND_MAX}")
+    if inp.region.size and int(inp.region.max()) > len(inp.region_names):
+        problems.append("a region code lies outside the declared region names")
+        return problems
     open_cells = _open_mask(inp)
     for code in sorted({int(value) for value in np.unique(inp.region[open_cells])}):
         name = inp.region_names[code - 1] if 0 < code <= len(inp.region_names) else None
