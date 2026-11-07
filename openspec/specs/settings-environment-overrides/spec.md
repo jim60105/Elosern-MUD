@@ -235,10 +235,10 @@ environment value without any change to the import structure.
 - **THEN** the effective setting is `90` and no environment value reached it
 
 #### Scenario: Secret settings replace only the layers they name
-- **WHEN** `LLM_MODEL=llama3.2` and `LLM_ACTION_OPTIONS_MAX_TOKENS=400` are present and
+- **WHEN** `LLM_MODEL=llama3.2` and `LLM_NARRATOR_MAX_TOKENS=400` are present and
   `secret_settings.py` defines an `LLM_PROFILES` map whose sole entry is a complete
   `character_creation` profile
-- **THEN** the `action_options` profile's `max_tokens` is `400` and every layer absent
+- **THEN** the `narrator` profile's `max_tokens` is `400` and every layer absent
   from the secret map keeps its environment-resolved values, while `character_creation`
   equals the secret entry
 
