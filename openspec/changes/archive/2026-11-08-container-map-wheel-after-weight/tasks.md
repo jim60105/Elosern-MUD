@@ -13,10 +13,10 @@
 
 ## 3. Remaining traceability and gates
 
-- [ ] 3.1 In `tests/test_container_contract.py`, add `@covers_requirement("container-image::multi-stage-containerfile")` (already imported at line 10) directly above `ContainerContractTests.test_the_map_package_wheel_is_rebuilt_after_the_weight_is_acquired` (currently unannotated, method body at the `def` that follows `test_the_default_removal_weight_is_acquired_during_the_image_build`). Change no assertion. Verify with `grep -n "multi-stage-containerfile" tests/test_container_contract.py` showing the decorator above that method's `def` line.
-- [ ] 3.2 Verify the container contract still passes: `uv run --locked python -m unittest tests.test_container_contract` → `Ran 21 tests` and `OK`.
-- [ ] 3.3 Verify traceability: `uv run --locked python -m tools.spec_traceability check` → `2759 requirements, 12680 associations, 2759 covered, 0 uncovered, 0 errors` (one association more than the 12679 baseline measured before the annotation; no requirement is added, removed, or renamed).
-- [ ] 3.4 Verify the aggregate gate: `uv run --locked python -m tools.contract_gate` → passed (traceability, observability and test-data lints, shard manifests).
+- [x] 3.1 In `tests/test_container_contract.py`, add `@covers_requirement("container-image::multi-stage-containerfile")` (already imported at line 10) directly above `ContainerContractTests.test_the_map_package_wheel_is_rebuilt_after_the_weight_is_acquired` (currently unannotated, method body at the `def` that follows `test_the_default_removal_weight_is_acquired_during_the_image_build`). Change no assertion. Verify with `grep -n "multi-stage-containerfile" tests/test_container_contract.py` showing the decorator above that method's `def` line.
+- [x] 3.2 Verify the container contract still passes: `uv run --locked python -m unittest tests.test_container_contract` → `Ran 21 tests` and `OK`.
+- [x] 3.3 Verify traceability: `uv run --locked python -m tools.spec_traceability check` → `2759 requirements, 12680 associations, 2759 covered, 0 uncovered, 0 errors` (one association more than the 12679 baseline measured before the annotation; no requirement is added, removed, or renamed).
+- [x] 3.4 Verify the aggregate gate: `uv run --locked python -m tools.contract_gate` → passed (traceability, observability and test-data lints, shard manifests).
 
 ## Workflow follow-up
 

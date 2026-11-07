@@ -5,13 +5,13 @@ Define the Podman container image and Compose deployment for the Evennia service
 ## Requirements
 
 ### Requirement: Multi-stage Containerfile
-The project SHALL provide a Podman-focused multi-stage `Containerfile` with a
-downloader stage that verifies the init binary, a builder stage, an
-application-layout stage that prepares the runtime tree and permissions, and a
-final stage carrying only the resulting virtual environment, init binary,
-application code, the build-acquired default removal model, and their runtime
-system dependencies. Model acquisition SHALL follow locked dependency
-installation and precede application-source copying.
+`Containerfile` SHALL be a Podman-focused multi-stage build: a downloader
+verifying the init binary, a builder, an application-layout stage that prepares
+the runtime tree, and a final stage carrying only the venv, init binary,
+application code, and the acquired removal weight. Model acquisition SHALL follow
+locked third-party dependency installation. The locked local `elosern-map-core`
+wheel SHALL install from `packages/map-core/` after acquisition and SHALL be
+rebuilt, never a cached wheel.
 
 #### Scenario: The idmapper memory probe has ps available
 - **WHEN** the served server runs its periodic idmapper cache maintenance
@@ -57,6 +57,14 @@ installation and precede application-source copying.
   model acquisition instruction
 - **THEN** the build can reuse the layer containing the already-acquired default weight
   without fetching it again
+
+#### Scenario: Map-package source edits reuse model acquisition
+- **WHEN** only the map package's source files change, while the root `pyproject.toml`, `uv.lock`, and `packages/map-core/pyproject.toml` stay unchanged
+- **THEN** the build reuses the layer containing the already-acquired default weight and rebuilds and installs exactly that one package
+
+#### Scenario: A rebuilt image carries the current map-package code
+- **WHEN** the map package's source changes and the image is rebuilt
+- **THEN** the installed `elosern_map_core` files match the rebuilt source, never a previously cached wheel
 
 ### Requirement: Non-root, arbitrary-UID-capable runtime
 The container SHALL run as a non-root user by default, and SHALL also start successfully when run

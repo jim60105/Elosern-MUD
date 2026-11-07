@@ -278,6 +278,7 @@ class ContainerContractTests(unittest.TestCase):
             "only the build-time map package source may follow the weight fetch",
         )
 
+    @covers_requirement("container-image::multi-stage-containerfile")
     def test_the_map_package_wheel_is_rebuilt_after_the_weight_is_acquired(self):
         # `packages/map-core/` is a locked local path dependency installed as a
         # wheel (`--no-editable`) into /venv, above the acquired weight layer so
