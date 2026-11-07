@@ -2,26 +2,27 @@
 
 ### Requirement: Per-layer profile registry
 `world/ai/profiles.py` SHALL define a frozen `LLMProfile` dataclass and a `LLM_PROFILES` registry
-read from the Django settings. The registry SHALL map the six layer names `narrator`,
-`npc_dialogue`, `scenario_director`, `scene_builder`, `character_creation`, and
-`title_nomination` to exactly one profile each. Layer keys outside the fixed set SHALL be
-rejected. The `api_key` value SHALL be excluded from the dataclass `repr`.
+read from the Django settings. The registry SHALL map the ten layer names `narrator`,
+`npc_dialogue`, `dialogue_summary`, `correspondence`, `dream`, `scenario_director`,
+`scene_builder`, `character_creation`, `title_nomination`, and `story_director` to exactly one
+profile each. Layer keys outside the fixed set SHALL be rejected. The `api_key` value SHALL be
+excluded from the dataclass `repr`.
 
 #### Scenario: Every layer resolves to a complete profile
-- **WHEN** a consumer requests the profile for any of the six layer names
+- **WHEN** a consumer requests the profile for any of the ten layer names
 - **THEN** the registry returns a frozen profile with a base URL, chat path, model name, bounded temperature and max tokens, a timeout, a retry budget, a structured-output capability flag, an enabled flag, and every optional endpoint-configuration field at its omit default (empty string or `None`)
 
 #### Scenario: Unknown layer keys are rejected
-- **WHEN** a consumer requests a profile for a key outside the six known layers, including the retired `action_options` key
+- **WHEN** a consumer requests a profile for a key outside the ten known layers, including the retired `action_options` key
 - **THEN** profile resolution raises a named error and no partial or default profile is returned
 
 #### Scenario: The action_options profile requires structured output
 - **WHEN** the effective `LLM_PROFILES` map is validated at settings load
-- **THEN** no `action_options` layer exists and no per-layer required-flag rule runs: the retired layer cannot be requested or overridden, and startup validation covers only the generic bounds of the six surviving profiles
+- **THEN** no `action_options` layer exists and no per-layer required-flag rule runs: the retired layer cannot be requested or overridden, and startup validation covers only the generic bounds of the ten surviving profiles
 
 #### Scenario: The per-layer code defaults survive
-- **WHEN** all six profiles resolve from code defaults with no injected overrides
-- **THEN** `title_nomination` carries its 640-token `max_tokens`, `scenario_director` carries its 8,192-token `max_tokens`, and the remaining layers carry the 250-token generic default
+- **WHEN** all ten profiles resolve from code defaults with no injected overrides
+- **THEN** `title_nomination` carries its 640-token `max_tokens`, `scenario_director` carries its 8,192-token `max_tokens`, `dialogue_summary` and `correspondence` carry 1,024, `dream` carries 3,072, `story_director` carries 1,536, and the remaining layers carry the 250-token generic default
 
 #### Scenario: The api key never reaches the profile repr
 - **WHEN** a profile is constructed with a non-empty `api_key` and formatted with `repr()` or `str()`

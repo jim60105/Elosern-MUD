@@ -25,7 +25,6 @@ LAYER_NAMES: tuple[str, ...] = (
     "scenario_director",
     "scene_builder",
     "character_creation",
-    "action_options",
     "title_nomination",
     "story_director",
 )
@@ -176,7 +175,6 @@ LLM_KNOBS: tuple[LlmKnob, ...] = (
         minimum=0,
         rule="expected a positive integer",
         layer_defaults={
-            "action_options": 320,
             "title_nomination": 640,
             "dialogue_summary": 1024,
             "correspondence": 1024,
