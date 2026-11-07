@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from elosern_map_core.roads_codec import RoadNetwork
+from tools.spec_traceability import covers_requirement
 from world.maps import road_network
 from world.rules import travel_cost
 from world.rules.fatigue import get_policy
@@ -70,6 +71,9 @@ class _RoadTerrainCase(unittest.TestCase):
 
 
 class RoadTerrainTests(_RoadTerrainCase):
+    @covers_requirement(
+        "wilderness-roads::road-speed-needs-road-cells-at-both-ends-of-a-step"
+    )
     def test_a_step_between_two_road_cells_is_a_road_step(self):
         self.fill([(0, 0), (1, 0), (1, 1)], "t_open")
         road_network._install(_network({(0, 0), (1, 0), (1, 1)}))
@@ -88,6 +92,9 @@ class RoadTerrainTests(_RoadTerrainCase):
                 )
                 self.assertEqual(cost.seconds, expected.seconds)
 
+    @covers_requirement(
+        "wilderness-roads::road-speed-needs-road-cells-at-both-ends-of-a-step"
+    )
     def test_a_partial_step_keeps_the_slower_region_in_both_directions(self):
         self.fill([(0, 0), (1, 0), (2, 0)], "t_open")
         self.regions[(1, 0)] = "t_woodland"
@@ -99,6 +106,9 @@ class RoadTerrainTests(_RoadTerrainCase):
                     wilderness_terrain(source, destination), _SLOW_TERRAIN
                 )
 
+    @covers_requirement(
+        "wilderness-roads::road-speed-needs-road-cells-at-both-ends-of-a-step"
+    )
     def test_a_road_cell_queried_with_itself_answers_road(self):
         self.fill([(0, 0), (5, 5)], "t_woodland")
         road_network._install(_network({(0, 0)}))
@@ -138,6 +148,9 @@ class PlannerRoadTerrainTests(PlannerTestCase):
             patch.start()
             self.addCleanup(patch.stop)
 
+    @covers_requirement(
+        "wilderness-roads::road-speed-needs-road-cells-at-both-ends-of-a-step"
+    )
     def test_the_planner_takes_the_road_at_equal_distance(self):
         self.fill(_box(5, 5, 7, 7), _OPEN)
         del self.terrain[(6, 6)]  # the impassable centre forces cardinal routes

@@ -573,6 +573,9 @@ _RUNTIME_INDEPENDENCE_PROBE = textwrap.dedent(
 
 
 class IndependentRuntimeTests(unittest.TestCase):
+    @covers_requirement(
+        "wilderness-roads::road-cell-lookup-reads-the-published-bundle"
+    )
     def test_the_read_view_imports_and_looks_up_without_numpy_or_scipy(self):
         result = run_with_numpy_blocked(_RUNTIME_INDEPENDENCE_PROBE)
         self.assertEqual(result.returncode, 0, result.stderr)

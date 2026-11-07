@@ -18,6 +18,7 @@ from elosern_map_core.roads_codec import (
     RoadMetadata,
     RoadNetwork,
 )
+from tools.spec_traceability import covers_requirement
 from world.maps import bootstrap, road_network, runtime
 from world.tests.geography_fixture import (
     clear_published_map_world,
@@ -49,6 +50,9 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
             clear_published_map_world()
         super().tearDown()
 
+    @covers_requirement(
+        "wilderness-roads::adoption-requires-a-current-road-network"
+    )
     def test_a_stale_artifact_rejects_the_candidate_and_keeps_the_bundle(self):
         baseline = runtime.current()
         stale = RoadMetadata(
@@ -67,6 +71,9 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
         self.assertIn("tools.road_network", str(caught.exception))
         self.assertIs(runtime.current(), baseline)
 
+    @covers_requirement(
+        "wilderness-roads::adoption-requires-a-current-road-network"
+    )
     def test_a_missing_or_corrupt_artifact_rejects_the_candidate(self):
         baseline = runtime.current()
         committed = road_network.artifact_metadata()
@@ -99,6 +106,9 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
             self.assertIn("rejected", str(caught.exception))
             self.assertIs(runtime.current(), baseline)
 
+    @covers_requirement(
+        "wilderness-roads::adoption-requires-a-current-road-network"
+    )
     def test_a_candidate_without_a_road_document_is_not_current(self):
         baseline = runtime.current()
         composed = runtime.compose()
@@ -119,6 +129,9 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
         self.assertIn("tools.road_network", str(caught.exception))
         self.assertIs(runtime.current(), baseline)
 
+    @covers_requirement(
+        "wilderness-roads::adoption-requires-a-current-road-network"
+    )
     def test_an_interior_edit_keeps_the_artifact_current(self):
         composed = runtime.compose()
         fingerprints = dict(composed.world.fingerprints)
@@ -136,6 +149,9 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
             runtime.road_freshness_for(edited, adopted.elevation.fingerprint).current
         )
 
+    @covers_requirement(
+        "wilderness-roads::adoption-requires-a-current-road-network"
+    )
     def test_offline_producers_stay_ungated(self):
         with mock.patch.object(
             road_network,
@@ -166,6 +182,9 @@ class RoadCellLookupTests(unittest.TestCase):
             clear_published_map_world()
         super().tearDown()
 
+    @covers_requirement(
+        "wilderness-roads::road-cell-lookup-reads-the-published-bundle"
+    )
     def test_lookup_reads_the_published_bundle(self):
         network = _network("t_published", {(3, 4), (4, 4)})
 
@@ -183,6 +202,9 @@ class RoadCellLookupTests(unittest.TestCase):
         self.assertFalse(road_network.is_road_cell((3, 4)))
         self.assertEqual(road_network.road_cells(), frozenset())
 
+    @covers_requirement(
+        "wilderness-roads::road-cell-lookup-reads-the-published-bundle"
+    )
     def test_a_failed_synchronization_restores_the_network(self):
         first = _network("t_first", {(1, 1), (2, 2)})
         baseline = runtime.publish(replace(runtime.current(), roads=first))
@@ -206,6 +228,9 @@ class RoadCellLookupTests(unittest.TestCase):
         self.assertTrue(road_network.is_road_cell((1, 1)))
         self.assertFalse(road_network.is_road_cell((5, 5)))
 
+    @covers_requirement(
+        "wilderness-roads::road-cell-lookup-reads-the-published-bundle"
+    )
     def test_a_bundle_identity_includes_its_network(self):
         one = replace(runtime.current(), roads=_network("t_one", {(1, 1)}))
         two = replace(runtime.current(), roads=_network("t_two", {(2, 2)}))

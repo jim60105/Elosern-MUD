@@ -259,6 +259,9 @@ class WildernessContentTests(_WildernessFixture):
             )
         )
 
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
     def test_road_cells_publish_the_road_fact_within_disclosure(self):
         start = self._away()
         self._at_wild(start)
@@ -276,6 +279,9 @@ class WildernessContentTests(_WildernessFixture):
         self.assertFalse(cells[other]["road"])
         self.assertTrue(_js_accepts(payload))
 
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
     def test_an_unrevealed_road_cell_publishes_nothing(self):
         from world.maps import road_network
 
@@ -295,6 +301,9 @@ class WildernessContentTests(_WildernessFixture):
                 if run["kind"] == "unknown":
                     self.assertEqual(set(run), {"length", "kind"})
 
+    @covers_requirement(
+        "wilderness-roads::map-facts-publish-the-road-fact-within-disclosure"
+    )
     def test_a_republished_network_is_not_read_from_cache(self):
         start = self._away()
         self._at_wild(start)
