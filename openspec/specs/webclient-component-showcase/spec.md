@@ -14,11 +14,11 @@ events/actions it emits, and its primary states.
 - **THEN** every listed component has at least one registered Storybook story, including the
   message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
   pending-action, and dialogue name-plate states, the place card's story with and without its room actions,
-  the question card's story with its dream question and locked states, the choice card's story with its verbs,
-  suggestions, generating, degraded-empty, and overflow states, the time choice card's story with its
+  the question card's story with its dream question and locked states, the choice card's story with its verbs
+  and overflow states, the time choice card's story with its
   default, locked, no-fatigue-row, and narrow states, the wait form's story with its default and locked states, the
   presence rail's story with its default, overflow, no-portraits, and objects-only states, the
-  exploration screen's story with its default, person-focus, wait-card, dream-question, and suggestions-card states, and the stage actor's story with its player, host-image,
+  exploration screen's story with its default, person-focus, wait-card, and dream-question states, and the stage actor's story with its player, host-image,
   host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story
   with its one-foe, two-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
   dialogue choice list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
@@ -99,21 +99,20 @@ non-local network requests blocked.
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 
 The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `ExitCompass`, `ExplorationReadout`,
-`RestForm`) SHALL present the `context_actions` v7 menus and, in exploration, the exit compass beside
-the 建議 pill sharing one readout, with the mode's guidance line, focused/disabled states, and the
-exact server-authored suggestion card shape on the centred suggestions card.
+`RestForm`) SHALL present the `context_actions` menus and, in exploration, the exit compass beside
+the shared readout, with the mode's guidance line and focused/disabled states.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell
 - **THEN** the focused cell is the dispatch target (its activation emits the action intent) and the disabled cell emits nothing, and each exposes its `action-` or `target-` key and a stable `data-testid`
 
 #### Scenario: Option and choice cards match the server shape
-- **WHEN** the `context_actions` suggestions render on the suggestions card
-- **THEN** each card row is the exact server-authored shape (label and optional hint) and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
+- **WHEN** a centred `ChoiceCard` renders the verb card, the wait card, or the rest entry's rows
+- **THEN** each row is the exact server-authored shape (label, badge, and disabled state) and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
 
 #### Scenario: The scene overview renders only its non-empty rows
 - **WHEN** the exploration root renders for a room with people, objects, and exits beside a compass
-- **THEN** no chip row renders, with no 人物, 物件, 出口, or footer row or label: the people and objects stand on the presence rail and the room actions on the place card and the 建議 pill
+- **THEN** no chip row renders, with no 人物, 物件, 出口, or footer row or label: the people and objects stand on the presence rail and the room actions on the place card
 
 #### Scenario: A disabled exit chip explains itself without submitting
 - **WHEN** a disabled compass target is aimed or clicked
@@ -136,8 +135,8 @@ exact server-authored suggestion card shape on the centred suggestions card.
   frame-opening intent its row carries, so no action or target is invented
 
 #### Scenario: Overview chips wrap inside the command panel
-- **WHEN** the command panel's right column holds the 建議 pill and the readout
-- **THEN** both stay inside the command panel and neither overflows it horizontally
+- **WHEN** the command panel's right column holds the readout
+- **THEN** it stays inside the command panel and does not overflow it horizontally
 
 #### Scenario: An exit chip follows the move row form's rules
 - **WHEN** the compass resolves and aims a committed move row
