@@ -1,10 +1,9 @@
-// The room actions' wiring (exploration-room-actions design D1/D3/D4/D5/D6;
+// The room actions' wiring (exploration-room-actions design D1/D3/D5/D6;
 // redesign-rest-entry design D1/D3/D5/D7): the place card's 查看房間 and 休息,
-// the 建議 pill, the suggestions card through ChoiceCard, the two-layer rest
-// entry (the TimeChoiceCard tiles, then the shared shell around the wait or
-// sleep form), focus return to the opener, the readout feed of the buttons
-// and the pill, and the exploration screen's Tab chain (compass → rail →
-// 查看房間 → 休息 → 建議).
+// the two-layer rest entry (the TimeChoiceCard tiles, then the shared shell
+// around the wait or sleep form), focus return to the opener, the readout
+// feed of the buttons, and the exploration screen's Tab chain (compass →
+// rail → 查看房間 → 休息).
 //
 // The open card is the store's client-local slice (`store.view.roomCard`, a
 // sibling of the presence card), so a commit can close it atomically and the
@@ -16,92 +15,10 @@
 // being returned to (no replayed entrance), and which control opened the
 // card.
 import { computed, nextTick, ref, watch } from "vue";
-import { BACK_ROW } from "./use-person-focus.js";
-import { pillReadout } from "../components/exploration-readout.js";
-import stableStringify from "../lib/stable_stringify.js";
 
 // The one reason the locked rest entry or dream answer states (a mutation in
 // flight or awaiting its declared revision, or the session not live).
 export const WAIT_LOCKED_REASON = "上一個行動尚未完成，請稍候。";
-
-export const SUGGESTIONS_GENERATING_NOTE = "AI 正在構思建議…";
-export const SUGGESTIONS_DEGRADED_NOTE = "AI 建議目前不可用";
-export const SUGGESTIONS_EMPTY_NOTE = "現在沒有什麼值得做的動作";
-const DISMISS_ACTION = "options.dismiss";
-
-function digitBadge(index) {
-  return index < 9 ? String(index + 1) : "·";
-}
-
-// The suggestions card's content from the store's `suggestionsCard`
-// (`{status, items}`): the card rows (label and optional hint), keyed by
-// action code and parameters so a suggestions-only update keeps the active
-// row on a card that survives; the 清除建議 row with its trash-can badge; the
-// trailing `✕ 返回`; and the muted notes for the generating, degraded, and
-// empty states. `builderKeys` maps each row key back to the builder row.
-export function suggestionsCardContent(content) {
-  const items = (content && content.items) || [];
-  const status = content ? content.status : null;
-  const builderKeys = {};
-  const used = new Set();
-  const rows = [];
-  let dismiss = null;
-  let cards = 0;
-  for (const item of items) {
-    if (!item.actionId) {
-      // The builder's generating and empty lines are notes, not rows.
-      continue;
-    }
-    if (item.actionId === DISMISS_ACTION) {
-      dismiss = item;
-      continue;
-    }
-    const base = `card:${item.actionId}:${stableStringify(item.payload || {})}`;
-    let key = base;
-    for (let n = 2; used.has(key); n += 1) {
-      key = `${base}#${n}`;
-    }
-    used.add(key);
-    builderKeys[key] = item.key;
-    rows.push({
-      key,
-      label: item.label,
-      hint: item.hint || null,
-      badge: digitBadge(cards),
-      kind: "verb",
-      enabled: true,
-      testId: "suggestions-card-row",
-    });
-    cards += 1;
-  }
-  const notes = [];
-  if (status === "generating") {
-    notes.push(SUGGESTIONS_GENERATING_NOTE);
-  } else if (status === "degraded") {
-    notes.push(SUGGESTIONS_DEGRADED_NOTE);
-    if (cards === 0) {
-      notes.push(SUGGESTIONS_EMPTY_NOTE);
-    }
-  }
-  let trailingIndex;
-  if (dismiss) {
-    builderKeys.dismiss = dismiss.key;
-    trailingIndex = rows.length;
-    rows.push({
-      key: "dismiss",
-      label: "清除建議",
-      badge: "",
-      icon: "trash",
-      kind: "dismiss",
-      enabled: true,
-      testId: "suggestions-card-dismiss",
-    });
-  } else {
-    trailingIndex = rows.length;
-  }
-  rows.push(BACK_ROW);
-  return { rows, notes, trailingIndex, builderKeys, count: cards };
-}
 
 // Whether an element can take focus right now: rendered, enabled, and not
 // inside an inert, hidden, or `display: none` ancestor.
@@ -122,13 +39,12 @@ const CHAIN_SELECTORS = Object.freeze({
   wait: '[data-anchor="map"] [data-testid="place-card-wait"]',
   // The travel leg panel's 紮營 (not a Tab-chain member; focus return only).
   camp: '#action-dock [data-testid="leg-camp"]',
-  pill: '#action-dock [data-testid="suggestions-pill"]',
 });
-const CHAIN_ORDER = Object.freeze(["compass", "rail", "look", "wait", "pill"]);
+const CHAIN_ORDER = Object.freeze(["compass", "rail", "look", "wait"]);
 
 export function useRoomActions(
   store,
-  { panelAvailable, dispatchIntent, skipDisabled, compassRef, onPlaceHover, onPillHover },
+  { panelAvailable, dispatchIntent, skipDisabled, compassRef, onPlaceHover },
 ) {
   const roomCardRef = ref(null);
   // The rest entry's layer: null (the tiles) | "wait" | "sleep" (that form).
@@ -137,7 +53,7 @@ export function useRoomActions(
   const lastTile = ref("wait");
   // The tiles are shown again after a step back: no replayed entrance.
   const returning = ref(false);
-  // Which control opened the open card: "wait" | "pill" | "camp" | null.
+  // Which control opened the open card: "wait" | "camp" | null.
   // The rest entry layer a travel camp asked for, consumed by the kind
   // watcher when the entry opens ("sleep" | null).
   let pendingLayer = null;
@@ -159,28 +75,6 @@ export function useRoomActions(
   // available.
   const placeActions = computed(() => explorationRootLive.value && panelAvailable("exploration"));
 
-  // The suggestions card's content, and the 建議 pill (hidden while the
-  // envelope presents nothing, i.e. `unavailable`, and while a re-homed
-  // sub-dock owns the surface).
-  const suggestions = computed(() => suggestionsCardContent(store.view.suggestionsCard));
-  const pillShown = computed(
-    () => placeActions.value && !!store.view.suggestionsCard && !store.view.activeSubDock,
-  );
-  const pillCount = computed(() =>
-    store.view.suggestionsCard && store.view.suggestionsCard.status !== "generating" ? suggestions.value.count : 0,
-  );
-  const pillLabel = computed(() => (pillCount.value > 0 ? `建議 ${pillCount.value}` : "建議"));
-
-  // The suggestions card's rows; the rest entry renders no rows.
-  const roomCardRows = computed(() => (roomCard.value?.kind === "suggestions" ? suggestions.value.rows : []));
-  const roomCardNotes = computed(() => (roomCard.value?.kind === "suggestions" ? suggestions.value.notes : []));
-  const roomCardTrailing = computed(() =>
-    roomCard.value?.kind === "suggestions" ? suggestions.value.trailingIndex : roomCardRows.value.length - 1,
-  );
-  const roomCardCaption = computed(() => (roomCard.value?.kind === "suggestions" ? "建議" : null));
-  const roomCardLabel = computed(() => "建議");
-  // The suggestions card through ChoiceCard.
-  const roomCardShown = computed(() => roomCardOpen.value && roomCard.value.kind === "suggestions");
   // The rest entry's layers: the tiles, the wait form, the sleep form.
   const tilesShown = computed(() => roomCard.value?.kind === "wait" && waitStep.value === null);
   const waitFormOpen = computed(() => roomCard.value?.kind === "wait" && waitStep.value === "wait");
@@ -222,22 +116,6 @@ export function useRoomActions(
   // returns focus to 紮營 when it closes. Opening sends no camp.
   function openTravelCamp() {
     return store.openTravelCamp ? store.openTravelCamp("leg") : false;
-  }
-
-  function onPill() {
-    if (store.openRoomCard("suggestions")) {
-      opener.value = "pill";
-    }
-  }
-
-  function onRoomCardPick(key) {
-    if (roomCard.value?.kind !== "suggestions") {
-      return;
-    }
-    const builderKey = suggestions.value.builderKeys[key];
-    if (builderKey) {
-      store.activateSuggestion(builderKey);
-    }
   }
 
   function onRoomCardBack() {
@@ -360,7 +238,7 @@ export function useRoomActions(
       if (!focusLost(document.activeElement)) {
         return;
       }
-      if (from && focusMember(from === "pill" || from === "camp" ? from : "wait")) {
+      if (from && focusMember(from === "camp" ? from : "wait")) {
         return;
       }
       if (compassRef.value) {
@@ -400,26 +278,15 @@ export function useRoomActions(
     onPlaceHover(content);
   }
 
-  function onPillHoverChange(hovered) {
-    const content = store.view.suggestionsCard;
-    onPillHover(hovered && content ? pillReadout(content.status, pillCount.value) : null);
-  }
-
   watch(placeActions, (shown) => {
     if (!shown) {
       onPlaceHover(null);
-    }
-  });
-  watch(pillShown, (shown) => {
-    if (!shown) {
-      onPillHover(null);
     }
   });
   // A card covering the screen clears the hover sources it hides.
   watch(roomCardOpen, (open) => {
     if (open) {
       onPlaceHover(null);
-      onPillHover(null);
     }
   });
 
@@ -460,22 +327,10 @@ export function useRoomActions(
     step(event, which, backward);
   }
 
-  function onPillTab(event) {
-    if (isTab(event)) {
-      step(event, "pill", event.shiftKey);
-    }
-  }
-
   return {
     roomCardRef,
     roomCard,
     roomCardOpen,
-    roomCardShown,
-    roomCardRows,
-    roomCardNotes,
-    roomCardTrailing,
-    roomCardCaption,
-    roomCardLabel,
     tilesShown,
     waitFormOpen,
     sleepOpen,
@@ -485,14 +340,9 @@ export function useRoomActions(
     sleepTileFatigue,
     placeActions,
     explorationRootLive,
-    pillShown,
-    pillCount,
-    pillLabel,
     onPlaceLook,
     onPlaceWait,
     openTravelCamp,
-    onPill,
-    onRoomCardPick,
     onRoomCardBack,
     onTilePick,
     onStepBack,
@@ -502,10 +352,8 @@ export function useRoomActions(
     onSleepRecover,
     onSleepSubmit,
     onPlaceHover: onPlaceHoverContent,
-    onPillHoverChange,
     onCompassTab,
     onRailTab,
     onPlaceTab,
-    onPillTab,
   };
 }

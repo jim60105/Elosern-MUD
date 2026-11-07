@@ -225,19 +225,16 @@ test("dynamic menus end with the back row, and no wait-row builder remains", () 
   // redesign-rest-entry: the place card's rest entry renders tiles and forms,
   // not builder rows, so the wait-row builder is retired.
   assert.equal(ExplorationMenu.waitItems, undefined, "the wait-row builder is retired");
-  // Dynamic menus (a target's affordances) and the suggestions rows end with
-  // the same back cell.
+  // Dynamic menus (a target's affordances) end with the same back cell.
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.items[targetMenu.items.length - 1].key, "back");
-  const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
-  assert.equal(suggestions.items[suggestions.items.length - 1].key, "back");
 });
 
 test("the menu model carries no router frame any more", () => {
-  // exploration-room-actions: the wait and suggestions frames are retired;
-  // the model keeps the panel and the current node the verb card reads.
+  // exploration-room-actions: the wait frame is retired; the model keeps the
+  // panel and the current node the verb card reads.
   const panel = validPanel();
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
   assert.deepEqual(model.menus, {});

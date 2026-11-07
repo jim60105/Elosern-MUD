@@ -27,9 +27,8 @@ import { rememberPartyWindowTab } from "../../components/party-window-memory.js"
 
 export function applyHud(ctx) {
   // The active sub-dock surface (null | "character"): which re-homed
-  // sub-dock currently owns the action-dock surface. The
-  // suggestions section must never render while one is active (spec
-  // webclient-options-surface). Set by the sub-dock panels on mount/unmount.
+  // sub-dock currently owns the action-dock surface. Set by the sub-dock
+  // panels on mount/unmount.
   // Declared before the initial view so `buildView` can read it.
   const activeSubDock = ref(null);
   ctx.activeSubDock = activeSubDock;

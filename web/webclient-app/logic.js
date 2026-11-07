@@ -7,12 +7,10 @@ import Protocol from "./lib/protocol.js";
 import KeyboardRouter from "./lib/keyboard_router.js";
 import NarrativeMarkup from "./lib/narrative_markup.js";
 import LocalMap from "./lib/local_map.js";
-import OptionCards from "./lib/option_cards.js";
 
 export {
   Protocol,
   KeyboardRouter,
   NarrativeMarkup,
   LocalMap,
-  OptionCards,
 };

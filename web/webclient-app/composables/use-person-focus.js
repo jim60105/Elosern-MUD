@@ -94,8 +94,8 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
       !store.view.beatHold &&
       !store.view.degradedRoot,
   );
-  // A room card (the wait or suggestions card, exploration-room-actions)
-  // takes the stage the same way.
+  // A room card (the wait card, exploration-room-actions) takes the stage
+  // the same way.
   const railShown = computed(() => railMounted.value && !cardOpen.value && !store.view.roomCard);
 
   // The interact target in focus, read from the committed panel.

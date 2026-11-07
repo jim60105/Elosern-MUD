@@ -71,15 +71,14 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       onRailHover: compass.onRailHover,
       showReadoutFlash: compass.showReadoutFlash,
     }),
-    // The place card's room actions, the 建議 pill, the wait and suggestions
-    // cards, and the exploration Tab chain (exploration-room-actions).
+    // The place card's room actions, the wait card, and the exploration Tab
+    // chain (exploration-room-actions).
     ...useRoomActions(store, {
       panelAvailable,
       dispatchIntent,
       skipDisabled: restWait.skipDisabled,
       compassRef,
       onPlaceHover: compass.onPlaceHover,
-      onPillHover: compass.onPillHover,
     }),
     // The server-owned contextual sleep-control surface
     // (align-sleep-handoff-and-owner-dream).

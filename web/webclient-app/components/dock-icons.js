@@ -7,7 +7,7 @@
 export const GLYPHS = {
   letters: "M3 5h18v14H3ZM3 5l9 7 9-7",
   // Exploration root item keys (the G2 stable keys). The `d` values for
-  // move/look/interact/suggestions are copied verbatim from
+  // move/look/interact are copied verbatim from
   // `docs/design/elosern-redesign/index.html` (the binding visual reference);
   // `look` folds the reference's eye outline plus pupil circle into one
   // multi-subpath string (the pupil as two arc subpaths).
@@ -26,7 +26,6 @@ export const GLYPHS = {
   wait: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 4v7l5 3-1.5 2.4L11 14V7h2z",
   // The travel leg panel's 紮營 (wilderness-travel-leg-ui): a ridge tent.
   camp: "M2.5 20 12 4l9.5 16ZM12 4v16M8.5 20 12 13.5 15.5 20M1.5 20h21",
-  suggestions: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
   // The reference's own get-icon (the command line's 拿 chip,
   // docs/design/elosern-redesign/index.html:870).
   get: "M6 11V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 11h16v9H4z",
@@ -141,8 +140,8 @@ export const GLYPHS = {
 
 // Per-key stroke attributes copied selectively from the reference: `move`
 // (cap+join), `interact` (join only), `attack`/`retreat` (cap only); every
-// other key keeps the SVG defaults (the star glyphs `suggestions`/`skills`
-// must NOT be rounded, so the reference omits the attributes there).
+// other key keeps the SVG defaults (the star glyph `skills` must NOT be
+// rounded, so the reference omits the attributes there).
 const STROKE_ATTRS = {
   move: { "stroke-linecap": "round", "stroke-linejoin": "round" },
   interact: { "stroke-linejoin": "round" },

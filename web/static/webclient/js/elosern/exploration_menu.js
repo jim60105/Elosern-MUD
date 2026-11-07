@@ -3,8 +3,8 @@
  *
  * Reduces a validated `exploration` panel into the logical keyboard menus
  * builders the exploration screen reads outside the keyboard router: the
- * bounded exit list and look room/entity/object rows, the suggestions card's
- * rows, and each interact target's server-authored
+ * bounded exit list and look room/entity/object rows, and each interact
+ * target's server-authored
  * affordances (交談, engage, party, possession, delivery, or the author
  * editor) plus its contextual services. Move payloads carry the canonical
  * `current_node` supplied by the local-map panel so `explore.move` passes its
@@ -25,8 +25,7 @@
  * lives outside it. The exits are the exit compass's (`exitTargets`,
  * exploration-exit-compass); the people and objects are the presence rail's
  * (`presenceEntries`, exploration-presence-rail); the room's 查看房間 row
- * (`lookItems`) and the suggestions rows (`suggestionsMenu`) are the place
- * card's and the suggestions card's (exploration-room-actions); the place
+ * (`lookItems`) is the place card's (exploration-room-actions); the place
  * card's rest entry reads no builder rows (redesign-rest-entry). `verbMenuFor` is an
  * interact target's interaction card: the common group (交談 at slot 1,
  * 查看 at slot 2, both kept when unavailable), the conditional operations in
@@ -669,106 +668,6 @@
   }
 
   // -------------------------------------------------------------------------
-  // Suggestions rows (the suggestions card, exploration-room-actions design
-  // D4): the committed `context_actions.suggestions` envelope's cards as
-  // rows, the dismiss row (`options.dismiss`, `{}`), and a back row.
-  // `generating` is one disabled row; `degraded` keeps the zero-card
-  // empty-state line; `unavailable` means no card and no 建議 pill.
-  // -------------------------------------------------------------------------
-
-  function cardItems(suggestions) {
-    var cards = (suggestions && Array.isArray(suggestions.cards)
-      ? suggestions.cards
-      : []);
-    var items = [];
-    var used = {};
-    function uniqueKey(base) {
-      var key = base;
-      for (var n = 2; used[key]; n += 1) {
-        key = base + "-" + n;
-      }
-      used[key] = true;
-      return key;
-    }
-    cards.forEach(function (card) {
-      var item;
-      if (card.kind === "freeform") {
-        // A freeform card speaks its label as the `explore.talk_freeform`
-        // speech (the options surface contract: the speech is always the
-        // label text).
-        item = {
-          key: uniqueKey("action-explore.talk_freeform"),
-          label: card.label,
-          hint: card.hint || null,
-          enabled: true,
-          actionId: "explore.talk_freeform",
-          payload: {
-            npc_id: card.params && card.params.npc_id,
-            speech: card.label,
-          },
-        };
-      } else {
-        // A known_action card dispatches its validator-normalized payload
-        // as-is.
-        item = {
-          key: uniqueKey("action-" + card.action_code),
-          label: card.label,
-          hint: card.hint || null,
-          enabled: true,
-          actionId: card.action_code,
-          payload: card.params || {},
-        };
-      }
-      items.push(item);
-    });
-    return items;
-  }
-
-  function suggestionsMenu(suggestions) {
-    var status = suggestions && suggestions.status;
-    var items = [];
-    if (status === "generating") {
-      items.push({
-        key: "suggestions-generating",
-        label: "AI 正在構思建議…",
-        enabled: false,
-        actionId: null,
-        payload: null,
-        description: "AI 正在構思建議…",
-        disabledReason: { code: "generating", message: "AI 正在構思建議…" },
-      });
-    } else if (status === "ready" || status === "degraded") {
-      items = cardItems(suggestions);
-      if (status === "degraded" && items.length === 0) {
-        items.push({
-          key: "suggestions-empty",
-          label: "現在沒有什麼值得做的動作",
-          enabled: false,
-          actionId: null,
-          payload: null,
-          description: "現在沒有什麼值得做的動作",
-          disabledReason: { code: "empty", message: "現在沒有什麼值得做的動作" },
-        });
-      }
-      items.push({
-        key: "action-options.dismiss",
-        label: "✕ 清除建議",
-        enabled: true,
-        actionId: "options.dismiss",
-        payload: {},
-      });
-    }
-    items.push(backItem());
-    return {
-      items: items,
-      focusKey: null,
-      title: "建議",
-      grid: true,
-      gridCols: items.length,
-    };
-  }
-
-  // -------------------------------------------------------------------------
   // Presence rail (exploration-presence-rail design D2/D7; scene overview
   // redesign §4.1): who and what is in the room, in the retired 人物 / 物件
   // rows' reading order — every interact target, then each present entity
@@ -883,6 +782,5 @@
      presenceEntries: presenceEntries,
      targetById: targetById,
      normalizeDirection: normalizeDirection,
-     suggestionsMenu: suggestionsMenu,
    };
 });

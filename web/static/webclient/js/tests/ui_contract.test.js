@@ -90,21 +90,17 @@ test("the narrative markup pipeline never parses HTML strings", () => {
 });
 
 
-test("suggestion cards and the dismiss row activate through the card's own handlers", () => {
-  // The suggestions card (exploration-room-actions design D4) is a ChoiceCard:
-  // its rows activate through the card's own click and keydown handlers,
-  // which consume every key they handle, never through the KeyboardRouter.
-  // The dismiss row keeps the label 清除建議 with a trash-can badge (not the
-  // ✕ of the trailing 返回 row).
+test("the card's own handlers activate its rows, and the retired suggestion hooks are absent", () => {
+  // A centred ChoiceCard's rows activate through the card's own click and
+  // keydown handlers, which consume every key they handle, never through the
+  // KeyboardRouter. The 建議 pill and its suggestions card are retired
+  // (retire-action-options-webclient), so no such hook remains.
   const card = read("web/webclient-app/components/ChoiceCard.vue");
   assert.match(card, /@click="onRowClick\(index\)"/);
   assert.match(card, /@keydown="onKeydown"/);
-  assert.match(card, /row\.icon === 'trash'/);
-  const rows = read("web/webclient-app/composables/use-room-actions.js");
-  assert.match(rows, /label: "清除建議"/);
-  assert.match(rows, /icon: "trash"/);
   const app = read("web/webclient-app/AppClient.vue");
-  assert.match(app, /data-testid="suggestions-pill"/);
+  assert.strictEqual(app.includes('data-testid="suggestions-pill"'), false, "no 建議 pill remains");
+  assert.strictEqual(app.includes('data-testid="suggestions-card"'), false, "no suggestions card remains");
   assert.strictEqual(app.includes("suggestions-dismiss"), false, "no dock dismiss control remains");
 });
 

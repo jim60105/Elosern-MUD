@@ -2,9 +2,9 @@
 // D4; scene overview redesign §3.6 and §5.3): one explanation line whose
 // content is chosen by priority — a transient flash for a blocked move, then
 // whatever is aimed or hovered, then the idle summary. Pure: the pane owns
-// the state and the flash timer; the presence rail, the place card's
-// buttons, and the 建議 pill feed the same priority function
-// (exploration-presence-rail, exploration-room-actions).
+// the state and the flash timer; the presence rail and the place card's
+// buttons feed the same priority function (exploration-presence-rail,
+// exploration-room-actions).
 import { octantGlyph } from "./compass-model.js";
 
 // How long a blocked-move flash holds the readout.
@@ -102,29 +102,18 @@ export function departedReadout(name) {
 export const PLACE_LOOK_READOUT = Object.freeze({ lead: "查看房間", text: "重新觀察四周", tone: "normal" });
 export const PLACE_WAIT_READOUT = Object.freeze({ lead: "休息", text: "保持清醒等待，或入睡恢復精力", tone: "normal" });
 
-// The 建議 pill: how many next steps the card lists, or what it is doing.
-export function pillReadout(status, count) {
-  if (status === "generating") {
-    return { lead: "建議", text: "AI 正在構思建議…", tone: "normal" };
-  }
-  if (count > 0) {
-    return { lead: "建議", text: `${count} 個可行的下一步`, tone: "normal" };
-  }
-  return { lead: "建議", text: "查看可行的下一步", tone: "normal" };
-}
-
 // Priority (§5.3; exploration-room-actions design D6): a blocked-move flash,
 // then whatever is aimed or hovered, then idle. Inside the aimed-or-hovered
 // tier the pointed-at controls outrank the compass aim, which stays set while
-// the compass rests: a hovered or focused place-card button, then the 建議
-// pill, then a presence-rail entry, then the compass aim. Hovering or
-// focusing any of them is the player's latest act of attention (focusing one
-// blurs the compass), and leaving one falls back to the next live slot.
-export function readoutContent({ flash = null, aim = null, rail = null, place = null, pill = null, idle = null } = {}) {
+// the compass rests: a hovered or focused place-card button, then a
+// presence-rail entry, then the compass aim. Hovering or focusing any of them
+// is the player's latest act of attention (focusing one blurs the compass),
+// and leaving one falls back to the next live slot.
+export function readoutContent({ flash = null, aim = null, rail = null, place = null, idle = null } = {}) {
   if (flash) {
     return { ...flash, flash: true };
   }
-  for (const source of [place, pill, rail, aim]) {
+  for (const source of [place, rail, aim]) {
     if (source) {
       return { ...source, flash: false };
     }

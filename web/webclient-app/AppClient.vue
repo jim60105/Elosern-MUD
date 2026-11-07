@@ -133,17 +133,16 @@ const {
   railRef, railMounted, railShown, presenceCardOpen, personFocus, focusTarget, focusPortrait,
   cardRef, cardRows, cardKey, cardCaption, cardLabel, cardMappingToken, speaker,
   onRailActivate, onCardPick, onCardBack, returnToServiceOrigin,
-  roomCardRef, roomCard, roomCardOpen, roomCardShown, roomCardRows, roomCardNotes, roomCardTrailing,
-  roomCardCaption, roomCardLabel, tilesShown, waitFormOpen, sleepOpen, lastTile, returning,
-  waitTileTime, sleepTileFatigue, placeActions, pillShown, pillCount, pillLabel,
-  onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack,
+  roomCardRef, roomCardOpen, tilesShown, waitFormOpen, sleepOpen, lastTile, returning,
+  waitTileTime, sleepTileFatigue, placeActions,
+  onPlaceLook, onPlaceWait, onRoomCardBack,
   onTilePick, onStepBack, onStepClose, onWaitDawn, onWaitSubmit, openTravelCamp,
-  onSleepRecover, onSleepSubmit, onPlaceHover, onPillHoverChange,
+  onSleepRecover, onSleepSubmit, onPlaceHover,
   sleepHandoffSelectionOpen, sleepHandoffQuestionOpen, sleepHandoffContinuationOpen,
   sleepHandoffRows, sleepHandoffContinuationRows, sleepHandoffCaption, sleepHandoffQuestionCaption,
   onSleepHandoffPick, onSleepContinuationPick,
   onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
-  onCompassTab, onRailTab, onPlaceTab, onPillTab,
+  onCompassTab, onRailTab, onPlaceTab,
   camp, campCardOpen, campBeatOpen, campOpen, closeCamp, selectMode, toggleDream, confirmCamp, continueTravel,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The command line's release (the shell's one focus seam): the free-form
@@ -1318,12 +1317,11 @@ const rootStyle = computed(() => {
             :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
             @continue="onLandmarkContinue(landmarkArrival.id)"
           />
-          <!-- The room cards (exploration-room-actions design D1/D4/D5;
+          <!-- The room card (exploration-room-actions design D1/D4/D5;
                redesign-rest-entry design D6): the rest entry the place card's
                休息 opens — first the TimeChoiceCard tiles, then one shared
-               shell around the wait or sleep form — and the suggestions card
-               the 建議 pill opens through the one card shell, each trapping
-               focus until it closes. -->
+               shell around the wait or sleep form, trapping focus until it
+               closes. -->
           <template v-else-if="roomCardOpen">
             <TimeChoiceCard
               v-if="tilesShown"
@@ -1335,23 +1333,6 @@ const rootStyle = computed(() => {
               :entrance="!modeHydrating && !returning"
               @pick="onTilePick"
               @close="onStepClose"
-            />
-            <ChoiceCard
-              v-else-if="roomCardShown"
-              ref="roomCardRef"
-              :key="roomCard.kind"
-              :test-id="`${roomCard.kind}-card`"
-              :data-card-kind="roomCard.kind"
-              :rows="roomCardRows"
-              :notes="roomCardNotes"
-              :trailing-index="roomCardTrailing"
-              :caption="roomCardCaption"
-              :aria-label="roomCardLabel"
-              :entrance="!modeHydrating"
-              trap-focus
-              autofocus
-              @pick="onRoomCardPick"
-              @back="onRoomCardBack"
             />
             <!-- The rest entry's second layer: a visible caption naming the
                  mode, the form, then (after the form in tab order) the
@@ -1619,10 +1600,10 @@ const rootStyle = computed(() => {
             <!-- The exploration dock's root pane (exploration-exit-compass
                  design D5; exploration-room-actions design D2): the exit
                  compass on the left, filling the panel height, and a right
-                 column holding the 建議 pill at its top and the shared
-                 readout at its bottom. The room actions are the place
-                 card's, and the people and objects the presence rail's; the
-                 panel holds no chip row, footer, or key hint. -->
+                 column holding the shared readout at its bottom. The room
+                 actions are the place card's, and the people and objects the
+                 presence rail's; the panel holds no chip row, footer, or key
+                 hint. -->
             <div
               v-if="explorationRootShown"
               class="exploration-root"
@@ -1659,31 +1640,8 @@ const rootStyle = computed(() => {
                   @move="onCompassMove"
                 />
               </div>
-              <div v-if="!travelLayout || pillShown" class="exploration-root__side">
-                <button
-                  v-if="pillShown"
-                  type="button"
-                  class="exploration-pill"
-                  data-testid="suggestions-pill"
-                  :aria-label="pillLabel"
-                  :data-count="pillCount > 0 ? pillCount : null"
-                  @click="onPill"
-                  @keydown.enter.stop
-                  @keydown.space.stop
-                  @keydown="onPillTab"
-                  @mouseenter="onPillHoverChange(true)"
-                  @mouseleave="onPillHoverChange(false)"
-                  @focus="onPillHoverChange(true)"
-                  @blur="onPillHoverChange(false)"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" />
-                  </svg>
-                  <span class="exploration-pill__label">建議</span>
-                  <b v-if="pillCount > 0" class="exploration-pill__count">{{ ` ${pillCount}` }}</b>
-                </button>
+              <div v-if="!travelLayout" class="exploration-root__side">
                 <ExplorationReadout
-                  v-if="!travelLayout"
                   class="exploration-root__readout"
                   :lead="readoutContent.lead"
                   :tag="readoutContent.tag || null"
@@ -2227,9 +2185,8 @@ const rootStyle = computed(() => {
 
 /* The exploration root pane (exploration-exit-compass design D5;
    exploration-room-actions design D2): the compass fills the pane's height on
-   the left; the right column holds the 建議 pill at its top right and the
-   shared readout at its bottom, so the pane (and the command panel's box)
-   never grows. */
+   the left; the right column holds the shared readout at its bottom, so the
+   pane (and the command panel's box) never grows. */
 .dock-pane-host.dock-pane-host--exploration {
   align-items: stretch;
   height: 100%;
@@ -2255,8 +2212,7 @@ const rootStyle = computed(() => {
   aspect-ratio: 1 / 1;
 }
 /* The travel movement column: the leg panel takes the pane's width; the
-   side column keeps only the 建議 pill (the intent line is the travel
-   readout), and collapses when no pill is shown. */
+   intent line is the travel readout inside the leg panel. */
 .exploration-root:has(> .exploration-root__travel) {
   grid-template-columns: minmax(0, 1fr) auto;
 }
@@ -2276,50 +2232,6 @@ const rootStyle = computed(() => {
 }
 .exploration-root__readout {
   margin-top: auto;
-}
-
-/* The 建議 pill (redesign §5.2): a quiet outlined pill at the column's top
-   right; the count in the gold numeral tone. */
-.exploration-pill {
-  align-self: flex-end;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: calc(6px * var(--ui-scale));
-  box-sizing: border-box;
-  height: calc(34px * var(--ui-scale));
-  padding: 0 calc(12px * var(--ui-scale)) 0 calc(10px * var(--ui-scale));
-  background: transparent;
-  border: 1px solid #736b5c;
-  border-radius: var(--radius-pill);
-  color: var(--paper-200);
-  font: var(--text-xs)/1 var(--f-sans);
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
-}
-.exploration-pill svg {
-  flex: none;
-  width: calc(18px * var(--ui-scale));
-  height: calc(18px * var(--ui-scale));
-}
-.exploration-pill__count {
-  font-weight: 500;
-  color: var(--gold-300);
-}
-.exploration-pill:hover,
-.exploration-pill:focus-visible {
-  border-color: var(--gold-500);
-  background: var(--gold-glow);
-  color: var(--paper-50);
-  outline: none;
-}
-.exploration-pill:focus-visible {
-  box-shadow: 0 0 0 1px var(--gold-400);
 }
 
 /* The rest entry's second layer (redesign-rest-entry design D6): one shell

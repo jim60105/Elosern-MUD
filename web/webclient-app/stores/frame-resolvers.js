@@ -18,10 +18,9 @@
 // compass's, read through `explorationExits`; the people and objects are the
 // presence rail's, read through `explorationPresence`; an interact target's
 // verbs are the client-local verb card's, read through `explorationVerbs`
-// (exploration-presence-rail); and the room actions (查看房間 and the
-// suggestions card) are the place card's and the 建議 pill's, read through
-// `explorationRoomLook` and `explorationSuggestions` (exploration-room-
-// actions); the place card's rest entry reads no builder rows
+// (exploration-presence-rail); and the room's 查看房間 row is the place
+// card's, read through `explorationRoomLook` (exploration-room-actions);
+// the place card's rest entry reads no builder rows
 // (redesign-rest-entry). None of them is a router frame: the retired
 // `exploration.target`, `exploration.wait`, and `exploration.suggestions`
 // sources are unregistered. `exploration.navigation` is the top navigation
@@ -47,8 +46,8 @@
 // descriptor against one committed state is idempotent.
 //
 // Degradation is data, never an exception: an unregistered source, an absent
-// identity/index, an unavailable panel form, a withdrawn suggestions
-// envelope, or a resolver that throws all return the shared marker
+// identity/index, an unavailable panel form, or a resolver that throws all
+// return the shared marker
 // `{unresolvable: true, reason}`. `reason` prefers the committed panel's
 // server-authored `reason.message` verbatim; otherwise it is null and the
 // CONSUMER chooses the local fallback line when rendering. Pop-versus-
@@ -64,10 +63,6 @@ import stableStringify from "../lib/stable_stringify.js";
 // The one degradation marker shape. Frozen so a consumer can never mutate
 // the shared instance into a payload.
 export const UNRESOLVABLE = Object.freeze({ unresolvable: true, reason: null });
-
-// The suggestions statuses the suggestions card may present (the
-// options-surface statuses minus `unavailable`, which forbids any card).
-const SUGGESTIONS_RESOLVABLE = ["generating", "ready", "degraded"];
 
 function marker(reasonMessage) {
   if (typeof reasonMessage !== "string" || reasonMessage === "") return UNRESOLVABLE;
@@ -222,32 +217,6 @@ export function createFrameResolver(deps) {
       if (!gate.ok) return null;
       const row = ExplorationMenu.lookItems(gate.panel).find((item) => item.key === "look-room");
       return row ? isolate(row) : null;
-    } catch (err) {
-      return null;
-    }
-  };
-
-  // The suggestions card's content (exploration-room-actions design D4):
-  // the committed envelope's status and `suggestionsMenu` rows without the
-  // router back row. Null when the exploration panel or `context_actions` is
-  // unavailable or absent, or the status is `unavailable` (or missing): no
-  // card and no pill exist then.
-  const explorationSuggestions = () => {
-    try {
-      const gate = requireExplorationPanel();
-      if (!gate.ok) return null;
-      const state = committed();
-      const contextActions = (state.panels && state.panels.context_actions) || null;
-      if (!contextActions || contextActions.available === false || contextActions.kind === "combat") {
-        return null;
-      }
-      const suggestions = contextActions.suggestions || null;
-      const status = suggestions && suggestions.status;
-      if (SUGGESTIONS_RESOLVABLE.indexOf(status) === -1) {
-        return null;
-      }
-      const menu = ExplorationMenu.suggestionsMenu(suggestions);
-      return isolate({ status, items: menu.items.filter((item) => !item.goBack) });
     } catch (err) {
       return null;
     }
@@ -567,7 +536,6 @@ export function createFrameResolver(deps) {
     explorationPresence,
     explorationVerbs,
     explorationRoomLook,
-    explorationSuggestions,
     // The combat model accessor (the declared selection-state home): the
     // store's client-local combat interactions (focus-skill recording, AREA
     // toggle, scale/shorthand choice, submit payload building) act on this

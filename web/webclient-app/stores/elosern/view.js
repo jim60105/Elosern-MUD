@@ -6,7 +6,6 @@
 // wholesale — no subscriber ever observes a partially applied panel state.
 
 import { computed } from "vue";
-import OptionCards from "../../lib/option_cards.js";
 import LocalMap from "../../lib/local_map.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import { gaugeRatio, isLowHp, isVitalsVisible } from "../../components/vitals.js";
@@ -126,7 +125,6 @@ export function applyView(ctx) {
   ctx.buildView = function buildView(prev, rs) {
     const panels = rs.panels || {};
     const panel = panels.context_actions || null;
-    const suggestions = panel && panel.suggestions ? panel.suggestions : null;
     // Pre-session totality: before the first publish mounts the root
     // descriptor the stack is empty (the mount point is `settleFrameStack`),
     // where frame-content reads would throw. `mounted` guards every read.
@@ -358,9 +356,6 @@ export function applyView(ctx) {
       autoAdvance: ctx.prefs.autoAdvance,
 
       contextActions: panel,
-      suggestions,
-      suggestionsView: OptionCards.buildOptionsView(panel || {}),
-      suggestionsSignature: OptionCards.suggestionsSignature(suggestions),
       localMapModel: panels.local_map
         ? {
             ...LocalMap.reducePanel(panels.local_map),
