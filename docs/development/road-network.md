@@ -76,8 +76,9 @@ published with the map bundle; `world.rules.travel_cost.wilderness_terrain`
 then prices a step at road speed when both of its ends are road cells, and the
 area and travel maps publish `road: true` for a disclosed road cell.
 
-A rejected startup means the artifact is missing, corrupt or stale. The error
-names the regeneration command; run it and commit the result:
+A rejected startup means the artifact is missing, corrupt or stale. A stale
+artifact's error names the regeneration command; run it and commit the result.
+A missing or corrupt artifact is reported as a read or decode rejection.
 
 ```console
 uv run --locked python -m tools.road_network

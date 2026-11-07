@@ -137,8 +137,6 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
         )
 
     def test_offline_producers_stay_ungated(self):
-        composed = runtime.compose()
-
         with mock.patch.object(
             road_network,
             "artifact_metadata",
@@ -148,6 +146,7 @@ class RoadNetworkAdoptionTests(unittest.TestCase):
             "frozen_network",
             side_effect=AssertionError("an offline producer read the road artifact"),
         ):
+            composed = runtime.compose()
             published = runtime.preview(composed)
 
         self.assertIs(published.roads, None)
@@ -214,8 +213,15 @@ class RoadCellLookupTests(unittest.TestCase):
         self.assertNotEqual(one.identity, two.identity)
 
     def test_a_synthetic_geography_publication_clears_the_road_cells(self):
+        from dataclasses import replace as replace_bundle
+
         before = runtime.current()
-        self.assertNotEqual(road_network.road_cells(), frozenset())
+        runtime.publish(
+            replace_bundle(
+                before, roads=_network("t_before_publication", {(1, 1)})
+            )
+        )
+        self.assertIn((1, 1), road_network.road_cells())
 
         publish_geography(before.geography)
 

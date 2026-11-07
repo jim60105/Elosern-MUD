@@ -30,16 +30,6 @@ def publish_shipped_map_world():
 
     if not runtime.is_published():
         runtime.adopt()
-    elif runtime.current().roads is None:
-        # A synthetic publication clears the road cells; the shipped world
-        # carries the committed network again.
-        from dataclasses import replace
-
-        from world.maps import road_network
-
-        runtime.publish(
-            replace(runtime.current(), roads=road_network.frozen_network())
-        )
     return runtime.current()
 
 
