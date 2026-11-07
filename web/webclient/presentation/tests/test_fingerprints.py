@@ -73,7 +73,6 @@ class EligibleAffordanceDigestTests(unittest.TestCase):
         base.update(params)
         return _entry("explore.move", base)
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_identical_eligibility_replays_with_differing_labels_order(self):
         first = [_entry("explore.wait", {"daypart": "noon"}, label="等待"), self._talk()]
         second = [
@@ -82,7 +81,6 @@ class EligibleAffordanceDigestTests(unittest.TestCase):
         ]
         self.assertEqual(eligible_affordance_digest(first), eligible_affordance_digest(second))
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_schedule_gate_flip_changes_the_digest(self):
         eligible = [self._talk(), self._move()]
         blocked = [self._move()]
@@ -90,7 +88,6 @@ class EligibleAffordanceDigestTests(unittest.TestCase):
             eligible_affordance_digest(eligible), eligible_affordance_digest(blocked)
         )
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_exit_lock_changes_the_digest(self):
         open_exit = [self._move(), self._talk()]
         locked_exit = [self._talk()]
@@ -98,7 +95,6 @@ class EligibleAffordanceDigestTests(unittest.TestCase):
             eligible_affordance_digest(open_exit), eligible_affordance_digest(locked_exit)
         )
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_monster_death_removes_engage_and_changes_the_digest(self):
         alive = [self._talk(), _entry("explore.engage", {"monster_id": 900})]
         dead = [self._talk()]
@@ -124,7 +120,6 @@ class EligibleAffordanceDigestTests(unittest.TestCase):
 
 
 class PublicStateDigestTests(unittest.TestCase):
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_multiple_objectives_hash_deterministically_across_orders(self):
         first = [
             ("q-1", 0, "抵達指定的地點"),
@@ -136,7 +131,6 @@ class PublicStateDigestTests(unittest.TestCase):
             public_state_digest(second, [(101, "陌生人")]),
         )
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_partial_progress_and_sub_tier_affinity_stability(self):
         # Neither the hidden stage-progress counter nor the numeric affinity is
         # an input: while the displayed identity and the tier label hold, the
@@ -147,7 +141,6 @@ class PublicStateDigestTests(unittest.TestCase):
         different_objective = public_state_digest([("q-1", 1, "抵達指定的地點")], [(101, "熟人")])
         self.assertNotEqual(base, different_objective)
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_tier_boundary_change_turns_over_the_digest(self):
         low = public_state_digest([], [(101, "熟人")])
         high = public_state_digest([], [(101, "摯友")])
@@ -199,16 +192,13 @@ class FingerprintTests(unittest.TestCase):
         base.update(params)
         return _entry("explore.move", base)
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_identical_situations_replay_on_the_same_fingerprint(self):
         self.assertEqual(self._fp(), self._fp())
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_identity_order_is_irrelevant(self):
         shuffled = self._fp(npc_ids=[102, 101])
         self.assertEqual(self._fp(), shuffled)
 
-    @covers_requirement("action-options-trigger-service::fingerprint-identifies-the-situation-not-the-moment")
     def test_each_component_change_invalidates(self):
         base = self._fp()
         self.assertNotEqual(base, self._fp(room_key="room:43"))
@@ -294,11 +284,10 @@ class SharedDerivationBoundaryTests(unittest.TestCase):
 
 
 class ExplorationSituationDerivationTests(EvenniaTest):
-    """The shared derivation: one fingerprint for scheduling and presentation.
+    """The shared exploration-situation derivation.
 
     Uses real Evennia fixtures so the typeclass identity, eligibility digest,
-    and public-state inputs all resolve; the trigger service delegates to this
-    exact helper, so the two consumers cannot drift.
+    and public-state inputs all resolve.
     """
 
     def setUp(self):
@@ -335,14 +324,6 @@ class ExplorationSituationDerivationTests(EvenniaTest):
         self.assertTrue(eligible)
         self.assertIsInstance(fingerprint_value, str)
         self.assertTrue(fingerprint_value)
-
-    def test_derivation_is_the_service_single_source(self):
-        from server import option_proposal_service as service
-
-        self.assertEqual(
-            service._derive_situation(self.player),
-            derive_exploration_situation(self.player),
-        )
 
     def test_no_location_or_out_of_exploration_yields_none(self):
         self.player.location = None

@@ -335,8 +335,8 @@ A non-owner that needs to edit a row's file is a **forced serialize**, not a mer
   brings the pointer path to parity. Neither is new work invented by this roadmap — both are contract
   violations the old layout hid, and neither may be left for H6 to sweep up.
 - **The settings overlay emits actions the server does not allowlist.** `SettingsOverlay.vue:74` emits
-  `options.type_scale` (and siblings), but `options.dismiss` is the *only* allowlisted `options.*`
-  action (`web/webclient/actions/registry.py:350`). The mismatch has never fired because the overlay is
+  `options.type_scale` (and siblings), but no `options.*` action is allowlisted
+  (`web/webclient/actions/registry.py`). The mismatch has never fired because the overlay is
   never mounted — wiring it in H5 is the moment it would. → H5 resolves it by treating the settings as
   **client-local presentation state** and carrying the `MODIFIED` delta on
   `webclient-component-showcase`'s "SHALL emit `options.*`" clause. Adding allowlisted actions would be

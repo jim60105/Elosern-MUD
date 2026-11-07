@@ -57,19 +57,17 @@ prompts/                         # 唯一的外部提示詞資料夾（YAML 格�
 world/prompts/                   # 提示詞驗證與註冊表（唯讀契約、白名單占位符保護）
 world/ai/                        # 生成提案層（無狀態、無副作用、Twisted 非同步驅動）
 ├── client.py                    # OpenAI 相容非同步 HTTP 用戶端（OpenAICompatClient）
-├── profiles.py                  # 7 大層級的不可變設定檔（LLMProfile）
+├── profiles.py                  # 各生成層級的不可變設定檔（LLMProfile）
 ├── guardrail.py                 # 驗證-重試-降級核心防護管線
 ├── narrator.py                  # 旁白散文生成
 ├── npc_dialogue.py              # NPC 對話與行為意圖生成
 ├── scenario_director.py         # 任務藍圖生成
 ├── scene_flavor.py              # 場景氛圍段落生成
 ├── character_creation.py        # 角色創角提案生成
-├── action_options.py            # 探索卡片建議生成
 ├── story_director/              # 故事橋段提案生成（story-director-beats）
 └── title_nomination.py          # 異名選票提案生成
 server/                          # 服務整合與雙向匯入邊界
 ├── ai_director_service.py       # 任務生成與創角提案服務
-├── option_proposal_service.py   # 行動建議卡片調度與快取服務
 ├── scene_flavor_service.py      # 場景氛圍排程服務
 └── title_nomination_service.py  # 稱號異名提名排程服務
 ```

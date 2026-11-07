@@ -9,70 +9,16 @@ from world.observability import log_warn
 from .entities import LivingEntity
 
 
-def _schedule_action_options_after_move(actor: Any) -> None:
-    """Register the action-options trigger to run after the move commits.
-
-    The room-entry trigger must never run inside the movement transaction's
-    critical section: a rollback would leave suggestions derived from a room
-    the player never reached. The scheduling is therefore registered through
-    the publication-commit seam (Django's ``on_commit`` plus the captured causal
-    publication group), so it runs only after the settlement transaction
-    commits — or immediately when no outer transaction is active — and its
-    immediate current-state push coalesces into the movement settlement's one
-    publication instead of preceding it. The gate and the fire-and-forget call
-    happen inside the committed callback; every synchronous failure is logged
-    as a bounded diagnostic and swallowed, never altering settlement.
-    """
-    from world.rules.presentation_events import on_publication_commit
-
-    on_publication_commit(
-        lambda: _schedule_action_options_committed(actor)
-    )
-
-
-def _schedule_action_options_committed(actor: Any) -> None:
-    """The committed relocation trigger: puppeted-player gate, then schedule.
-
-    Only a puppeted ``PlayerCharacter`` moves through ``at_post_move`` (NPC
-    and monster moves, and rollback compensations with ``move_hooks=False``,
-    stay silent). The service import is function-local (the ``commands/
-    scene.py`` precedent) and every synchronous failure is logged as a bounded
-    diagnostic and swallowed: the trigger never alters movement and never
-    raises into its caller.
-    """
-    from world.rules.player_control import is_player_driven
-
-    if not is_player_driven(actor):
-        return
-    if isinstance(actor, PlayerCharacter) and getattr(actor, "account", None) is None:
-        return
-    try:
-        from server.option_proposal_service import schedule_action_options
-        from web.webclient.presentation.watchers import watchers_for
-
-        schedule_action_options(
-            actor,
-            watchers=watchers_for(actor),
-        )
-    except Exception as error:
-        log_warn(
-            "action_options_trigger_failed",
-            context={"char": str(getattr(actor, "pk", "?")), "trigger": "relocation"},
-            exc=error,
-        )
-
-
 def _schedule_projection_refresh_after_activation(actor: Any) -> None:
     """Refresh the live session projections after an activation commit.
 
     A committed activation can add an occupant the player's open window does not
     know about yet, so the refresh re-derives the same three projections a
-    settled room entry produces, through the existing seams only: the
-    action-options schedule (affordances), and the WebClient full snapshot for
-    each live session (occupants and the dialogue target list), which itself
-    resolves ordinary visibility and access gates. It runs only for a live,
-    player-driven actor, after the commit, and a failure is a bounded diagnostic
-    that never alters the committed activation.
+    settled room entry produces, through the existing seam only: the WebClient
+    full snapshot for each live session (occupants and the dialogue target
+    list), which itself resolves ordinary visibility and access gates. It runs
+    only for a live, player-driven actor, after the commit, and a failure is a
+    bounded diagnostic that never alters the committed activation.
     """
     from world.rules.player_control import is_player_driven
 
@@ -81,12 +27,10 @@ def _schedule_projection_refresh_after_activation(actor: Any) -> None:
     if isinstance(actor, PlayerCharacter) and getattr(actor, "account", None) is None:
         return
     try:
-        from server.option_proposal_service import schedule_action_options
         from web.webclient.presentation.ingress import refresh_after_command
         from web.webclient.presentation.watchers import watchers_for
 
         watchers = tuple(watchers_for(actor))
-        schedule_action_options(actor, watchers=watchers)
         # ``watchers_for`` pairs each live session with its captured
         # coordinator epoch; the session is what the snapshot push takes.
         for session, _epoch in watchers:
@@ -171,17 +115,15 @@ class PlayerCharacter(LivingEntity):
         return admitted
 
     def at_post_move(self, source_location, **kwargs) -> None:
-        """Schedule fresh action options after every committed player move.
+        """Run the post-move boundary for every committed player move.
 
         Every successful, hooks-enabled relocation — ordinary exit traversal
-        and a direct ``move_to()`` alike — lands here; the trigger registers
-        through ``transaction.on_commit`` so an aborted movement publishes
-        nothing, and rollback compensations (``move_hooks=False``) never reach
-        this hook. NPC and monster moves never run this override. The whole
-        post-move boundary runs in one causal publication group, so a direct
-        move's checkpoint and its action-option/arrival effects coalesce into
-        one final publication (an exit traversal simply reuses the movement
-        settlement's group).
+        and a direct ``move_to()`` alike — lands here; rollback compensations
+        (``move_hooks=False``) never reach this hook. NPC and monster moves
+        never run this override. The whole boundary runs in one causal
+        publication group, so a direct move's checkpoint and its arrival
+        effects coalesce into one final publication (an exit traversal simply
+        reuses the movement settlement's group).
         """
         from world.rules.presentation_events import publication_group
         from world.rules.movement_settlement import note_direct_move_end
@@ -189,7 +131,6 @@ class PlayerCharacter(LivingEntity):
         with publication_group():
             super().at_post_move(source_location, **kwargs)
             note_direct_move_end(self)
-            _schedule_action_options_after_move(self)
             from world.quests.room_observation import observe_arrival_lore
 
             observe_arrival_lore(self, self.location)

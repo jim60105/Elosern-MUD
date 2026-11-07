@@ -191,9 +191,6 @@ class NPC(LivingEntity):
         from world.quests.escort_events import collect_escort_actors
 
         collect_escort_actors((self,))
-        from typeclasses.characters import _schedule_action_options_after_move
-
-        _schedule_action_options_after_move(self)
         # A lawfully possessed companion exploring on the owner's behalf is a
         # real exploration boundary: published encounters whose locator covers
         # its actual position activate, with ownership staying with the original

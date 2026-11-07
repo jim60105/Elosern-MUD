@@ -23,7 +23,6 @@
 | **`scenario_director`** | `world/ai/scenario_director.py` | 公會委託櫃檯任務查詢 | JSON（任務藍圖） | 自手寫任務範本池抽取符合條件之任務 |
 | **`scene_builder`** | `world/ai/scene_flavor.py` | 玩家進入動態副本房間 | 正體中文氛圍散文 (50-200 字) | 回傳 `None`（房間不附加額外氛圍） |
 | **`character_creation`** | `world/ai/character_creation.py` | 玩家輸入自然語言創角構想 | JSON（配點/人設/技能） | 回傳 `None`（引導切換至手動點選精靈） |
-| **`action_options`** | `world/ai/action_options.py` | 移動進房、行動結算、登入 | JSON（3～5 張行動卡片） | 回傳 `None`（前端僅呈現原生按鈕） |
 | **`title_nomination`** | `world/ai/title_nomination.py` | 登出、休息結算、公會升階、任務通關 | JSON（候選異名、事蹟引用與來源引用代碼） | 回傳空選票（不生成新稱號） |
 | **`story_director`** | `world/ai/story_director/` | 決定性敘事核心排定故事橋段（`world/narrative/director.py`） | JSON（單一橋段提案：後續／線索／邀請／信件／任務種子） | 回傳 `None`（不排定任何橋段，不生成替代內容） |
 
@@ -197,32 +196,7 @@ LLM 必須輸出 JSON 格式：
 
 ---
 
-## 6. 行動建議卡片層 (`action_options`)
-
-### 業務定位
-在 Webclient HUD 介面的情境操作區，為處於探索模式（Exploration Mode）的玩家即時運算出 3～5 張符合當前環境、具備高度可行性的行動建議卡片（`SuggestionCard`）。
-
-### 呼叫鏈路
-```text
-玩家移動、行動結算或登入 (at_post_move / dispatcher.py / ingress.py)
-  └── server/option_proposal_service.py: schedule_action_options()
-        └── world/ai/action_options.py: generate_action_options()
-              └── 12 階驗證天梯 (Ladder 0～11)
-                    ├── 成功 ──> 快取並推送 OOB 訊息至 Webclient
-                    └── 降級 (None) ──> 記錄短期負向快取，前端顯示預設按鈕
-```
-
-### 輸入與提示詞
-* **提示詞鍵值**：`prompts/action_options.yaml` $\rightarrow$ `action_options.system` 與 `action_options.user`。
-* **使用者輸入預留位置**：`{room_name}`、`{room_summary}`、`{npc_entries}`、`{monster_entries}`、`{objective}`、`{narrative_tail}`、`{affordances}`（現場確實可執行的動作清單）。
-* **結構化需求**：此層級要求 Profile 必須支援 `supports_response_format: True`。
-
-### 12 階驗證天梯（Ladder）
-所有建議卡片必須在本地連續通過 12 道嚴格關卡，詳見 [護欄天梯與語意驗證機制](/development/llm-guardrails)。其中最核心者為：**卡片內之 `action_code` 必須與當前環境實際提供的可執行動作（Affordances）完全一致**，杜絕無效動作卡。
-
----
-
-## 7. 異名稱號提名層 (`title_nomination`)
+## 6. 異名稱號提名層 (`title_nomination`)
 
 ### 業務定位
 在冒險的重要休息節點，根據玩家近期的真實冒險事蹟（`recent_deeds` 結構化資料），提煉出 5 個具備事蹟佐證的候選異名（Epithet），並過濾出前 3 名合格者組成投票選票。
@@ -287,7 +261,7 @@ LLM 必須輸出 JSON 格式：
 
 ---
 
-## 8. 故事導演層 (`story_director`)
+## 7. 故事導演層 (`story_director`)
 
 ### 業務定位
 由確定性敘事核心（`world/narrative/director.py`）驅動的故事橋段排定：每次決策最多排定一個橋段，也可以選擇不排定。生成層只提出值（value-only）提案，路由、驗證與寫入一律由確定性擁有者執行。

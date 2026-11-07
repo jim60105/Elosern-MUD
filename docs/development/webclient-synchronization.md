@@ -664,9 +664,9 @@ given, and the mode, layout version and server time published with them.
 Nothing is persisted, and no second store exists — every publisher (graphical
 action completion and the stale/internal recovery paths, explicit
 `ui_sync`/login/reconnect/puppet sync, text-command settlement, art completion,
-the party/dialogue/lore-codex pushes, the action-options and title-ballot
-generations, the scene-activation and dream refreshes, and the on-demand map
-request) hands the same coordinator an intent:
+the party/dialogue/lore-codex pushes, the title-ballot generations, the
+scene-activation and dream refreshes, and the on-demand map request) hands the
+same coordinator an intent:
 
 ```python
 coordinator.enqueue_publication(
@@ -891,7 +891,7 @@ The deterministic owner produces the fact:
 - `PlayerCharacter.at_pre_move`/`at_post_move` capture a direct `move_to()` the
   settlement does not own, with a per-actor settlement scope suppressing the
   duplicate fact; the post-move boundary runs inside one causal group so the
-  checkpoint, the action-options trigger and the arrival effects coalesce.
+  checkpoint and the arrival effects coalesce.
 - `NPC.move_to` already routes through `settle_movement`, so NPC and possessed
   body moves use the same owner.
 

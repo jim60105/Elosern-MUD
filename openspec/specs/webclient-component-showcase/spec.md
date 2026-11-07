@@ -449,9 +449,7 @@ manifest-listed overlay that nothing imports is not complete.
 
 #### Scenario: Only options.dismiss stays on the action allowlist
 - **WHEN** a settings change is considered for dispatch
-- **THEN** no `ui_action` is dispatched for any setting: `options.dismiss` — the suggestions
-  dismissal — is the only allowlisted `options.*` action, and widening the action allowlist is a
-  server-side change that no showcase or redesign wave makes
+- **THEN** no `ui_action` is dispatched for any setting, and no `options.*` action is registered at all: the retired dismissal is gone and widening the action allowlist remains a server-side change that no showcase or redesign wave makes
 
 #### Scenario: Settings reset with the store on an unrecognised version
 - **WHEN** the client loads and the stored presentation-store version is unrecognised

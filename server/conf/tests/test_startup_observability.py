@@ -52,7 +52,6 @@ _BODY_TARGETS = (
     "world.ai.scenario_director.register_scenario_director",
     "world.ai.character_creation.register_character_creation",
     "world.ai.scene_flavor.register_scene_flavor",
-    "world.ai.action_options.register_action_options",
     "world.ai.title_nomination.register_title_nomination",
     "world.ai.story_director.register_story_director",
     "server.title_nomination_service.register_nomination_triggers",

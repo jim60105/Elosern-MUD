@@ -1,20 +1,20 @@
 """Composition root scheduling AI epithet nominations (change G trigger service).
 
 ``schedule_epithet_nomination`` is the single production caller of
-``world.ai.title_nomination.generate_epithet_candidates``. It mirrors the
-``option_proposal_service`` discipline exactly: every ``world.ai`` import is
-deferred into the call path so a cold import binds no guardrail logger, the
-scheduling never blocks or raises into a rest-point hook, and an offline or
-disabled ``title_nomination`` profile means the stage simply does not fire
-(the deterministic game stays fully playable; fixed titles are unaffected).
+``world.ai.title_nomination.generate_epithet_candidates``. Every ``world.ai``
+import is deferred into the call path so a cold import binds no guardrail
+logger, the scheduling never blocks or raises into a rest-point hook, and an
+offline or disabled ``title_nomination`` profile means the stage simply does
+not fire (the deterministic game stays fully playable; fixed titles are
+unaffected).
 
 The service writes no durable state itself. Ballot persistence is performed
 solely by the rules-layer writer ``world.rules.titles.
 persist_nomination_ballot`` — which re-checks single-ballot + cooldown
-suppression after the proposal returns — and the panel push is the same
-epoch-guarded ``publish_panel_update`` helper the options generation uses, so
-a reconnect or puppet change between proposal and delivery silently drops a
-stale push while the next full snapshot re-renders the truth.
+suppression after the proposal returns — and the panel push uses the shared
+epoch-guarded ``publish_panel_update`` helper, so a reconnect or puppet change
+between proposal and delivery silently drops a stale push while the next full
+snapshot re-renders the truth.
 
 Rest-point triggers (title-system D4 §7.1): player logout, committed voluntary/forced
 awakening, and qualifying quest-arc completion after settlement commits.
@@ -47,9 +47,9 @@ _PROCESSED_OCCURRENCES: set[str] = set()
 def _build_nomination_client() -> Any:
     """Build the injected ``title_nomination`` client, or ``None`` when off.
 
-    Unlike the options layer there is no ephemeral display state to keep warm
-    while the profile is disabled: an offline nomination stage must not fire
-    at all (the deterministic-offline invariant), so ``None`` means "no call".
+    There is no ephemeral display state to keep warm while the profile is
+    disabled: an offline nomination stage must not fire at all (the
+    deterministic-offline invariant), so ``None`` means "no call".
     """
     from world.ai.client import OpenAICompatClient
     from world.ai.profiles import get_profile

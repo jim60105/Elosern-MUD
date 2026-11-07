@@ -19,8 +19,7 @@ prompts/
 ├── npc.yaml                NPC 思考回饋範本
 ├── art.yaml                美術描述範本與生成提示詞（scene／portrait／negative）
 ├── character_creation.yaml 創角提示詞（前瞻註冊，尚未有消費者）
-├── story_director.yaml     故事導演（StoryDirector）橋段提案系統提示詞
-└── action_options.yaml     行動建議提示詞（前瞻註冊，消費者於 action-options-layer 落地）
+└── story_director.yaml     故事導演（StoryDirector）橋段提案系統提示詞
 ```
 
 ## YAML 格式
@@ -51,8 +50,6 @@ prompts:
 | `art.portrait_prompt` | `art.yaml` | `{description}` |
 | `art.negative_prompt` | `art.yaml` | 無 |
 | `character_creation.system` | `character_creation.yaml` | 無 |
-| `action_options.system` | `action_options.yaml` | 無 |
-| `action_options.user` | `action_options.yaml` | `{room_name}`、`{room_summary}`、`{npc_entries}`、`{monster_entries}`、`{objective}`、`{narrative_tail}`、`{affordances}` |
 
 只有允許清單內的 `{token}` 會被替換，替換是逐一且精確的：
 

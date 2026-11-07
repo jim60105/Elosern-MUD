@@ -183,7 +183,6 @@ describe("ActionDock (B2 action-dock family)", () => {
     // When transport reset occurs, the suggestions menu is cleared
     const w = mountDock({ rootItems: ROOT_ITEMS }, []);
     expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
-    expect(w.find('[data-item-key="action-options.dismiss"]').exists()).toBe(false);
   });
 });
 

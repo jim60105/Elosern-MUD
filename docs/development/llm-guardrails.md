@@ -68,34 +68,15 @@ flowchart TD
 
 除了通用驗證，各業務情境還實作了領域專屬的嚴格防線：
 
-### 1. 探索行動卡片 12 階驗證天梯（Action Options Ladder）
-
-在 `world/ai/action_options.py` 中，建議卡片必須在本地連續通過 12 道順序固定的嚴格關卡（Ladder 0～11）。任何階段失敗，立即終止並對應到該階的專屬拒絕碼：
-
-| 階級 (Stage) | 拒絕碼 (Rejection Code) | 檢驗內容與安全約束 |
-| :---: | :--- | :--- |
-| **0** | `schema_violation` | 回傳非合法 JSON 或缺少必要結構欄位。 |
-| **1** | `card_count_out_of_range` | 卡片數量必須恰好為 3 到 5 張。 |
-| **2** | `empty_label` | 卡片標籤（`label`）為空。 |
-| **3** | `label_too_long` | 標籤長度超過 24 字元。 |
-| **4** | `non_cjk_label` | 標籤未包含正體中文 CJK 漢字。 |
-| **5** | `placeholder_label` | 標籤含有未置換的範本標籤。 |
-| **6** | `digit_in_label` | 標籤內出現阿拉伯數字（防數值幻覺）。 |
-| **7** | `unknown_action_code` | 行動程式碼非系統已知指令且非自由發言。 |
-| **8** | `no_such_affordance` | **【核心防禦】** 卡片的 `action_code` 必須完全吻合當前房間實際可執行的動作（Affordances）。 |
-| **9** | `unknown_target` | 卡片所引用的目標 NPC 或物件不存在於現場。 |
-| **10** | `hint_too_long` | 說明文字（`hint`）超過 60 字元。 |
-| **11** | `leak_detected` | 標籤或說明中出現內部好感度或真實隱藏屬性數值。 |
-
-### 2. 數值外洩防護（No-leak Secrets）
+### 1. 數值外洩防護（No-leak Secrets）
 * **NPC 對話**：NPC 內部好感度（Favor/Disposition）是隱藏數值。若 NPC 在台詞中直接說出「我對你的好感度目前是 65 分」，該台詞將直接被 `_no_leak_validator` 攔截。
 * **偽裝屬性（Disguised Stats）**：若玩家裝備了具有「偽裝」效果的道具（例如對外顯示攻擊力 10，真實攻擊力 80），真實數值會被放入 `no_leak_secrets` 集合，防止 NPC 對話意外揭露玩家的真實數值。
 
-### 3. 無數字鐵律（No Fabricated Numbers）
-* 在場景氛圍描述（`scene_flavor`）與行動建議卡片（`action_options`）中，**嚴禁出現任何阿拉伯數字**。
+### 2. 無數字鐵律（No Fabricated Numbers）
+* 在場景氛圍描述（`scene_flavor`）中，**嚴禁出現任何阿拉伯數字**。
 * 此規則旨在杜絕 LLM 擅自創造「5 隻哥布林伏擊」、「前方 20 公尺處有懸崖」等未經確定性核心批准的虛構數字。
 
-### 4. 年齡合理值底線（Age Range Bound）
+### 3. 年齡合理值底線（Age Range Bound）
 * 角色年齡為合理值：`age` 與 `apparent_age` 必須是 $0$ 至 $10000$ 的整數。
 * 在創角提案（`character_creation`）中，越界的提案輸出由生成層驗證時修正到範圍內；匯入與創角路徑則由驗證層直接拒絕越界值，絕不允許進入遊戲世界。
 
@@ -103,7 +84,7 @@ flowchart TD
 
 ## 結構化輸出與 JSON Schema 登錄
 
-對於需要輸出結構化資料的層次（如 `action_options`、`scenario_director`、`character_creation`、`title_nomination`）：
+對於需要輸出結構化資料的層次（如 `scenario_director`、`character_creation`、`title_nomination`）：
 
 1. **結構化旗標宣告**：
    該層 Profile 必須宣告 `supports_response_format: True`。若底層模型支援 OpenAI 的 `response_format: { type: "json_object" }`，用戶端將在請求時帶入該標頭。

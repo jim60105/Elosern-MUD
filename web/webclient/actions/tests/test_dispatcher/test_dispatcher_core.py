@@ -500,7 +500,6 @@ class DispatcherTests(unittest.TestCase):
             self.assertFalse(state.in_flight)
 
     @covers_requirement(
-        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
         "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
     )
     def test_proof_adapter_receives_the_session_as_the_third_argument(self):
@@ -523,7 +522,6 @@ class DispatcherTests(unittest.TestCase):
         self.assertIs(session_arg, session)
 
     @covers_requirement(
-        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
         "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
     )
     def test_two_argument_direct_invocation_defaults_session_to_none(self):
@@ -538,7 +536,6 @@ class DispatcherTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "success")
 
     @covers_requirement(
-        "dismiss-options-action::adapters-receive-the-authenticated-session-through-a-fixed-optional-parameter",
         "webclient-action-dispatch::adapters-may-receive-the-authenticated-session-through-a-fixed-optional-third-parameter",
     )
     def test_dispatcher_passes_three_positionals_without_introspection(self):

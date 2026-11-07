@@ -17,8 +17,7 @@ presentation-side components allowed to invoke public deterministic APIs.
 Adapters declare the fixed ``adapter(actor, payload, session=None)`` ABI;
 ``_invoke_adapter`` passes the authenticated session positionally as the third
 argument with no signature introspection, so an adapter may target the session
-(for example the ``options.dismiss`` eviction) without guessing Evennia
-account APIs.
+without guessing Evennia account APIs.
 """
 
 from collections import OrderedDict
@@ -78,20 +77,6 @@ _MALFORMED_PAYLOAD_CODE = "malformed_payload"
 _MALFORMED_PAYLOAD_MESSAGE = "操作內容格式錯誤"
 _INTERNAL_CODE = "internal_error"
 _INTERNAL_MESSAGE = "操作時發生內部錯誤"
-
-# The dialogue actions whose successful completion triggers a fresh
-# action-options generation (action-options-trigger-hooks D3).
-_DIALOGUE_TRIGGER_ACTION_IDS = frozenset({"explore.talk_scripted", "explore.talk_freeform"})
-
-# The combat actions whose successful completion may end the active session
-# and therefore trigger a fresh exploration action-options generation for
-# every live watcher of the actor (action-options-wiring-hardening D2): the
-# party command's completing confirmation and the confirmed party exit are the
-# only two routes that can settle a terminal outcome.
-_COMBAT_TRIGGER_ACTION_IDS = frozenset({"combat.command", "combat.exit_confirm"})
-
-# The field cast whose instant-terminal opening also ends a combat.
-_FIELD_CAST_ACTION_ID = "explore.cast"
 
 
 class DispatchError(ValueError):
@@ -305,7 +290,6 @@ def handle_ui_action(
         registry,
         request_id,
         state.epoch,
-        action_id=spec.action_id,
     )
 
 
@@ -318,15 +302,11 @@ def _invoke_adapter(
     registry: PresentationRegistry,
     request_id: str,
     epoch: str,
-    action_id: str | None = None,
 ) -> None:
     """Invoke the adapter, observing both settlement paths.
 
     Both paths funnel into :func:`_publish_completion`, whose publication
-    Deferred owns the in-flight release. ``action_id`` (default ``None`` so
-    existing callers and tests keep their signatures) is threaded into the
-    completion publication so the dialogue trigger can identify talk
-    completions (action-options-trigger-hooks D3).
+    Deferred owns the in-flight release.
 
     The synchronous adapter invocation is bound to one causal publication
     group, so every panel push and checkpoint fact the adapter's committed work
@@ -358,7 +338,7 @@ def _invoke_adapter(
         return
     if isinstance(result, Deferred):
         result.addBoth(
-            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch, _i=action_id: _publish_completion(_s, _a, value, _r, _q, _e, action_id=_i, group_id=None)
+            lambda value, _s=session, _a=actor, _r=registry, _q=request_id, _e=epoch: _publish_completion(_s, _a, value, _r, _q, _e, group_id=None)
         )
         return
     _publish_completion(
@@ -368,7 +348,6 @@ def _invoke_adapter(
         registry,
         request_id,
         epoch,
-        action_id=action_id,
         group_id=group_id,
     )
 
@@ -413,7 +392,6 @@ def _publish_completion(
     registry: PresentationRegistry,
     request_id: str,
     epoch: str,
-    action_id: str | None = None,
     group_id: str | None = None,
 ) -> Any:
     """Publish canonical presentation and the matching result for an adapter.
@@ -507,7 +485,7 @@ def _publish_completion(
         coordinator.flush_publication_group(target_group)
     deferred.addCallbacks(
         lambda receipt: _completion_published(
-            receipt, session, actor, coordinator, request_id, action_id, result, value, epoch
+            receipt, session, request_id, result, epoch
         ),
         lambda failure: _completion_failed(
             failure, session, actor, coordinator, request_id, result, epoch
@@ -538,46 +516,18 @@ def _publication_group_id(value: Any) -> str | None:
 def _completion_published(
     receipt: PublicationReceipt | None,
     session: Any,
-    actor: Any,
-    coordinator: PresentationCoordinator,
     request_id: str,
-    action_id: str | None,
     result: dict[str, Any],
-    value: dict[str, Any],
     epoch: str,
 ) -> None:
     """Release the in-flight marker after the batch (and its result) sent.
 
     ``None`` means the captured sequence retired before its publication ran:
-    nothing was sent and nothing may be published into the replacement. After a
-    released marker, a successful talk or terminal-combat completion schedules
-    its action-options regeneration fire-and-forget
-    (action-options-trigger-hooks D3 / action-options-wiring-hardening D2): the
-    reply text, presentation and result are already on the wire, so the trigger
-    cannot reorder existing traffic, and a scheduling failure is logged and
-    swallowed, never raised into publication.
+    nothing was sent and nothing may be published into the replacement.
     """
     if receipt is not None:
         _cache_result(_sequence_state(session), request_id, result)
     _settle_in_flight(session, epoch, None)
-    # The gates use the *normalized* outcome actually sent to the client: a
-    # raw ``success`` that normalizes into an internal error must never
-    # schedule (action-options-trigger-hooks D3 / action-options-wiring-
-    # hardening D2).
-    if result["outcome"] == "success" and action_id in _DIALOGUE_TRIGGER_ACTION_IDS:
-        _schedule_dialogue_options(session, actor, coordinator)
-    if result["outcome"] == "success" and action_id in _COMBAT_TRIGGER_ACTION_IDS:
-        _schedule_terminal_combat_options(actor)
-    # A field cast whose opening ended the encounter at once is a combat
-    # ending too (skillbook-authoritative-casting); an ordinary utility cast
-    # or a continuing opening round schedules nothing. The flag is internal
-    # adapter data that ``_normalize_result`` never copies to the wire.
-    if (
-        result["outcome"] == "success"
-        and action_id == _FIELD_CAST_ACTION_ID
-        and value.get("field_combat_terminal") is True
-    ):
-        _schedule_terminal_combat_options(actor)
     return None
 
 
@@ -744,70 +694,6 @@ def _completion(request_id: str, result: dict[str, Any]) -> PublicationCompletio
         return _result_envelope(epoch, request_id, owned, revision)
 
     return PublicationCompletion(request_id=request_id, result=owned, envelope=envelope)
-
-
-def _schedule_dialogue_options(
-    session: Any,
-    actor: Any,
-    coordinator: PresentationCoordinator,
-) -> None:
-    """Fire-and-forget the action-options generation after a talk completion.
-
-    The dispatcher-held session is the sole watcher and the coordinator epoch
-    is captured at publication time, so the service publishes through the
-    correct sequence. The scheduling call is fire-and-forget by contract; any
-    synchronous failure is logged as a bounded diagnostic and swallowed so
-    publication is never delayed or altered.
-    """
-    try:
-        from server.option_proposal_service import schedule_action_options
-
-        schedule_action_options(
-            actor,
-            watchers=((session, coordinator.epoch),),
-        )
-    except Exception as error:
-        log_warn(
-            "action_options_schedule_failed",
-            context={
-                "surface": "dialogue-reply",
-                "session": getattr(session, "sessid", "?"),
-            },
-            exc=error,
-        )
-
-
-def _schedule_terminal_combat_options(actor: Any) -> None:
-    """Fire-and-forget the exploration options trigger after terminal combat.
-
-    Runs only after the dispatcher has published the terminal completion
-    presentation and the action result, and only when the successful combat
-    action actually returned the actor to exploration — a non-terminal round
-    leaves the session active, so nothing schedules. Every live watcher of the
-    actor (``watchers_for(actor)``) is refreshed, not just the initiating
-    session. Fire-and-forget by contract: any synchronous failure is logged
-    as a bounded diagnostic and swallowed.
-    """
-    try:
-        from server.option_proposal_service import schedule_action_options
-        from web.webclient.presentation.affordances import in_exploration_mode
-        from web.webclient.presentation.watchers import watchers_for
-
-        if not in_exploration_mode(actor):
-            return
-        schedule_action_options(
-            actor,
-            watchers=watchers_for(actor),
-        )
-    except Exception as error:
-        log_warn(
-            "action_options_schedule_failed",
-            context={
-                "surface": "terminal-combat",
-                "char": str(getattr(actor, "pk", "?")),
-            },
-            exc=error,
-        )
 
 
 def _normalize_result(value: dict[str, Any]) -> dict[str, Any]:

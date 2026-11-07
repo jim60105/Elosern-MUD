@@ -106,7 +106,6 @@ def _imports_state_writer(tree: ast.Module) -> list[str]:
 
 class AiTransportBoundaryTests(unittest.TestCase):
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
-    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_only_client_py_imports_a_live_transport(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -145,7 +144,6 @@ class AiTransportBoundaryTests(unittest.TestCase):
 
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
     @covers_requirement("persona-dialogue-injection::persona-wiring-is-read-only-and-value-passing")
-    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_no_ai_module_imports_a_state_writer(self):
         for module_path in _production_module_paths(AI_ROOT):
             tree = ast.parse(module_path.read_text(encoding="utf-8"))
@@ -169,7 +167,6 @@ class AiTransportBoundaryTests(unittest.TestCase):
 
     @covers_requirement("fake-llm-client::generative-layer-tests-never-contact-a-live-endpoint")
     @covers_requirement("scenario-director::the-scenario-director-layer-preserves-the-single-writer-and-transport-boundaries")
-    @covers_requirement("action-options-layer::the-layer-is-strictly-proposal-only")
     def test_generative_module_source_has_no_socket_imports(self):
         for module_path in [
             *_production_module_paths(AI_ROOT),
@@ -179,28 +176,6 @@ class AiTransportBoundaryTests(unittest.TestCase):
             with self.subTest(module=module_path.as_posix()):
                 self.assertNotIn("import socket", source)
                 self.assertNotIn("from socket", source)
-
-    @covers_requirement("action-options-trigger-hooks::every-trigger-is-fire-and-forget-non-raising-and-non-mutating")
-    def test_generative_layer_never_references_the_triggers_or_the_scheduling_api(self):
-        """The trigger call sites and the scheduling API live outside
-        ``world/ai``: no module under the generative layer may name the
-        service, its scheduling entry point, or the watcher registry
-        (action-options-trigger-hooks requirement 5 scenario)."""
-        forbidden = (
-            "option_proposal_service",
-            "schedule_action_options",
-            "watchers_for",
-            "web.webclient.presentation.watchers",
-        )
-        for module_path in _production_module_paths(AI_ROOT):
-            source = module_path.read_text(encoding="utf-8")
-            with self.subTest(module=module_path.as_posix()):
-                for fragment in forbidden:
-                    self.assertNotIn(
-                        fragment,
-                        source,
-                        f"{module_path} must not reference {fragment}",
-                    )
 
     @covers_requirement("scenario-director::the-scenario-director-name-inspiration-reads-the-namegen-rule-layer-without-crossing-the-single-writer-boundary")
     def test_read_only_allowlist_is_exactly_the_two_pure_rule_modules(self):

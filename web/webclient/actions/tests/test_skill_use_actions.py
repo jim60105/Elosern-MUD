@@ -484,7 +484,6 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertGreater(self._tick(), tick_before)
         # Completion retires the preview selection.
         self.assertEqual(envelope["panels"]["skill_use"]["available"], False)
-        self.assertNotIn("field_combat_terminal", result)
 
     def test_none_and_self_carry_no_target_authority(self):
         for key in (_T_NONE, _T_SELF):
@@ -556,8 +555,8 @@ class FieldCastActionTests(_SkillUseCase):
     @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
     def test_waiting_seed_keeps_the_fight_open_without_terminal_options(self):
         # A party opening seeds the initiating entry and waits: the browser
-        # route reports the draft, schedules no terminal options, and the
-        # fight is published as a live combat view with nothing spent yet.
+        # route reports the draft and the fight is published as a live combat
+        # view with nothing spent yet.
         from world.rules.party import join_party
 
         companion = self._npc("seeded companion")
@@ -569,15 +568,11 @@ class FieldCastActionTests(_SkillUseCase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=50),
             patch("world.rules.combat.damage.roll_d100", return_value=50),
             patch("world.rules.combat.rounds.roll_d100", return_value=50),
-            patch("web.webclient.actions.dispatcher._schedule_terminal_combat_options") as schedule,
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = self._act("explore.cast", payload)
         self.assertEqual(result["outcome"], "success", result)
         self.assertEqual(result["code"], "draft")
-        # ``field_combat_terminal`` is internal wire-invisible state, so the
-        # waiting seed's evidence is the scheduler it never arms.
-        schedule.assert_not_called()
         record = read_session(self.player)
         self.assertIsNotNone(record)
         self.assertEqual(record.rounds_elapsed, 0)
@@ -603,12 +598,11 @@ class FieldCastActionTests(_SkillUseCase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("web.webclient.actions.dispatcher._schedule_terminal_combat_options") as schedule,
             self.captureOnCommitCallbacks(execute=True),
         ):
             result = self._act("explore.cast", payload)
             # A duplicate delivery replays the cached result and never
-            # re-schedules (or re-settles) anything.
+            # re-settles anything.
             replay = {
                 "protocol_version": 1,
                 "presentation_epoch": self.coordinator.epoch,
@@ -620,8 +614,6 @@ class FieldCastActionTests(_SkillUseCase):
             handle_ui_action(self.session, self.player, replay, self.action_registry, self.registry)
         self.assertEqual(result["outcome"], "success", result)
         self.assertEqual(result["code"], "victory")
-        self.assertNotIn("field_combat_terminal", result)
-        schedule.assert_called_once_with(self.player)
         snapshots = [call for call in self.session.sent if "ui_snapshot" in call]
         envelope = snapshots[-1]["ui_snapshot"][0][0]
         # No transient combat view: the snapshot is already settled exploration.

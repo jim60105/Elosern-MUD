@@ -797,8 +797,8 @@ if isinstance(_secret_profiles, Mapping):
     }
 
 # Validate the effective profile map after every settings override, so a
-# misconfigured action_options structured-output slot fails at startup rather
-# than at the first live call, even when it arrives via secret_settings.
+# profile outside the generic bounds fails at startup rather than at the first
+# live call, even when it arrives via secret_settings.
 build_profiles(LLM_PROFILES)
 
 # Derived (not configurable): the store extension for the EFFECTIVE output

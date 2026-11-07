@@ -260,63 +260,6 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTestCase):
         # The emitted envelope is exactly the schema-valid result envelope.
         validate_ui_action_result(self.session.sent[-1]["ui_action_result"][0][0])
 
-    def test_terminal_combat_schedules_exploration_options_once(self):
-        self.monster.traits.hp.current = 1
-        engage(self.player, self.monster)
-        coordinator = self._coordinator()
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
-            patch("world.rules.combat.damage.roll_d100", return_value=100),
-            patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.action.gates.roll_d100", return_value=100),
-            patch(
-                "server.option_proposal_service.schedule_action_options"
-            ) as schedule,
-        ):
-            result = self._dispatch(
-                coordinator,
-                "combat.command",
-                self._command_payload(
-                    {
-                        "kind": "skill",
-                        "payload": {
-                            "skill_key": BASIC_ATTACK_KEY,
-                            "target_ids": [self.monster.pk],
-                        },
-                    }
-                ),
-            )
-        self.assertEqual(result["code"], "combat_terminal", result)
-        self.assertEqual(schedule.call_count, 1)
-
-    def test_nonterminal_round_schedules_no_exploration_options(self):
-        engage(self.player, self.monster)
-        coordinator = self._coordinator()
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
-            patch("world.rules.combat.damage.roll_d100", return_value=1),
-            patch("world.rules.combat.rounds.roll_d100", return_value=1),
-            patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch(
-                "server.option_proposal_service.schedule_action_options"
-            ) as schedule,
-        ):
-            result = self._dispatch(
-                coordinator,
-                "combat.command",
-                self._command_payload(
-                    {
-                        "kind": "skill",
-                        "payload": {
-                            "skill_key": _T_SINGLE,
-                            "target_ids": [self.monster.pk],
-                        },
-                    }
-                ),
-            )
-        self.assertEqual(result["code"], "round_committed", result)
-        self.assertEqual(schedule.call_count, 0)
-
     # -- admission and rejection -----------------------------------------
 
     @covers_requirement(

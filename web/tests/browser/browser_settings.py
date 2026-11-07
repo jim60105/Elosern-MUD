@@ -246,15 +246,12 @@ ART_SCHEDULER_LIMIT = 4
 # developer settings, so every knob the deterministic core reads must be
 # declared here.
 DEFEAT_ADULT_SCENES = True
-# Disable dialogue transport and ordinary room-entry options generation.
-# The dedicated options fixture enables its deterministic replay client only.
-# Free-form dialogue uses the authored greeting/silence; other browser journeys
-# use the options service's rule-card fallback without contacting a live LLM.
+# Disable dialogue transport. Free-form dialogue uses the authored
+# greeting/silence, so no browser journey contacts a live LLM.
 from world.ai.profiles import default_profiles  # noqa: E402
 
 _LLM_PROFILES = default_profiles()
 _LLM_PROFILES["npc_dialogue"]["enabled"] = False
-_LLM_PROFILES["action_options"]["enabled"] = False
 LLM_PROFILES = _LLM_PROFILES
 
 

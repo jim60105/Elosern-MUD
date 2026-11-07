@@ -10,7 +10,7 @@ re-validated by ``remove_epithet`` at execution. Each validator enforces an
 exact bounded payload shape; each adapter calls only the rules-layer writers
 (``world.rules.titles``) and never assigns attributes directly. A successful
 answer declares its affected panels so the completion publication re-renders
-them immediately — the targeted-update precedent set by ``options.dismiss``.
+them immediately — the targeted-update precedent.
 The rejection messages mirror the telnet ``title`` command surface
 (``commands/title.py``) verbatim so both faces speak one line.
 """

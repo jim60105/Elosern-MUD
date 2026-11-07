@@ -191,8 +191,6 @@ class DefaultBootTests(_LlmSubprocessTests):
             ("narrator", "frequency_penalty"),
             ("narrator", "reasoning_enabled"),
             ("narrator", "api_key"),
-            ("action_options", "max_tokens"),
-            ("action_options", "supports_response_format"),
             ("title_nomination", "max_tokens"),
         ]
         printed = self._fields(wanted)
@@ -208,8 +206,6 @@ class DefaultBootTests(_LlmSubprocessTests):
         self.assertEqual(printed[("narrator", "frequency_penalty")], "'<ABSENT>'")
         self.assertEqual(printed[("narrator", "reasoning_enabled")], "'<ABSENT>'")
         self.assertEqual(printed[("narrator", "api_key")], "'<ABSENT>'")
-        self.assertEqual(printed[("action_options", "max_tokens")], "320")
-        self.assertEqual(printed[("action_options", "supports_response_format")], "True")
         self.assertEqual(printed[("title_nomination", "max_tokens")], "640")
 
     @covers_requirement(
@@ -414,13 +410,13 @@ class PrecedenceTests(_LlmSubprocessTests):
     def test_per_layer_max_tokens_override_preserves_other_layers(self):
         printed = self._fields(
             [
-                ("action_options", "max_tokens"),
+                ("dialogue_summary", "max_tokens"),
                 ("title_nomination", "max_tokens"),
                 ("narrator", "max_tokens"),
             ],
-            LLM_ACTION_OPTIONS_MAX_TOKENS="400",
+            LLM_DIALOGUE_SUMMARY_MAX_TOKENS="400",
         )
-        self.assertEqual(printed[("action_options", "max_tokens")], "400")
+        self.assertEqual(printed[("dialogue_summary", "max_tokens")], "400")
         self.assertEqual(printed[("title_nomination", "max_tokens")], "640")
         self.assertEqual(printed[("narrator", "max_tokens")], "250")
 
@@ -436,7 +432,7 @@ class TestSettingsSanitizationTests(_LlmSubprocessTests):
                 "sys.argv = ['evennia', 'test']",
                 "import server.conf.test_settings as t",
                 "print('MODEL', repr(t.LLM_PROFILES['narrator']['model']))",
-                "print('AOTOK', repr(t.LLM_PROFILES['action_options']['max_tokens']))",
+                "print('SDTOK', repr(t.LLM_PROFILES['story_director']['max_tokens']))",
                 "print('HOST', repr(t.LLM_PROFILES['narrator']['base_url']))",
             ]
         )
@@ -444,13 +440,13 @@ class TestSettingsSanitizationTests(_LlmSubprocessTests):
             code,
             MUD_TEST_SETTINGS="1",
             LLM_MODEL="poisoned",
-            LLM_ACTION_OPTIONS_MAX_TOKENS="999",
+            LLM_STORY_DIRECTOR_MAX_TOKENS="999",
             LLM_BASE_URL="http://poisoned:1",
             OLLAMA_BASE_URL="http://old-poison:1",
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("MODEL 'llama3.2'", result.stdout)
-        self.assertIn("AOTOK 320", result.stdout)
+        self.assertIn("SDTOK 1536", result.stdout)
         self.assertIn("HOST 'http://127.0.0.1:11434'", result.stdout)
 
 
@@ -500,7 +496,7 @@ class SecretMergeTests(_LlmSubprocessTests):
             "import server.conf.settings as s\n"
             + _raw_field("character_creation", "model")
             + "\n"
-            + _raw_field("action_options", "max_tokens")
+            + _raw_field("dialogue_summary", "max_tokens")
             + "\n"
             + _raw_field("narrator", "model")
             + "\n"
@@ -510,7 +506,7 @@ class SecretMergeTests(_LlmSubprocessTests):
         result = self._run(
             code,
             LLM_MODEL="llama3.2",
-            LLM_ACTION_OPTIONS_MAX_TOKENS="400",
+            LLM_DIALOGUE_SUMMARY_MAX_TOKENS="400",
             LLM_BASE_URL="http://env-host:8000",
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
@@ -518,7 +514,7 @@ class SecretMergeTests(_LlmSubprocessTests):
             result.stdout,
             {
                 ("character_creation", "model"),
-                ("action_options", "max_tokens"),
+                ("dialogue_summary", "max_tokens"),
                 ("narrator", "model"),
                 ("narrator", "base_url"),
             },
@@ -526,7 +522,7 @@ class SecretMergeTests(_LlmSubprocessTests):
         # Secret layer: wholesale from the secret entry.
         self.assertEqual(printed[("character_creation", "model")], repr("secret-model"))
         # Environment layers survive.
-        self.assertEqual(printed[("action_options", "max_tokens")], "400")
+        self.assertEqual(printed[("dialogue_summary", "max_tokens")], "400")
         self.assertEqual(printed[("narrator", "model")], repr("llama3.2"))
         self.assertEqual(printed[("narrator", "base_url")], repr("http://env-host:8000"))
 

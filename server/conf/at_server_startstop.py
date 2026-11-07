@@ -74,7 +74,6 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_scenario_director_layer",
     "register_character_creation_layer",
     "register_scene_flavor_layer",
-    "register_action_options_layer",
     "register_title_nomination_layer",
     "register_story_director_layer",
     "register_nomination_triggers",
@@ -159,7 +158,7 @@ def at_server_init():
     pass
 
 
-def _conflict_classes(*, schema: bool = False, profile: bool = False):
+def _conflict_classes(*, schema: bool = False):
     """Resolve the tolerated registration-conflict classes (pre-refactor, the
     registration helpers imported them inside their own bodies; resolving them
     lazily keeps those imports off the path of every earlier startup step).
@@ -171,14 +170,10 @@ def _conflict_classes(*, schema: bool = False, profile: bool = False):
         from world.ai.schemas.registry import DuplicateSchemaError
 
         classes.append(DuplicateSchemaError)
-    if profile:
-        from world.ai.profiles import UnknownLayerError
-
-        classes.append(UnknownLayerError)
     return tuple(classes)
 
 
-def _tolerant_register(name: str, register, *, schema: bool = False, profile: bool = False) -> bool:
+def _tolerant_register(name: str, register, *, schema: bool = False) -> bool:
     """Register one guardrail layer, preserving the seam-level tolerance contract.
 
     The registration seams are called both from ``at_server_start`` (through
@@ -189,7 +184,7 @@ def _tolerant_register(name: str, register, *, schema: bool = False, profile: bo
     ``False`` is returned so the wrapper skips its success event. Anything else
     propagates unchanged.
     """
-    classes = _conflict_classes(schema=schema, profile=profile)
+    classes = _conflict_classes(schema=schema)
     try:
         register()
     except classes as exc:
@@ -326,29 +321,6 @@ def _register_scene_flavor_layer():
     from world.ai.scene_flavor import register_scene_flavor
 
     return _tolerant_register("register_scene_flavor_layer", register_scene_flavor)
-
-
-def _register_action_options_layer():
-    """Register the action_options layer's guardrail hooks.
-
-    Called from ``at_server_start`` for the same reason as
-    ``_register_narrator_layer``: ``world.ai.guardrail`` captures the logger at
-    import time, so registration must happen after ``evennia._init()``. The
-    registration is boot-tolerant: a foreign leftover action_options
-    registration (a conflicting fallback or output schema) must never abort
-    server startup. Unlike the other layers, the ``action_options`` profile
-    slot (``LAYER_NAMES``) arrives with the prompts change, so a branch that
-    lands this wiring first must also survive ``UnknownLayerError`` with a
-    bounded warning-and-skip — the same warning-and-skip applies to
-    ``DuplicateSchemaError``/``GuardrailRegistrationError`` as with the other
-    layers. The proposal gate still fails loudly on a non-action_options
-    registration, so correctness is preserved.
-    """
-    from world.ai.action_options import register_action_options
-
-    return _tolerant_register(
-        "register_action_options_layer", register_action_options, schema=True, profile=True
-    )
 
 
 def _register_title_nomination_layer():
@@ -628,9 +600,6 @@ def at_server_start():
         fail_loud=False,
     )
     _startup_step("register_scene_flavor_layer", _register_scene_flavor_layer, fail_loud=False)
-    _startup_step(
-        "register_action_options_layer", _register_action_options_layer, fail_loud=False
-    )
     _startup_step(
         "register_title_nomination_layer",
         _register_title_nomination_layer,

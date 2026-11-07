@@ -169,10 +169,10 @@ decides how identity reads. It exports:
 
 ## Story and quest surfaces
 
-**LLM context.** `monster_entries` in
-`server/option_proposal_service/situation.py` adds `individual_name`,
-`species_name` and `variant_name`, so a prompt can treat a named boss as a
-specific creature and keeps the variant it previously saw through `key`.
+**LLM context.** The monster record carries `individual_name`, `species_name`
+and `variant_name`, so any surviving proposal or presentation consumer can
+treat a named boss as a specific creature and keep the variant it previously
+saw through `key`.
 
 **Event data.** `world/rules/action/event_log.py` and `world/rules/upkeep.py`
 already record `species_key` and `variant_key` for a species-backed target. Both

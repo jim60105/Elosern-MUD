@@ -66,8 +66,8 @@ Unchanged:
 ### 2.3 Record shapes
 
 Every LLM call goes through `world/ai/guardrail.py` `guarded_call()` (the
-`option_proposal_service` and `world/narrative/epochs.py` wrappers only wrap
-the inner client), so the guardrail and the transport are the only writers.
+`world/narrative/epochs.py` wrapper only wraps the inner client), so the
+guardrail and the transport are the only writers.
 
 `call_id` is `uuid4().hex`, generated once at the start of `guarded_call`.
 `ChatRequestDescriptor` gains optional `call_id` and `attempt` fields so the
@@ -198,7 +198,7 @@ The S1 總覽 view becomes the dashboard.
 | layer  呼叫  降級率  p95  最近成功 | 第 12 日 黃昏 · tick 98231  |
 | …                               | 線上 1 · 戰鬥 0 · 副本 2    |
 + 最近 LLM 呼叫（點選檢視 payload）-+ 美術佇列 -------------------+
-| 12:34:36 action_options ok 8.1s | 等待 3 · 進行中 1 · 失敗 2  |
+| 12:34:36 npc_dialogue ok 8.1s   | 等待 3 · 進行中 1 · 失敗 2  |
 + 最近警告與錯誤 -----------------+-----------------------------+
 | 12:40 [error] <event> | <caller> | k=v tb: …                  |
 +--------------------------------------------------------------+

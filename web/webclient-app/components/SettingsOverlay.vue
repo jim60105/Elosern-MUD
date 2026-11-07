@@ -3,9 +3,8 @@
 // shared full-screen overlay surface. The modal chrome now belongs to the
 // OverlayHost (header, close control, focus trap). The settings are
 // client-local presentation state (webclient-component-showcase delta): no
-// settings control dispatches a `ui_action` — `options.dismiss` remains the
-// only allowlisted `options.*` action, and this wave does not touch the
-// allowlist.
+// settings control dispatches a `ui_action`, no `options.*` action is
+// allowlisted, and this wave does not touch the allowlist.
 //
 // Controls (task 7.2–7.4): the narrative prose scale as the draft's
 // A−/A/A+ segmented control, re-stepped by retarget-desktop-viewport-contract

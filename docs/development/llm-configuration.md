@@ -56,7 +56,7 @@ flowchart LR
 | :--- | :---: | :---: | :--- |
 | `MODEL` | 字串 | `llama3.2` | 呼叫的模型標籤或名稱。 |
 | `TEMPERATURE` | 浮點數 | `0.7` | 採樣溫度（0.0～2.0）。數值愈低愈穩定，愈高愈具隨機創造力。 |
-| `MAX_TOKENS` | 整數 | 視層級而定 | 回傳最大 Token 數（一般層預設 250，`action_options` 為 320，`title_nomination` 為 640，`scenario_director` 為 8192，`story_director` 為 1536，`dialogue_summary` 與 `correspondence` 為 1024，`dream` 為 3072）。 |
+| `MAX_TOKENS` | 整數 | 視層級而定 | 回傳最大 Token 數（一般層預設 250，`title_nomination` 為 640，`scenario_director` 為 8192，`story_director` 為 1536，`dialogue_summary` 與 `correspondence` 為 1024，`dream` 為 3072）。 |
 | `MAX_COMPLETION_TOKENS` | 整數 | 省略 | 若設定此值，將取代 `max_tokens` 傳出（OpenAI 新版 API 相容）。 |
 | `TOP_P` | 浮點數 | 省略 | 核採樣機率閾值（0.0～1.0）。 |
 | `TOP_K` | 整數 | 省略 | Top-K 採樣限制（正整數）。 |
@@ -73,7 +73,7 @@ flowchart LR
 | :--- | :---: | :---: | :--- |
 | `REASONING_EFFORT` | 選擇 | 省略 | 思考強度，可選值：`minimal`、`low`、`medium`、`high`。 |
 | `REASONING_STYLE` | 選擇 | `off` | 推理格式封裝：`openrouter`（嵌套物件）、`vllm`（`chat_template_kwargs`）、`off`（不傳送）。 |
-| `SUPPORTS_RESPONSE_FORMAT` | 布林 | 視層級而定 | 是否支援結構化 JSON 輸出（`action_options` 強制要求 `True`）。 |
+| `SUPPORTS_RESPONSE_FORMAT` | 布林 | `False` | 是否支援結構化 JSON 輸出。 |
 
 ---
 
@@ -95,13 +95,6 @@ LLM_TEMPERATURE=0.7
 LLM_SCENARIO_DIRECTOR_MODEL=qwen2.5:32b
 LLM_SCENARIO_DIRECTOR_TEMPERATURE=0.3
 LLM_SCENARIO_DIRECTOR_TIMEOUT_SECONDS=120
-
-# ==============================================================================
-# 行動建議卡片（ActionOptions）：要求極低延遲與穩定 JSON 輸出
-# ==============================================================================
-LLM_ACTION_OPTIONS_MODEL=qwen2.5:7b
-LLM_ACTION_OPTIONS_TEMPERATURE=0.2
-LLM_ACTION_OPTIONS_TIMEOUT_SECONDS=15
 
 # ==============================================================================
 # NPC 對話（NPCDialogue）：要求豐富的情感表達與台詞文采

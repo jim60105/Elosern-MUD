@@ -27,10 +27,8 @@ DEFAULT_CHAT_PATH = "/v1/chat/completions"
 DEFAULT_MODEL = "llama3.2"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 250
-ACTION_OPTIONS_MAX_TOKENS = 320
-# 5-candidate ``{display, basis}`` JSON payload (change G); sized like the
-# action-options payload with headroom for 80-character Traditional-Chinese
-# basis quotes.
+# 5-candidate ``{display, basis}`` JSON payload (change G); sized with
+# headroom for 80-character Traditional-Chinese basis quotes.
 TITLE_NOMINATION_MAX_TOKENS = 640
 # A quest blueprint whose (at most three) occupants each carry a complete
 # compact card of about 800 rendered code points costs roughly 5,800 output
@@ -60,13 +58,6 @@ REASONING_STYLES: tuple[str, ...] = ("openrouter", "vllm", "off")
 # api_key stays the single credential route (design D-A5).
 CREDENTIAL_HEADER_NAMES = frozenset(
     {"authorization", "proxy-authorization", "x-api-key", "api-key"}
-)
-
-# The only generative layer that consumes JSON-schema structured output; its
-# profile must declare the capability at construction time (pipeline design
-# doc §5), enforced per layer in ``build_profiles``.
-REQUIRED_PROFILE_FLAGS: Mapping[str, Mapping[str, bool]] = MappingProxyType(
-    {"action_options": {"supports_response_format": True}}
 )
 
 
@@ -282,11 +273,9 @@ def default_profiles(
     the bare-metal localhost code default, and ``server/conf/settings.py``
     injects its environment-resolved per-layer field overrides through
     ``defaults``. ``supports_response_format`` defaults false because design §7.5 only
-    requests structured output when the endpoint declares support; the
-    ``action_options`` layer is the single exception and always defaults to
-    the capability on, with ``max_tokens`` sized for a 5-card JSON payload
-    (pipeline design doc §5). ``title_nomination``, ``scenario_director`` and
-    ``story_director`` carry their own larger output budgets.
+    requests structured output when the endpoint declares support.
+    ``title_nomination``, ``scenario_director`` and ``story_director`` carry
+    their own larger output budgets.
     """
     profiles = {
         layer: {
@@ -302,11 +291,6 @@ def default_profiles(
             "enabled": True,
         }
         for layer in LAYER_NAMES
-    }
-    profiles["action_options"] = {
-        **profiles["action_options"],
-        "max_tokens": ACTION_OPTIONS_MAX_TOKENS,
-        "supports_response_format": True,
     }
     profiles["title_nomination"] = {
         **profiles["title_nomination"],
@@ -352,8 +336,7 @@ def build_profiles(
     duplicate layer keys can be detected. Unknown layers are rejected, every
     profile is validated against every bound, and any registered layer missing
     from the source falls back to the local-first default so the registry maps
-    exactly the registered layer names. Per-layer required flags (``action_options``
-    must declare structured output) are enforced after the generic bounds.
+    exactly the registered layer names.
     """
     if isinstance(raw_profiles, Mapping):
         entries = list(raw_profiles.items())
@@ -371,13 +354,6 @@ def build_profiles(
     profiles: dict[str, LLMProfile] = {}
     for layer, values in merged.items():
         validate_profile_values(layer, values)
-        for field, required in REQUIRED_PROFILE_FLAGS.get(layer, {}).items():
-            if values.get(field) is not required:
-                raise ProfileValidationError(
-                    layer,
-                    field,
-                    f"must be {required!r} for the {layer!r} layer",
-                )
         profiles[layer] = LLMProfile(**dict(values))
     return MappingProxyType(profiles)
 

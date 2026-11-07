@@ -54,13 +54,13 @@ The browser SHALL resolve, for every button-triggered mutation submission, exact
 
 #### Scenario: The silent presentation control emits nothing
 
-- **WHEN** the catalog is asked for `options.dismiss`
-- **THEN** it returns `null` and no narrative line is appended
+- **WHEN** the catalog is asked for any declared silent presentation control (the account create/switch actions, the name roll, and the dialogue leave)
+- **THEN** it returns `null` and no narrative line is appended, and the retired `options.dismiss` is not among them
 
 #### Scenario: The silent control is a pure visibility control
 
-- **WHEN** the declared silent presentation control `options.dismiss` is examined
-- **THEN** it is a UI visibility control with no game action and no typed equivalent
+- **WHEN** the declared silent presentation controls are examined
+- **THEN** each is a control with no typed-command equivalent and no game action of its own, and no `options.*` action is declared or registered
 
 #### Scenario: The display descriptor is a bounded label bundle from menu-build time
 
@@ -73,6 +73,7 @@ The browser SHALL resolve, for every button-triggered mutation submission, exact
 - **THEN** it is pure and deterministic — no `document`/`window`, no storage, no transport, no network
 
 #### Scenario: Every registered mutation action is a supported action
+
 - **WHEN** the catalog is asked for any registered mutation action other than the explicitly declared silent presentation controls
 - **THEN** it returns a non-empty bounded string
 
@@ -262,7 +263,7 @@ The display command line SHALL be strictly input-side and presentation-only. It 
 
 ### Requirement: Catalog coverage is pinned against the action registry
 
-The test suites SHALL pin the command-line catalog's coverage of the action registry: the Node catalog suite SHALL enumerate every registered mutation action id and assert each one either resolves to a non-empty bounded line from a pinned fixture or appears on the declared silent presentation-control list, so a newly registered action cannot ship with a silent catalog gap.
+The test suites SHALL pin the command-line catalog's coverage of the action registry: the Node catalog suite SHALL enumerate every registered mutation action id and assert each one resolves to a non-empty bounded line from a pinned fixture, so a newly registered action cannot ship with a silent catalog gap.
 
 #### Scenario: A new registered action without catalog coverage fails the gate
 
@@ -274,10 +275,11 @@ The test suites SHALL pin the command-line catalog's coverage of the action regi
 
 #### Scenario: Silent status is an explicit declaration
 
-- **WHEN** the Node coverage test processes `options.dismiss`
-- **THEN** it asserts the id is on the silent presentation-control list and
-  resolves to `null`, and any other registered mutation action is required to
-  resolve non-null
+- **WHEN** the Node coverage test processes the retired `options.dismiss` id
+- **THEN** it asserts the id is absent from both the production registry and the
+  silent presentation-control list, and that every other registered mutation
+  action resolves non-null unless it is one of the explicitly declared silent
+  controls
 
 #### Scenario: The registry mirrors the enumerated set
 
@@ -292,7 +294,7 @@ The test suites SHALL pin the command-line catalog's coverage of the action regi
 #### Scenario: The pins complement the per-surface test table
 
 - **WHEN** the dispatch requirement's per-surface behavioral test table is considered
-- **THEN** these pins complement — and never replace — that table, where every dispatch surface (and every intentional silence) is a reviewed row and the set of action ids exercised by that table covers every registered mutation id except the silent presentation controls
+- **THEN** these pins complement — and never replace — that table, where every dispatch surface (and every intentional silence) is a reviewed row and the set of action ids exercised by that table covers every registered mutation id
 
 ### Requirement: The full-log surface opens at its latest line
 Whenever the full-log surface opens, it SHALL present the most recent retained narrative line in view, with its scroll region scrolled to the end of its content, so the player sees the latest one or two replies without scrolling. The scroll region is the log's one scrolling box inside its frame; it SHALL take the initial focus, so the reading keys scroll it at once.

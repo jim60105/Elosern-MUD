@@ -621,17 +621,16 @@ test("explore.cast with empty or non-array targetLabels falls back like before",
   );
 });
 
-test("options.dismiss is a declared silent presentation control", () => {
-  assert.ok(Echo.SILENT_PRESENTATION_CONTROLS.indexOf("options.dismiss") !== -1);
+test("declared silent presentation controls emit no line", () => {
   assert.ok(Echo.SILENT_PRESENTATION_CONTROLS.indexOf("creation.roll_name") !== -1);
   assert.ok(
     Echo.SILENT_PRESENTATION_CONTROLS.indexOf("explore.dialogue_leave") !== -1,
     "align-11: the exit control has no typed echo (no farewell command exists)"
   );
   assert.strictEqual(Echo.commandLine("explore.dialogue_leave", { npc_id: 3 }, {}), null);
-  assert.strictEqual(Echo.isSilentPresentationControl("options.dismiss"), true);
+  assert.strictEqual(Echo.isSilentPresentationControl("creation.roll_name"), true);
   assert.strictEqual(
-    Echo.commandLine("options.dismiss", {}, { npcLabel: "老闆" }),
+    Echo.commandLine("creation.roll_name", {}, { npcLabel: "老闆" }),
     null,
     "the silence is by declaration, not an accidental missing resolver"
   );
@@ -722,7 +721,6 @@ const REGISTERED_MUTATION_ACTIONS = {
   "guild.register": { payload: { npc_id: 61 }, display: {} },
   "inventory.toggle_equip": { payload: { item_key: "leather_vest", actor_id: 7 }, display: {} },
   "inventory.use": { payload: { item_key: SYNTH_ITEM.id }, display: {} },
-  "options.dismiss": null,
   "party.transfer": null,
   "party.view_member": null,
   "map.view": null,

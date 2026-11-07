@@ -2,9 +2,9 @@
 
 ``reject_mutable_containers`` is the single copy of the recursive
 ``dict``/``list``-under-``value`` refusal used by the proposal dataclasses
-in ``world/ai/action_options.py`` and ``world/ai/scenario_director.py``, so
-a fix or tightening of the immutability gate applies to every layer at
-once. Imports only the dataclasses reflection helpers and ``typing`` —
+in ``world/ai/scenario_director.py``, so a fix or tightening of the
+immutability gate applies to every layer at once. Imports only the dataclasses
+reflection helpers and ``typing`` —
 no Evennia, jsonschema, or transport surface — preserving the
 import-boundary contracts of its consumers.
 """
