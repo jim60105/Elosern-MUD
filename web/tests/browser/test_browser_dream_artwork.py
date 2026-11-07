@@ -118,8 +118,34 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         return ((panel.get("scene") or {}).get("artwork")) or None
 
     def displayed(self, page) -> str:
+        """The stage's one presented layer, once the shared walk has settled."""
         image = page.locator(ART_IMAGE)
-        assert image.count() == 1, "the dream stage presents exactly one layer"
+        # The artwork lifecycle attaches the layer only after it walks the
+        # committed descriptor's positions and the browser resolves the bytes,
+        # so an open panel does not yet imply a layer. A reached failure marker
+        # is no settle point either: the required bundled stand-in may still be
+        # loading beside it. Wait for the presented layer itself; the failure
+        # marker and the descriptor only explain a run that never presents one.
+        try:
+            page.wait_for_selector(ART_IMAGE, timeout=60000)
+        except PlaywrightTimeoutError as error:
+            marker = page.locator(ART_FAILURE)
+            raise AssertionError(
+                "the dream stage never presented a layer: failure={failure!r} "
+                "attempts={attempts}".format(
+                    failure=marker.inner_text() if marker.count() else None,
+                    attempts=self.descriptor(page)["attempts"],
+                )
+            ) from error
+        layers = image.count()
+        failure = page.locator(ART_FAILURE)
+        assert layers == 1, (
+            "the dream stage presents exactly one layer, found {layers}; "
+            "failure={failure!r}".format(
+                layers=layers,
+                failure=failure.inner_text() if failure.count() else None,
+            )
+        )
         return image.get_attribute("src")
 
     # --- the journey -----------------------------------------------------
@@ -187,7 +213,8 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         marker = page2.locator(ART_FAILURE)
         marker.wait_for(state="visible", timeout=60000)
         self.assertTrue(marker.inner_text().strip())
-        self.assertTrue(self.displayed(page2).startswith(BUNDLED_PREFIX), self.displayed(page2))
+        shown2 = self.displayed(page2)
+        self.assertTrue(shown2.startswith(BUNDLED_PREFIX), shown2)
         # The failure is the browser's OWN local observation, so the committed
         # server descriptor is unchanged: it still carries the admitted
         # preferred image and no fault at all. Only the rendered marker states
