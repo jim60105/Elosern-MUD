@@ -87,6 +87,8 @@ TRAVEL_YAML = yaml.safe_load(RULEBOOK_PATH.read_text(encoding="utf-8"))
 #: and good wilderness road share the design's 1.25 m/s calibration.
 TERRAIN_SPEEDS: Mapping[str, int] = dict(TRAVEL_YAML["terrain_meters_per_hour"])
 WILDERNESS_TERRAIN: Mapping[str, str] = dict(TRAVEL_YAML["wilderness_terrain"])
+#: The travel context of a wilderness step whose both ends are road cells.
+ROAD_TERRAIN = "road"
 
 
 class TravelRulebookError(ValueError):
@@ -588,13 +590,19 @@ def wilderness_distance_m(
 
 
 def wilderness_terrain(source_xy: tuple[int, int], destination_xy: tuple[int, int]) -> str:
-    """The slower of the two endpoint regions' terrains (symmetric edge cost).
+    """Road when both ends are road cells; else the slower region's terrain.
 
     The deterministic region model supplies one terrain key per cell; an edge
     between a forest cell and an open cell is as slow as its slower end in
     either direction, so identical physical roads charge identical durations.
+    A road step needs a road cell at both ends, and a road cell queried with
+    itself answers road, so a party standing on a road moves at road speed.
     """
 
+    from world.maps import road_network
+
+    if road_network.is_road_cell(source_xy) and road_network.is_road_cell(destination_xy):
+        return ROAD_TERRAIN
     source_region = region_for_coordinates(*source_xy)
     destination_region = region_for_coordinates(*destination_xy)
     try:
@@ -1014,6 +1022,7 @@ def log_traversal_refusal(source: str, traversing_object: Any, reason: str) -> N
 __all__ = [
     "DEPLETION_MESSAGE",
     "MovementPreflightRefused",
+    "ROAD_TERRAIN",
     "TRAVEL_YAML",
     "TERRAIN_SPEEDS",
     "TraversalCost",
