@@ -16,6 +16,7 @@ Discovery is deterministic (lexicographic canonical relative paths):
 | `content/maps/continent.yaml` | `continent` | fixed `continent` |
 | `content/maps/locations.yaml` | `locations` | fixed `locations` |
 | `content/maps/districts.yaml` | `districts` | fixed `districts` |
+| `content/maps/road_network.yaml` | `road_network` | fixed `road_network` |
 | `content/maps/settlements/<map_id>.yaml` | `settlement` | file stem |
 | `content/maps/interiors/<interior_id>.yaml` | `interior` | file stem |
 
@@ -25,7 +26,9 @@ district partition, the wilderness elevation tiles, the reference context) and a
 scanned as sources. Every document declares `version: 1` and a `kind`; the
 kind, version and fixed id or file-stem identity must agree. Unknown document
 kinds, unsupported versions, duplicate identities and missing singleton
-documents fail the whole authoring load.
+documents fail the whole authoring load. `content/maps/road_network.yaml` is the
+one exception: the road parameter document is optional, so a world without it
+still loads and reports no road parameters.
 
 All shapes are documented machine-readably: `schema()` returns a deep copy of
 the version-1 schema, and `python -m elosern_map_core schema` prints it as

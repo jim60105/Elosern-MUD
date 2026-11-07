@@ -340,6 +340,7 @@ def test_schema_is_machine_readable_and_mutation_isolated():
         "continent",
         "locations",
         "districts",
+        "road_network",
         "settlement",
         "interior",
         "layout",

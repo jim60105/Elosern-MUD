@@ -1,0 +1,13 @@
+# Wilderness road parameters (schema version 1). The offline road generator
+# reads this document; the game never computes the network at runtime.
+version: 1
+kind: road_network
+id: road_network
+node_kinds: [capital, city, port, town]
+forbidden_regions: [north_deep_forest]
+slope_factor_per_band: 0.15
+noise_amplitude: 0.15
+noise_wavelength_cells: 48
+noise_seed: 20261107
+detour_limit: 1.8
+reuse_factor: 0.4

@@ -42,6 +42,7 @@ from .documents import (
     DistrictsDocument,
     InteriorDocument,
     LocationsDocument,
+    RoadNetworkDocument,
     SettlementDocument,
     WildernessEntryGeometry,
 )
@@ -81,7 +82,9 @@ from .terrain import (
 )
 
 EXTERNAL_RESULT_VERSION = 1
-WORLD_SOURCE_KINDS = frozenset({"continent", "locations", "districts", "settlement", "interior"})
+WORLD_SOURCE_KINDS = frozenset(
+    {"continent", "locations", "districts", "road_network", "settlement", "interior"}
+)
 _OPPOSITE_DIRECTION = {
     "n": "s",
     "s": "n",
@@ -734,6 +737,7 @@ class AuthoringWorld:
     districts: DistrictsDocument
     settlements: Mapping[str, SettlementDocument]
     interiors: Mapping[str, InteriorDocument]
+    road_network: RoadNetworkDocument | None
     documents: tuple[AuthoringDocument, ...]
     fingerprints: Mapping[str, str]
     diagnostics: tuple[Diagnostic, ...]
@@ -936,8 +940,13 @@ def load_authoring_world(source_documents: Iterable[SourceDocument]) -> Authorin
             for parsed in parsed_by_kind.get("interior", [])
         }
     )
+    road_network_entries = parsed_by_kind.get("road_network", [])
+    road_network: RoadNetworkDocument | None = (
+        road_network_entries[0].document if road_network_entries else None
+    )
 
     diagnostics.extend(_structural_diagnostics(continent, locations, districts, settlements, interiors))
+    diagnostics.extend(_road_network_diagnostics(road_network, continent))
     if diagnostics:
         raise AuthoringError(sorted_diagnostics(diagnostics))
 
@@ -948,6 +957,7 @@ def load_authoring_world(source_documents: Iterable[SourceDocument]) -> Authorin
         districts=districts,
         settlements=settlements,
         interiors=interiors,
+        road_network=road_network,
         documents=tuple(sorted(documents, key=lambda item: item.relative_path)),
         fingerprints=fingerprints,
         diagnostics=(),
@@ -959,6 +969,7 @@ def load_authoring_world(source_documents: Iterable[SourceDocument]) -> Authorin
         districts=districts,
         settlements=settlements,
         interiors=interiors,
+        road_network=road_network,
         documents=world.documents,
         fingerprints=fingerprints,
         diagnostics=sorted_diagnostics(diagnostics),
@@ -1183,6 +1194,31 @@ def _structural_diagnostics(
                         object_id=interior_id,
                     )
                 )
+    return diagnostics
+
+
+def _road_network_diagnostics(
+    road_network: RoadNetworkDocument | None,
+    continent: ContinentDocument,
+) -> list[Diagnostic]:
+    """Reject every forbidden region the continent never declares."""
+
+    if road_network is None:
+        return []
+    diagnostics: list[Diagnostic] = []
+    for region in road_network.forbidden_regions:
+        if region in continent.regions:
+            continue
+        diagnostics.append(
+            _diagnostic(
+                "unknown_road_region",
+                STRUCTURE,
+                f"road parameter forbidden region {region!r} is not a declared region",
+                document=road_network,
+                field_path="forbidden_regions",
+                object_id=region,
+            )
+        )
     return diagnostics
 
 

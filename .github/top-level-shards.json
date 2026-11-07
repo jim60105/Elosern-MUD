@@ -37,6 +37,7 @@
     "tests.test_map_reference_context",
     "tests.test_map_geographic_sources",
     "tests.test_map_partition_independence",
+    "tests.test_road_network_format",
     "tests.test_map_view_boundary",
     "tests.test_map_core_contract",
     "tests.test_map_editor_generation",

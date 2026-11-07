@@ -5,8 +5,12 @@ The supported world source set is exactly::
     content/maps/continent.yaml
     content/maps/locations.yaml
     content/maps/districts.yaml
+    content/maps/road_network.yaml
     content/maps/settlements/<map_id>.yaml
     content/maps/interiors/<interior_id>.yaml
+
+``road_network.yaml`` is the one optional singleton: a world without it loads
+and simply declares no road parameters.
 
 Editor layout documents under ``content/map-editor-layouts/<interior_id>.yaml``
 are recognised by the codec but are never discovered as world snapshot inputs.
@@ -30,6 +34,7 @@ FIXED_SOURCES: dict[str, tuple[str, str]] = {
     "content/maps/continent.yaml": ("continent", "continent"),
     "content/maps/locations.yaml": ("locations", "locations"),
     "content/maps/districts.yaml": ("districts", "districts"),
+    "content/maps/road_network.yaml": ("road_network", "road_network"),
 }
 
 SOURCE_DIRECTORIES: dict[str, str] = {
@@ -87,7 +92,7 @@ def _normalise(relative_path: str) -> str | None:
 def expected_document(relative_path: str) -> tuple[str, str | None] | None:
     """Return ``(kind, identity)`` for a supported path, else ``None``.
 
-    ``identity`` is the fixed id for the three singleton documents and the file
+    ``identity`` is the fixed id for the singleton documents and the file
     stem for settlements, interiors and layouts.
     """
 

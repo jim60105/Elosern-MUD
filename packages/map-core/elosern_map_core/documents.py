@@ -489,6 +489,41 @@ class LocationsDocument(AuthoringDocument):
 
 
 @dataclass(frozen=True, slots=True)
+class RoadNetworkDocument(AuthoringDocument):
+    """The authored wilderness road parameters, read by the offline generator."""
+
+    node_kinds: tuple[str, ...] = field(init=False, repr=False)
+    forbidden_regions: tuple[str, ...] = field(init=False, repr=False)
+    slope_factor_per_band: float = field(init=False, repr=False)
+    noise_amplitude: float = field(init=False, repr=False)
+    noise_wavelength_cells: float = field(init=False, repr=False)
+    noise_seed: int = field(init=False, repr=False)
+    detour_limit: float = field(init=False, repr=False)
+    reuse_factor: float = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        data = self.data
+        object.__setattr__(
+            self, "node_kinds", tuple(str(value) for value in data["node_kinds"])
+        )
+        object.__setattr__(
+            self,
+            "forbidden_regions",
+            tuple(str(value) for value in data["forbidden_regions"]),
+        )
+        for name in (
+            "slope_factor_per_band",
+            "noise_amplitude",
+            "noise_wavelength_cells",
+            "detour_limit",
+            "reuse_factor",
+        ):
+            object.__setattr__(self, name, float(data[name]))
+        object.__setattr__(self, "noise_seed", int(data["noise_seed"]))
+
+
+@dataclass(frozen=True, slots=True)
 class DistrictsDocument(AuthoringDocument):
     districts: Mapping[str, DistrictDeclaration] = field(init=False, repr=False)
 
@@ -702,6 +737,7 @@ DOCUMENT_CLASSES: dict[str, type[AuthoringDocument]] = {
     "continent": ContinentDocument,
     "locations": LocationsDocument,
     "districts": DistrictsDocument,
+    "road_network": RoadNetworkDocument,
     "settlement": SettlementDocument,
     "interior": InteriorDocument,
     "layout": LayoutDocument,
@@ -759,6 +795,7 @@ __all__ = [
     "QualifiedRef",
     "RegionDeclaration",
     "RoadDeclaration",
+    "RoadNetworkDocument",
     "SettlementDocument",
     "TerrainDeclaration",
     "WaterwayDeclaration",
