@@ -295,7 +295,6 @@ export const useElosernStore = defineStore("elosern", () => {
     activateRoomLook: ctx.activateRoomLook,
     openRoomCard: ctx.openRoomCard,
     closeRoomCard: ctx.closeRoomCard,
-    activateSuggestion: ctx.activateSuggestion,
     chooseScale: ctx.chooseScale,
     // The 技能-tab 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,
@@ -375,8 +374,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // publication, `getCommittedState()`'s value, never a mutable copy.
     subscribe: (listener) => ctx.reducer.subscribe(listener),
     // Set which re-homed sub-dock currently owns the action-dock surface
-    // (null clears). The sub-dock panels set/clear this on mount/unmount;
-    // the suggestions section hides while one is active.
+    // (null clears). The sub-dock panels set/clear this on mount/unmount.
     setActiveSubDock: ctx.setActiveSubDock,
     // H4 (task 4.1/4.2): the reference drawer controller — the single open
     // entry (`openHudDrawer` over the closed name set, unknown names

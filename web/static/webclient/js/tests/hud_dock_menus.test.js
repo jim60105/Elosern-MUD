@@ -1,9 +1,9 @@
 /*
  * DOM-independent tests for the H3 webclient-hud-03-action-dock menu
  * additions (task 2.8): the router breadcrumb trail, menu titles on every
- * stackable frame, the suggestions frame's four statuses, the combat
- * category/group skill frames (single-subgroup collapse), and the corrected
- * root geometry (root gridCols equals the item count).
+ * stackable frame, the combat category/group skill frames (single-subgroup
+ * collapse), and the corrected root geometry (root gridCols equals the item
+ * count).
  *
  * Runs with Node 24's built-in test runner; no npm packages.
  */
@@ -165,10 +165,6 @@ function combatPanel(overrides) {
   return Object.assign(base, opts);
 }
 
-function suggestionsEnvelope(status, cards) {
-  return { status: status, cards: cards || [] };
-}
-
 // ---------------------------------------------------------------- trail
 
 test("router.trail() lists every stacked frame title in push order", () => {
@@ -219,11 +215,9 @@ test("router.trail() lists every stacked frame title in push order", () => {
 
 test("exploration builders carry fixed titles", () => {
   // exploration-room-actions: the exploration root is an empty router menu
-  // (the resolver's), and the wait and suggestions frames are retired; the
-  // suggestions builder keeps its title for the card it feeds.
+  // (the resolver's), and the wait frame is retired.
   const model = ExplorationMenu.buildMenus(explorationPanel(), { currentNode: "room:3" });
   assert.deepEqual(model.menus, {});
-  assert.equal(ExplorationMenu.suggestionsMenu(suggestionsEnvelope("generating")).title, "建議");
 });
 
 test("combat menus carry fixed breadcrumb titles", () => {
@@ -292,51 +286,6 @@ test("creation and character menus carry fixed breadcrumb titles", () => {
   // The wallet row renders as display-only copper text.
   const walletRow = character.items.find((item) => item.key === "wallet");
   assert.equal(walletRow.label, "錢包：1234 銅");
-});
-
-// ---------------------------------------------------------------- suggestions rows
-
-test("suggestions rows: generating shows one disabled row", () => {
-  const menu = ExplorationMenu.suggestionsMenu(suggestionsEnvelope("generating"));
-  assert.deepEqual(
-    menu.items.map((item) => item.key),
-    ["suggestions-generating", "back"]
-  );
-  assert.equal(menu.items[0].enabled, false);
-  assert.equal(menu.gridCols, menu.items.length);
-  assert.equal(menu.title, "建議");
-});
-
-test("suggestions rows: ready lists card rows plus dismiss", () => {
-  const cards = [
-    {
-      kind: "known_action",
-      action_code: "explore.look",
-      params: {},
-      label: "查看房間",
-      hint: null,
-    },
-    { kind: "freeform", params: { npc_id: 5 }, label: "和南門守衛交談", hint: null },
-  ];
-  const menu = ExplorationMenu.suggestionsMenu(suggestionsEnvelope("ready", cards));
-  assert.deepEqual(
-    menu.items.map((item) => item.key),
-    ["action-explore.look", "action-explore.talk_freeform", "action-options.dismiss", "back"]
-  );
-  assert.equal(menu.items[0].actionId, "explore.look");
-  assert.equal(menu.items[1].actionId, "explore.talk_freeform");
-  assert.deepEqual(menu.items[1].payload, { npc_id: 5, speech: "和南門守衛交談" });
-  assert.equal(menu.items[2].actionId, "options.dismiss");
-  assert.deepEqual(menu.items[2].payload, {});
-});
-
-test("suggestions rows: degraded with zero cards keeps the muted empty line", () => {
-  const menu = ExplorationMenu.suggestionsMenu(suggestionsEnvelope("degraded"));
-  assert.deepEqual(
-    menu.items.map((item) => item.key),
-    ["suggestions-empty", "action-options.dismiss", "back"]
-  );
-  assert.equal(menu.items[0].enabled, false);
 });
 
 // ---------------------------------------------------------------- geometry

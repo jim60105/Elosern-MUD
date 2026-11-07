@@ -8,10 +8,6 @@ import { idleReadout } from "../../components/exploration-readout.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import {
   EXPLORATION_AFFORDANCES_SAMPLE,
-  SUGGESTIONS_DEGRADED_EMPTY_SAMPLE,
-  SUGGESTIONS_GENERATING_SAMPLE,
-  SUGGESTIONS_READY_SAMPLE,
-  SUGGESTIONS_UNAVAILABLE_SAMPLE,
 } from "../fixtures.js";
 import {
   AFFORDANCES,
@@ -35,8 +31,8 @@ import { localMapAround } from "../fixtures/local_map.js";
 
 // The exploration root pane (exploration-room-actions design D2), from the
 // shared derived-shape helper: the exit compass (the same exit rows the live
-// resolver returns) beside a right column holding the 建議 pill over the
-// shared readout. The room's other actions are the place card's.
+// resolver returns) beside a right column holding the shared readout. The
+// room's other actions are the place card's.
 const OVERVIEW_PANEL = explorationPanelFixture({
   exits: [
     { ref: "n", label: "北", destination: "town:gate:0:1" },
@@ -74,9 +70,9 @@ const renderDock = (args) => ({
     ]),
 });
 
-// The exploration root: the compass, the 建議 pill, and the readout in the
-// pane; no tab bar, chip row, or legend strip.
-const renderOverview = ({ pillCount, ...args }) => {
+// The exploration root: the compass and the readout in the pane; no tab bar,
+// chip row, or legend strip.
+const renderOverview = (args) => {
   const { localMapModel, ...compass } = compassArgs(OVERVIEW_PANEL, OVERVIEW_MAP);
   return {
     render: () =>
@@ -87,10 +83,6 @@ const renderOverview = ({ pillCount, ...args }) => {
               h("div", { class: "exploration-root", "data-testid": "exploration-root" }, [
                 h("div", { class: "exploration-root__compass" }, [h(ExitCompass, { ...compass, active: true })]),
                 h("div", { class: "exploration-root__side" }, [
-                  h("button", { type: "button", class: "exploration-pill", "data-testid": "suggestions-pill" }, [
-                    h("span", { class: "exploration-pill__label" }, "建議"),
-                    pillCount > 0 ? h("b", { class: "exploration-pill__count" }, ` ${pillCount}`) : null,
-                  ]),
                   h(ExplorationReadout, { class: "exploration-root__readout", ...idleReadout(compass.targets.cycle.length, 1) }),
                 ]),
               ]),
@@ -112,7 +104,6 @@ export const ExplorationRoot = {
     mode: "exploration",
     rootItems: [],
     tabStop: false,
-    pillCount: 4,
   },
 };
 
@@ -285,34 +276,6 @@ export const ExplorationDock = {
   args: {
     mode: "exploration",
     guidancePrefix: "附近動作",
-    suggestions: SUGGESTIONS_READY_SAMPLE,
-  },
-};
-
-export const GeneratingSuggestions = {
-  render: renderDock,
-  args: {
-    mode: "exploration",
-    guidancePrefix: "附近動作",
-    suggestions: SUGGESTIONS_GENERATING_SAMPLE,
-  },
-};
-
-export const DegradedEmptySuggestions = {
-  render: renderDock,
-  args: {
-    mode: "exploration",
-    guidancePrefix: "附近動作",
-    suggestions: SUGGESTIONS_DEGRADED_EMPTY_SAMPLE,
-  },
-};
-
-export const UnavailableSuggestions = {
-  render: renderDock,
-  args: {
-    mode: "exploration",
-    guidancePrefix: "附近動作",
-    suggestions: SUGGESTIONS_UNAVAILABLE_SAMPLE,
   },
 };
 

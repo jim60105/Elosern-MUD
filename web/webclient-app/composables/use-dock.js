@@ -177,9 +177,9 @@ export function useDock(store, { panel, dispatchIntent }) {
   const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
 
   // The exploration root pane (exploration-room-actions design D2): the
-  // exit compass, the shared readout, and the 建議 pill, while the router's
-  // current frame is the (empty) exploration root. A degraded root still
-  // renders through DockMenu's single marker row.
+  // exit compass and the shared readout, while the router's current frame is
+  // the (empty) exploration root. A degraded root still renders through
+  // DockMenu's single marker row.
   const explorationRootShown = computed(
     () => !store.view.degradedRoot && store.view.dockSource === "exploration.root",
   );

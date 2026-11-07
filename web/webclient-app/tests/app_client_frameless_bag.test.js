@@ -84,8 +84,8 @@ describe("frameless 背包 drawer (composition contract)", () => {
     const dock = wrapper.get("#action-dock");
     // The exploration root is an empty router menu (exploration-room-
     // actions): the exits are the exit compass's, the people and objects the
-    // presence rail's, and the room actions the place card's and the 建議
-    // pill's, so the dock renders no row and no reference entry.
+    // presence rail's, and the room actions the place card's, so the dock
+    // renders no row and no reference entry.
     expect(dock.findAll('[role="option"]')).toHaveLength(0);
     expect(dock.find('[data-item-key="inventory"]').exists()).toBe(false);
     expect(store.view.focus.key).toBeNull();

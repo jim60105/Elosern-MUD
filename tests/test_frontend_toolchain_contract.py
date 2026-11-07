@@ -118,7 +118,6 @@ class NodeGateAndInteropTests(unittest.TestCase):
             "keyboard_router.js",
             "narrative_markup.js",
             "local_map.js",
-            "option_cards.js",
         ):
             path = app_lib / wrapper
             self.assertTrue(

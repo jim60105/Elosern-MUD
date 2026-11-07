@@ -24,10 +24,9 @@ export function useReadoutState(idle) {
   // The hovered or focused presence-rail entry's content
   // (exploration-presence-rail design D6).
   const rail = ref(null);
-  // The hovered or focused place-card button and 建議 pill
-  // (exploration-room-actions design D6).
+  // The hovered or focused place-card button (exploration-room-actions
+  // design D6).
   const place = ref(null);
-  const pill = ref(null);
   const flash = ref(null);
   let timer = null;
 
@@ -41,10 +40,6 @@ export function useReadoutState(idle) {
 
   function setPlace(next) {
     place.value = next;
-  }
-
-  function setPill(next) {
-    pill.value = next;
   }
 
   function showFlash(content) {
@@ -63,7 +58,6 @@ export function useReadoutState(idle) {
     aim.value = null;
     rail.value = null;
     place.value = null;
-    pill.value = null;
   }
 
   if (getCurrentScope()) {
@@ -76,12 +70,11 @@ export function useReadoutState(idle) {
       aim: aimReadout(aim.value),
       rail: rail.value,
       place: place.value,
-      pill: pill.value,
       idle: idle(),
     }),
   );
 
-  return { aim, rail, place, pill, flash, content, setAim, setRail, setPlace, setPill, showFlash, clear };
+  return { aim, rail, place, flash, content, setAim, setRail, setPlace, showFlash, clear };
 }
 
 export function useExitCompass(store, { panel, compassRef }) {
@@ -107,7 +100,7 @@ export function useExitCompass(store, { panel, compassRef }) {
   // The compass is the live control only at the exploration root, with no
   // drawer or overlay over it; anything else stops a walk.
   // An open presence card (exploration-presence-rail) or room card — the
-  // wait or suggestions card (exploration-room-actions) — stops it too.
+  // wait card (exploration-room-actions) — stops it too.
   const compassActive = computed(
     () =>
       store.view.mode === "exploration" &&
@@ -243,9 +236,8 @@ export function useExitCompass(store, { panel, compassRef }) {
     // The presence rail's readout feed and the departed flash
     // (exploration-presence-rail design D6).
     onRailHover: readout.setRail,
-    // The place card's buttons and the 建議 pill (exploration-room-actions).
+    // The place card's buttons (exploration-room-actions).
     onPlaceHover: readout.setPlace,
-    onPillHover: readout.setPill,
     showReadoutFlash: readout.showFlash,
   };
 }

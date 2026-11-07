@@ -479,7 +479,7 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
     """Robustly focus the ``#action-dock`` element, gated on deterministic state.
 
     The action dock is a conditional surface (rendered only when its backing
-    ``context_actions`` panel or ``suggestions`` envelope is available), so a
+    ``context_actions`` panel is available), so a
     raw ``document.getElementById('action-dock').focus()`` raises
     ``TypeError: Cannot read properties of null (reading 'focus')`` in a loaded
     CI runner where the dock has not mounted yet. This helper gates on the
@@ -492,17 +492,15 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
     def _dock_ready(state: dict) -> bool:
         if not state.get("connected"):
             return False
-        if state.get("suggestions"):
-            return True
         panels = state.get("panels") or {}
         ca = panels.get("context_actions") or {}
         if ca.get("available"):
             kind = ca.get("kind")
             if kind == "exploration":
                 # The exploration root is an empty router menu
-                # (exploration-room-actions): its pane is the exit compass,
-                # the 建議 pill, and the readout over the committed
-                # `exploration` panel, so that panel is the readiness gate.
+                # (exploration-room-actions): its pane is the exit compass and
+                # the readout over the committed `exploration` panel, so that
+                # panel is the readiness gate.
                 exploration = panels.get("exploration") or {}
                 return exploration.get("available") is True and state.get("dockSource") == "exploration.root"
             if kind == "combat":
@@ -558,18 +556,15 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
 PRESENCE_KEY_PREFIXES = ("target-", "entity-", "object-", "presence-more")
 RAIL_SELECTOR = '[data-anchor="presence"] [data-testid="presence-rail"]'
 CARD_SELECTOR = '[data-anchor="choices"] [data-testid="presence-card"]'
-# The room cards (exploration-room-actions; redesign-rest-entry): the rest
-# entry's first layer the place card's 休息 opens (its two choice tiles), the
-# suggestions card the 建議 pill opens, and the owner-only 進入夢境協作？
-# question the accepted sleep handoff asks.
+# The room card (exploration-room-actions; redesign-rest-entry): the rest
+# entry's first layer the place card's 休息 opens (its two choice tiles), and
+# the owner-only 進入夢境協作？ question the accepted sleep handoff asks.
 WAIT_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="wait-card"]'
 WAIT_TILE_SELECTOR = WAIT_CARD_SELECTOR + ' [data-testid="wait-card-tile"][data-tile="%s"]'
 WAIT_FORM_SELECTOR = '[data-anchor="choices"] [data-testid="wait-form"]'
-SUGGESTIONS_CARD_SELECTOR = '[data-anchor="choices"] [data-testid="suggestions-card"]'
 DREAM_QUESTION_SELECTOR = '[data-anchor="choices"] [data-testid="dream-question"]'
 PLACE_LOOK_SELECTOR = '[data-anchor="map"] [data-testid="place-card-look"]'
 PLACE_WAIT_SELECTOR = '[data-anchor="map"] [data-testid="place-card-wait"]'
-PILL_SELECTOR = '#action-dock [data-testid="suggestions-pill"]'
 # The retired wait rows' key vocabulary, kept by ``activate_wait_row``: each
 # key maps onto the rest entry's tile-then-form path (redesign-rest-entry).
 WAIT_ROW_KEYS = ("wait-dawn", "wait-sleep", "wait-rest")
@@ -680,13 +675,6 @@ def open_wait_card(page: Page, timeout: int = 30000) -> None:
     page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=timeout)
 
 
-def open_suggestions_card(page: Page, timeout: int = 30000) -> None:
-    """Open the suggestions card from the 建議 pill and wait for it."""
-    if page.locator(SUGGESTIONS_CARD_SELECTOR).count() == 0:
-        press_control(page, PILL_SELECTOR, timeout=timeout)
-    page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="visible", timeout=timeout)
-
-
 def answer_dream_question(page: Page, dream: bool, timeout: int = 30000) -> None:
     """Answer the accepted sleep view's owner dream question: 是 or 否."""
     question = page.locator(DREAM_QUESTION_SELECTOR)
@@ -751,37 +739,19 @@ def activate_wait_row(
         answer_dream_question(page, True, timeout=timeout)
 
 
-def suggestion_row_key(page: Page, builder_key: str) -> str:
-    """The suggestions card's row key for a builder row key (``action-<code>``
-    or ``action-options.dismiss``), resolved from the committed card content."""
-    if builder_key == "action-options.dismiss":
-        return "dismiss"
-    rows = page.evaluate(
-        """() => (window.__elosernBridge.store.view.suggestionsCard || {items: []}).items
-          .filter((item) => item.actionId && item.actionId !== 'options.dismiss')
-          .map((item) => item.key)"""
-    )
-    keys = card_row_keys(page, SUGGESTIONS_CARD_SELECTOR)
-    cards = [key for key in keys if key and key.startswith("card:")]
-    if builder_key not in rows:
-        raise AssertionError("no suggestion %r (cards %r)" % (builder_key, rows))
-    return cards[rows.index(builder_key)]
-
-
 def exploration_root_controls(page: Page) -> dict:
     """The exploration screen's room-action controls and the dock's rows
     (exploration-room-actions): whether the place card's 查看房間 and 休息
-    and the 建議 pill are rendered, and the dock's row keys (none at the
-    empty exploration root)."""
+    are rendered, and the dock's row keys (none at the empty exploration
+    root)."""
     return page.evaluate(
-        """([look, wait, pill]) => ({
+        """([look, wait]) => ({
           look: !!document.querySelector(look),
           wait: !!document.querySelector(wait),
-          pill: !!document.querySelector(pill),
           dockRows: Array.from(document.querySelectorAll('#action-dock [data-item-key]'))
             .map((el) => el.getAttribute('data-item-key')),
         })""",
-        [PLACE_LOOK_SELECTOR, PLACE_WAIT_SELECTOR, PILL_SELECTOR],
+        [PLACE_LOOK_SELECTOR, PLACE_WAIT_SELECTOR],
     )
 
 
@@ -789,16 +759,13 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
     """Activate one exploration entry by its keyboard key.
 
     The exploration screen's entries live outside the router's (empty) root
-    (exploration-room-actions): ``look-room`` is the place card's 查看房間,
-    ``wait`` its 休息 (opening the rest entry's first layer), and
-    ``suggestions`` the 建議 pill (opening the suggestions card); a retired
+    (exploration-room-actions): ``look-room`` is the place card's 查看房間
+    and ``wait`` its 休息 (opening the rest entry's first layer); a retired
     wait row key (``wait-dawn``, ``wait-sleep``, ``wait-rest``) runs through
     the rest entry's tile and form (``activate_wait_row``), the sleep path
     submitting its form and leaving the accepted sleep view to the caller;
-    ``back`` while the rest entry's first layer is open presses its ✕; and
-    while the suggestions card is open a builder key (``action-<code>``,
-    ``action-options.dismiss``) names
-    one of its rows. The exits are the exit compass's
+    and ``back`` while the rest entry's first layer is open presses its ✕.
+    The exits are the exit compass's
     (``activate_compass_exit``), and the people and objects
     (``target-<identity>``, ``entity-<identity>``, ``object-<identity>``) are
     the presence rail's (exploration-presence-rail), so those keys route to
@@ -820,15 +787,8 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
     if key == "wait":
         open_wait_card(page, timeout=timeout)
         return
-    if key == "suggestions":
-        open_suggestions_card(page, timeout=timeout)
-        return
     if key in WAIT_ROW_KEYS:
         activate_wait_row(page, key, timeout=timeout)
-        return
-    if page.locator(SUGGESTIONS_CARD_SELECTOR).count() > 0:
-        row = key if key in ("back", "dismiss") or key.startswith("card:") else suggestion_row_key(page, key)
-        activate_card_row(page, row, timeout=timeout, selector=SUGGESTIONS_CARD_SELECTOR)
         return
     if page.locator(WAIT_CARD_SELECTOR).count() > 0:
         # The rest entry's first layer has tiles, not rows: only its ✕ is

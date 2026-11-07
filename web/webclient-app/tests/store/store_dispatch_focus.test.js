@@ -296,9 +296,8 @@ describe("store dispatch + focus", () => {
       const view = store.view;
       // The exits are the exit compass's (exploration-exit-compass), the
       // people and objects the presence rail's (exploration-presence-rail),
-      // and the room actions the place card's and the 建議 pill's
-      // (exploration-room-actions), so the root carries no item and nothing
-      // is focused on it.
+      // and the room actions the place card's (exploration-room-actions), so
+      // the root carries no item and nothing is focused on it.
       expect(view.focus.key).toBeNull();
       expect(store.router.rootMenu().items).toEqual([]);
       expect(view.degradedRoot).toBeNull();

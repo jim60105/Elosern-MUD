@@ -210,8 +210,8 @@ describe("H1 preserved DOM contract (design D6)", () => {
     expect(dock.attributes("data-mode")).toBe("exploration");
     // The dock keeps its `tabindex` attribute and stays the programmatic
     // focus target, but at the exploration root it leaves the tab order
-    // (exploration-room-actions): the compass, the rail, the place card's
-    // buttons, and the 建議 pill are the tab stops, and the root has no row.
+    // (exploration-room-actions): the compass, the rail, and the place card's
+    // buttons are the tab stops, and the root has no row.
     expect(dock.attributes("tabindex")).toBe("-1");
     expect(wrapper.find('#action-dock [data-item-key]').exists()).toBe(false);
     expect(wrapper.find('#action-dock [data-testid="exit-compass"]').exists()).toBe(true);

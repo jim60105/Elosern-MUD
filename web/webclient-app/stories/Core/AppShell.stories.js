@@ -389,13 +389,7 @@ const renderPlayer = (args) => ({
               }] : []),
             ],
           }),
-          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat, args.foeOverrides || {}, args.companions ?? 2, !!args.conditions, args.downedCompanions || []) : protocolFixtures.explorationActions({
-            suggestions: { status: "ready", cards: [
-              { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
-              { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
-              { kind: "known_action", action_code: "explore.look", label: "查看木箱", params: { target_id: 3 } },
-            ] },
-          }),
+          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat, args.foeOverrides || {}, args.companions ?? 2, !!args.conditions, args.downedCompanions || []) : protocolFixtures.explorationActions(),
           local_map: protocolFixtures.localMapPanel(),
           ...(args.journey ? journeyPanels(STAGE_JOURNEY_STOPS[0]) : {}),
           services: SERVICES_PANEL_SAMPLE,

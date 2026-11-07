@@ -11,7 +11,6 @@ describe("dock-icons glyph table", () => {
     move: "M12 5v14M12 5 7 10M12 5l5 5",
     look: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
     interact: "M4 5h16v11H8l-4 4V5Z",
-    suggestions: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     attack: "M5 19 19 5M5 19h4M5 19v-4",
     skills: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
     items: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
@@ -27,9 +26,6 @@ describe("dock-icons glyph table", () => {
     for (const [key, d] of Object.entries(REFERENCE_D)) {
       expect(glyphPath(key)).toBe(d);
     }
-    // `suggestions` and `skills` intentionally share the reference's single
-    // star glyph.
-    expect(REFERENCE_D.suggestions).toBe(REFERENCE_D.skills);
     // `inventory` and `items` intentionally share the reference's single
     // backpack glyph (align-drawer-chrome-symbols): neither key may regress
     // to the old box silhouette independently of the other.
@@ -47,9 +43,9 @@ describe("dock-icons glyph table", () => {
     expect(glyphAttrs("interact")).toEqual({ "stroke-linejoin": "round" });
     expect(glyphAttrs("attack")).toEqual({ "stroke-linecap": "round" });
     expect(glyphAttrs("retreat")).toEqual({ "stroke-linecap": "round" });
-    // The star glyphs and the other replaced/untouched keys carry no
+    // The star glyph and the other replaced/untouched keys carry no
     // attributes (the reference omits them there).
-    for (const key of ["look", "suggestions", "skills", "items", "defend", "surrender", "character", "quests", "inventory", "wait"]) {
+    for (const key of ["look", "skills", "items", "defend", "surrender", "character", "quests", "inventory", "wait"]) {
       expect(glyphAttrs(key)).toEqual({});
     }
     expect(glyphAttrs(null)).toEqual({});
@@ -63,7 +59,7 @@ describe("dock-icons glyph table", () => {
     const interactSvg = glyphSvg("interact");
     expect(interactSvg.children[0].props["stroke-linejoin"]).toBe("round");
     expect(interactSvg.children[0].props["stroke-linecap"]).toBeUndefined();
-    const starSvg = glyphSvg("suggestions");
+    const starSvg = glyphSvg("skills");
     expect(starSvg.children[0].props["stroke-linecap"]).toBeUndefined();
     expect(starSvg.children[0].props["stroke-linejoin"]).toBeUndefined();
   });

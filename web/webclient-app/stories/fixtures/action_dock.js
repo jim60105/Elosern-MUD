@@ -5,8 +5,8 @@
 //
 // Every value mirrors a validated `context_actions` v6 slice — the exact
 // server-authored shapes (the v6 exploration form's action/navigation
-// affordances and the suggestions envelope) — so the offline showcase and
-// the live (C1 store) views cannot drift. Fixed literals only.
+// affordances) — so the offline showcase and the live (C1 store) views
+// cannot drift. Fixed literals only.
 // ---------------------------------------------------------------------------
 
 // v5 exploration-form action + navigation affordances, one bounded frame:
@@ -65,47 +65,3 @@ export const TARGET_ITEMS_SAMPLE = [
   { identity: "e2", label: "斷刃巡衛", enabled: false, disabled_reason: { code: "down", message: "已倒地" } },
   { identity: "a2", label: "同行劍士", enabled: true, disabled_reason: null },
 ];
-
-// v5 suggestions envelope, one per stream status (ready 3..5 cards,
-// degraded 0..5 cards; label is 1..24 code points with at least one CJK
-// character; hint is at most 60 code points or absent).
-export const SUGGESTIONS_GENERATING_SAMPLE = { status: "generating" };
-
-export const SUGGESTIONS_READY_SAMPLE = {
-  status: "ready",
-  cards: [
-    {
-      kind: "known_action",
-      action_code: "explore.look",
-      label: "查看房間",
-      params: { room: true },
-    },
-    {
-      kind: "known_action",
-      action_code: "explore.wait",
-      label: "等到黃昏",
-      params: { daypart: "dusk" },
-      hint: "先休息一會兒再行動",
-    },
-    {
-      kind: "known_action",
-      action_code: "explore.talk_scripted",
-      label: "與灰婆婆交談",
-      params: { npc_id: 7, keyword_id: "問候" },
-    },
-    {
-      kind: "freeform",
-      action_code: "explore.talk_freeform",
-      label: "我們聊聊好嗎？",
-      params: { npc_id: 9 },
-      hint: "說任何想說的話",
-    },
-  ],
-};
-
-export const SUGGESTIONS_DEGRADED_EMPTY_SAMPLE = {
-  status: "degraded",
-  cards: [],
-};
-
-export const SUGGESTIONS_UNAVAILABLE_SAMPLE = { status: "unavailable" };

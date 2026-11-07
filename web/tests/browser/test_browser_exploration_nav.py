@@ -10,7 +10,6 @@ from .browser_helpers import (
     WAIT_CARD_SELECTOR,
     PLACE_LOOK_SELECTOR,
     PLACE_WAIT_SELECTOR,
-    PILL_SELECTOR,
     activate_compass_exit,
     activate_overview_chip,
     card_row_keys,
@@ -290,14 +289,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         controls = exploration_root_controls(page)
         self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
         self.assertTrue(controls["look"] and controls["wait"], "the place card's room actions")
-        # The 建議 pill renders whenever the committed envelope's status is
-        # not `unavailable`.
-        suggestions = (
-            ((store_state(page).get("panels") or {}).get("context_actions") or {})
-            .get("suggestions")
-            or {}
-        )
-        self.assertEqual(controls["pill"], suggestions.get("status") not in (None, "unavailable"))
         # Escape returned focus to the medallion that opened the card.
         self.assertEqual(
             page.evaluate(
@@ -467,14 +458,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def test_room_actions_hold_at_both_reference_viewports(self):
         """exploration-room-actions: at 1451x790 and 1920x1080 the place
         card's 查看房間 and 休息 fit the card without truncating the
-        location heading's accessible name, the 建議 pill does not overlap
-        the compass, and the rest entry's first layer and each second-layer
-        form (redesign-rest-entry) are centred and fully visible."""
+        location heading's accessible name, and the rest entry's first layer
+        and each second-layer form (redesign-rest-entry) are centred and
+        fully visible."""
         for viewport in ((1451, 790), (1920, 1080)):
             page = self.logged_in_page(viewport)
             self._wait_exploration_available(page)
             geometry = page.evaluate(
-                """([look, waitBtn, pill, compassSel]) => {
+                """([look, waitBtn]) => {
                   const rect = (sel) => {
                     const el = document.querySelector(sel);
                     if (!el) return null;
@@ -484,29 +475,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   };
                   const card = document.querySelector('[data-testid="place-card"]');
                   const heading = document.querySelector('[data-testid="place-card__location"]');
-                  const pillRect = rect(pill);
-                  const compassRect = rect(compassSel);
-                  const overlap =
-                    pillRect &&
-                    compassRect &&
-                    pillRect.left < compassRect.right &&
-                    pillRect.right > compassRect.left &&
-                    pillRect.top < compassRect.bottom &&
-                    pillRect.bottom > compassRect.top;
                   return {
                     look: rect(look),
                     wait: rect(waitBtn),
-                    pill: pillRect,
                     cardScrolls: card.scrollHeight - card.clientHeight,
                     headingName: heading.getAttribute("title"),
-                    pillClearsCompass: !pillRect || !compassRect || !overlap,
                   };
                 }""",
                 [
                     PLACE_LOOK_SELECTOR,
                     PLACE_WAIT_SELECTOR,
-                    PILL_SELECTOR,
-                    '#action-dock [data-testid="exit-compass"]',
                 ],
             )
             self.assertTrue(
@@ -523,10 +501,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self.assertTrue(
                 geometry["headingName"],
                 f"{viewport}: the heading keeps its full accessible name",
-            )
-            self.assertTrue(
-                geometry["pillClearsCompass"],
-                f"{viewport}: the 建議 pill does not overlap the compass",
             )
             # A centred card open: the rest entry's first layer and each
             # second-layer shell render fully inside the stage, centred in the

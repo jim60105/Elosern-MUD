@@ -7,7 +7,6 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     CARD_SELECTOR,
-    SUGGESTIONS_CARD_SELECTOR,
     WAIT_CARD_SELECTOR,
     exploration_root_controls,
     activate_card_row,
@@ -32,7 +31,6 @@ from ._journey_support import (
     _interact_target,
     _move_row,
     _exploration_panel,
-    _suggestions_ready,
     _exploration_context_actions_panel,
     _combat_panel,
     _inject_snapshot,
@@ -338,15 +336,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     )
     def test_breadcrumb_tracks_router_depth(self):
         """The breadcrumb appears below the root and names parent + current;
-        a person's verb card and the suggestions card are no router frames
-        and add none (exploration-presence-rail, exploration-room-actions)."""
+        a person's verb card is no router frame and adds none
+        (exploration-presence-rail, exploration-room-actions)."""
         page = self.logged_in_page()
         exploration = _exploration_panel(
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
         )
-        context_actions = _exploration_context_actions_panel(
-            _suggestions_ready(["查看四周", "查看物品", "查看角色"])
-        )
+        context_actions = _exploration_context_actions_panel({"status": "unavailable"})
         _inject_snapshot(
             page,
             {
@@ -378,19 +374,6 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         activate_card_row(page, "back")
         wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
-        self.assertEqual(sent_action_count(page), 0, "the card's back row dispatches no ui_action")
-
-        # The suggestions card is client-local too: no router frame, no
-        # breadcrumb; its ✕ 返回 closes it with no ui_action.
-        activate_overview_chip(page, "suggestions")
-        page.wait_for_selector(SUGGESTIONS_CARD_SELECTOR, timeout=15000)
-        self.assertEqual(_dock_depth(page), 1, "the suggestions card pushes no router frame")
-        self.assertTrue(
-            crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
-            "no breadcrumb is rendered under the suggestions card",
-        )
-        activate_card_row(page, "back", selector=SUGGESTIONS_CARD_SELECTOR)
-        wait_for_store_state(page, lambda s: s.get("roomCard") is None)
         self.assertEqual(sent_action_count(page), 0, "the card's back row dispatches no ui_action")
 
         # A real submenu keeps the breadcrumb naming parent + current: the
@@ -454,15 +437,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _wait_mode(page, "exploration")
 
         # The exploration root is empty (exploration-room-actions): the
-        # room actions are the place card's (the suggestions envelope is
-        # unavailable, so no 建議 pill); the person stands on the presence
+        # room actions are the place card's; the person stands on the presence
         # rail and the three exits on the exit compass
         # (exploration-exit-compass), none taking a dock row.
         self.assertEqual(_dock_depth(page), 1, "the exploration root is the only frame")
         controls = exploration_root_controls(page)
         self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
         self.assertTrue(controls["look"] and controls["wait"])
-        self.assertFalse(controls["pill"])
         self.assertEqual(presence_entry_keys(page), ["target-11"])
         self.assertEqual(sorted(compass_target_refs(page)), ["ex-a", "ex-b", "ex-c"])
 

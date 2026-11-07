@@ -1,8 +1,7 @@
 // The room-actions group of the composed Elosern store (exploration-room-
-// actions design D1/D3/D4/D5; redesign-rest-entry design D1/D2): the place
+// actions design D1/D3/D5; redesign-rest-entry design D1/D2): the place
 // card's 查看房間, and the client-local room card slice — the rest entry
-// (kind "wait") the place card's 休息 opens and the suggestions card the 建議
-// pill opens.
+// (kind "wait") the place card's 休息 opens.
 //
 // A room card is client-local state, never a router frame: opening it sends
 // no request and pushes nothing. It is its own slice beside the presence
@@ -12,11 +11,7 @@
 // that hides the rail, stops the compass, and claims the digits. Opening one
 // kind of card closes the other: the `choices` anchor holds one card.
 //
-// Every suggestions row is re-resolved from the committed panels at
-// activation time and submitted through the one gated exploration activation
-// (`activateExplorationRow`), so payloads, the command echo, and the
-// in-flight and awaiting-revision lock are the retired router rows'. The
-// rest entry has no rows: its forms dispatch through the view's single
+// The rest entry has no rows: its forms dispatch through the view's single
 // `dispatchIntent` entry.
 
 // The committed location (room identity plus the committed current node), as
@@ -43,10 +38,10 @@ function isMove(from, to) {
   return from.node !== null && to.node !== null && from.node !== to.node;
 }
 
-const ROOM_CARD_KINDS = new Set(["wait", "suggestions"]);
+const ROOM_CARD_KINDS = new Set(["wait"]);
 
 export function applyRoomActions(ctx) {
-  // null | {kind: "wait" | "suggestions", location}
+  // null | {kind: "wait", location}
   ctx.roomCard = null;
 
   function currentLocation(rs) {
@@ -68,22 +63,16 @@ export function applyRoomActions(ctx) {
     return ctx.activateExplorationRow(ctx.frameResolver.explorationRoomLook());
   };
 
-  // Open the rest entry or the suggestions card. Local: no request, no
-  // frame. The rest entry opens only while the committed exploration panel
-  // is present and available (redesign-rest-entry design D2); the
-  // suggestions card only while the committed envelope presents one (its
-  // status is not `unavailable`).
+  // Open the rest entry. Local: no request, no frame. It opens only while
+  // the committed exploration panel is present and available
+  // (redesign-rest-entry design D2).
   ctx.openRoomCard = function openRoomCard(kind) {
     const rs = ctx.reducer.getCommittedState();
     if (!ROOM_CARD_KINDS.has(kind) || rs.mode !== "exploration") {
       return false;
     }
-    if (kind === "wait") {
-      const panel = rs.panels && rs.panels.exploration;
-      if (!panel || panel.available === false) {
-        return false;
-      }
-    } else if (!ctx.frameResolver.explorationSuggestions() || ctx.activeSubDock.value) {
+    const panel = rs.panels && rs.panels.exploration;
+    if (!panel || panel.available === false) {
       return false;
     }
     ctx.presenceCard = null;
@@ -101,30 +90,9 @@ export function applyRoomActions(ctx) {
     return true;
   };
 
-  // A suggestions card row (design D4): a card or the dismiss row, matched by
-  // its builder key in the envelope committed right now.
-  ctx.activateSuggestion = function activateSuggestion(key) {
-    if (!ctx.roomCard || ctx.roomCard.kind !== "suggestions") {
-      return { sent: false, handled: false, reason: "missing" };
-    }
-    const content = ctx.frameResolver.explorationSuggestions();
-    const row = content ? content.items.find((item) => item.key === key) : null;
-    if (!row || !row.actionId) {
-      return { sent: false, handled: false, reason: "missing" };
-    }
-    const outcome = ctx.activateExplorationRow(row);
-    if (outcome.sent) {
-      ctx.closeRoomCard();
-    }
-    return outcome;
-  };
-
   // The commit-time settle, run at every publish: a mode other than
   // exploration, a committed move, or an unavailable exploration panel
-  // closes the card; the suggestions card also closes once the committed
-  // envelope no longer presents one (`unavailable`, withdrawn, or a
-  // transport reset's empty panels) and while a re-homed sub-dock owns the
-  // surface (the options-surface rule the 建議 pill follows too).
+  // closes the card.
   ctx.settleRoomCard = function settleRoomCard(rs) {
     const card = ctx.roomCard;
     if (card === null) {
@@ -140,9 +108,6 @@ export function applyRoomActions(ctx) {
       return;
     }
     card.location = { room: location.room, node: location.node ?? (card.location ? card.location.node : null) };
-    if (card.kind === "suggestions" && (!ctx.frameResolver.explorationSuggestions() || ctx.activeSubDock.value)) {
-      ctx.roomCard = null;
-    }
   };
 
   // Drop the slice without publishing (a root reset or a new transport).
@@ -150,13 +115,11 @@ export function applyRoomActions(ctx) {
     ctx.roomCard = null;
   };
 
-  // The view slice: the open card, the place card's room row, and the
-  // suggestions content (null while the envelope presents nothing).
+  // The view slice: the open card and the place card's room row.
   ctx.roomActionsView = function roomActionsView() {
     return {
       roomCard: ctx.roomCard ? { kind: ctx.roomCard.kind } : null,
       roomLook: ctx.frameResolver.explorationRoomLook(),
-      suggestionsCard: ctx.frameResolver.explorationSuggestions(),
     };
   };
 }

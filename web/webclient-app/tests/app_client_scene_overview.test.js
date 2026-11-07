@@ -3,10 +3,9 @@
 // the compass, exploration-presence-rail the people and objects to the
 // presence rail on the stage (tests/app_client_presence_rail.test.js), and
 // exploration-room-actions retired the scene overview itself: the room actions
-// are the place card's and the 建議 pill's
-// (tests/app_client_room_actions.test.js), so the command panel holds the
-// compass, the pill, and the readout. The move/look/interact tab root is gone;
-// only the combat root keeps a tab bar.
+// are the place card's (tests/app_client_room_actions.test.js), so the command
+// panel holds the compass and the readout. The move/look/interact tab root is
+// gone; only the combat root keeps a tab bar.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -68,7 +67,7 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     document.body.innerHTML = "";
   });
 
-  it("renders the compass, the pill, and the readout at the exploration root with no tab bar", async () => {
+  it("renders the compass and the readout at the exploration root with no tab bar", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
@@ -76,12 +75,11 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
 
     expect(store.view.dockSource).toBe("exploration.root");
     // The root pane (exploration-room-actions D2): the compass on the left,
-    // then a right column with the 建議 pill over the readout.
+    // then a right column holding only the readout.
     const root = wrapper.get('#action-dock [data-testid="exploration-root"]');
     const [left, right] = root.element.children;
     expect(left.querySelector('[data-testid="exit-compass"]')).not.toBeNull();
     expect(Array.from(right.children).map((el) => el.getAttribute("data-testid"))).toEqual([
-      "suggestions-pill",
       "exploration-readout",
     ]);
     // No retired surface: no scene overview, chip, footer, or row container.

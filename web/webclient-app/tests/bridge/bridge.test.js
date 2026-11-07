@@ -200,8 +200,8 @@ describe("window.Elosern bridge", () => {
 
     // The exploration root is an empty router menu (exploration-room-actions:
     // the exits are the exit compass's, the people and objects the presence
-    // rail's, and the room actions the place card's and the 建議 pill's), so
-    // nothing is focused on it.
+    // rail's, and the room actions the place card's), so nothing is focused
+    // on it.
     expect(store.view.focus.key).toBeNull();
 
     // An unclaimed key (a plain letter) is not swallowed by the bridge.

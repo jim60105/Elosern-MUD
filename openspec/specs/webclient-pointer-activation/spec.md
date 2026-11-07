@@ -36,12 +36,12 @@ or pops a frame.
 - **THEN** it captures its own input, the router's frame is unchanged beneath it, and closing it restores what that surface showed before it opened
 
 #### Scenario: The overview beneath a popover is inert
-- **WHEN** a person's verb card is open over the stage and the player presses the compass or the 建議 pill in the command panel beneath it
-- **THEN** the command panel is `inert` while the card is open, so the press reaches no compass target or pill, no `ui_action` is emitted, the router's current frame is unchanged, and the card keeps focus until Escape or its `✕ 返回` row closes it
+- **WHEN** a person's verb card is open over the stage and the player presses the compass in the command panel beneath it
+- **THEN** the command panel is `inert` while the card is open, so the press reaches no compass target, no `ui_action` is emitted, the router's current frame is unchanged, and the card keeps focus until Escape or its `✕ 返回` row closes it
 
 #### Scenario: The exploration root's room actions live outside the router menu
 - **WHEN** the exploration dock renders its root frame
-- **THEN** the root's router menu is empty, the exploration compass is independent of router rows and submits committed move rows through the same store gate, and the place card's room actions and the 建議 pill submit or open through that same gate outside the router menu
+- **THEN** the root's router menu is empty, the exploration compass is independent of router rows and submits committed move rows through the same store gate, and the place card's room actions submit through that same gate outside the router menu
 
 #### Scenario: Re-render is synchronous with the router event
 - **WHEN** the router pushes, replaces, or pops a frame
@@ -132,7 +132,7 @@ container.
 
 #### Scenario: Only one container is the listbox at a time
 - **WHEN** the dock is inspected at the exploration root and again at a row-bearing frame
-- **THEN** at the exploration root the dock renders no row container at all — its composite is the presence rail's, the place-card buttons and the 建議 pill are native buttons, and the compass is a separate single tab stop with `role="application"` where no exit is a router row — while a row-bearing frame renders exactly one row container carrying the listbox role, the tab stop and the active-descendant reference, with any other container neither focusable by Tab nor exposed as a listbox, so the row-container clauses hold for every row-bearing frame
+- **THEN** at the exploration root the dock renders no row container at all — its composite is the presence rail's, the place-card buttons are native buttons, and the compass is a separate single tab stop with `role="application"` where no exit is a router row — while a row-bearing frame renders exactly one row container carrying the listbox role, the tab stop and the active-descendant reference, with any other container neither focusable by Tab nor exposed as a listbox, so the row-container clauses hold for every row-bearing frame
 
 #### Scenario: Focus indication stays with the router
 - **WHEN** the player clicks a row

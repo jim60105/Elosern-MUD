@@ -20,7 +20,6 @@ const ROOT_ITEMS = [
   { key: "move", label: "移動", enabled: true },
   { key: "look", label: "查看", enabled: true },
   { key: "interact", label: "互動", enabled: true },
-  { key: "suggestions", label: "建議", enabled: true },
 ];
 
 // The combat root is the ONLY root that renders the tab bar
@@ -74,11 +73,11 @@ describe("ActionDock (B2 action-dock family)", () => {
 
     const submenu = mountDock({
       rootItems: ROOT_ITEMS,
-      view: { dockDepth: 2, dockTrail: ["場景", "建議"], dockSource: "suggestions" },
+      view: { dockDepth: 2, dockTrail: ["場景", "查看"], dockSource: "exploration.root" },
     });
     const crumb = submenu.get('[data-testid="dock-crumb"]');
     expect(crumb.attributes("hidden")).toBeUndefined();
-    expect(crumb.text()).toContain("場景 › 建議");
+    expect(crumb.text()).toContain("場景 › 查看");
   });
 
   it("renders the draft shortcut legend as the single hook-bearing element", () => {

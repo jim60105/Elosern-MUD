@@ -2,15 +2,13 @@
 // (webclient-scene-overview-component design D7; the showcase rule that a
 // story is bound to the same reducer-derived shape the live wiring passes).
 // Every PresenceRail, ExitCompass, and ChoiceCard story builds its args
-// here, by running the real `presenceEntries` /
-// `verbMenuFor` / `suggestionsMenu` of the exploration-menu
-// model over a synthesized `exploration` panel. Every value is a fixed
-// literal: no live server, LLM, or image data.
+// here, by running the real `presenceEntries` / `verbMenuFor` of the
+// exploration-menu model over a synthesized `exploration` panel. Every value
+// is a fixed literal: no live server, LLM, or image data.
 import ExplorationMenu from "../../lib/exploration_menu.js";
 import { resolveTargets } from "../../components/compass-model.js";
 import { localMapModelFor } from "./local_map.js";
 import { overflowCardRows, verbCardRows } from "../../composables/use-person-focus.js";
-import { suggestionsCardContent } from "../../composables/use-room-actions.js";
 
 const DIRECTION_LABELS = ["北", "東", "南", "西", "東北", "西北", "東南", "西南", "上", "下"];
 
@@ -118,21 +116,6 @@ export function timeChoiceArgs({ locked = false, fatigue = true } = {}) {
     locked,
     entrance: false,
     autofocus: true,
-  };
-}
-
-// ChoiceCard args for the suggestions card (exploration-room-actions): the
-// builder's rows mapped exactly as the room actions' wiring maps them.
-export function suggestionsCardArgs(suggestions) {
-  const items = ExplorationMenu.suggestionsMenu(suggestions).items.filter((item) => !item.goBack);
-  const content = suggestionsCardContent({ status: suggestions.status, items });
-  return {
-    rows: content.rows,
-    notes: content.notes,
-    trailingIndex: content.trailingIndex,
-    caption: "建議",
-    ariaLabel: "建議",
-    testId: "suggestions-card",
   };
 }
 

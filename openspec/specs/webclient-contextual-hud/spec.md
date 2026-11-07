@@ -42,7 +42,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered: 
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
 #### Scenario: The bottom band keeps one height whatever it holds
-- **WHEN** the shell renders at 1451x790 and the player moves through the exploration root (the compass, the 建議 pill, and the readout), a person's verb card, the wait card, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **WHEN** the shell renders at 1451x790 and the player moves through the exploration root (the compass and the readout), a person's verb card, the wait card, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
 - **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration states, and in the combat and dialogue states the message region spans the band's whole width at the same height while the command region is collapsed
 
 #### Scenario: The band splits two thirds and one third
@@ -187,7 +187,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
   stage, crossfading over the scene duration at `full` and switching in one frame at `off`
 
 #### Scenario: Focus is rescued before its surface is hidden
-- **WHEN** the focused element belongs to a surface that the incoming mode hides, including the exit compass, a place-card room action, the 建議 pill, or a person's verb card or a room card when the incoming mode is dialogue
+- **WHEN** the focused element belongs to a surface that the incoming mode hides, including the exit compass, a place-card room action, or a person's verb card or a room card when the incoming mode is dialogue
 - **THEN** focus is moved to the incoming mode's focus home before the surface is removed, and no focus is lost to the document body
 
 #### Scenario: Creation mode presents only the creation surfaces
@@ -953,7 +953,7 @@ In combat mode the root SHALL render one vertical icon-and-label command list wi
 
 #### Scenario: Exploration renders no combat root list
 - **WHEN** the dock renders in exploration or dialogue mode at any depth
-- **THEN** no combat root list is rendered, and no 移動, 查看, 互動, or 建議 root row exists anywhere in the dock
+- **THEN** no combat root list is rendered, and no 移動, 查看, or 互動 root row exists anywhere in the dock
 
 #### Scenario: Recovery root is bounded
 - **WHEN** the resolver supplies only the recovery Forfeit path
@@ -972,7 +972,7 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 
 #### Scenario: Digits pick and confirm the frame's first nine entries
 - **WHEN** the dock owns keyboard focus (the key target is not editable) and the player presses `1`–`9`
-- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order; a frame's `back` row takes the slot of its rendered position) — except in the exploration screen, where the presence rail owns the digits as `webclient-presence-rail` defines: they pick its visible entries, never a place-card room action or the 建議 pill, while a wait or suggestions card is open its own rows take them, and exits belong to the separate compass, and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
+- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order; a frame's `back` row takes the slot of its rendered position) — except in the exploration screen, where the presence rail owns the digits as `webclient-presence-rail` defines: they pick its visible entries, never a place-card room action, while the wait card is open its own rows take them, and exits belong to the separate compass, and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
 
 #### Scenario: Digits outside the dock's claim fall through
 - **WHEN** dialogue mode holds — or a digit's entry does not exist (a frame with fewer rendered entries, dialogue mode, or the pre-session empty stack)
@@ -1038,7 +1038,7 @@ The dock SHALL render a breadcrumb line whenever the router's menu stack is deep
 - **THEN** exactly one menu level closes, the parent frame's rows render with the previously focused row marked, and no `ui_action` is emitted
 
 #### Scenario: A focused `back` row keeps a visible focus carrier
-- **WHEN** keyboard focus moves onto the suggestions frame's `back` item
+- **WHEN** keyboard focus moves onto a submenu frame's `back` item
 - **THEN** that `back` item is rendered as a row carrying the focused state (fill and border change together, not color alone), the breadcrumb's back control carries no focused state, and Enter on the row or a click on the breadcrumb control pops exactly one level back to the parent frame
 - **WHEN** a person's verb card's `✕ 返回` row is the card's active row
 - **THEN** it carries the card's active-row treatment, and Enter or a click on the row closes the card without popping a router level and returns focus to the rail entry that opened it
@@ -1059,7 +1059,7 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 
 #### Scenario: The form set is fixed
 - **WHEN** the row region selects a form
-- **THEN** the forms are the combat forms specified elsewhere in this capability, and in exploration the exploration root's pane — the exit compass beside the 建議 pill and the shared readout — whose router menu is empty; the wait and suggestions cards are centred `ChoiceCard`s over the stage, never dock forms
+- **THEN** the forms are the combat forms specified elsewhere in this capability, and in exploration the exploration root's pane — the exit compass beside the shared readout — whose router menu is empty; the wait card is a centred `ChoiceCard` over the stage, never a dock form
 
 #### Scenario: Exploration frames never regress to grids or nav lists
 - **WHEN** any exploration frame renders
@@ -1123,7 +1123,7 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 
 #### Scenario: The move frame has no companion panel
 - **WHEN** the exploration root renders
-- **THEN** the compass occupies the left side and the 建議 pill and the shared readout occupy the right column; no exit-outlet grid, chip row, or detail aside renders
+- **THEN** the compass occupies the left side and the shared readout occupies the right column; no exit-outlet grid, chip row, or detail aside renders
 
 #### Scenario: A row renders only backed fields
 - **WHEN** the presence rail renders a look-only entry for a present entity
@@ -1655,7 +1655,7 @@ The client SHALL expose a narrative prose scale with three steps — `A−` 16px
 
 #### Scenario: Settings are client-local and dispatch nothing
 - **WHEN** any setting the surface offers changes
-- **THEN** it is client-local presentation state; no settings control dispatches an action — the client's action allowlist carries exactly one `options.*` action, the suggestions dismissal, and this capability adds none
+- **THEN** it is client-local presentation state; no settings control dispatches an action, and the settings surface adds no action to the client's action allowlist
 
 #### Scenario: Settings apply immediately and persist versioned
 - **WHEN** a setting changes
@@ -1683,7 +1683,7 @@ The client SHALL expose a narrative prose scale with three steps — `A−` 16px
 
 #### Scenario: No setting dispatches an action
 - **WHEN** the player changes every control the settings surface offers
-- **THEN** no `ui_action` is sent for any of them, and the only `options.*` action the client can dispatch remains the suggestions dismissal
+- **THEN** no `ui_action` is sent for any of them, and the settings surface adds no action to the client's action allowlist
 
 #### Scenario: A setting survives a reload and resets cleanly
 - **WHEN** the player changes the prose scale, the text speed, and the motion level, reloads the client, and then the presentation store's stored version is unrecognised
@@ -1817,7 +1817,7 @@ Outside combat the action dock SHALL fill the bottom band's command region (the 
 - **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region or, in combat, the card
 
 #### Scenario: Popovers and wide frames stay inside the region
-- **WHEN** a person's verb card, the wait card, or the suggestions card renders, or a frame's content does not fit the region's width
+- **WHEN** a person's verb card or the wait card renders, or a frame's content does not fit the region's width
 - **THEN** the card renders centred over the stage in the `choices` anchor, outside the command region, scrolling inside its own card when its rows exceed it, while the command region keeps its box, and the wide frame wraps or collapses its own columns inside the region or the combat card, never overflowing it horizontally
 
 #### Scenario: One dock element persists across every mode
@@ -1989,7 +1989,7 @@ When a dock pane's row region uses a fixed column count for keyboard row/col geo
 
 #### Scenario: The scene overview is not a fixed-column pane
 - **WHEN** the exploration root renders
-- **THEN** its pane is the compass beside the 建議 pill and the readout, with no row region at all — the exploration root is not a fixed-column pane
+- **THEN** its pane is the compass beside the readout, with no row region at all — the exploration root is not a fixed-column pane
 
 #### Scenario: A narrow command region keeps every row inside the pane
 - **WHEN** a combat skill, target, or scale pane renders in the combat command card at the 1451x790 reference viewport with three foes standing

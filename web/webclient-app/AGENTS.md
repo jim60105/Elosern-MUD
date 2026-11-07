@@ -282,8 +282,9 @@ dream or creation surface owns the stage. There is no server travel mode.
   環顧 is `store.activateRoomLook()` (the guarded `explore.look
   {room:true}`); 紮營 is `openTravelCamp()` (use-room-actions.js), which
   opens the existing rest entry on its sleep form until the camp card
-  replaces that destination. In travel the dock's side column keeps only
-  the 建議 pill; the intent line is the travel readout.
+  replaces that destination. In travel the leg panel owns the movement
+  column and its intent line is the travel readout; the command panel's
+  right readout column is not rendered.
 - Route preview (wilderness-travel-planning-ui; design §4.3/§5/§12): the
   store owns the destination (`hoverTravelCell` / `lockTravelDestination` /
   `clearTravelTarget`, published as `view.travel.hover`, `lockedDestination`,
@@ -450,7 +451,10 @@ contextual services in the server's own order, then the unnumbered return.
 - `ChoiceCard` draws each contiguous group as a real `role="group"` named by its
   own visible heading. Headings are not rows: no badge, no digit, no tab stop,
   and they are never part of the row index. Disabled rows stay in the roving
-  focus with `aria-disabled` and an inline `aria-describedby` reason.
+  focus with `aria-disabled` and an inline `aria-describedby` reason. A row
+  carries only its label, digit badge, kind, enabled state and optional
+  disabled reason; there is no notes line, no second hint line, and no trash
+  badge.
 - The store publishes the mapping the card was rendered from (actor, target,
   room/node, ordered row keys, each row's route identity, enabled/reason) and
   every activation names that mapping back — the DOM copy on the card for

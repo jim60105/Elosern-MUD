@@ -105,13 +105,12 @@ describe("classifyPane (task 5.1)", () => {
     expect(classifyPane(frame)).toBe("confirm");
   });
 
-  it("has no cards kind: the suggestions are the centred card's, so suggestion-shaped rows are plain", () => {
+  it("has no cards kind: the suggestions surface is retired, so its-shaped rows are plain", () => {
     // exploration-room-actions: the suggestions frame and its `cards` pane
     // are retired with the router frame.
     const frame = {
       items: [
         { key: "action-explore.talk_freeform", label: "交談", action_id: "explore.talk_freeform" },
-        { key: "action-options.dismiss", label: "✕ 清除建議", action_id: "options.dismiss" },
         { key: "back", label: "戻る", navigation: true, surface: "back" },
       ],
     };
