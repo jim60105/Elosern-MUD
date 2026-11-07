@@ -1415,12 +1415,12 @@ reads every unread page and only returns once the choice list has taken focus,
 so a following `Enter` cannot activate a row that appeared between the read and
 the keypress.
 
-Every browser journey takes the disabled-profile early return in
-`world/ai/action_options/generation.py` followed by the options service's
-rule-card fallback; no journey reaches a live LLM transport. Journeys that
-assert a dialogue outcome check the server side — the committed player/NPC turn
-pair reloaded from the private SQLite database and the NPC speech rendered in
-the narrative window — rather than only the dispatched envelope.
+Every browser journey disables the dialogue transport profile, so free-form
+dialogue uses the authored greeting or silence and no journey reaches a live
+LLM transport. Journeys that assert a dialogue outcome check the server side —
+the committed player/NPC turn pair reloaded from the private SQLite database
+and the NPC speech rendered in the narrative window — rather than only the
+dispatched envelope.
 
 **Managed save roots (browser-console-save-isolation).** The GM console
 snapshots the world before its first intervention after process start, so the

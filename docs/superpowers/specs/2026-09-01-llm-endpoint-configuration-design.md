@@ -93,14 +93,14 @@
 | `LLM_REASONING_EFFORT` | `reasoning_effort` | 閉集 `minimal`／`low`／`medium`／`high`，可省略 | 未設定 | 不分大小寫，儲存為小寫 |
 | `LLM_REASONING_STYLE` | `reasoning_style` | 閉集 `openrouter`／`vllm`／`off` | `openrouter` | 選擇 C-6 的映射；僅在任一 reasoning 欄位有設定時才被查詢 |
 | `LLM_MAX_COMPLETION_TOKENS` | `max_completion_tokens` | 正整數，可省略 | 未設定 | 有設定時在 body 中取代 `max_tokens` |
-| `LLM_MAX_TOKENS` | `max_tokens` | 正整數 | `250`（action_options `320`、title_nomination `640`） | 每層 code 預設保留 |
+| `LLM_MAX_TOKENS` | `max_tokens` | 正整數 | `250`（title_nomination `640`） | 每層 code 預設保留 |
 | `LLM_TIMEOUT_SECONDS` | `timeout_seconds` | 正整數 | `60` | |
 | `LLM_MAX_RETRIES` | `max_retries` | 非負整數 | `2` | |
-| `LLM_SUPPORTS_RESPONSE_FORMAT` | `supports_response_format` | 布林 | `False`；`action_options` 被 `REQUIRED_PROFILE_FLAGS` 強制 `True` | 企圖用每層覆寫清掉 action_options 旗標仍會開機失敗 |
+| `LLM_SUPPORTS_RESPONSE_FORMAT` | `supports_response_format` | 布林 | `False` | 每層可獨立覆寫 |
 | `LLM_ENABLED` | `enabled` | 布林 | `True` | 每層離線降級開關 |
 
 每層形態：`LLM_<LAYER>_<SUFFIX>`，層名大寫且底線保留——`NARRATOR`、
-`NPC_DIALOGUE`、`SCENARIO_DIRECTOR`、`SCENE_BUILDER`、`ACTION_OPTIONS`、
+`NPC_DIALOGUE`、`SCENARIO_DIRECTOR`、`SCENE_BUILDER`、
 `TITLE_NOMINATION`、`CHARACTER_CREATION`。例：
 `LLM_CHARACTER_CREATION_MODEL=qwen2.5-32b-instruct`。
 
@@ -215,7 +215,7 @@ bearer 塞進 headers 會癱瘓 `api_key` 的 `repr=False` 保護）；錯誤點
 
 | 領域 | 測試 |
 |---|---|
-| Profiles（`world/ai/tests/test_profiles.py`） | 每個新欄位的界線矩陣（區間內、邊界、超界、非有限、錯型別）；`reasoning_style`／`reasoning_effort` 閉集驗證；`None` 預設值缺席；`repr(profile)` 不含 `api_key`；注入 `defaults` 的合併；`action_options` 必要旗標失敗路徑 |
+| Profiles（`world/ai/tests/test_profiles.py`） | 每個新欄位的界線矩陣（區間內、邊界、超界、非有限、錯型別）；`reasoning_style`／`reasoning_effort` 閉集驗證；`None` 預設值缺席；`repr(profile)` 不含 `api_key`；注入 `defaults` 的合併 |
 | Client（`world/ai/tests/test_client.py`） | Request body 序列化矩陣：每個取樣欄位的出現／缺席；`max_completion_tokens` 取代 `max_tokens`；三種 reasoning 形態 × enabled/effort 組合；新 knob 全未設定時 body 與今日_payload_逐位元組相容（回歸）；有／無 `api_key`、`app_title`、`app_url` 的 header 矩陣；錯誤路徑字串絕不含金鑰 |
 | Settings（`server/conf/tests/`） | 每個 knob 的 fail-closed 開機錯誤（點名變數、原始值、規則）；全域—每層優先序；空白 ⇒ 預設；三態 reasoning-enabled 的未設 vs false；`test_settings.py` sanitize 清單涵蓋每個生成名稱 |
 | 庫存契約（`test_env_overrides.py`） | `.env.example` 金鑰 ↔ settings.py AST env 讀取（生成的名稱全部可解析）；`EXTERNAL_READERS` 不再列 `OLLAMA_BASE_URL`；AST 讀者學會識得生成的 knob 迴圈，庫存檢查不得假陰錯 |
