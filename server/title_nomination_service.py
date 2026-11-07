@@ -1,12 +1,12 @@
 """Composition root scheduling AI epithet nominations (change G trigger service).
 
 ``schedule_epithet_nomination`` is the single production caller of
-``world.ai.title_nomination.generate_epithet_candidates``. It mirrors the
-``option_proposal_service`` discipline exactly: every ``world.ai`` import is
-deferred into the call path so a cold import binds no guardrail logger, the
-scheduling never blocks or raises into a rest-point hook, and an offline or
-disabled ``title_nomination`` profile means the stage simply does not fire
-(the deterministic game stays fully playable; fixed titles are unaffected).
+``world.ai.title_nomination.generate_epithet_candidates``. Every ``world.ai``
+import is deferred into the call path so a cold import binds no guardrail
+logger, the scheduling never blocks or raises into a rest-point hook, and an
+offline or disabled ``title_nomination`` profile means the stage simply does
+not fire (the deterministic game stays fully playable; fixed titles are
+unaffected).
 
 The service writes no durable state itself. Ballot persistence is performed
 solely by the rules-layer writer ``world.rules.titles.

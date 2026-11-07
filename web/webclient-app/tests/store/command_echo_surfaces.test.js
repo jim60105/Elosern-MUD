@@ -744,15 +744,6 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
     },
 
     {
-      id: "EXPECTED SILENCE: options.dismiss presentation control",
-      ids: ["options.dismiss"],
-      silence: true,
-      prepare() {
-        openExploration();
-        store.dispatchAction("options.dismiss", {});
-      },
-    },
-    {
       // The name roll is a UI-only convenience: no typed-command equivalent,
       // declared silent, dispatched with its exact wire payload.
       id: "EXPECTED SILENCE: creation.roll_name dice control",

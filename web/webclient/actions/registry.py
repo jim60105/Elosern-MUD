@@ -96,8 +96,8 @@ def build_production_action_registry() -> ActionRegistry:
     account adapters (``account.character.switch``, ``account.character.create``), the two
     NPC author-editor adapters (``npc.persona.read``, ``npc.persona.update``), the
     two party adapters (``party.transfer``, ``party.view_member``), the
-    ``options.dismiss`` action, the read-only ``map.view`` and
-    ``services.open`` requests, and the read-only ``travel.plan`` preview.
+    read-only ``map.view`` and ``services.open`` requests, and the read-only
+    ``travel.plan`` preview.
     Each action binds one exact payload validator and one narrow deterministic
     adapter; no action routes through the text parser.
     """
@@ -186,10 +186,6 @@ def build_production_action_registry() -> ActionRegistry:
         validate_talk_scripted_payload,
         validate_wait_payload,
         validate_practice_payload,
-    )
-    from web.webclient.actions.options import (
-        _dismiss_adapter,
-        validate_options_dismiss_payload,
     )
     from web.webclient.actions.party_actions import (
         _party_transfer_adapter,
@@ -719,24 +715,13 @@ def build_production_action_registry() -> ActionRegistry:
     )
     registry.register(
         ActionSpec(
-            action_id="options.dismiss",
-            validate_payload=validate_options_dismiss_payload,
-            adapter=_dismiss_adapter,
-            # The completion publication is the single send: the adapter's
-            # eviction is state-only, and the panel renders the session's
-            # now-unavailable options state exactly once (design D1).
-            affected_panels=("context_actions",),
-        )
-    )
-    registry.register(
-        ActionSpec(
             action_id="title.accept",
             validate_payload=validate_title_accept_payload,
             adapter=_title_accept_adapter,
             # Targeted refresh: answering consumes the ballot, so the
-            # completion publication re-renders the menu panel immediately
-            # (the options.dismiss precedent). The codex carries the 「提名中」
-            # tab, so it refreshes with the ballot.
+            # completion publication re-renders the menu panel immediately.
+            # The codex carries the 「提名中」 tab, so it refreshes with the
+            # ballot.
             affected_panels=("title_ballot", "title_codex"),
         )
     )

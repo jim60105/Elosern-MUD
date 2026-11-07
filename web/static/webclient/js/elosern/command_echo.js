@@ -15,8 +15,8 @@
  * party combat actions) emit a bounded action label of the activating control
  * as an action description (the server exit label where the panel carries one,
  * a verbatim-pinned client-owned control label otherwise) and never invent a
- * command. Declared silent presentation controls (`options.dismiss`) return
- * `null` by declaration.
+ * command. Declared silent presentation controls return `null` by
+ * declaration.
  *
  * No `document` or `window` access at load time; Node tests exercise the
  * module directly.
@@ -146,7 +146,6 @@
     // NPC persona author editor actions are silent webclient author controls.
     "npc.persona.read",
     "npc.persona.update",
-    "options.dismiss",
     // The two party actions have no client producer yet (the party window's
     // member rail and inventory panel land later in the batch), so neither
     // fabricates a line: `party.view_member` is a pure presentation selection

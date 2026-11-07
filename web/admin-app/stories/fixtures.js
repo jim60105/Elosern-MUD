@@ -58,7 +58,6 @@ export const DASHBOARD = Object.freeze({
     layers: [
       { layer: "narrator", enabled: true, model: "synthetic-small", endpoint_host: "llm.local.test", calls: 48, ok: 46, degraded: 2, rejected: 0, reasons: { invalid_output: 2 }, mean_ms: 2140, p95_ms: 5120, last_success_at: NOW - 12 },
       { layer: "npc_dialogue", enabled: true, model: "synthetic-large", endpoint_host: "llm.local.test", calls: 22, ok: 14, degraded: 7, rejected: 1, reasons: { transport_error: 5, invalid_output: 2 }, mean_ms: 8120, p95_ms: 16438, last_success_at: NOW - 64 },
-      { layer: "action_options", enabled: true, model: "synthetic-small", endpoint_host: "llm.local.test", calls: 31, ok: 28, degraded: 3, rejected: 0, reasons: { invalid_output: 3 }, mean_ms: 1630, p95_ms: 3900, last_success_at: NOW - 5 },
       { layer: "dream", enabled: true, model: "synthetic-large", endpoint_host: "llm.local.test", calls: 0, ok: 0, degraded: 0, rejected: 0, reasons: {}, mean_ms: null, p95_ms: null, last_success_at: null },
       { layer: "correspondence", enabled: true, model: "synthetic-small", endpoint_host: "llm.local.test", calls: 3, ok: 3, degraded: 0, rejected: 0, reasons: {}, mean_ms: 4300, p95_ms: 5010, last_success_at: NOW - 900 },
       { layer: "scene_builder", enabled: true, model: "synthetic-small", endpoint_host: "llm.local.test", calls: 9, ok: 9, degraded: 0, rejected: 0, reasons: {}, mean_ms: 940, p95_ms: 1300, last_success_at: NOW - 150 },
@@ -66,7 +65,6 @@ export const DASHBOARD = Object.freeze({
       { layer: "title_nomination", enabled: false, model: "synthetic-small", endpoint_host: "llm.local.test", calls: 0, ok: 0, degraded: 0, rejected: 0, reasons: {}, mean_ms: null, p95_ms: null, last_success_at: null },
     ],
     recent: [
-      call(5, "action_options", "ok", 1630, null, 0),
       call(12, "narrator", "ok", 2210, null, 1),
       call(31, "npc_dialogue", "degraded", 16438, "transport_error", 2),
       call(64, "npc_dialogue", "ok", 8090, null, 3),
