@@ -1415,9 +1415,7 @@ reads every unread page and only returns once the choice list has taken focus,
 so a following `Enter` cannot activate a row that appeared between the read and
 the keypress.
 
-Only the dedicated options-surface fixture (`ELOSERN_BROWSER_OPTIONS_SURFACE=1`)
-enables the `action_options` profile, together with its deterministic replay
-client. Every other browser journey takes the disabled-profile early return in
+Every browser journey takes the disabled-profile early return in
 `world/ai/action_options/generation.py` followed by the options service's
 rule-card fallback; no journey reaches a live LLM transport. Journeys that
 assert a dialogue outcome check the server side — the committed player/NPC turn
