@@ -7,6 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from world.rules.traits import GAUGE_KEYS
 from world.rules.clock import (
     AdvanceSource,
     ClockAdvanceBoundError,
@@ -117,6 +118,30 @@ class ClockTests(unittest.TestCase):
         entity.traits.hp = Gauge(99, 125, 1.25)
         _settle_gauge_regen([entity], 30)
         self.assertEqual(entity.traits.hp.current, 125)
+        self.assertEqual(entity.traits.hp.regen_remainder, 0.0)
+
+    @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")
+    def test_resting_gauges_are_left_alone_without_reading_modifiers(self):
+        entity = Entity()
+        for key in GAUGE_KEYS:
+            gauge = Gauge(100, 100, 1.0)
+            gauge.regen_remainder = 0.0
+            setattr(entity.traits, key, gauge)
+
+        with patch(
+            "world.rules.combat_modifiers.evaluate_combat_modifiers"
+        ) as modifiers:
+            _settle_gauge_regen([entity], 30)
+        modifiers.assert_not_called()
+        self.assertEqual(entity.traits.hp.current, 100)
+
+    @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")
+    def test_a_gauge_with_a_remainder_still_settles_to_full(self):
+        entity = Entity()
+        entity.traits.hp = Gauge(100, 100, 1.0)
+        entity.traits.hp.regen_remainder = 0.25
+
+        _settle_gauge_regen([entity], 30)
         self.assertEqual(entity.traits.hp.regen_remainder, 0.0)
 
     @covers_requirement("world-clock::gauge-regen-is-a-closed-form-computation-never-a-per-second-or-per-quantum-loop")

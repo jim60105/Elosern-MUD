@@ -337,19 +337,24 @@ def _member_ids(wilderness: Any, site: MonsterSite) -> tuple[int, ...]:
 
 
 def _living_member_ids(
-    wilderness: Any, site: MonsterSite, tick: int
+    wilderness: Any,
+    site: MonsterSite,
+    tick: int,
+    *,
+    presence: Mapping[object, Any] | None = None,
 ) -> frozenset[int]:
     """The site's own members that are alive at ``tick`` (projected presence).
 
     The projection is the same evidence the regional owner accounts with, so a
     member whose loss is committed at a later tick still counts before it, and
     a deleted member never keeps a clear-out waiting merely because its row is
-    gone.
+    gone. ``presence`` supplies the facts at ``tick`` when already read.
     """
     ids = set(_member_ids(wilderness, site))
     if not ids:
         return frozenset()
-    presence = presence_at(wilderness, at_tick=tick)
+    if presence is None:
+        presence = presence_at(wilderness, at_tick=tick)
     return frozenset(
         individual_id
         for individual_id in ids
@@ -752,7 +757,11 @@ def _last_member_loss_tick(wilderness: Any, individual_id: int) -> int | None:
 
 
 def _clear_boundary(
-    wilderness: Any, site: MonsterSite, start_tick: int
+    wilderness: Any,
+    site: MonsterSite,
+    start_tick: int,
+    *,
+    presence: Mapping[object, Any] | None = None,
 ) -> int | None:
     """The tick at which this populated site's last own member is lost.
 
@@ -765,7 +774,8 @@ def _clear_boundary(
     member_ids = _member_ids(wilderness, site)
     if not member_ids:
         return start_tick
-    presence = presence_at(wilderness)
+    if presence is None:
+        presence = presence_at(wilderness)
     boundaries: list[int] = []
     for individual_id in member_ids:
         fact = presence.get(individual_id)
@@ -842,6 +852,7 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
         return None
     uninitialized = False
     candidates: list[int] = []
+    presence: Mapping[object, Any] | None = None
     for key, site in MONSTER_SITE_REGISTRY.items():
         record = states.get(key)
         if record is None:
@@ -849,7 +860,11 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
             continue
         state = _saved_state(record)
         if state == SITE_STATE_POPULATED:
-            boundary = _clear_boundary(wilderness, site, start_tick)
+            if presence is None:
+                presence = presence_at(wilderness)
+            boundary = _clear_boundary(
+                wilderness, site, start_tick, presence=presence
+            )
             if boundary is not None:
                 # A boundary already reached is re-evaluated at the interval
                 # start (a deferred clear or an avoided protected cell), so a
@@ -893,6 +908,9 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
     states = _state_map(wilderness)
     events: list[ScheduledEvent] = []
     changed = False
+    # Liveness of a site's own saved members at this tick: a same-pass birth
+    # adds other individuals and never changes what this read answers.
+    presence: Mapping[object, Any] | None = None
     for key in sorted(MONSTER_SITE_REGISTRY):
         site = MONSTER_SITE_REGISTRY[key]
         record = states.get(key)
@@ -917,7 +935,9 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
         seed, saved_sequence = _require_occurrence(site, record)
         member_ids = _require_member_ids(site, record)
         if state == SITE_STATE_POPULATED:
-            if _living_member_ids(wilderness, site, tick):
+            if presence is None:
+                presence = presence_at(wilderness, at_tick=tick)
+            if _living_member_ids(wilderness, site, tick, presence=presence):
                 continue
             members = _members_from_ids(site, member_ids)
             if members and _session_participant_ids().intersection(
@@ -985,11 +1005,9 @@ def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
     deepcopy for values that may embed database objects (the same helper
     ``world/maps/instance.py`` uses for ``owned_entities``).
     """
-    from evennia.utils.dbserialize import from_pickle, to_pickle
+    from world.rules.surfaces import db_safe_attribute_snapshot
 
-    exists = obj.attributes.has(key)
-    value = from_pickle(to_pickle(obj.attributes.get(key))) if exists else None
-    return exists, value
+    return db_safe_attribute_snapshot(obj, key)
 
 
 def snapshot_monster_site_surfaces(

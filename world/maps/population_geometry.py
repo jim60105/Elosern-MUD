@@ -41,6 +41,7 @@ from world.lore.monster_placement import (
     SettlementBirthPolicy,
     composition_bounds,
 )
+from world.maps.published import PublishedView, SourceMemo
 
 #: The authored anchor categories that are inhabited settlements. They receive
 #: the automatic birth exclusion; every other category (a dungeon entrance in
@@ -165,6 +166,10 @@ def _buffers(
     }
 
 
+_BIRTH_CELLS = SourceMemo()
+_REGION_CELLS = SourceMemo()
+
+
 def _chebyshev(first: tuple[int, int], second: tuple[int, int]) -> int:
     return max(abs(first[0] - second[0]), abs(first[1] - second[1]))
 
@@ -199,6 +204,25 @@ def eligible_birth_cells(
     removed. Intersecting rectangles are deduplicated. Cells outside the zone's
     rectangles are simply absent: unconfigured ground has no implicit source.
     """
+    source = entries.source if isinstance(entries, PublishedView) else entries
+    # Cells are pure functions of these immutable values, yet the lifecycle
+    # reads them for every zone at every boundary.
+    return _BIRTH_CELLS.resolve(
+        (geography, source, policies),
+        (zone.region_key, zone.rectangles),
+        lambda: _compute_birth_cells(
+            zone, geography=geography, entries=entries, policies=policies
+        ),
+    )
+
+
+def _compute_birth_cells(
+    zone: EcologyZone,
+    *,
+    geography: Any,
+    entries: Mapping[str, Any],
+    policies: Mapping[str, SettlementBirthPolicy],
+) -> tuple[tuple[int, int], ...]:
     terrain = geography.terrain
     footprints = frozenset().union(
         *(entry.footprint_cells for entry in entries.values())
@@ -220,6 +244,24 @@ def eligible_birth_cells(
                     continue
                 cells.add(cell)
     return tuple(sorted(cells))
+
+
+def zone_rectangle_region_cells(
+    zone: EcologyZone, *, terrain: Any
+) -> frozenset[tuple[int, int]]:
+    """Every cell of the zone's rectangles classified into its parent region."""
+
+    def build() -> frozenset[tuple[int, int]]:
+        return frozenset(
+            cell
+            for rectangle in zone.rectangles
+            for cell in _rectangle_cells(rectangle)
+            if region_for_coordinates(terrain, *cell) == zone.region_key
+        )
+
+    return _REGION_CELLS.resolve(
+        (terrain,), (zone.region_key, zone.rectangles), build
+    )
 
 
 def _rectangle_cells(

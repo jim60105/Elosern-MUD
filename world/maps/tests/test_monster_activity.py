@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from types import MappingProxyType
+from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.contrib.grid.wilderness.wilderness import (
@@ -40,6 +41,7 @@ from world.maps import (
 )
 from world.maps import monster_activity as activity_owner
 from world.maps.monster_activity import (
+    ActivityReceipt,
     MemberTime,
     MonsterActivityState,
     commit_group_decision,
@@ -1211,3 +1213,163 @@ class ChronologicalSettlementTests(ActivityFixture):
         self.assertNotEqual(group.position, LocationRef.wilderness(WILDERNESS_NAME, 505, 705))
         self.assertGreater(group.next_decision_tick, 60)
         self.assertEqual(state.journeys, {})
+
+
+class BulkSettlementEconomyTests(ActivityFixture):
+    """The settlement shortcuts keep every read and write faithful."""
+
+    def _saved(self, **fields):
+        state = read_monster_activity(self.wilderness)
+        self.wilderness.db.monster_activity = state_to_dict(
+            replace(state, **fields)
+        )
+
+    def test_read_follows_every_kind_of_stored_write(self):
+        first = read_monster_activity(self.wilderness)
+        self.assertIs(read_monster_activity(self.wilderness), first)
+        self._saved(settled_through_tick=first.settled_through_tick + 5)
+        self.assertEqual(
+            read_monster_activity(self.wilderness).settled_through_tick,
+            first.settled_through_tick + 5,
+        )
+        self.wilderness.db.monster_activity["settled_through_tick"] = 777
+        self.assertEqual(
+            read_monster_activity(self.wilderness).settled_through_tick, 777
+        )
+
+    def test_batch_stores_once_when_the_pass_completes(self):
+        before = read_monster_activity(self.wilderness)
+        group_id, _bodies = self._group(tick=0)
+        stored = state_to_dict(read_monster_activity(self.wilderness))
+        with activity_owner.batched_state_writes(self.wilderness):
+            activity_owner.settle_group_decisions_at(self.wilderness, 90)
+            inside = read_monster_activity(self.wilderness)
+            self.assertGreater(inside.groups[group_id].sequence, 0)
+            self.assertEqual(
+                state_to_dict(from_stored(self.wilderness)), stored
+            )
+        self.assertEqual(
+            state_to_dict(read_monster_activity(self.wilderness)),
+            state_to_dict(inside),
+        )
+        self.assertIsNot(before, inside)
+
+    def test_failed_batch_discards_its_in_flight_state(self):
+        group_id, _bodies = self._group(tick=0)
+        stored = state_to_dict(read_monster_activity(self.wilderness))
+        with self.assertRaises(ZeroDivisionError):
+            with activity_owner.batched_state_writes(self.wilderness):
+                activity_owner.settle_group_decisions_at(self.wilderness, 90)
+                raise ZeroDivisionError
+        self.assertEqual(
+            state_to_dict(read_monster_activity(self.wilderness)), stored
+        )
+        self.assertIn(group_id, read_monster_activity(self.wilderness).groups)
+
+    def test_unbatched_work_sees_the_stored_record_and_batching_resumes(self):
+        self._group(tick=0)
+        with activity_owner.batched_state_writes(self.wilderness):
+            activity_owner.settle_group_decisions_at(self.wilderness, 90)
+            inside = state_to_dict(read_monster_activity(self.wilderness))
+            with activity_owner.unbatched_state_writes():
+                self.assertEqual(
+                    state_to_dict(from_stored(self.wilderness)), inside
+                )
+            activity_owner.settle_idle_physiology(self.wilderness, 91)
+            self.assertEqual(state_to_dict(from_stored(self.wilderness)), inside)
+
+    def test_resting_stays_decide_at_the_slower_cadence(self):
+        group_id, _bodies = self._group(
+            tick=0, postures=(SleepPosture.AWAKE, SleepPosture.VOLUNTARY)
+        )
+        decision = plan_group_decision(self.wilderness, group_id, tick=90)
+        commit_group_decision(self.wilderness, decision)
+        self.assertEqual(
+            read_monster_activity(self.wilderness).groups[group_id].next_decision_tick,
+            90 + activity_owner.RESTING_DECISION_INTERVAL,
+        )
+
+    def test_only_resting_reasons_slow_the_cadence(self):
+        ordinary = activity_owner.activity_decision_interval(SOLO_ACTIVITY)
+        for reason in activity_owner.RESTING_STAY_REASONS:
+            self.assertEqual(
+                activity_owner.stay_decision_interval(SOLO_ACTIVITY, reason),
+                activity_owner.RESTING_DECISION_INTERVAL,
+            )
+        self.assertEqual(
+            activity_owner.stay_decision_interval(
+                SOLO_ACTIVITY, activity_owner.DECISION_STAY
+            ),
+            ordinary,
+        )
+
+    def test_settled_decision_receipts_retire_and_others_remain(self):
+        def receipt(operation_id, journey_id, tick):
+            return ActivityReceipt(
+                operation_id,
+                activity_owner.RECEIPT_DEPARTURE,
+                "group",
+                journey_id,
+                None,
+                tick,
+            )
+
+        group_id, _bodies = self._group(tick=0)
+        decision = next(
+            plan
+            for tick in range(90, 90 * 40, 90)
+            if (plan := plan_group_decision(self.wilderness, group_id, tick=tick)).edge
+        )
+        commit_group_decision(self.wilderness, decision)
+        state = read_monster_activity(self.wilderness)
+        live = next(iter(state.journeys))
+        settled = f"{activity_owner.DECISION_OPERATION_PREFIX}gone:10"
+        current = f"{activity_owner.DECISION_OPERATION_PREFIX}gone:500"
+        escape = "escape:gone:10"
+        self._saved(
+            receipts={
+                **state.receipts,
+                settled: receipt(settled, "journey:arrived", 10),
+                current: receipt(current, "journey:arrived", 500),
+                escape: receipt(escape, "journey:arrived", 10),
+            }
+        )
+        activity_owner.retire_settled_decision_receipts(self.wilderness, 500)
+        kept = read_monster_activity(self.wilderness).receipts
+        self.assertNotIn(settled, kept)
+        self.assertIn(current, kept)
+        self.assertIn(escape, kept)
+        self.assertTrue(any(item.journey_id == live for item in kept.values()))
+
+    def test_reused_presence_follows_the_stored_facts(self):
+        _group_id, bodies = self._group(tick=0)
+        with patch.object(
+            regional_population,
+            "_living_monsters",
+            wraps=regional_population._living_monsters,
+        ) as scan:
+            with regional_population.reused_living_presence():
+                first = regional_population.presence_at(self.wilderness)
+                self.assertEqual(
+                    regional_population.presence_at(self.wilderness), first
+                )
+                self.assertEqual(scan.call_count, 1)
+                self.wilderness.db.itemcoordinates[bodies[0]] = (501, 701)
+                moved = regional_population.presence_at(self.wilderness)
+                self.assertEqual(scan.call_count, 2)
+                self.assertEqual(
+                    (moved[bodies[0].pk].position.x, moved[bodies[0].pk].position.y),
+                    (501, 701),
+                )
+                regional_population.forget_living_presence()
+                regional_population.presence_at(self.wilderness)
+                self.assertEqual(scan.call_count, 3)
+            regional_population.presence_at(self.wilderness)
+            self.assertEqual(scan.call_count, 4)
+
+
+def from_stored(wilderness):
+    """Decode the stored record, bypassing any in-flight batched state."""
+    return activity_owner.state_from_dict(
+        wilderness.attributes.get(activity_owner.MONSTER_ACTIVITY_ATTRIBUTE)
+    )

@@ -335,8 +335,31 @@ def _gauge_value(gauge: Any) -> float:
     return float(getattr(gauge, "current", gauge.value))
 
 
+def _gauge_at_rest(gauge: Any) -> bool:
+    """Whether regeneration would rewrite this gauge with its current values.
+
+    Authored regen scales are never negative, so a full gauge carrying no
+    remainder stays exactly as stored whatever the elapsed time or scale.
+    """
+    maximum = float(gauge.max)
+    return (
+        float(getattr(gauge, "rate", 0)) >= 0
+        and getattr(gauge, "regen_remainder", None) == 0.0
+        and _gauge_value(gauge) == round(maximum) >= maximum
+    )
+
+
 def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
     for entity in entities:
+        # A resting body is the common case for an unobserved population, and
+        # one gauge write stores its entire trait record.
+        gauges = tuple(
+            gauge
+            for gauge in (getattr(entity.traits, key, None) for key in GAUGE_KEYS)
+            if gauge is not None
+        )
+        if all(_gauge_at_rest(gauge) for gauge in gauges):
+            continue
         mods: dict[str, Any] = {}
         if hasattr(entity, "traits"):
             try:

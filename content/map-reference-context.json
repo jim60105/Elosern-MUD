@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "57b304f7a9275f177bb2f1bc8835815b4ca697bd64e5267471989b8285317ef4",
+  "fingerprint": "1d58fe876b77faca51f7bc2d11bf70c4de87f4cd0add146c1a418e3c375b0126",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1705,7 +1705,7 @@
     "world/rules/church.py": "d0d197ca2b70aa2623edeecf065f4d702789bfcfde32dc59d1e8b028397e7b52",
     "world/rules/church_rulebook.py": "7373da0ee3b9311dc8dbb1c768ff54437ad180a86307ef7fc2c6d3480f679f7e",
     "world/rules/city_gates.py": "769431ba2710458d3f6f560ef8eb5b9f0c0d704ebf29230246b59b9fec67232b",
-    "world/rules/clock.py": "354b33043de6156223fe5b55874d34f4a51b21741bfae31ca2094566aa4f4217",
+    "world/rules/clock.py": "268749ba823983c2f9dbe13da0a0bc4fe9cfc5e6e89a0f2a759b2bf6c9d13808",
     "world/rules/combat/__init__.py": "e6f030fbd5174ae8e7e32a0cd9e69ba46858d09cebbe1b523c72dcc5e24fa813",
     "world/rules/combat/battlefield.py": "d76c5fca0046579e19362ba04ecde17a10d006ed831cec836ec6f0e7d6fbeab0",
     "world/rules/combat/damage.py": "ec953ec43ed0fab1adfabe5772a1100a379393637ae52a36a16838bbef4f3019",
@@ -1809,7 +1809,7 @@
     "world/rules/monster_behaviour.py": "57e58f8022e94ca5dac89353245c6bfb701f487b5222381677a58e33fe7f3dcf",
     "world/rules/monster_individual.py": "aacf9a52419bfff9677495d5305e8b7380bb375905c10268e4287c0f5e8773fd",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
-    "world/rules/movement_edges.py": "dc07fce13e91bee630557ce493bc1089855ffba5b28285ac32c51bdf1239006e",
+    "world/rules/movement_edges.py": "ea91cd45cea73df108322dca9949522c02dd0818e7d891afc130ff35293624b6",
     "world/rules/movement_settlement.py": "60b5f5c19dea147d82025c411e591297a67f49991a5be4044152a8369e87f3fc",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "93b04048e6593599605183f7dc3d8d92330ff136759c314893c7d43c14563993",
@@ -1916,7 +1916,7 @@
     "world/rules/status_text.py": "293518f7c908dd79946ed08e8af1c65a4871c4deaae3fd656553bccc2c19417b",
     "world/rules/stored_sexual_reads.py": "6ce57e7c3a8d1166476efaf8ea21cd4c0408d9c05270beef08e737be54378fd5",
     "world/rules/story_effects.py": "571c1dd4c381be9925b75ba15ad3b3e862e5b9f754d5a3fc558f5590cfe480c5",
-    "world/rules/surfaces.py": "0647111b374f045a4081ad6c4231370641db9faa3cd8a9d90b952aa0fe4f00fa",
+    "world/rules/surfaces.py": "c238f8a97746cc5b8ca564c60f2cb78c457c1e822ae4c06f593ca940a87cf13a",
     "world/rules/target_facts.py": "18c850571b194d6fbaddf6d2ce329a2b6763e920e3050da97d3db1d3df04855b",
     "world/rules/targeting.py": "de3600f8b834e19a1e47527723dc6d376258cfd943f8b049faebaecdb708aea8",
     "world/rules/time_skip.py": "d54d477f4ebe109a22a67fb4d9ce55c9f5d4d11d13fdbafc259edf01784c4113",

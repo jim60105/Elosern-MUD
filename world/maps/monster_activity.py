@@ -19,13 +19,16 @@ named ``monster_activity_state_invalid`` reason instead of being reset.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from fractions import Fraction
 from math import gcd
-from typing import Any, Iterable, Mapping, Sequence
+from types import MappingProxyType
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from django.db import transaction
 
+from world.maps.published import SourceMemo
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.movement_edges import (
@@ -77,8 +80,15 @@ STAGED_DECISION_INTERVAL = 120
 #: published binding rather than moving it.
 DEFAULT_DECISION_INTERVAL = 60
 
+#: The slower cadence of a stay only elapsed time can change (see
+#: :func:`stay_decision_interval`).
+RESTING_DECISION_INTERVAL = 600
+
 #: The departure receipt kind this owner writes.
 RECEIPT_DEPARTURE = "departure"
+
+#: Operation ids of ordinary scheduled decisions start with this prefix.
+DECISION_OPERATION_PREFIX = "activity:"
 
 #: The one draw purpose an ordinary activity decision consumes.
 DECISION_PURPOSE = "activity"
@@ -99,6 +109,11 @@ STAY_MEMBER_SLEEPING = "member_sleeping"
 STAY_MEMBER_UNAFFORDABLE = "member_unaffordable"
 STAY_MEMBER_BLOCKED = "member_blocked"
 STAY_OUTSIDE_BOUNDS_WAITING = "outside_bounds_waiting"
+
+#: Stays whose outcome no ordinary interval can change.
+RESTING_STAY_REASONS = frozenset(
+    {STAY_STATIONARY, STAY_MEMBER_SLEEPING, STAY_MEMBER_UNAFFORDABLE}
+)
 
 #: The bounded number of posture segments one idle interval may commit.
 _MAX_POSTURE_SEGMENTS = 64
@@ -837,7 +852,11 @@ def state_from_dict(value: Any) -> MonsterActivityState:
     )
     settled = _require_int(data["settled_through_tick"], "settled_through_tick")
     return MonsterActivityState(
-        groups, journeys, receipts, protection, settled
+        MappingProxyType(groups),
+        MappingProxyType(journeys),
+        MappingProxyType(receipts),
+        protection,
+        settled,
     )
 
 
@@ -872,15 +891,32 @@ def initialize_monster_activity(wilderness: Any, *, tick: int) -> MonsterActivit
     return state
 
 
+#: The last decoded record and the stored value it came from. Every write,
+#: including an in-place saver mutation and a rollback restore, replaces the
+#: stored value object, so its identity proves the decode is still current and
+#: an unchanged record is never decoded twice. The state it holds is read-only.
+_DECODED_STATE: tuple[Any, MonsterActivityState] | None = None
+
+
 def read_monster_activity(wilderness: Any) -> MonsterActivityState:
     """Read the complete owner record; missing or malformed state refuses."""
+    global _DECODED_STATE
     _require_wilderness(wilderness)
-    raw = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE)
+    batch = _ACTIVE_BATCH
+    if batch is not None and batch.wilderness is wilderness and batch.state is not None:
+        return batch.state
+    stored = wilderness.attributes.get(MONSTER_ACTIVITY_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
     if raw is None:
         raise _invalid(
             f"{MONSTER_ACTIVITY_ATTRIBUTE!r} is missing from this provisioned world"
         )
-    return state_from_dict(raw)
+    decoded = _DECODED_STATE
+    if decoded is not None and decoded[0] is raw:
+        return decoded[1]
+    state = state_from_dict(raw)
+    _DECODED_STATE = (raw, state)
+    return state
 
 
 def activity_provisioned(wilderness: Any) -> bool:
@@ -894,7 +930,69 @@ def activity_provisioned(wilderness: Any) -> bool:
 
 
 def _write_state(wilderness: Any, state: MonsterActivityState) -> None:
+    batch = _ACTIVE_BATCH
+    if batch is not None and batch.wilderness is wilderness:
+        batch.state = state
+        return
     wilderness.db.monster_activity = state_to_dict(state)
+
+
+@dataclass(slots=True)
+class _StateBatch:
+    """The in-flight record of one bulk settlement pass."""
+
+    wilderness: Any
+    state: MonsterActivityState | None = None
+
+
+_ACTIVE_BATCH: _StateBatch | None = None
+
+
+@contextmanager
+def batched_state_writes(wilderness: Any) -> Iterator[None]:
+    """Store a pass's many owner writes as one write when it completes.
+
+    The record is one blob, so paying for it per decision multiplies a pass by
+    the population. Reads inside the pass see the in-flight state. The pass
+    runs inside the clock advance, whose rollback owns every failure: an
+    exception discards the in-flight state and leaves the stored record as it
+    was before the pass. Work that handles its own failure and carries on
+    belongs in :func:`unbatched_state_writes`.
+    """
+    global _ACTIVE_BATCH
+    if _ACTIVE_BATCH is not None:
+        yield
+        return
+    batch = _StateBatch(wilderness)
+    _ACTIVE_BATCH = batch
+    try:
+        yield
+    finally:
+        _ACTIVE_BATCH = None
+    if batch.state is not None:
+        _write_state(wilderness, batch.state)
+
+
+@contextmanager
+def unbatched_state_writes() -> Iterator[None]:
+    """Store any in-flight state and run the enclosed work on the stored record.
+
+    For a caller that may roll its own writes back from a snapshot of the
+    stored record and continue the pass.
+    """
+    global _ACTIVE_BATCH
+    batch = _ACTIVE_BATCH
+    if batch is None:
+        yield
+        return
+    _ACTIVE_BATCH = None
+    if batch.state is not None:
+        _write_state(batch.wilderness, batch.state)
+        batch.state = None
+    try:
+        yield
+    finally:
+        _ACTIVE_BATCH = batch
 
 
 def _copy_state(state: MonsterActivityState, **fields: Any) -> MonsterActivityState:
@@ -1141,6 +1239,11 @@ def _declaration(activity_key: str) -> Any | None:
     return MONSTER_ACTIVITY_REGISTRY.get(activity_key)
 
 
+#: Resolved areas of the published geography: every decision reads its group's
+#: whole area, and the result is a pure function of these immutable values.
+_RESOLVED_AREAS = SourceMemo()
+
+
 def _group_area(group: MonsterGroup) -> tuple[Mapping[str, object], ...]:
     """The bounded legal cells of one group's committed activity binding."""
     from world.lore.monster_activity import (
@@ -1159,12 +1262,17 @@ def _group_area(group: MonsterGroup) -> tuple[Mapping[str, object], ...]:
         raise _invalid(
             f"activity {declaration.key!r} names a missing activity area"
         )
-    return tuple(
-        resolve_activity_area(
-            area,
-            home=encode_location_ref(group.home),
-            candidate_world=current_geography(),
-        )
+    geography = current_geography()
+    return _RESOLVED_AREAS.resolve(
+        (geography,),
+        (area, group.home),
+        lambda: tuple(
+            resolve_activity_area(
+                area,
+                home=encode_location_ref(group.home),
+                candidate_world=geography,
+            )
+        ),
     )
 
 
@@ -1478,7 +1586,7 @@ def commit_group_decision(wilderness: Any, plan: ActivityDecision) -> None:
         raise TypeError(f"expected an ActivityDecision, got {plan!r}")
     _require_wilderness(wilderness)
     _require_int(plan.tick, "tick")
-    operation_id = f"activity:{plan.group_id}:{plan.tick}"
+    operation_id = f"{DECISION_OPERATION_PREFIX}{plan.group_id}:{plan.tick}"
     state = read_monster_activity(wilderness)
     existing = state.receipts.get(operation_id)
     if existing is not None:
@@ -1509,8 +1617,19 @@ def commit_group_decision(wilderness: Any, plan: ActivityDecision) -> None:
     _commit_departure(wilderness, group, plan, operation_id=operation_id)
 
 
-def _decision_interval(group: MonsterGroup) -> int:
-    return _activity_interval(group.activity_key)
+def stay_decision_interval(activity_key: str, reason: str) -> int:
+    """The positive interval until the next decision after one committed stay.
+
+    A group that cannot act until time alone restores it would repeat the same
+    stay at every ordinary interval, and those staggered no-op decisions are
+    what fill a resting population's advance with boundaries. It decides again
+    at the slower resting cadence instead; physiology is unaffected, because
+    idle posture settles from its cursor whenever the group is next settled.
+    """
+    interval = _activity_interval(activity_key)
+    if reason in RESTING_STAY_REASONS:
+        return max(interval, RESTING_DECISION_INTERVAL)
+    return interval
 
 
 def _emit_decided(plan: ActivityDecision) -> None:
@@ -1526,8 +1645,9 @@ def _emit_decided(plan: ActivityDecision) -> None:
 
 
 def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -> None:
-    del group  # the group is re-read inside the owning transaction
-    snapshot = snapshot_departure_surfaces(wilderness)
+    # The group is re-read inside the owning transaction; a stay writes only
+    # this record and the group's own bodies.
+    snapshot = snapshot_activity_surfaces(wilderness, member_ids=group.member_ids)
     try:
         with transaction.atomic():
             settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
@@ -1547,7 +1667,8 @@ def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -
             groups[plan.group_id] = _replace_group(
                 current,
                 sequence=current.sequence + 1,
-                next_decision_tick=int(plan.tick) + _decision_interval(current),
+                next_decision_tick=int(plan.tick)
+                + stay_decision_interval(current.activity_key, plan.reason),
             )
             _write_state(
                 wilderness,
@@ -1637,7 +1758,7 @@ def _commit_departure(
             "monster_activity_route_stale",
             "at least one living member can no longer take the selected edge",
         )
-    snapshot = snapshot_departure_surfaces(wilderness)
+    snapshot = snapshot_group_decision_surfaces(wilderness, plan.group_id)
     try:
         with transaction.atomic():
             settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
@@ -2540,16 +2661,17 @@ def settle_group_decisions_at(
     _require_int(tick, "tick")
     if not activity_provisioned(wilderness):
         return []
-    for group_id in sorted(read_monster_activity(wilderness).groups):
-        state = read_monster_activity(wilderness)
-        group = state.groups.get(group_id)
-        if group is None or group.journey_id is not None:
-            continue
-        if group.next_decision_tick > tick:
-            continue
-        settle_group_idle(wilderness, group_id, tick=tick)
-        decision = plan_group_decision(wilderness, group_id, tick=tick)
-        commit_group_decision(wilderness, decision)
+    with batched_state_writes(wilderness):
+        for group_id in sorted(read_monster_activity(wilderness).groups):
+            state = read_monster_activity(wilderness)
+            group = state.groups.get(group_id)
+            if group is None or group.journey_id is not None:
+                continue
+            if group.next_decision_tick > tick:
+                continue
+            settle_group_idle(wilderness, group_id, tick=tick)
+            decision = plan_group_decision(wilderness, group_id, tick=tick)
+            commit_group_decision(wilderness, decision)
     return []
 
 
@@ -2844,6 +2966,11 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
     _require_int(tick, "tick")
     if not activity_provisioned(wilderness):
         return []
+    with batched_state_writes(wilderness):
+        return _settle_due_journeys(wilderness, tick)
+
+
+def _settle_due_journeys(wilderness: Any, tick: int) -> list[ScheduledEvent]:
     from evennia.objects.models import ObjectDB
 
     state = read_monster_activity(wilderness)
@@ -3024,6 +3151,38 @@ def retire_room_protection(wilderness: Any, tick: int) -> None:
         _write_state(wilderness, _copy_state(state, room_protection=remaining))
 
 
+def retire_settled_decision_receipts(wilderness: Any, tick: int) -> None:
+    """Consume ordinary decision receipts once their replay window has passed.
+
+    A decision's receipt answers a replay of that same tick. Once its journey
+    has arrived and progress has moved past the tick, the group's sequence and
+    next decision tick already refuse a stale plan, so the receipt protects
+    nothing and would otherwise grow the whole-record write without bound.
+    """
+    if not activity_provisioned(wilderness):
+        return
+    state = read_monster_activity(wilderness)
+    retired = {
+        operation_id
+        for operation_id, receipt in state.receipts.items()
+        if operation_id.startswith(DECISION_OPERATION_PREFIX)
+        and receipt.occurred_tick < tick
+        and receipt.journey_id not in state.journeys
+    }
+    if retired:
+        _write_state(
+            wilderness,
+            _copy_state(
+                state,
+                receipts={
+                    operation_id: receipt
+                    for operation_id, receipt in state.receipts.items()
+                    if operation_id not in retired
+                },
+            ),
+        )
+
+
 # ---------------------------------------------------------------------------
 # Surfaces for a caller-owned rollback
 
@@ -3031,17 +3190,9 @@ def retire_room_protection(wilderness: Any, tick: int) -> None:
 def _db_safe_attribute_snapshot(
     obj: Any, key: str, category: str | None = None
 ) -> tuple[bool, Any]:
-    from evennia.utils import dbserialize
+    from world.rules.surfaces import db_safe_attribute_snapshot
 
-    exists = obj.attributes.has(key, category=category)
-    value = (
-        dbserialize.from_pickle(
-            dbserialize.to_pickle(obj.attributes.get(key, category=category))
-        )
-        if exists
-        else None
-    )
-    return exists, value
+    return db_safe_attribute_snapshot(obj, key, category)
 
 
 def _tracked_individual_ids(state: MonsterActivityState) -> tuple[int, ...]:
@@ -3065,16 +3216,25 @@ def snapshot_monster_activity_surfaces(
     return snapshot_activity_surfaces(wilderness)
 
 
-def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
-    """Snapshot every durable and live surface one activity write may touch."""
+def snapshot_activity_surfaces(
+    wilderness: Any, *, member_ids: Iterable[int] | None = None
+) -> dict[int, SurfaceSnapshot]:
+    """Snapshot every durable and live surface one activity write may touch.
+
+    ``member_ids`` narrows the bodies to the ones a single-group write can
+    reach; omitted, every tracked individual is included.
+    """
     from evennia.objects.models import ObjectDB
 
     from world.rules.fatigue import FATIGUE_ATTRIBUTE_SURFACES
     from world.rules.sleep_receipt import SLEEP_RECEIPT_SURFACES
 
+    # A batched pass leaves the stored record untouched until it completes.
     surfaces: dict[int, SurfaceSnapshot] = {
         id(wilderness): SurfaceSnapshot(
-            attributes={
+            attributes={}
+            if _ACTIVE_BATCH is not None
+            else {
                 (MONSTER_ACTIVITY_ATTRIBUTE, None): _db_safe_attribute_snapshot(
                     wilderness, MONSTER_ACTIVITY_ATTRIBUTE
                 ),
@@ -3085,7 +3245,8 @@ def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
         state = read_monster_activity(wilderness)
     except MonsterActivityError:  # observability: ignore R2: a malformed record still snapshots its own attribute; the write refuses before any member is read
         return surfaces
-    for individual_id in _tracked_individual_ids(state):
+    tracked = _tracked_individual_ids(state) if member_ids is None else member_ids
+    for individual_id in tracked:
         individual = ObjectDB.objects.filter(id=individual_id).first()
         if individual is None:
             continue
@@ -3109,11 +3270,27 @@ def snapshot_activity_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
     return surfaces
 
 
-def snapshot_departure_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
+def snapshot_group_decision_surfaces(
+    wilderness: Any, group_id: str
+) -> dict[int, SurfaceSnapshot]:
+    """One group decision's snapshot: its own bodies plus the shared records.
+
+    A stay or departure writes only the group's members, so a decision pays for
+    what it can touch instead of snapshotting every tracked body.
+    """
+    current = read_monster_activity(wilderness).groups.get(group_id)
+    return snapshot_departure_surfaces(
+        wilderness, member_ids=() if current is None else current.member_ids
+    )
+
+
+def snapshot_departure_surfaces(
+    wilderness: Any, *, member_ids: Iterable[int] | None = None
+) -> dict[int, SurfaceSnapshot]:
     """The departure effect's snapshot, including coordinates and timeline."""
     from world.maps import regional_population as owner
 
-    surfaces = snapshot_activity_surfaces(wilderness)
+    surfaces = snapshot_activity_surfaces(wilderness, member_ids=member_ids)
     surfaces[id(wilderness)] = SurfaceSnapshot(
         attributes={
             **surfaces[id(wilderness)].attributes,
@@ -3196,6 +3373,7 @@ __all__ = [
     "ACTIVITY_SLEEP",
     "COMBAT_ACTIVITIES",
     "DECISION_DEPART",
+    "DECISION_OPERATION_PREFIX",
     "DECISION_PURPOSE",
     "DECISION_STAY",
     "DEFAULT_DECISION_INTERVAL",
@@ -3231,12 +3409,15 @@ __all__ = [
     "PlanMember",
     "PlanSegment",
     "RECEIPT_DEPARTURE",
+    "RESTING_DECISION_INTERVAL",
+    "RESTING_STAY_REASONS",
     "RoomProtection",
     "STAGED_DECISION_INTERVAL",
     "STAGED_STATIONARY_ACTIVITY",
     "STATE_INVALID",
     "activity_member_mode",
     "activity_provisioned",
+    "batched_state_writes",
     "begin_monster_journey",
     "commit_group_decision",
     "create_group",
@@ -3265,15 +3446,18 @@ __all__ = [
     "release_group",
     "restore_activity_surfaces",
     "retire_room_protection",
+    "retire_settled_decision_receipts",
     "room_protected",
     "settle_group_decisions_at",
     "settle_group_idle",
     "settle_idle_physiology",
     "settle_monster_activity_at",
     "snapshot_activity_surfaces",
+    "stay_decision_interval",
     "snapshot_departure_surfaces",
     "snapshot_monster_activity_surfaces",
     "state_from_dict",
     "state_to_dict",
+    "unbatched_state_writes",
     "update_member_time",
 ]

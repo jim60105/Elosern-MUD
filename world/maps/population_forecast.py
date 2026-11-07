@@ -707,6 +707,9 @@ class _Projection:
         except Exception:  # observability: ignore R2: the committed planner's refusal is this group's lawful stay for the read-only pass
             return
         if decision.edge is None:
+            group.next_decision_tick = tick + monster_activity.stay_decision_interval(
+                group.activity_key, decision.reason
+            )
             return
         try:
             bodies = monster_activity.living_member_bodies(wilderness, group.group_id)

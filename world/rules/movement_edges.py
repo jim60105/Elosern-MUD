@@ -365,26 +365,28 @@ def _arrival_refused(actor: Any, destination: Any) -> bool:
     return False
 
 
-def _direction_admits(actor: Any, source: LocationRef, direction: str) -> bool:
+def _materialized_room(source: LocationRef) -> Any | None:
+    """The wilderness room currently materialized at ``source``, if any."""
+    from evennia.utils.search import search_script
+
+    script = search_script(WILDERNESS_NAME)
+    if not script:
+        return None
+    return (script[0].db.rooms or {}).get((source.x, source.y))
+
+
+def _direction_admits(actor: Any, room: Any | None, direction: str) -> bool:
     """Whether the materialized wilderness direction exit admits ``actor``.
 
     A recycled/unmaterialized cell has no exit object to consult, so topology
     remains the authority there. When the cell is materialized, its real
     ``WildernessReturnExit`` traverse lock is checked read-only.
     """
-    if source.kind != KIND_WILDERNESS:
-        return False
-    from evennia.utils.search import search_script
-
     from world.maps.wilderness_destination import normalize_wilderness_direction
 
     normalized = normalize_wilderness_direction(direction)
     if normalized is None:
         return False
-    script = search_script(WILDERNESS_NAME)
-    if not script:
-        return True
-    room = (script[0].db.rooms or {}).get((source.x, source.y))
     if room is None:
         return True
     for exit_obj in room.exits:
@@ -532,8 +534,9 @@ def legal_edges(
         cell = _coordinate_pair((source.x, source.y))
         if cell is None:
             return ()
+        room = _materialized_room(source)
         for direction in DIRECTION_ORDER:
-            if not _direction_admits(actor, source, direction):
+            if not _direction_admits(actor, room, direction):
                 continue
             edge = resolve_direction_edge(source, cell, direction)
             if edge is not None:
@@ -600,7 +603,7 @@ def _direction_quote(
             actor, "wilderness_move", status=TraversalStatus.UNRESOLVED,
             cost=None, members=travellers, source=edge.source,
         )
-    if not _direction_admits(actor, edge.source, direction):
+    if not _direction_admits(actor, _materialized_room(edge.source), direction):
         return _resolution(
             actor, "wilderness_move", status=TraversalStatus.UNRESOLVED,
             cost=None, members=travellers, source=edge.source,

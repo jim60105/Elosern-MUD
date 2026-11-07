@@ -34,6 +34,7 @@ from world.lore.monster_placement import (
 from world.lore.wilderness_entry import WildernessEntryPoint
 from world.lore.wilderness_regions import WildernessRegion
 from world.maps import population_geometry
+from world.maps.published import SourceMemo
 from world.maps.population_geometry import (
     MINIMUM_SETTLEMENT_BUFFER,
     PopulationGeometryError,
@@ -559,3 +560,21 @@ class CandidatePublicationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SourceMemoTests(unittest.TestCase):
+    """Derived map values follow the identity of their immutable sources."""
+
+    def test_a_value_is_built_once_per_source_generation(self):
+        memo = SourceMemo()
+        source = {"a": 1}
+        builds = mock.Mock(side_effect=[1, 2, 3])
+        self.assertEqual(memo.resolve((source,), "key", builds), 1)
+        self.assertEqual(memo.resolve((source,), "key", builds), 1)
+        self.assertEqual(memo.resolve((source,), "other", builds), 2)
+        self.assertEqual(builds.call_count, 2)
+
+    def test_an_equal_but_distinct_source_drops_every_value(self):
+        memo = SourceMemo()
+        memo.resolve(({"a": 1},), "key", lambda: "old")
+        self.assertEqual(memo.resolve(({"a": 1},), "key", lambda: "new"), "new")

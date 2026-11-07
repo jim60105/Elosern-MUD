@@ -49,6 +49,26 @@ def _zone_keys(wilderness: Any) -> tuple[str, ...]:
     return regional_population.initialized_zone_keys(wilderness)
 
 
+def _note_boundary(
+    wilderness: Any,
+    zone_keys: tuple[str, ...],
+    tick: int,
+    *,
+    noted: tuple[Any, ...] | None = None,
+) -> tuple[Any, ...]:
+    """Note this boundary unless ``noted`` proves the measure cannot differ.
+
+    The same presence and the same tick always yield the same episode answer,
+    and measuring the whole population is the costly part of a quiet boundary.
+    """
+    current = regional_population.presence_fingerprint(wilderness)
+    if current != noted:
+        regional_population.note_population_boundaries(
+            wilderness, zone_keys, tick=tick
+        )
+    return current
+
+
 def _settle_population_at(
     wilderness: Any, tick: int, *, contact_tick: int | None = None
 ) -> list[ScheduledEvent]:
@@ -63,19 +83,13 @@ def _settle_population_at(
     # 1. Lawful completed arrivals and protected-arrival retries first, so a
     # present arrival consumes the headroom it actually occupies at this tick.
     events = list(monster_activity.settle_monster_activity_at(wilderness, tick))
-    for zone_key in zone_keys:
-        regional_population.note_population_boundary(
-            wilderness, zone_key, tick=tick
-        )
+    noted = _note_boundary(wilderness, zone_keys, tick)
     # 2. Explicit site births, then 3. ordinary regional births.
     events.extend(monster_sites.settle_monster_sites_at(tick))
     # Same-tick explicit site births restore local density: cancel or refresh
     # each episode from the post-site counts before any regional wave is
     # considered, so a restored episode never survives into a later due time.
-    for zone_key in zone_keys:
-        regional_population.note_population_boundary(
-            wilderness, zone_key, tick=tick
-        )
+    noted = _note_boundary(wilderness, zone_keys, tick, noted=noted)
     for zone_key in zone_keys:
         events.extend(
             regional_population.settle_recovery_due(
@@ -90,9 +104,12 @@ def _settle_population_at(
     if contact_tick is not None and int(tick) == int(contact_tick):
         from world.rules.field_contact import settle_population_contact_at
 
-        events.extend(
-            settle_population_contact_at(wilderness, tick, int(contact_tick))
-        )
+        # A failed contact restores its participants and the advance goes on.
+        with monster_activity.unbatched_state_writes():
+            events.extend(
+                settle_population_contact_at(wilderness, tick, int(contact_tick))
+            )
+        regional_population.forget_living_presence()
     # 5. Idle departures last: a contact cannot be avoided by iterating a
     # wandering departure before the encounter it belongs to.
     events.extend(monster_activity.settle_group_decisions_at(wilderness, tick))
@@ -102,10 +119,7 @@ def _settle_population_at(
     events.extend(monster_activity.settle_monster_activity_at(wilderness, tick))
     # A departure can itself open a recovery deficit at this tick. Establish or
     # cancel each episode from the post-departure counts without another birth.
-    for zone_key in zone_keys:
-        regional_population.note_population_boundary(
-            wilderness, zone_key, tick=tick
-        )
+    _note_boundary(wilderness, zone_keys, tick, noted=noted)
     regional_population.settle_timeline_through(
         wilderness, tick, retain=monster_sites.retained_loss_ids(wilderness)
     )
@@ -159,22 +173,29 @@ def settle_population_lifecycle(
         return []
     events: list[ScheduledEvent] = []
     tick = start_tick
-    while tick <= end_tick:
-        events.extend(
-            _settle_population_at(wilderness, tick, contact_tick=end_tick)
+    with (
+        monster_activity.batched_state_writes(wilderness),
+        regional_population.reused_living_presence(),
+    ):
+        while tick <= end_tick:
+            events.extend(
+                _settle_population_at(wilderness, tick, contact_tick=end_tick)
+            )
+            following = _next_population_boundary(wilderness, tick, end_tick)
+            if following is None or following <= tick:
+                break
+            tick = following
+        # Progress is the interval endpoint whether or not a boundary fell
+        # there: equal elapsed time must leave equal settlement progress and
+        # equal protection retirement.
+        monster_activity.settle_idle_physiology(wilderness, end_tick)
+        regional_population.settle_timeline_through(
+            wilderness,
+            end_tick,
+            retain=monster_sites.retained_loss_ids(wilderness),
         )
-        following = _next_population_boundary(wilderness, tick, end_tick)
-        if following is None or following <= tick:
-            break
-        tick = following
-    # Progress is the interval endpoint whether or not a boundary fell there:
-    # equal elapsed time must leave equal settlement progress and equal
-    # protection retirement.
-    monster_activity.settle_idle_physiology(wilderness, end_tick)
-    regional_population.settle_timeline_through(
-        wilderness, end_tick, retain=monster_sites.retained_loss_ids(wilderness)
-    )
-    monster_activity.retire_room_protection(wilderness, end_tick)
+        monster_activity.retire_room_protection(wilderness, end_tick)
+        monster_activity.retire_settled_decision_receipts(wilderness, end_tick)
     return events
 
 

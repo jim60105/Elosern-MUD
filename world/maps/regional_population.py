@@ -55,16 +55,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any
 
 from django.db import transaction
 from evennia.contrib.grid.wilderness.wilderness import WildernessScript
-from evennia.utils.dbserialize import from_pickle, to_pickle
-
-from elosern_map_core.terrain import region_for_coordinates
+from evennia.utils.dbserialize import from_pickle
 
 from typeclasses.monsters import Monster
 from world.lore.monster_activity import movement_units
@@ -78,13 +77,17 @@ from world.lore.monster_placement import (
     variant_species_key,
 )
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
-from world.maps.population_geometry import density_bounds, eligible_birth_cells
+from world.maps.population_geometry import (
+    density_bounds,
+    eligible_birth_cells,
+    zone_rectangle_region_cells,
+)
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.movement_edges import LocationRef
 from world.rules.monster_individual import construct_species_individual
-from world.rules.surfaces import persisted_hp
+from world.rules.surfaces import db_safe_attribute_snapshot, persisted_hp
 
 #: The world seed a freshly provisioned wilderness script starts with. It is an
 #: explicit configured value, never an implicit default for a missing seed: an
@@ -594,6 +597,27 @@ def _is_wilderness(wilderness: Any, candidate: Any) -> bool:
     )
 
 
+#: The last unpacked coordinate map and the stored value it came from. Every
+#: write replaces the stored value object, so its identity proves the map is
+#: current; unpacking it per entity would rebuild every live reference.
+_UNPACKED_REGISTRATION: tuple[Any, Mapping[Any, Any]] | None = None
+
+
+def _coordinate_registration(wilderness: Any) -> Mapping[Any, Any] | None:
+    """The wilderness's coordinate map as a read-only view, if it has one."""
+    global _UNPACKED_REGISTRATION
+    stored = wilderness.attributes.get(ITEMCOORDINATES_ATTRIBUTE, return_obj=True)
+    if stored is None:
+        return None
+    raw = stored.db_value
+    unpacked = _UNPACKED_REGISTRATION
+    if unpacked is not None and unpacked[0] is raw:
+        return unpacked[1]
+    registration = MappingProxyType(from_pickle(raw))
+    _UNPACKED_REGISTRATION = (raw, registration)
+    return registration
+
+
 def actual_cell(wilderness: Any, entity: Any) -> tuple[int, int] | None:
     """Where one entity actually stands in this wilderness, or ``None``.
 
@@ -603,7 +627,7 @@ def actual_cell(wilderness: Any, entity: Any) -> tuple[int, int] | None:
     the room's active coordinates, so another wilderness at the same numeric
     cell can never consume this zone's headroom.
     """
-    registration = getattr(wilderness, "itemcoordinates", None)
+    registration = _coordinate_registration(wilderness)
     if registration is not None:
         registered = registration.get(entity)
         if registered is not None:
@@ -637,14 +661,7 @@ def _region_cells(zone: EcologyZone) -> frozenset[tuple[int, int]]:
     Deliberately wider than the birth geometry: settlement-excluded and
     otherwise non-birth cells still hold individuals who count locally.
     """
-    terrain = _published_geography().terrain
-    cells: set[tuple[int, int]] = set()
-    for x_min, x_max, y_min, y_max in zone.rectangles:
-        for x in range(x_min, x_max + 1):
-            for y in range(y_min, y_max + 1):
-                if region_for_coordinates(terrain, x, y) == zone.region_key:
-                    cells.add((x, y))
-    return frozenset(cells)
+    return zone_rectangle_region_cells(zone, terrain=_published_geography().terrain)
 
 
 def _birth_cells(zone: EcologyZone) -> tuple[tuple[int, int], ...]:
@@ -812,29 +829,10 @@ def population_counts(
     unchanged read must leave no trace beyond its own return value.
     """
     _require_wilderness(wilderness)
-    zone = _zone(zone_key)
-    local_cells = _region_cells(zone)
-    name = _wilderness_name(wilderness)
-    home: set[int] = set()
-    cells: dict[tuple[int, int], set[int]] = {}
-    for individual_id, presence in presence_at(wilderness, at_tick=at_tick).items():
-        if not presence.alive:
-            continue
-        if presence.home_zone == zone_key:
-            home.add(individual_id)
-        position = presence.position
-        if position is None or position.wilderness != name:
-            continue
-        cell = (position.x, position.y)
-        if cell in local_cells:
-            cells.setdefault(cell, set()).add(individual_id)
-    local = {pk for occupants in cells.values() for pk in occupants}
-    return PopulationCounts(
-        local_ids=frozenset(local),
-        home_ids=frozenset(home),
-        cell_ids=MappingProxyType(
-            {cell: frozenset(occupants) for cell, occupants in cells.items()}
-        ),
+    return counts_from_presence(
+        zone_key,
+        presence_at(wilderness, at_tick=at_tick),
+        wilderness=_wilderness_name(wilderness),
     )
 
 
@@ -1265,18 +1263,46 @@ def record_population_protection(
     )
 
 
-def presence_at(
-    wilderness: Any, *, at_tick: int | None = None
-) -> dict[int, PopulationPresence]:
-    """Every known individual's presence at one tick, keyed by persistent ID.
+@dataclass(slots=True)
+class _PresenceReuse:
+    """The last living-presence read of one reuse scope."""
 
-    The actual living state is the base; a pending transition committed later
-    than ``at_tick`` is reversed through its complete before facts in reverse
-    chronological, stable source/individual order. An individual whose row was
-    deleted is restored only for accounting: nothing is recreated and no
-    public presence is fabricated.
+    fingerprint: tuple[Any, ...] | None = None
+    presence: Mapping[int, PopulationPresence] = field(default_factory=dict)
+
+
+_PRESENCE_REUSE: _PresenceReuse | None = None
+
+
+@contextmanager
+def reused_living_presence() -> Iterator[None]:
+    """Reuse one living-presence read while its stored facts stand still.
+
+    Only for bulk settlement, where nothing changes an individual's liveness:
+    a loss arrives through combat, which :func:`forget_living_presence` brackets.
+    Scanning every individual is a boundary's costliest read and it recurs at
+    every step of the merged lifecycle.
     """
-    _require_wilderness(wilderness)
+    global _PRESENCE_REUSE
+    _PRESENCE_REUSE = _PresenceReuse()
+    try:
+        yield
+    finally:
+        _PRESENCE_REUSE = None
+
+
+def forget_living_presence() -> None:
+    """Drop a reused read after work that may have changed liveness."""
+    if _PRESENCE_REUSE is not None:
+        _PRESENCE_REUSE.fingerprint = None
+
+
+def _living_presence(wilderness: Any) -> Mapping[int, PopulationPresence]:
+    """Every living individual's actual presence, keyed by persistent ID."""
+    reuse = _PRESENCE_REUSE
+    fingerprint = presence_fingerprint(wilderness)
+    if reuse is not None and reuse.fingerprint == fingerprint:
+        return reuse.presence
     name = _wilderness_name(wilderness)
     presence: dict[int, PopulationPresence] = {}
     for individual in _living_monsters():
@@ -1291,6 +1317,25 @@ def presence_at(
                 getattr(individual.db, "site_key", None), "site_key"
             ),
         )
+    if reuse is not None:
+        reuse.fingerprint = fingerprint
+        reuse.presence = presence
+    return presence
+
+
+def presence_at(
+    wilderness: Any, *, at_tick: int | None = None
+) -> dict[int, PopulationPresence]:
+    """Every known individual's presence at one tick, keyed by persistent ID.
+
+    The actual living state is the base; a pending transition committed later
+    than ``at_tick`` is reversed through its complete before facts in reverse
+    chronological, stable source/individual order. An individual whose row was
+    deleted is restored only for accounting: nothing is recreated and no
+    public presence is fabricated.
+    """
+    _require_wilderness(wilderness)
+    presence = dict(_living_presence(wilderness))
     if at_tick is None:
         return presence
     _require_argument_int(at_tick, "at_tick")
@@ -1431,6 +1476,46 @@ def counts_from_presence(
     )
 
 
+def presence_fingerprint(wilderness: Any) -> tuple[Any, ...]:
+    """The stored facts ``presence_at`` measures at one fixed boundary tick.
+
+    Every placement, departure, arrival or recorded loss replaces one of these
+    stored values, so unchanged values mean an earlier measure still holds.
+    """
+    return tuple(
+        None if stored is None else stored.db_value
+        for stored in (
+            wilderness.attributes.get(key, return_obj=True)
+            for key in (ITEMCOORDINATES_ATTRIBUTE, POPULATION_TIMELINE_ATTRIBUTE)
+        )
+    )
+
+
+def note_population_boundaries(
+    wilderness: Any, zone_keys: Iterable[str], *, tick: int
+) -> None:
+    """Note one settled boundary for every zone from a single presence read.
+
+    A note writes only zone records, never presence, so every zone of one pass
+    measures the same facts and the global individual scan runs once.
+    """
+    _require_wilderness(wilderness)
+    _require_argument_int(tick, "tick")
+    keys = tuple(zone_keys)
+    if not keys:
+        return
+    presence = presence_at(wilderness, at_tick=tick)
+    states = _state_map(wilderness)
+    changed = False
+    for zone_key in keys:
+        fields = _boundary_fields(wilderness, zone_key, tick, presence)
+        if fields:
+            states[zone_key] = {**states[zone_key], **fields}
+            changed = True
+    if changed:
+        _write_state(wilderness, states)
+
+
 def note_population_boundary(wilderness: Any, zone_key: str, *, tick: int) -> None:
     """Establish or cancel a zone's recovery episode at one settled boundary.
 
@@ -1442,23 +1527,41 @@ def note_population_boundary(wilderness: Any, zone_key: str, *, tick: int) -> No
     """
     _require_wilderness(wilderness)
     _require_argument_int(tick, "tick")
+    fields = _boundary_fields(
+        wilderness, zone_key, tick, presence_at(wilderness, at_tick=tick)
+    )
+    if fields:
+        _write_zone_fields(wilderness, zone_key, **fields)
+
+
+def _boundary_fields(
+    wilderness: Any,
+    zone_key: str,
+    tick: int,
+    presence: Mapping[object, PopulationPresence],
+) -> dict[str, object]:
+    """The zone record fields one settled boundary changes, if any."""
     state = zone_state(wilderness, zone_key)
     if state is None:
-        return
+        return {}
     zone = _zone(zone_key)
     lower = density_lower_bound(wilderness, zone_key)
-    below = len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) < lower
+    counts = counts_from_presence(
+        zone_key, presence, wilderness=_wilderness_name(wilderness)
+    )
+    below = len(counts.local_ids) < lower
     fields: dict[str, object] = {"settled_through_tick": max(state.settled_through_tick, tick)}
     if not below:
         if state.recovery_due_tick is not None:
             fields["recovery_due_tick"] = None
     elif state.recovery_due_tick is None:
         fields["recovery_due_tick"] = tick + zone.recovery_delay
-    if fields != {
+    if fields == {
         "settled_through_tick": state.settled_through_tick,
         "recovery_due_tick": state.recovery_due_tick,
     }:
-        _write_zone_fields(wilderness, zone_key, **fields)
+        return {}
+    return fields
 
 
 def settle_recovery_due(
@@ -2195,9 +2298,7 @@ def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
     deepcopy for values that embed database objects (the same helper
     ``world/maps/monster_sites.py`` uses).
     """
-    exists = obj.attributes.has(key)
-    value = from_pickle(to_pickle(obj.attributes.get(key))) if exists else None
-    return exists, value
+    return db_safe_attribute_snapshot(obj, key)
 
 
 def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
@@ -2359,6 +2460,9 @@ __all__ = [
     "population_provisioned",
     "population_counts",
     "presence_at",
+    "presence_fingerprint",
+    "forget_living_presence",
+    "reused_living_presence",
     "presence_of",
     "protected_cells",
     "read_population_seed",

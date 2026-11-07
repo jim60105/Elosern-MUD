@@ -29,6 +29,22 @@ def attribute_snapshot(obj: Any, key: str, category: str | None = None) -> tuple
     return exists, value
 
 
+def db_safe_attribute_snapshot(
+    obj: Any, key: str, category: str | None = None
+) -> tuple[bool, Any]:
+    """Return ``(existed, detached-value)`` for a value embedding database objects.
+
+    A plain ``deepcopy`` cannot copy live objects; unpacking the stored form
+    yields the same detached value without first rebuilding it twice.
+    """
+    from evennia.utils.dbserialize import from_pickle
+
+    stored = obj.attributes.get(key, category=category, return_obj=True)
+    if stored is None:
+        return False, None
+    return True, from_pickle(stored.db_value)
+
+
 def restore_attribute(
     obj: Any,
     key: str,
@@ -111,12 +127,16 @@ def persisted_hp(entity: Any) -> float:
     and constructor validation calls ``trait_data.update(...)``, which saves the
     Attribute on read. To ensure pure, side-effect-free reads that never modify
     Attribute records or trigger saves, read the persisted trait mapping directly.
-    Fails closed to 0.0 on missing or unreadable records.
+    The stored value is read as is: this runs for every individual at every
+    population boundary, and rebuilding the whole saver tree to reach one gauge
+    costs far more than the read. Fails closed to 0.0 on missing or unreadable
+    records.
     """
     attributes = getattr(entity, "attributes", None)
     if attributes is None:
         return 0.0
-    traits = attributes.get("traits", category="traits")
+    stored = attributes.get("traits", category="traits", return_obj=True)
+    traits = getattr(stored, "db_value", None)
     if not isinstance(traits, Mapping):
         return 0.0
     record = traits.get("hp")

@@ -23,6 +23,7 @@ gateway hit only. The pinning test moves a character through the real exit and
 compares predicted and actual arrival nodes.
 """
 
+from collections.abc import Mapping
 from math import hypot
 from typing import Any
 
@@ -33,6 +34,7 @@ from world.lore.wilderness_entry import (
     WildernessGate,
 )
 from world.maps.map_data import settlement_graph
+from world.maps.published import PublishedView, SourceMemo
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     is_valid_wilderness_cell,
@@ -261,11 +263,35 @@ def find_gateway(
     presentation agree by construction (the legacy hardcoded
     ``(wilderness_xy, "south")`` pair is gone in any form).
     """
-    for entry in WILDERNESS_ENTRY_REGISTRY.values():
+    registry = WILDERNESS_ENTRY_REGISTRY
+    source = registry.source if isinstance(registry, PublishedView) else registry
+    entries_by_cell = _GATEWAY_ENTRIES.resolve(
+        (source,), None, lambda: _entries_by_gateway_cell(source)
+    )
+    for entry in entries_by_cell.get(coordinates, ()):
         gate = _gateway_from_entry(entry, coordinates, direction)
         if gate is not None:
             return entry, gate
     return None
+
+
+_GATEWAY_ENTRIES = SourceMemo()
+
+
+def _entries_by_gateway_cell(
+    entries: Mapping[str, WildernessEntryPoint],
+) -> dict[tuple[int, int], tuple[WildernessEntryPoint, ...]]:
+    """Each entry under the cells its gates can match, in registry order."""
+    cells: dict[tuple[int, int], list[WildernessEntryPoint]] = {}
+    for entry in entries.values():
+        gateway_cells = (
+            {entry.anchor_cell}
+            if entry.is_point_shape
+            else {entry.approach_cell(gate) for gate in entry.gates}
+        )
+        for cell in gateway_cells:
+            cells.setdefault(cell, []).append(entry)
+    return {cell: tuple(found) for cell, found in cells.items()}
 
 
 def grid_room_for_gate(gate: WildernessGate) -> Any:
