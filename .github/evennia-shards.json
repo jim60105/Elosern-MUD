@@ -733,8 +733,6 @@
         "world.narrative.tests.test_dream_dispatch",
         "world.narrative.tests.test_dream_dispatch_runner",
         "world.narrative.tests.test_dream_dispatch_smoke",
-        "world.ai.tests.test_action_options_layer",
-        "world.ai.tests.test_action_options_schema",
         "world.ai.tests.test_aftermath_overlay",
         "world.ai.tests.test_ai_observability",
         "world.ai.tests.test_character_creation",
@@ -859,7 +857,6 @@
         "server",
         "typeclasses.tests.test_account_capacity",
         "typeclasses.tests.test_account_login",
-        "typeclasses.tests.test_action_options_room_entry",
         "typeclasses.tests.test_appearance",
         "typeclasses.tests.test_art_room_entry",
         "typeclasses.tests.test_components",
@@ -913,7 +910,6 @@
         "web.webclient.actions.tests.test_creation_actions.test_payload_validation",
         "web.webclient.actions.tests.test_dialogue_composition",
         "web.webclient.actions.tests.test_dispatcher.test_adapter_data_slot",
-        "web.webclient.actions.tests.test_dispatcher.test_dialogue_trigger",
         "web.webclient.actions.tests.test_dispatcher.test_dispatcher_core",
         "web.webclient.actions.tests.test_dispatcher.test_registry",
         "web.webclient.actions.tests.test_exploration_actions.test_deliver",
@@ -939,7 +935,6 @@
         "web.webclient.actions.tests.test_npc_persona_actions",
         "web.webclient.actions.tests.test_npc_persona_privacy",
         "web.webclient.actions.tests.test_npc_persona_validators",
-        "web.webclient.actions.tests.test_options_actions",
         "web.webclient.actions.tests.test_party_actions",
         "web.webclient.actions.tests.test_party_management_acceptance_fixture"
       ]
