@@ -46,7 +46,7 @@ describe("operations dashboard overview", () => {
     expect(wrapper.get("[data-testid='gm-llm-layers']").text()).toContain("緩衝區保留 113 / 500 筆呼叫");
     const dream = layerRows.find((row) => row.text().includes("dream"));
     expect(dream.get(".status-marker").text()).toBe("尚無資料");
-    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(7);
+    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(6);
     expect(wrapper.get("[data-testid='gm-world']").text()).toContain("黃昏");
     expect(wrapper.get("[data-testid='gm-art']").text()).toContain("排程執行中");
     expect(wrapper.get("[data-testid='gm-process']").text()).toContain("可讀取");
@@ -153,12 +153,12 @@ describe("operations dashboard overview", () => {
     const fresh = { ...DASHBOARD.llm.recent[0], ts: DASHBOARD.llm.recent[0].ts + 1, call_id: "ff".repeat(16) };
     snapshot = { ...DASHBOARD, llm: { ...DASHBOARD.llm, recent: [fresh, ...DASHBOARD.llm.recent] } };
     await vi.advanceTimersByTimeAsync(5000);
-    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(7);
+    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(6);
     expect(wrapper.get("[data-testid='gm-calls-new']").text()).toBe("有 1 筆新呼叫");
     await region.trigger("pointerleave");
-    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(7);
+    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(6);
     await region.trigger("focusout");
-    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(8);
+    expect(wrapper.findAll("[data-testid='gm-recent-calls'] tbody tr")).toHaveLength(7);
     expect(wrapper.find("[data-testid='gm-calls-new']").exists()).toBe(false);
     wrapper.unmount();
   });
