@@ -26,7 +26,6 @@ var env = require("./protocol/envelope.js");
 var store = require("./protocol/store.js");
 var combat = require("./protocol/panels/combat.js");
 var status = require("./protocol/panels/status.js");
-var suggestions = require("./protocol/panels/suggestions.js");
 var local_map = require("./protocol/panels/local_map.js");
 var services = require("./protocol/panels/services.js");
 var creation = require("./protocol/panels/creation.js");
@@ -229,16 +228,6 @@ var publication_parts = require("./protocol/publication_parts.js");
     validateCharacterSelectedSkill: character.validateCharacterSelectedSkill,
     validateContextActionsPanel: combat.validateContextActionsPanel,
     validateContextActionsAffordanceParams: combat.validateContextActionsAffordanceParams,
-    validateSuggestions: suggestions.validateSuggestions,
-    validateSuggestionCard: suggestions.validateSuggestionCard,
-    OPTIONS_STATUSES: C.OPTIONS_STATUSES.slice(),
-    OPTIONS_CARD_KINDS: C.OPTIONS_CARD_KINDS.slice(),
-    MAX_OPTION_CARDS: C.MAX_OPTION_CARDS,
-    MAX_OPTION_LABEL: C.MAX_OPTION_LABEL,
-    MAX_OPTION_HINT: C.MAX_OPTION_HINT,
-    MAX_OPTION_PARAMS: C.MAX_OPTION_PARAMS,
-    OPTIONS_FREEFORM_ACTION_CODE: C.OPTIONS_FREEFORM_ACTION_CODE,
-    OPTIONS_MAX_PARAM_STRING: C.OPTIONS_MAX_PARAM_STRING,
     validateLocalMapPanel: local_map.validateLocalMapPanel,
     validateServicesPanel: services.validateServicesPanel,
     validatePartyPanel: misc.validatePartyPanel,

@@ -72,8 +72,8 @@ var CONTEXT_ACTIONS_MAX_NODE_ID = C.CONTEXT_ACTIONS_MAX_NODE_ID;
 var CONTEXT_ACTIONS_MAX_KEYWORD_ID = C.CONTEXT_ACTIONS_MAX_KEYWORD_ID;
 var CONTEXT_ACTIONS_MAX_ITEM_KEY = C.CONTEXT_ACTIONS_MAX_ITEM_KEY;
 var CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS = C.CONTEXT_ACTIONS_MAX_WEB_SKIP_SECONDS;
-// Shared action-parameter gate used by the context_actions affordance rows and
-// the suggestion cards (one mirror of the Python affordance table).
+// Shared action-parameter gate used by the context_actions affordance rows
+// (one mirror of the Python affordance table).
 function validateContextActionsAffordanceParams(actionId, params) {
   if (!isPlainObject(params)) {
     throw new Error("affordance params must be a JSON object");

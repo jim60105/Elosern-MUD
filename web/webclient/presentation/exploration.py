@@ -97,6 +97,7 @@ from web.webclient.presentation.protocol import (
     _validate_identifier,
     json_byte_size,
 )
+from web.webclient.presentation.affordance_params import validate_affordance_params
 from web.webclient.presentation.protocol_validation import (
     require_exit_ref,
     require_node_id_shape,
@@ -107,7 +108,6 @@ from web.webclient.presentation.monster_identity import (
     validate_monster_identity,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from web.webclient.presentation.options import _validate_affordance_params
 from world.rules.dialogue import is_dialogue_host, opens_dialogue
 from world.rules.monster_individual import monster_identity_view
 from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
@@ -274,7 +274,7 @@ def _validate_affordance(value: Any) -> dict[str, Any]:
             "disabled_reason": disabled_reason,
         }
         if action_id == "explore.deliver":
-            normalized["params"] = _validate_affordance_params(
+            normalized["params"] = validate_affordance_params(
                 action_id, value["params"]
             )
         return normalized

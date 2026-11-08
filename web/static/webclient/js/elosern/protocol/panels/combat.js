@@ -66,9 +66,6 @@ var CHARACTER_MAX_KEY = C.CHARACTER_MAX_KEY;
 var NODE_ID_RE = C.NODE_ID_RE;
 var TOKEN_RE = C.TOKEN_RE;
 
-var suggestions = require("./suggestions.js");
-var validateSuggestions = suggestions.validateSuggestions;
-
 function validateToken(value) {
   if (typeof value !== "string" || !TOKEN_RE.test(value) || value.length > MAX_TOKEN) {
     throw new Error("participant token must be aN or eN");
@@ -370,7 +367,7 @@ function validateContextActionsExplorationForm(payload) {
   requireExactFields(
     payload,
     "context_actions exploration form",
-    ["schema_version", "available", "kind", "affordances", "suggestions"],
+    ["schema_version", "available", "kind", "affordances"],
     []
   );
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -394,7 +391,6 @@ function validateContextActionsExplorationForm(payload) {
     available: true,
     kind: "exploration",
     affordances: affordances,
-    suggestions: validateSuggestions(payload.suggestions),
   };
 }
 
@@ -788,7 +784,7 @@ function validateContextActionsPanel(payload) {
     payload,
     "context_actions panel",
     ["schema_version", "available", "kind"],
-    ["session", "participants", "root_actions", "secondary_actions", "actors", "choices", "draft", "affordances", "suggestions"]
+    ["session", "participants", "root_actions", "secondary_actions", "actors", "choices", "draft", "affordances"]
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
   if (payload.schema_version !== CONTEXT_ACTIONS_SCHEMA_VERSION) {
@@ -806,7 +802,7 @@ function validateContextActionsPanel(payload) {
   requireExactFields(
     payload,
     "context_actions panel",
-    ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "actors", "choices", "draft", "suggestions"],
+    ["schema_version", "available", "kind", "session", "participants", "root_actions", "secondary_actions", "actors", "choices", "draft"],
     []
   );
 
@@ -921,19 +917,9 @@ function validateContextActionsPanel(payload) {
     }
   }
 
-  // Combat proposals are out of scope: the combat form always reports the
-  // suggestions envelope as exactly unavailable.
-  var combatSuggestions = validateSuggestions(payload.suggestions);
-  if (
-    combatSuggestions.status !== "unavailable" ||
-    Object.keys(combatSuggestions).length !== 1
-  ) {
-    throw new Error("combat suggestions must be exactly unavailable");
-  }
   return Object.assign({}, payload, {
     choices: choicesView,
     draft: draftView,
-    suggestions: combatSuggestions,
   });
 }
 

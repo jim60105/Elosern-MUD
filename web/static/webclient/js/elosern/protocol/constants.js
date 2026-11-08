@@ -104,8 +104,9 @@ var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical
 // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
 // The panel's own schema version (mirror of CONTEXT_ACTIONS_SCHEMA_VERSION):
 // v7 publishes the exact party actor/choices/draft read model; v8 adds the
-// nullable participant monster_identity (monster-individual-names).
-var CONTEXT_ACTIONS_SCHEMA_VERSION = 8;
+// nullable participant monster_identity (monster-individual-names); v9
+// removes the retired suggestions envelope from both available forms.
+var CONTEXT_ACTIONS_SCHEMA_VERSION = 9;
 var MAX_SESSION_ID_CODE_POINTS = 128;
 var MAX_PARTICIPANTS = 16;
 // v7 party bounds (mirror of world.rules.combat_view): ordered allied actor
@@ -173,16 +174,6 @@ var CONTEXT_ACTIONS_ACTION_CODES = [
 ];
 var CONTEXT_ACTIONS_SURFACES = ["guild", "shop"];
 var CONTEXT_ACTIONS_DAYPARTS = ["midnight", "dawn", "noon", "dusk"];
-// Suggestions envelope bounds and enums (mirror of
-// web.webclient.presentation.options and the generative schema caps).
-var OPTIONS_STATUSES = ["generating", "ready", "degraded", "unavailable"];
-var OPTIONS_CARD_KINDS = ["known_action", "freeform"];
-var MAX_OPTION_CARDS = 5;
-var MAX_OPTION_LABEL = 24;
-var MAX_OPTION_HINT = 60;
-var MAX_OPTION_PARAMS = 4;
-var OPTIONS_FREEFORM_ACTION_CODE = "explore.talk_freeform";
-var OPTIONS_MAX_PARAM_STRING = 512;
 // SkillCategory enum values, in the registry's fixed declaration order
 // (mirror of world.skills.registry.SkillCategory).
 var SKILL_CATEGORY_KEYS = [
@@ -684,14 +675,6 @@ module.exports = {
   CONTEXT_ACTIONS_ACTION_CODES: CONTEXT_ACTIONS_ACTION_CODES,
   CONTEXT_ACTIONS_SURFACES: CONTEXT_ACTIONS_SURFACES,
   CONTEXT_ACTIONS_DAYPARTS: CONTEXT_ACTIONS_DAYPARTS,
-  OPTIONS_STATUSES: OPTIONS_STATUSES,
-  OPTIONS_CARD_KINDS: OPTIONS_CARD_KINDS,
-  MAX_OPTION_CARDS: MAX_OPTION_CARDS,
-  MAX_OPTION_LABEL: MAX_OPTION_LABEL,
-  MAX_OPTION_HINT: MAX_OPTION_HINT,
-  MAX_OPTION_PARAMS: MAX_OPTION_PARAMS,
-  OPTIONS_FREEFORM_ACTION_CODE: OPTIONS_FREEFORM_ACTION_CODE,
-  OPTIONS_MAX_PARAM_STRING: OPTIONS_MAX_PARAM_STRING,
   SKILL_CATEGORY_KEYS: SKILL_CATEGORY_KEYS,
   LOCAL_MAP_MAX_NODES: LOCAL_MAP_MAX_NODES,
   LOCAL_MAP_MAX_EDGES: LOCAL_MAP_MAX_EDGES,
