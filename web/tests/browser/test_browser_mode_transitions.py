@@ -47,7 +47,7 @@ def _dialogue_panel() -> dict:
 def _exploration_panels() -> dict:
     return {
         "exploration": _exploration_panel([_interact_target(11, "小販")]),
-        "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+        "context_actions": _exploration_context_actions_panel(),
     }
 
 

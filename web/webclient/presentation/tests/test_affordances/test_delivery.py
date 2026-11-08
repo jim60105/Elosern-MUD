@@ -16,13 +16,9 @@ from evennia.utils.create import create_object
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     MAX_AFFORDANCES,
-    MAX_CARDS,
-    SUGGESTIBLE_ACTION_IDS,
     SURFACES,
     AffordanceView,
-    default_cards,
     exploration_affordances,
-    suggestible_candidates,
 )
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 import unittest

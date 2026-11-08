@@ -39,8 +39,6 @@ from web.webclient.actions.exploration_actions import (
 from web.webclient.actions.service_actions import _buy_adapter, _sell_adapter
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
-    SUGGESTIBLE_ACTION_IDS,
-    default_cards,
     exploration_affordances,
 )
 from web.webclient.presentation.character import character_presenter
@@ -722,12 +720,19 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(res_release["outcome"], "success")
         self.assertEqual(res_release["code"], "released")
 
-        # Suggestible exclusion: possession actions are never suggestible cards
+        # Possession controls reach the client only as the companion's own
+        # vocabulary affordances; no suggestion eligibility set exists to
+        # consult.
         vocab = exploration_affordances(self.player)
-        cards = default_cards(vocab, actor=self.player)
-        card_actions = {c.action_id for c in cards}
-        self.assertNotIn("explore.possess", card_actions)
-        self.assertNotIn("explore.possess_release", card_actions)
+        possess_entries = [
+            entry
+            for entry in vocab
+            if entry.action_id in ("explore.possess", "explore.possess_release")
+        ]
+        self.assertTrue(possess_entries)
+        for entry in possess_entries:
+            self.assertFalse(entry.navigation)
+            self.assertEqual(entry.params, {"npc_id": int(self.npc.pk)})
 
     def test_locked_recheck_prevents_stale_possession(self):
         """If gate changes right before row lock, enter_possession raises PossessionGateError under lock."""

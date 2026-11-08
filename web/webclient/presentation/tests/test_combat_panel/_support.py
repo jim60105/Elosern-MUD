@@ -212,7 +212,7 @@ def _valid_draft(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "combat",
         "session": {
@@ -237,7 +237,6 @@ def _valid_panel(**overrides):
         "actors": [_valid_actor()],
         "choices": _valid_choices(),
         "draft": _valid_draft(),
-        "suggestions": {"status": "unavailable"},
     }
     # Tests name the requested actor's skill catalog directly; route it into
     # the v7 choices object.
@@ -250,7 +249,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "combat",
         "session": {
@@ -267,7 +266,6 @@ def _recovery_panel(**overrides):
         "actors": [],
         "choices": None,
         "draft": None,
-        "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
     return value
@@ -282,7 +280,7 @@ def _player(key="panel player"):
 
 def _exploration_panel(**overrides):
     value = {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "exploration",
         "affordances": [
@@ -314,33 +312,9 @@ def _exploration_panel(**overrides):
                 "disabled_reason": None,
             },
         ],
-        "suggestions": {"status": "unavailable"},
     }
     value.update(overrides)
     return value
-
-
-def _suggestion_card(**overrides):
-    value = {
-        "kind": "known_action",
-        "action_code": "explore.look",
-        "label": "查看房間",
-        "params": {"room": True},
-    }
-    value.update(overrides)
-    return value
-
-
-def _ready_suggestions(count=3):
-    cards = [
-        _suggestion_card(),
-        _suggestion_card(action_code="explore.wait", label="等待片刻", params={"daypart": "noon"}),
-        _suggestion_card(label="查看木箱", params={"target_id": 9}),
-        _suggestion_card(label="前往東邊", params={"target_id": 9}),
-        _suggestion_card(label="查看南門", params={"target_id": 9}),
-        _suggestion_card(label="查看北門", params={"target_id": 9}),
-    ]
-    return {"status": "ready", "cards": cards[:count]}
 
 
 def _monster(key="panel goblin", hp=100):

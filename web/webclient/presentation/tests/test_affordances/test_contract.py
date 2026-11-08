@@ -2,13 +2,9 @@
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     MAX_AFFORDANCES,
-    MAX_CARDS,
-    SUGGESTIBLE_ACTION_IDS,
     SURFACES,
     AffordanceView,
-    default_cards,
     exploration_affordances,
-    suggestible_candidates,
 )
 from world.rules.time_skip import DAYPARTS, unsafe_rejection
 import unittest
@@ -35,22 +31,6 @@ class AffordanceContractTests(unittest.TestCase):
             ),
         )
         self.assertNotIn("explore.interact", ACTION_CODE_ALLOWLIST)
-
-    def test_suggestible_set_excludes_party_actions_talk_open_and_completion(self):
-        self.assertEqual(
-            SUGGESTIBLE_ACTION_IDS,
-            set(ACTION_CODE_ALLOWLIST) - {
-                "explore.talk_open",
-                "explore.dialogue_complete",
-                "explore.party_invite",
-                "explore.party_leave",
-                "explore.possess",
-                "explore.possess_release",
-            },
-        )
-
-    def test_max_cards_is_five(self):
-        self.assertEqual(MAX_CARDS, 5)
 
     def test_action_entry_shape_is_exact(self):
         entry = AffordanceView(

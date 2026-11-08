@@ -107,7 +107,7 @@ function nestedSkills(...skills) {
 
 function readyPanel(overrides) {
   const base = {
-    schema_version: 7,
+    schema_version: 9,
     available: true,
     kind: "combat",
     session: {
@@ -147,7 +147,6 @@ function readyPanel(overrides) {
       needs_selection_ids: [2],
       reselection_reasons: [],
     },
-    suggestions: { status: "unavailable" },
   };
   const opts = Object.assign({}, overrides);
   // Tests name the requested actor's grouped catalog directly; route a

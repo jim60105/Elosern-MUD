@@ -102,7 +102,7 @@ function validCombatDraft(overrides) {
 
 function validCombatPanel(overrides) {
   const base = {
-    schema_version: 8,
+    schema_version: 9,
     available: true,
     kind: "combat",
     session: {
@@ -119,7 +119,6 @@ function validCombatPanel(overrides) {
     actors: [validCombatActor()],
     choices: validCombatChoices(),
     draft: validCombatDraft(),
-    suggestions: { status: "unavailable" },
   };
   const opts = Object.assign({}, overrides);
   // Tests name the requested actor's grouped catalog directly; route a
@@ -134,7 +133,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "combat",
       session: {
@@ -151,7 +150,6 @@ function validRecoveryPanel(overrides) {
       actors: [],
       choices: null,
       draft: null,
-      suggestions: { status: "unavailable" },
     },
     overrides
   );
@@ -162,23 +160,13 @@ function nestedSkills(...skills) {
   return [validCategoryGroup({ groups: [validSkillGroup({ skills: skills })] })];
 }
 
-function validSuggestions(overrides) {
-  return deepMerge(
-    {
-      status: "unavailable",
-    },
-    overrides
-  );
-}
-
 function validContextActionsExplorationPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "exploration",
       affordances: [],
-      suggestions: validSuggestions(),
     },
     overrides
   );
@@ -755,7 +743,6 @@ module.exports = {
   validCombatPanel,
   validRecoveryPanel,
   nestedSkills,
-  validSuggestions,
   validContextActionsExplorationPanel,
   validServicesAction,
   validServicesBoardRow,

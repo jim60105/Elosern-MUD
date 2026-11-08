@@ -88,7 +88,7 @@ def _room(index: int, exits: list) -> dict:
         "panels": {
             "exploration": exploration,
             "local_map": local_map,
-            "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+            "context_actions": _exploration_context_actions_panel(),
         },
         "targets": {ref: target for ref, _label, _xy, target, _enabled in exits},
     }

@@ -102,9 +102,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 page,
                 {
                     "exploration": exploration,
-                    "context_actions": _exploration_context_actions_panel(
-                        {"status": "unavailable"}
-                    ),
+                    "context_actions": _exploration_context_actions_panel(),
                     "local_map": valid_local_map_panel(),
                 },
                 mode="exploration",
@@ -189,7 +187,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -310,7 +308,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -342,7 +340,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         exploration = _exploration_panel(
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
         )
-        context_actions = _exploration_context_actions_panel({"status": "unavailable"})
+        context_actions = _exploration_context_actions_panel()
         _inject_snapshot(
             page,
             {
@@ -429,7 +427,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -504,9 +502,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel(
-                    {"status": "unavailable"}
-                ),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -588,7 +584,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",

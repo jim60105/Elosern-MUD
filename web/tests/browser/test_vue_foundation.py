@@ -639,10 +639,10 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         # Drive the store to an active session through the stable test hook
         # (the live OOB delivery of these envelopes is C3's transport work).
         context_actions = {
-            # The registered ``context_actions`` version (v8 since the
-            # monster-identity cutover); the exploration form's exact field
-            # set is unchanged.
-            "schema_version": 8,
+            # The registered ``context_actions`` version (v9 since the
+            # suggestions-envelope retirement); the exploration form carries
+            # no suggestions key.
+            "schema_version": 9,
             "available": True,
             "kind": "exploration",
             "affordances": [
@@ -663,7 +663,6 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                     "disabled_reason": None,
                 },
             ],
-            "suggestions": {"status": "generating"},
         }
         envelope = snapshot_envelope(
             fresh_epoch(),

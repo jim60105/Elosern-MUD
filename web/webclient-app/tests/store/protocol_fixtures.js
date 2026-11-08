@@ -79,7 +79,7 @@ export function statusPanel(overrides = undefined) {
 export function explorationActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "exploration",
       affordances: [
@@ -103,7 +103,6 @@ export function explorationActions(overrides = undefined) {
         },
         { surface: "guild", label: "公會", navigation: true, enabled: true, disabled_reason: null },
       ],
-      suggestions: { status: "generating" },
     },
     overrides,
   );
@@ -172,7 +171,7 @@ export function explorationPanel(overrides = undefined) {
 export function combatActions(overrides = undefined) {
   const panel = deepMerge(
     {
-      schema_version: 8,
+      schema_version: 9,
       available: true,
       kind: "combat",
       session: { session_id: "s-1", mode: "hostile", round: 1, round_revision: 0, state: "ready", reason: null },
@@ -212,9 +211,6 @@ export function combatActions(overrides = undefined) {
         needs_selection_ids: [8],
         reselection_reasons: [],
       },
-      // The UMD reducer's exact-field validation: a combat-form panel's
-      // `suggestions` must be exactly { status: "unavailable" }.
-      suggestions: { status: "unavailable" },
     },
     overrides,
   );

@@ -77,19 +77,18 @@ def _exploration_panel(interact_targets: list, move_rows: list | None = None) ->
     }
 
 
-def _exploration_context_actions_panel(suggestions: dict) -> dict:
-    """A schema-valid ``context_actions`` exploration form with a suggestions envelope.
+def _exploration_context_actions_panel() -> dict:
+    """A schema-valid ``context_actions`` exploration form.
 
     The panel's registered schema version is the live client mirror's
-    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (8 since the monster-identity
-    cutover), so an injected exploration form carries that exact version.
+    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (9 since the suggestions-envelope
+    retirement), so an injected exploration form carries that exact version.
     """
     return {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "exploration",
         "affordances": [],
-        "suggestions": suggestions,
     }
 
 
@@ -230,7 +229,7 @@ def _combat_panel() -> dict:
         ),
     ]
     return {
-        "schema_version": 8,
+        "schema_version": 9,
         "available": True,
         "kind": "combat",
         "session": {
@@ -267,7 +266,6 @@ def _combat_panel() -> dict:
             "needs_selection_ids": [1],
             "reselection_reasons": [],
         },
-        "suggestions": {"status": "unavailable"},
     }
 
 

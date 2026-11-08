@@ -2,9 +2,8 @@
 
 Every publication path — the ``ui_sync``/snapshot refresh, the dispatcher's
 completion, internal-error, and stale paths — MUST build its context through
-``build_presentation_context`` so the ``context_actions`` presenter renders
-``suggestions`` exclusively from the immutable ``OptionsSnapshot`` (an async
-``ready`` result survives the next snapshot) and never from the raw session.
+``build_presentation_context``, which never hands the raw session to a
+presenter.
 """
 
 from types import SimpleNamespace
@@ -17,7 +16,6 @@ from typeclasses.rooms import Room
 from web.webclient.actions import dispatcher
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.ingress import build_presentation_context, synchronize_session
 from web.webclient.presentation.lineage import MAX_LINEAGE_PANEL_BYTES
 from web.webclient.presentation.protocol import (
@@ -25,44 +23,6 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
-
-CARDS = [
-    {
-        "kind": "known_action",
-        "action_code": "explore.look",
-        "label": "環顧四周",
-        "params": {"room": True},
-    },
-    {
-        "kind": "known_action",
-        "action_code": "explore.wait",
-        "label": "等待午後",
-        "params": {"daypart": "noon"},
-    },
-    {
-        "kind": "known_action",
-        "action_code": "explore.talk_scripted",
-        "label": "向店員問候",
-        "params": {"npc_id": 7, "topic_id": "問候", "context_id": "ctx-1"},
-    },
-]
-
-
-def _wire_cards():
-    """The card list after the presenter's shape gate normalization (hint=None)."""
-    return [{**card, "hint": None} for card in CARDS]
-
-
-def _options_state(owner_pk, fingerprint, **overrides):
-    state = {
-        "owner_actor_id": owner_pk,
-        "fingerprint": fingerprint,
-        "status": "ready",
-        "generation_token": 1,
-        "displayed": [dict(card) for card in CARDS],
-    }
-    state.update(overrides)
-    return state
 
 
 class _FakeSession:
@@ -84,60 +44,13 @@ class _FakeSession:
         ]
 
 
-class ContextFactoryTests(EvenniaTestCase):
-    """Factory behavior on a fake session: no evennia fixtures required."""
-
-    def _session(self, puppet_pk="1", state=None):
-        session = _FakeSession(SimpleNamespace(pk=puppet_pk))
-        if state is not None:
-            session.ndb.options_state = state
-        return session
-
-    def test_absent_state_snapshots_to_none(self):
-        context = build_presentation_context(self._session(), SimpleNamespace(pk="1"))
-        self.assertIsNone(context.options_state)
-
-    def test_valid_state_deep_copies_into_an_immutable_snapshot(self):
-        state = _options_state("1", "fixture-fingerprint")
-        session = self._session("1", state)
-        context = build_presentation_context(session, SimpleNamespace(pk="1"))
-        snapshot = context.options_state
-        self.assertEqual(snapshot.fingerprint, "fixture-fingerprint")
-        self.assertEqual(snapshot.status, "ready")
-        self.assertEqual(len(snapshot.displayed), len(CARDS))
-        self.assertEqual(snapshot.displayed[0].action_code, "explore.look")
-        # Later replacement of the session state object must not move the
-        # snapshot the presenter already holds.
-        session.ndb.options_state = _options_state("1", "fixture-fingerprint", status="unavailable")
-        self.assertEqual(snapshot.status, "ready")
-
-    def test_aliens_owner_snapshot_is_refused(self):
-        state = _options_state("other", "fixture-fingerprint", status="ready")
-        context = build_presentation_context(self._session("1", state), SimpleNamespace(pk="1"))
-        self.assertIsNone(context.options_state)
-
-    def test_non_dict_state_degrades_to_none_without_raising(self):
-        for state in ("garbage", 42, [1, 2]):
-            context = build_presentation_context(self._session("1", state), SimpleNamespace(pk="1"))
-            self.assertIsNone(context.options_state)
-
-    def test_shape_invalid_displayed_entries_are_dropped_without_raising(self):
-        state = _options_state("1", "fixture-fingerprint", displayed=[1, "x", dict(CARDS[0])])
-        context = build_presentation_context(self._session("1", state), SimpleNamespace(pk="1"))
-        self.assertIsNotNone(context.options_state)
-        self.assertEqual(len(context.options_state.displayed), 1)
-
-
 class PublicationPathSnapshotTests(EvenniaTest):
-    """One state-preservation test per publication path: ui_sync, completion,
-    internal-error, stale."""
+    """Every publication path renders through the shared context factory."""
 
     character_typeclass = PlayerCharacter
 
     def setUp(self):
         super().setUp()
-        from web.webclient.presentation.fingerprints import derive_exploration_situation
-
         from world.rules.clock import get_world_clock
 
         get_world_clock()
@@ -148,68 +61,19 @@ class PublicationPathSnapshotTests(EvenniaTest):
         self.player.location = self.room
         self.registry = build_production_registry()
         self.session = _FakeSession(self.player)
-        situation = derive_exploration_situation(self.player)
-        self.assertIsNotNone(situation)
-        self.fingerprint = situation[0]
-        self.session.ndb.options_state = _options_state(
-            str(self.player.pk), self.fingerprint
-        )
         # Every publication path follows the transport's initial sync: the
         # fixture establishes the committed baseline first, then asserts only
         # the publications under test.
         synchronize_session(self.session, self.player)
         self.session.sent.clear()
 
-    def test_context_factory_carries_the_current_situation_fingerprint(self):
-        context = build_presentation_context(self.session, self.player)
-        self.assertEqual(context.options_fingerprint, self.fingerprint)
-
-    def test_context_factory_fails_closed_without_a_derivable_situation(self):
-        # A malformed actor or an out-of-exploration mode never raises: the
-        # context carries no fingerprint and the presenter emits unavailable.
-        self.player.creation_pending = True
-        context = build_presentation_context(self.session, self.player)
-        self.assertIsNone(context.options_fingerprint)
-        self.player.creation_pending = False
-        self.player.location = None
-        context = build_presentation_context(self.session, self.player)
-        self.assertIsNone(context.options_fingerprint)
-
-    def test_puppet_change_clears_options_state_and_barriers(self):
-        from collections import OrderedDict
-
-        from evennia.utils.create import create_object
-        from typeclasses.rooms import Room
-
-        second_room = create_object(Room, key="second snapshot room")
-        other = create_object(PlayerCharacter, key="other snapshot player")
-        other.race = "human"
-        other.apply_race_baseline()
-        other.location = second_room
-        session = _FakeSession(self.player)
-        session.ndb.elosern_actor_id = str(self.player.pk)
-        session.ndb.options_state = _options_state(str(self.player.pk), self.fingerprint)
-        session.ndb.options_barriers = OrderedDict([(self.fingerprint, 7)])
-        from web.webclient.presentation.coordinator import attach_coordinator
-
-        attach_coordinator(session, self.registry)
-        session.puppet = other
-        synchronize_session(session, other)
-        # The puppet change cleared the previous character's barrier store and
-        # options state before the reconnect trigger wrote the new puppet's
-        # own state (the old fingerprint never survives the change).
-        self.assertIsNone(session.ndb.options_barriers)
-        state = session.ndb.options_state
-        self.assertEqual(state["owner_actor_id"], str(other.pk))
-        self.assertNotEqual(state["fingerprint"], self.fingerprint)
-
-    def test_ui_sync_snapshot_carries_the_ready_suggestions(self):
+    def test_ui_sync_snapshot_carries_no_suggestions_field(self):
         synchronize_session(self.session, self.player)
         snapshots = self.session._envelopes("ui_snapshot")
         self.assertTrue(snapshots)
         panel = snapshots[-1]["panels"]["context_actions"]
-        self.assertEqual(panel["suggestions"]["status"], "ready")
-        self.assertEqual(panel["suggestions"]["cards"], _wire_cards())
+        self.assertTrue(panel["available"])
+        self.assertNotIn("suggestions", panel)
 
     def test_full_snapshot_fits_the_client_envelope(self):
         """The whole production snapshot must fit the transport bound.
@@ -227,41 +91,7 @@ class PublicationPathSnapshotTests(EvenniaTest):
             MAX_LINEAGE_PANEL_BYTES,
         )
 
-    def test_completion_publication_carries_the_ready_suggestions(self):
-        # A fresh generation result replaced the cards after the committed
-        # baseline, so the completion publication really has a difference to
-        # transmit (an unchanged panel is never retransmitted).
-        updated = [dict(card) for card in CARDS]
-        updated[2]["params"] = {"npc_id": 8, "topic_id": "問候", "context_id": "ctx-1"}
-        self.session.ndb.options_state = _options_state(
-            str(self.player.pk), self.fingerprint, displayed=updated
-        )
-        coordinator = attach_coordinator(self.session, self.registry)
-        state = dispatcher._sequence_state(self.session)
-        state.in_flight = True
-        state.epoch = coordinator.epoch
-        dispatcher._publish_completion(
-            self.session,
-            self.player,
-            {
-                "outcome": "success",
-                "code": "ok",
-                "message": "完成",
-                "affected_panels": ["context_actions"],
-            },
-            self.registry,
-            "r1",
-            coordinator.epoch,
-        )
-        updates = self.session._envelopes("ui_update")
-        self.assertTrue(updates)
-        panel = updates[-1]["panels"]["context_actions"]
-        self.assertEqual(panel["suggestions"]["status"], "ready")
-        self.assertEqual(
-            panel["suggestions"]["cards"], [{**card, "hint": None} for card in updated]
-        )
-
-    def test_internal_error_publication_carries_the_ready_suggestions(self):
+    def test_internal_error_publication_renders_the_panel(self):
         coordinator = attach_coordinator(self.session, self.registry)
         dispatcher._settle_internal_error(
             self.session,
@@ -274,18 +104,18 @@ class PublicationPathSnapshotTests(EvenniaTest):
         snapshots = self.session._envelopes("ui_snapshot")
         self.assertTrue(snapshots)
         panel = snapshots[-1]["panels"]["context_actions"]
-        self.assertEqual(panel["suggestions"]["status"], "ready")
-        self.assertEqual(panel["suggestions"]["cards"], _wire_cards())
+        self.assertTrue(panel["available"])
+        self.assertNotIn("suggestions", panel)
 
-    def test_stale_rejection_publication_carries_the_ready_suggestions(self):
+    def test_stale_rejection_publication_renders_the_panel(self):
         coordinator = attach_coordinator(self.session, self.registry)
         state = dispatcher._sequence_state(self.session)
         dispatcher._send_stale(self.session, coordinator, state, "r1")
         snapshots = self.session._envelopes("ui_snapshot")
         self.assertTrue(snapshots)
         panel = snapshots[-1]["panels"]["context_actions"]
-        self.assertEqual(panel["suggestions"]["status"], "ready")
-        self.assertEqual(panel["suggestions"]["cards"], _wire_cards())
+        self.assertTrue(panel["available"])
+        self.assertNotIn("suggestions", panel)
 
 
 def _proposal_state(owner_pk, **overrides):

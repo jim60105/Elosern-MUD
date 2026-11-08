@@ -16,13 +16,9 @@ from typeclasses.rooms import Room
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     MAX_AFFORDANCES,
-    MAX_CARDS,
-    SUGGESTIBLE_ACTION_IDS,
     SURFACES,
     AffordanceView,
-    default_cards,
     exploration_affordances,
-    suggestible_candidates,
 )
 from web.webclient.actions.exploration_actions import validate_move_payload
 from world.quests.binding import bind_stage_runtime

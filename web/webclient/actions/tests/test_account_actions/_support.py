@@ -55,8 +55,6 @@ from web.webclient.actions.dispatcher import (
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.ingress import (
-    FrozenCard,
-    OptionsSnapshot,
     ProposalSnapshot,
     synchronize_session,
 )

@@ -10,13 +10,9 @@ from world.rules.combat_session import engage
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     MAX_AFFORDANCES,
-    MAX_CARDS,
-    SUGGESTIBLE_ACTION_IDS,
     SURFACES,
     AffordanceView,
-    default_cards,
     exploration_affordances,
-    suggestible_candidates,
 )
 from world.tests.synthetic_data import synthetic_registries
 import unittest

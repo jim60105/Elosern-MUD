@@ -8,7 +8,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 from web.webclient.presentation.combat_panel import validate_context_actions
-from web.webclient.presentation.context import FrozenCard, OptionsSnapshot, PresentationContext
+from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_LIST_ITEMS,
@@ -292,7 +292,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "exploration")
-        self.assertEqual(payload["schema_version"], 8)
+        self.assertEqual(payload["schema_version"], 9)
         self.assertNotIn("session", payload)
         self.assertNotIn("participants", payload)
         self.assertNotIn("root_actions", payload)
@@ -300,37 +300,20 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("skills", payload)
         self.assertNotIn("attack", repr(payload))
         self.assertGreaterEqual(len(payload["affordances"]), 1)
-        # Without trigger-service state the exploration suggestions are inert.
-        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
+        self.assertNotIn("suggestions", payload)
 
-    def test_combat_presenter_pins_suggestions_unavailable_in_both_forms(self):
-        # A ready options snapshot must never leak into the combat form: the
-        # combat presenter does not read options_state at all.
+    def test_combat_and_exploration_forms_carry_no_suggestions_field(self):
+        # The retired suggestions envelope appears on neither available form.
         engage(self.player, self.monster)
-        context = PresentationContext(
-            actor=self.player,
-            protocol_version=1,
-            options_state=OptionsSnapshot(
-                fingerprint="fp",
-                status="ready",
-                generation_token=1,
-                displayed=(
-                    FrozenCard(
-                        kind="known_action",
-                        action_code="explore.look",
-                        label="查看房間",
-                        params={"room": True},
-                    ),
-                ),
-            ),
+        payload = self.registry.render(
+            "context_actions",
+            PresentationContext(actor=self.player, protocol_version=1),
         )
-        payload = self.registry.render("context_actions", context)
         self.assertEqual(payload["kind"], "combat")
-        self.assertEqual(payload["suggestions"], {"status": "unavailable"})
-        # The recovery form carries the same pin (schema-level; the presenter
-        # emits it verbatim in both branches).
+        self.assertNotIn("suggestions", payload)
+        # The recovery form carries no suggestion field either.
         normalized = validate_context_actions(_recovery_panel())
-        self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
+        self.assertNotIn("suggestions", normalized)
 
     def test_presenter_is_read_only(self):
         engage(self.player, self.monster)
@@ -755,7 +738,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
-        self.assertEqual(payload["schema_version"], 8)
+        self.assertEqual(payload["schema_version"], 9)
         self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
         self.assertNotIn("affordances", payload)
         self.assertNotIn("suggestions", payload)
@@ -810,7 +793,7 @@ class ContextActionsMonsterIdentityTests(BattlefieldIsolation, EvenniaTestCase):
         tier_only.apply_monster_tier("floor")
         engage(self.player, named)
         payload = self._render()
-        self.assertEqual(payload["schema_version"], 8)
+        self.assertEqual(payload["schema_version"], 9)
         rows = {p["identity"]: p for p in payload["participants"]}
         self.assertIsNone(rows[self.player.pk]["monster_identity"])
         self.assertEqual(rows[named.pk]["display_name"], "合成首領")

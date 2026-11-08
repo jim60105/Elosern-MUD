@@ -54,13 +54,13 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _exploration_available, timeout=timeout)
 
-    def _mount_overview(self, page, exploration: dict, suggestions: dict) -> None:
+    def _mount_overview(self, page, exploration: dict) -> None:
         """Commit one synthetic exploration panel and settle on the overview."""
         _inject_snapshot(
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel(suggestions),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -93,7 +93,6 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._mount_overview(
             page,
             _exploration_panel(people, move_rows=exits),
-            {"status": "unavailable"},
         )
 
         keys = page.evaluate(

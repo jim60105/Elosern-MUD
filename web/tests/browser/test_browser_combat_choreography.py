@@ -73,7 +73,7 @@ def _exploration_panels() -> dict:
     return {
         "status": valid_status_panel("勇者", PLAYER),
         "exploration": _exploration_panel([_interact_target(21, "小販")]),
-        "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+        "context_actions": _exploration_context_actions_panel(),
         "local_map": valid_local_map_panel(),
         "art": _art_panel([]),
     }
