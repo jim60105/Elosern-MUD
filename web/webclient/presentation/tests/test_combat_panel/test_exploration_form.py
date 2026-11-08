@@ -27,6 +27,14 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         self.assertNotIn("surface", normalized["affordances"][0])
         self.assertNotIn("action_id", normalized["affordances"][2])
 
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-7-panel")
+    def test_suggestions_is_rejected_as_an_unknown_field(self):
+        retired = {"status": "unavailable"}
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(_exploration_panel(suggestions=retired))
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(_valid_panel(suggestions=retired))
+
     def test_combat_fields_in_the_exploration_form_reject(self):
         payload = _exploration_panel(session={"session_id": "x"}, skills=[])
         with self.assertRaises(ProtocolValidationError):
