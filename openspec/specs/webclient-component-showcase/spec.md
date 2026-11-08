@@ -447,7 +447,7 @@ manifest-listed overlay that nothing imports is not complete.
   the text-to-HTML narrative toggle, and the colourblind-safe status palette as **client-local
   presentation state**
 
-#### Scenario: Only options.dismiss stays on the action allowlist
+#### Scenario: No options action stays on the action allowlist
 - **WHEN** a settings change is considered for dispatch
 - **THEN** no `ui_action` is dispatched for any setting, and no `options.*` action is registered at all: the retired dismissal is gone and widening the action allowlist remains a server-side change that no showcase or redesign wave makes
 

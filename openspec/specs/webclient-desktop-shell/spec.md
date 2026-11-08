@@ -279,7 +279,7 @@ document.
 - **THEN** a literal `/` is typed into that control and the router claims nothing, so text such as
   `whisper /ooc` remains fully typeable
 
-#### Scenario: The suggestions root entry appears only when the envelope carries one
+#### Scenario: No suggestions root entry exists
 - **WHEN** the committed exploration panel of a retired-suggestions build is inspected
 - **THEN** it carries no `suggestions` envelope at all, so the command panel carries no 建議 pill in every case and no client-local suggestions card can be opened, with no `ui_action` and no router frame involved
 

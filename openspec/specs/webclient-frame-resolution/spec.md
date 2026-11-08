@@ -58,7 +58,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 - **WHEN** `exploration.move`, `exploration.look`, `exploration.interact`, `exploration.target`, `exploration.wait`, or `exploration.suggestions` is resolved (the first three frames were retired with the exploration tab root, the target frame with the verb popover, whose place the client-local verb card took, and the waiting and suggestions frames with the scene overview, whose places the client-local wait card and then-retired suggestions card took)
 - **THEN** each returns the shared unresolvable marker and produces no menu, so a stray push of one pops instead of resurrecting a pane
 
-#### Scenario: A withdrawn suggestions envelope degrades like a lost identity
+#### Scenario: No suggestions accessor exists
 
 - **WHEN** the committed `context_actions` payload of the retired suggestions surface is inspected after the envelope's removal
 - **THEN** the client exposes no suggestions accessor and the exploration dock therefore presents no suggestion content and no 建議 pill

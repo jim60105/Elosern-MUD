@@ -167,7 +167,7 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **WHEN** a successful `explore.talk_open` runs
 - **THEN** the adapter makes no LLM or network request, does not advance world time or change affinity, memory, party, quest or inventory, and writes only session state plus deterministic narrative availability observation
 
-#### Scenario: talk_open is allowlisted but never suggestible
+#### Scenario: talk_open is allowlisted but never a standalone action
 - **WHEN** the shared action-code registries are consulted
 - **THEN** `explore.talk_open` is a member of the shared `ACTION_CODE_ALLOWLIST` and is emitted only as a target's 交談 affordance, so no exploration entry proposes it as a standalone action
 

@@ -91,7 +91,7 @@ banner.
 - **THEN** the client receives the action result followed by a snapshot carrying the banner and
   the possessed actor's panels
 
-#### Scenario: Possession controls never suggested
+#### Scenario: Possession controls never appear as standalone actions
 - **WHEN** the exploration vocabulary or any card surface is computed
 - **THEN** `explore.possess`/`explore.possess_release` appear only as the companion's own interact affordances and never in a proposal list, and no suggestion eligibility set exists to consult
 

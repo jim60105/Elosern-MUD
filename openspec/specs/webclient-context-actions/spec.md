@@ -14,7 +14,7 @@ unavailable form otherwise. The presenter SHALL be read-only: it SHALL NOT mutat
 resources, buffs, sexual state, battlefield, session, quest, location, party, or world time, and
 SHALL emit no live object or filesystem reference.
 
-#### Scenario: One available form per mode with suggestions
+#### Scenario: One available form per mode
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot, and again when the
   same actor is inside an active combat session
 - **THEN** the first `context_actions` payload is the exploration available form and the second is
@@ -27,13 +27,13 @@ SHALL emit no live object or filesystem reference.
   reason, and semantics as the version-4 form, its `schema_version` equals 9, and no
   affordance, session, participant, skill, or suggestion data is present
 
-#### Scenario: The exploration form no longer forbids suggestions
+#### Scenario: The exploration form rejects a suggestions key
 - **WHEN** the exploration available form is validated at version 9 with or without a `suggestions`
   key
 - **THEN** the payload without the key is accepted and the payload carrying it is rejected as an
   unknown field, and the `affordances` vocabulary contract is unchanged
 
-#### Scenario: The combat form is byte-identical to version 4 plus suggestions
+#### Scenario: The combat form is byte-identical to version 4
 - **WHEN** a combat fixture is validated by the version-9 validator (and by the client mirror)
 - **THEN** the combat payload follows the exact v7 party field set, retains conditions and polarity introduced in v6, and carries no suggestions key; the combat capability owns all party-field details
 
@@ -47,7 +47,7 @@ SHALL emit no live object or filesystem reference.
 - **WHEN** a valid active combat session renders the available payload
 - **THEN** it SHALL contain exactly `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`, `secondary_actions`, `actors`, `choices`, and `draft`, with `available` true and `kind` `"combat"` — the obsolete puppet-level skills field is removed and actor/choices/draft fields follow the v7 contract (the `webclient-combat-menu` capability owns the combat-field details)
 
-#### Scenario: The exploration available form carries suggestions
+#### Scenario: The exploration available form carries no suggestions
 - **WHEN** exploration mode renders the available payload
 - **THEN** it SHALL contain exactly `schema_version`, `available`, `kind`, and `affordances`, with `available` true, `kind` `"exploration"`, and `affordances` following the exploration-affordances capability contract; the retired `suggestions` envelope is rejected as an unknown field
 

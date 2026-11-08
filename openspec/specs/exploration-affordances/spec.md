@@ -275,7 +275,7 @@ emission rules are scenario-pinned.
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
   possession gates, while the `context_actions` form keeps consuming the per-keyword and free-form entries unchanged
 
-#### Scenario: Completion is not a topic suggestion
+#### Scenario: Completion is not an interact-target action
 - **WHEN** action registries and exploration targets are projected
 - **THEN** explore.dialogue_complete is registered only for exact context-bound acknowledgement payloads and is never emitted as an interact-target action
 

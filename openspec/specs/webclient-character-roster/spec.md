@@ -383,7 +383,7 @@ proposal, and its completed-result cache and in-flight marker SHALL NOT be visib
 by the new puppet. Per-character persistent state SHALL remain on the character it belongs to and
 SHALL be unchanged by the switch.
 
-#### Scenario: The new puppet inherits no suggestion state
+#### Scenario: The new puppet inherits no retired session state
 - **WHEN** a player switches to another character after a committed action-suggestion era state had existed on the session
 - **THEN** no client surface carries a suggestion card, a suggestion fingerprint, or a dismissal barrier from the previous character, because the retired suggestion state is never written and the switch clears every session-scoped slice
 

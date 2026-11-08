@@ -8,7 +8,7 @@ Room actions (re-read the room, let time pass) sit beside the values they act on
 ### Requirement: The exploration screen roots at the compass, the rail, and room actions
 In exploration mode the screen SHALL be composed of the exit compass and the shared readout in the command panel, the presence rail on the stage, and the room-action buttons on the place card. The command panel SHALL hold no chip row, footer, or key-hint line, and the router's exploration root frame SHALL carry no item, so the compass, the rail, and the place-card actions own their keys outside the router.
 
-#### Scenario: The command panel holds the compass, the pill, and the readout
+#### Scenario: The command panel holds the compass and the readout
 - **WHEN** the committed exploration panel carries exits, people, and objects
 - **THEN** the command panel renders the exit compass and the readout, and no 建議 pill, chip, footer row, or `action-dock-description` element
 
@@ -16,7 +16,7 @@ In exploration mode the screen SHALL be composed of the exit compass and the sha
 - **WHEN** the dock is at the exploration root
 - **THEN** the router's current frame is the root with zero items, it does not degrade into the single disabled marker row, and no key is claimed by a root item
 
-#### Scenario: Tab order is compass, rail, place-card actions, pill
+#### Scenario: Tab order is compass, rail, then place-card actions
 - **WHEN** the exploration screen has focus on the compass and the player presses Tab repeatedly
 - **THEN** focus moves through the rail and the place card's 查看房間 and 休息 buttons, each zone one tab stop with a visible focus ring, and the retired 建議 pill is not a tab stop
 
