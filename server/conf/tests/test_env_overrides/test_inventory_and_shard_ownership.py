@@ -130,8 +130,9 @@ class InventoryTests(unittest.TestCase):
         source = open(SETTINGS_PATH, encoding="utf-8").read()
         self.assertIn("LLM_ENV_NAMES = frozenset(llm_env_names())", source)
         # Drift guard: bump deliberately when a layer or knob lands (the W3
-        # dream-story layers took the inventory from 184 to 276).
-        self.assertEqual(len(llm_env_names()), 276)
+        # dream-story layers took the inventory from 184 to 276; retiring the
+        # action_options layer took it to 253).
+        self.assertEqual(len(llm_env_names()), 253)
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
