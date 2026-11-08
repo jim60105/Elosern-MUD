@@ -37,8 +37,18 @@ OVERSIZED_PANEL = "lore_codex"
 SNAPSHOT_PANEL_BYTES = 58_000
 DELTA_PANEL_BYTES = 65_500
 
+#: The second ordinary delta's content. It must differ from every other case's
+#: payload (the coordinator's unchanged-publication skip compares candidates)
+#: and stay small enough that its envelope travels as one intact frame, which
+#: is what a withheld-publication fault needs as its *next* real publication
+#: — the recovery contract reads the mismatch off an ``ui_update`` frame, not
+#: off a part transfer. The structural floor of a codex payload is ~42.7 KB,
+#: so the target must sit above it to pad anything at all.
+SECOND_DELTA_MARKER = chr(0x4E19)
+SECOND_DELTA_PANEL_BYTES = 45_000
+
 #: Participants per fixture case.
-CASES = ("snapshot", "delta", "omit", "nochange", "eager")
+CASES = ("snapshot", "delta", "delta_next", "omit", "nochange", "eager")
 
 #: The repeated row marker of each oversized payload, written as a code point
 #: so this test module carries no shipped-content string literal.
@@ -280,6 +290,16 @@ def run(caller: Any, case: str) -> str:
         return _report(case, receipt, panel)
     if case == "delta":
         panel = oversized_payload(DELTA_MARKER, DELTA_PANEL_BYTES)
+        before = coordinator.published_revision
+        receipt = _publish_candidates(
+            session, caller, coordinator, {OVERSIZED_PANEL: panel}
+        )
+        return _report(case, receipt, panel, extra=str(before))
+    if case == "delta_next":
+        # One further ordinary delta, used as the real publication that
+        # follows a deliberately withheld one: its base names a revision the
+        # client never adopted, which is the missed-publication condition.
+        panel = oversized_payload(SECOND_DELTA_MARKER, SECOND_DELTA_PANEL_BYTES)
         before = coordinator.published_revision
         receipt = _publish_candidates(
             session, caller, coordinator, {OVERSIZED_PANEL: panel}

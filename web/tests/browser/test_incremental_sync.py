@@ -843,33 +843,24 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             lambda s: narrative_log_text(page).count(room_name) > seen_names,
             timeout=30000,
         )
-        # The command's own presentation refresh is enqueued after its output
-        # settles, and the situation-driven options publication follows it.
-        # Waiting for the window's first presentation frame is what makes the
-        # following assertions read a settled window; a bounded wait keeps a
-        # genuinely silent read (the unchanged-publication skip proven below)
-        # a named failure instead of an empty set.
-        wait_for_store_state(
-            page,
-            lambda s: bool(_presentation(frames, mark)),
-            timeout=30000,
-        )
+        # ``refresh_after_command`` enqueues the command's own comparison
+        # refresh once its output settles. A read that changes no eager panel
+        # renders an identical candidate, so the coordinator's
+        # unchanged-publication skip applies (the same control the nochange
+        # fixture proves below): no revision is consumed and no frame is sent.
+        # A frame here would be a real change that still had to be a delta,
+        # never a checkpoint.
         wait_for_presentation_settled(page)
         quiet = store_state(page)["revision"]
         read_frames = _presentation(frames, mark)
         self.assertEqual(
-            {frame["name"] for frame in read_frames},
-            {UPDATE},
-            f"a read action publishes only deltas, observed {read_frames}",
+            [frame["name"] for frame in read_frames],
+            [],
+            f"an unchanged read publishes nothing, observed {read_frames}",
         )
-        chain = moved
-        for frame in read_frames:
-            envelope = frame["args"][0]
-            self.assertEqual(
-                envelope["base_revision"], chain, "each read delta keeps the exact base"
-            )
-            chain = envelope["revision"]
-        self.assertEqual(chain, quiet, "the last read delta is the committed revision")
+        self.assertEqual(
+            quiet, moved, "an unchanged read consumes no revision and sends no frame"
+        )
 
         # -- authoritative different-map boundary through text --------------
         mark = len(frames)
@@ -1137,6 +1128,11 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
             "the withheld publication belongs to the fault window",
         )
         self.assertGreater(withheld, base)
+        # The missed-publication condition needs one further real publication
+        # whose base names the revision this client never adopted. Publish it
+        # deliberately: the client's own command refresh is skipped when it
+        # changes nothing, so nothing else is guaranteed to arrive here.
+        self._fixture(page, "delta_next")
         # The episode is transient by design (the repair lands immediately), so
         # the locked window and the single request are read from the
         # subscriber's recorded transitions and the outbound recorder.
@@ -1289,6 +1285,10 @@ class IncrementalSyncBrowserTests(ManagedServerTearDownMixin, BrowserAcceptanceT
         page.wait_for_function(
             "() => window.__syncGateState().dropped.length === 1", timeout=60000
         )
+        # The next real publication is what exposes the uncommitted baseline;
+        # publish it deliberately rather than waiting for a push that no
+        # command produces.
+        self._fixture(page, "delta_next")
         wait_for_store_state(
             page, lambda s: s.get("recovery", {}).get("status") == "failed", timeout=60000
         )
