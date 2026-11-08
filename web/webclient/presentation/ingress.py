@@ -16,8 +16,6 @@ from twisted.internet.defer import succeed
 from twisted.python.failure import Failure
 
 from web.webclient.presentation.context import (
-    FrozenCard,
-    OptionsSnapshot,
     ProposalSnapshot,
     PresentationContext,
 )
@@ -85,15 +83,10 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
     actor_id = str(getattr(actor, "pk", ""))
     last_actor = getattr(session.ndb, "elosern_actor_id", None)
     if last_actor is not None and last_actor != actor_id:
-        # A puppet change starts a distinct presentation sequence and drops the
-        # previous character's options state (the new puppet never inherits the
-        # old one's fingerprint, cards, or degraded status) and its dismissal
-        # barriers (a dismissed minimum generation is per character).
+        # A puppet change starts a distinct presentation sequence.
         coordinator.reset()
-        session.ndb.options_state = None
-        session.ndb.options_barriers = None
-        # The transient concept proposal belongs to the old puppet exactly
-        # like the options state: the new puppet never sees it.
+        # The transient concept proposal belongs to the old puppet: the new
+        # puppet never sees it.
         session.ndb.concept_proposal = None
         session.ndb.skill_use_selection = None
         session.ndb.party_actor_selection = None
@@ -132,68 +125,9 @@ def reset_client_sequence(session: Any) -> None:
     coordinator.reset()
     if getattr(session, "ndb", None) is not None:
         session.ndb.elosern_actor_id = None
-        session.ndb.options_state = None
-        session.ndb.options_barriers = None
         session.ndb.concept_proposal = None
         session.ndb.skill_use_selection = None
         session.ndb.party_actor_selection = None
-
-
-def options_snapshot(session: Any) -> OptionsSnapshot | None:
-    """Return an immutable snapshot of ``session.ndb.options_state``, or ``None``.
-
-    The write side (the trigger service) populates ``session.ndb.options_state``
-    as a dict carrying ``owner_actor_id``, ``fingerprint``, ``status``,
-    ``generation_token``, and ``displayed``; this read-side factory deep-copies
-    the displayed cards into frozen :class:`FrozenCard` representations so a
-    presenter's render is stable even if the async writer later replaces the
-    session state object. An absent state (the common case until the trigger
-    service lands) yields ``None``, as does any malformed state — this factory
-    must never raise on the ingress/dispatcher publication path, so a corrupt
-    ephemeral write degrades to an inert snapshot rather than an internal
-    presentation error.
-    """
-    ndb = getattr(session, "ndb", None)
-    state = getattr(ndb, "options_state", None) if ndb is not None else None
-    if state is None:
-        return None
-    try:
-        return _build_options_snapshot(session, state)
-    except Exception:
-        log_unavailable("options snapshot", "malformed options_state degraded to None")
-        return None
-
-
-def _build_options_snapshot(session: Any, state: Any) -> OptionsSnapshot | None:
-    if not isinstance(state, dict):
-        return None
-    owner = state.get("owner_actor_id")
-    if owner is not None:
-        actor = getattr(session, "puppet", None)
-        if str(getattr(actor, "pk", "")) != str(owner):
-            # A repuppeted session never renders the previous character's
-            # fingerprint, cards, or degraded state (belt and braces).
-            return None
-    displayed = state.get("displayed")
-    cards: tuple[FrozenCard, ...] | None = None
-    if isinstance(displayed, (list, tuple)):
-        cards = tuple(
-            FrozenCard(
-                kind=str(card.get("kind", "")),
-                action_code=str(card.get("action_code", "")),
-                label=str(card.get("label", "")),
-                params=MappingProxyType(deepcopy(card.get("params") or {})),
-                hint=card.get("hint"),
-            )
-            for card in displayed
-            if isinstance(card, dict)
-        )
-    return OptionsSnapshot(
-        fingerprint=state.get("fingerprint"),
-        status=str(state.get("status", "")),
-        generation_token=int(state.get("generation_token", 0)),
-        displayed=cards,
-    )
 
 
 def proposal_snapshot(session: Any, actor: Any) -> ProposalSnapshot | None:
@@ -204,11 +138,11 @@ def proposal_snapshot(session: Any, actor: Any) -> ProposalSnapshot | None:
     ``subrace``, ``allocations``, and ``persona``; this read-side factory
     deep-copies the content into the frozen :class:`ProposalSnapshot` so a
     presenter's render is stable and never exposes a live reference. Mirrors
-    :func:`options_snapshot`: an absent slot yields ``None``, a slot owned by
-    a different actor is refused (the proposal never follows a puppet switch),
-    and any malformed or incomplete shape degrades to ``None`` — this factory
-    must never raise on the publication path (retool-concept-transient-fill
-    D1).
+    the absent/malformed-slot contract: an absent slot yields ``None``, a slot
+    owned by a different actor is refused (the proposal never follows a puppet
+    switch), and any malformed or incomplete shape degrades to ``None`` — this
+    factory must never raise on the publication path
+    (retool-concept-transient-fill D1).
     """
     ndb = getattr(session, "ndb", None)
     state = getattr(ndb, "concept_proposal", None) if ndb is not None else None
@@ -292,16 +226,9 @@ def build_presentation_context(
     """The single factory every publication path builds its context through.
 
     Full-snapshot synchronization, the dispatcher's completion, internal-error,
-    and stale paths, the art-completion push, and the trigger service's own
-    guarded push all assemble their :class:`PresentationContext` through this
-    factory, so no path can omit the options snapshot. It deep-copies
-    ``session.ndb.options_state`` into the immutable :class:`OptionsSnapshot`
-    (an absent or malformed state degrades to ``None``, and a snapshot whose
-    owner differs from the rendering puppet is refused) and derives the
-    current exploration situation fingerprint through the shared freshness
-    derivation (``None`` when no situation can be derived — for example in
-    combat, creation, or on a malformed actor — and never raising into the
-    publication path). It never hands the raw session to a presenter.
+    and stale paths, and the art-completion push all assemble their
+    :class:`PresentationContext` through this factory, so no path can omit a
+    session-scoped snapshot. It never hands the raw session to a presenter.
 
     ``combat_round`` is the completing combat action's frozen round record.
     Only the dispatcher's completion publication passes it (combat-beats-panel
@@ -329,8 +256,6 @@ def build_presentation_context(
     return PresentationContext(
         actor=actor,
         protocol_version=PROTOCOL_VERSION,
-        options_state=options_snapshot(session),
-        options_fingerprint=_current_options_fingerprint(actor),
         proposal=proposal_snapshot(session, actor),
         gallery_subject=gallery_selection_snapshot(session, actor),
         combat_round=combat_round,
@@ -339,26 +264,6 @@ def build_presentation_context(
         unlocks=unlock_flags(session),
         party_view=party_view_selection_snapshot(session, actor),
     )
-
-
-def _current_options_fingerprint(actor: Any) -> str | None:
-    """The current exploration situation fingerprint, or ``None``.
-
-    Read-only and fail-closed: a derivation that cannot name the situation
-    (or raises on a malformed actor) yields ``None`` so the suggestions
-    presenter emits ``unavailable`` instead of rendering a stale snapshot.
-    """
-    try:
-        from web.webclient.presentation.fingerprints import derive_exploration_situation
-
-        situation = derive_exploration_situation(actor)
-    except Exception:
-        log_unavailable(
-            "options fingerprint",
-            "exploration situation derivation failed (degraded to None)",
-        )
-        return None
-    return situation[0] if situation is not None else None
 
 
 def synchronize_session(session: Any, actor: Any) -> Deferred:
