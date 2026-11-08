@@ -1,7 +1,7 @@
 # webclient-room-actions Specification
 
 ## Purpose
-Room actions (re-read the room, let time pass, ask for suggestions) sit beside the values they act on, and one readout line explains whatever the player aims at or hovers.
+Room actions (re-read the room, let time pass) sit beside the values they act on, and one readout line explains whatever the player aims at or hovers.
 
 ## Requirements
 

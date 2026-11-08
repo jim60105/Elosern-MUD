@@ -3,9 +3,8 @@
 The canonical, shared, read-only affordance vocabulary for exploration-mode surfaces — the
 discriminated `AffordanceView` contract (action vs navigation), the eight emitted action codes
 plus the guild/shop surfaces, validator-normalized params, the freeform binding-only exception,
-the idle baseline, the suggestion-eligibility layer, and the deterministic `default_cards()`
-degradation derivation. This capability owns the vocabulary; `webclient-context-actions` and
-(later) the suggestions feature consume it.
+and the idle baseline. This capability owns the vocabulary; `webclient-context-actions` consumes
+it.
 
 ## Requirements
 
@@ -14,7 +13,7 @@ Action descriptors SHALL be validator-normalized. Authored topic descriptors SHA
 
 #### Scenario: Every emitted entry executes against its real adapter
 - **WHEN** a unit or integration test takes the vocabulary emitted for a fixture room and
-  dispatches each suggestible action entry through the production dispatcher
+  dispatches each emitted action entry through the production dispatcher
 - **THEN** no `malformed_payload` rejection occurs, and the move entry passes the adapter's
   `stale_location` comparison unchanged
 
@@ -45,9 +44,9 @@ Action descriptors SHALL be validator-normalized. Authored topic descriptors SHA
 
 #### Scenario: Freeform is the single validator exception
 - **WHEN** the native non-authored affordance vocabulary considers an `explore.talk_freeform` entry
-- **THEN** no registered full validator produces its shape without
-  `speech` — so the full validator SHALL run only on the client-composed dispatch payload
-  (`speech` = the label text) defined by the later suggestions slices
+- **THEN** no registered full validator produces its shape without `speech`, so the vocabulary
+  carries only the `{"npc_id": int}` binding and the full validator runs only on the composed
+  dispatch payload that adds `speech`
 
 #### Scenario: A rejected candid payload is a logged test bug
 - **WHEN** a builder's candid payload is rejected by its validator
@@ -73,7 +72,7 @@ an `explore.wait` action entry with `params {"daypart": "noon"}` only when the w
 #### Scenario: An empty room still yields a nonempty executable baseline
 - **WHEN** a room has no exits, no NPCs, no monsters, and no objects
 - **THEN** the vocabulary emits the `explore.look` room entry (and, in a safe room, the
-  `explore.wait` entry), and `default_cards()` derives a nonempty suggestion set from them
+  `explore.wait` entry), so the context form always carries at least one executable entry
 
 #### Scenario: An unsafe room never offers wait
 - **WHEN** a living Monster is present but no combat session is active
@@ -86,78 +85,8 @@ an `explore.wait` action entry with `params {"daypart": "noon"}` only when the w
   appear in it — look is a section there and wait has no panel affordance
 
 #### Scenario: Baseline entries reach the context form and fallback
-- **WHEN** the `context_actions` exploration form and `default_cards()` are rendered
-- **THEN** the idle-baseline entries SHALL appear in both
-
-### Requirement: Suggestion eligibility derives executable cards
-`suggestible_candidates(affordances)` SHALL return exactly the action entries that are
-executable *suggestions*: `enabled` true, `action_id` in `SUGGESTIBLE_ACTION_IDS`, not a
-navigation entry, not a party action, not blocked by the talk schedule gate, and not an
-unsafe-room wait. This layer is the single source of "is this card runnable right now" for the
-deterministic fallback and, later, for the AI proposal ladder; the vocabulary itself SHALL
-remain unchanged by this filtering.
-
-#### Scenario: A schedule-blocked host is suggestible-excluded but vocabulary-present
-- **WHEN** a present dialogue host is inside its schedule gate's blocked window
-- **THEN** the vocabulary still contains its talk entries (v1 semantics), while
-  `suggestible_candidates()` excludes them
-
-#### Scenario: Party and navigation actions are never suggestions
-- **WHEN** the vocabulary contains party entries and navigation entries
-- **THEN** `suggestible_candidates()` contains none of them
-
-#### Scenario: The suggestible code set is closed
-- **WHEN** suggestibility is judged by action code
-- **THEN** `SUGGESTIBLE_ACTION_IDS` is exactly `explore.move`, `explore.look`,
-  `explore.talk_scripted`, `explore.talk_freeform`, `explore.engage`, `explore.wait`
-
-#### Scenario: The talk schedule gate excludes blocked hosts
-- **WHEN** the talk schedule gate (`interaction_reason(npc, "talk")`) is evaluated
-- **THEN** a blocked host's talk entries are excluded, and an unsafe-room wait is excluded too
-  (wait entries only exist when safe, per the idle-baseline requirement)
-
-#### Scenario: Without the live actor, talk entries are excluded
-- **WHEN** `suggestible_candidates()` is called without the actor
-- **THEN** it SHALL exclude every talk entry rather than claim executability for an unverifiable
-  card — the schedule and safety gates require the live actor, and the caller that needs talk
-  suggestions passes the actor
-
-### Requirement: The deterministic degradation fallback derives rule cards
-`default_cards(affordances, *, objective_npc_ids=frozenset())` SHALL derive the deterministic
-fallback suggestion list from `suggestible_candidates(affordances)`: it SHALL rank
-objective-relevant entries first, SHALL then prefer talk and engage entries over the idle
-baseline, SHALL preserve vocabulary order within a rank, and SHALL return only executable
-suggestion cards, so the result is always a strict subset of the current affordance union.
-
-#### Scenario: Objective-relevant actions rank first
-- **WHEN** `objective_npc_ids` names a present NPC that supports `explore.talk_scripted`
-- **THEN** that scripted-talk entry precedes all move, baseline, and non-objective talk entries in
-  the derivation, and every navigation, party, and disabled entry is absent
-
-#### Scenario: The subset contract holds on every fixture
-- **WHEN** `default_cards()` is evaluated across the per-scenario fixtures (empty room, exits,
-  schedule-blocked NPC, monster present, quest objective, multi-LLM-NPC)
-- **THEN** the result is at least 1 and at most 5 cards, each card exactly matches one current
-  affordance union entry (id, params, label), and order complies with the ranking rule
-
-#### Scenario: The objective rank keys on params-referenced NPC ids
-- **WHEN** the objective ranking is applied
-- **THEN** an entry whose params reference a present NPC id in `objective_npc_ids` precedes all
-  others
-
-#### Scenario: Returned cards are vocabulary-identical suggestion cards
-- **WHEN** `default_cards()` returns any card
-- **THEN** it is an executable suggestion card with the same `action_id`, same
-  validator-normalized `params`, and same label as the vocabulary entry it came from
-
-#### Scenario: The card count bounds are fixed
-- **WHEN** `default_cards()` returns for v1 exploration
-- **THEN** it contains at most 5 cards and at least 1 card — the room-look baseline is always
-  suggestible
-
-#### Scenario: The derivation is pure
-- **WHEN** `default_cards()` is called
-- **THEN** the function never mutates state and only reads what the caller passes
+- **WHEN** the `context_actions` exploration form is rendered
+- **THEN** the idle-baseline entries SHALL appear in it
 
 ### Requirement: Navigation entries render off-anchor service hosts honestly
 A `guild` or `shop` navigation entry for a co-located host whose corresponding service component
@@ -260,8 +189,8 @@ emission rules are scenario-pinned.
 #### Scenario: The conversation-opening code is allowlisted but never emitted
 - **WHEN** the vocabulary is emitted for a room holding a scripted host and an `LLMNPC`
 - **THEN** it contains the hosts' `explore.talk_scripted` and `explore.talk_freeform` entries and no
-  `explore.talk_open` entry, `explore.talk_open` is a member of `ACTION_CODE_ALLOWLIST`, and it is
-  absent from `SUGGESTIBLE_ACTION_IDS`
+  `explore.talk_open` entry, and `explore.talk_open` is a member of `ACTION_CODE_ALLOWLIST` while
+  never being emitted by the vocabulary
 
 #### Scenario: The vocabulary exposes exactly two view shapes
 - **WHEN** any vocabulary is serialized
@@ -332,8 +261,7 @@ emission rules are scenario-pinned.
 #### Scenario: Schedule-blocked hosts stay in the vocabulary
 - **WHEN** a dialogue host sits inside its schedule gate's blocked window
 - **THEN** it SHALL NOT be omitted from the vocabulary; the vocabulary preserves the v1 panel's
-  emission semantics, and schedule-gate exclusion applies only to suggestion eligibility (the
-  suggestion-eligibility requirement below)
+  emission semantics
 
 #### Scenario: An unresolvable dialogue table yields no talk entries
 - **WHEN** a dialogue host's authored dialogue table cannot be resolved
@@ -345,12 +273,11 @@ emission rules are scenario-pinned.
 - **WHEN** the `exploration` panel serializes a conversable host's talk entries
 - **THEN** it renders its server-qualified topic `explore.talk_scripted` descriptors and its `explore.talk_freeform`
   entry as one 交談 `explore.talk_open` affordance derived from the same host, presence, and
-  possession gates, while the `context_actions` form, suggestion eligibility, and the deterministic
-  fallback keep consuming the per-keyword and free-form entries unchanged
+  possession gates, while the `context_actions` form keeps consuming the per-keyword and free-form entries unchanged
 
 #### Scenario: Completion is not a topic suggestion
 - **WHEN** action registries and exploration targets are projected
-- **THEN** explore.dialogue_complete is registered only for exact context-bound acknowledgement payloads and is never emitted as a suggestible or interact-target action
+- **THEN** explore.dialogue_complete is registered only for exact context-bound acknowledgement payloads and is never emitted as an interact-target action
 
 #### Scenario: The possessed actor's talk entries stay visible disabled
 - **WHEN** the possessed actor is offered native freeform talk outside the authorized authored conversation surface

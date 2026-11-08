@@ -5,15 +5,15 @@ Exact combat context actions panel, keyboard menu, allowlisted combat adapters, 
 ## Requirements
 
 ### Requirement: Combat context actions are an exact read-only panel
-The production presentation registry SHALL register `context_actions` schema version 8.
+The production presentation registry SHALL register `context_actions` schema version 9.
 For a valid active combat session, its available payload SHALL contain exactly
 `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`,
-`secondary_actions`, `actors`, `choices`, `draft`, and `suggestions`; `available` SHALL be true, `kind`
-SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`.
+`secondary_actions`, `actors`, `choices`, and `draft`; `available` SHALL be true and `kind`
+SHALL be `combat`.
 
 #### Scenario: Active session produces canonical combat presentation
 - **WHEN** a puppeted WebClient in a valid persistent combat session receives a full snapshot
-- **THEN** `context_actions` reports that session's ID, mode, round, ordered participants, current actions, and the exact `suggestions` object `{"status": "unavailable"}` while a before/after comparison of canonical game state is unchanged
+- **THEN** `context_actions` reports that session's ID, mode, round, ordered participants, and current actions at schema version 9 with no `suggestions` key, while a before/after comparison of canonical game state is unchanged
 
 #### Scenario: Exploration does not receive fake combat actions
 - **WHEN** the active puppet is in exploration mode
@@ -30,8 +30,8 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
   the shared unavailable form is emitted instead
 
 #### Scenario: Combat fields stay byte-identical across the version bump
-- **WHEN** a v7 party-command fixture is validated by the server and client mirror
-- **THEN** the exact v7 actor/choices/draft shape is accepted, v6 conditions and polarity remain present, and old-version or puppet-level skills payloads reject
+- **WHEN** a current-version party-command fixture is validated by the server and client mirror
+- **THEN** the exact party actor/choices/draft shape is accepted, v6 conditions and polarity remain present, and old-version payloads reject
 
 #### Scenario: Absent location emits the shared unavailable form
 - **WHEN** the puppet has an absent location

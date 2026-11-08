@@ -92,8 +92,8 @@ banner.
   the possessed actor's panels
 
 #### Scenario: Possession controls never suggested
-- **WHEN** suggestion candidates are computed
-- **THEN** `explore.possess`/`explore.possess_release` never appear (their absence from `SUGGESTIBLE_ACTION_IDS` is the mechanism; no new filter)
+- **WHEN** the exploration vocabulary or any card surface is computed
+- **THEN** `explore.possess`/`explore.possess_release` appear only as the companion's own interact affordances and never in a proposal list, and no suggestion eligibility set exists to consult
 
 ### Requirement: The dispatcher preserves talk and engage refusals during possession
 Lawful possessed authored talk open, selection and leave SHALL use the acting-body/owning-player context. Freeform talk and combat engage SHALL retain stable possession refusals and epoch guards. Shop buy/sell SHALL retain ordinary commander-purse/member-bag rules without a new prohibition.
