@@ -165,11 +165,11 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 
 #### Scenario: talk_open changes only the session and narrative observation
 - **WHEN** a successful `explore.talk_open` runs
-- **THEN** the adapter makes no LLM or network request, does not advance world time or change affinity, memory, party, quest or inventory, and writes only session state plus deterministic narrative availability observation without action-options generation
+- **THEN** the adapter makes no LLM or network request, does not advance world time or change affinity, memory, party, quest or inventory, and writes only session state plus deterministic narrative availability observation
 
 #### Scenario: talk_open is allowlisted but never suggestible
 - **WHEN** the shared action-code registries are consulted
-- **THEN** `explore.talk_open` is a member of the shared `ACTION_CODE_ALLOWLIST` and is not a suggestible action code, so no suggestion card or AI proposal names it
+- **THEN** `explore.talk_open` is a member of the shared `ACTION_CODE_ALLOWLIST` and is emitted only as a target's 交談 affordance, so no exploration entry proposes it as a standalone action
 
 #### Scenario: Rejections reuse talk_scripted's codes and message set
 - **WHEN** the adapter rejects a possess, resolution, schedule, or host-class failure
@@ -190,7 +190,7 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 
 #### Scenario: talk_open touches no state beyond the session
 - **WHEN** a freeform-only conversation opens without a scene topic definition
-- **THEN** no scene observation is written, no model/action-options generation runs and only its session changes; static/generated scene hosts use the shared observation path
+- **THEN** no scene observation is written, no model generation runs and only its session changes; static/generated scene hosts use the shared observation path
 
 ### Requirement: Exploration affordances are server-authored, never inferred from prose
 Existing exploration affordances SHALL remain server-authored. Party invite SHALL use general identity and its separate four-member quota; same-owner temporary-only members SHALL remain normally recruitable. Party leave SHALL address source-aware general removal or selected private escort abandonment through the existing mission drawer, never detach a valid escort reason directly. Other conversation/service/combat/editor gates SHALL remain.
@@ -237,7 +237,7 @@ Existing exploration affordances SHALL remain server-authored. Party invite SHAL
 
 #### Scenario: No in-conversation codes or keyword lists are offered
 - **WHEN** the presenter builds target affordances
-- **THEN** no target carries an `explore.talk_scripted` or `explore.talk_freeform` affordance or a keyword list: the host's authored keywords and free-form speech are offered by the dialogue surface once the conversation is open, and the shared vocabulary's per-keyword and free-form entries remain the source of suggestion cards
+- **THEN** no target carries an `explore.talk_scripted` or `explore.talk_freeform` affordance or a keyword list: the host's authored keywords and free-form speech are offered by the dialogue surface once the conversation is open
 
 #### Scenario: Party invite eligibility and enablement
 - **WHEN** party invite affordances are built

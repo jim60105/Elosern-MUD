@@ -32,11 +32,11 @@ test("the combat form follows the exact v7 party field set", () => {
       })
     )
   );
-  // The current panel is v8: the v7 party fields plus the participant
-  // monster_identity, which v8 adds.
-  assert.equal(version7.schema_version, 8);
+  // The current panel is v9: the v7 party fields plus the participant
+  // monster_identity added in v8, with no suggestions envelope.
+  assert.equal(version7.schema_version, 9);
   const normalized = Protocol.validateContextActionsPanel(version7);
-  assert.equal(normalized.schema_version, 8);
+  assert.equal(normalized.schema_version, 9);
   assert.throws(() =>
     Protocol.validateContextActionsPanel(Object.assign({}, version7, { schema_version: 7 }))
   );
@@ -70,7 +70,6 @@ test("the combat form follows the exact v7 party field set", () => {
     "schema_version",
     "secondary_actions",
     "session",
-    "suggestions",
   ]);
   assert.deepEqual(normalized.root_actions, [
     "attack",
@@ -82,7 +81,7 @@ test("the combat form follows the exact v7 party field set", () => {
     "retreat",
   ]);
   assert.deepEqual(normalized.secondary_actions, ["surrender"]);
-  assert.deepEqual(normalized.suggestions, { status: "unavailable" });
+  assert.equal("suggestions" in normalized, false);
   // A legacy top-level skills field and pre-v7 versions all reject.
   assert.throws(() =>
     Protocol.validateContextActionsPanel(Object.assign({}, version7, { skills: version4Skills }))
@@ -143,7 +142,7 @@ test("the unavailable forms differ only in schema_version", () => {
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
   const version7 = {
-    schema_version: 8,
+    schema_version: 9,
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
@@ -154,18 +153,18 @@ test("the unavailable forms differ only in schema_version", () => {
   };
   assert.deepEqual(withoutVersion(version7), withoutVersion(version4));
   assert.doesNotThrow(() =>
-    Protocol.validatePanel("context_actions", 8, version7)
+    Protocol.validatePanel("context_actions", 9, version7)
   );
-  assert.throws(() => Protocol.validatePanel("context_actions", 8, version4));
+  assert.throws(() => Protocol.validatePanel("context_actions", 9, version4));
   assert.throws(() =>
-    Protocol.validatePanel("context_actions", 8, Object.assign({}, version7, { schema_version: 7 }))
+    Protocol.validatePanel("context_actions", 9, Object.assign({}, version7, { schema_version: 7 }))
   );
   // The unavailable form rejects a suggestions field: the field set stays
   // exactly schema_version/available/reason.
   assert.throws(() =>
     Protocol.validatePanel(
       "context_actions",
-      8,
+      9,
       Object.assign({}, version7, { suggestions: { status: "unavailable" } })
     )
   );

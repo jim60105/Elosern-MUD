@@ -1,39 +1,33 @@
-"""Exact schema-version-8 ``context_actions`` panel and presenter.
+"""Exact schema-version-9 ``context_actions`` panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
 bounded schema before returning it to the presentation registry. Inside a
 valid active combat session it emits the combat available form:
 schema_version, available, kind, session, participants, root_actions,
-secondary_actions, actors, choices, draft, suggestions.
-In exploration mode it emits the exploration available form carrying the canonical
-affordance vocabulary and the state-backed suggestions envelope.
+secondary_actions, actors, choices, draft.
+In exploration mode it emits the exploration available form carrying the
+canonical affordance vocabulary.
 Outside both modes it raises :class:`PanelUnavailableError`.
 
-Version 8 (monster-individual-names) adds one required, nullable
+Version 9 removes the retired ``suggestions`` envelope from both available
+forms, so the panel carries no suggestion state at any version. Version 8
+(monster-individual-names) added one required, nullable
 ``monster_identity`` to every combat participant (see
 ``web.webclient.presentation.monster_identity``); the participant's
-``display_name`` is derived from a non-null identity. The top-level field sets
-and the exploration and unavailable forms are otherwise unchanged.
+``display_name`` is derived from a non-null identity.
 """
 
 from typing import Any
 
+from web.webclient.presentation.affordance_params import validate_affordance_params
 from web.webclient.presentation.affordances import (
     ACTION_CODE_ALLOWLIST,
     SURFACES,
-    AffordanceView,
-    default_cards,
     exploration_affordances,
     in_exploration_mode,
 )
 from web.webclient.presentation.context import PresentationContext
-from web.webclient.presentation.coordinator import log_unavailable
-from web.webclient.presentation.options import (
-    OPTIONS_STATUSES,
-    _validate_affordance_params,
-    validate_suggestions,
-)
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -77,7 +71,7 @@ from world.rules.progression import (
 from world.rules.status_display import CONDITION_SEVERITIES
 from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 8
+CONTEXT_ACTIONS_SCHEMA_VERSION = 9
 
 MAX_CONTEXT_AFFORDANCES = 320
 MAX_AFFORDANCE_LABEL = 128
@@ -873,7 +867,7 @@ def _validate_affordance_view(value: Any) -> dict[str, Any]:
     for key, child in params_value.items():
         if isinstance(child, str) and len(child) > MAX_AFFORDANCE_PARAM_STRING:
             raise ProtocolValidationError("affordance params string exceeds its bound")
-    params = _validate_affordance_params(action_id, params_value)
+    params = validate_affordance_params(action_id, params_value)
     return {
         "action_id": action_id,
         "label": label,
@@ -889,7 +883,7 @@ def _validate_exploration_form(payload: Any) -> dict[str, Any]:
     _require_exact_fields(
         payload,
         "context_actions exploration form",
-        {"schema_version", "available", "kind", "affordances", "suggestions"},
+        {"schema_version", "available", "kind", "affordances"},
         {},
     )
     if _require_int(
@@ -906,13 +900,11 @@ def _validate_exploration_form(payload: Any) -> dict[str, Any]:
             f"affordances must be a list of at most {MAX_CONTEXT_AFFORDANCES} entries"
         )
     views = [_validate_affordance_view(entry) for entry in affordances]
-    suggestions = validate_suggestions(payload["suggestions"])
     result = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
         "kind": "exploration",
         "affordances": views,
-        "suggestions": suggestions,
     }
     if json_byte_size(result) > MAX_CANONICAL_JSON_BYTES:
         raise ContextActionsError(
@@ -943,7 +935,6 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
             "actors",
             "choices",
             "draft",
-            "suggestions",
         },
         {},
     )
@@ -1066,10 +1057,6 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
         choices_view = None
         draft_view = None
 
-    suggestions = validate_suggestions(payload["suggestions"])
-    if suggestions != {"status": "unavailable"}:
-        raise ContextActionsError("combat suggestions must be exactly unavailable")
-
     result = {
         "schema_version": CONTEXT_ACTIONS_SCHEMA_VERSION,
         "available": True,
@@ -1081,7 +1068,6 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
         "actors": actor_views,
         "choices": choices_view,
         "draft": draft_view,
-        "suggestions": suggestions,
     }
     if json_byte_size(result) > MAX_CANONICAL_JSON_BYTES:
         raise ContextActionsError("context_actions combat form exceeds the OOB envelope limit")
@@ -1222,60 +1208,6 @@ def _serialize_draft(draft: Any) -> dict[str, Any] | None:
     }
 
 
-def _serialize_suggestions_card(entry: AffordanceView) -> dict[str, Any]:
-    return {
-        "kind": "freeform" if entry.freeform else "known_action",
-        "action_code": entry.action_id,
-        "label": entry.label,
-        "params": dict(entry.params),
-    }
-
-
-def _suggestions_section(
-    context: PresentationContext, affordances: tuple[AffordanceView, ...]
-) -> dict[str, Any]:
-    snapshot = context.options_state
-    if snapshot is None or snapshot.status not in OPTIONS_STATUSES or snapshot.status == "unavailable":
-        return {"status": "unavailable"}
-    if context.options_fingerprint is None or snapshot.fingerprint != context.options_fingerprint:
-        log_unavailable(
-            "exploration suggestions",
-            "snapshot fingerprint no longer matches the current situation",
-        )
-        return {"status": "unavailable"}
-    if snapshot.status == "generating":
-        return {"status": "generating"}
-    if snapshot.status == "degraded":
-        cards = [
-            _serialize_suggestions_card(entry)
-            for entry in default_cards(affordances, actor=context.actor)
-        ]
-        try:
-            return validate_suggestions({"status": "degraded", "cards": cards})
-        except ProtocolValidationError:
-            log_unavailable(
-                "exploration suggestions",
-                "degraded derivation fails the v5 shape gate",
-            )
-            return {"status": "unavailable"}
-    displayed = snapshot.displayed
-    if displayed is None:
-        log_unavailable(
-            "exploration suggestions",
-            "ready snapshot carries no displayed set",
-        )
-        return {"status": "unavailable"}
-    cards = [card.as_dict() for card in displayed]
-    try:
-        return validate_suggestions({"status": "ready", "cards": cards})
-    except ProtocolValidationError:
-        log_unavailable(
-            "exploration suggestions",
-            "ready displayed set fails the v5 shape gate",
-        )
-        return {"status": "unavailable"}
-
-
 def _exploration_payload(context: PresentationContext) -> dict[str, Any]:
     actor = context.actor
     if not in_exploration_mode(actor):
@@ -1289,7 +1221,6 @@ def _exploration_payload(context: PresentationContext) -> dict[str, Any]:
         "available": True,
         "kind": "exploration",
         "affordances": [entry.as_dict() for entry in affordances],
-        "suggestions": _suggestions_section(context, affordances),
     }
     return validate_context_actions(payload)
 
@@ -1352,7 +1283,6 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
             "actors": [],
             "choices": None,
             "draft": None,
-            "suggestions": {"status": "unavailable"},
         }
         return validate_context_actions(payload)
 
@@ -1407,6 +1337,5 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
         "actors": actors,
         "choices": _serialize_choices(view.choices),
         "draft": _serialize_draft(view.draft),
-        "suggestions": {"status": "unavailable"},
     }
     return validate_context_actions(payload)

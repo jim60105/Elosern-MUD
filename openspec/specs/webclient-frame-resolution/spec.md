@@ -1,7 +1,7 @@
 # webclient-frame-resolution Specification
 
 ## Purpose
-Defines the store-owned frame resolver registry mapping frame descriptors to menus derived from committed presentation state at access time, with resolvers forbidden from reading cached or component state. Covers the finite exploration/combat/creation descriptor tables, verbatim dynamic rows against client-owned navigation rows, the shared degradation marker for unresolvable descriptors, router frames storing descriptors with focus tracked across re-resolution, stack pop and root-reason rules, status-driven suggestions frames, single-decision-point teardown, and committed-state activation payloads.
+Defines the store-owned frame resolver registry mapping frame descriptors to menus derived from committed presentation state at access time, with resolvers forbidden from reading cached or component state. Covers the finite exploration/combat/creation descriptor tables, verbatim dynamic rows against client-owned navigation rows, the shared degradation marker for unresolvable descriptors, router frames storing descriptors with focus tracked across re-resolution, stack pop and root-reason rules, single-decision-point teardown, and committed-state activation payloads.
 
 ## Requirements
 

@@ -88,13 +88,12 @@ AFFECTED_ACTIVATE = ()
 # against the saved draft.
 FINGERPRINT_NDB_KEY = "elosern_confirmed_draft_fingerprint"
 
-# The session ndb key carrying the transient concept proposal slot (mirrors the
-# ``session.ndb.options_state`` pattern): ``owner_actor_id`` binding, the
-# session-monotonic ``revision``, and the four content keys. Lost with the
-# session, cleared by a successful custom save or reset (retool-concept-
-# transient-fill D1). The revision sequence lives in its own counter key so a
-# consumed slot never restarts it; that counter is only ever lost with the
-# session itself.
+# The session ndb key carrying the transient concept proposal slot:
+# ``owner_actor_id`` binding, the session-monotonic ``revision``, and the four
+# content keys. Lost with the session, cleared by a successful custom save or
+# reset (retool-concept-transient-fill D1). The revision sequence lives in its
+# own counter key so a consumed slot never restarts it; that counter is only
+# ever lost with the session itself.
 PROPOSAL_NDB_KEY = "concept_proposal"
 PROPOSAL_REVISION_KEY = "concept_proposal_revision"
 

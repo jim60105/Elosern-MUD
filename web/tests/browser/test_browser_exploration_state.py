@@ -854,11 +854,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         pinned_context = {
             "context_actions": {
-                "schema_version": 8,
+                "schema_version": 9,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
-                "suggestions": {"status": "generating"},
             },
         }
         accepted = self._inject_panels(page, {

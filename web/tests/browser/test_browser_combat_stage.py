@@ -164,7 +164,7 @@ def _combat_panels(
 def _exploration_panels(companions: int = 0) -> dict:
     panels = {
         "exploration": _exploration_panel([_interact_target(11, "小販")]),
-        "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+        "context_actions": _exploration_context_actions_panel(),
         "art": _art_panel([]),
     }
     if companions:

@@ -234,23 +234,8 @@ class AccountActionsIntegrationTests(EvenniaTest):
         "webclient-character-roster::a-puppet-change-carries-no-session-scoped-state-across-characters"
     )
     def test_cross_puppet_session_state_isolation(self):
-        """Switching characters clears ephemeral options state and concept proposals."""
+        """Switching characters carries no transient concept proposal across."""
         # Set up ephemeral state for char1
-        self.session.ndb.options_state = {
-            "owner_actor_id": str(self.char1.pk),
-            "fingerprint": "fp_char1",
-            "status": "ready",
-            "generation_token": 1,
-            "displayed": [
-                {
-                    "kind": "known_action",
-                    "action_code": "explore.look",
-                    "label": "打量四周",
-                    "params": {},
-                    "hint": None,
-                }
-            ],
-        }
         self.session.ndb.concept_proposal = {
             "owner_actor_id": str(self.char1.pk),
             "revision": 1,
@@ -278,12 +263,7 @@ class AccountActionsIntegrationTests(EvenniaTest):
 
         self.assertIs(self.session.puppet, self.char2)
 
-        # Ephemeral session state from char1 must not be inherited
-        options_state = getattr(self.session.ndb, "options_state", None)
-        if options_state is not None:
-            # If reconnect trigger initialized state for char2, verify it's char2's
-            self.assertEqual(options_state.get("owner_actor_id"), str(self.char2.pk))
-            self.assertNotEqual(options_state.get("fingerprint"), "fp_char1")
+        # The previous character's transient proposal must not be inherited.
         self.assertIsNone(getattr(self.session.ndb, "concept_proposal", None))
 
         # ---------------------------------------------------------------------

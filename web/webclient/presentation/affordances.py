@@ -3,9 +3,7 @@
 This module owns the shared, read-only affordance rules for a puppeted player
 in exploration mode: the frozen discriminated :class:`AffordanceView` contract
 (action vs navigation), the ten emitted action codes, validator-normalized
-params, the freeform binding-only exception, the idle baseline, the
-suggestion-eligibility layer, and the deterministic ``default_cards()``
-degradation derivation.
+params, the freeform binding-only exception, and the idle baseline.
 
 The vocabulary emits action codes only: a target's supported services reach the
 player through the exploration panel's separate target-bound ``services`` field
@@ -20,8 +18,6 @@ All builders are read-only: nothing here mutates traits, knowledge, dialogue,
 quests, inventory, combat sessions, party, or world time.
 """
 
-import hashlib
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,7 +35,6 @@ from world.rules.dialogue import (
     dialogue_topic_keywords,
     is_dialogue_host,
 )
-from world.rules.npc_schedules import interaction_reason
 from world.rules.party import has_general_membership, is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
 # The thirteen action codes the allowlist admits. ``explore.interact`` is
@@ -48,10 +43,9 @@ from world.rules.time_skip import unsafe_rejection
 # a member because the exploration panel folds each conversable host's talk
 # entries into one 交談 affordance naming it, but the vocabulary itself never
 # emits it (the per-keyword and free-form entries stay, so the
-# ``context_actions`` form, suggestion eligibility, and the AI proposal ladder
-# keep consuming them). ``explore.dialogue_complete`` is a member because the
-# in-conversation acknowledgement is a registered dispatcher action; it is
-# never emitted as an affordance or a suggestion.
+# ``context_actions`` form keeps consuming them). ``explore.dialogue_complete``
+# is a member because the in-conversation acknowledgement is a registered
+# dispatcher action; it is never emitted as an affordance.
 ACTION_CODE_ALLOWLIST = (
     "explore.move",
     "explore.look",
@@ -68,23 +62,7 @@ ACTION_CODE_ALLOWLIST = (
     "explore.dialogue_complete",
 )
 
-# The subset of action codes a suggestion may carry: party management is a
-# dock affordance, not a suggested action, and ``explore.talk_open`` would
-# duplicate the dock's own 交談 row. Completion is a context-bound
-# acknowledgement, never a suggested or interact-target action.
-SUGGESTIBLE_ACTION_IDS = frozenset(ACTION_CODE_ALLOWLIST) - {
-    "explore.talk_open",
-    "explore.dialogue_complete",
-    "explore.party_invite",
-    "explore.party_leave",
-    "explore.possess",
-    "explore.possess_release",
-}
-
 SURFACES = ("guild", "shop")
-
-# The deterministic fallback card cap.
-MAX_CARDS = 5
 
 # Exact shared bounds (carried over from the version-1 panel).
 MAX_MOVE_EXITS = 12
@@ -278,19 +256,6 @@ def _resolve_single_host(actor: Any, component_class: type) -> Any | None:
     ]
     if len(matches) == 1:
         return matches[0]
-    return None
-
-
-def _present_npc(actor: Any, npc_id: int) -> Any | None:
-    """Resolve a present NPC by identity, or ``None`` when absent."""
-    from typeclasses.npcs import NPC
-
-    location = getattr(actor, "location", None)
-    if location is None:
-        return None
-    candidates = [obj for obj in location.contents if isinstance(obj, NPC) and int(obj.pk) == npc_id]
-    for obj in location.filter_visible(candidates, actor):
-        return obj
     return None
 
 
@@ -818,158 +783,11 @@ def exploration_affordances(actor: Any) -> tuple[AffordanceView, ...]:
     return tuple(entries)
 
 
-def suggestible_candidates(
-    affordances: tuple[AffordanceView, ...] | list[AffordanceView],
-    *,
-    actor: Any | None = None,
-) -> tuple[AffordanceView, ...]:
-    """Return exactly the executable suggestion entries of a vocabulary.
-
-    An entry is suggestible iff it is an enabled action entry whose code is in
-    ``SUGGESTIBLE_ACTION_IDS`` — never a navigation, party, or disabled entry.
-    Talk entries are suggestible only when ``actor`` is provided and the host
-    is present and not blocked by the talk schedule gate; a wait entry is
-    suggestible only when the room is safe (the vocabulary never emits an
-    unsafe wait, and ``actor`` re-verifies it). Without an actor the schedule
-    and safety gates cannot be verified, so talk entries are excluded —
-    executability is never claimed for an unverifiable card. This layer is the
-    single source of "is this card runnable right now" for the deterministic
-    fallback and the later AI proposal ladder; the vocabulary itself is
-    unchanged by this filtering.
-    """
-    results: list[AffordanceView] = []
-    for entry in affordances:
-        if entry.navigation:
-            continue
-        if not entry.enabled:
-            continue
-        if entry.action_id not in SUGGESTIBLE_ACTION_IDS:
-            continue
-        if entry.action_id in ("explore.talk_scripted", "explore.talk_freeform"):
-            if actor is None:
-                continue
-            npc = _present_npc(actor, entry.params["npc_id"])
-            if npc is None:
-                continue
-            if interaction_reason(npc, "talk") is not None:
-                continue
-        if entry.action_id == "explore.wait":
-            if actor is not None and unsafe_rejection(actor) is not None:
-                continue
-        results.append(entry)
-    return tuple(results)
-
-
-def default_cards(
-    affordances: tuple[AffordanceView, ...] | list[AffordanceView],
-    *,
-    objective_npc_ids: frozenset[int] = frozenset(),
-    actor: Any | None = None,
-    max_cards: int = MAX_CARDS,
-) -> tuple[AffordanceView, ...]:
-    """Derive the deterministic degradation suggestion list (rule cards).
-
-    Filters through :func:`suggestible_candidates`, ranks objective-relevant
-    entries first (params referencing a present NPC id in ``objective_npc_ids``),
-    then talk and engage entries over the remaining baseline, preserves
-    vocabulary order within a rank, and caps at ``max_cards``. In v1
-    exploration the room-look baseline is always suggestible, so the result is
-    never empty there. Production callers pass the ``actor`` so talk
-    eligibility re-verifies presence and the schedule gate; without it, talk
-    entries are excluded (see :func:`suggestible_candidates`). The function is
-    pure: it never mutates state and only reads what the caller passes.
-    """
-    suggestible = suggestible_candidates(affordances, actor=actor)
-
-    def _is_objective(entry: AffordanceView) -> bool:
-        return (
-            isinstance(entry.params, dict)
-            and isinstance(entry.params.get("npc_id"), int)
-            and entry.params["npc_id"] in objective_npc_ids
-        )
-
-    def _rank(entry: AffordanceView) -> int:
-        if _is_objective(entry):
-            return 0
-        if entry.action_id in ("explore.talk_scripted", "explore.talk_freeform", "explore.engage"):
-            return 1
-        return 2
-
-    ordered = sorted(suggestible, key=_rank)
-    return tuple(ordered[:max_cards])
-
-
-# ---------------------------------------------------------------------------
-# Canonical serialization and the eligibility digest (shared sources).
-# ---------------------------------------------------------------------------
-
-
-def canonical_json(value: Any) -> str:
-    """Serialize one JSON-safe value into its canonical stable-key form.
-
-    Keys are recursively sorted, non-ASCII text is kept literal, and compact
-    separators are used, so byte-identical input produces byte-identical output
-    regardless of key insertion order. Tuples serialize as arrays (the
-    deterministic type coercion over the vocabulary's containers). This is the
-    single serialization the schema ladder's canonical comparison, the
-    trigger-service eligibility and public-state digests, and the test fixtures
-    all share, so builder-side and validator-side representations cannot drift.
-
-    Raises ``ValueError`` for containers with non-string keys, which have no
-    deterministic ordering.
-    """
-    _ensure_canonical(value)
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-
-
-def _ensure_canonical(value: Any) -> None:
-    """Recursively verify that ``value`` is deterministically serializable."""
-    if isinstance(value, dict):
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise ValueError("canonical JSON requires string-sortable keys")
-            _ensure_canonical(item)
-    elif isinstance(value, (list, tuple)):
-        for item in value:
-            _ensure_canonical(item)
-    elif not isinstance(value, (str, int, float, bool)) and value is not None:
-        raise ValueError(
-            f"canonical JSON cannot serialize {type(value).__name__}; "
-            "sets have no deterministic ordering"
-        )
-
-
-def eligible_affordance_digest(affordances: Any) -> str:
-    """Digest of the canonical eligible-affordance list (labels excluded).
-
-    ``affordances`` is a sequence of action-entry :class:`AffordanceView`
-    (navigation entries are rejected — a navigation surface has no dispatcher
-    action code and no eligibility). The digest is the SHA-256 of the canonical
-    JSON of the ``sorted((action_id, params))`` pairs with ``params`` serialized
-    key-sorted, so any change that makes an action executable or not —
-    schedule-gate flips, locked exits, monster death, vanishing objects —
-    changes the digest while identical eligibility (labels, display names, and
-    ordering aside) always produces the same value.
-    """
-    pairs = []
-    for entry in affordances:
-        if getattr(entry, "navigation", False):
-            raise ValueError("the eligibility digest covers action entries only")
-        if entry.params is None:
-            raise ValueError("a digest action entry carries no params")
-        pairs.append((entry.action_id, canonical_json(entry.params)))
-    pairs.sort()
-    return hashlib.sha256(
-        canonical_json([list(pair) for pair in pairs]).encode("utf-8")
-    ).hexdigest()
-
-
 __all__ = [
     "ACTION_CODE_ALLOWLIST",
     "AffordanceView",
     "BASELINE_WAIT_DAYPART",
     "MAX_AFFORDANCES",
-    "MAX_CARDS",
     "MAX_DISPLAY_NAME_CODE_POINTS",
     "MAX_EXIT_REF_CHARS",
     "MAX_INTERACT_TARGETS",
@@ -981,12 +799,7 @@ __all__ = [
     "MAX_NODE_ID_CHARS",
     "MAX_REASON_MESSAGE_CODE_POINTS",
     "MAX_SCRIPTED_KEYWORDS",
-    "SUGGESTIBLE_ACTION_IDS",
     "SURFACES",
-    "canonical_json",
-    "default_cards",
-    "eligible_affordance_digest",
     "exploration_affordances",
     "in_exploration_mode",
-    "suggestible_candidates",
 ]

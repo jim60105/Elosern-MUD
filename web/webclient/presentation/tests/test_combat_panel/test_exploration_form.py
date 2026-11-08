@@ -27,6 +27,14 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         self.assertNotIn("surface", normalized["affordances"][0])
         self.assertNotIn("action_id", normalized["affordances"][2])
 
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-7-panel")
+    def test_suggestions_is_rejected_as_an_unknown_field(self):
+        retired = {"status": "unavailable"}
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(_exploration_panel(suggestions=retired))
+        with self.assertRaises(ProtocolValidationError):
+            validate_context_actions(_valid_panel(suggestions=retired))
+
     def test_combat_fields_in_the_exploration_form_reject(self):
         payload = _exploration_panel(session={"session_id": "x"}, skills=[])
         with self.assertRaises(ProtocolValidationError):
@@ -161,9 +169,9 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
             }
             for category in version7["choices"]["skills"]
         ]
-        self.assertEqual(version7["schema_version"], 8)
+        self.assertEqual(version7["schema_version"], 9)
         normalized = validate_context_actions(version7)
-        self.assertEqual(normalized["schema_version"], 8)
+        self.assertEqual(normalized["schema_version"], 9)
         # Participant rows keep their v4 field set plus the v6 conditions and
         # the v8 monster identity.
         self.assertEqual(
@@ -205,7 +213,6 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
                 "schema_version",
                 "secondary_actions",
                 "session",
-                "suggestions",
             ],
         )
         self.assertEqual(
@@ -213,9 +220,8 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
             ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
         )
         self.assertEqual(normalized["secondary_actions"], ["surrender"])
-        self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
         # A legacy top-level skills payload and a version-7, version-6 or
-        # version-5 payload are all rejected by the v8 validator.
+        # version-5 payload are all rejected by the version-9 validator.
         with self.assertRaises((ProtocolValidationError, ContextActionsError)):
             validate_context_actions({**version7, "schema_version": 7})
         with self.assertRaises((ProtocolValidationError, ContextActionsError)):
@@ -255,14 +261,12 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
         )
         self.assertEqual(version5["schema_version"], 5)
         # The common unavailable form carries exactly schema_version,
-        # available, and reason — never a suggestions field (design D-1
-        # amendment; the shared builder in presentation/registry.py is
-        # unchanged).
+        # available, and reason; the shared builder in presentation/registry.py
+        # is unchanged.
         self.assertEqual(
             set(version5),
             {"schema_version", "available", "reason"},
         )
-        self.assertNotIn("suggestions", version5)
 
 
 if __name__ == "__main__":

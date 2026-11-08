@@ -378,19 +378,17 @@ carry a stable code and a safe Traditional Chinese message and SHALL change no s
 
 ### Requirement: A puppet change carries no session-scoped state across characters
 A transition performed by an account-scoped action SHALL leave the retiring character's
-session-scoped presentation state behind: the previous character's action-options state and
-dismissal barriers, its transient creation concept proposal, and its completed-result cache and
-in-flight marker SHALL NOT be visible to or reusable by the new puppet. Per-character persistent
-state SHALL remain on the character it belongs to and SHALL be unchanged by the switch.
+session-scoped presentation state behind: the previous character's transient creation concept
+proposal, and its completed-result cache and in-flight marker SHALL NOT be visible to or reusable
+by the new puppet. Per-character persistent state SHALL remain on the character it belongs to and
+SHALL be unchanged by the switch.
 
 #### Scenario: The new puppet inherits no suggestion state
-- **WHEN** a player with committed action-option cards switches to another character
-- **THEN** the new puppet's first snapshot carries no card, fingerprint, or dismissal barrier from
-  the previous character
+- **WHEN** a player switches to another character after a committed action-suggestion era state had existed on the session
+- **THEN** no client surface carries a suggestion card, a suggestion fingerprint, or a dismissal barrier from the previous character, because the retired suggestion state is never written and the switch clears every session-scoped slice
 
 #### Scenario: An in-flight generation cannot cross the switch
-- **WHEN** an action-options generation started for the previous character settles after the switch
-  completes
+- **WHEN** a deferred generative reply started for the previous character settles after the switch completes
 - **THEN** it publishes no panel state or result into the new character's sequence
 
 #### Scenario: Per-character persistent state stays with its character

@@ -1457,7 +1457,7 @@ def publish_panel_update(
     coordinator is left alone — nothing is attached by this helper; the ingress
     attaches on the session's next sync. ``context`` is the caller's
     :class:`PresentationContext`, assembled through the shared ingress factory
-    so the ``context_actions`` presenter renders from the ``OptionsSnapshot``.
+    so every presenter renders from the same session-scoped snapshots.
 
     The queued request always rebuilds its context through that same ingress
     factory at drain time, so a grouped push can never re-render from a stale

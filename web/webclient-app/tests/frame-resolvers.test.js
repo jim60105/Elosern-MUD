@@ -537,7 +537,7 @@ function combatFixturePanel(overrides = {}) {
       extra
     );
   return {
-    schema_version: 7,
+    schema_version: 9,
     available: true,
     kind: "combat",
     session: { session_id: "hostile:1:0", mode: "hostile", round: 1, round_revision: 0, state: "ready", reason: null },
@@ -567,7 +567,6 @@ function combatFixturePanel(overrides = {}) {
       needs_selection_ids: [7],
       reselection_reasons: [],
     },
-    suggestions: { status: "unavailable" },
     ...overrides,
   };
 }

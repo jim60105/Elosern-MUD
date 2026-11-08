@@ -814,9 +814,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 page,
                 {
                     "exploration": exploration,
-                    "context_actions": _exploration_context_actions_panel(
-                        {"status": "unavailable"}
-                    ),
+                    "context_actions": _exploration_context_actions_panel(),
                     "local_map": valid_local_map_panel(),
                 },
                 mode="exploration",
@@ -893,7 +891,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 page,
                 {
                     "exploration": exploration,
-                    "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                    "context_actions": _exploration_context_actions_panel(),
                     "local_map": valid_local_map_panel(),
                     "dialogue": dialogue_panel(line="歡迎光臨。"),
                 },
@@ -948,7 +946,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             exploration = _exploration_panel([_interact_target(11, "小販")])
             panels = {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             }
             _inject_snapshot(page, panels, mode="exploration")
@@ -1148,7 +1146,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
             },
             mode="exploration",
@@ -1191,7 +1189,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "dialogue": dialogue_panel(
                     line="歡迎光臨，要看看今天的貨嗎？",
                     choices=(
@@ -1249,7 +1247,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
             },
             mode="exploration",
         )
@@ -1339,7 +1337,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         exploration = _exploration_panel([_selectable_target(11, "小販")])
         explore_panels = {
             "exploration": exploration,
-            "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+            "context_actions": _exploration_context_actions_panel(),
             "local_map": valid_local_map_panel(),
             "objectives": objectives,
         }
@@ -1589,7 +1587,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             page,
             {
                 "exploration": exploration,
-                "context_actions": _exploration_context_actions_panel({"status": "unavailable"}),
+                "context_actions": _exploration_context_actions_panel(),
                 "local_map": valid_local_map_panel(),
                 "lore_codex": valid_lore_codex_panel(),
                 "gallery": _GALLERY_PANEL,
