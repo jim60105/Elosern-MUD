@@ -367,20 +367,23 @@ browser test, not only Storybook.
 
 The top bar (`DesktopNavigation.vue`; webclient-main-navigation-hotkeys,
 design §8 of the party member management design, after the prototype's
-`MainNavPrototype.vue`) is 隊伍 / 任務 / 地圖, the `工具` icon group (信件,
+`MainNavPrototype.vue`) is 隊伍 / 手帳 / 地圖, the `工具` icon group (信件,
 圖鑑, 稱號冊, 角色肖像圖庫 while the `gallery` panel is available, 說明) and
 設定 last, divided by thin gold hairlines.
 
 - `components/nav-primary.js` is the one entry model (label, glyph, hotkey)
   and `primaryEntries()` decides presence: 隊伍 follows `store.partyAvailable`
-  in every playing mode, 任務 is the server's `quests` navigation row (none in
-  combat), 地圖 is absent in combat. Each entry draws its hotkey as a
+  in every playing mode, 手帳 (the quest window) is the server's `quests`
+  navigation row (none in combat), 地圖 is absent in combat. Each entry draws its hotkey as a
   decorative key chip (`aria-hidden`, the control carries `aria-keyshortcuts`).
   The primary region is sized for all three entries (glyph counts plus a
   fixed chrome including the chip) and packed trailing, so the tools and 設定
   hold their place within 1px across modes.
 - 隊伍 is `store.openHudDrawer("party")` — the remembered tab, no router pop
-  and no submission-lock wait; 任務 keeps `tabToRootAndConfirm("quests")`.
+  and no submission-lock wait; 手帳 keeps `tabToRootAndConfirm("quests")`.
+  The 稱號冊 tool calls `store.openHandbook("titles")` (handbook-titles-tab):
+  a sequenced route request on the `serviceReadRequest` slot that opens the
+  quest drawer on its 稱號 tab, also in combat, where it is the only tab.
   The bar marks 隊伍 current while the party window is open, whatever its tab.
 - `composables/use-window-hotkeys.js`: one document `keydown` listener
   (bubble phase, beside the keyboard bridge, which never claims letters).

@@ -36,8 +36,8 @@ Run every pnpm command from the repository root (`/var/home/jim60105/repos/MUD`)
 
 ## 6. Evidence bridge and gates
 
-- [ ] 6.1 Extend `web/webclient/tests/test_vue_handbook_evidence.py` (created by `handbook-primitives`) with one `test_*` method per ADDED `webclient-quest-drawer` requirement. Each method runs the vitest files that establish that requirement (`tests/handbook/title_codex_tab.test.js`, `tests/handbook/codex_medal_grid.test.js`, `tests/world/quest_drawer.test.js`, `tests/store/hud_drawer.test.js`, `tests/app_client_drawers.test.js`) and asserts that they pass. Annotate the method running `quest_drawer.test.js` with the existing ID `webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface`. Verify by running the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract` with the uv-managed `evennia test --settings test_settings.py --keepdb` form from AGENTS.md.
-- [ ] 6.2 Run `uv run --locked python -m tools.contract_gate --change handbook-titles-tab` and `openspec validate handbook-titles-tab --strict`. Both pass.
+- [x] 6.1 Extend `web/webclient/tests/test_vue_handbook_evidence.py` (created by `handbook-primitives`) with one `test_*` method per ADDED `webclient-quest-drawer` requirement. Each method runs the vitest files that establish that requirement (`tests/handbook/title_codex_tab.test.js`, `tests/handbook/codex_medal_grid.test.js`, `tests/world/quest_drawer.test.js`, `tests/store/hud_drawer.test.js`, `tests/app_client_drawers.test.js`) and asserts that they pass. Annotate the method running `quest_drawer.test.js` with the existing ID `webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface`. Verify by running the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract` with the uv-managed `evennia test --settings test_settings.py --keepdb` form from AGENTS.md.
+- [x] 6.2 Run `uv run --locked python -m tools.contract_gate --change handbook-titles-tab` and `openspec validate handbook-titles-tab --strict`. Both pass.
 
 ## Workflow follow-up
 
