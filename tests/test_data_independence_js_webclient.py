@@ -38,12 +38,22 @@ MIGRATED_FILES = (
     "web/webclient-app/tests/data/breakdown_rendering.test.js",
     "web/webclient-app/tests/frame-resolvers.test.js",
     "web/webclient-app/tests/overlays/creation_overlay.test.js",
-    "web/webclient-app/tests/overlays/title_codex_panel.test.js",
     "web/webclient-app/tests/preserved_contract.test.js",
     "web/webclient-app/tests/store/command_echo_surfaces.test.js",
     "web/webclient-app/tests/store/declarative_surfaces.test.js",
     "web/webclient-app/tests/store/store_dispatch_focus.test.js",
     "web/webclient-app/tests/world/item_icons.test.js",
+)
+
+#: The handbook titles tab suites that replaced the retired title-codex
+#: overlay suite (handbook-titles-tab). They were written synthetic-first, so
+#: they never entered the seeded debt array: they are scanned for zero
+#: findings and no ledger exemption, but not pinned to the seed.
+HANDBOOK_FILES = (
+    "web/webclient-app/tests/handbook/handbook_tabs.test.js",
+    "web/webclient-app/tests/handbook/title_codex_model.test.js",
+    "web/webclient-app/tests/handbook/codex_medal_grid.test.js",
+    "web/webclient-app/tests/handbook/title_codex_tab.test.js",
 )
 
 #: Manifest paths whose suite became a flat sibling family on disk. The
@@ -75,7 +85,7 @@ class WebclientJsTestDataMigrationContractTests(DataIndependenceContractMixin, u
         "synthetic-fixtures"
     )
     def test_migrated_files_hold_no_ledger_exemption(self):
-        self.assert_no_ledger_exemption(_scan_files(MIGRATED_FILES))
+        self.assert_no_ledger_exemption(_scan_files(MIGRATED_FILES) + list(HANDBOOK_FILES))
 
     @covers_requirement(
         "test-data-independence::"
@@ -83,7 +93,7 @@ class WebclientJsTestDataMigrationContractTests(DataIndependenceContractMixin, u
         "synthetic-fixtures"
     )
     def test_migrated_files_carry_zero_findings(self):
-        self.assert_zero_findings(_scan_files(MIGRATED_FILES))
+        self.assert_zero_findings(_scan_files(MIGRATED_FILES) + list(HANDBOOK_FILES))
 
     def test_no_violation_naming_a_manifest_file(self):
         self.assert_no_violation_naming_manifest(_scan_files(MIGRATED_FILES))
