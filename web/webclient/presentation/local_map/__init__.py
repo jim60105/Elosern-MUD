@@ -38,6 +38,7 @@ from web.webclient.presentation.local_map.gateways import (
     _registered_gateways,
     _wild_region_label,
     _wilderness_gateway_at,
+    _wilderness_gateways_by_approach,
 )
 from web.webclient.presentation.local_map.grid import (
     _free_slot,
@@ -133,6 +134,7 @@ __all__ = [
     "_visited_map",
     "_wild_region_label",
     "_wilderness_gateway_at",
+    "_wilderness_gateways_by_approach",
     "_wilderness_layer",
     "local_map_presenter",
     "validate_local_map",

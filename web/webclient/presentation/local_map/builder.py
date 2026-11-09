@@ -6,6 +6,7 @@ adapters share one bounded payload accumulator and one fail-closed traversal
 probe.
 """
 
+from collections.abc import Iterable
 from typing import Any
 
 from world.rules.map_knowledge import NodeVisit
@@ -89,6 +90,16 @@ class _GraphBuilder:
         ]
         candidates.sort(key=lambda visit: (-visit.last_seen_tick, visit.node_id))
         return candidates[:cap]
+
+    def remembered_among(self, node_ids: Iterable[str]) -> list[NodeVisit]:
+        """Visited nodes among ``node_ids`` not yet drawn, ordered like ``remembered``."""
+        candidates = [
+            self.visited[node_id]
+            for node_id in set(node_ids)  # any iterable of IDs; a dict iterates its keys
+            if node_id in self.visited and node_id not in self._by_id
+        ]
+        candidates.sort(key=lambda visit: (-visit.last_seen_tick, visit.node_id))
+        return candidates
 
 
 def _exit_ref(exit_obj: Any) -> str:
