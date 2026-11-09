@@ -16,6 +16,7 @@ import {
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
 } from "../fixtures.js";
 import { titleCodex } from "../fixtures/title_codex_panels.js";
+import { LORE_CODEX_HANDBOOK_SAMPLE } from "../fixtures/lore_codex_panels.js";
 
 // QuestDrawer (quest-drawer-book-tab): the 手帳 drawer's body inside the real
 // HudDrawer chrome, as the live client mounts it (flush body). The first
@@ -187,8 +188,26 @@ export const TitlesTab = {
   args: { questLog: QUEST_LOG_PANEL_SAMPLE, services: SERVICES_PANEL_SAMPLE, titleCodex: titleCodex(), top: "titles" },
 };
 
-// In combat the handbook carries only its 稱號 tab.
+// handbook-codex-tab: the 圖鑑 tab on its default category.
+export const CodexTab = {
+  render: renderDrawer,
+  args: {
+    questLog: QUEST_LOG_PANEL_SAMPLE,
+    services: SERVICES_PANEL_SAMPLE,
+    titleCodex: titleCodex(),
+    loreCodex: LORE_CODEX_HANDBOOK_SAMPLE,
+    top: "codex",
+  },
+};
+
+// In combat the handbook carries only its 圖鑑 and 稱號 tabs.
 export const InCombat = {
   render: renderDrawer,
-  args: { questLog: QUEST_LOG_PANEL_SAMPLE, services: SERVICES_PANEL_SAMPLE, titleCodex: titleCodex(), combat: true },
+  args: {
+    questLog: QUEST_LOG_PANEL_SAMPLE,
+    services: SERVICES_PANEL_SAMPLE,
+    titleCodex: titleCodex(),
+    loreCodex: LORE_CODEX_HANDBOOK_SAMPLE,
+    combat: true,
+  },
 };

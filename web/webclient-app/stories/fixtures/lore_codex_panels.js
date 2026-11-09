@@ -156,3 +156,92 @@ export function codexArt(subject, url) {
     terminal: null,
   });
 }
+
+// A monster art descriptor whose portrait is not on disk: the shared
+// lifecycle falls through to the committed silhouette alpha mask.
+function codexMonsterArt(subject) {
+  return artworkDescriptor({
+    subject_id: subject,
+    generation_subject: subject,
+    attempts: [
+      {
+        type: "image",
+        source_id: `${subject}:1`,
+        rank: 30,
+        resource: artworkResource({ resource_id: `portrait/monster/${subject}.webp`, url: `/art/portraits/${subject}-story-missing.webp` }),
+      },
+    ],
+    terminal: {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:monster",
+      rank: 100,
+      resource: artworkResource({ resource_id: "defaults/monster_anon.webp", url: "/art/defaults/monster_anon.webp" }),
+    },
+  });
+}
+
+const STORY_LOCKED = ["published_description_zh", "published_ecology_zh", "habitat_tags", "variants"];
+const storySighted = (key, title) =>
+  codexEntry(key, title, {
+    stage: "sighted",
+    art: codexMonsterArt(key),
+    card: [
+      { name: "display_name_zh", value: title },
+      { name: "published_appearance_zh", value: `${title}在霧中只露出一截輪廓。` },
+      { name: "threat_tier", value: "合成階" },
+    ],
+    locked_fields: STORY_LOCKED,
+  });
+const storyDefeated = (key, title) =>
+  codexEntry(key, title, {
+    stage: "defeated",
+    art: codexMonsterArt(key),
+    card: [
+      { name: "display_name_zh", value: title },
+      { name: "published_appearance_zh", value: `${title}的骨甲泛著冷白。` },
+      { name: "threat_tier", value: "合成階" },
+      { name: "published_description_zh", value: `${title}成群出沒的合成記述。` },
+      { name: "published_ecology_zh", value: `${title}在渡口一帶覓食的合成生態。` },
+      { name: "habitat_tags", value: "河岸・霧林" },
+      { name: "variants", value: `${title}・幼體\n${title}・首領` },
+    ],
+  });
+const P = CODEX_PLACEHOLDER;
+const one = (key, slots) => [{ key, label: null, slots }];
+
+// The handbook codex tab's story panel: the eight categories in mapping
+// order, the monster wall in two tiers with mixed stages, a region with its
+// bundled scene art, and art-less entries elsewhere.
+export const LORE_CODEX_HANDBOOK_SAMPLE = loreCodex([
+  codexCategory("race", "種族", one("race", [codexEntry("s_race_a", "合成種族甲"), P, P])),
+  codexCategory("nation", "國家", one("nation", [P, P])),
+  codexCategory("region", "地域", one("region", [
+    codexEntry("s_region_a", "合成地域甲", {
+      art: codexArt("scene:s_region_a", "/art/scenes/city_street.webp"),
+      card: [
+        { name: "display_name_zh", value: "合成地域甲" },
+        { name: "terrain_flavor_zh", value: "石板街道在雨後泛光的合成地貌。" },
+      ],
+    }),
+    P,
+  ])),
+  codexCategory("monster", "魔物", [
+    { key: "story_low", label: "合成低階", slots: [storyDefeated("s_mon_a", "合成骨狼"), storySighted("s_mon_b", "合成霧蛙"), P, P, P] },
+    { key: "story_high", label: "合成高階", slots: [P, storySighted("s_mon_c", "合成灰鷲"), P, P, P, P, P] },
+  ]),
+  codexCategory("element", "元素", one("element", [codexEntry("s_elem_a", "合成元素甲"), P])),
+  codexCategory("magic", "魔法", one("magic", [P, P, P])),
+  codexCategory("anchor", "地點", one("anchor", [codexEntry("s_anchor_a", "合成地點甲"), P])),
+  codexCategory("guild", "公會", one("guild", [P])),
+]);
+
+// Every slot of the story panel turned into a placeholder.
+export const LORE_CODEX_HANDBOOK_EMPTY_SAMPLE = loreCodex(
+  LORE_CODEX_HANDBOOK_SAMPLE.categories.map((category) =>
+    codexCategory(
+      category.key,
+      category.label,
+      category.groups.map((group) => ({ ...group, slots: group.slots.map(() => P) })),
+    ),
+  ),
+);

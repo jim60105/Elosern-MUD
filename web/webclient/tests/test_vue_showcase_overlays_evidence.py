@@ -185,7 +185,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/LocalMap",
     "World/ShopWindow",
     "World/QuestDrawer",
-    "World/LoreCodexDrawer",
+    "World/LoreCodexTab",
     "World/MapLattice",
     # The client-local action-feedback toast queue joined the frozen set
     # when add-action-feedback-toasts refroze the manifest at 42.
