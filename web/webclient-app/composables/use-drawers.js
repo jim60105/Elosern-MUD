@@ -11,7 +11,6 @@ export function useDrawers(store, { panel, panelAvailable }) {
   const DRAWER_TITLES = {
     letters: "信件",
     quest: "手帳",
-    lore: "世界圖鑑",
   };
   const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");
   // The drawer head glyph (webclient-drawer-frame-unification): a
@@ -20,19 +19,19 @@ export function useDrawers(store, { panel, panelAvailable }) {
   const DRAWER_ICONS = {
     letters: "letters",
     quest: "quests",
-    lore: "lore",
   };
   const drawerIcon = computed(() => DRAWER_ICONS[store.view.hudDrawer] || null);
   // No reference drawer stands an art column (webclient-party-status-tab):
-  // the codex, the quest log and the shop are not the
+  // the handbook (with its codex tab) and the shop are not the
   // player, so they take the whole workspace width, and the character's
   // status moved into the party window, which owns its WindowFrame chrome
   // and carries portraits in its rail, nameplate and status hero.
 
-  // The command line's 圖鑑 utility control (webclient-lore-codex-drawer)
-  // opens the codex reference drawer through the store's single open-drawer
-  // entry point: at most one focus-trapped surface is open at a time and the
-  // existing drawer teardown rules apply unchanged.
+  // A drawer opener (the 信件 tool) opens its reference drawer through the
+  // store's single open-drawer entry point: at most one focus-trapped surface
+  // is open at a time and the existing drawer teardown rules apply unchanged.
+  // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab), opened
+  // through the handbook route request instead.
   function onOpenDrawer(name) {
     store.openHudDrawer(name);
   }

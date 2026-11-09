@@ -24,6 +24,7 @@ import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { resetPartyWindowMemory } from "../components/party-window-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import { titleCodex } from "../stories/fixtures/title_codex_panels.js";
+import { LORE_CODEX_PANEL_SAMPLE } from "../stories/fixtures/lore_codex_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { dialoguePanel as v3Panel } from "./support/dialogue_panel.js";
 import {
@@ -94,7 +95,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
   const REFERENCE_SURFACES = {
     shop: "shop-window",
     quest: "quest-drawer",
-    lore: "lore-codex-drawer",
+    letters: "letters-panel",
     party: "party-window",
   };
 
@@ -118,6 +119,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       expect(store.view.hudDrawer).toBe(name);
       expect(wrapper.find(`[data-testid="${testid}"]`).exists(), name).toBe(true);
     }
+    // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab): one
+    // handbook route request opens it.
+    store.closeHudDrawer();
+    store.openHandbook("codex");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-testid="handbook__codex"]').exists()).toBe(true);
     // The retired character-status drawer's name opens the party window on
     // its 狀態 tab (webclient-party-status-tab) in the same one action.
     store.closeHudDrawer();
@@ -181,7 +188,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.get('[data-testid="party-skill-tab"]').text()).not.toContain("1,240");
     expect(wrapper.findAll('[data-testid="party-window__purse"]')).toHaveLength(1);
-    for (const name of ["shop", "quest", "lore"]) {
+    for (const name of ["shop", "quest"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       const other = wrapper.get('[data-testid="hud-drawer"]');
@@ -647,7 +654,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       expect(servicesReads(sender)).toHaveLength(before);
     });
 
-    it("opens in combat with only the titles tab and reads no counter", async () => {
+    it("opens in combat on the titles tab beside the codex tab and reads no counter", async () => {
       const sender = await openWith(
         { status: fx.statusPanel(), context_actions: fx.combatActions(), title_codex: titleCodex() },
         "combat",
@@ -656,8 +663,39 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
       await wrapper.vm.$nextTick();
       expect(store.view.hudDrawer).toBe("quest");
       const tabs = wrapper.findAll('[data-testid="quest-drawer__top-tabs"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
-      expect(tabs).toEqual(["titles"]);
+      expect(tabs).toEqual(["codex", "titles"]);
       expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+      expect(servicesReads(sender)).toHaveLength(0);
+    });
+
+    // handbook-codex-tab: the 圖鑑 tool opens the 手帳 on its 圖鑑 tab through
+    // the same route request, in exploration and in combat.
+    it("opens the codex tab from the 圖鑑 tool and returns focus to it on close", async () => {
+      const sender = await openWith({ ...explorationPanels(), lore_codex: LORE_CODEX_PANEL_SAMPLE });
+      const opener = wrapper.get('[data-testid="nav-tool-lore"]');
+      opener.element.focus();
+      await opener.trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.view.hudOverlay).toBeNull();
+      expect(store.view.serviceReadRequest).toMatchObject({ slot: "handbook", section: "codex" });
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("codex");
+      expect(wrapper.find('[data-testid="handbook__codex"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="handbook__codex-rail"]').exists()).toBe(true);
+      expect(sender.sent.actions.filter((envelope) => envelope.action_id === "lore.read")).toHaveLength(0);
+    });
+
+    it("opens the codex tab from the 圖鑑 tool in combat beside the titles tab only", async () => {
+      const sender = await openWith(
+        { status: fx.statusPanel(), context_actions: fx.combatActions(), title_codex: titleCodex(), lore_codex: LORE_CODEX_PANEL_SAMPLE },
+        "combat",
+      );
+      await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBe("quest");
+      const tabs = wrapper.findAll('[data-testid="quest-drawer__top-tabs"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
+      expect(tabs).toEqual(["codex", "titles"]);
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("codex");
       expect(servicesReads(sender)).toHaveLength(0);
     });
 

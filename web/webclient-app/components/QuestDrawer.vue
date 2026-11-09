@@ -2,8 +2,8 @@
 // QuestDrawer (quest-drawer-book-tab): the 手帳 (handbook) drawer's body — a
 // two-level icon-tabbed master/detail surface. The first level (a horizontal
 // strip under the drawer header) switches between the quest book, the guild
-// counter and the titles tab (handbook-titles-tab), and offers only the
-// titles tab in combat. The book adds a vertical state rail (in progress, completed,
+// counter, the codex tab (handbook-codex-tab) and the titles tab
+// (handbook-titles-tab), and offers only the codex and titles tabs in combat. The book adds a vertical state rail (in progress, completed,
 // failed) beside the list column and the detail column. The counter tab
 // (quest-drawer-guild-board-tab) has the same three columns for a registered
 // holder: a grade rail built from the guild section's `rank_ladder`, the rank
@@ -16,8 +16,10 @@
 // counter tab is disabled, yet focusable with its reason, while no usable
 // guild section exists; a remembered counter tab then falls back to the book.
 //
-// The titles tab is TitleCodexTab; its armed epithet removal is exposed to
-// the host as `closeGuard`. A handbook route request (`slot: "handbook"`)
+// The codex tab is LoreCodexTab (read-only, it dispatches nothing). The
+// titles tab is TitleCodexTab; its armed epithet removal is exposed to the
+// host as `closeGuard`. Each is disabled, yet focusable with its panel's
+// reason, while its panel is unavailable. A handbook route request (`slot: "handbook"`)
 // selects the named first-level tab; every route request is applied once.
 //
 // Every intent (book, board, registration, examination, and title) is
@@ -29,8 +31,10 @@ import GuildRankCard from "./GuildRankCard.vue";
 import IconTabs from "./IconTabs.vue";
 import QuestDetail from "./QuestDetail.vue";
 import QuestList from "./QuestList.vue";
+import LoreCodexTab from "./handbook/LoreCodexTab.vue";
 import TitleCodexTab from "./handbook/TitleCodexTab.vue";
 import { HANDBOOK_TAB_META, handbookTabs } from "./handbook/handbook-tabs.js";
+import { loreCodexStatus } from "./handbook/lore-codex-model.js";
 import { titleCodexStatus } from "./handbook/title-codex-model.js";
 import {
   BOOK_STATES,
@@ -68,6 +72,8 @@ const props = defineProps({
   combat: { type: Boolean, default: false },
   // The committed `title_codex` v1 panel (null before the first commit).
   titleCodex: { type: Object, default: null },
+  // The committed `lore_codex` v2 panel (null before the first commit).
+  loreCodex: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action"]);
@@ -98,10 +104,16 @@ const panelId = (key) => `quest-drawer-${uid}-${key}`;
 const counter = computed(() => counterTab(props.services));
 const titlesStatus = computed(() => titleCodexStatus(props.titleCodex));
 const titlesDisabled = computed(() => titlesStatus.value === "unavailable");
+const codexDisabled = computed(() => loreCodexStatus(props.loreCodex) === "unavailable");
+// The effective tab: the remembered one when present in the mode and enabled.
+// In combat a remembered book or counter yields to the first combat tab (the
+// codex), or to the titles tab while only the codex is disabled; the
+// remembered key itself is never overwritten.
 const top = computed(() => {
-  if (props.combat) return "titles";
-  if (memory.top === "counter" && counter.value.enabled) return "counter";
   if (memory.top === "titles" && !titlesDisabled.value) return "titles";
+  if (memory.top === "codex" && !codexDisabled.value) return "codex";
+  if (props.combat) return codexDisabled.value && !titlesDisabled.value ? "titles" : "codex";
+  if (memory.top === "counter" && counter.value.enabled) return "counter";
   return "book";
 });
 
@@ -117,6 +129,11 @@ const TAB_STATE = {
       : props.services?.available === false
         ? { "data-testid": "quest-drawer__counter-unavailable", "data-reason-code": counter.value.reasonCode ?? undefined }
         : { "data-testid": "quest-drawer__counter-absent" },
+  }),
+  codex: () => ({
+    controls: codexDisabled.value ? undefined : panelId("codex"),
+    disabled: codexDisabled.value,
+    reason: codexDisabled.value ? (props.loreCodex?.reason?.message ?? undefined) : undefined,
   }),
   titles: () => ({
     controls: titlesDisabled.value ? undefined : panelId("titles"),
@@ -336,6 +353,15 @@ function registerNow() {
       />
       <QuestDetail :detail="detail" :actions="actions" @action="forward" />
     </div>
+
+    <LoreCodexTab
+      v-else-if="top === 'codex'"
+      :id="panelId('codex')"
+      class="quest-drawer__body"
+      :codex="loreCodex"
+      :memory-scope="memoryScope"
+      :combat="combat"
+    />
 
     <TitleCodexTab
       v-else-if="top === 'titles'"

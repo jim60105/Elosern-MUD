@@ -4,7 +4,7 @@
 //
 // H4 (webclient-hud-04-reference-drawers, design D3): the reference
 // drawer controller. `view.hudDrawer` is the single open-drawer name
-// (null | shop | quest | lore | party | npc_persona | letters); at most one
+// (null | shop | quest | party | npc_persona | letters); at most one
 // drawer is open at a time (structural: a single value). Unknown names
 // are rejected, not coerced. The store is the single writer and owns the
 // teardown on a mode change, an epoch reset, or a transport loss.
@@ -40,7 +40,9 @@ export function applyHud(ctx) {
     ctx.publishView();
   };
 
-  const HUD_DRAWER_NAMES = new Set(["shop", "quest", "lore", "party", "npc_persona", "letters"]);
+  // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab): the retired
+  // `lore` drawer name is rejected like any unknown name.
+  const HUD_DRAWER_NAMES = new Set(["shop", "quest", "party", "npc_persona", "letters"]);
   // `npc_persona` (the NPC author editor) never hosts a router frame either:
   // the verb card that opened it stays open (exploration-presence-rail).
   const FRAMELESS_DRAWER_NAMES = new Set(["party", "quest", "shop", "npc_persona", "letters"]);
