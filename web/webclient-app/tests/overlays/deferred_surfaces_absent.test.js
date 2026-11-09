@@ -328,9 +328,10 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
   });
 
   it("reserves no intimate collapsible, item-rarity affordance or discovered-lore compendium (task 8.4)", () => {
-    // H4 (task 8.4): the reference-drawer layer is the closed set of seven
-    // drawers (including party). The deferred surfaces are NOT reserved in the drawer layer.
-    const DRAWER_NAMES = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
+    // H4 (task 8.4): the reference-drawer layer is a closed set of drawer
+    // names (including party; the world codex is the handbook's 圖鑑 tab since
+    // handbook-codex-tab). The deferred surfaces are NOT reserved in the drawer layer.
+    const DRAWER_NAMES = ["skill", "inventory", "shop", "quest", "status", "party"];
     const DEFERRED_SURFACES = ["intimate", "rarity", "codex"];
     // None of the deferred surfaces is in the six-drawer set.
     for (const deferred of DEFERRED_SURFACES) {

@@ -409,19 +409,20 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.view.focus.key).toBeNull();
   });
 
-  it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
+  it("a frameless drawer close while talking keeps the sub-dock and the router", () => {
     openSession();
     store.receive(1, "ui_snapshot", [dialogueSnapshot()], {});
-    // A framed reference drawer (the codex) closing over a character
-    // sub-dock while talking must clear the sub-dock and re-home the
-    // exploration root — the widened close guard (align-11 D8).
+    // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab), so
+    // the retired framed codex drawer opens nothing; the handbook is
+    // frameless, and closing it over a character sub-dock while talking
+    // leaves the sub-dock and the router alone.
     store.setActiveSubDock("character");
-    expect(store.openHudDrawer("lore")).toBe(true);
+    expect(store.openHudDrawer("lore")).toBe(false);
+    const title = store.router.currentMenu().title;
+    expect(store.openHandbook("codex")).toBe(true);
     expect(store.closeHudDrawer()).toBe(true);
-    // The widened non-hosted close guard (align-11 D8): the sub-dock dies
-    // with the drawer and the root frame re-homes, exactly as in exploration.
-    expect(store.view.activeSubDock).toBe(null);
-    expect(store.router.currentMenu().title).toBe("場景");
+    expect(store.view.activeSubDock).toBe("character");
+    expect(store.router.currentMenu().title).toBe(title);
   });
 
   it("a panel loss while talking settles the sub-dock in one access", () => {

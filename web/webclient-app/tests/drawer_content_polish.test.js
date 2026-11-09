@@ -15,7 +15,7 @@ import EmptyState from "../components/EmptyState.vue";
 import PartyBagTab from "../components/PartyBagTab.vue";
 import PartyLineageTab from "../components/PartyLineageTab.vue";
 import PartyStatusTab from "../components/PartyStatusTab.vue";
-import LoreCodexDrawer from "../components/LoreCodexDrawer.vue";
+import LoreCodexTab from "../components/handbook/LoreCodexTab.vue";
 import PartyWindow from "../components/PartyWindow.vue";
 import QuestDrawer from "../components/QuestDrawer.vue";
 import { glyphPath } from "../components/dock-icons.js";
@@ -65,13 +65,19 @@ describe("available-empty versus unavailable drawer lists", () => {
   });
 
   it("keeps the codex's empty guidance and its unavailable reason distinct", () => {
-    const empty = mount(LoreCodexDrawer, { props: { codex: LORE_CODEX_PANEL_EMPTY_SAMPLE } });
-    expect(empty.get('[data-testid="lore-codex-drawer__empty"]').classes()).toContain("empty-state");
-    const unavailable = mount(LoreCodexDrawer, { props: { codex: LORE_CODEX_PANEL_UNAVAILABLE_SAMPLE } });
-    expect(unavailable.find(".empty-state").exists()).toBe(false);
-    expect(unavailable.get('[data-testid="lore-codex-drawer__unavailable"]').text()).toBe(
+    // The handbook's 圖鑑 tab (handbook-codex-tab): nothing discovered shows
+    // the shared guidance beside the placeholder wall; an unavailable panel
+    // shows only its registry reason, never the empty guidance.
+    const empty = mount(LoreCodexTab, { props: { codex: LORE_CODEX_PANEL_EMPTY_SAMPLE, memoryScope: "polish|1" } });
+    expect(empty.get('[data-testid="handbook__codex-empty"]').classes()).toContain("empty-state");
+    expect(empty.find('[data-testid="tile-wall"] [aria-disabled="true"]').exists()).toBe(true);
+    const unavailable = mount(LoreCodexTab, { props: { codex: LORE_CODEX_PANEL_UNAVAILABLE_SAMPLE, memoryScope: "polish|1" } });
+    expect(unavailable.find('[data-testid="handbook__codex-empty"]').exists()).toBe(false);
+    expect(unavailable.get('[data-testid="handbook__codex-unavailable"]').text()).toBe(
       LORE_CODEX_PANEL_UNAVAILABLE_SAMPLE.reason.message,
     );
+    empty.unmount();
+    unavailable.unmount();
   });
 
   // webclient-party-bag-retire: the bag is the party window's 背包 tab.
@@ -221,7 +227,7 @@ describe("drawer art in the client", () => {
     expect(store.receive(1, "ui_snapshot", [fx.snapshot({ panels, revision: 1 })]).accepted).toBe(true);
     await wrapper.vm.$nextTick();
     const seen = {};
-    for (const name of ["skill", "shop", "quest", "lore", "status", "party"]) {
+    for (const name of ["skill", "shop", "quest", "status", "party"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       if (!wrapper.find('[data-testid="hud-drawer"]').exists()) continue;
@@ -237,7 +243,7 @@ describe("drawer art in the client", () => {
     // "party" names) carries the viewed member's portrait in its rail,
     // nameplate and 狀態 hero, never a drawer column; no other drawer is
     // about the player (webclient-party-status-tab).
-    expect(Object.keys(seen).sort()).toEqual(["lore", "party", "quest", "shop", "skill", "status"]);
+    expect(Object.keys(seen).sort()).toEqual(["party", "quest", "shop", "skill", "status"]);
     for (const [name, hasArt] of Object.entries(seen)) {
       expect(hasArt, name).toBe(false);
     }
