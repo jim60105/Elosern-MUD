@@ -122,6 +122,29 @@ async function press(key) {
   if (intent) emit("action", intent);
 }
 
+// A commit can unmount the focused control (a confirmed removal or an
+// answered ballot drops its row, and the footer buttons with it). Focus then
+// lands on <body>, outside the drawer; return it to the rail's selected entry
+// so the drawer keeps keyboard ownership (Escape still closes it). Only focus
+// that was inside the tab before the update is rescued.
+const root = ref(null);
+const focusSource = () => [status.value, rail.value, selectedId.value, armed.value, footer.value?.buttons?.length ?? 0];
+let focusWasInside = false;
+watch(focusSource, () => {
+  focusWasInside = !!root.value?.contains(document.activeElement);
+}, { flush: "pre" });
+watch(
+  focusSource,
+  async () => {
+    await nextTick();
+    if (!focusWasInside) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    root.value?.querySelector('[data-testid="handbook__titles-rail"] [role="tab"][tabindex="0"]')?.focus();
+  },
+  { flush: "post" },
+);
+
 // The host's close guard: an armed removal is cancelled instead of closing.
 function guardClose() {
   if (armed.value) {
@@ -135,7 +158,7 @@ defineExpose({ guardClose });
 </script>
 
 <template>
-  <div class="title-codex-tab" :class="`title-codex-tab--${status}`" role="tabpanel" aria-label="稱號" data-testid="handbook__titles">
+  <div ref="root" class="title-codex-tab" :class="`title-codex-tab--${status}`" role="tabpanel" aria-label="稱號" data-testid="handbook__titles">
     <EmptyState
       v-if="status === 'absent'"
       class="title-codex-tab__state"
@@ -230,7 +253,11 @@ defineExpose({ guardClose });
   box-sizing: border-box;
 }
 
+/* Eight labelled entries plus the divider must fit the drawer body at the
+   1451x790 reference viewport, so the rail's tabs are a little shorter than
+   the default 58px. No overflow clip: the tooltips open over the list. */
 .title-codex-tab__rail {
+  --icon-tabs-tab-h: calc(52px * var(--ui-scale));
   position: relative;
   z-index: 1;
 }

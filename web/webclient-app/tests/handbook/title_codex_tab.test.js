@@ -197,6 +197,43 @@ describe("TitleCodexTab (handbook-titles-tab)", () => {
     });
   });
 
+  describe("focus ownership", () => {
+    const railFocused = () => document.activeElement?.closest?.('[data-testid="handbook__titles-rail"]') != null;
+
+    it("returns focus to the rail when a confirmed removal unmounts the footer control", async () => {
+      mountTab();
+      await arm();
+      find("remove-confirm").element.focus();
+      await find("remove-confirm").trigger("click");
+      await nextTick();
+      await nextTick();
+      expect(railFocused()).toBe(true);
+    });
+
+    it("returns focus to the rail when an answered ballot leaves with its row", async () => {
+      mountTab(titleCodex({ pending_ballot: BALLOT }));
+      await openRail("ballot");
+      find("ballot-accept").element.focus();
+      await find("ballot-accept").trigger("click");
+      await wrapper.setProps({ codex: titleCodex() });
+      await nextTick();
+      await nextTick();
+      expect(railFocused()).toBe(true);
+    });
+
+    it("never pulls focus in from outside on a commit", async () => {
+      const outside = document.createElement("button");
+      document.body.appendChild(outside);
+      mountTab(titleCodex({ pending_ballot: BALLOT }));
+      await openRail("ballot");
+      outside.focus();
+      await wrapper.setProps({ codex: titleCodex() });
+      await nextTick();
+      await nextTick();
+      expect(document.activeElement).toBe(outside);
+    });
+  });
+
   describe("honest degradation", () => {
     it("shows the shared empty state and no medal or row before the first commit", () => {
       mountTab(null);
