@@ -1,12 +1,12 @@
 // The top navigation's labelled primary entries (webclient-main-navigation-
-// hotkeys; design §8 of the party member management design): 隊伍, 任務 and
+// hotkeys; design §8 of the party member management design): 隊伍, 手帳 (the quest window, handbook-titles-tab) and
 // 地圖, in that fixed order, each with the window hotkey it shares with
 // `composables/use-window-hotkeys.js`. The bar packs the present entries
 // against the trailing edge of a region sized for all three, so the 工具
 // group and 設定 never move when a mode drops an entry.
 export const NAV_PRIMARY = Object.freeze([
   Object.freeze({ key: "party", label: "隊伍", glyph: "party", hotkey: "P" }),
-  Object.freeze({ key: "quests", label: "任務", glyph: "quests", hotkey: "J" }),
+  Object.freeze({ key: "quests", label: "手帳", glyph: "quests", hotkey: "J" }),
   Object.freeze({ key: "map", label: "地圖", glyph: "map", hotkey: "M" }),
 ]);
 
@@ -15,7 +15,7 @@ export const NAV_PRIMARY = Object.freeze([
 export const NAV_PRIMARY_GLYPHS = NAV_PRIMARY.reduce((sum, entry) => sum + Array.from(entry.label).length, 0);
 
 // The entries present for one committed state, in bar order. 隊伍 follows the
-// committed `party` panel (client-mapped, in every playing mode); 任務 is the
+// committed `party` panel (client-mapped, in every playing mode); 手帳 is the
 // server's `quests` navigation row (absent while the quest surface is
 // unavailable and in combat, whose root carries no quest row); 地圖 is
 // client-local and absent in combat. A missing entry is simply absent —

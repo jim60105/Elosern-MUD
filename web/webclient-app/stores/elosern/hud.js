@@ -11,7 +11,7 @@
 //
 // H5 (webclient-hud-05-overlays-and-command-line, design D7/D8): the
 // full-screen overlay controller. `view.hudOverlay` is the single
-// open-overlay name (null | map | settings | help | codex | gallery); at most one
+// open-overlay name (null | map | settings | help | gallery); at most one
 // overlay is open at a time (structural: a single value). Unknown names are
 // rejected, not coerced. Opening an overlay closes any open reference
 // drawer (design D8: an overlay and a drawer are never open together,
@@ -24,6 +24,7 @@
 
 import { ref } from "vue";
 import { rememberPartyWindowTab } from "../../components/party-window-memory.js";
+import { handbookTabs } from "../../components/handbook/handbook-tabs.js";
 
 export function applyHud(ctx) {
   // The active sub-dock surface (null | "character"): which re-homed
@@ -148,6 +149,20 @@ export function applyHud(ctx) {
     return true;
   };
 
+  // The handbook route entry (handbook-titles-tab, design D2): publish a
+  // sequenced route request naming one first-level tab of the quest drawer
+  // (the 手帳) and open it. The request rides the same slot the drawer's
+  // `routeRequest` already reads, carries no provider, and the shell reads
+  // nothing for it beyond a plain opening. A tab outside the current mode's
+  // tab set is refused without opening anything.
+  ctx.openHandbook = function openHandbook(tab) {
+    const view = ctx.view.value || {};
+    if (!handbookTabs({ combat: view.mode === "combat" }).includes(tab)) return false;
+    ctx.serviceReadSeq += 1;
+    ctx.serviceReadRequest = { seq: ctx.serviceReadSeq, slot: "handbook", npcId: null, section: tab };
+    return ctx.openHudDrawer("quest");
+  };
+
   // A dialogue service route, in two steps: the row opens the exact host and
   // records which still-disclosed topic the client should FOCUS once the
   // committed choices arrive. Nothing is selected and no effect runs.
@@ -197,7 +212,7 @@ export function applyHud(ctx) {
     return true;
   };
 
-  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "codex", "gallery"]);
+  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "gallery"]);
   const hudOverlay = ref(null);
   const hudOverlayOpener = ref(null);
   ctx.hudOverlay = hudOverlay;

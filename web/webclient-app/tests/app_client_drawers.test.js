@@ -23,6 +23,7 @@ import {
 import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { resetPartyWindowMemory } from "../components/party-window-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
+import { titleCodex } from "../stories/fixtures/title_codex_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { dialoguePanel as v3Panel } from "./support/dialogue_panel.js";
 import {
@@ -580,6 +581,116 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     expect(offered.length).toBeGreaterThan(0);
     expect(offered.every((id) => boardKeys.includes(id))).toBe(true);
     expect(offered.some((id) => held.includes(id))).toBe(false);
+  });
+
+  // handbook-titles-tab: the 稱號冊 tool opens the 手帳 on its 稱號 tab through
+  // the handbook route request. Opening a closed drawer this way reads exactly
+  // what a plain opening reads; switching an open drawer reads nothing; in
+  // combat the drawer offers only the titles tab and reads no counter.
+  describe("the handbook titles route", () => {
+    const servicesReads = (sender) => sender.sent.actions.filter((envelope) => envelope.action_id === "services.open");
+
+    async function openWith(panels, mode = "exploration") {
+      const sender = fx.createFakeSender();
+      store.setSender(sender);
+      mountAppClient();
+      await wrapper.vm.$nextTick();
+      store.beginTransport(1);
+      store.setConnected(true);
+      const received = store.receive(1, "ui_snapshot", [fx.snapshot({ mode, panels })], {});
+      expect(received.accepted).toBe(true);
+      await wrapper.vm.$nextTick();
+      return sender;
+    }
+
+    const explorationPanels = () => ({
+      status: fx.statusPanel(),
+      exploration: fx.explorationPanel(),
+      context_actions: fx.explorationActions(),
+      services: SERVICES_PANEL_SAMPLE,
+      quest_log: QUEST_LOG_PANEL_SAMPLE,
+      title_codex: titleCodex(),
+    });
+
+    it("opens a closed drawer on the titles tab with exactly the plain opening's reads", async () => {
+      const sender = await openWith(explorationPanels());
+      const answered = new Set();
+      store.openHudDrawer("quest");
+      await wrapper.vm.$nextTick();
+      const plainReads = servicesReads(sender).map((envelope) => envelope.payload);
+      settleServicesReads(store, sender, answered);
+      store.closeHudDrawer();
+      await wrapper.vm.$nextTick();
+      const before = servicesReads(sender).length;
+
+      await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.view.hudOverlay).toBeNull();
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("titles");
+      expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+      expect(servicesReads(sender).slice(before).map((envelope) => envelope.payload)).toEqual(plainReads);
+    });
+
+    it("switches an open drawer to the titles tab without any services read", async () => {
+      const sender = await openWith(explorationPanels());
+      const answered = new Set();
+      store.openHudDrawer("quest");
+      await wrapper.vm.$nextTick();
+      settleServicesReads(store, sender, answered);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("book");
+      const before = servicesReads(sender).length;
+      expect(store.openHandbook("titles")).toBe(true);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("titles");
+      expect(servicesReads(sender)).toHaveLength(before);
+    });
+
+    it("opens in combat with only the titles tab and reads no counter", async () => {
+      const sender = await openWith(
+        { status: fx.statusPanel(), context_actions: fx.combatActions(), title_codex: titleCodex() },
+        "combat",
+      );
+      await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBe("quest");
+      const tabs = wrapper.findAll('[data-testid="quest-drawer__top-tabs"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
+      expect(tabs).toEqual(["titles"]);
+      expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+      expect(servicesReads(sender)).toHaveLength(0);
+    });
+
+    it("dispatches one title.equip from the titles tab and keeps the drawer open on an armed close", async () => {
+      const sender = await openWith(explorationPanels());
+      const answered = new Set();
+      const opener = wrapper.get('[data-testid="nav-tool-codex"]');
+      opener.element.focus();
+      await opener.trigger("click");
+      await wrapper.vm.$nextTick();
+      settleServicesReads(store, sender, answered);
+      await wrapper.vm.$nextTick();
+      const body = () => wrapper.get('[data-testid="handbook__titles"]');
+      await body().get('[data-testid="handbook__titles-rail"] [data-tab-key="guild"]').trigger("click");
+      await body().get('[data-testid="handbook__equip"]').trigger("click");
+      const equips = sender.sent.actions.filter((envelope) => envelope.action_id === "title.equip");
+      expect(equips).toHaveLength(1);
+      expect(equips[0].payload).toEqual({ kind: "fixed", identifier: "g_x_rank" });
+
+      await body().get('[data-testid="handbook__titles-rail"] [data-tab-key="epithet"]').trigger("click");
+      await body().get('[data-testid="handbook__remove"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      const sentBefore = sender.sent.actions.length;
+      await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(body().find('[data-testid="handbook__remove-confirm"]').exists()).toBe(false);
+      expect(sender.sent.actions).toHaveLength(sentBefore);
+      await wrapper.get('[data-testid="hud-drawer-close"]').trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer).toBeNull();
+      expect(document.activeElement).toBe(opener.element);
+    });
   });
 
   it("renders companions on stage and keeps the drawer reachable", async () => {

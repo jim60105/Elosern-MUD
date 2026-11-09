@@ -90,7 +90,7 @@ describe("frameless 背包 drawer (composition contract)", () => {
     expect(dock.find('[data-item-key="inventory"]').exists()).toBe(false);
     expect(store.view.focus.key).toBeNull();
     const labels = wrapper.findAll(".desktop-navigation__label").map((node) => node.text());
-    expect(labels).toEqual(["隊伍", "任務", "地圖"]);
+    expect(labels).toEqual(["隊伍", "手帳", "地圖"]);
   });
 
   it("opens the bag frameless with no hosted row region and returns focus on every close route", async () => {

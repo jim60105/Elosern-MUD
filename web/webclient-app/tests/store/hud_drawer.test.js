@@ -224,4 +224,52 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.openHudDrawer("party")).toBe(true);
     expect(store.view.hudDrawer).toBe("party");
   });
+  // handbook-titles-tab (design D2): the handbook route entry.
+  describe("openHandbook", () => {
+    function enterCombat() {
+      const result = store.receive(1, "ui_snapshot", [{
+        protocol_version: 1,
+        presentation_epoch: fx.EPOCH_A,
+        revision: 2,
+        mode: "combat",
+        panels: { status: fx.statusPanel(), context_actions: fx.combatActions() },
+        layout_version: 1,
+        server_time: fx.serverTime({ minute: 5 }),
+      }], {});
+      expect(result.accepted).toBe(true);
+    }
+
+    it("opens the quest drawer and publishes a handbook route request with no provider", () => {
+      openSession();
+      expect(store.openHandbook("titles")).toBe(true);
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.view.serviceReadRequest).toMatchObject({ slot: "handbook", npcId: null, section: "titles" });
+      const first = store.view.serviceReadRequest.seq;
+      expect(store.openHandbook("book")).toBe(true);
+      expect(store.view.serviceReadRequest.seq).toBe(first + 1);
+    });
+
+    it("refuses an unknown tab without opening or publishing", () => {
+      openSession();
+      expect(store.openHandbook("bogus")).toBe(false);
+      expect(store.view.hudDrawer).toBe(null);
+      expect(store.view.serviceReadRequest).toBe(null);
+    });
+
+    it("offers only the titles tab in combat", () => {
+      openSession();
+      enterCombat();
+      expect(store.openHandbook("book")).toBe(false);
+      expect(store.view.hudDrawer).toBe(null);
+      expect(store.view.serviceReadRequest).toBe(null);
+      expect(store.openHandbook("titles")).toBe(true);
+      expect(store.view.hudDrawer).toBe("quest");
+    });
+
+    it("no longer accepts the retired codex overlay", () => {
+      openSession();
+      expect(store.openOverlay("codex")).toBe(false);
+      expect(store.view.hudOverlay).toBe(null);
+    });
+  });
 });

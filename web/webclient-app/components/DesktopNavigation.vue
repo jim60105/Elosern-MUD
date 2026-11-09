@@ -1,7 +1,7 @@
 <script setup>
 // DesktopNavigation: the top bar's navigation row (webclient-desktop-shell;
 // webclient-main-navigation-hotkeys, design §8 of the party member
-// management design). The labelled primary entries 隊伍, 任務 and 地圖 (each
+// management design). The labelled primary entries 隊伍, 手帳 and 地圖 (each
 // with its window hotkey drawn as a key chip), then the icon-only tool group
 // (`工具`: 信件, 圖鑑, 稱號冊, 角色肖像圖庫 when available, and 說明), then 設定
 // at the very end, inside the 48px band. There is no home entry: the stage
@@ -25,13 +25,13 @@ const props = defineProps({
   // The server's navigation rows; the bar reads the `quests` row from them.
   items: { type: Array, default: () => [] },
   // The open drawer name: 隊伍 is current while the party window is open,
-  // 任務 while the quest board is.
+  // 手帳 while the quest board is.
   drawer: { type: String, default: null },
   // The committed `party` panel's availability: 隊伍 renders only with it.
   partyAvailable: { type: Boolean, default: false },
   galleryAvailable: { type: Boolean, default: false },
 });
-const emit = defineEmits(["navigate", "overlay", "drawer"]);
+const emit = defineEmits(["navigate", "overlay", "drawer", "handbook"]);
 const CURRENT_DRAWER = { party: "party", quests: "quest" };
 const entries = computed(() => primaryEntries({ mode: props.mode, partyAvailable: props.partyAvailable, items: props.items }));
 
@@ -118,7 +118,8 @@ function onToolKeydown(event, key) {
 function activateTool(tool) {
   hoverKey.value = null;
   focusKey.value = null;
-  if (tool.drawer) emit("drawer", tool.drawer);
+  if (tool.handbook) emit("handbook", tool.handbook);
+  else if (tool.drawer) emit("drawer", tool.drawer);
   else emit("overlay", tool.key);
 }
 function activateSettings() {

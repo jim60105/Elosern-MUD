@@ -1,6 +1,6 @@
 // The window hotkeys (webclient-main-navigation-hotkeys; design §8 of the
 // party member management design): P 隊伍 (the party window on its last
-// tab), B 背包, C 狀態, K 技能, L 系譜, J 任務 and M 地圖. Each key runs the very
+// tab), B 背包, C 狀態, K 技能, L 系譜, J 手帳 and M 地圖. Each key runs the very
 // opener its navigation control (or the party window tab alias) runs, so the
 // surface captures the focused element as its opener exactly as a click
 // does.
@@ -18,7 +18,7 @@
 //   keys. The one exception: while the party window itself is open, its tab
 //   keys (P B C K L) switch it live;
 // - the surface is available: an absent 隊伍 (no committed party panel), an
-//   absent or disabled 任務 and the 地圖 entry in combat ignore their keys.
+//   absent or disabled 手帳 and the 地圖 entry in combat ignore their keys.
 import { onBeforeUnmount, onMounted } from "vue";
 
 // The party window's tab aliases, as `openHudDrawer` resolves them; P is the

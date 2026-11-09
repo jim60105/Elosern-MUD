@@ -33,7 +33,6 @@ import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
-import TitleCodexPanel from "./components/TitleCodexPanel.vue";
 import GalleryPanel from "./components/GalleryPanel.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
 import LettersPanel from "./components/LettersPanel.vue";
@@ -122,7 +121,7 @@ const {
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
   tradeNotice, tradePending, onShopTrade, clearTradeNotice,
-  onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction, onTitleCodexAction,
+  onPartyBagAction, onPartyBagCombatItem, onTitleBallotAction,
   onCreationAction, onCreationDispatch, onCreationRequestReset, onCreationCancelConfirm,
   onQuestAction, onPersonaEdit, onSubmitCommand, onSwitchCharacter, onCreateCharacter,
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
@@ -305,6 +304,10 @@ function servicesFor(slot) {
   };
 }
 const shopServices = computed(() => servicesFor("shop"));
+// The handbook (quest drawer) exposes its close guard: an armed epithet
+// removal on the titles tab cancels a close attempt instead of closing.
+const questDrawerRef = ref(null);
+const questCloseGuard = () => questDrawerRef.value?.closeGuard?.() ?? true;
 const counterServices = computed(() => servicesFor("counter"));
 // The NPC whose verb card opened the drawer is the selected provider; the
 // room summary's own discovery stands in only when no card named one. The
@@ -318,18 +321,30 @@ watch(
   ([drawer, seq], previous) => {
     if (previous && drawer === previous[0] && seq === previous[1]) return;
     const request = store.view.serviceReadRequest;
-    if (request && seq !== previous?.[1] &&
+    if (request && (request.slot === "shop" || request.slot === "counter") &&
+        seq !== previous?.[1] &&
         drawer === (request.slot === "shop" ? "shop" : "quest")) {
       openServices(request.slot, request.npcId);
       closeServices(request.slot === "shop" ? "counter" : "shop");
       return;
     }
+    // A handbook route request (handbook-titles-tab, design D2) names a tab,
+    // not a provider: switching an already open handbook reads nothing, and
+    // opening a closed one falls through to the plain opening read below.
+    if (request?.slot === "handbook" && seq !== previous?.[1] &&
+        previous?.[0] === "quest" && drawer === "quest") return;
     if (drawer === "shop") {
       const provider = panel("services")?.shop?.provider_id;
       openServices(
         "shop",
         presenceProviderId() ?? (Number.isSafeInteger(provider) ? provider : null),
       );
+      closeServices("counter");
+      return;
+    }
+    if (drawer === "quest" && store.view.mode === "combat") {
+      // In combat the handbook carries only its titles tab: no counter read.
+      closeServices("shop");
       closeServices("counter");
       return;
     }
@@ -1027,6 +1042,7 @@ const rootStyle = computed(() => {
             @navigate="onNavigate"
             @overlay="onOpenOverlay"
             @drawer="onOpenDrawer"
+            @handbook="(tab) => store.openHandbook(tab)"
           />
         </template>
         <!-- The scene backdrop is the lowest stage layer (design D3/D8):
@@ -1772,15 +1788,19 @@ const rootStyle = computed(() => {
       :icon="drawerIcon"
       :drawer-key="store.view.hudDrawer"
       :body-flush="store.view.hudDrawer === 'quest'"
+      :close-guard="store.view.hudDrawer === 'quest' ? questCloseGuard : null"
       @close="onHudDrawerClose"
     >
       <LettersPanel v-if="store.view.hudDrawer === 'letters'" :store="store" />
       <QuestDrawer
         v-else-if="store.view.hudDrawer === 'quest'"
+        ref="questDrawerRef"
         :quest-log="panel('quest_log')"
         :services="counterServices"
         :route-request="store.view.serviceReadRequest"
         :memory-scope="`${store.view.generation}|${store.view.epoch}`"
+        :combat="store.view.mode === 'combat'"
+        :title-codex="panel('title_codex')"
         @action="onQuestAction"
       />
       <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
@@ -1831,15 +1851,6 @@ const rootStyle = computed(() => {
           @colorblind-change="store.setColorblind"
           @text-speed-change="store.setTextSpeed"
           @auto-advance-change="store.setAutoAdvance"
-        />
-        <!-- title-codex-removal: the big-window codex renders the committed
-             `title_codex` panel verbatim — the server's `can_remove` flag
-             alone decides whether a 移除 control exists; the client owns no
-             gate rule and no 卸裝 control. -->
-        <TitleCodexPanel
-          v-else-if="openName === 'codex'"
-          :codex="panel('title_codex')"
-          @action="onTitleCodexAction"
         />
         <GalleryPanel
           v-else-if="openName === 'gallery'"
