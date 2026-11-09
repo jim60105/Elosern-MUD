@@ -39,7 +39,7 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 ## 6. Evidence bridge and gates
 
 - [x] 6.1 Extend `web/webclient/tests/test_vue_handbook_evidence.py` (created by `handbook-primitives`) with one method per ADDED codex-tab requirement that runs `tests/handbook/lore_codex_tab.test.js`, `codex_tile_grid.test.js`, `codex_detail.test.js`, `codex_art.test.js` and `lore_codex_model.test.js` and asserts that they pass. Verify with the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract`.
-- [ ] 6.2 Run `uv run --locked python -m tools.contract_gate --change handbook-codex-tab` (it tolerates the three REMOVED drawer requirements) and `openspec validate handbook-codex-tab --strict`. Both pass.
+- [x] 6.2 Run `uv run --locked python -m tools.contract_gate --change handbook-codex-tab` (it tolerates the three REMOVED drawer requirements) and `openspec validate handbook-codex-tab --strict`. Both pass.
 
 ## Workflow follow-up
 
