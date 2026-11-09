@@ -4,6 +4,9 @@ handbook-primitives adds the grouped roving-focus ``TileWall`` and the
 ``DetailFooter`` that the quest detail now renders its pinned footer through.
 handbook-titles-tab adds the 手帳's titles tab (``TitleCodexTab``,
 ``CodexMedalGrid``), its route request and its close guard.
+handbook-codex-tab adds the 手帳's codex tab (``LoreCodexTab``,
+``CodexTileGrid``, ``CodexArt``, the codex view of ``CodexDetail`` and the
+``lore-codex-model`` view model), which replaces the world-codex drawer.
 Their behavior is implemented and verified in the Vue layer, and
 ``covers_requirement`` can only attach to a Python ``test_*`` function, so
 this module executes the relevant Vitest component files and asserts every
@@ -164,6 +167,74 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "titles tab degradation",
         )
 
+
+    # -- handbook-codex-tab ----------------------------------------------------
+    # The requirement annotations are applied at this change's archive, once
+    # its ADDED requirements are synced into the main spec.
+
+    def test_codex_tab_renders_the_committed_panel_as_a_grouped_tile_wall(self):
+        # One rail entry per shipped category with its discovered count; the
+        # selected category's groups in order with headings only for
+        # non-null labels; placeholders focusable but never selected; arrow,
+        # Home and End roving; the card rendered verbatim under readable
+        # names; per-category selection memory; nothing dispatched.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "handbook" / "lore_codex_tab.test.js",
+                TESTS_DIR / "handbook" / "codex_tile_grid.test.js",
+                TESTS_DIR / "handbook" / "lore_codex_model.test.js",
+            ),
+            "codex tab tile wall",
+        )
+
+    def test_codex_tab_marks_research_stages_by_shape_with_a_legend(self):
+        # Filled, hollow and ？ marks with distinct data-stage values; the
+        # legend with its three marks only on the monster wall, as the
+        # scroller's last child; the two-step research track following the
+        # stage, its second step naming the locked fields.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "handbook" / "codex_tile_grid.test.js",
+                TESTS_DIR / "handbook" / "codex_detail.test.js",
+                TESTS_DIR / "handbook" / "lore_codex_model.test.js",
+            ),
+            "codex tab stage marks",
+        )
+
+    def test_codex_tab_shows_locked_fields_without_values(self):
+        # One locked box per locked field, in order, with no value; none for
+        # a defeated entry.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "handbook" / "codex_detail.test.js",
+                TESTS_DIR / "handbook" / "lore_codex_model.test.js",
+            ),
+            "codex tab locked fields",
+        )
+
+    def test_codex_hero_art_falls_back_to_the_category_emblem(self):
+        # A null art shows the emblem, a failed single attempt with no
+        # terminal falls back to it, and a loaded image replaces it.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "handbook" / "codex_art.test.js",
+                TESTS_DIR / "handbook" / "codex_detail.test.js",
+                TESTS_DIR / "handbook" / "lore_codex_tab.test.js",
+            ),
+            "codex hero art fallback",
+        )
+
+    def test_codex_tab_degrades_honestly(self):
+        # The absent empty state before the first commit, the unavailable
+        # panel disabling the tab with its reason, the full placeholder wall
+        # with the empty guidance, and a vanished selection falling back.
+        _assert_vitest_passes(
+            _run_vitest(
+                TESTS_DIR / "handbook" / "lore_codex_tab.test.js",
+                TESTS_DIR / "world" / "quest_drawer.test.js",
+            ),
+            "codex tab degradation",
+        )
 
 if __name__ == "__main__":
     unittest.main()
