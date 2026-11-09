@@ -5,13 +5,15 @@ handbook-primitives adds the grouped roving-focus ``TileWall`` and the
 Their behavior is implemented and verified in the Vue layer, and
 ``covers_requirement`` can only attach to a Python ``test_*`` function, so
 this module executes the relevant Vitest component files and asserts every
-test passes. The requirement annotations are added once the change's delta
-requirements are synced into the main spec.
+test passes. The requirement annotations were applied at the change's archive,
+once its delta requirements were synced into the main spec.
 """
 
 from pathlib import Path
 import subprocess
 import unittest
+
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
@@ -37,6 +39,9 @@ def _assert_vitest_passes(result, label):
 
 
 class VueHandbookEvidenceTest(unittest.TestCase):
+    @covers_requirement(
+        "webclient-window-primitives::tilewall-is-a-grouped-roving-focus-listbox"
+    )
     def test_tile_wall_roving_focus(self):
         # One tab stop (the selected item, else the first); arrow keys, Home
         # and End move focus in reading order across groups without
@@ -47,6 +52,9 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "tile wall roving focus",
         )
 
+    @covers_requirement(
+        "webclient-window-primitives::detailfooter-renders-descriptor-buttons-and-a-committed-reason"
+    )
     def test_detail_footer_contract(self):
         # A disabled button stays focusable with aria-disabled and emits
         # nothing, a toggle keeps native disabled, an enabled button emits
