@@ -15,12 +15,12 @@ Focused test commands use the AGENTS.md form `uv run --locked --env-file=<file> 
 ## 3. Retire the tier reveal
 
 - [x] 3.1 Apply design D5 to `world/quests/planner.py` and `world/rules/tests/test_lore_deterministic_reveals.py`. Update the `_quest_log_writes` docstring in `world/quests/tests/test_planner.py` (a defeat no longer stages a lore effect), plus any assertion found by `git grep -n "lore codex reveal" -- world/quests/tests`. Verify that `git grep -n "_make_defeat_lore_apply\|reveals-its-tier"` prints nothing outside `openspec/`, then run the focused labels `world.rules.tests.test_lore_deterministic_reveals` and the quest planner tests (`git grep -ln "quest_event_effect_planner" -- 'world/quests/tests/*.py'`). Expect all green.
-- [ ] 3.2 Update `web/webclient/presentation/tests/test_lore_codex_panel.py` and `web/webclient/presentation/tests/test_lore_codex_registry_contract.py` wherever they build monster entries from tiers, so that they use a synthetic species. Verify with the focused labels `web.webclient.presentation.tests.test_lore_codex_panel` and `web.webclient.presentation.tests.test_lore_codex_registry_contract`.
+- [x] 3.2 Update `web/webclient/presentation/tests/test_lore_codex_panel.py` and `web/webclient/presentation/tests/test_lore_codex_registry_contract.py` wherever they build monster entries from tiers, so that they use a synthetic species. Verify with the focused labels `web.webclient.presentation.tests.test_lore_codex_panel` and `web.webclient.presentation.tests.test_lore_codex_registry_contract`.
 
 ## 4. Gates
 
-- [ ] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, and the focused label `tests.test_evennia_test_optimization_contract`. All pass.
-- [ ] 4.2 Run `uv run --locked python -m tools.contract_gate --change lore-species-research` (it tolerates the REMOVED tier requirement) and `openspec validate lore-species-research --strict`. Both pass.
+- [x] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, and the focused label `tests.test_evennia_test_optimization_contract`. All pass.
+- [x] 4.2 Run `uv run --locked python -m tools.contract_gate --change lore-species-research` (it tolerates the REMOVED tier requirement) and `openspec validate lore-species-research --strict`. Both pass.
 
 ## Workflow follow-up
 
