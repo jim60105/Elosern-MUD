@@ -56,7 +56,7 @@ Visual language: the game's existing tokens only (`--ink-*`, `--paper-*`,
 ## 3. Delivery: four changes, in dependency order
 
 1. **Titles tab (client only).** Handbook rename, `titles` tab, medal wall,
-   detail, equip/remove/ballot through `ActionBar`. `title_codex` payload is
+   detail, equip/remove/ballot through the quest detail's action footer. `title_codex` payload is
    unchanged. Removes `TitleCodexPanel.vue` and the `codex` overlay branch;
    the 稱號 tool shortcut opens the tab.
 2. **Monster species codex and research state (server).** Re-point the
@@ -158,17 +158,21 @@ medals use the existing `GradeGem`.
 
 New components under `web/webclient-app/components/handbook/`:
 
-- `LoreCodexTab.vue` — rail (`IconTabs`, 8 categories, discovered count
-  badge), `CodexTileGrid`, `CodexDetail`.
-- `TitleCodexTab.vue` — rail (six categories, divider, 異名, 提名 with the
-  hot badge while a ballot is pending), `CodexMedalGrid` for fixed titles,
+- `LoreCodexTab.vue` — rail (`IconTabs` with `showLabels`, 8 categories,
+  discovered count badge), `CodexTileGrid`, `CodexDetail`.
+- `TitleCodexTab.vue` — rail (`IconTabs` with `showLabels`: six categories
+  (風流韻事 drawn as 韻事), divider, 異名, 提名 with the hot badge, present only
+  while a ballot is pending), `CodexMedalGrid` for fixed titles,
   `QuestList`-style rows for epithets and ballot entries, `CodexDetail`.
 - `CodexTileGrid.vue` / `CodexMedalGrid.vue` — group headings and tiles;
   roving focus with arrow keys, selection on Enter, Space or click.
   Placeholders are focusable, named 未記錄, and not selectable.
 - `CodexDetail.vue` — hero band (art or emblem; medal plus full-title
   nameplate for titles), the quest detail's ribbon, title, subtitle and
-  sections, and a pinned `ActionBar`.
+  sections, and the quest detail's pinned action footer
+  (`QuestDetail` `.quest-detail__actions` / `__why` / `__btn`), extracted into
+  a shared component rather than copied; `ActionBar` is not used because the
+  quest window does not use it.
 - `CodexEmblem.vue` — one SVG emblem per codex category and per title
   category, in the `dock-icons.js` stroke style. Used for tiles, medal faces
   and the art fallback.
@@ -183,14 +187,22 @@ New components under `web/webclient-app/components/handbook/`:
 
 - Full title: shown at the right end of the top tab row on the 稱號 tab
   only, verbatim from `full_title`.
-- Equip: select an unlocked medal or an epithet; `ActionBar` 裝備 emits
+- Equip: select an unlocked medal or an epithet; the footer's 裝備 emits
   `title.equip` (`kind: fixed | epithet`). The equipped entry shows 已裝備
-  disabled.
+  disabled with ★ 目前裝備中 in the footer's reason slot; a locked medal stays
+  selectable (its detail shows 取得條件) with 裝備 disabled and
+  尚未取得，無法裝備.
 - Remove: only where the row says `can_remove`. 移除… arms a confirm state
   (確認移除・此操作不可恢復); any close attempt (Escape, ✕, scrim) cancels
-  it through `closeGuard`, as 放棄任務 does. Confirm emits `title.remove`.
-- Ballot: 接受 per row (`title.accept`), 放棄提名 in the action bar
-  (`title.decline`).
+  it through `closeGuard`, as 放棄任務 does, and focus moves to 取消 when
+  armed. Confirm emits `title.remove`.
+- Ballot: select a nominee; the footer offers 放棄提名 (`title.decline`) and
+  接受此異名 (`title.accept`).
+- Tile stage marks differ by shape: defeated is a filled gold diamond,
+  sighted a hollow one (sighted art is also desaturated); placeholders are a
+  hatched dashed tile with ？. A legend under the monster wall names all three.
+- The monster detail shows a two-pip research track (目擊｜擊敗, each naming
+  what it unlocks) and a rotated stage stamp over the hero (已擊敗 / 目擊).
 - Codex detail for a sighted monster shows each `locked_fields` entry as a
   dashed 擊敗後解鎖 box.
 - Shortcuts: the 圖鑑 / 稱號 tools call `openHudDrawer("quest")` with a route
@@ -204,7 +216,15 @@ New components under `web/webclient-app/components/handbook/`:
 the `codex` OverlayHost branch, `lib/codex_field_label.js`, their stories,
 and any `.elosern-root` duplicates in `styles/app-shell.css`.
 
-## 6. Error and empty states
+## 6. Prototype
+
+`docs/design/handbook-codex-titles/` (Storybook `Design/Handbook`) is the
+approved visual reference: real `HudDrawer`, `IconTabs`, `GradeGem`,
+`EmptyState` and `QuestDrawer`, prototype `TileWall`, `CodexEmblem`, codex
+and titles tabs, synthetic v2 fixtures. Monster tiles show the pipeline's
+offline fallback (`monster_anon`).
+
+## 7. Error and empty states
 
 - Panel not yet committed: the tab is enabled and shows `EmptyState`.
 - Panel unavailable: the tab is disabled but focusable with the registry
@@ -217,7 +237,7 @@ and any `.elosern-root` duplicates in `styles/app-shell.css`.
   entry, else show the empty detail. Focus rescue follows `QuestDrawer`'s
   `focusSource` pattern.
 
-## 7. Testing
+## 8. Testing
 
 Specs and tests define logic only, never game data; no wall-clock assertions.
 
