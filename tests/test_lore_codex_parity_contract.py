@@ -2,7 +2,8 @@
 
 The ``lore_codex`` bounds and category vocabulary are shared between the
 Python presenter/validator in ``web/webclient/presentation/lore_codex.py`` and
-the JavaScript validator in ``web/static/webclient/js/elosern/protocol.js``.
+the JavaScript validator in ``web/static/webclient/js/elosern/protocol/panels/exotic.js``
+(constants in ``protocol/constants.js``).
 This contract enforces numerically identical values and exact category mapping
 order so the client and server validators can never diverge.
 """
@@ -20,9 +21,11 @@ _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
 
 _LORE_CODEX_CONSTANTS = (
     ("LORE_CODEX_SCHEMA_VERSION", "LORE_CODEX_SCHEMA_VERSION"),
-    ("LORE_CODEX_MAX_ENTRIES_PER_CATEGORY", "LORE_CODEX_MAX_ENTRIES_PER_CATEGORY"),
-    ("LORE_CODEX_MAX_TOTAL_ENTRIES", "LORE_CODEX_MAX_TOTAL_ENTRIES"),
+    ("LORE_CODEX_MAX_SLOTS_PER_CATEGORY", "LORE_CODEX_MAX_SLOTS_PER_CATEGORY"),
+    ("LORE_CODEX_MAX_TOTAL_SLOTS", "LORE_CODEX_MAX_TOTAL_SLOTS"),
+    ("LORE_CODEX_MAX_GROUPS_PER_CATEGORY", "LORE_CODEX_MAX_GROUPS_PER_CATEGORY"),
     ("LORE_CODEX_MAX_CARD_FIELDS", "LORE_CODEX_MAX_CARD_FIELDS"),
+    ("LORE_CODEX_MAX_VARIANT_LINES", "LORE_CODEX_MAX_VARIANT_LINES"),
     ("LORE_CODEX_MAX_KEY_CODE_POINTS", "LORE_CODEX_MAX_KEY_CODE_POINTS"),
     ("LORE_CODEX_MAX_TITLE_CODE_POINTS", "LORE_CODEX_MAX_TITLE_CODE_POINTS"),
     ("LORE_CODEX_MAX_LABEL_CODE_POINTS", "LORE_CODEX_MAX_LABEL_CODE_POINTS"),
