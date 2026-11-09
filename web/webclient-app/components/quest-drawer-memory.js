@@ -24,6 +24,9 @@ const memory = reactive({
   // once and never re-applied by a later mount.
   titlesRail: null,
   appliedRouteSeq: null,
+  // handbook-codex-tab (design D2): the last codex rail category. The codex
+  // selection per category rides selectedByTab under `codex:<category>`.
+  codexCategory: null,
 });
 
 function clear() {
@@ -34,6 +37,7 @@ function clear() {
   memory.selectedByTab = {};
   memory.titlesRail = null;
   memory.appliedRouteSeq = null;
+  memory.codexCategory = null;
 }
 
 // Returns the shared memory, reset first when the scope changed.

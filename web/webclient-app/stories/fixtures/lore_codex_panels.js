@@ -1,4 +1,5 @@
 // Story fixture slices: see stories/fixtures.js (facade) for the public surface.
+import { artworkDescriptor, artworkResource } from "./art_panels.js";
 
 // The committed `lore_codex` panel v2 (webclient-lore-codex-panel): the
 // eight codex categories in CODE_CATEGORIES mapping order, each with its
@@ -99,3 +100,59 @@ export const LORE_CODEX_PANEL_UNAVAILABLE_SAMPLE = Object.freeze({
     message: "知識圖鑑目前無法顯示",
   }),
 });
+// Synthetic `lore_codex` v2 builders for the handbook codex tab stories and
+// tests (handbook-codex-tab). Every key, title, label and field value a caller
+// passes is invented test data; the builders add no shipped string.
+export const CODEX_PLACEHOLDER = Object.freeze({ placeholder: true });
+
+// One entry slot. `card` defaults to a title field plus one description field.
+export function codexEntry(key, title, overrides = {}) {
+  return {
+    key,
+    title,
+    stage: null,
+    art: null,
+    card: [
+      { name: "display_name_zh", value: title },
+      { name: "description", value: `${title}的合成記述。` },
+    ],
+    locked_fields: [],
+    ...overrides,
+  };
+}
+
+// One category over `groups` ([{ key, label, slots }]); counts are derived.
+export function codexCategory(key, label, groups) {
+  const slots = groups.flatMap((group) => group.slots);
+  return {
+    key,
+    label,
+    discovered: slots.filter((slot) => !slot.placeholder).length,
+    total: slots.length,
+    groups,
+  };
+}
+
+export function loreCodex(categories) {
+  const slots = categories.flatMap((category) => category.groups.flatMap((group) => group.slots));
+  return {
+    schema_version: 2,
+    available: true,
+    discovered_total: slots.filter((slot) => !slot.placeholder).length,
+    total: slots.length,
+    categories,
+  };
+}
+
+// One art descriptor with a single image attempt and no terminal, in the
+// canonical descriptor shape the shared artwork lifecycle consumes.
+export function codexArt(subject, url) {
+  return artworkDescriptor({
+    subject_id: subject,
+    generation_subject: subject,
+    attempts: [
+      { type: "image", source_id: `${subject}:1`, rank: 30, resource: artworkResource({ resource_id: url, url }) },
+    ],
+    terminal: null,
+  });
+}

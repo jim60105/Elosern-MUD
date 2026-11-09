@@ -4,9 +4,9 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 
 ## 1. Model and tabs
 
-- [ ] 1.1 Extend `handbook-tabs.js` per design D1 and update `tests/handbook/handbook_tabs.test.js` (orders `["book","counter","codex","titles"]` and `["codex","titles"]`). Verify with vitest on that file.
-- [ ] 1.2 Create `components/handbook/lore-codex-model.js` per design D3. Add `tests/handbook/lore_codex_model.test.js` covering: status; rail counts from `discovered`; `defaultCodexCategory`; group order and null-label groups; placeholder items unselectable with an identity-free label and unique ids; entry item labels with stage suffix; `firstEntryKey`; `codexDetail` fields excluding `display_name_zh`, readable labels, `資料` fallback, locked items, monster stamp, track `reached`, and the sighted track's `unlocks` derived from `locked_fields` labels (`null` once defeated); `null` for an unknown key. Verify with vitest.
-- [ ] 1.3 Add `codexCategory` to `quest-drawer-memory.js` per design D2, with a scope-reset assertion in the existing memory test. Verify with vitest.
+- [x] 1.1 Extend `handbook-tabs.js` per design D1 and update `tests/handbook/handbook_tabs.test.js` (orders `["book","counter","codex","titles"]` and `["codex","titles"]`). Verify with vitest on that file.
+- [x] 1.2 Create `components/handbook/lore-codex-model.js` per design D3. Add `tests/handbook/lore_codex_model.test.js` covering: status; rail counts from `discovered`; `defaultCodexCategory`; group order and null-label groups; placeholder items unselectable with an identity-free label and unique ids; entry item labels with stage suffix; `firstEntryKey`; `codexDetail` fields excluding `display_name_zh`, readable labels, `資料` fallback, locked items, monster stamp, track `reached`, and the sighted track's `unlocks` derived from `locked_fields` labels (`null` once defeated); `null` for an unknown key. Verify with vitest.
+- [x] 1.3 Add `codexCategory` to `quest-drawer-memory.js` per design D2, with a scope-reset assertion in the existing memory test. Verify with vitest.
 
 ## 2. Components
 

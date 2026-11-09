@@ -345,11 +345,14 @@ describe("quest-drawer-memory", () => {
     const memory = useQuestDrawerMemory("1|7");
     memory.top = "counter";
     memory.selectedByTab["book:in_progress"] = "q_2077";
+    memory.codexCategory = "cat_b";
     expect(useQuestDrawerMemory("1|7").top).toBe("counter");
+    expect(useQuestDrawerMemory("1|7").codexCategory).toBe("cat_b");
     const fresh = useQuestDrawerMemory("2|7");
     expect(fresh.top).toBe("book");
     expect(fresh.bookState).toBe("in_progress");
     expect(fresh.selectedByTab).toEqual({});
+    expect(fresh.codexCategory).toBeNull();
   });
 });
 
