@@ -318,6 +318,9 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_selector(TITLES, state="detached", timeout=15000)
         _wait_inp_line(page, 2, "title accept 1", exact=True)
 
+    @covers_requirement(
+        "webclient-quest-drawer::the-handbook-titles-tab-fits-the-reference-viewports"
+    )
     def test_titles_tab_geometry_at_reference_viewports(self):
         """Three columns fit the drawer body, no horizontal scroll, no tiny text."""
         for viewport in ((1451, 790), (2560, 1440)):

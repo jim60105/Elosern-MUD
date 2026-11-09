@@ -7,10 +7,8 @@ handbook-titles-tab adds the 手帳's titles tab (``TitleCodexTab``,
 Their behavior is implemented and verified in the Vue layer, and
 ``covers_requirement`` can only attach to a Python ``test_*`` function, so
 this module executes the relevant Vitest component files and asserts every
-test passes. Requirement annotations are applied at each change's archive,
-once its delta requirements are synced into the main spec; the
-handbook-titles-tab methods for requirements that change adds stay
-unannotated until then.
+test passes. The requirement annotations were applied at each change's archive,
+once its delta requirements were synced into the main spec.
 """
 
 from pathlib import Path
@@ -87,6 +85,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "handbook tab set",
         )
 
+    @covers_requirement("webclient-quest-drawer::a-handbook-route-request-opens-the-drawer-on-the-named-tab")
     def test_handbook_route_request_opens_the_named_tab(self):
         # The store's handbook entry opens the drawer on the named tab, a new
         # request switches an open drawer, an unknown or out-of-mode tab is
@@ -101,6 +100,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "handbook route request",
         )
 
+    @covers_requirement("webclient-quest-drawer::the-titles-tab-organizes-the-committed-title-codex-by-rail")
     def test_titles_tab_rail_and_medal_wall(self):
         # The rail follows the closed category order with unlocked counts,
         # adds the hot ballot entry only while a ballot is pending and falls
@@ -115,6 +115,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "titles tab rail and medal wall",
         )
 
+    @covers_requirement("webclient-quest-drawer::the-titles-tab-equips-through-the-detail-footer")
     def test_titles_tab_equips_through_the_detail_footer(self):
         # One title.equip per activation (fixed by key, epithet by display),
         # disabled with a reason for locked and equipped entries, and the
@@ -127,6 +128,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "titles tab equip",
         )
 
+    @covers_requirement("webclient-quest-drawer::epithet-removal-takes-two-steps-and-any-close-attempt-cancels-it")
     def test_titles_tab_two_step_removal_and_close_guard(self):
         # The remove control follows can_remove; arming moves focus to cancel;
         # confirm emits one title.remove; a selection, rail or close attempt
@@ -140,6 +142,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "titles tab removal",
         )
 
+    @covers_requirement("webclient-quest-drawer::the-titles-tab-answers-a-pending-ballot")
     def test_titles_tab_answers_the_ballot(self):
         # Accept emits one title.accept with the one-based nominee index and
         # decline one title.decline with an empty payload.
@@ -148,6 +151,7 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "titles tab ballot",
         )
 
+    @covers_requirement("webclient-quest-drawer::the-titles-tab-degrades-honestly")
     def test_titles_tab_degrades_honestly(self):
         # The absent empty state before the first commit, the unavailable
         # panel disabling the tab with its reason, and a vanished selection
