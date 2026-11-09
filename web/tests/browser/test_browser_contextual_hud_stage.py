@@ -1672,7 +1672,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.locator('[data-nav-slot="map"]').focus()
         expected_tools = (
             ("nav-tool-letters", '[data-testid="letters-panel"]'),
-            ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
+            ("nav-tool-lore", '[data-testid="handbook__codex"]'),
             ("nav-tool-codex", '[data-testid="handbook__titles"]'),
             ("gallery-opener", '[data-testid="gallery-panel"]'),
             ("nav-tool-help", '[data-testid="help-overlay"]'),

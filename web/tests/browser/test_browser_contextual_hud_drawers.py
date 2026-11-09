@@ -1,4 +1,4 @@
-"""Contextual HUD drawer acceptance (webclient-contextual-hud): reference drawers and recession marks, the codex drawer pair, the quest drawer, and status-drawer geometry.
+"""Contextual HUD drawer acceptance (webclient-contextual-hud): reference drawers and recession marks, the handbook codex tab pair, the quest drawer, and status-drawer geometry.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "party-bag-tab",
         "shop-window",
         "quest-drawer",
-        "lore-codex-drawer",
+        "handbook__codex",
         "party-status-tab",
     ]
 
@@ -180,7 +180,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
 
     # ------------------------------------------------------------------
-    # webclient-lore-codex-drawer: the world-codex drawer surface.
+    # The world codex: since handbook-codex-tab the 圖鑑 tool opens the 手帳
+    # (the quest drawer) on its 圖鑑 tab; the `lore` drawer is gone.
     # ------------------------------------------------------------------
 
     @covers_requirement(
@@ -190,10 +191,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_codex_drawer_opens_from_the_utility_strip(self):
-        """The command line's 圖鑑 utility control opens the codex reference
-        drawer with a real user click: the drawer body renders the committed
-        `lore_codex` panel's discovered entries, the stage recesses while it
-        is open, and Escape closes it."""
+        """The top bar's 圖鑑 tool opens the handbook on its codex tab with a
+        real user click: the tab renders the committed `lore_codex` panel's
+        discovered entries, the stage recesses while it is open, and Escape
+        closes it and returns focus to the tool."""
         page = self.logged_in_page()
         stage = page.locator('[data-testid="elosern-stage"]')
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
@@ -202,18 +203,27 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # The real trigger path: a clean-state click on the top-bar tool-group
         # control while the command line is collapsed.
         page.locator('[data-testid="nav-tool-lore"]').click()
-        page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
+        page.wait_for_selector('[data-testid="handbook__codex"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="lore-codex-drawer"]').count(),
+            page.locator('[data-testid="handbook__codex"]').count(),
             1,
-            "the utility-strip control opens exactly the codex reference drawer",
+            "the 圖鑑 tool opens exactly the handbook codex tab",
         )
-        # The body renders the panel's discoveries (not the old guild-quest
-        # prose, not an empty stub): the aggregate control and both entries.
-        body_text = page.locator('[data-testid="lore-codex-drawer"]').inner_text()
-        self.assertIn("全部", body_text, "the aggregate control renders")
-        self.assertIn("平原族", body_text, "the discovered race entry renders")
-        self.assertIn("霧骨渡口", body_text, "the discovered anchor entry renders")
+        self.assertEqual(
+            page.locator('[data-testid="quest-drawer"]').get_attribute("data-tab"),
+            "codex",
+            "the handbook opens on its codex tab",
+        )
+        # The tab renders the panel's discoveries: the race entry on the
+        # default category's wall and detail, then the anchor entry on its
+        # own category.
+        codex = page.locator('[data-testid="handbook__codex"]')
+        self.assertIn("平原族", codex.inner_text(), "the discovered race entry renders")
+        codex.locator('[data-testid="handbook__codex-rail"] [data-tab-key="anchor"]').click()
+        page.wait_for_function(
+            "() => (document.querySelector('[data-testid=\"handbook__codex\"]') || {}).innerText.includes('霧骨渡口')",
+            timeout=15000,
+        )
         self.assertEqual(
             stage.get_attribute("data-menu-open"),
             "true",
@@ -242,9 +252,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_codex_drawer_replaces_the_open_drawer_or_overlay(self):
-        """At most one focus-trapped surface is open: opening the codex drawer
-        through the store's single open-drawer entry point closes an open
-        reference drawer, and opening an overlay closes the codex drawer."""
+        """At most one focus-trapped surface is open: opening the handbook
+        codex tab through the store's handbook route entry closes an open
+        reference drawer, and opening an overlay closes the handbook."""
         page = self.logged_in_page()
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
@@ -255,13 +265,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self._open_reference_drawer(page)
         page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store; "
-            "if (s) s.openHudDrawer('lore'); }"
+            "if (s) s.openHandbook('codex'); }"
         )
-        page.wait_for_selector('[data-testid="lore-codex-drawer"]', timeout=15000)
+        page.wait_for_selector('[data-testid="handbook__codex"]', timeout=15000)
         self.assertEqual(
             page.locator('[data-testid="party-window"]').count(),
             0,
-            "opening the codex drawer closes the open reference drawer",
+            "opening the codex tab closes the open reference drawer",
         )
 
         # Drawer-vs-overlay: opening the settings overlay closes the codex
@@ -269,9 +279,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.evaluate("window.__elosernBridge.store.openOverlay('settings')")
         page.wait_for_selector('[data-testid="settings-overlay"]', timeout=15000)
         self.assertEqual(
-            page.locator('[data-testid="lore-codex-drawer"]').count(),
+            page.locator('[data-testid="handbook__codex"]').count(),
             0,
-            "opening the settings overlay closes the codex drawer",
+            "opening the settings overlay closes the handbook codex tab",
         )
         page.locator('[data-testid="overlay-host-close"]').click()
         page.wait_for_function(
@@ -284,9 +294,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
     )
     def test_quest_drawer_offers_no_codex_control(self):
-        """The quest drawer contains no control that opens the codex: the
-        世界圖鑑 button is removed outright, and the split drawer carries no
-        codex-opening control of any kind."""
+        """The quest drawer opens no separate codex drawer: the retired
+        世界圖鑑 button stays gone, and the codex is the handbook's own 圖鑑
+        tab, reached in place without any second surface."""
         page = self.logged_in_page()
         _inject_snapshot(page, {"lore_codex": valid_lore_codex_panel()}, mode="exploration")
         _wait_mode(page, "exploration")
@@ -302,17 +312,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             0,
             "the removed 世界圖鑑 control is gone from the quest drawer",
         )
-        self.assertEqual(
-            page.locator('[data-testid="lore-codex-drawer"]').count(),
-            0,
-            "no codex drawer is open beside the quest drawer",
-        )
-        # No control anywhere inside the quest-drawer body names the codex.
         self.assertNotIn(
             "世界圖鑑",
             quest_drawer.inner_text(),
-            "the quest drawer renders no codex-opening control",
+            "the quest drawer renders no retired codex-drawer control",
         )
+        # The codex is the handbook's own tab: selecting it keeps exactly one
+        # drawer open and renders the codex inside the quest drawer.
+        quest_drawer.locator('[data-testid="quest-drawer__top-tabs"] [data-tab-key="codex"]').click()
+        page.wait_for_selector('[data-testid="quest-drawer"] [data-testid="handbook__codex"]', timeout=15000)
+        self.assertEqual(page.locator('[data-testid="hud-drawer"]').count(), 1, "one drawer stays open")
         page.close()
 
     @covers_requirement(
