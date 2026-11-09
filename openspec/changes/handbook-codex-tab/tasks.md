@@ -24,7 +24,7 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 
 - [x] 4.1 Add the stories per design D8 and update `component-manifest.json` and the showcase evidence lists per design D7. Verify with `pnpm run build-storybook && pnpm run showcase-coverage` and the focused labels `web.webclient.tests.test_vue_showcase_action_evidence`, `web.webclient.tests.test_vue_showcase_data_evidence`, `web.webclient.tests.test_vue_showcase_overlays_evidence` and `web.webclient.tests.test_vue_showcase_world_evidence`.
 - [x] 4.2 Update `docs/game/commands.md` per design D6, then run the focused label `tests.test_command_docs`. It passes.
-- [ ] 4.3 Update the frozen-contract audit and `tests/test_data_independence_js_webclient.py` per design D7. Verify with the focused labels `tests.test_webclient_frozen_contract` and `tests.test_data_independence_js_webclient`, plus `uv run --locked python -m tools.test_data_lint check`.
+- [x] 4.3 Update the frozen-contract audit and `tests/test_data_independence_js_webclient.py` per design D7. Verify with the focused labels `tests.test_webclient_frozen_contract` and `tests.test_data_independence_js_webclient`, plus `uv run --locked python -m tools.test_data_lint check`.
 
 ## 5. Live-client browser acceptance
 

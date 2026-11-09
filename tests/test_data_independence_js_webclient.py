@@ -45,8 +45,9 @@ MIGRATED_FILES = (
     "web/webclient-app/tests/world/item_icons.test.js",
 )
 
-#: The handbook titles tab suites that replaced the retired title-codex
-#: overlay suite (handbook-titles-tab). They were written synthetic-first, so
+#: The handbook titles and codex tab suites that replaced the retired
+#: title-codex overlay and world-codex drawer suites (handbook-titles-tab,
+#: handbook-codex-tab). They were written synthetic-first, so
 #: they never entered the seeded debt array: they are scanned for zero
 #: findings and no ledger exemption, but not pinned to the seed.
 HANDBOOK_FILES = (
@@ -54,6 +55,13 @@ HANDBOOK_FILES = (
     "web/webclient-app/tests/handbook/title_codex_model.test.js",
     "web/webclient-app/tests/handbook/codex_medal_grid.test.js",
     "web/webclient-app/tests/handbook/title_codex_tab.test.js",
+    # handbook-codex-tab: the codex tab suites that replaced the retired
+    # world-codex drawer suite.
+    "web/webclient-app/tests/handbook/lore_codex_model.test.js",
+    "web/webclient-app/tests/handbook/codex_art.test.js",
+    "web/webclient-app/tests/handbook/codex_tile_grid.test.js",
+    "web/webclient-app/tests/handbook/codex_detail.test.js",
+    "web/webclient-app/tests/handbook/lore_codex_tab.test.js",
 )
 
 #: Manifest paths whose suite became a flat sibling family on disk. The
