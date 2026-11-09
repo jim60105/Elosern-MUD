@@ -10,10 +10,10 @@ Run pnpm commands from the repository root, vitest as `pnpm exec vitest run <pat
 
 ## 2. TileWall, CodexEmblem, CodexDetail
 
-- [ ] 2.1 Port `TileWall.vue` per design D2 and add `tests/handbook/tile_wall.test.js` covering every scenario of the TileWall requirement. Verify with vitest on that file.
-- [ ] 2.2 Add the emblem paths and `CodexEmblem.vue` per design D3, with `tests/handbook/codex_emblem.test.js` (a known name renders its path; an unknown name renders the `emblem_unknown` path). Verify with vitest.
-- [ ] 2.3 Create `CodexDetail.vue` per design D4 with `tests/handbook/codex_detail.test.js`: it renders ribbon, title, subtitle and sections; a grade renders `GradeGem`, else the emblem; `locked` draws the silhouette marker (`data-locked="true"`); the `hero` slot replaces the face; a null `footer` renders no footer; a footer `press` is re-emitted; a null detail renders `handbook__detail-empty`. Verify with vitest.
-- [ ] 2.4 Run `grep -n -E "detail-footer|tile-wall|codex-detail|codex-emblem" web/webclient-app/styles/app-shell.css` and expect no output.
+- [x] 2.1 Port `TileWall.vue` per design D2 and add `tests/handbook/tile_wall.test.js` covering every scenario of the TileWall requirement. Verify with vitest on that file.
+- [x] 2.2 Add the emblem paths and `CodexEmblem.vue` per design D3, with `tests/handbook/codex_emblem.test.js` (a known name renders its path; an unknown name renders the `emblem_unknown` path). Verify with vitest.
+- [x] 2.3 Create `CodexDetail.vue` per design D4 with `tests/handbook/codex_detail.test.js`: it renders ribbon, title, subtitle and sections; a grade renders `GradeGem`, else the emblem; `locked` draws the silhouette marker (`data-locked="true"`); the `hero` slot replaces the face; a null `footer` renders no footer; a footer `press` is re-emitted; a null detail renders `handbook__detail-empty`. Verify with vitest.
+- [x] 2.4 Run `grep -n -E "detail-footer|tile-wall|codex-detail|codex-emblem" web/webclient-app/styles/app-shell.css` and expect no output.
 
 ## 3. Stories, manifest, evidence
 

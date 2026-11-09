@@ -136,6 +136,19 @@ export const GLYPHS = {
   minus: "M5 12h14",
   give: "M4 12h13M13 7l5 5-5 5",
   knocked_out: "M6 9l6 6 6-6",
+  // The handbook emblems (handbook-primitives, design D3): one per title
+  // category, the epithet, the ballot, and the unknown fallback, copied from
+  // the approved prototype (docs/design/handbook-codex-titles/CodexEmblem.vue).
+  // CodexEmblem.vue draws them as `emblem_<name>`.
+  emblem_combat: "M4.5 4.5 15 15M15 15l1.5-.5L19.5 17.5l-2 2L14.5 16.5zM19.5 4.5 9 15M9 15l-1.5-.5-3 3 2 2 3-3z",
+  emblem_spell: "M12 2.5 14 9.6 21 12l-7 2.4-2 7.1-2-7.1L3 12l7-2.4z",
+  emblem_explore: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM15.5 8.5l-2 5-5 2 2-5zM12 3v2M12 19v2M3 12h2M19 12h2",
+  emblem_guild: "M12 2.8 4.5 5.6v6c0 4.8 3.2 8 7.5 9.6 4.3-1.6 7.5-4.8 7.5-9.6v-6zM8 11h8M12 7v10M9.5 14.5h5",
+  emblem_clergy: "M12 3v18M7 8h10M12 3a2 2 0 0 0 0 0M8.5 21h7M5.5 12.5c2 1.5 4.2 2.2 6.5 2.2s4.5-.7 6.5-2.2",
+  emblem_romance: "M12 20.5s-7.5-4.6-7.5-10.1A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.8c0 5.5-7.5 10.1-7.5 10.1zM12 7.6V4M10 3.5h4",
+  emblem_epithet: "M19.5 3.5C13 4 8.5 8.6 7.2 15.3L6 19l3.6-1.3C16 16.2 20 11.5 20.5 4.5ZM7.2 15.3 13.5 9M4 21h9",
+  emblem_ballot: "M4 6h16v13H4zM4 6l8 6.5L20 6M8 3h8",
+  emblem_unknown: "M9.2 9a2.8 2.8 0 1 1 4.1 2.5c-.8.4-1.3 1.2-1.3 2.1v.6M12 17.2v.3",
 };
 
 // Per-key stroke attributes copied selectively from the reference: `move`
@@ -170,6 +183,9 @@ for (const key of [
   "member", "status", "potion", "sword", "hammer", "bow", "shield", "armor", "staff",
   "amulet", "ration", "scroll", "herb", "holy", "ice", "wind", "buff", "debuff",
   "slot_empty", "plus", "minus", "give", "knocked_out",
+  // The handbook emblems: the prototype's CodexEmblem rounds every stroke.
+  "emblem_combat", "emblem_spell", "emblem_explore", "emblem_guild", "emblem_clergy",
+  "emblem_romance", "emblem_epithet", "emblem_ballot", "emblem_unknown",
 ]) {
   STROKE_ATTRS[key] = { "stroke-linecap": "round", "stroke-linejoin": "round" };
 }

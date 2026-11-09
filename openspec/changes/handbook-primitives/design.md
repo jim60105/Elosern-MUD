@@ -57,7 +57,7 @@ Port `docs/design/handbook-codex-titles/TileWall.vue` to `components/handbook/Ti
 
 - Props: `groups` (`[{key, label|null, items:[{id, selectable, label}]}]`), `selectedId`, `ariaLabel` and `variant` (`tile` | `medal`).
 - Emits `select(id)`. The scoped slot is `tile` (`{item, selected}`).
-- Up and Down step by the measured grid column count (`getComputedStyle(grid).gridTemplateColumns`). In jsdom that resolves to 1, which the tests rely on.
+- Up and Down step by the measured grid column count (`getComputedStyle(grid).gridTemplateColumns`). The vitest config loads SFC styles, so jsdom returns the unresolved `repeat(auto-fill, ...)` string; the row-step test stubs the measurement with a fixed column count.
 - Add `data-testid="tile-wall"` on the root and `data-tile="<id>"` on each cell (already in the prototype).
 
 ### D3. CodexEmblem
