@@ -10,6 +10,7 @@ export const CODEX_FIELD_LABELS = Object.freeze({
   capital_name_zh: "首都",
   terrain_flavor_zh: "地貌",
   example_monsters_zh: "例證",
+  published_appearance_zh: "外觀",
 });
 
 export function codexFieldLabel(name) {

@@ -14,6 +14,15 @@ no-ops; unknown categories and unresolvable keys reject with named errors),
 ``list_discovered`` returns a deterministic discovered-only listing, and
 ``lore_card`` renders one registry entry through the declared card fields,
 never a raw dataclass dump.
+
+The ``monster`` category is a species bestiary with two research stages
+(lore-species-research). A species is *sighted* when ``monster:<species>``
+is in ``lore_discovered`` and *defeated* when its key is also in
+``character.db.lore_species_defeated``, a second append-only set this module
+alone writes. ``record_species_sighting`` and ``record_species_defeat`` are
+its writers (a defeat also records the sighting), ``list_species_defeated``
+its reader, and the ``schedule_species_*_best_effort`` helpers the
+post-commit, never-failing entry points the combat hooks use.
 """
 
 from collections.abc import Callable, Mapping, Set as ABCSet
@@ -23,7 +32,7 @@ from typing import Any
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.magic import MAGIC_TIER_REGISTRY
-from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
 from world.lore.nations import NATION_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.observability import log_warn
@@ -31,6 +40,10 @@ from world.observability import log_warn
 # The persisted codex attribute name. All stored entries are namespaced
 # ``category:key`` identifiers.
 KNOWLEDGE_ATTR = "lore_discovered"
+
+# The persisted defeated-species attribute name: an append-only set of bare
+# species keys (no category prefix).
+DEFEATED_ATTR = "lore_species_defeated"
 
 # Player-facing category labels used by the listing groups and presentation panels.
 CATEGORY_LABELS: dict[str, str] = {
@@ -98,9 +111,12 @@ CODE_CATEGORIES: dict[str, CodexCategory] = {
     "region": CodexCategory(
         _published("regions"), ("display_name_zh", "terrain_flavor_zh")
     ),
+    # The species registry is a frozen MappingProxyType, so the loader reads
+    # this module's binding at call time instead of capturing the object at
+    # import: a swapped binding (synthetic test scopes) is always observed.
     "monster": CodexCategory(
-        _constant(MONSTER_TIER_REGISTRY),
-        ("display_name_zh", "description", "example_monsters_zh"),
+        lambda: MONSTER_SPECIES_REGISTRY,
+        ("display_name_zh", "published_appearance_zh"),
     ),
     "element": CodexCategory(_constant(ELEMENT_REGISTRY), ("display_name_zh", "description")),
     "magic": CodexCategory(_constant(MAGIC_TIER_REGISTRY), ("display_name_zh", "description")),
@@ -261,6 +277,125 @@ def schedule_lore_reveal_best_effort(
                 "key": key,
             },
         )
+
+
+def _require_species_key(species_key: Any) -> None:
+    """Reject a key that does not resolve in the monster (species) category."""
+    if not isinstance(species_key, str) or species_key not in CODE_CATEGORIES["monster"].registry:
+        raise LoreKeyError(f"no lore entry {species_key!r} in category 'monster'")
+
+
+def _validated_species_record(record: Any, *, tolerant: bool = False) -> set[str]:
+    """Strictly parse a stored defeated-species record, raising on corrupt content.
+
+    The record must be a set of non-empty str keys without ``':'``; strict mode
+    also requires each key to resolve in ``CODE_CATEGORIES["monster"]``. When
+    ``tolerant`` is True, a well-formed key that no longer resolves is kept.
+    Anything else raises :class:`LoreRecordError`. Returns a fresh copy.
+    """
+    if not isinstance(record, ABCSet) or not all(
+        isinstance(item, str) for item in record
+    ):
+        raise LoreRecordError("defeated species record is not a set of strings")
+    registry = CODE_CATEGORIES["monster"].registry
+    for item in record:
+        if not item or ":" in item:
+            raise LoreRecordError(f"defeated species entry {item!r} is malformed")
+        if not tolerant and item not in registry:
+            raise LoreRecordError(f"defeated species entry {item!r} is unresolvable")
+    return set(record)
+
+
+def list_species_defeated(player: Any, *, tolerant: bool = False) -> tuple[str, ...]:
+    """Return the defeated species keys in sorted order.
+
+    A player with no record reads as ``()``. A malformed record raises
+    :class:`LoreRecordError` (the stored value is never reset or fabricated).
+    """
+    current = getattr(player.db, DEFEATED_ATTR)
+    if current is None:
+        return ()
+    return tuple(sorted(_validated_species_record(current, tolerant=tolerant)))
+
+
+def record_species_sighting(player: Any, species_key: str) -> None:
+    """Record that the player has sighted one species (``monster:<key>``).
+
+    Validates the key (:class:`LoreKeyError`) and writes exclusively through
+    :func:`record_lore_reveal`, so the codex keeps its single writer and its
+    one-push-per-change rule.
+    """
+    _require_species_key(species_key)
+    record_lore_reveal(player, "monster", species_key)
+
+
+def record_species_defeat(player: Any, species_key: str) -> None:
+    """Record that the player has defeated one species (implies the sighting).
+
+    Validates the key and the stored defeated record strictly BEFORE any write,
+    records the sighting, then appends the key to the defeated set and
+    schedules one codex push only when that set changed. A repeat defeat is a
+    no-op success; a corrupt record raises and is never rewritten.
+    """
+    _require_species_key(species_key)
+    current = getattr(player.db, DEFEATED_ATTR)
+    current = set() if current is None else _validated_species_record(current)
+    record_species_sighting(player, species_key)
+    if species_key in current:
+        return
+    updated = set(current)
+    updated.add(species_key)
+    setattr(player.db, DEFEATED_ATTR, updated)
+    _schedule_lore_codex_push(player)
+
+
+def _species_failure_context(player: Any, species_key: Any, stage: str) -> dict[str, Any]:
+    return {
+        "char": str(getattr(player, "key", player)),
+        "category": "monster",
+        "key": species_key,
+        "stage": stage,
+    }
+
+
+def _species_best_effort(player: Any, species_key: str, stage: str) -> None:
+    """Run one species writer, logging (never raising) any failure."""
+    writer = record_species_defeat if stage == "defeated" else record_species_sighting
+    try:
+        writer(player, species_key)
+    except Exception as exc:
+        log_warn(
+            "lore_reveal_failed",
+            exc=exc,
+            context=_species_failure_context(player, species_key, stage),
+        )
+
+
+def _schedule_species_best_effort(player: Any, species_key: Any, stage: str) -> None:
+    if not isinstance(species_key, str) or not species_key:
+        return
+    try:
+        from world.rules.presentation_events import on_publication_commit
+
+        on_publication_commit(
+            lambda: _species_best_effort(player, species_key, stage)
+        )
+    except Exception as exc:
+        log_warn(
+            "lore_reveal_failed",
+            exc=exc,
+            context=_species_failure_context(player, species_key, stage),
+        )
+
+
+def schedule_species_sighting_best_effort(player: Any, species_key: str | None) -> None:
+    """Schedule a best-effort species sighting to run after the transaction commits."""
+    _schedule_species_best_effort(player, species_key, "sighted")
+
+
+def schedule_species_defeat_best_effort(player: Any, species_key: str | None) -> None:
+    """Schedule a best-effort species defeat to run after the transaction commits."""
+    _schedule_species_best_effort(player, species_key, "defeated")
 
 
 def list_discovered(player: Any, *, tolerant: bool = False) -> tuple[tuple[str, str], ...]:

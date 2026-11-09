@@ -32,6 +32,7 @@ from ._knowledge_probes import (
     live_element_registry,
     live_guild_rank_registry,
     live_magic_tier_registry,
+    live_monster_species_registry,
     live_monster_tier_registry,
     live_nation_registry,
     live_race_registry,
@@ -46,7 +47,7 @@ def _expected_registries():
         "race": live_race_registry(),
         "nation": live_nation_registry(),
         "region": live_region_registry(),
-        "monster": live_monster_tier_registry(),
+        "monster": live_monster_species_registry(),
         "element": live_element_registry(),
         "magic": live_magic_tier_registry(),
         "anchor": live_anchor_registry(),
@@ -58,7 +59,7 @@ EXPECTED_CARD_FIELDS = {
     "race": ("display_name_zh", "description"),
     "nation": ("display_name_zh", "capital_name_zh"),
     "region": ("display_name_zh", "terrain_flavor_zh"),
-    "monster": ("display_name_zh", "description", "example_monsters_zh"),
+    "monster": ("display_name_zh", "published_appearance_zh"),
     "element": ("display_name_zh", "description"),
     "magic": ("display_name_zh", "description"),
     "anchor": ("display_name_zh", "description"),
@@ -97,6 +98,7 @@ _LORE_LOGICALS = (
     "subraces",
     "nations",
     "regions",
+    "monster_species",
     "monster_tiers",
     "elements",
     "magic_tiers",
@@ -136,6 +138,24 @@ class CodexMappingTests(unittest.TestCase):
         with self.assertRaises(LoreKeyError):
             record_lore_reveal(player, "race", subrace)
         self.assertIsNone(player.db.lore_discovered)
+
+    @covers_requirement("lore-knowledge::the-codex-defines-a-closed-category-to-registry-mapping")
+    def test_a_threat_tier_key_is_not_a_monster_entry(self):
+        tier = _first_key(live_monster_tier_registry())
+        self.assertNotIn(tier, live_monster_species_registry())
+        player = _player()
+        with self.assertRaises(LoreKeyError):
+            record_lore_reveal(player, "monster", tier)
+        self.assertIsNone(player.db.lore_discovered)
+
+    def test_monster_category_observes_the_current_species_registry(self):
+        # The species registry is swapped (not mutated) by a scope, so the
+        # category must resolve the live binding, not an import-time capture.
+        species = _first_key(live_monster_species_registry())
+        self.assertIn(species, CODE_CATEGORIES["monster"].registry)
+        player = _player()
+        record_lore_reveal(player, "monster", species)
+        self.assertEqual(player.db.lore_discovered, {f"monster:{species}"})
 
 
 @synthetic_registries(*_LORE_LOGICALS)
@@ -287,12 +307,17 @@ class CardRenderingTests(unittest.TestCase):
             anchors[nations[nation].capital_anchor_key].display_name_zh,
         )
 
-    def test_monster_card_renders_examples_as_entries(self):
-        tiers = live_monster_tier_registry()
-        tier = _first_key(tiers)
-        card = lore_card("monster", tier)
-        self.assertEqual(card["display_name_zh"], tiers[tier].display_name_zh)
-        self.assertIn(tiers[tier].example_monsters_zh[0], card["example_monsters_zh"])
+    def test_monster_card_renders_species_name_and_published_appearance(self):
+        species = live_monster_species_registry()
+        key = _first_key(species)
+        card = lore_card("monster", key)
+        self.assertEqual(
+            card,
+            {
+                "display_name_zh": species[key].display_name_zh,
+                "published_appearance_zh": species[key].published_appearance_zh,
+            },
+        )
 
     def test_guild_card_renders_rank_name_and_description(self):
         ranks = live_guild_rank_registry()
@@ -306,7 +331,7 @@ class CardRenderingTests(unittest.TestCase):
             "race": _first_key(live_race_registry()),
             "nation": _first_key(live_nation_registry()),
             "region": _first_key(live_region_registry()),
-            "monster": _first_key(live_monster_tier_registry()),
+            "monster": _first_key(live_monster_species_registry()),
             "element": _first_key(live_element_registry()),
             "magic": _first_key(live_magic_tier_registry()),
             "anchor": _first_key(live_anchor_registry()),

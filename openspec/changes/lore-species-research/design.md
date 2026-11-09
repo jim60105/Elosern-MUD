@@ -33,12 +33,16 @@ In `lore_knowledge.py`, replace the `MONSTER_TIER_REGISTRY` import with `from wo
 
 ```python
 "monster": CodexCategory(
-    _constant(MONSTER_SPECIES_REGISTRY),
+    lambda: MONSTER_SPECIES_REGISTRY,
     ("display_name_zh", "published_appearance_zh"),
 ),
 ```
 
+The loader reads the module binding at call time rather than `_constant(MONSTER_SPECIES_REGISTRY)`. Unlike the other dict registries, `MONSTER_SPECIES_REGISTRY` is a frozen `MappingProxyType`, and the synthetic kit swaps such a registry by rebinding the owner and consumer module names. An import-time closure would keep the shipped object and never observe a scope.
+
 Both card fields are plain string attributes of `MonsterSpecies`, so `lore_card` keeps working unchanged. The author-private fields are never declared. Update the module docstring.
+
+`tests/test_client_display_vocabulary_contract.py` requires every declared card field to have a readable name in `web/webclient-app/lib/codex_field_label.js`, so the new `published_appearance_zh` field gains the label 外觀 there. This is a one-line label-map entry, not a drawer or protocol change.
 
 ### D2. Writers and reader (verbatim contracts)
 
