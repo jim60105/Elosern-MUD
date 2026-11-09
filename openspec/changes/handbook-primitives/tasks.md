@@ -4,9 +4,9 @@ Run pnpm commands from the repository root, vitest as `pnpm exec vitest run <pat
 
 ## 1. DetailFooter extraction
 
-- [ ] 1.1 Create `components/DetailFooter.vue` and switch `QuestDetail.vue` to it per design D1. Update the class assertion in `tests/world/quest_detail.test.js`. Verify with `pnpm exec vitest run web/webclient-app/tests/world/quest_detail.test.js web/webclient-app/tests/world/quest_drawer.test.js`. Every existing test passes.
-- [ ] 1.2 Add `tests/components/detail_footer.test.js` covering every scenario of the DetailFooter requirement: a disabled button is focusable with `aria-disabled` and emits nothing; a toggle uses native `disabled`; `press` is emitted once per activation; `focus(key)` focuses that button; `reasonRole="alert"` renders. Verify with vitest on that file.
-- [ ] 1.3 Run the quest-drawer browser footer methods once, each on its own: the methods in `web/tests/browser/test_browser_services_quest_drawer.py` that click `quest-drawer__abandon` or `quest-drawer__track` (find them with `git grep -n "quest-drawer__abandon\|quest-drawer__track" web/tests/browser`). Use `uv run --locked python -m web.tests.browser.unittest_driver <module>.<Class>.<method>` with output captured to a scratch file. All pass.
+- [x] 1.1 Create `components/DetailFooter.vue` and switch `QuestDetail.vue` to it per design D1. Update the class assertion in `tests/world/quest_detail.test.js`. Verify with `pnpm exec vitest run web/webclient-app/tests/world/quest_detail.test.js web/webclient-app/tests/world/quest_drawer.test.js`. Every existing test passes.
+- [x] 1.2 Add `tests/components/detail_footer.test.js` covering every scenario of the DetailFooter requirement: a disabled button is focusable with `aria-disabled` and emits nothing; a toggle uses native `disabled`; `press` is emitted once per activation; `focus(key)` focuses that button; `reasonRole="alert"` renders. Verify with vitest on that file.
+- [x] 1.3 Run the quest-drawer browser footer methods once, each on its own: the methods in `web/tests/browser/test_browser_services_quest_drawer.py` that click `quest-drawer__abandon` or `quest-drawer__track` (find them with `git grep -n "quest-drawer__abandon\|quest-drawer__track" web/tests/browser`). Use `uv run --locked python -m web.tests.browser.unittest_driver <module>.<Class>.<method>` with output captured to a scratch file. All pass.
 
 ## 2. TileWall, CodexEmblem, CodexDetail
 

@@ -5,7 +5,8 @@
 // tab can reuse it. Top to bottom: the hero (ribbon, title, objective and
 // note, grade gem, completed/failed stamp), one-based progress, the
 // rationale and deadline pair, the issuer letter, and the reward cells with
-// their settlement note. The action bar is pinned to the bottom.
+// their settlement note. The action footer (DetailFooter) is pinned to the
+// bottom.
 //
 // A guild board offer (quest-drawer-guild-board-tab, `offerDetail` /
 // `offerActions`) uses the same layout: no progress or stamp, the 接取條件
@@ -17,7 +18,8 @@
 // server descriptor (or the row's track descriptor) names. Abandon needs a
 // second confirmation; the armed state belongs to one quest and disarms when
 // the selection changes or the abandon descriptor goes away.
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
+import DetailFooter from "./DetailFooter.vue";
 import GradeGem from "./GradeGem.vue";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { ABANDON_WARNING } from "./quest-drawer-model.js";
@@ -41,30 +43,28 @@ watch(
   },
 );
 
-const abandonButton = ref(null);
-const cancelButton = ref(null);
+// The pinned footer (handbook-primitives, design D1) renders through the
+// shared DetailFooter; focus moves through its exposed `focus(key)`.
+const footerRef = ref(null);
 const numberFormat = new Intl.NumberFormat("zh-TW");
 const fmt = (value) => numberFormat.format(value);
 
 async function arm() {
   armedId.value = props.detail.id;
   await nextTick();
-  cancelButton.value?.focus();
+  footerRef.value?.focus("cancel");
 }
 
 async function disarm() {
   armedId.value = null;
   await nextTick();
-  abandonButton.value?.focus();
+  footerRef.value?.focus("abandon");
 }
 
 function dispatch(descriptor) {
   if (!descriptor) return;
   emit("action", { action_id: descriptor.action_id, payload: { ...descriptor.payload } });
 }
-
-const trackButton = ref(null);
-const reasonId = `quest-detail-reason-${useId()}`;
 
 async function confirmAbandon() {
   const abandon = props.actions?.abandon;
@@ -73,7 +73,7 @@ async function confirmAbandon() {
   // The confirm control leaves the DOM; keep focus inside the drawer on the
   // tracking toggle until the commit replaces the row.
   await nextTick();
-  trackButton.value?.focus();
+  footerRef.value?.focus("track");
 }
 
 function accept() {
@@ -84,6 +84,76 @@ function accept() {
 function toggleTrack() {
   const track = props.actions?.track;
   if (track?.enabled) dispatch(track);
+}
+
+// The footer descriptor. Armed: the danger warning (role alert) with cancel
+// and confirm. Otherwise: the action reason, then abandon, the tracking
+// toggle, turn-in and accept. The spacer rides the tracking toggle; the
+// panel contract (quest_log.py) gives every row a track descriptor, so an
+// abandon never appears without the toggle that carries the spacer.
+const footer = computed(() => {
+  if (armed.value) {
+    return {
+      reason: ABANDON_WARNING(props.detail.name),
+      reasonTone: "danger",
+      reasonRole: "alert",
+      reasonTestid: "quest-drawer__abandon-confirm",
+      buttons: [
+        { key: "cancel", label: "取消", tone: "plain", testid: "quest-drawer__abandon-confirm-no" },
+        { key: "confirm", label: "確認放棄", tone: "danger", testid: "quest-drawer__abandon-confirm-yes" },
+      ],
+    };
+  }
+  const actions = props.actions ?? {};
+  const buttons = [];
+  if (actions.abandon) {
+    buttons.push({ key: "abandon", label: actions.abandon.label, tone: "ghost", testid: "quest-drawer__abandon" });
+  }
+  if (actions.track) {
+    buttons.push({
+      key: "track",
+      label: actions.track.label,
+      tone: "plain",
+      pressed: !!actions.track.pressed,
+      enabled: !!actions.track.enabled,
+      glyph: "track_flag",
+      spacerBefore: true,
+      testid: "quest-drawer__track",
+    });
+  }
+  if (actions.turnin) {
+    buttons.push({ key: "turnin", label: actions.turnin.label, tone: "primary", testid: "quest-drawer__turnin" });
+  }
+  if (actions.accept) {
+    buttons.push({
+      key: "accept",
+      label: actions.accept.label,
+      tone: "primary",
+      enabled: !!actions.accept.enabled,
+      describedByReason: true,
+      testid: "quest-drawer__accept",
+    });
+  }
+  return {
+    reason: actions.reason ?? null,
+    reasonTone: "plain",
+    reasonRole: null,
+    reasonTestid: "quest-drawer__action-reason",
+    buttons,
+  };
+});
+
+const PRESS = {
+  cancel: disarm,
+  confirm: confirmAbandon,
+  abandon: arm,
+  track: toggleTrack,
+  turnin: () => dispatch(props.actions?.turnin),
+  accept,
+};
+
+function onPress(key) {
+  PRESS[key]?.();
 }
 </script>
 
@@ -181,78 +251,7 @@ function toggleTrack() {
       </section>
     </div>
 
-    <footer class="quest-detail__actions" data-testid="quest-drawer__actions">
-      <template v-if="armed">
-        <p
-          class="quest-detail__why quest-detail__why--danger"
-          data-testid="quest-drawer__abandon-confirm"
-          role="alert"
-        >{{ ABANDON_WARNING(detail.name) }}</p>
-        <button
-          ref="cancelButton"
-          type="button"
-          class="quest-detail__btn"
-          data-testid="quest-drawer__abandon-confirm-no"
-          @click="disarm"
-        >取消</button>
-        <button
-          type="button"
-          class="quest-detail__btn quest-detail__btn--danger"
-          data-testid="quest-drawer__abandon-confirm-yes"
-          @click="confirmAbandon"
-        >確認放棄</button>
-      </template>
-      <template v-else>
-        <p
-          v-if="actions.reason"
-          :id="reasonId"
-          class="quest-detail__why"
-          data-testid="quest-drawer__action-reason"
-        >{{ actions.reason }}</p>
-        <button
-          v-if="actions.abandon"
-          ref="abandonButton"
-          type="button"
-          class="quest-detail__btn quest-detail__btn--ghost"
-          data-testid="quest-drawer__abandon"
-          @click="arm"
-        >{{ actions.abandon.label }}</button>
-        <span v-if="actions.abandon || actions.track" class="quest-detail__spacer"></span>
-        <button
-          v-if="actions.track"
-          ref="trackButton"
-          type="button"
-          class="quest-detail__btn"
-          :class="{ 'is-on': actions.track.pressed }"
-          :aria-pressed="String(actions.track.pressed)"
-          :disabled="!actions.track.enabled"
-          data-testid="quest-drawer__track"
-          @click="toggleTrack"
-        >
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path :d="glyphPath('track_flag')" stroke="currentColor" stroke-width="1.6" v-bind="glyphAttrs('track_flag')" />
-          </svg>
-          {{ actions.track.label }}
-        </button>
-        <button
-          v-if="actions.turnin"
-          type="button"
-          class="quest-detail__btn quest-detail__btn--primary"
-          data-testid="quest-drawer__turnin"
-          @click="dispatch(actions.turnin)"
-        >{{ actions.turnin.label }}</button>
-        <button
-          v-if="actions.accept"
-          type="button"
-          class="quest-detail__btn quest-detail__btn--primary"
-          :class="{ 'is-disabled': !actions.accept.enabled }"
-          :aria-disabled="actions.accept.enabled ? undefined : 'true'"
-          :aria-describedby="!actions.accept.enabled && actions.reason ? reasonId : undefined"
-          data-testid="quest-drawer__accept"
-          @click="accept"
-        >{{ actions.accept.label }}</button>
-      </template>
-    </footer>
+    <DetailFooter ref="footerRef" testid="quest-drawer__actions" v-bind="footer" @press="onPress" />
   </article>
   <div v-else class="quest-detail quest-detail--empty" data-testid="quest-drawer__detail-empty"></div>
 </template>
@@ -564,115 +563,9 @@ function toggleTrack() {
   font-size: var(--text-xs);
 }
 
-.quest-detail__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-  box-sizing: border-box;
-  min-height: calc(64px * var(--ui-scale));
-  padding: var(--sp-3) var(--sp-8);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.4));
-  border-top: 1px solid var(--quest-detail-line);
-}
-
-.quest-detail__spacer {
-  flex: 1;
-}
-
-.quest-detail__why {
-  margin: 0 auto 0 0;
-  color: var(--paper-400);
-  font-size: var(--text-sm);
-}
-
-.quest-detail__why--danger {
-  color: var(--seal-400);
-}
-
-.quest-detail__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-5);
-  color: var(--paper-100);
-  font: var(--text-md) var(--f-display);
-  letter-spacing: 0.08em;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--ink-600);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: border-color var(--motion-fast) ease, color var(--motion-fast) ease, background-color var(--motion-fast) ease;
-}
-
-.quest-detail__btn svg {
-  width: 1em;
-  height: 1em;
-}
-
-.quest-detail__btn:hover:not(:disabled) {
-  color: var(--paper-50);
-  border-color: var(--gold-500);
-}
-
-.quest-detail__btn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-}
-
-.quest-detail__btn:disabled,
-.quest-detail__btn.is-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.quest-detail__btn.is-on {
-  color: var(--gold-300);
-  background: var(--gold-glow);
-  border-color: var(--gold-500);
-}
-
-.quest-detail__btn.is-on svg {
-  fill: rgba(228, 200, 142, 0.35);
-}
-
-.quest-detail__btn--primary {
-  justify-content: center;
-  min-width: calc(160px * var(--ui-scale));
-  color: var(--paper-50);
-  background: linear-gradient(180deg, var(--seal-600), var(--seal-700));
-  border-color: var(--gold-500);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 0 14px var(--seal-glow);
-}
-
-.quest-detail__btn--primary:hover:not(:disabled):not(.is-disabled) {
-  background: linear-gradient(180deg, var(--seal-500), var(--seal-600));
-}
-
-.quest-detail__btn--ghost {
-  color: var(--paper-400);
-  background: transparent;
-  border-color: transparent;
-}
-
-.quest-detail__btn--ghost:hover:not(:disabled) {
-  color: var(--seal-400);
-  border-color: rgba(207, 68, 68, 0.4);
-}
-
-.quest-detail__btn--danger {
-  color: var(--paper-50);
-  background: var(--seal-700);
-  border-color: var(--seal-500);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .quest-detail {
     animation: none;
-  }
-
-  .quest-detail__btn {
-    transition: none;
   }
 }
 </style>
