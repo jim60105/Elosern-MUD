@@ -297,15 +297,22 @@ function onArtError(src) {
   font-weight: 500;
 }
 
+/* The legend stays pinned to the wall's bottom edge while the tiles scroll,
+   so the stage marks are always explained. */
 .hb-wall__legend {
+  position: sticky;
+  bottom: calc(-1 * var(--sp-4));
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-4);
-  margin: auto 0 0;
-  padding-top: var(--sp-3);
-  color: var(--paper-500);
+  margin: auto calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4));
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--paper-400);
   font-size: var(--text-xs);
-  border-top: 1px dashed rgba(185, 154, 96, 0.14);
+  background: #15171c;
+  border-top: 1px solid rgba(185, 154, 96, 0.18);
+  box-shadow: 0 -8px 12px -6px rgba(0, 0, 0, 0.6);
 }
 
 .hb-legend {
@@ -315,8 +322,10 @@ function onArtError(src) {
 }
 
 .hb-legend svg {
-  width: 0.9em;
-  height: 0.9em;
+  display: block;
+  flex: none;
+  width: calc(12px * var(--ui-scale));
+  height: calc(12px * var(--ui-scale));
 }
 
 /* ---- Tiles */
@@ -386,8 +395,7 @@ function onArtError(src) {
   filter: drop-shadow(0 1px 2px #000);
 }
 
-.hb-tile__stage svg,
-.hb-legend svg {
+.hb-tile__stage svg {
   display: block;
   width: 100%;
   height: 100%;
