@@ -53,25 +53,33 @@ Visual language: the game's existing tokens only (`--ink-*`, `--paper-*`,
 - D10 In combat the handbook is reachable only through the tool shortcuts and
   shows only the 圖鑑 and 稱號 tabs.
 
-## 3. Delivery: four changes, in dependency order
+## 3. Delivery: OpenSpec changes, in dependency order
 
-1. **Titles tab (client only).** Handbook rename, `titles` tab, medal wall,
-   detail, equip/remove/ballot through the quest detail's action footer. `title_codex` payload is
-   unchanged. Removes `TitleCodexPanel.vue` and the `codex` overlay branch;
-   the 稱號 tool shortcut opens the tab.
-2. **Monster species codex and research state (server).** Re-point the
-   monster category; add sighting/defeat recording and the combat hooks.
-3. **`lore_codex` schema v2 (server and protocol).** Placeholders, totals,
-   groups, stage-filtered fields, art descriptors, raised bounds.
-4. **Codex tab (client).** Tile wall, detail with hero art, research state.
-   Removes `LoreCodexDrawer.vue` and the `lore` drawer branch; the 圖鑑 tool
-   shortcut opens the tab.
+The work is proposed as five OpenSpec changes under `openspec/changes/`. The
+original first change (titles tab) was split in two after review because it
+exceeded one workday.
 
-Change 1 has no dependency. Change 3 depends on 2. Change 4 depends on 3.
+| # | Change | Scope | Depends on |
+| --- | --- | --- | --- |
+| 1 | `handbook-primitives` | Client. Extracts the quest detail's action footer into a shared `DetailFooter.vue` (same test ids); adds the handbook `TileWall`, `CodexEmblem` and `CodexDetail` with stories and a vitest evidence bridge. | — |
+| 2 | `handbook-titles-tab` | Client. Renames the quest window to 手帳; adds the `titles` tab (medal wall, epithet and ballot rows, equip, two-step removal cancelled through `closeGuard`, ballot answers); adds the handbook route request (`slot: "handbook"`, each request applied once); the 稱號冊 shortcut opens the tab; combat shows only the handbook tabs. Removes `TitleCodexPanel.vue` and the `codex` overlay branch. `title_codex` is unchanged. | 1 |
+| 3 | `lore-species-research` | Server. Re-points the monster category to `MONSTER_SPECIES_REGISTRY`; adds `lore_species_defeated`, `record_species_sighting`, `record_species_defeat`, `list_species_defeated` and post-commit push scheduling. The sighting hook is called when a hostile combat session is created and credits every player character in the session; the defeat hook is in `_record_round_defeats`. Removes the tier reveal on defeat. | — |
+| 4 | `lore-codex-schema-v2` | Server and protocol. `lore_codex` v2 (totals, identity-free ordinal placeholders, tier groups, stage-filtered species cards with `locked_fields`, art descriptors with per-slot failure isolation), bounds, envelope trimming, JS validator parity; an interim v2 read in `LoreCodexDrawer`. | 3 |
+| 5 | `handbook-codex-tab` | Client. The `codex` tab (rail, grouped tile wall, stage marks drawn as different shapes, sticky legend, hero art with emblem fallback, stamp, research track derived from `locked_fields`, locked boxes); the 圖鑑 shortcut opens the tab. Removes `LoreCodexDrawer.vue`, `lib/codex_field_label.js` and the `lore` drawer branch. | 2, 4 |
+
+The client chain (1 → 2) and the server chain (3 → 4) are independent until
+change 5. Change 5 depends on 2 for sequencing only: it extends the handbook
+shell and modifies the same quest-drawer and desktop-shell requirements.
+
+Known limits recorded in the proposals:
+
+- Kills recorded outside `_record_round_defeats` do not count as defeats.
+- A portrait that finishes generating reaches the codex on its next push; no
+  new push path is added.
 
 ## 4. Server design
 
-### 4.1 Research records (changes 2)
+### 4.1 Research records (change 3)
 
 `world/rules/lore_knowledge.py` stays the sole writer.
 
@@ -88,15 +96,16 @@ Change 1 has no dependency. Change 3 depends on 2. Change 4 depends on 3.
     the existing `_schedule_lore_codex_push`.
 - `CODE_CATEGORIES["monster"]` resolves against `MONSTER_SPECIES_REGISTRY`.
 - Hooks:
-  - Sighting: `world/rules/combat_initiation.py`, once per hostile
-    individual's species when a session is created.
+  - Sighting: a helper in `world/rules/combat_initiation.py`, called when a
+    hostile session is created, once per hostile individual's species, for
+    every player character in the session.
   - Defeat: `world/rules/combat_session/rounds.py` `_record_round_defeats`,
     the same source the quest kill counters read.
   - A participant without a resolvable species records nothing.
 - Stale `monster:<tier>` records are omitted by the existing tolerant read.
   No migration (no released users).
 
-### 4.2 `lore_codex` schema v2 (change 3)
+### 4.2 `lore_codex` schema v2 (change 4)
 
 ```
 {
@@ -142,10 +151,12 @@ Slot = { placeholder: true }
 - Bounds (shared by the Python and JS validators, pinned by the existing
   dual-direction parity test): slots per category ≤ 128, total slots ≤ 512,
   card fields ≤ 8, field value ≤ 1024 code points, variants ≤ 8.
-  `discovered` and `total` must equal the counted slots.
+  `discovered` equals the category's entry-slot count; the slot count is at
+  most `total`.
 - Envelope trimming: if the canonical payload exceeds the OOB envelope,
-  trailing placeholders drop first (last category first); `total` and
-  `discovered` still describe the untrimmed view.
+  trailing placeholders drop first (last category first), then art
+  descriptors; if it still does not fit, the panel fails closed. Entries are
+  never trimmed, and `total` still describes the untrimmed view.
 
 ### 4.3 `title_codex`
 
