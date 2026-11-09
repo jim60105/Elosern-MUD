@@ -99,6 +99,7 @@ class WildernessEntryTests(_WildernessFixture):
         self.assertEqual(payload["edges"], [])
         self.assertTrue(_js_accepts(payload))
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_repeated_renders_reuse_one_gateway_table(self):
         from web.webclient.presentation.local_map import gateways
         from world.maps.published import SourceMemo

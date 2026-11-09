@@ -1,3 +1,4 @@
+from tools.spec_traceability import covers_requirement
 import unittest
 from unittest.mock import patch
 from world.maps.bootstrap import sync_grid, sync_wilderness
@@ -145,6 +146,7 @@ class GatewayTableMemoTests(unittest.TestCase):
         )
         return builds, indexes
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_repeated_lookups_build_one_table_and_one_settlement_index(self):
         builds, indexes = self._spies()
         with self._registry(
@@ -159,6 +161,7 @@ class GatewayTableMemoTests(unittest.TestCase):
         self.assertEqual(build_spy.call_count, 1)
         self.assertEqual(index_spy.call_count, 1)
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_a_new_registry_or_settlement_graph_source_rebuilds_the_table(self):
         from world.maps import map_data
 
@@ -184,6 +187,7 @@ class GatewayTableMemoTests(unittest.TestCase):
                     self.assertEqual(self.gateways._registered_gateways(), rows)
                     self.assertEqual(build_spy.call_count, 3)
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_a_gate_without_an_approach_cell_is_skipped_without_error(self):
         empty = self._point("t_empty", (20, 20), shape=(".",))
         with self._registry(empty, self._point("t_valid", (10, 10))):
@@ -191,6 +195,7 @@ class GatewayTableMemoTests(unittest.TestCase):
             self.assertEqual([row[2] for row in rows], ["t_valid"])
             self.assertIsNone(self.gateways._wilderness_gateway_at(20, 20))
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_duplicate_cells_return_the_first_registered_gate(self):
         with self._registry(
             self._point("t_first", (10, 10)), self._point("t_second", (10, 10))
@@ -205,6 +210,7 @@ class GatewayTableMemoTests(unittest.TestCase):
                 ["t_first", "t_second"],
             )
 
+    @covers_requirement("webclient-local-map::registered-gateway-resolution-is-built-once-per-published-map-world")
     def test_mutating_the_returned_rows_does_not_change_the_table(self):
         with self._registry(self._point("t_alpha", (10, 10))):
             rows = self.gateways._registered_gateways()

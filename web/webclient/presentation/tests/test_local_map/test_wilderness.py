@@ -496,6 +496,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         self.assertTrue(payload["available"])
         return lookup.call_count
 
+    @covers_requirement("webclient-local-map::remembered-wilderness-boundaries-do-not-probe-every-visited-cell")
     def test_gateway_lookups_do_not_grow_with_visited_cells(self):
         ex, ey = EAST_APPROACH
         with patch.object(gateways, "_GATEWAY_TABLE", SourceMemo()), patch.object(
@@ -554,6 +555,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         self.char1.attributes.add(KNOWLEDGE_ATTR, record)
         return _t_wild_id(*later), _t_wild_id(*earlier)
 
+    @covers_requirement("webclient-local-map::remembered-wilderness-boundaries-do-not-probe-every-visited-cell")
     def test_remembered_gateways_follow_recency_not_id_order(self):
         later_id, earlier_id = self._visit_both_approaches_with_distinct_recency()
         self.assertGreater(later_id, earlier_id)
@@ -563,6 +565,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         ]
         self.assertEqual(remembered, [later_id, earlier_id])
 
+    @covers_requirement("webclient-local-map::remembered-wilderness-boundaries-do-not-probe-every-visited-cell")
     def test_the_remembered_ceiling_applies_after_filtering(self):
         later_id, _ = self._visit_both_approaches_with_distinct_recency()
         with patch(
@@ -576,6 +579,7 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         # Collision counting runs over the bounded set only: no qualifier.
         self.assertEqual(remembered[0]["label"], _t_anchor_display(_T_MAP_KEY))
 
+    @covers_requirement("webclient-local-map::remembered-wilderness-boundaries-do-not-probe-every-visited-cell")
     def test_an_out_of_bounds_point_gateway_does_not_break_the_layer(self):
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 
