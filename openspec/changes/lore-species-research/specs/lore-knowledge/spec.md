@@ -61,11 +61,11 @@ At least one reveal source SHALL be reachable through purely deterministic play,
 
 ### Requirement: Combat records the species it sighted and defeated
 
-Creating a hostile combat session SHALL record a sighting of each distinct species among its hostile monsters for the session's player commander. A committed round in which a hostile monster's HP crosses from above zero to zero or below SHALL record a defeat of its species for each player character in the session. A monster without a species key, and any guild-examination session, SHALL record nothing. Recording SHALL run only after the commit.
+Creating a hostile combat session SHALL record a sighting of each distinct species among its hostile monsters for each player character among the session's players. A committed round in which a hostile monster's HP crosses from above zero to zero or below SHALL record a defeat of its species for each player character in the session. A monster without a species key, and any guild-examination session, SHALL record nothing. Recording SHALL run only after the commit.
 
 #### Scenario: An engagement sights each species once
 - **WHEN** a hostile session is created against two monsters of one species and one monster of another
-- **THEN** exactly those two species are recorded as sighted for the commander, and neither is recorded as defeated
+- **THEN** exactly those two species are recorded as sighted for each player character in the session, and neither is recorded as defeated
 
 #### Scenario: A rolled-back engagement records nothing
 - **WHEN** a hostile session's creation transaction rolls back

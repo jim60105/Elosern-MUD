@@ -78,23 +78,25 @@ Each returns silently for a non-str or empty key. Otherwise it registers `on_pub
 Add to `world/rules/combat_initiation.py`:
 
 ```python
-def schedule_session_sightings(commander: Any, targets: Iterable[Any]) -> None:
-    """Schedule one post-commit sighting per distinct species among the hostile targets."""
+def schedule_session_sightings(participants: Iterable[Any], targets: Iterable[Any]) -> None:
+    """Schedule one post-commit sighting per (player character, distinct hostile species)."""
     from typeclasses.characters import PlayerCharacter
     from world.rules.lore_knowledge import schedule_species_sighting_best_effort
 
-    if not isinstance(commander, PlayerCharacter):
+    players = [entity for entity in participants if isinstance(entity, PlayerCharacter)]
+    if not players:
         return
     seen: list[str] = []
     for target in targets:
         key = getattr(target, "species_key", None) if isinstance(target, Monster) else None
         if isinstance(key, str) and key and key not in seen:
             seen.append(key)
-    for key in seen:
-        schedule_species_sighting_best_effort(commander, key)
+    for player in players:
+        for key in seen:
+            schedule_species_sighting_best_effort(player, key)
 ```
 
-Call it from `lifecycle.py::_create_hostile_session` inside the existing `with transaction.atomic():`, directly after `_persist(actor, record)`. Use a deferred import (`from world.rules.combat_initiation import schedule_session_sightings`), because `combat_initiation` imports `combat_session`. The design's §4.1 names `combat_initiation.py`, and the helper lives there. The call site is the shared creation body so that `engage`, `engage_group`, skill openings and authored contact all record a sighting. Alternative considered: calling it only from `initiate_field_combat`. Rejected because `engage()` (the `engage` command and `explore.engage`) and authored contact would then never sight anything. Confirm the actual `PlayerCharacter` import path with `git grep -n "class PlayerCharacter"` before writing the import.
+Call it from `lifecycle.py::_create_hostile_session` inside the existing `with transaction.atomic():`, directly after `_persist(actor, record)`, as `schedule_session_sightings((actor, *companion_entities), targets)` (`companion_entities` is the local list the body already builds for `initial_sleep_ids`). Sighting is credited to the same set of player characters that D4 credits with defeats, so a defeat never lands on a character that has not sighted the species. Use a deferred import (`from world.rules.combat_initiation import schedule_session_sightings`), because `combat_initiation` imports `combat_session`. The design's §4.1 names `combat_initiation.py`, and the helper lives there. The call site is the shared creation body so that `engage`, `engage_group`, skill openings and authored contact all record a sighting. Alternative considered: calling it only from `initiate_field_combat`. Rejected because `engage()` (the `engage` command and `explore.engage`) and authored contact would then never sight anything. Confirm the actual `PlayerCharacter` import path with `git grep -n "class PlayerCharacter"` before writing the import.
 
 ### D4. Defeat hook
 
@@ -127,7 +129,10 @@ Delete `_make_defeat_lore_apply` and the `if crediting_player is not None:` bloc
 
 ## Risks / Trade-offs
 
-- [A dev database holding a stale `monster:<tier>` makes the strict writer reject every later reveal (best-effort, logged as `lore_reveal_failed`)] → Accepted under the no-migration rule. The GM raw console (`server/console/raw.py`) can clear the attribute. The tolerant presenter keeps the codex readable.
+- [Not every committed monster defeat passes through `_record_round_defeats`. `world/rules/upkeep.py::_stage_casualties` (between-round upkeep casualties) and `world/rules/action/transaction.py::_record_population_crossings` (out-of-combat action resolution) also emit `target_defeated` events, and the quest planner reads those events, not this hook] → The user explicitly placed the defeat hook in `_record_round_defeats`, and in-session rounds are where defeats happen in play. Out-of-round kills credit no species defeat in this change. A test pins that boundary (task 2.2). A later change can re-point the planner's `target_defeated` path (whose `_defeat_identities` already carries `species_key` and `simulated`) if those kills must count.
+- [A stale `monster:<tier>` in `lore_discovered` makes the strict `record_lore_reveal` reject every later reveal of any category, not only monster] → Called out here and in the PR notes. The failure is logged as `lore_reveal_failed` with the offending record. The GM raw console clears it.
+
+- [Accepted no-migration consequence of the stale tier record above] → The tolerant presenter keeps the codex readable.
 - [Two pushes for a first defeat] → They coalesce through the causal group, and no new push path is added.
 - [Crediting by `record.player_ids` could credit a possessed body] → Only `PlayerCharacter` entities are credited, and the codex is keyed on the same object the other reveals use.
 
