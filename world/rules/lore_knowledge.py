@@ -32,7 +32,11 @@ from typing import Any
 from world.lore.elements import ELEMENT_REGISTRY
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.magic import MAGIC_TIER_REGISTRY
-from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
+from world.lore.monster_species import (
+    MONSTER_SPECIES_REGISTRY,
+    MONSTER_VARIANT_REGISTRY,
+)
+from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.nations import NATION_REGISTRY
 from world.lore.races import RACE_REGISTRY
 from world.observability import log_warn
@@ -447,3 +451,77 @@ def lore_card(category: str, key: str) -> dict[str, str]:
     return {
         field: _card_value(getattr(entry, field)) for field in codex.card_fields
     }
+
+
+# The two research stages of a monster species card, in rendering order.
+# A sighted card carries SIGHTED_FIELDS and names DEFEATED_FIELDS as locked;
+# a defeated card carries SIGHTED_FIELDS + DEFEATED_FIELDS.
+SPECIES_STAGES = ("sighted", "defeated")
+SIGHTED_FIELDS = ("display_name_zh", "published_appearance_zh", "threat_tier")
+DEFEATED_FIELDS = (
+    "published_description_zh",
+    "published_ecology_zh",
+    "habitat_tags",
+    "variants",
+)
+
+
+def _species_habitat(species: Any) -> str:
+    """Join the display names of the species' resolvable habitat regions."""
+    from world.maps.geography import current
+
+    regions = current().regions
+    return "、".join(
+        regions[tag].display_name_zh for tag in species.habitat_tags if tag in regions
+    )
+
+
+def _species_variants(species_key: str) -> str:
+    """One line per ordinary variant of the species, in variant registry order."""
+    lines = []
+    for variant in MONSTER_VARIANT_REGISTRY.values():
+        if variant.species_key != species_key or not variant.ordinary_variant:
+            continue
+        rank = (
+            GUILD_RANK_REGISTRY.get(variant.danger_grade)
+            if variant.danger_grade is not None
+            else None
+        )
+        if rank is None:
+            lines.append(variant.display_name_zh)
+        else:
+            lines.append(f"{variant.display_name_zh}・{rank.display_name_zh}")
+    return "\n".join(lines)
+
+
+def species_card(species_key: str, stage: str) -> tuple[dict[str, str], tuple[str, ...]]:
+    """Render one monster species card at one research stage (canonical renderer).
+
+    Returns ``(card, locked_fields)``. At ``"sighted"`` the card carries the
+    name, the published appearance and the default variant's threat tier,
+    and ``locked_fields`` names the defeated-stage fields it withholds. At
+    ``"defeated"`` the card adds the published description, ecology, the
+    resolvable habitat region names and the ordinary variants, and
+    ``locked_fields`` is empty. The author-private fields are never read.
+
+    The key is checked first: an unknown key raises :class:`LoreKeyError`,
+    then an unknown stage raises :class:`ValueError`.
+    """
+    species = CODE_CATEGORIES["monster"].registry.get(species_key)
+    if species is None:
+        raise LoreKeyError(f"no lore entry {species_key!r} in category 'monster'")
+    if stage not in SPECIES_STAGES:
+        raise ValueError(f"unknown species research stage {stage!r}")
+    default_variant = MONSTER_VARIANT_REGISTRY[species.default_variant_key]
+    card = {
+        "display_name_zh": species.display_name_zh,
+        "published_appearance_zh": species.published_appearance_zh,
+        "threat_tier": MONSTER_TIER_REGISTRY[default_variant.threat_tier].display_name_zh,
+    }
+    if stage == "sighted":
+        return card, DEFEATED_FIELDS
+    card["published_description_zh"] = species.published_description_zh
+    card["published_ecology_zh"] = species.published_ecology_zh
+    card["habitat_tags"] = _species_habitat(species)
+    card["variants"] = _species_variants(species_key)
+    return card, ()
