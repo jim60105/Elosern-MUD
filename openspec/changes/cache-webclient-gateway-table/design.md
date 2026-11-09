@@ -202,7 +202,7 @@ def remembered_among(self, node_ids: Iterable[str]) -> list[NodeVisit]:
     """Visited nodes among ``node_ids`` not yet drawn, ordered like ``remembered``."""
     candidates = [
         self.visited[node_id]
-        for node_id in set(node_ids)
+        for node_id in set(node_ids)  # any iterable of IDs; a dict iterates its keys
         if node_id in self.visited and node_id not in self._by_id
     ]
     candidates.sort(key=lambda visit: (-visit.last_seen_tick, visit.node_id))
@@ -215,9 +215,12 @@ header and gateway lookup change; everything after the
 
 ```python
 by_approach = _wilderness_gateways_by_approach()
-approach_ids = {
-    encode_wild(WILDERNESS_NAME, ax, ay): (ax, ay) for ax, ay in by_approach
-}
+approach_ids: dict[str, tuple[int, int]] = {}
+for ax, ay in by_approach:
+    try:
+        approach_ids[encode_wild(WILDERNESS_NAME, ax, ay)] = (ax, ay)
+    except NodeIDError:  # observability: ignore R2: an out-of-bounds point-shape approach cell is never a stored visit, so it can never be remembered
+        continue
 gateway_candidates: list[tuple[str, int, int, str, str]] = []
 for visit in builder.remembered_among(approach_ids):
     gx, gy = approach_ids[visit.node_id]
@@ -245,8 +248,14 @@ Equivalence argument (why the payload is identical):
 - Field-of-view skip, disclosure filter, `remembered_budget` truncation
   (still computed after the loop), and label-collision qualification are
   untouched.
-- `encode_wild` cannot raise for a table row: `approach_cell` only returns
-  cells inside the provider rectangle.
+- `encode_wild` CAN raise `NodeIDError` for a table row: a point-shape
+  entry's `approach_cell` is its anchor cell with no provider-bounds check
+  (`world/lore/wilderness_entry.py`, point-shape branch). Such a cell can never
+  be a stored canonical visit, so the old scan never matched it; the D3 loop
+  skips it instead of raising, keeping the panel available on authored data
+  (the `gateways.py` contract). `NodeIDError` is imported from
+  `world.rules.map_knowledge` (add it to the existing import block in
+  `wilderness.py`).
 
 The in-view neighbour lookup at line 221 and the gateway-step lookup at line
 153 keep calling `_wilderness_gateway_at` / `_grid_gateway_at` (now O(1)).

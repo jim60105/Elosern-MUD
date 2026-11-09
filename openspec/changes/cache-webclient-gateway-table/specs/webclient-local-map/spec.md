@@ -33,3 +33,7 @@ On the wilderness layer, the remembered-boundary scan SHALL consider only visite
 #### Scenario: Remembered boundaries are unchanged
 - **WHEN** a character has stood on registered approach cells and ordinary cells and is rendered outside the field of view of those approach cells
 - **THEN** the remembered nodes SHALL be exactly the disclosed approach cells it visited outside the drawn 3x3 field, ordered by descending last-seen tick then ascending node ID, bounded by the remembered ceiling after filtering, and labelled with the far-side name qualified on collision
+
+#### Scenario: An approach cell outside the wilderness bounds is ignored
+- **WHEN** a registered gate's approach cell lies outside the published wilderness bounds and the wilderness layer is rendered
+- **THEN** the render SHALL succeed, and that gate SHALL never appear as a remembered boundary
