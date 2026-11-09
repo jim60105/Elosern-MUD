@@ -188,7 +188,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::an-open-drawer-or-overlay-dims-the-stage-behind-it"
     )
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
+        "webclient-desktop-shell::the-top-navigation-bar-carries-the-tool-group",
     )
     def test_codex_drawer_opens_from_the_utility_strip(self):
         """The top bar's 圖鑑 tool opens the handbook on its codex tab with a
@@ -249,7 +249,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
+        "webclient-contextual-hud::a-full-screen-overlay-is-one-focus-trapped-surface-and-only-one-is-open-at-a-time",
     )
     def test_codex_drawer_replaces_the_open_drawer_or_overlay(self):
         """At most one focus-trapped surface is open: opening the handbook
@@ -291,7 +291,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface",
     )
     def test_quest_drawer_offers_no_codex_control(self):
         """The quest drawer opens no separate codex drawer: the retired
@@ -325,7 +325,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-opens-from-the-top-navigation-bar-not-from-the-quest-drawer",
+        "webclient-desktop-shell::the-top-navigation-bar-carries-the-tool-group",
     )
     def test_the_two_codex_controls_are_distinguishable(self):
         """The world-codex control and the title-codex control in the utility

@@ -316,10 +316,6 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
     )
-    @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels",
-        "webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does",
-    )
     def test_vitest_world_family_suite_passes(self):
         """Every world + services family SFC renders its contract states under Vitest.
 

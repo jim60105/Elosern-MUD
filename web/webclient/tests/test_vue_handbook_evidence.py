@@ -169,9 +169,10 @@ class VueHandbookEvidenceTest(unittest.TestCase):
 
 
     # -- handbook-codex-tab ----------------------------------------------------
-    # The requirement annotations are applied at this change's archive, once
-    # its ADDED requirements are synced into the main spec.
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-handbook-codex-tab-renders-the-committed-panel-as-a-grouped-tile-wall"
+    )
     def test_codex_tab_renders_the_committed_panel_as_a_grouped_tile_wall(self):
         # One rail entry per shipped category with its discovered count; the
         # selected category's groups in order with headings only for
@@ -187,6 +188,9 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "codex tab tile wall",
         )
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::monster-research-stages-differ-by-shape-and-are-explained"
+    )
     def test_codex_tab_marks_research_stages_by_shape_with_a_legend(self):
         # Filled, hollow and ？ marks with distinct data-stage values; the
         # legend with its three marks only on the monster wall, as the
@@ -201,6 +205,9 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "codex tab stage marks",
         )
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::a-sighted-monster-shows-its-locked-fields-without-values"
+    )
     def test_codex_tab_shows_locked_fields_without_values(self):
         # One locked box per locked field, in order, with no value; none for
         # a defeated entry.
@@ -212,6 +219,9 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "codex tab locked fields",
         )
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::codex-hero-art-falls-back-to-the-category-emblem"
+    )
     def test_codex_hero_art_falls_back_to_the_category_emblem(self):
         # A null art shows the emblem, a failed single attempt with no
         # terminal falls back to it, and a loaded image replaces it.
@@ -224,6 +234,9 @@ class VueHandbookEvidenceTest(unittest.TestCase):
             "codex hero art fallback",
         )
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-handbook-codex-tab-degrades-honestly"
+    )
     def test_codex_tab_degrades_honestly(self):
         # The absent empty state before the first commit, the unavailable
         # panel disabling the tab with its reason, the full placeholder wall

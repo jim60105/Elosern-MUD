@@ -19,6 +19,8 @@ shipped category key is spelled here.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import valid_lore_codex_panel
 from ._journey_support import _combat_panel, _inject_snapshot, _wait_mode
@@ -160,6 +162,9 @@ class HandbookCodexBrowserTest(BrowserAcceptanceTest):
         # Let the detail column's entrance animation settle.
         page.evaluate("() => Promise.all(document.getAnimations().map((a) => a.finished))")
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-handbook-codex-tab-fits-the-reference-viewports"
+    )
     def test_codex_tab_geometry_at_reference_viewports(self):
         """Three columns fit the drawer body, no horizontal scroll, no tiny
         text, and fixed-size legend marks."""
@@ -193,6 +198,9 @@ class HandbookCodexBrowserTest(BrowserAcceptanceTest):
                     self.assertAlmostEqual(width, expected, delta=1, msg=f"legend mark width at {viewport}")
                 page.close()
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::monster-research-stages-differ-by-shape-and-are-explained"
+    )
     def test_monster_legend_stays_pinned_while_tiles_scroll(self):
         """On an overflowing monster wall the legend lies inside the wall's
         visible box at scroll top and at scroll bottom."""
@@ -210,6 +218,9 @@ class HandbookCodexBrowserTest(BrowserAcceptanceTest):
             self.assertLessEqual(probe["legend"]["bottom"], probe["wall"]["bottom"] + 1, f"legend below the wall at {top}")
         page.close()
 
+    @covers_requirement(
+        "webclient-quest-drawer::the-quest-drawer-is-a-two-level-icon-tabbed-surface"
+    )
     def test_codex_tool_opens_the_codex_tab_in_combat(self):
         """In combat the 圖鑑 tool opens the handbook with exactly the codex
         and titles tabs, on the codex tab."""
