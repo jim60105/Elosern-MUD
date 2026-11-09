@@ -99,6 +99,19 @@ class WildernessEntryTests(_WildernessFixture):
         self.assertEqual(payload["edges"], [])
         self.assertTrue(_js_accepts(payload))
 
+    def test_repeated_renders_reuse_one_gateway_table(self):
+        from web.webclient.presentation.local_map import gateways
+        from world.maps.published import SourceMemo
+
+        self._at_wild(EAST_APPROACH)
+        with mock.patch.object(gateways, "_GATEWAY_TABLE", SourceMemo()), mock.patch.object(
+            gateways, "_build_gateway_table", wraps=gateways._build_gateway_table
+        ) as builds:
+            payloads = [_render(self.char1) for _ in range(3)]
+        self.assertEqual(builds.call_count, 1)
+        self.assertEqual(payloads[0], payloads[1])
+        self.assertEqual(payloads[1], payloads[2])
+
     @covers_requirement(
         "webclient-area-map::wilderness-area-maps-cover-a-revealed-forty-one-cell-neighbourhood"
     )
