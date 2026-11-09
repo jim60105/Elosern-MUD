@@ -9,6 +9,7 @@ dependency direction is one-way — ``combat_initiation`` imports
 ``combat_session``, never the reverse.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -61,6 +62,29 @@ def field_combat_target(actor: Any, target: Any) -> Monster | None:
         # observability: ignore R2: a target whose traits fail to parse is simply not a field-combat target; engage_group's own reads surface any real error downstream, and this routing predicate never reports them
         living = False
     return target if living else None
+
+
+def schedule_session_sightings(participants: Iterable[Any], targets: Iterable[Any]) -> None:
+    """Schedule one post-commit sighting per (player character, distinct hostile species).
+
+    Called from the shared hostile-session creation body inside its durable
+    unit, so a rolled-back engagement records nothing. Only ``PlayerCharacter``
+    participants are credited, and a species-less monster contributes nothing.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.lore_knowledge import schedule_species_sighting_best_effort
+
+    players = [entity for entity in participants if isinstance(entity, PlayerCharacter)]
+    if not players:
+        return
+    seen: list[str] = []
+    for target in targets:
+        key = getattr(target, "species_key", None) if isinstance(target, Monster) else None
+        if isinstance(key, str) and key and key not in seen:
+            seen.append(key)
+    for player in players:
+        for key in seen:
+            schedule_species_sighting_best_effort(player, key)
 
 
 def field_enemy_roster(actor: Any) -> tuple[Monster, ...]:

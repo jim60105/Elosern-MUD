@@ -10,20 +10,40 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from django.db import transaction
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
 from tools.spec_traceability import covers_requirement
+from typeclasses.npcs import NPC
+from typeclasses.rooms import Room
+from world.rules.combat_initiation import schedule_session_sightings
+from world.rules.combat_session import engage_group, read_session
 
 from world.rules.lore_knowledge import (
     LoreKeyError,
     LoreRecordError,
+    list_discovered,
     list_species_defeated,
     record_species_defeat,
     record_species_sighting,
     schedule_species_defeat_best_effort,
     schedule_species_sighting_best_effort,
 )
-from world.tests.synthetic_data import make_monster_species, synthetic_registries
+from world.rules.monster_individual import construct_species_individual
+from world.tests.synthetic_data import (
+    make_monster_species,
+    make_monster_variant,
+    synthetic_registries,
+)
 
-from ._knowledge_probes import live_monster_species_registry
+from ._combat_session_helpers import (
+    _monster as _plain_monster,
+    _player as _combat_player,
+    open_synthetic_scope,
+)
+from ._knowledge_probes import live_monster_species_registry, live_registry
+from .combat_fixtures import BattlefieldIsolation
 
 _SECOND_SPECIES = "t_second_species"
 _SPECIES_EXTRA = {
@@ -225,6 +245,121 @@ class SpeciesBestEffortTests(unittest.TestCase):
                 schedule_species_sighting_best_effort(_player(), bad)
                 schedule_species_defeat_best_effort(_player(), bad)
             register.assert_not_called()
+
+
+_SECOND_VARIANT = "t_second_species_ordinary"
+_SESSION_LOGICALS = (
+    "monster_species",
+    "monster_variants",
+    "monster_tiers",
+    "races",
+    "subraces",
+    "static_tiers",
+    "elements",
+)
+
+
+def _session_extra():
+    return {
+        "monster_species": {
+            _SECOND_SPECIES: make_monster_species(
+                _SECOND_SPECIES, default_variant_key=_SECOND_VARIANT
+            )
+        },
+        "monster_variants": {
+            _SECOND_VARIANT: make_monster_variant(
+                _SECOND_VARIANT, species_key=_SECOND_SPECIES
+            )
+        },
+    }
+
+
+class _SessionFixture(BattlefieldIsolation, EvenniaTest):
+    """A player in a room plus species-backed monsters of two synthetic species."""
+
+    def setUp(self):
+        open_synthetic_scope(self, *_SESSION_LOGICALS, extra=_session_extra())
+        super().setUp()
+        self.room = create_object(Room, key="t research arena")
+        self.player = _combat_player("t research hunter")
+        self.player.location = self.room
+        self.player.traits.hp.base = 2000
+        self.player.traits.hp.current = 2000
+        variants = live_registry("world.lore.monster_species", "MONSTER_VARIANT" + "_REGISTRY")
+        self.first_species = next(
+            key for key in live_monster_species_registry() if key != _SECOND_SPECIES
+        )
+        first_variant = next(
+            key
+            for key, variant in variants.items()
+            if variant.species_key == self.first_species and variant.ordinary_variant
+        )
+        self.first_a = self._individual(self.first_species, first_variant)
+        self.first_b = self._individual(self.first_species, first_variant)
+        self.second = self._individual(_SECOND_SPECIES, _SECOND_VARIANT)
+
+    def _individual(self, species_key, variant_key):
+        individual = construct_species_individual(species_key, variant_key)
+        individual.traits.hp.base = 1000
+        individual.traits.hp.current = 1000
+        individual.location = self.room
+        return individual
+
+    def _sighted(self, player):
+        return tuple(key for category, key in list_discovered(player) if category == "monster")
+
+
+class SessionSightingTests(_SessionFixture):
+    def test_an_engagement_sights_each_species_once(self):
+        with patch(_PUSH), self.captureOnCommitCallbacks(execute=True):
+            engage_group(self.player, [self.first_a, self.second, self.first_b])
+        self.assertEqual(
+            self._sighted(self.player),
+            tuple(sorted((self.first_species, _SECOND_SPECIES))),
+        )
+        self.assertEqual(list_species_defeated(self.player), ())
+
+    def test_sightings_are_scheduled_once_per_species(self):
+        with patch(
+            "world.rules.lore_knowledge.schedule_species_sighting_best_effort"
+        ) as schedule:
+            engage_group(self.player, [self.first_a, self.second, self.first_b])
+        self.assertEqual(
+            sorted(call.args for call in schedule.call_args_list),
+            sorted(
+                [(self.player, self.first_species), (self.player, _SECOND_SPECIES)]
+            ),
+        )
+
+    def test_a_non_player_companion_is_not_credited(self):
+        companion = create_object(NPC, key="t research companion", location=self.room)
+        with patch(
+            "world.rules.lore_knowledge.schedule_species_sighting_best_effort"
+        ) as schedule:
+            schedule_session_sightings((self.player, companion), (self.second,))
+            schedule_session_sightings((companion,), (self.first_a,))
+        self.assertEqual(
+            [call.args for call in schedule.call_args_list],
+            [(self.player, _SECOND_SPECIES)],
+        )
+
+    def test_a_species_less_monster_records_nothing(self):
+        plain = _plain_monster("t research plain", hp=1000)
+        plain.location = self.room
+        self.assertIsNone(plain.species_key)
+        with patch(_PUSH), self.captureOnCommitCallbacks(execute=True):
+            engage_group(self.player, [plain])
+        self.assertIsNotNone(read_session(self.player))
+        self.assertIsNone(self.player.db.lore_discovered)
+
+    def test_a_rolled_back_engagement_records_nothing(self):
+        with patch(_PUSH) as push, self.captureOnCommitCallbacks(execute=True):
+            with self.assertRaises(RuntimeError):
+                with transaction.atomic():
+                    engage_group(self.player, [self.first_a, self.second])
+                    raise RuntimeError("t injected rollback")
+        self.assertIsNone(self.player.db.lore_discovered)
+        push.assert_not_called()
 
 
 class SpeciesSoleWriterBoundaryTests(unittest.TestCase):
