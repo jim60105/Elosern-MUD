@@ -24,7 +24,7 @@ class LoreCodexRegistryContractTests(GeographyPublicationMixin, unittest.TestCas
     """Every map-owned category reads the published shipped map world."""
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_every_legal_registry_entry_remains_available_and_identifiable(self):
         registry = build_production_registry()

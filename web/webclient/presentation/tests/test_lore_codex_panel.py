@@ -456,7 +456,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
                 validate_lore_codex(payload)
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_string_field_code_point_bounds_breach_raises(self):
         edits = (
@@ -477,7 +477,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
                 validate_lore_codex(payload)
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_slot_bounds_per_category_and_in_total(self):
         payload = _valid_payload()
@@ -502,7 +502,7 @@ class LoreCodexValidatorTests(unittest.TestCase):
             validate_lore_codex(_rebalance(payload))
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_envelope_byte_size_overflow_fails_closed(self):
         payload = _valid_payload()
@@ -552,6 +552,9 @@ class LoreCodexTrimTests(unittest.TestCase):
                         count -= 1
         return expected
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed",
+    )
     def test_placeholders_drop_exactly_until_the_payload_fits(self):
         payload = self._payload()
         for count in range(1, 6):
@@ -563,6 +566,9 @@ class LoreCodexTrimTests(unittest.TestCase):
                 _trim_to_envelope(trimmed)
                 self.assertEqual(trimmed, expected)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed",
+    )
     def test_art_drops_from_the_last_entry_after_every_placeholder(self):
         payload = self._payload()
         no_placeholders = self._drop_trailing_placeholders(payload, 5)
@@ -589,6 +595,9 @@ class LoreCodexTrimTests(unittest.TestCase):
                 _trim_to_envelope(trimmed)
                 self.assertEqual(trimmed, expected)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed",
+    )
     def test_nothing_left_to_trim_fails_closed(self):
         with patch.object(lore_codex_module, "MAX_CANONICAL_JSON_BYTES", 10):
             with self.assertRaises(LoreCodexPanelError):
@@ -636,7 +645,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
             self.assertTrue(all(slot == {"placeholder": True} for slot in _slots(category)))
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel",
+        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-2-presentation-panel",
         "webclient-lore-codex-panel::codex-entry-titles-are-the-registry-s-display-names",
     )
     def test_two_discoveries_serialize_exactly(self):
@@ -671,6 +680,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertNotIn(T_RACE, [field["value"] for field in race["card"]])
         self.assertEqual(_entry_slot(payload, "anchor", T_ANCHOR)["title"], T_ANCHOR_TITLE)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-2-presentation-panel",
+    )
     def test_totals_count_the_registry_and_non_monster_categories_have_one_unlabeled_group(self):
         payload = self._render(_mock_player(lore_discovered={f"race:{T_RACE}"}))
         for category in payload["categories"]:
@@ -688,6 +700,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
             payload["discovered_total"], sum(c["discovered"] for c in payload["categories"])
         )
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-monster-category-groups-species-by-threat-tier",
+    )
     def test_monster_species_group_by_tier_in_tier_order(self):
         payload = self._render(_mock_player(lore_discovered={f"monster:{T_RIVEN_SPECIES}"}))
         monster = _by_key(payload, "monster")
@@ -703,7 +718,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual([slot["key"] for slot in riven["slots"]], [T_RIVEN_SPECIES])
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-discloses-only-what-the-holder-discovered"
+        "webclient-lore-codex-panel::the-panel-discloses-only-the-count-and-ordinal-position-of-undiscovered-entries"
     )
     def test_placeholders_carry_no_identity(self):
         payload = self._render(_mock_player(lore_discovered={f"race:{T_RACE}"}))
@@ -722,6 +737,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
                     self.assertNotIn(f'"{key}"', dumped)
                     self.assertNotIn(entry.display_name_zh, dumped)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::monster-entries-carry-stage-gated-cards",
+    )
     def test_sighted_and_defeated_monster_cards(self):
         sighted = self._render(_mock_player(lore_discovered={f"monster:{T_SPECIES}"}))
         slot = _entry_slot(sighted, "monster", T_SPECIES)
@@ -769,6 +787,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual([(f["name"], f["value"]) for f in monster["card"]], list(card.items()))
         self.assertEqual(monster["locked_fields"], list(locked))
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::monster-entries-carry-stage-gated-cards",
+    )
     def test_author_private_text_never_ships(self):
         for defeated in (None, {T_SPECIES}):
             payload = self._render(
@@ -781,6 +802,10 @@ class LoreCodexPresenterTests(EvenniaTestCase):
                 with self.subTest(defeated=defeated, marker=marker):
                     self.assertNotIn(marker, dumped)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::monster-entries-carry-stage-gated-cards",
+        "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",
+    )
     def test_non_monster_entries_carry_no_stage_and_no_art_outside_regions_and_anchors(self):
         payload = self._render(
             _mock_player(lore_discovered={f"race:{T_RACE}", f"nation:{T_NATION}"})
@@ -791,6 +816,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
             self.assertEqual(slot["locked_fields"], [])
             self.assertIsNone(slot["art"])
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",
+    )
     def test_monster_and_region_entries_carry_existing_art(self):
         payload = self._render(
             _mock_player(lore_discovered={f"monster:{T_SPECIES}", f"region:{T_ART_REGION}"})
@@ -803,6 +831,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual(region_art["subject_id"], f"codex:region:{T_ART_REGION}")
         self.assertIn(T_ART_ARCHETYPE, json.dumps(region_art))
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",
+    )
     def test_building_art_is_read_only_and_idempotent(self):
         record = {f"monster:{T_SPECIES}", f"region:{T_ART_REGION}", f"race:{T_RACE}"}
         defeated = {T_SPECIES}
@@ -817,6 +848,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual(player.db.lore_discovered, record)
         self.assertEqual(player.db.lore_species_defeated, defeated)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",
+    )
     def test_an_art_failure_nulls_only_that_slot(self):
         player = _mock_player(
             lore_discovered={f"monster:{T_SPECIES}", f"monster:{T_RIVEN_SPECIES}", f"region:{T_ART_REGION}"}
@@ -865,7 +899,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual(player.db.lore_species_defeated, defeated)
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-lore-codex-panel::the-lore-codex-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_read_only_isolation_building_twice_leaves_record_unchanged(self):
         record = {f"race:{T_RACE}", f"anchor:{T_ANCHOR}"}
@@ -918,7 +952,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_trailing_placeholders_drop_first(self):
         player, untrimmed = self._untrimmed()
@@ -944,7 +978,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_art_drops_after_every_placeholder(self):
         player, untrimmed = self._untrimmed()
@@ -965,7 +999,7 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         self.assertEqual(trimmed["discovered_total"], 3)
 
     @covers_requirement(
-        "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed"
     )
     def test_oversize_cards_without_placeholders_or_art_fail_closed(self):
         player, _ = self._untrimmed()
@@ -973,6 +1007,9 @@ class LoreCodexPresenterTests(EvenniaTestCase):
             with self.assertRaises(LoreCodexPanelError):
                 self._render(player)
 
+    @covers_requirement(
+        "webclient-lore-codex-panel::the-panel-is-bounded-trims-placeholders-then-art-and-fails-closed",
+    )
     def test_a_category_above_the_slot_bound_raises(self):
         ranks = {
             f"t_codex_rank_{i:03d}": make_guild_rank(f"t_codex_rank_{i:03d}")
