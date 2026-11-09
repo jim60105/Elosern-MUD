@@ -25,6 +25,7 @@ from web.webclient.presentation.local_map.gateways import (
     _gateway_far_side_label,
     _grid_gateway_at,
     _wilderness_gateway_at,
+    _wilderness_gateways_by_approach,
 )
 from web.webclient.presentation.local_map.grid import _grid_room_label
 from web.webclient.presentation.local_map.validate import (
@@ -35,6 +36,7 @@ from web.webclient.presentation.local_map.validate import (
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.map_knowledge import (
     KnowledgeError,
+    NodeIDError,
     NodeVisit,
     decode_node,
     encode_grid,
@@ -248,24 +250,26 @@ def _wilderness_layer(actor: Any, visits: list[NodeVisit], builder: _GraphBuilde
     # visited ground (design D1-D6). Same filter-then-bound ordering as the
     # grid layer -- the gateway filter runs over every ordered visited
     # candidate before the result is truncated to the remembered ceiling.
+    by_approach = _wilderness_gateways_by_approach()
+    approach_ids: dict[str, tuple[int, int]] = {}
+    for ax, ay in by_approach:
+        try:
+            approach_ids[encode_wild(WILDERNESS_NAME, ax, ay)] = (ax, ay)
+        except NodeIDError:  # observability: ignore R2: an out-of-bounds point-shape approach cell is never a stored visit, so it can never be remembered
+            continue
     gateway_candidates: list[tuple[str, int, int, str, str]] = []
-    for visit in builder.remembered(len(builder.visited)):
-        if not visit.node_id.startswith("wild:"):
-            continue
-        decoded = decode_node(visit.node_id)
-        if abs(decoded["x"] - x) <= 1 and abs(decoded["y"] - y) <= 1:
+    for visit in builder.remembered_among(approach_ids):
+        gx, gy = approach_ids[visit.node_id]
+        if abs(gx - x) <= 1 and abs(gy - y) <= 1:
             continue  # still inside the drawn field of view
-        gateway = _wilderness_gateway_at(decoded["x"], decoded["y"])
-        if gateway is None:
-            continue
-        _, (grid_xy, z_map_key), anchor_key = gateway
+        _, (grid_xy, z_map_key), anchor_key = by_approach[(gx, gy)]
         gate_node = encode_grid(z_map_key, *grid_xy)
         if not disclosure.gateway_disclosed(anchor_key, gate_node):
             # An unvisited hidden entry's boundary publishes no identity.
             continue
-        far_label = _gateway_far_side_label("wilderness", (decoded["x"], decoded["y"]), anchor_key)
+        far_label = _gateway_far_side_label("wilderness", (gx, gy), anchor_key)
         boundary_name = _grid_room_label(grid_xy, z_map_key)
-        gateway_candidates.append((visit.node_id, decoded["x"], decoded["y"], far_label, boundary_name))
+        gateway_candidates.append((visit.node_id, gx, gy, far_label, boundary_name))
 
     remembered_budget = min(MAX_REMEMBERED_GATEWAYS, MAX_NODES - len(builder.nodes))
     gateway_candidates = gateway_candidates[:remembered_budget]

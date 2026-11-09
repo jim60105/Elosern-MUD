@@ -6,8 +6,10 @@ from unittest.mock import patch
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import GridRoom, InstanceRoom, Room
 from web.webclient.presentation.local_map import LEGEND_LABELS, MAX_LEGEND, MAX_STRING_CODE_POINTS
+from web.webclient.presentation.local_map import gateways
 from web.webclient.presentation.registry import build_production_registry
 from world.tests.geography_fixture import sync_test_settlements, sync_test_wilderness
+from world.maps.published import SourceMemo
 from world.rules.map_knowledge import encode_grid, record_arrival
 
 from ._support import (
@@ -483,6 +485,116 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
             },
         )
         self.assertEqual(len(set(remembered.values())), 2)
+
+    def _render_counting_gateway_lookups(self):
+        """Render ``local_map`` and count the layer's per-cell approach lookups."""
+        with patch(
+            "web.webclient.presentation.local_map.wilderness._wilderness_gateway_at",
+            wraps=gateways._wilderness_gateway_at,
+        ) as lookup:
+            payload = self._registry().render("local_map", _context(self.char1))
+        self.assertTrue(payload["available"])
+        return lookup.call_count
+
+    def test_gateway_lookups_do_not_grow_with_visited_cells(self):
+        ex, ey = EAST_APPROACH
+        with patch.object(gateways, "_GATEWAY_TABLE", SourceMemo()), patch.object(
+            gateways, "_build_gateway_table", wraps=gateways._build_gateway_table
+        ) as builds:
+            self._at_wild((ex + 10, ey + 5))
+            self._at_wild((ex + 20, ey))
+            count_few = self._render_counting_gateway_lookups()
+            for i in range(1, 9):
+                self._at_wild((ex + 10 + i, ey + 5))
+            # Same position again, so the in-view neighbour set is identical.
+            self._at_wild((ex + 20, ey))
+            count_many = self._render_counting_gateway_lookups()
+        self.assertEqual(count_few, count_many)
+        # The in-view loop asks once per revealed non-grid neighbour.
+        self.assertTrue(1 <= count_many <= 8, count_many)
+        self.assertEqual(builds.call_count, 1)
+
+    def _visit_both_approaches_with_distinct_recency(self):
+        """Stand on both approach cells, walk away, and pin distinct recency.
+
+        The approach whose node ID sorts LATER as a string gets the larger
+        ``last_seen_tick``, so only recency (never ID order) can put it first.
+        Returns ``(later_id, earlier_id)`` in the expected payload order.
+        """
+        from evennia.utils.dbserialize import deserialize
+        from world.maps.wilderness_provider import WILDERNESS_NAME
+        from world.rules.map_knowledge import CHUNK_CELLS, KNOWLEDGE_ATTR
+
+        entry = _live_gateway_entry()
+        south_approach = entry.approach_cell(entry.gate_for("n"))
+        east_approach = entry.approach_cell(entry.gate_for("w"))
+        self._at_wild(south_approach)
+        self._at_wild(east_approach)
+        ex, ey = EAST_APPROACH
+        self._at_wild((ex + 20, ey))
+
+        record = deserialize(self.char1.attributes.get(KNOWLEDGE_ATTR))
+        chunks = record["wilderness"][WILDERNESS_NAME]
+
+        def cell_entry(cell):
+            x, y = cell
+            chunk = chunks[f"{x // CHUNK_CELLS}:{y // CHUNK_CELLS}"]
+            return chunk[str((y % CHUNK_CELLS) * CHUNK_CELLS + (x % CHUNK_CELLS))]
+
+        later, earlier = sorted(
+            (south_approach, east_approach), key=lambda cell: _t_wild_id(*cell), reverse=True
+        )
+        base = max(
+            tick
+            for cell in (later, earlier)
+            for tick in (cell_entry(cell)["first_seen_tick"], cell_entry(cell)["last_seen_tick"])
+        )
+        cell_entry(later)["last_seen_tick"] = base + 50
+        cell_entry(earlier)["last_seen_tick"] = base + 40
+        self.char1.attributes.add(KNOWLEDGE_ATTR, record)
+        return _t_wild_id(*later), _t_wild_id(*earlier)
+
+    def test_remembered_gateways_follow_recency_not_id_order(self):
+        later_id, earlier_id = self._visit_both_approaches_with_distinct_recency()
+        self.assertGreater(later_id, earlier_id)
+        payload = self._registry().render("local_map", _context(self.char1))
+        remembered = [
+            node["id"] for node in payload["nodes"] if node["visibility"] == "remembered"
+        ]
+        self.assertEqual(remembered, [later_id, earlier_id])
+
+    def test_the_remembered_ceiling_applies_after_filtering(self):
+        later_id, _ = self._visit_both_approaches_with_distinct_recency()
+        with patch(
+            "web.webclient.presentation.local_map.wilderness.MAX_REMEMBERED_GATEWAYS", 1
+        ):
+            payload = self._registry().render("local_map", _context(self.char1))
+        remembered = [
+            node for node in payload["nodes"] if node["visibility"] == "remembered"
+        ]
+        self.assertEqual([node["id"] for node in remembered], [later_id])
+        # Collision counting runs over the bounded set only: no qualifier.
+        self.assertEqual(remembered[0]["label"], _t_anchor_display(_T_MAP_KEY))
+
+    def test_an_out_of_bounds_point_gateway_does_not_break_the_layer(self):
+        from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
+
+        registry = _live("world.lore.wilderness_entry", "WILDERNESS_ENTRY" + "_REGISTRY")
+        max_x = _live("world.maps.wilderness_provider", "WILDERNESS_MAX_X")
+        outside = WildernessEntryPoint(
+            anchor_key="t_out_of_bounds",
+            shape=("#",),
+            origin_xy=(max_x + 5, 0),
+            gates=(WildernessGate("n", _live_gateway_entry().gate_for("n").destination),),
+        )
+        ex, ey = EAST_APPROACH
+        with patch(
+            "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
+            {**dict(registry.items()), "t_out_of_bounds": outside},
+        ):
+            self._at_wild((ex + 20, ey))
+            payload = self._registry().render("local_map", _context(self.char1))
+        self.assertTrue(payload["available"])
 
     @covers_requirement("wilderness-gateway::physical-footprints-and-concealed-point-entries-preserve-approaches")
     def test_ciaran_non_entrance_directions_do_not_disclose_the_village(self):
