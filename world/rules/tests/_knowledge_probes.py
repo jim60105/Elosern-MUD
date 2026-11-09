@@ -61,6 +61,10 @@ def live_monster_tier_registry():
     return live_registry("world.lore.monsters", "MONSTER_TIER" + "_REGISTRY")
 
 
+def live_monster_species_registry():
+    return live_registry("world.lore.monster_species", "MONSTER_SPECIES" + "_REGISTRY")
+
+
 def live_element_registry():
     return live_registry("world.lore.elements", "ELEMENT" + "_REGISTRY")
 
@@ -155,6 +159,7 @@ __all__ = [
     "live_guild_rank_registry",
     "live_magic_tier_registry",
     "live_map_key",
+    "live_monster_species_registry",
     "live_monster_tier_registry",
     "live_name_pack_registry",
     "live_nation_registry",

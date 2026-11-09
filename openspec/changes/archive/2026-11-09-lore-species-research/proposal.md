@@ -33,6 +33,6 @@ The approved design `docs/superpowers/specs/2026-11-09-handbook-codex-titles-des
 
 - Server only: `world/rules/lore_knowledge.py`, `world/rules/combat_initiation.py`, `world/rules/combat_session/lifecycle.py`, `world/rules/combat_session/rounds.py`, `world/quests/planner.py`.
 - Tests: `world/rules/tests/test_lore_knowledge.py`, `world/rules/tests/test_lore_deterministic_reveals.py`, a new `world/rules/tests/test_lore_species_research.py` (registered in `.github/evennia-shards.json`), and `web/webclient/presentation/tests/test_lore_codex_panel.py` (its monster fixtures move from tier to species).
-- `lore_codex` stays at schema v1 in this change. The v1 drawer shows a species card under 魔物 and labels `published_appearance_zh` with the drawer's fallback name until `handbook-codex-tab` replaces the drawer.
-- No client, protocol, command or docs change. The `lore` command reads through the same reader and card renderer.
+- `lore_codex` stays at schema v1 in this change. The v1 drawer shows a species card under 魔物 until `handbook-codex-tab` replaces the drawer. The client display-vocabulary contract requires a readable name for every card field, so `web/webclient-app/lib/codex_field_label.js` gains one label entry (`published_appearance_zh`).
+- No other client change, and no protocol, command or docs change. The `lore` command reads through the same reader and card renderer.
 - Human-reviewed: none. Every requirement in this change is mechanical.

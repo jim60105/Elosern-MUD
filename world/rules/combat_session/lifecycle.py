@@ -258,7 +258,8 @@ def _create_hostile_session(
     no-active-session check, the per-target living-hostile-``Monster``-in-room
     checks in their established order and reasons, ``combat_companions()``
     collection, record construction with one dbref per supplied target in
-    deterministic (sorted-pk) order, battlefield reconstruction, persistence,
+    deterministic (sorted-pk) order, battlefield reconstruction, persistence
+    (which also schedules the post-commit species sightings),
     skip-safety registration, and dialogue clearing. Any single invalid
     target rejects the whole group before anything is persisted or
     registered, and a repeated target dbref is rejected as
@@ -422,6 +423,11 @@ def _create_hostile_session(
     try:
         with transaction.atomic():
             _persist(actor, record)
+            # Deferred: combat_initiation imports combat_session. The sightings
+            # register on this unit's commit, so a rollback records nothing.
+            from world.rules.combat_initiation import schedule_session_sightings
+
+            schedule_session_sightings((actor, *companion_entities), targets)
             _own_mapped_combat_time(record)
             if settle_continuation:
                 from world.rules.combat_session.rounds import (

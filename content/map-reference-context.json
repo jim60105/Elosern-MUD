@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "bb1b7e3d43c531c13925b95bf6fd46009131301fbc237159087e9866d078f3cd",
+  "fingerprint": "572415937048f70469ae2a3fc1612f9bfdaeb05166680b6a14377f53c52fc1ff",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1661,7 +1661,7 @@
     "world/quests/models.py": "beb4f3547e99d2903abe4062c0ebcc02e34bcb31e3f076d5bd27ce3c34577cf2",
     "world/quests/outcome_store.py": "550af8d48bef66bcd401fb93cc03a7250d849e1623d8c6bafca57fb615d288d9",
     "world/quests/phases.py": "f1843d5294f22d36ac94402a8b733c75af93527750b8545372b56a309d72e1fe",
-    "world/quests/planner.py": "758063633840a0ea112af9cb1603599b15ac2fa9f7d603bf37a19ab005caccb0",
+    "world/quests/planner.py": "8942a031ca591090d870520fffc784157dba9a63974a33dcbc2d809ce57b6b5c",
     "world/quests/retention.py": "0dc112629dea61ae4bb3ad034e7d3dd7920950cb77b86ddf6615e2cf06568003",
     "world/quests/room_observation.py": "e3e16618f1801807215a7b61315858746332b34df06f35db2bcac3518fa0ef8c",
     "world/quests/runtime.py": "1796316b8e7bbd7dd522d11af842cf536093afa0cc088539f213df8e664c48ab",
@@ -1717,7 +1717,7 @@
     "world/rules/combat/scalars.py": "42e20bfdbe8b0e79f03956f28a03f2029b2f087a148c7ceaa55ba71df478490a",
     "world/rules/combat_beats.py": "0faddf1855fb3dc971fc9a05ec1d9932030a1912f2cfee35ed8beaa958a1893f",
     "world/rules/combat_identity.py": "547c95c5f63215a4ee3408e5f0a6206f876fb929ff4da2f79c06d62d19785946",
-    "world/rules/combat_initiation.py": "3e23c59ce46c86a1bd8a8786da233d875867f77daecc09a0c2c387001b9127b6",
+    "world/rules/combat_initiation.py": "bbb8d2168220631177e4e98783d070e66cbf5770a6696470c58571d106914a03",
     "world/rules/combat_modifiers.py": "e92118029122d78857a12311167090bfb5e6303f95318ae1c197581c71598b22",
     "world/rules/combat_result.py": "959975c30966790d43f32d7e4f44634b699421b086ab111078829132e0ff84e8",
     "world/rules/combat_session/__init__.py": "cc925fae7ff4592e574a012b9462ad7ec8bf14ce05e755c7fb27e868d7da8b52",
@@ -1725,11 +1725,11 @@
     "world/rules/combat_session/battlefield.py": "57f3ce9277f9496a9d9dddb9f497a338075dab97e4d41756aedd635fae9b6ad0",
     "world/rules/combat_session/errors.py": "152eaff66f2c457a367fb5f135a44e7745de95612110d5ee7216b9e8c2e4bf27",
     "world/rules/combat_session/exit.py": "36838901ef8959246c96400ad74a056e35dfa015b62716f3abddea8de8b1a392",
-    "world/rules/combat_session/lifecycle.py": "6ad5d63a7c128df4376b069c294022dd506dd1b37db78e356148761279559e7a",
+    "world/rules/combat_session/lifecycle.py": "fac2506740849383cf656fd4abae0c25ea48fd3c33a9b92f89db1d0b06bda3e2",
     "world/rules/combat_session/observations.py": "519997b958ac35208dbf8407550de5de7d7075e6d7bda48a2a0e408a5300cbb7",
     "world/rules/combat_session/policies.py": "fb06ff301d4b72df6d616f2a6e4dd27114df338d68de78ba0e09c770a8f82e24",
     "world/rules/combat_session/records.py": "fe04ecf1853e5332e3f968856b99a49b688cd16bc3a8dbcf6feb1d2f2f7407eb",
-    "world/rules/combat_session/rounds.py": "21e21680fa6a97a5814c06ec7e1fa622864393224f21f6acb83d94ddd4c1860a",
+    "world/rules/combat_session/rounds.py": "747a9a2dafb8714399e3005cee6e15806a2fd2ea08b0d21fd9ea2fe78cc00928",
     "world/rules/combat_session/scans.py": "a151939a6e9aae8cca57618bd10ec98535975d051f78ddc6a9afa89d3d13cfde",
     "world/rules/combat_session/settlement.py": "75e8d82b2e6c17370d05912aadd21131af443818a522757ce6581012c2974728",
     "world/rules/combat_session/snapshot.py": "25a360b3fdbce4c469e84f8bfde68af4c56442133b7ee44d8b87baf272dee51a",
@@ -1791,7 +1791,7 @@
     "world/rules/items/reads.py": "7dc93f3d671b2966f16f0c10a508ad221b03f71cea5d400f9ccf2c7d908d95a1",
     "world/rules/items/settlement.py": "3547cee7eca756a68e3f423ec6fbc0b9344527b3f41eb74c7fb863ef1adb21e3",
     "world/rules/lineage_query.py": "b9aaca47b1582b2d1556227a90e0ee21c5a6bf96a6ef945ce9424f0302de93ce",
-    "world/rules/lore_knowledge.py": "04ee8bf163fc3b9ad5d0a428576650637204e37c8893b0e8fd5116a589ad0a02",
+    "world/rules/lore_knowledge.py": "056f6604b5bf744334ac2b39187e72f806e33dbe54365eba024199882c78d79a",
     "world/rules/map_discovery.py": "a97c3216776f3db32397c9a72050203922c7b6a6e51c006104208d1f245f10b3",
     "world/rules/map_district_lighting.py": "45e346cefbff57dc213b7b0110b1d8bf34ec284bff85e8cbc06fbae616648a36",
     "world/rules/map_knowledge.py": "3d3dc3ff0d9b051f882b5256c403af919027c72a1b0cad7ff4902a334afdaa39",
