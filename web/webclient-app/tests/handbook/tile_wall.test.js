@@ -5,6 +5,8 @@ import TileWall from "../../components/handbook/TileWall.vue";
 
 // Synthetic groups: two groups, five items, one not selectable. Up/Down step
 // by the grid's measured column count; the row test stubs that measurement.
+// Keep the stub: the vitest config loads SFC styles, so jsdom returns the
+// unresolved `repeat(auto-fill, ...)` string rather than a column list.
 const GROUPS = [
   {
     key: "g1",
