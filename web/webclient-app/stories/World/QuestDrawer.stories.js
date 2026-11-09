@@ -15,8 +15,9 @@ import {
   SERVICES_PANEL_SAMPLE,
   SERVICES_PANEL_UNAVAILABLE_SAMPLE,
 } from "../fixtures.js";
+import { titleCodex } from "../fixtures/title_codex_panels.js";
 
-// QuestDrawer (quest-drawer-book-tab): the 任務 drawer's body inside the real
+// QuestDrawer (quest-drawer-book-tab): the 手帳 drawer's body inside the real
 // HudDrawer chrome, as the live client mounts it (flush body). The first
 // level switches between the quest book and the guild counter; the counter
 // tab is disabled, yet focusable with its reason, while no usable guild
@@ -49,7 +50,7 @@ const renderDrawer = ({ top = "book", bookState = "in_progress", boardGrade = nu
       if (offerKey) memory.selectedByTab = { [`board:${boardGrade}`]: offerKey };
     }
     return () =>
-      h(HudDrawer, { open: true, title: "任務", icon: "quests", drawerKey: "quest", bodyFlush: true }, () => [
+      h(HudDrawer, { open: true, title: "手帳", icon: "quests", drawerKey: "quest", bodyFlush: true }, () => [
         h(QuestDrawer, { ...args, memoryScope: scope }),
       ]);
   },
@@ -178,4 +179,16 @@ export const BookUnavailable = {
 export const BookBeforeCommit = {
   render: renderDrawer,
   args: { questLog: null, services: SERVICES_PANEL_SAMPLE },
+};
+
+// handbook-titles-tab: the 稱號 tab with the full title in the head.
+export const TitlesTab = {
+  render: renderDrawer,
+  args: { questLog: QUEST_LOG_PANEL_SAMPLE, services: SERVICES_PANEL_SAMPLE, titleCodex: titleCodex(), top: "titles" },
+};
+
+// In combat the handbook carries only its 稱號 tab.
+export const InCombat = {
+  render: renderDrawer,
+  args: { questLog: QUEST_LOG_PANEL_SAMPLE, services: SERVICES_PANEL_SAMPLE, titleCodex: titleCodex(), combat: true },
 };

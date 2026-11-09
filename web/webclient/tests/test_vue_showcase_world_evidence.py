@@ -182,7 +182,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
     # desktop redesign, World/TitleBallotMenu from the dock-workspace
-    # alignment, and the Overlays/LineagePanel (since retired) + Overlays/TitleCodexPanel
+    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel (both since retired)
     # big windows from the obsidian-gold wave.
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
@@ -198,7 +198,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ArtworkAlpha",
     "Core/ArtworkFailure",
     "World/TitleBallotMenu",
-    "Overlays/TitleCodexPanel",
     # The gallery management surface refroze the manifest at 56:
     # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery
     # showcase wave, plus the three gallery overlay drawers
@@ -268,6 +267,9 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/DetailFooter",
     "World/TileWall",
     "World/CodexDetail",
+    # The handbook titles tab replaced the title-codex big window
+    # (handbook-titles-tab).
+    "World/TitleCodexTab",
 }
 
 # The World-directory story files that sit outside the B4 family: the
@@ -298,6 +300,9 @@ WORLD_KEYS_JOINED_AFTER_B4 = (
     "World/DetailFooter",
     "World/TileWall",
     "World/CodexDetail",
+    # The handbook titles tab replaced the title-codex big window
+    # (handbook-titles-tab).
+    "World/TitleCodexTab",
 )
 
 

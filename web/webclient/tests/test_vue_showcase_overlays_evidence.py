@@ -193,7 +193,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The desktop-redesign and obsidian-gold waves refroze the manifest at
     # 51: Core/DesktopNavigation and Core/ReferenceArtwork joined from the
     # desktop redesign, World/TitleBallotMenu from the dock-workspace
-    # alignment, and the Overlays/LineagePanel (since retired) + Overlays/TitleCodexPanel
+    # alignment, and the Overlays/LineagePanel + Overlays/TitleCodexPanel (both since retired)
     # big windows from the obsidian-gold wave.
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
@@ -209,7 +209,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ArtworkAlpha",
     "Core/ArtworkFailure",
     "World/TitleBallotMenu",
-    "Overlays/TitleCodexPanel",
     # The gallery management surface refroze the manifest at 56:
     # Data/GalleryPanel + Data/GalleryDetailRail joined from the gallery
     # showcase wave, plus the three gallery overlay drawers
@@ -293,17 +292,18 @@ PREVIOUS_MANIFEST_KEYS = {
     "World/DetailFooter",
     "World/TileWall",
     "World/CodexDetail",
+    # The handbook titles tab replaced the title-codex big window
+    # (handbook-titles-tab).
+    "World/TitleCodexTab",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
-# title-codex big window (the lineage window retired with
-# webclient-party-lineage-tab) joined the frozen manifest with the
-# obsidian-gold wave, and the three gallery overlay drawers joined with the
-# gallery refreeze at 56; the settings reading preview joined with
+# three gallery overlay drawers joined with the gallery refreeze at 56 (the
+# obsidian-gold wave's title-codex and lineage big windows have since
+# retired, with handbook-titles-tab and webclient-party-lineage-tab); the settings reading preview joined with
 # webclient-settings-reading-preview. The story-count partition below asserts
 # the family files plus exactly these.
 OVERLAYS_KEYS_JOINED_AFTER_B5 = (
-    "Overlays/TitleCodexPanel",
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",

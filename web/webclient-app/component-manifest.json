@@ -54,7 +54,6 @@
     "Overlays/SettingsOverlay",
     "Overlays/ReadingSample",
     "Overlays/HelpOverlay",
-    "Overlays/TitleCodexPanel",
     "Overlays/PartyLineageTab",
     "Overlays/OverlayHost",
     "Overlays/CreationOverlay",
@@ -86,7 +85,8 @@
     "World/WildernessTravel",
     "World/DetailFooter",
     "World/TileWall",
-    "World/CodexDetail"
+    "World/CodexDetail",
+    "World/TitleCodexTab"
   ],
   "frozen": true
 }
