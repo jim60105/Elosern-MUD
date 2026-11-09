@@ -218,7 +218,7 @@ describe("QuestDetail (quest-drawer-book-tab)", () => {
     it("renders the enabled accept as the primary action", async () => {
       mountOffer(open);
       const accept = get("accept");
-      expect(accept.classes()).toContain("quest-detail__btn--primary");
+      expect(accept.classes()).toContain("detail-footer__btn--primary");
       expect(accept.attributes("aria-disabled")).toBeUndefined();
       await accept.trigger("click");
       expect(wrapper.emitted("action")).toEqual([

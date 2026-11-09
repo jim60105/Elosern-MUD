@@ -288,6 +288,11 @@ PREVIOUS_MANIFEST_KEYS = {
     # The wilderness travel stage story joined the frozen set with
     # wilderness-travel-interface.
     "World/WildernessTravel",
+    # The handbook's shared detail footer, tile wall and detail column joined
+    # with handbook-primitives.
+    "World/DetailFooter",
+    "World/TileWall",
+    "World/CodexDetail",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
