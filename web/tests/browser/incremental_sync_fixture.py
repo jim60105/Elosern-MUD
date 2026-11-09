@@ -105,14 +105,17 @@ def xyz_arg(position: tuple[int, int, str]) -> str:
     return f"({x}, {y}, {z_map})"
 
 
-def _entry(index: int, marker: str) -> dict[str, Any]:
-    """One schema-valid codex entry with empty card values (tuned later)."""
+def _entry(index: int, marker: str, stage: str | None) -> dict[str, Any]:
+    """One schema-valid codex entry slot with empty card values (tuned later)."""
     return {
         "key": f"fixture{index:04d}",
         "title": f"{marker}{index:04d}",
+        "stage": stage,
+        "art": None,
         "card": [
             {"name": f"field{slot}", "value": ""} for slot in range(4)
         ],
+        "locked_fields": [],
     }
 
 
@@ -127,37 +130,55 @@ def oversized_payload(marker: str, target_bytes: int) -> dict[str, Any]:
     """
     from web.webclient.presentation.lore_codex import (
         LORE_CODEX_CATEGORIES,
-        LORE_CODEX_MAX_ENTRIES_PER_CATEGORY,
         LORE_CODEX_MAX_FIELD_VALUE_CODE_POINTS,
+        LORE_CODEX_MAX_TOTAL_SLOTS,
         validate_lore_codex,
     )
     from web.webclient.presentation.protocol import json_byte_size
 
-    per_category = LORE_CODEX_MAX_ENTRIES_PER_CATEGORY
+    # A quarter of the per-category share of the slot bound: each v2 entry
+    # slot carries a fixed field overhead, so 64 entry slots per category
+    # alone would exceed the envelope (and 32 the smallest byte target)
+    # before any card value grows. 512 growable card values stay plenty.
+    per_category = LORE_CODEX_MAX_TOTAL_SLOTS // len(LORE_CODEX_CATEGORIES) // 4
     categories = []
     for group_index, category_key in enumerate(LORE_CODEX_CATEGORIES):
+        monster = category_key == "monster"
         entries = [
-            _entry(group_index * per_category + index, marker)
+            _entry(
+                group_index * per_category + index,
+                marker,
+                "defeated" if monster else None,
+            )
             for index in range(per_category)
         ]
         categories.append(
             {
                 "key": category_key,
                 "label": f"{marker}{group_index}",
-                "count": len(entries),
-                "entries": entries,
+                "discovered": len(entries),
+                "total": len(entries),
+                "groups": [
+                    {
+                        "key": f"fixture{group_index}",
+                        "label": f"{marker}{group_index}" if monster else None,
+                        "slots": entries,
+                    }
+                ],
             }
         )
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
-        "categories": categories,
         "discovered_total": per_category * len(LORE_CODEX_CATEGORIES),
+        "total": per_category * len(LORE_CODEX_CATEGORIES),
+        "categories": categories,
     }
     values = [
         field
         for category in payload["categories"]
-        for entry in category["entries"]
+        for group in category["groups"]
+        for entry in group["slots"]
         for field in entry["card"]
     ]
     remaining = target_bytes - json_byte_size(payload)

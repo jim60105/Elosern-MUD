@@ -67,6 +67,13 @@ function onSelectEntry(compositeKey) {
   selectedEntryKey.value = compositeKey;
 }
 
+// A v2 category's discovered entries: its groups' entry slots in panel
+// order. Placeholders (undiscovered entries) are never rendered here, and
+// no total is shown, so the drawer discloses no more than it did before.
+function discoveredEntries(category) {
+  return (category.groups ?? []).flatMap((group) => group.slots ?? []).filter((slot) => !slot.placeholder);
+}
+
 // The visible entries: the selected category's own entries, or the
 // aggregate's flattened discovered entries — each tagged with its category
 // so the aggregate view can label provenance. Order is the panel's order
@@ -77,7 +84,7 @@ const visibleEntries = computed(() => {
     if (selectedCategory.value !== "all" && category.key !== selectedCategory.value) {
       continue;
     }
-    for (const entry of category.entries ?? []) {
+    for (const entry of discoveredEntries(category)) {
       rows.push({
         categoryKey: category.key,
         categoryLabel: category.label,
@@ -142,7 +149,7 @@ const selectedEntry = computed(
           :data-testid="`lore-codex-drawer__category--${category.key}`"
           @click="onSelectCategory(category.key)"
         >
-          {{ category.label }} <span class="lore-codex-drawer__pill-count">{{ category.count }}</span>
+          {{ category.label }} <span class="lore-codex-drawer__pill-count">{{ category.discovered }}</span>
         </button>
       </div>
 

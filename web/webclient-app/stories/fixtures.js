@@ -19,7 +19,7 @@
 //   creation_panels.js    — B5 `creation` v5 wizard family
 //   party_panels.js       — align-05 party panel family
 //   objectives_panels.js  — objectives panel family
-//   lore_codex_panels.js  — `lore_codex` panel v1 family
+//   lore_codex_panels.js  — `lore_codex` panel v2 family
 //   quest_log_panels.js   — `quest_log` panel read-model family
 //   combat_stage.js       — the foe line-up's participants and catalog
 //   window_primitives.js  — the shared window primitives' rail and holdings args

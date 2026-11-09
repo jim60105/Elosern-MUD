@@ -89,7 +89,7 @@ describe("LoreCodexDrawer (webclient-lore-codex-drawer)", () => {
 
   it("names an undeclared card field neutrally instead of printing its identifier", async () => {
     const codex = structuredClone(LORE_CODEX_PANEL_SAMPLE);
-    codex.categories.find((group) => group.key === "monster").entries[0].card.push({ name: "t_new_field", value: "新欄位的值" });
+    codex.categories.find((group) => group.key === "monster").groups[0].slots[0].card.push({ name: "t_new_field", value: "新欄位的值" });
     wrapper = mount(LoreCodexDrawer, { props: { codex } });
     await wrapper.get('[data-testid="lore-codex-drawer__entry--monster-mist_wolf"]').trigger("click");
     const field = wrapper.get('[data-field="t_new_field"]');

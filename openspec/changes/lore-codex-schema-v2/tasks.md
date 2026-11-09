@@ -18,9 +18,9 @@ Prerequisite: `lore-species-research` is merged (`git grep -n "def list_species_
 
 ## 4. Interim drawer and fixtures
 
-- [ ] 4.1 Apply design D6 to `web/webclient-app/components/LoreCodexDrawer.vue` and its fixtures and tests. Verify with `pnpm exec vitest run web/webclient-app/tests/world/lore_codex_drawer.test.js web/webclient-app/tests/drawer_content_polish.test.js web/webclient-app/tests/store/store_slices.test.js web/webclient-app/tests/app_client_drawers.test.js`. All pass with unchanged assertions.
-- [ ] 4.2 Apply design D7 to `web/tests/browser/browser_helpers.py` and `web/tests/browser/incremental_sync_fixture.py`. Run the one browser class that consumes the oversized payload (`web.tests.browser.test_incremental_sync`, one method at a time through `uv run --locked python -m web.tests.browser.unittest_driver <module>.<Class>.<method>`) and the lore drawer method in `web.tests.browser.test_browser_contextual_hud_drawers`. All pass.
-- [ ] 4.3 Run `pnpm run build-storybook && pnpm run showcase-coverage` (the drawer stories read the converted fixtures) and the focused label `web.webclient.tests.test_vue_showcase_world_evidence`. Both pass.
+- [x] 4.1 Apply design D6 to `web/webclient-app/components/LoreCodexDrawer.vue` and its fixtures and tests. Verify with `pnpm exec vitest run web/webclient-app/tests/world/lore_codex_drawer.test.js web/webclient-app/tests/drawer_content_polish.test.js web/webclient-app/tests/store/store_slices.test.js web/webclient-app/tests/app_client_drawers.test.js`. All pass with unchanged assertions.
+- [x] 4.2 Apply design D7 to `web/tests/browser/browser_helpers.py` and `web/tests/browser/incremental_sync_fixture.py`. Run the one browser class that consumes the oversized payload (`web.tests.browser.test_incremental_sync`, one method at a time through `uv run --locked python -m web.tests.browser.unittest_driver <module>.<Class>.<method>`) and the lore drawer method in `web.tests.browser.test_browser_contextual_hud_drawers`. All pass.
+- [x] 4.3 Run `pnpm run build-storybook && pnpm run showcase-coverage` (the drawer stories read the converted fixtures) and the focused label `web.webclient.tests.test_vue_showcase_world_evidence`. Both pass.
 
 ## 5. Gates
 
