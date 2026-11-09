@@ -1101,18 +1101,33 @@ def _record_round_defeats(
     hp_after: Any,
     completed_round: int,
 ) -> None:
-    """Record one complete transition per newly defeated mapped opponent.
+    """Record each newly defeated opponent's species and mapped population loss.
 
-    Only a real live-to-dead crossing of an enemy ``Monster`` in a mapped
-    wilderness session is a loss: a simulated exam, a knockout, a flee or a
-    participant that was already dead notifies nothing, and no participant is
-    replaced or appended. The occurrence tick is the session's own start plus
-    the completed-round offset, so a later-round defeat never borrows the
-    pre-combat tick as recovery headroom.
+    Only a real live-to-dead crossing of an enemy ``Monster`` counts: a
+    knockout, a flee or a participant that was already dead records nothing,
+    and no participant is replaced or appended. In a hostile session each
+    crossing schedules a post-commit species defeat for every credited player
+    character, whether or not the fight is mapped; a guild examination records
+    no species. In a mapped wilderness session each crossing also records one
+    complete population transition. The occurrence tick is the session's own
+    start plus the completed-round offset, so a later-round defeat never
+    borrows the pre-combat tick as recovery headroom.
     """
+    from typeclasses.monsters import Monster
+
+    enemies = set(record.enemy_ids)
+    crossings = [
+        entity
+        for entity in battlefield.roster.values()
+        if isinstance(entity, Monster)
+        and int(entity.pk) in enemies
+        and hp_before.get(int(entity.pk), 0) > 0
+        and hp_after.get(int(entity.pk), 0) <= 0
+    ]
+    if record.mode == "hostile":
+        _schedule_round_species_defeats(record, battlefield, crossings)
     if record.population_cell is None:
         return
-    from typeclasses.monsters import Monster
     from world.maps import regional_population
 
     wilderness = regional_population.live_wilderness()
@@ -1123,19 +1138,10 @@ def _record_round_defeats(
     )
     if cell is None or wilderness.db_key != record.population_cell.get("wilderness"):
         return
-    enemies = set(record.enemy_ids)
     occurred_tick = record.started_tick + completed_round * _ROUND_SECONDS
     engagement_id = record.engagement_id or record.session_id
-    for entity in battlefield.roster.values():
-        if not isinstance(entity, Monster):
-            continue
+    for entity in crossings:
         individual_id = int(entity.pk)
-        if individual_id not in enemies:
-            continue
-        if hp_before.get(individual_id, 0) <= 0:
-            continue
-        if hp_after.get(individual_id, 0) > 0:
-            continue
         regional_population.record_population_transition(
             wilderness,
             regional_population.PopulationTransition(
@@ -1150,6 +1156,39 @@ def _record_round_defeats(
                 ),
             ),
         )
+
+
+def _schedule_round_species_defeats(
+    record: CombatSessionRecord, battlefield: Battlefield, crossings: Sequence[Any]
+) -> None:
+    """Schedule one post-commit species defeat per (credited player, species).
+
+    Credited players are the ``PlayerCharacter`` roster entities whose pk is in
+    ``record.player_ids``; a crossing monster without a species key records
+    nothing. Duplicates within the round are scheduled once.
+    """
+    if not crossings:
+        return
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.lore_knowledge import schedule_species_defeat_best_effort
+
+    player_ids = set(record.player_ids)
+    players = [
+        entity
+        for entity in battlefield.roster.values()
+        if isinstance(entity, PlayerCharacter) and int(entity.pk) in player_ids
+    ]
+    scheduled: set[tuple[int, str]] = set()
+    for monster in crossings:
+        key = getattr(monster, "species_key", None)
+        if not isinstance(key, str) or not key:
+            continue
+        for player in players:
+            pair = (int(player.pk), key)
+            if pair in scheduled:
+                continue
+            scheduled.add(pair)
+            schedule_species_defeat_best_effort(player, key)
 
 
 def _paid_posture_activity(state: Any) -> Any:

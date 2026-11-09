@@ -8,6 +8,7 @@ factory-built row; no shipped species, variant or tier key appears here.
 
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import transaction
@@ -19,6 +20,7 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.rules.combat_initiation import schedule_session_sightings
 from world.rules.combat_session import engage_group, read_session
+from world.rules.combat_session.rounds import _record_round_defeats
 
 from world.rules.lore_knowledge import (
     LoreKeyError,
@@ -360,6 +362,151 @@ class SessionSightingTests(_SessionFixture):
                     raise RuntimeError("t injected rollback")
         self.assertIsNone(self.player.db.lore_discovered)
         push.assert_not_called()
+
+
+_DEFEAT = "world.rules.lore_knowledge.schedule_species_defeat_best_effort"
+
+
+class RoundDefeatTests(_SessionFixture):
+    """``_record_round_defeats`` driven directly, as the population tests do."""
+
+    def setUp(self):
+        super().setUp()
+        self.ally = _combat_player("t research ally")
+        self.ally.location = self.room
+
+    def _record(self, *enemies, mode="hostile", population_cell=None):
+        return SimpleNamespace(
+            session_id="hostile:1:100",
+            engagement_id="hostile:1:100:1",
+            mode=mode,
+            enemy_ids=tuple(int(enemy.pk) for enemy in enemies),
+            player_ids=(int(self.player.pk), int(self.ally.pk)),
+            started_tick=100,
+            population_cell=population_cell,
+        )
+
+    def _battlefield(self, *entities):
+        return SimpleNamespace(
+            roster={str(entity.pk): entity for entity in entities}, fled=set()
+        )
+
+    def _run(self, record, battlefield, hp_before, hp_after):
+        with patch(_DEFEAT) as schedule:
+            _record_round_defeats(record, battlefield, hp_before, hp_after, 1)
+        return sorted((int(player.pk), key) for player, key in (
+            call.args for call in schedule.call_args_list
+        ))
+
+    def test_a_lethal_crossing_credits_every_session_player(self):
+        monster = self.first_a
+        battlefield = self._battlefield(self.player, self.ally, monster)
+        calls = self._run(
+            self._record(monster), battlefield, {monster.pk: 5}, {monster.pk: 0}
+        )
+        self.assertEqual(
+            calls,
+            sorted(
+                [
+                    (int(self.player.pk), self.first_species),
+                    (int(self.ally.pk), self.first_species),
+                ]
+            ),
+        )
+
+    def test_an_unmapped_session_still_records_the_defeat(self):
+        monster = self.second
+        record = self._record(monster)
+        self.assertIsNone(record.population_cell)
+        calls = self._run(
+            record,
+            self._battlefield(self.player, monster),
+            {monster.pk: 5},
+            {monster.pk: 0},
+        )
+        self.assertEqual(calls, [(int(self.player.pk), _SECOND_SPECIES)])
+
+    def test_two_crossings_of_one_species_schedule_once_per_player(self):
+        a, b = self.first_a, self.first_b
+        calls = self._run(
+            self._record(a, b),
+            self._battlefield(self.player, a, b),
+            {a.pk: 5, b.pk: 4},
+            {a.pk: 0, b.pk: -2},
+        )
+        self.assertEqual(calls, [(int(self.player.pk), self.first_species)])
+
+    def test_only_a_real_crossing_records(self):
+        dead, hurt = self.first_a, self.second
+        calls = self._run(
+            self._record(dead, hurt),
+            self._battlefield(self.player, dead, hurt),
+            {dead.pk: 0, hurt.pk: 5},
+            {dead.pk: 0, hurt.pk: 3},
+        )
+        self.assertEqual(calls, [])
+
+    def test_a_guild_examination_records_nothing(self):
+        monster = self.first_a
+        calls = self._run(
+            self._record(monster, mode="guild_exam"),
+            self._battlefield(self.player, monster),
+            {monster.pk: 5},
+            {monster.pk: 0},
+        )
+        self.assertEqual(calls, [])
+
+    def test_a_species_less_monster_records_nothing(self):
+        plain = _plain_monster("t research plain foe", hp=5)
+        self.assertIsNone(plain.species_key)
+        calls = self._run(
+            self._record(plain),
+            self._battlefield(self.player, plain),
+            {plain.pk: 5},
+            {plain.pk: 0},
+        )
+        self.assertEqual(calls, [])
+
+    def test_a_non_player_roster_entity_is_not_credited(self):
+        monster = self.second
+        companion = create_object(NPC, key="t research npc ally", location=self.room)
+        record = self._record(monster)
+        record.player_ids = (*record.player_ids, int(companion.pk))
+        calls = self._run(
+            record,
+            self._battlefield(self.player, companion, monster),
+            {monster.pk: 5},
+            {monster.pk: 0},
+        )
+        self.assertEqual(calls, [(int(self.player.pk), _SECOND_SPECIES)])
+
+    def test_a_planned_target_defeated_event_stages_no_lore_effect(self):
+        """Out-of-round defeats reach only the quest planner, which stages no
+        species defeat and no tier reveal (the documented boundary)."""
+        from world.quests.planner import quest_event_effect_planner
+
+        monster = self.second
+        entry = SimpleNamespace(
+            kind="target_defeated",
+            data={
+                "target_id": int(monster.pk),
+                "monster_tier": monster.threat_tier,
+                "species_key": monster.species_key,
+                "variant_key": monster.variant_key,
+            },
+        )
+        request = SimpleNamespace(
+            actor=self.player, context=SimpleNamespace(battlefield=None)
+        )
+        with patch(_DEFEAT) as defeat, patch(
+            "world.rules.lore_knowledge.schedule_lore_reveal_best_effort"
+        ) as reveal:
+            effects = quest_event_effect_planner(request, SimpleNamespace(entries=[entry]))
+            for effect in effects:
+                effect.apply()
+        self.assertEqual(effects, [])
+        defeat.assert_not_called()
+        reveal.assert_not_called()
 
 
 class SpeciesSoleWriterBoundaryTests(unittest.TestCase):
