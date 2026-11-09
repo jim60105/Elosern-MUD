@@ -18,6 +18,10 @@ drawers, and SHALL NOT push a keyboard menu frame.
 - **WHEN** the player activates the 圖鑑 control in the tool group, in exploration and in combat
 - **THEN** the quest drawer opens on its codex tab through the handbook route request, no `lore` drawer exists, and closing the drawer returns focus to the control
 
+#### Scenario: The two codex controls are distinguishable
+- **WHEN** the tool group renders
+- **THEN** the world-codex (圖鑑) control and the title-codex (稱號冊) control carry distinct labels and distinct glyphs
+
 #### Scenario: The gallery tool follows the committed gallery panel
 - **WHEN** the committed `gallery` panel is available, and a later revision commits the panel's unavailable form
 - **THEN** the 角色肖像圖庫 control is rendered in the tool group while the panel is available, and after the unavailable form commits it is absent from the bar and the tab order

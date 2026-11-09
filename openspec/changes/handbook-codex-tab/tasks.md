@@ -5,7 +5,7 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 ## 1. Model and tabs
 
 - [ ] 1.1 Extend `handbook-tabs.js` per design D1 and update `tests/handbook/handbook_tabs.test.js` (orders `["book","counter","codex","titles"]` and `["codex","titles"]`). Verify with vitest on that file.
-- [ ] 1.2 Create `components/handbook/lore-codex-model.js` per design D3. Add `tests/handbook/lore_codex_model.test.js` covering: status; rail counts from `discovered`; `defaultCodexCategory`; group order and null-label groups; placeholder items unselectable with an identity-free label and unique ids; entry item labels with stage suffix; `firstEntryKey`; `codexDetail` fields excluding `display_name_zh`, readable labels, `資料` fallback, locked items, monster stamp and track `reached`; `null` for an unknown key. Verify with vitest.
+- [ ] 1.2 Create `components/handbook/lore-codex-model.js` per design D3. Add `tests/handbook/lore_codex_model.test.js` covering: status; rail counts from `discovered`; `defaultCodexCategory`; group order and null-label groups; placeholder items unselectable with an identity-free label and unique ids; entry item labels with stage suffix; `firstEntryKey`; `codexDetail` fields excluding `display_name_zh`, readable labels, `資料` fallback, locked items, monster stamp, track `reached`, and the sighted track's `unlocks` derived from `locked_fields` labels (`null` once defeated); `null` for an unknown key. Verify with vitest.
 - [ ] 1.3 Add `codexCategory` to `quest-drawer-memory.js` per design D2, with a scope-reset assertion in the existing memory test. Verify with vitest.
 
 ## 2. Components
@@ -18,7 +18,7 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 ## 3. Dispatcher, shortcut and removals
 
 - [ ] 3.1 Edit `QuestDrawer.vue` (design D1, D5), `nav-tools.js`, `stores/elosern/hud.js`, `composables/use-drawers.js` and `AppClient.vue` per design D1. Update `tests/world/quest_drawer.test.js` (four tabs outside combat, two in combat, a remembered `book` in combat resolving to `codex`, the disabled codex tab with reason, a `{slot:"handbook", section:"codex"}` request switching the tab), `tests/store/hud_drawer.test.js` (`openHudDrawer("lore")` rejected, `openHandbook("codex")` accepted in combat), `tests/desktop_navigation.test.js` (圖鑑 emits `handbook` with `"codex"`), and `tests/app_client_drawers.test.js` (`nav-tool-lore` opens the quest drawer on the codex tab). Verify with vitest on those files.
-- [ ] 3.2 Apply design D7 deletions. Fix every remaining vitest reference (`git grep -n "LoreCodexDrawer\|codex_field_label\|hudDrawer === 'lore'\|\"lore\"" web/webclient-app` should show only `nav-tools.js`'s key and glyph uses). Verify with `pnpm test` (full vitest run): all green.
+- [ ] 3.2 Apply design D7 deletions. Fix every remaining vitest reference (`git grep -n "LoreCodexDrawer\|codex_field_label\|hudDrawer === 'lore'\|openHudDrawer(\"lore\")\|\"lore\"" web/webclient-app` should show only `nav-tools.js`'s key and glyph uses, after fixing `tests/dialogue_store.test.js`, `tests/app_client_frameless_shop.test.js`, `tests/reference_surface_frame.test.js` and every other hit). If any deleted test path appears in `tools/test_data_freeze.json` or `tools/test_data_lint_seed.json`, remove it from both. Verify with `pnpm test` (full vitest run): all green.
 
 ## 4. Stories, manifest, docs, contracts
 
@@ -38,7 +38,7 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 
 ## 6. Evidence bridge and gates
 
-- [ ] 6.1 Extend `web/webclient/tests/test_vue_handbook_evidence.py` (created by `handbook-titles-tab`) with one method per ADDED codex-tab requirement that runs `tests/handbook/lore_codex_tab.test.js`, `codex_tile_grid.test.js`, `codex_detail.test.js`, `codex_art.test.js` and `lore_codex_model.test.js` and asserts that they pass. Verify with the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract`.
+- [ ] 6.1 Extend `web/webclient/tests/test_vue_handbook_evidence.py` (created by `handbook-primitives`) with one method per ADDED codex-tab requirement that runs `tests/handbook/lore_codex_tab.test.js`, `codex_tile_grid.test.js`, `codex_detail.test.js`, `codex_art.test.js` and `lore_codex_model.test.js` and asserts that they pass. Verify with the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract`.
 - [ ] 6.2 Run `uv run --locked python -m tools.contract_gate --change handbook-codex-tab` (it tolerates the three REMOVED drawer requirements) and `openspec validate handbook-codex-tab --strict`. Both pass.
 
 ## Workflow follow-up

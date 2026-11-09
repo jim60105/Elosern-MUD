@@ -38,7 +38,7 @@ The codex tab SHALL render only the committed `lore_codex` panel. Its rail SHALL
 
 #### Scenario: The detail renders the card verbatim
 - **WHEN** an entry tile is selected
-- **THEN** the detail shows the slot's title and every card field in panel order, each value verbatim under a readable field name, and no raw field identifier is visible
+- **THEN** the detail shows the slot's title and every card field other than the title field, in panel order, each value verbatim under a readable field name, and no raw field identifier is visible
 
 #### Scenario: The selection is remembered per category
 - **WHEN** the player selects an entry, switches category, and returns
@@ -62,7 +62,7 @@ A monster entry tile SHALL mark its stage by a shape that differs between `defea
 
 #### Scenario: The research track follows the stage
 - **WHEN** a sighted and then a defeated monster entry is selected
-- **THEN** the track marks only its first step reached for the sighted entry, and both steps for the defeated entry
+- **THEN** the track marks only its first step reached for the sighted entry, and both steps for the defeated entry; for the sighted entry the second step names exactly the readable names of its `locked_fields`
 
 ### Requirement: A sighted monster shows its locked fields without values
 

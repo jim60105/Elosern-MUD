@@ -6,7 +6,7 @@
 - depends-on: handbook-titles-tab
 - conflict: `handbook-titles-tab` introduces the handbook dispatcher, `handbook-tabs.js`, `openHandbook`, `TileWall.vue`, `CodexDetail.vue`, `CodexEmblem.vue` and `DetailFooter.vue`, and this change extends all of them. This change's `webclient-quest-drawer` and `webclient-desktop-shell` deltas are written against that change's archived text. The design's §3 lists only "4 depends on 3", but the codex tab cannot exist without the handbook shell, so the dependency on change 1 is added here as a sequencing fact. No design decision changes.
 - conflict: `lore-codex-schema-v2` supplies the v2 payload and the interim v2 read in `LoreCodexDrawer.vue`, which this change deletes.
-- conflict: `lore-species-research`: indirect only (through change 3).
+- conflict: `lore-species-research` and `handbook-primitives`: indirect only (through changes 3 and 1).
 
 ## Why
 
