@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import CodexArt from "../../components/handbook/CodexArt.vue";
 import { codexArt } from "../../stories/fixtures/lore_codex_panels.js";
+import { artworkTerminal } from "../../stories/fixtures/art_panels.js";
 
 // The committed panel the descriptor came from (its `available` is the
 // availability fact the art is judged against).
@@ -57,5 +58,34 @@ describe("CodexArt (handbook-codex-tab)", () => {
     expect(image().attributes("src")).toBe("/art/synthetic/three.webp");
     expect(emblem().exists()).toBe(false);
     expect(wrapper.get(".codex-art").attributes("data-art-state")).toBe("loaded");
+  });
+
+  it("returns to the emblem when the art changes subject, until the new image loads", async () => {
+    mountArt({ art: codexArt("subject:four", "/art/synthetic/four.webp") });
+    declareImage(image().element);
+    await image().trigger("load");
+    await nextTick();
+    expect(emblem().exists()).toBe(false);
+    await wrapper.setProps({ art: codexArt("subject:five", "/art/synthetic/five.webp") });
+    await nextTick();
+    expect(image().attributes("src")).toBe("/art/synthetic/five.webp");
+    expect(emblem().exists()).toBe(true);
+    await image().trigger("error");
+    await nextTick();
+    expect(image().exists()).toBe(false);
+    expect(emblem().exists()).toBe(true);
+  });
+
+  it("keeps the emblem under a terminal-only silhouette probe until it loads", async () => {
+    const art = { ...codexArt("subject:six", "/art/synthetic/six.webp"), attempts: [], terminal: artworkTerminal() };
+    mountArt({ art });
+    const probe = image();
+    expect(probe.classes()).toContain("codex-art__img--probe");
+    expect(emblem().exists()).toBe(true);
+    declareImage(probe.element);
+    await probe.trigger("load");
+    await nextTick();
+    expect(emblem().exists()).toBe(false);
+    expect(wrapper.find('[data-testid="artwork-alpha-fill"]').exists()).toBe(true);
   });
 });
