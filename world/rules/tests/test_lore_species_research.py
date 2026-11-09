@@ -333,6 +333,20 @@ class SessionSightingTests(_SessionFixture):
             ),
         )
 
+    def test_creation_passes_the_actor_companions_and_targets(self):
+        companion = _combat_player("t research bound ally")
+        companion.location = self.room
+        with patch(
+            "world.rules.party.combat_companions", return_value=[companion]
+        ), patch(
+            "world.rules.combat_initiation.schedule_session_sightings"
+        ) as sightings:
+            engage_group(self.player, [self.second, self.first_a])
+        sightings.assert_called_once()
+        participants, targets = sightings.call_args.args
+        self.assertEqual(tuple(participants), (self.player, companion))
+        self.assertEqual(list(targets), [self.second, self.first_a])
+
     def test_a_non_player_companion_is_not_credited(self):
         companion = create_object(NPC, key="t research companion", location=self.room)
         with patch(
@@ -482,7 +496,12 @@ class RoundDefeatTests(_SessionFixture):
 
     def test_a_planned_target_defeated_event_stages_no_lore_effect(self):
         """Out-of-round defeats reach only the quest planner, which stages no
-        species defeat and no tier reveal (the documented boundary)."""
+        species defeat and no tier reveal (the documented boundary).
+
+        The entry carries the individual's registered threat tier, which the
+        retired planner reveal would have turned into a lore effect; the
+        actor holds no quest records, so any staged effect is a lore effect.
+        """
         from world.quests.planner import quest_event_effect_planner
 
         monster = self.second
