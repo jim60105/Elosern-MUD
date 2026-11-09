@@ -44,7 +44,7 @@ Field values:
 - `habitat_tags`: the `display_name_zh` of each tag that resolves in `world.maps.geography.current().regions`, in tag order, joined with `、`. Unresolvable tags are skipped. A raw tag key is never emitted.
 - `variants`: one line per variant in `MONSTER_VARIANT_REGISTRY` order whose `species_key` matches and whose `ordinary_variant` is true, joined with `\n`. A line is `display_name_zh` alone, or `f"{display_name_zh}・{GUILD_RANK_REGISTRY[danger_grade].display_name_zh}"` when `danger_grade` is set and resolves.
 
-Sighted returns the three sighted fields and `DEFEATED_FIELDS` as `locked_fields`. Defeated returns all seven fields in `SIGHTED_FIELDS + DEFEATED_FIELDS` order and `()`. The `author_*` attributes are never read. This keeps the "canonical renderer, never composed by the presenter" rule. Alternative considered: composing monster cards in the presenter. Rejected because it breaks that requirement.
+Sighted returns the three sighted fields and `DEFEATED_FIELDS` as `locked_fields`. Defeated returns all seven fields in `SIGHTED_FIELDS + DEFEATED_FIELDS` order and `()`. The `author_*` attributes are never read. This keeps the "canonical renderer, never composed by the presenter" rule. `lore_card("monster", key)` (used by the `lore` command) keeps rendering the two declared sighted fields, which are the first two `species_card` fields. The `lore` command intentionally shows no defeated-stage data, and changing it is out of scope. Alternative considered: composing monster cards in the presenter. Rejected because it breaks that requirement.
 
 ### D2. Presenter algorithm (`lore_codex_presenter`)
 
@@ -54,10 +54,10 @@ Sighted returns the three sighted fields and `DEFEATED_FIELDS` as `locked_fields
 4. Entry slot: `{"key", "title", "stage", "art", "card", "locked_fields"}`. For monster: `stage = "defeated" if key in defeated else "sighted"` and `card, locked = species_card(key, stage)`. For others: `stage = None`, `card = lore_card(cat, key)` and `locked = ()`. `title = card["display_name_zh"]`, `card` = `[{"name", "value"}]` in order, and `locked_fields = list(locked)`.
 5. Groups. Monster: `tier = MONSTER_VARIANT_REGISTRY[species.default_variant_key].threat_tier`. Groups follow `MONSTER_TIER_REGISTRY` order, keeping only tiers with ≥ 1 species, as `{"key": tier, "label": MONSTER_TIER_REGISTRY[tier].display_name_zh, "slots": [...]}`. Others: `[{"key": cat, "label": None, "slots": [...]}]`.
 6. Category: `{"key", "label": CATEGORY_LABELS[cat], "discovered", "total", "groups"}`. `total` is the registry size and `discovered` the entry-slot count. Top level: `{"schema_version": 2, "available": True, "discovered_total", "total", "categories"}`.
-7. Trimming: while `json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES`, delete the last placeholder found scanning categories in reverse, groups in reverse and slots in reverse. If none is left, raise `LoreCodexPanelError("lore_codex payload exceeds the OOB envelope limit")`. Counts are not touched.
+7. Trimming, in two stages. Stage 1: while `json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES`, delete the last placeholder found scanning categories in reverse, groups in reverse and slots in reverse. Stage 2, once no placeholder is left: set `art` to `None` on the last entry slot (same reverse scan) whose `art` is not `None`, and repeat. If neither stage can trim further, raise `LoreCodexPanelError("lore_codex payload exceeds the OOB envelope limit")`. Counts are not touched. Compute the size once, then subtract each removed element's `json_byte_size` plus its separator, so the loop stays linear.
 8. Return `validate_lore_codex(payload)`.
 
-Art helper `_slot_art(category, key)`:
+Art helper `_slot_art(category, key)`. Its body runs inside `try`, and any exception returns `None` after `log_warn("lore_codex_art_failed", exc=error, context={"char": str(actor.pk), "category": category, "key": key})` (a facade import in `lore_codex.py`). An art-subsystem fault therefore never blanks the codex:
 
 - `monster`: `describe_portrait(monster_subject_for(key))` when `is_registered_monster_visual_key(key)`, else `None`.
 - `region`: `archetype = current().regions[key].scene_archetype`.
@@ -90,7 +90,7 @@ Delete `LORE_CODEX_MAX_ENTRIES_PER_CATEGORY` and `LORE_CODEX_MAX_TOTAL_ENTRIES` 
 ### D4. Validator rules (Python and JS identical)
 
 - Top level: exact fields `{schema_version, available, discovered_total, total, categories}`, `schema_version == 2`, `available is True`, and exactly 8 categories in `LORE_CODEX_CATEGORIES` order.
-- Category: exact `{key, label, discovered, total, groups}`. `key` matches the expected key, `label` is non-empty and ≤ 32 code points, `groups` is a list of 1–16 items with unique `key`s, `discovered` equals the number of entry slots, the slot count is ≤ `total` ≤ 128, and `discovered` ≤ `total`.
+- Category: exact `{key, label, discovered, total, groups}`. `key` matches the expected key, `label` is non-empty and ≤ 32 code points, `groups` is a list of up to 16 items with unique `key`s (exactly 1 for non-monster categories, 0 to 16 for monster, so an empty species registry is legal), `discovered` equals the number of entry slots, the slot count is ≤ `total` ≤ 128, and `discovered` ≤ `total`.
 - Group: exact `{key, label, slots}`. `key` is non-empty, ≤ 64 code points and colon-free. `label` is null for non-monster categories and a non-empty string ≤ 32 code points for monster. `slots` is a list.
 - Placeholder: exactly `{placeholder: true}`.
 - Entry slot: exact `{key, title, stage, art, card, locked_fields}`. `key` follows the v1 rules (non-empty, ≤ 64, colon-free, no lone surrogate) and is unique within the category. `title` is non-empty and ≤ 64. `stage` is `"sighted"` or `"defeated"` for monster and `null` otherwise. `art` is `null` or passes the shared artwork validator. `card` holds ≤ 8 `{name, value}` with unique names, and the v1 per-field rules apply. `locked_fields` holds unique strings ≤ 64 code points, disjoint from the card names, ≤ 8 items, and is empty unless `stage == "sighted"`. A card field named `variants` has at most 8 `\n`-separated lines.
@@ -118,7 +118,7 @@ The drawer shows no total, so its existing non-disclosure requirement still hold
 
 ## Risks / Trade-offs
 
-- [Art descriptors weigh more than cards, so a large discovered set could exceed 64 KiB even after trimming every placeholder] → The presenter fails closed (the registry then serves the common unavailable form). That is loud and test-visible. A presenter test builds a synthetic oversize codex to prove the trim order and the fail-closed path. Shrinking descriptors is out of scope.
+- [Art descriptors weigh more than cards, so a large discovered set could exceed 64 KiB even after trimming every placeholder] → Stage 2 trimming drops art from the last slots, and the client falls back to the emblem. The presenter fails closed only when the cards alone exceed the envelope. A presenter test proves both stages and the fail-closed path.
 - [The design text says both "`discovered` and `total` must equal the counted slots" and "after trimming `total` still describes the untrimmed view"] → Resolved: `discovered` always equals the counted entry slots (entries are never trimmed), and `total` ≥ the counted slots, with equality whenever nothing was trimmed. The presenter test asserts equality on an untrimmed payload.
 - [Between this change and `handbook-codex-tab` the old drawer shows species cards with fallback field names] → Accepted for the interim. The drawer is deleted by `handbook-codex-tab`.
 - [`describe_portrait` logs a `gallery_fallback_used` info event for each fallback species on every build] → Accepted. It is the existing presenter's behavior, and no new logging path is added.

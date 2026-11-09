@@ -14,7 +14,7 @@
 
 ### Requirement: The panel is bounded and fails closed on registry growth
 
-**Reason**: Replaced by "The panel is bounded, trims only placeholders, and fails closed", which carries the v2 slot bounds and the placeholder-first envelope trimming.
+**Reason**: Replaced by "The panel is bounded, trims placeholders then art, and fails closed", which carries the v2 slot bounds and the placeholder-first envelope trimming.
 
 **Migration**: None.
 
@@ -131,7 +131,7 @@ A monster entry's `stage` SHALL be `defeated` when the holder's defeated record 
 
 ### Requirement: Codex entries carry an existing art descriptor or none
 
-A monster entry's `art` SHALL be the existing portrait descriptor of the `portrait:monster:<species_key>` subject, including its fallback terminal, or null when the species is not a registered visual key. A region or anchor entry's `art` SHALL be the existing scene descriptor of its declared scene archetype, or null when it declares none. Every other entry's `art` SHALL be null. Building art SHALL enqueue no job and write no record.
+A monster entry's `art` SHALL be the existing `portrait:monster:<species_key>` descriptor with its fallback terminal, or null for an unregistered visual key. A region or anchor entry's `art` SHALL be its declared scene archetype's scene descriptor, or null. Other entries' `art` SHALL be null. An art-building failure SHALL null that slot's art and be logged. Building art SHALL enqueue no job and write no record.
 
 #### Scenario: A monster entry uses the monster portrait subject
 - **WHEN** a sighted synthetic species is a registered visual key
@@ -149,16 +149,24 @@ A monster entry's `art` SHALL be the existing portrait descriptor of the `portra
 - **WHEN** the panel is built for a holder with discovered monsters and regions
 - **THEN** no art job is enqueued and no art record is created
 
-### Requirement: The panel is bounded, trims only placeholders, and fails closed
+#### Scenario: An art failure degrades one slot only
+- **WHEN** building one entry's art descriptor raises
+- **THEN** that slot's `art` is null, the failure is logged through the observability facade, and the panel stays available with every other slot unchanged
 
-The panel SHALL declare and enforce bounds of 128 slots per category, 512 slots in total, 16 groups per category, 8 card fields, 1024 code points per field value and 8 variant lines, plus code-point bounds on every string. If the payload exceeds the envelope limit, trailing placeholders SHALL be dropped first, from the last category backwards, while `discovered` and `total` keep the untrimmed counts. If no placeholder is left to drop, the presenter SHALL raise its named error.
+### Requirement: The panel is bounded, trims placeholders then art, and fails closed
+
+The panel SHALL declare and enforce bounds of 128 slots per category, 512 slots in total, 16 groups per category, 8 card fields, 1024 code points per field value and 8 variant lines, plus code-point bounds on every string. Over the envelope limit, trailing placeholders SHALL drop first, last category first, then entry art SHALL become null from the last slot backwards; counts stay untrimmed. If nothing is left to trim, the presenter SHALL raise its named error.
 
 #### Scenario: Trailing placeholders drop first
 - **WHEN** a synthetic codex exceeds the envelope limit by less than its placeholders weigh
 - **THEN** only placeholders are dropped, last category first and last slot first, every entry slot is kept, each category's `total` is unchanged, and the payload fits the envelope
 
-#### Scenario: An oversize codex without placeholders fails closed
-- **WHEN** a codex whose entry slots alone exceed the envelope is built
+#### Scenario: Art is dropped after placeholders
+- **WHEN** a synthetic codex still exceeds the envelope after every placeholder was dropped
+- **THEN** entry slots lose their `art` (set to null) from the last slot backwards until the payload fits, and every entry slot and card is kept
+
+#### Scenario: An oversize codex without placeholders or art fails closed
+- **WHEN** a codex whose entry cards alone exceed the envelope is built
 - **THEN** the presenter raises its named validation error and ships nothing
 
 #### Scenario: A bound violation raises
