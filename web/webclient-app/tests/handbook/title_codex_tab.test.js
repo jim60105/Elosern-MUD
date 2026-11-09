@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import TitleCodexTab from "../../components/handbook/TitleCodexTab.vue";
 import { resetQuestDrawerMemory } from "../../components/quest-drawer-memory.js";
-import { BALLOT, UNAVAILABLE_CODEX, epithetRow, titleCodex } from "../../stories/fixtures/title_codex_panels.js";
+import { BALLOT, UNAVAILABLE_CODEX, epithetRow, fixedRow, titleCodex } from "../../stories/fixtures/title_codex_panels.js";
 
 describe("TitleCodexTab (handbook-titles-tab)", () => {
   let wrapper;
@@ -55,6 +55,22 @@ describe("TitleCodexTab (handbook-titles-tab)", () => {
       mountTab(titleCodex({ pending_ballot: BALLOT }));
       expect(railKeys().at(-1)).toBe("ballot");
       expect(railTab("ballot").attributes("aria-label")).toBe("提名（2）");
+    });
+
+    it("renders clergy rows as medals under their own rail entry", async () => {
+      const codex = titleCodex({
+        fixed_rows: [
+          ...titleCodex().fixed_rows,
+          fixedRow({ key: "t_clergy_one", display: "合成聖職甲", category: "clergy" }),
+          fixedRow({ key: "t_clergy_two", display: "合成聖職乙", category: "clergy", unlocked: false, flavor: "", hint: "合成聖職條件。" }),
+        ],
+      });
+      mountTab(codex);
+      expect(railTab("clergy").attributes("aria-label")).toBe("聖職（1）");
+      await openRail("clergy");
+      expect(find("medal--t_clergy_one").attributes("data-locked")).toBe("false");
+      expect(find("medal--t_clergy_two").attributes("data-locked")).toBe("true");
+      expect(wrapper.find('[data-testid="handbook__medal--t_alpha"]').exists()).toBe(false);
     });
 
     it("counts a category's unlocked rows", () => {
