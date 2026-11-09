@@ -356,8 +356,12 @@ drawers, and SHALL NOT push a keyboard menu frame.
 - **THEN** the quest drawer opens on its titles tab through the handbook route request, no overlay opens, and closing the drawer returns focus to the control
 
 #### Scenario: The codex tool opens the reference drawer
-- **WHEN** the player activates the 圖鑑 control in the tool group
-- **THEN** the world-codex reference drawer opens through the single open-drawer entry point, and closing it returns focus to the control
+- **WHEN** the player activates the 圖鑑 control in the tool group, in exploration and in combat
+- **THEN** the quest drawer opens on its codex tab through the handbook route request, no `lore` drawer exists, and closing the drawer returns focus to the control
+
+#### Scenario: The two codex controls are distinguishable
+- **WHEN** the tool group renders
+- **THEN** the world-codex (圖鑑) control and the title-codex (稱號冊) control carry distinct labels and distinct glyphs
 
 #### Scenario: The gallery tool follows the committed gallery panel
 - **WHEN** the committed `gallery` panel is available, and a later revision commits the panel's unavailable form
@@ -377,11 +381,11 @@ drawers, and SHALL NOT push a keyboard menu frame.
 
 #### Scenario: The tool group carries the five tools in order
 - **WHEN** the tool group renders
-- **THEN** it carries, in order, 信件 for the letters drawer, 圖鑑 for the world-codex reference drawer, 稱號冊 for the handbook's titles tab, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay; skill lineage is reached through the party window's 系譜 tab
+- **THEN** it carries, in order, 信件 for the letters drawer, 圖鑑 for the handbook's codex tab, 稱號冊 for the handbook's titles tab, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay; skill lineage is reached through the party window's 系譜 tab
 
 #### Scenario: Each tool control names itself from the shared tool model
 - **WHEN** a tool control renders
-- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens (a tool that opens a handbook tab names that tab's surface, while the drawer header keeps the handbook's own title), discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
+- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens (a tool that opens a handbook tab — 圖鑑 or 稱號冊 — names that tab's surface, while the drawer header keeps the handbook's own title), discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
 
 #### Scenario: A tool opens through the opener-captured path
 - **WHEN** the player activates a tool control with one pointer action or one Enter press

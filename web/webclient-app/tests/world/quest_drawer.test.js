@@ -4,6 +4,7 @@ import { mount } from "@vue/test-utils";
 import QuestDrawer from "../../components/QuestDrawer.vue";
 import { resetQuestDrawerMemory, useQuestDrawerMemory } from "../../components/quest-drawer-memory.js";
 import { UNAVAILABLE_CODEX, titleCodex } from "../../stories/fixtures/title_codex_panels.js";
+import { CODEX_PLACEHOLDER, codexCategory, codexEntry, loreCodex } from "../../stories/fixtures/lore_codex_panels.js";
 import {
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_SAMPLE,
@@ -588,21 +589,28 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       wrapper.findAll('[data-testid="quest-drawer__top-tabs"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
     const titlesRequest = (seq) => ({ seq, slot: "handbook", npcId: null, section: "titles" });
 
-    it("names the window 手帳 and carries the book, counter and titles tabs outside combat", () => {
+    it("names the window 手帳 and carries the book, counter, codex and titles tabs outside combat", () => {
       mountDrawer({ titleCodex: titleCodex() });
-      expect(topKeys()).toEqual(["book", "counter", "titles"]);
+      expect(topKeys()).toEqual(["book", "counter", "codex", "titles"]);
       expect(wrapper.get('[data-testid="quest-drawer"]').attributes("aria-label")).toBe("手帳");
       expect(wrapper.get('[data-testid="quest-drawer__top-tabs"]').attributes("aria-label")).toBe("手帳分類");
     });
 
-    it("carries only the titles tab in combat, keeping a remembered book", () => {
+    it("carries only the codex and titles tabs in combat, keeping a remembered book", () => {
       mountDrawer({ titleCodex: titleCodex(), combat: true });
-      expect(topKeys()).toEqual(["titles"]);
-      expect(topTab("titles").attributes("aria-selected")).toBe("true");
-      expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+      expect(topKeys()).toEqual(["codex", "titles"]);
+      expect(topTab("codex").attributes("aria-selected")).toBe("true");
+      expect(wrapper.find('[data-testid="handbook__codex"]').exists()).toBe(true);
       expect(useQuestDrawerMemory("1|1").top).toBe("book");
       reopen({ titleCodex: titleCodex() });
       expect(topTab("book").attributes("aria-selected")).toBe("true");
+    });
+
+    it("keeps a remembered titles tab in combat", async () => {
+      mountDrawer({ titleCodex: titleCodex(), combat: true });
+      await topTab("titles").trigger("click");
+      reopen({ titleCodex: titleCodex(), combat: true });
+      expect(topTab("titles").attributes("aria-selected")).toBe("true");
     });
 
     it("switches an open drawer to the titles tab on a handbook request", async () => {
@@ -668,6 +676,65 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       await wrapper.setProps({ memoryScope: "2|1" });
       expect(memory.titlesRail).toBeNull();
       expect(memory.appliedRouteSeq).toBeNull();
+    });
+  });
+
+  // handbook-codex-tab: the codex tab in the tab set, its route request and
+  // its honest degradation.
+  describe("the handbook codex tab", () => {
+    const codexRequest = (seq) => ({ seq, slot: "handbook", npcId: null, section: "codex" });
+    const CODEX = loreCodex([
+      codexCategory("cat_a", "甲類", [{ key: "cat_a", label: null, slots: [codexEntry("k_a", "合成甲"), CODEX_PLACEHOLDER] }]),
+    ]);
+    const UNAVAILABLE_LORE = {
+      schema_version: 2,
+      available: false,
+      reason: { code: "x_code", message: "合成的圖鑑不可用原因" },
+    };
+
+    it("switches an open drawer to the codex tab on a handbook request", async () => {
+      mountDrawer({ titleCodex: titleCodex(), loreCodex: CODEX });
+      expect(find("book").exists()).toBe(true);
+      await wrapper.setProps({ routeRequest: codexRequest(1) });
+      expect(topTab("codex").attributes("aria-selected")).toBe("true");
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("codex");
+      expect(wrapper.find('[data-testid="handbook__codex"]').exists()).toBe(true);
+      expect(wrapper.find('[data-tile="k_a"]').exists()).toBe(true);
+    });
+
+    it("opens the codex tab from a request in combat", () => {
+      mountDrawer({ titleCodex: titleCodex(), loreCodex: CODEX, combat: true, routeRequest: codexRequest(2) });
+      expect(topTab("codex").attributes("aria-selected")).toBe("true");
+    });
+
+    it("shows the absent empty state before the first lore_codex commit, with the tab enabled", async () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      await topTab("codex").trigger("click");
+      expect(topTab("codex").attributes("aria-disabled")).toBeUndefined();
+      expect(wrapper.find('[data-testid="handbook__codex-absent"]').exists()).toBe(true);
+    });
+
+    it("disables the codex tab with the panel's reason while the panel is unavailable", async () => {
+      mountDrawer({ titleCodex: titleCodex(), loreCodex: UNAVAILABLE_LORE });
+      const codex = topTab("codex");
+      expect(codex.attributes("aria-disabled")).toBe("true");
+      expect(codex.attributes("data-tip")).toBe("圖鑑 · 合成的圖鑑不可用原因");
+      expect(codex.attributes("aria-describedby")).toBeTruthy();
+      await codex.trigger("click");
+      expect(topTab("book").attributes("aria-selected")).toBe("true");
+    });
+
+    it("yields to the titles tab in combat while only the codex is disabled", () => {
+      mountDrawer({ titleCodex: titleCodex(), loreCodex: UNAVAILABLE_LORE, combat: true });
+      expect(topTab("titles").attributes("aria-selected")).toBe("true");
+    });
+
+    it("dispatches nothing from the codex tab", async () => {
+      mountDrawer({ titleCodex: titleCodex(), loreCodex: CODEX, routeRequest: codexRequest(3) });
+      await wrapper.get('[data-tile="k_a"]').trigger("click");
+      await wrapper.get('[data-testid="handbook__codex-rail"] [data-tab-key="cat_a"]').trigger("click");
+      expect(wrapper.emitted("action")).toBeUndefined();
+      expect(wrapper.find('[data-testid="handbook__full-title"]').exists()).toBe(false);
     });
   });
 });

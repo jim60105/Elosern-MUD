@@ -218,16 +218,16 @@ describe("DesktopNavigation", () => {
     expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("角色肖像圖庫");
   });
 
-  it("emits handbook for codex, overlay for gallery/help and drawer for letters and lore", async () => {
+  it("emits handbook for lore and codex, overlay for gallery/help and drawer for letters", async () => {
     mountNav({ galleryAvailable: true });
     await wrapper.get('[data-testid="nav-tool-letters"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
-    expect(wrapper.emitted("handbook")).toEqual([["titles"]]);
+    expect(wrapper.emitted("handbook")).toEqual([["codex"], ["titles"]]);
     expect(wrapper.emitted("overlay")).toEqual([["gallery"], ["help"]]);
-    expect(wrapper.emitted("drawer")).toEqual([["letters"], ["lore"]]);
+    expect(wrapper.emitted("drawer")).toEqual([["letters"]]);
   });
 
   it("renders identically with and without possession (the bar takes no possession input)", () => {

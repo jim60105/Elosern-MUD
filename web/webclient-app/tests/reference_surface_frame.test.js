@@ -13,6 +13,7 @@ import AppClient from "../AppClient.vue";
 import DrawerHeader from "../components/DrawerHeader.vue";
 import GalleryGenerateDrawer from "../components/GalleryGenerateDrawer.vue";
 import { glyphPath } from "../components/dock-icons.js";
+import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
 import { GALLERY_SAMPLE } from "../stories/gallery-fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
@@ -51,6 +52,9 @@ describe("reference surface headers in the client", () => {
   let wrapper;
 
   beforeEach(() => {
+    // The handbook's session memory is module level: each test starts from a
+    // reload, so a route seq applied by an earlier test never shadows its own.
+    resetQuestDrawerMemory();
     setActivePinia(createPinia());
     store = useElosernStore();
     store.setSender(fx.createFakeSender());
@@ -84,7 +88,6 @@ describe("reference surface headers in the client", () => {
       ["gallery-opener", "角色肖像圖庫"],
       ["nav-tool-help", "說明"],
       ["nav-settings", "設定"],
-      ["nav-tool-lore", "世界圖鑑"],
     ];
     for (const [testid, title] of tools) {
       const opener = wrapper.get(`[data-testid="${testid}"]`);
@@ -100,21 +103,25 @@ describe("reference surface headers in the client", () => {
     }
   }, 20000);
 
-  // handbook-titles-tab: 稱號冊 opens the 手帳 on its 稱號 tab; the drawer
-  // header keeps the handbook's own title and glyph.
-  it("opens the handbook on its titles tab from 稱號冊 under the handbook's own header", async () => {
+  // handbook-titles-tab and handbook-codex-tab: 稱號冊 and 圖鑑 open the 手帳 on
+  // their 稱號 and 圖鑑 tabs; the drawer header keeps the handbook's own title
+  // and glyph.
+  it("opens the handbook on its titles and codex tabs under the handbook's own header", async () => {
     await snapshot();
-    const opener = wrapper.get('[data-testid="nav-tool-codex"]');
-    opener.element.focus();
-    await opener.trigger("click");
-    await wrapper.vm.$nextTick();
-    expect(store.view.hudDrawer).toBe("quest");
-    expect(store.view.hudOverlay).toBeNull();
-    expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("titles");
-    expect(wrapper.findAll(".drawer-header")).toHaveLength(1);
-    expect(wrapper.get(".drawer-header__title").text()).toBe("手帳");
-    await wrapper.get(".drawer-header__close").trigger("click");
-    expect(document.activeElement).toBe(opener.element);
+    for (const [testid, tab] of [["nav-tool-codex", "titles"], ["nav-tool-lore", "codex"]]) {
+      const opener = wrapper.get(`[data-testid="${testid}"]`);
+      opener.element.focus();
+      await opener.trigger("click");
+      await wrapper.vm.$nextTick();
+      expect(store.view.hudDrawer, testid).toBe("quest");
+      expect(store.view.hudOverlay, testid).toBeNull();
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab"), testid).toBe(tab);
+      expect(wrapper.findAll(".drawer-header"), testid).toHaveLength(1);
+      expect(wrapper.get(".drawer-header__title").text(), testid).toBe("手帳");
+      expect(headerGlyph(), testid).toBe(glyphPath("quests"));
+      await wrapper.get(".drawer-header__close").trigger("click");
+      expect(document.activeElement, testid).toBe(opener.element);
+    }
   });
 
   it("opens the party window on 系譜 with the L hotkey from 隊伍 and returns focus on close", async () => {
@@ -154,7 +161,7 @@ describe("reference surface headers in the client", () => {
   it("gives every reference drawer a registry glyph", async () => {
     await snapshot();
     const opened = [];
-    for (const name of ["skill", "inventory", "quest", "lore", "status", "party"]) {
+    for (const name of ["skill", "inventory", "quest", "status", "party"]) {
       store.openHudDrawer(name);
       await wrapper.vm.$nextTick();
       // A drawer opens only while its payload is present; the fixture

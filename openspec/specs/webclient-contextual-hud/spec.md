@@ -2715,7 +2715,7 @@ Reference drawers and full-screen overlays SHALL present one shared header: a de
 - **THEN** the header uses the matching glyph and has one named close control in the shared position
 
 ### Requirement: Drawer art and identity match the subject
-The party window and the shop window SHALL show members through the member rail portraits and SHALL render no portrait art column; a remaining reference drawer SHALL show the current character's portrait column only when that character is its subject. The skill book, shop, quest, and world-codex drawers SHALL render no art column and no stand-in illustration. The status tab hero SHALL name only supplied values.
+The party window and the shop window SHALL show members through the member rail portraits and SHALL render no portrait art column; a remaining reference drawer SHALL show the current character's portrait column only when that character is its subject. The skill book, shop and quest drawers SHALL render no art column and no stand-in illustration; the codex detail hero SHALL show only the entry's own art or category emblem. The status tab hero SHALL name only supplied values.
 
 #### Scenario: The art column is bounded over plain ink
 - **WHEN** a subject drawer renders its art column
@@ -2728,6 +2728,10 @@ The party window and the shop window SHALL show members through the member rail 
 #### Scenario: Codex is not the player
 - **WHEN** the world codex or quest log opens
 - **THEN** the player portrait is not presented as relevant content and the content uses the available width
+
+#### Scenario: The codex hero shows only the entry
+- **WHEN** a codex entry is selected in the handbook codex tab
+- **THEN** its hero renders that entry's art descriptor, or its category emblem when the entry has none, and never the player's portrait or a scene of the current room
 
 #### Scenario: Character fields are unavailable
 - **WHEN** the character panel lacks a rank or title
@@ -2742,7 +2746,7 @@ The party window and the shop window SHALL show members through the member rail 
 - **THEN** the frame's single label reads `無肖像`, not `肖像生成中`
 
 ### Requirement: Empty drawer guidance preserves unavailable reasons
-An available but empty list — the quest book with no rows, the world codex with nothing discovered, the party window bag tab with no rows, and the party window member rail with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own.
+An available but empty list — the quest book with no rows, the world codex detail with nothing discovered (beside its placeholder wall), the party window bag tab with no rows, and the party window member rail with no companions — SHALL render the shared empty guidance: a decorative registry glyph, a short headline, and one line of guidance in a solid ink frame, adding no control of its own.
 
 #### Scenario: The party keeps its invite row
 - **WHEN** the party has no companions

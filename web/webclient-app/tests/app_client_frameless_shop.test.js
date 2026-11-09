@@ -92,7 +92,7 @@ describe("frameless 商店 drawer (composition contract)", () => {
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
+    const drawers = ["skill", "inventory", "shop", "quest", "status", "party"];
     // A deep exploration frame that renders a row region. The exploration
     // family pushes none of its own since exploration-room-actions (the
     // wait and suggestions are client-local cards), so the top navigation's

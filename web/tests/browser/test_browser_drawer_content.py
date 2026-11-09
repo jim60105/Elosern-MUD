@@ -159,10 +159,15 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                 )
                 _close_drawer(page)
 
-                for name in ("quest", "lore"):
+                for name, tab in (("quest", "book"), ("quest", "codex")):
                     _open_drawer(page, name)
+                    if tab == "codex":
+                        # The world codex is the handbook's 圖鑑 tab
+                        # (handbook-codex-tab).
+                        page.locator('[data-testid="quest-drawer__top-tabs"] [data-tab-key="codex"]').click()
+                        page.wait_for_selector('[data-testid="handbook__codex"]', timeout=15000)
                     probe = page.evaluate(_ART_PROBE)
-                    self.assertIsNone(probe["artWidth"], f"the {name} drawer carries no art column")
+                    self.assertIsNone(probe["artWidth"], f"the {name} drawer's {tab} tab carries no art column")
                     self.assertGreaterEqual(probe["bodyWidth"], probe["workspaceWidth"] - 1)
                     _close_drawer(page)
                 page.close()
@@ -212,12 +217,16 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
             category["discovered"] = 0
         codex["discovered_total"] = 0
         inject_update(page, {"lore_codex": codex})
-        _open_drawer(page, "lore")
-        empty = page.locator('[data-testid="lore-codex-drawer__empty"]')
+        page.locator('[data-testid="nav-tool-lore"]').click()
+        empty = page.locator('[data-testid="handbook__codex-empty"]')
         empty.wait_for(timeout=15000)
-        self.assertEqual(empty.locator(".empty-state__headline").inner_text(), "尚未發現任何條目")
+        self.assertEqual(empty.locator(".empty-state__headline").inner_text(), "尚無記錄")
         self.assertEqual(empty.locator(".empty-state__glyph").get_attribute("aria-hidden"), "true")
-        self.assertEqual(page.locator('[data-testid="lore-codex-drawer__unavailable"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="handbook__codex-unavailable"]').count(), 0)
+        # The empty guidance stands beside the full placeholder wall.
+        self.assertGreater(
+            page.locator('[data-testid="handbook__codex-wall"] [role="option"][aria-disabled="true"]').count(), 0
+        )
         page.close()
 
     @covers_requirement("webclient-contextual-hud::lineage-identity-and-inventory-rarity-use-backed-fields")

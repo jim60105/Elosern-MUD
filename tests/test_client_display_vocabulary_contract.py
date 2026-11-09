@@ -4,7 +4,7 @@ The Vue client names a few finite server identifiers itself instead of
 printing them (webclient-zh-tw-copy-and-labels): the combat-modifier
 adjustment keys (``lib/condition_label.js``), the skill target types and
 elements (``lib/skill_labels.js``), and the lore codex card fields
-(``lib/codex_field_label.js``). Each dictionary falls back to a neutral name
+(``components/handbook/lore-codex-model.js``). Each dictionary falls back to a neutral name
 for an unknown identifier, so a server-side addition would silently read as
 其他修正 / 未知屬性 / 資料. This contract fails first instead: every identifier
 the server can ship has an entry, and element names equal the registry's own.
@@ -35,6 +35,7 @@ from world.rules.lore_knowledge import CODE_CATEGORIES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _LIB = REPO_ROOT / "web/webclient-app/lib"
+_HANDBOOK = REPO_ROOT / "web/webclient-app/components/handbook"
 
 
 def _frozen_map(path: Path, name: str) -> dict[str, str]:
@@ -81,7 +82,7 @@ class ClientDisplayVocabularyContractTests(unittest.TestCase):
             for category in CODE_CATEGORIES.values()
             for field in category.card_fields
         }
-        labels = _frozen_map(_LIB / "codex_field_label.js", "CODEX_FIELD_LABELS")
+        labels = _frozen_map(_HANDBOOK / "lore-codex-model.js", "CODEX_FIELD_LABELS")
         self.assertEqual(sorted(fields - labels.keys()), [])
 
 

@@ -114,10 +114,14 @@ describe("H4 store reference-drawer controller", () => {
 
   it("opens the named drawer and rejects an unknown drawer name (task 4.1)", () => {
     openSession();
-    expect(store.openHudDrawer("lore")).toBe(true);
-    expect(store.view.hudDrawer).toBe("lore");
+    expect(store.openHudDrawer("letters")).toBe(true);
+    expect(store.view.hudDrawer).toBe("letters");
     expect(store.openHudDrawer("bogus")).toBe(false);
-    expect(store.view.hudDrawer).toBe("lore");
+    expect(store.view.hudDrawer).toBe("letters");
+    // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab): the
+    // retired `lore` drawer name is rejected like any unknown name.
+    expect(store.openHudDrawer("lore")).toBe(false);
+    expect(store.view.hudDrawer).toBe("letters");
     // The retired skill-book drawer's name opens the party window on its
     // 技能 tab (webclient-party-skill-tab); "skill" is never stored.
     expect(store.openHudDrawer("skill")).toBe(true);
@@ -128,8 +132,8 @@ describe("H4 store reference-drawer controller", () => {
     expect(store.openHudDrawer("status")).toBe(true);
     expect(store.view.hudDrawer).toBe("party");
     expect(partyWindowTab()).toBe("status");
-    expect(store.openHudDrawer("lore")).toBe(true);
-    expect(store.view.hudDrawer).toBe("lore");
+    expect(store.openHudDrawer("quest")).toBe(true);
+    expect(store.view.hudDrawer).toBe("quest");
     expect(store.openHudDrawer("party")).toBe(true);
     expect(store.view.hudDrawer).toBe("party");
   });
@@ -256,7 +260,7 @@ describe("H4 store reference-drawer controller", () => {
       expect(store.view.serviceReadRequest).toBe(null);
     });
 
-    it("offers only the titles tab in combat", () => {
+    it("offers only the codex and titles tabs in combat", () => {
       openSession();
       enterCombat();
       expect(store.openHandbook("book")).toBe(false);
@@ -264,6 +268,16 @@ describe("H4 store reference-drawer controller", () => {
       expect(store.view.serviceReadRequest).toBe(null);
       expect(store.openHandbook("titles")).toBe(true);
       expect(store.view.hudDrawer).toBe("quest");
+      expect(store.openHandbook("codex")).toBe(true);
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.view.serviceReadRequest).toMatchObject({ slot: "handbook", npcId: null, section: "codex" });
+    });
+
+    it("rejects the retired lore drawer name in combat too", () => {
+      openSession();
+      enterCombat();
+      expect(store.openHudDrawer("lore")).toBe(false);
+      expect(store.view.hudDrawer).toBe(null);
     });
 
     it("no longer accepts the retired codex overlay", () => {

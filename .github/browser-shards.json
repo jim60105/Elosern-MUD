@@ -1298,7 +1298,10 @@
         "web.tests.browser.test_browser_gallery_image_contract.GalleryImageContractBrowserTest.test_official_and_synthetic_rows_carry_their_own_truth"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round"
+        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
+        "web.tests.browser.test_browser_handbook_codex.HandbookCodexBrowserTest.test_codex_tab_geometry_at_reference_viewports",
+        "web.tests.browser.test_browser_handbook_codex.HandbookCodexBrowserTest.test_monster_legend_stays_pinned_while_tiles_scroll",
+        "web.tests.browser.test_browser_handbook_codex.HandbookCodexBrowserTest.test_codex_tool_opens_the_codex_tab_in_combat"
       ]
     }
   ]

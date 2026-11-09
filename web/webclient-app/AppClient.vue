@@ -18,7 +18,6 @@ import ExplorationReadout from "./components/ExplorationReadout.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
 import HudDrawer from "./components/HudDrawer.vue";
 import LocalMap from "./components/LocalMap.vue";
-import LoreCodexDrawer from "./components/LoreCodexDrawer.vue";
 import MapDrawer from "./components/MapDrawer.vue";
 import SleepForm from "./components/SleepForm.vue";
 import TimeChoiceCard from "./components/TimeChoiceCard.vue";
@@ -343,7 +342,8 @@ watch(
       return;
     }
     if (drawer === "quest" && store.view.mode === "combat") {
-      // In combat the handbook carries only its titles tab: no counter read.
+      // In combat the handbook carries only its codex and titles tabs: no
+      // counter read.
       closeServices("shop");
       closeServices("counter");
       return;
@@ -1801,9 +1801,9 @@ const rootStyle = computed(() => {
         :memory-scope="`${store.view.generation}|${store.view.epoch}`"
         :combat="store.view.mode === 'combat'"
         :title-codex="panel('title_codex')"
+        :lore-codex="panel('lore_codex')"
         @action="onQuestAction"
       />
-      <LoreCodexDrawer v-else-if="store.view.hudDrawer === 'lore'" :codex="panel('lore_codex')" />
     </HudDrawer>
 
     <!-- H5 (tasks 5.4/6.4): the single shared full-screen overlay surface.

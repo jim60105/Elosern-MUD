@@ -29,14 +29,11 @@ Test-to-requirement mapping (applied at archive):
   every story file, plus ``test_world_family_stories_make_no_non_local_requests``,
   which scopes that check to the World family's six story files).
 
-- ``webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels``
-  and ``webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does``
-  (change 10's drawer behavior, implemented and verified in the Vue layer):
-  ``test_vitest_world_family_suite_passes`` executes the world Vitest filter
-  that includes ``lore_codex_drawer.test.js`` — the suite pinning the
-  category strip with honest zero counts and the aggregate control, the
-  locally-dispatched two-level navigation, the panel-order card fields, and
-  the empty, unavailable, and absent states.
+- The world codex drawer (change 10's ``LoreCodexDrawer``) retired with
+  handbook-codex-tab: the codex is the handbook's 圖鑑 tab, whose Vitest
+  suites under ``tests/handbook/`` run through
+  ``web/webclient/tests/test_vue_handbook_evidence.py``. The family keeps the
+  ``World/LoreCodexTab`` component and its stories.
 """
 
 from __future__ import annotations
@@ -61,7 +58,7 @@ WORLD_FAMILY_KEYS = (
     "World/LocalMap",
     "World/ShopWindow",
     "World/QuestDrawer",
-    "World/LoreCodexDrawer",
+    "World/LoreCodexTab",
     "World/MapLattice",
 )
 
@@ -78,11 +75,15 @@ WORLD_FAMILY_STORY_IDS = {
     "world-maplattice--island-scale-sample",
     "world-maplattice--island-scale-wilderness",
     "world-maplattice--island-scale-minimal",
-    "world-lorecodexdrawer--populated-codex",
-    "world-lorecodexdrawer--category-selected",
-    "world-lorecodexdrawer--entry-selected",
-    "world-lorecodexdrawer--empty-codex",
-    "world-lorecodexdrawer--unavailable",
+    "world-lorecodextab--monster-wall",
+    "world-lorecodextab--sighted-detail",
+    "world-lorecodextab--defeated-detail",
+    "world-lorecodextab--region-scene-art",
+    "world-lorecodextab--element-emblem",
+    "world-lorecodextab--nothing-discovered",
+    "world-lorecodextab--absent",
+    "world-lorecodextab--unavailable",
+    "world-lorecodextab--in-combat",
     "world-questdrawer--book-in-progress",
     "world-questdrawer--completed-hot-badge",
     "world-questdrawer--failed",
@@ -315,10 +316,6 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     @covers_requirement(
         "webclient-component-showcase::the-map-art-and-services-surfaces-render-oob-backed-data-truthfully"
     )
-    @covers_requirement(
-        "webclient-lore-codex-panel::the-codex-drawer-renders-the-panel-in-two-navigation-levels",
-        "webclient-lore-codex-panel::the-codex-drawer-discloses-no-more-than-the-panel-does",
-    )
     def test_vitest_world_family_suite_passes(self):
         """Every world + services family SFC renders its contract states under Vitest.
 
@@ -417,7 +414,7 @@ class VueShowcaseWorldEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             family_titles,
             {f"World/{component}" for component in (
                 "LocalMap", "ShopWindow",
-                "QuestDrawer", "LoreCodexDrawer",
+                "QuestDrawer", "LoreCodexTab",
                 "MapLattice",
             )},
         )

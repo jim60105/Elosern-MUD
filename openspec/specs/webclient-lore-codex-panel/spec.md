@@ -67,100 +67,6 @@ which the writer treats as a no-op, SHALL NOT push.
 - **WHEN** an already-discovered entry is revealed again
 - **THEN** no push occurs
 
-### Requirement: The codex drawer renders the panel in two navigation levels
-
-The codex drawer SHALL render only the committed `lore_codex` panel. It SHALL present a category
-strip carrying one control per shipped category plus an aggregate control covering every discovered
-entry, an entry list for the selected category, and the selected entry's card. Navigation between
-these levels SHALL be local to the client.
-
-#### Scenario: Selecting a category filters locally
-- **WHEN** the player selects a category control
-- **THEN** the entry list shows exactly that category's entries and no request is dispatched
-
-#### Scenario: Selecting an entry shows its card
-- **WHEN** the player selects an entry
-- **THEN** its card renders exactly the panel's field list in the panel's order, each value verbatim
-  under its readable field name and no raw field identifier visible, and no request is dispatched
-
-#### Scenario: The aggregate control shows everything discovered
-- **WHEN** the player selects the aggregate control
-- **THEN** every discovered entry across every category is listed
-
-#### Scenario: Navigation is local because the panel is complete
-- **WHEN** the player navigates between the drawer's levels
-- **THEN** no action is dispatched and no fetch is triggered, because the panel already carries
-  every discovered entry and its rendered card
-
-#### Scenario: The card renders in the panel's field order
-- **WHEN** a card renders in the drawer
-- **THEN** it shows the panel's card fields in the order the panel supplies them, with no field
-  added, reordered, or truncated by the drawer and every field value verbatim
-
-#### Scenario: Card fields carry readable names
-- **WHEN** a card field renders in the drawer
-- **THEN** it is named by the drawer's closed readable vocabulary for the declared card fields
-  (名稱, 描述, 首都, 地貌, 例證), never by its raw field identifier, which stays only a non-visible
-  hook
-
-#### Scenario: A field outside the vocabulary falls back to 資料
-- **WHEN** a card field is outside the closed readable vocabulary
-- **THEN** it is named by the neutral 資料 and keeps its value
-
-### Requirement: The codex drawer discloses no more than the panel does
-
-Each category control SHALL show that category's discovered count and nothing else — no registry
-total, no denominator, no completion percentage, and no locked, hidden, or greyed entry placeholder.
-A category shipped with zero entries SHALL render as a zero-count control. A codex with nothing
-discovered SHALL render an honest empty state rather than a list of unavailable entries. An
-unavailable panel SHALL render the registry-owned unavailable reason and no codex content.
-
-#### Scenario: A category with nothing discovered shows zero, not a total
-- **WHEN** the player has discovered nothing in a category
-- **THEN** its control shows a count of zero and its entry list is empty, with no indication of how
-  many entries the category could hold
-
-#### Scenario: An empty codex renders an honest empty state
-- **WHEN** the panel ships every category empty
-- **THEN** the drawer renders an empty-codex message and no entry rows
-
-#### Scenario: An unavailable panel renders its reason
-- **WHEN** the panel is the common unavailable form
-- **THEN** the drawer renders that reason and no category strip, entry list, or card
-
-### Requirement: The codex opens from the top navigation bar, not from the quest drawer
-
-The codex drawer SHALL be opened by the labelled 圖鑑 control in the top navigation bar's tool group,
-and by no control inside the quest drawer or the command line. The control SHALL open the codex
-reference drawer through the store's single open-drawer entry point.
-
-#### Scenario: The top navigation bar opens the codex
-- **WHEN** the player activates the 圖鑑 control in the top navigation bar's tool group while the command line is collapsed
-- **THEN** the codex reference drawer opens and any previously open drawer or overlay closes
-
-#### Scenario: The quest drawer offers no codex control
-- **WHEN** the quest drawer renders
-- **THEN** it contains no control that opens the codex
-
-#### Scenario: The two codex controls are distinguishable
-- **WHEN** the top navigation bar's tool group renders
-- **THEN** the world-codex control and the title-codex control carry distinct labels and distinct
-  glyphs
-
-#### Scenario: Opening the codex respects drawer exclusivity
-- **WHEN** the control opens the codex reference drawer
-- **THEN** at most one focus-trapped surface is open at a time and the existing drawer teardown
-  rules apply unchanged
-
-#### Scenario: Closing the drawer returns focus
-- **WHEN** the codex drawer closes
-- **THEN** focus returns to the 圖鑑 control
-
-#### Scenario: The glyph is distinct from the title-codex control
-- **WHEN** the top navigation bar's tool group renders
-- **THEN** the codex control's glyph is visually distinct from the adjacent title-codex (稱號冊)
-  control, which opens a different system
-
 ### Requirement: Codex entry titles are the registry's display names
 
 Each entry slot's `title` SHALL be the `display_name_zh` of its card, which every category declares as its first card field, so a race entry is titled by its race name (人類, never `human`) and a guild rank entry by its rank name (`F 級`). The entry `key` SHALL stay the opaque registry key.
@@ -297,3 +203,111 @@ The panel SHALL declare and enforce bounds of 128 slots per category, 512 slots 
 #### Scenario: The client validator mirrors the declared bounds
 - **WHEN** the server declares its payload bounds
 - **THEN** the client validator mirrors the exact values, guarded by the dual-direction parity contract
+
+### Requirement: The handbook codex tab renders the committed panel as a grouped tile wall
+
+The codex tab SHALL render only the committed `lore_codex` panel. Its rail SHALL carry one entry per shipped category, in panel order, with the category's `discovered` count. The wall SHALL render the selected category's groups in order, with a group heading for each non-null label, and one tile per slot in slot order. Navigation SHALL be local and dispatch nothing.
+
+#### Scenario: Selecting a category shows its wall
+- **WHEN** the player selects a rail entry
+- **THEN** the wall shows exactly that category's slots grouped as shipped, and no request is dispatched
+
+#### Scenario: Placeholders are focusable but not selectable
+- **WHEN** focus reaches a placeholder tile and the player presses Enter or clicks it
+- **THEN** the tile carries an accessible name that names no entry and `aria-disabled`, and the selection does not change
+
+#### Scenario: Tiles walk by keyboard
+- **WHEN** focus is on a tile and the player presses an arrow key, Home or End, then Enter on an entry tile
+- **THEN** focus moves in reading order across groups without changing the selection, and Enter selects the focused entry
+
+#### Scenario: The detail renders the card verbatim
+- **WHEN** an entry tile is selected
+- **THEN** the detail shows the slot's title and every card field other than the title field, in panel order, each value verbatim under a readable field name, and no raw field identifier is visible
+
+#### Scenario: The selection is remembered per category
+- **WHEN** the player selects an entry, switches category, and returns
+- **THEN** the same entry is selected again within the same memory scope
+
+#### Scenario: A codex route request opens the codex tab
+- **WHEN** the handbook route entry is called with the codex tab, in exploration and in combat
+- **THEN** the quest drawer opens with the codex tab selected
+
+### Requirement: Monster research stages differ by shape and are explained
+
+A monster entry tile SHALL mark its stage by a shape that differs between `defeated` and `sighted`, and a placeholder SHALL use a third mark. The monster wall SHALL carry a legend naming all three marks. The legend SHALL stay visible at the bottom edge of the wall while the tiles scroll. The monster detail SHALL show a two-step research track whose steps reflect the stage.
+
+#### Scenario: Stage marks differ by shape
+- **WHEN** the monster wall shows a defeated tile, a sighted tile and a placeholder
+- **THEN** each carries a distinct stage-mark element (`data-stage` `defeated`, `sighted`, or `unknown`) whose shape differs, not only its colour
+
+#### Scenario: The legend stays pinned
+- **WHEN** the monster wall's tiles overflow and the wall is scrolled to its top and then to its bottom
+- **THEN** the legend's box lies inside the wall's visible box at both positions
+
+#### Scenario: The research track follows the stage
+- **WHEN** a sighted and then a defeated monster entry is selected
+- **THEN** the track marks only its first step reached for the sighted entry, and both steps for the defeated entry; for the sighted entry the second step names exactly the readable names of its `locked_fields`
+
+### Requirement: A sighted monster shows its locked fields without values
+
+For each name in a selected entry's `locked_fields`, the detail SHALL render one locked box labelled with that field's readable name. A locked box SHALL show no value. A defeated entry SHALL render no locked box.
+
+#### Scenario: Locked fields render as locked boxes
+- **WHEN** a sighted entry whose `locked_fields` names four fields is selected
+- **THEN** the detail renders four locked boxes in `locked_fields` order and no value for those fields
+
+#### Scenario: A defeated entry has no locked box
+- **WHEN** a defeated entry is selected
+- **THEN** no locked box renders
+
+### Requirement: Codex hero art falls back to the category emblem
+
+The detail hero SHALL render the selected entry's `art` descriptor through the shared artwork attempt lifecycle. When `art` is null, when no attempt or terminal of the descriptor has loaded, or when every permitted source failed, the hero SHALL render the category emblem instead. The hero SHALL never show an empty frame.
+
+#### Scenario: A null art shows the emblem
+- **WHEN** an entry whose `art` is null is selected
+- **THEN** the hero shows that category's emblem
+
+#### Scenario: A failed image falls back to the emblem
+- **WHEN** an entry's art descriptor has one attempt whose image fails to load and no terminal
+- **THEN** after the failure the hero shows the category emblem and no image frame
+
+#### Scenario: A loaded image replaces the emblem
+- **WHEN** an entry's art descriptor attempt loads successfully
+- **THEN** the hero shows that image
+
+### Requirement: The handbook codex tab degrades honestly
+
+Before the first `lore_codex` commit the codex tab SHALL be enabled and show the shared empty state. While the panel is unavailable the tab SHALL be disabled, yet focusable, with the panel's reason. A codex with nothing discovered SHALL render its full placeholder wall and the empty detail guidance. A selection gone after a commit SHALL move to the category's first entry, else to the empty detail.
+
+#### Scenario: Before the first commit
+- **WHEN** the codex tab is selected before any `lore_codex` panel was committed
+- **THEN** it shows the shared empty state and no tile
+
+#### Scenario: An unavailable panel disables the tab
+- **WHEN** the committed `lore_codex` panel is the common unavailable form
+- **THEN** the codex tab is disabled, keyboard focus can reach it, and its tooltip and accessible description carry the panel's reason message
+
+#### Scenario: Nothing discovered shows the placeholder wall
+- **WHEN** the committed panel holds only placeholders
+- **THEN** the wall renders every placeholder and the detail renders the shared empty guidance
+
+#### Scenario: A vanished selection falls back
+- **WHEN** the selected entry is gone after a commit
+- **THEN** the category's first entry is selected, or the empty detail shows when it has none
+
+### Requirement: The handbook codex tab fits the reference viewports
+
+On the live client at 1451x790 and at 2560x1440 the codex tab SHALL lay out its rail, wall and detail columns side by side inside the drawer body. The wall SHALL NOT scroll horizontally. No rendered text SHALL be smaller than the `--text-xs` token's computed size. Each legend mark SHALL have a fixed size that does not depend on the wall width.
+
+#### Scenario: Three columns fit at both viewports
+- **WHEN** the live client opens the monster category of the codex tab at 1451x790 and at 2560x1440
+- **THEN** the rail, wall and detail columns do not overlap, each lies inside the drawer body, and the wall has no horizontal scroll overflow
+
+#### Scenario: No text below the floor
+- **WHEN** the codex tab renders at either viewport
+- **THEN** every visible text node's computed font size is at least the computed size of `--text-xs`
+
+#### Scenario: Legend marks keep their size
+- **WHEN** the monster legend renders at both viewports
+- **THEN** each legend mark's rendered width equals `12px` times the page's `--ui-scale` within 1px

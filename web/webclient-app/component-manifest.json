@@ -46,7 +46,7 @@
     "World/QuestList",
     "World/QuestDetail",
     "World/LettersPanel",
-    "World/LoreCodexDrawer",
+    "World/LoreCodexTab",
     "World/TitleBallotMenu",
     "World/MapLattice",
     "Overlays/MapDrawer",

@@ -9,9 +9,18 @@
 // pinned at the bottom. The `hero` slot replaces the default hero face
 // (the codex tab puts art there). It renders a view model only and owns no
 // state; footer presses are re-emitted as `press(key)`.
+//
+// A codex detail (`detail.kind === "codex"`, handbook-codex-tab design D4)
+// draws the entry's art (CodexArt, falling back to its category emblem) in a
+// taller hero under the rotated stage stamp, then the two-step research track
+// for a monster, the card fields as labelled sections, and one dashed
+// 擊敗後解鎖 box per locked field, which never shows a value. The codex has no
+// action, so it is shown with no footer. The `empty` slot fills the empty
+// column (the codex tab's 尚無記錄 guidance).
 import { ref } from "vue";
 import DetailFooter from "../DetailFooter.vue";
 import GradeGem from "../GradeGem.vue";
+import CodexArt from "./CodexArt.vue";
 import CodexEmblem from "./CodexEmblem.vue";
 
 defineProps({
@@ -21,6 +30,8 @@ defineProps({
   // DetailFooter props ({ reason, reasonTone, reasonRole, buttons }), or null
   // for no footer.
   footer: { type: Object, default: null },
+  // The committed panel a codex detail's art descriptor came from.
+  artPanel: { type: Object, default: null },
 });
 
 const emit = defineEmits(["press"]);
@@ -37,9 +48,17 @@ defineExpose({ focus });
 <template>
   <article v-if="detail" :key="detail.id" class="codex-detail" data-testid="handbook__detail" :data-detail-id="detail.id">
     <div class="codex-detail__scroll">
-      <div class="codex-detail__hero">
+      <div class="codex-detail__hero" :class="{ 'codex-detail__hero--art': detail.kind === 'codex' }">
         <slot name="hero" :detail="detail">
-          <div class="codex-detail__face">
+          <CodexArt
+            v-if="detail.kind === 'codex'"
+            class="codex-detail__art"
+            :art="detail.art"
+            :panel="artPanel"
+            :emblem="detail.emblem"
+            variant="hero"
+          />
+          <div v-else class="codex-detail__face">
             <span
               class="codex-detail__medal"
               :class="{ 'is-locked': detail.locked }"
@@ -57,6 +76,7 @@ defineExpose({ focus });
           :class="`codex-detail__stamp--${detail.stamp.kind}`"
           data-testid="handbook__stamp"
           :data-stamp="detail.stamp.kind"
+          :data-stage="detail.kind === 'codex' ? detail.stage : undefined"
         >{{ detail.stamp.label }}</span>
       </div>
 
@@ -68,6 +88,50 @@ defineExpose({ focus });
         <h3 class="codex-detail__title" :class="{ 'is-locked': detail.locked }">{{ detail.name }}</h3>
         <p v-if="detail.subtitle" class="codex-detail__subtitle">{{ detail.subtitle }}</p>
       </header>
+
+      <section v-if="detail.track" class="codex-detail__research" aria-label="研究進度">
+        <h4 class="codex-detail__label">研究</h4>
+        <ol class="codex-detail__track" data-testid="handbook__research-track">
+          <li
+            v-for="step in detail.track"
+            :key="step.key"
+            :class="{ 'is-on': step.reached }"
+            :data-step="step.key"
+            :data-reached="String(step.reached)"
+          >
+            <span class="codex-detail__pip" aria-hidden="true"></span>
+            {{ step.label }}
+            <small v-if="step.unlocks">{{ step.unlocks }}</small>
+          </li>
+        </ol>
+      </section>
+
+      <section
+        v-for="field in detail.fields ?? []"
+        :key="`field:${field.name}`"
+        class="codex-detail__section"
+        data-testid="handbook__section"
+        :data-field="field.name"
+      >
+        <h4 class="codex-detail__label">{{ field.label }}</h4>
+        <p class="codex-detail__text codex-detail__text--field">{{ field.value }}</p>
+      </section>
+
+      <section
+        v-for="item in detail.locked ?? []"
+        :key="`locked:${item.name}`"
+        class="codex-detail__locked"
+        data-testid="handbook__locked-field"
+        :data-field="item.name"
+      >
+        <h4 class="codex-detail__label">{{ item.label }}</h4>
+        <p class="codex-detail__locked-box">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M8 11V8a4 4 0 0 1 8 0v3M5.5 11h13v9.5h-13zM12 14.5v2.5" stroke="currentColor" stroke-width="1.6" />
+          </svg>
+          擊敗後解鎖
+        </p>
+      </section>
 
       <section
         v-for="(section, index) in detail.sections ?? []"
@@ -81,7 +145,7 @@ defineExpose({ focus });
     </div>
     <DetailFooter v-if="footer" ref="footerRef" v-bind="footer" @press="(key) => emit('press', key)" />
   </article>
-  <div v-else class="codex-detail codex-detail--empty" data-testid="handbook__detail-empty"></div>
+  <div v-else class="codex-detail codex-detail--empty" data-testid="handbook__detail-empty"><slot name="empty" /></div>
 </template>
 
 <style scoped>
@@ -144,6 +208,19 @@ defineExpose({ focus });
     radial-gradient(40% 70% at 50% 55%, rgba(228, 200, 142, 0.16), transparent 70%),
     radial-gradient(70% 90% at 50% 60%, #2c261b, #121418 75%);
   border-bottom: 1px solid rgba(185, 154, 96, 0.2);
+}
+
+/* The codex hero: the prototype's taller `.hb-hero` band, art edge to edge,
+   fading out at the bottom. */
+.codex-detail__hero--art {
+  height: calc(230px * var(--ui-scale));
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.codex-detail__art {
+  position: absolute;
+  inset: 0;
 }
 
 .codex-detail__face {
@@ -216,6 +293,20 @@ defineExpose({ focus });
 .codex-detail__stamp--pending {
   color: var(--seal-400);
   border: 3px double var(--seal-500);
+}
+
+.codex-detail__stamp--defeated {
+  color: var(--seal-400);
+  border: 3px double var(--seal-500);
+}
+
+.codex-detail__stamp--sighted {
+  color: var(--paper-300);
+  border: 2px dashed var(--paper-500);
+}
+
+.codex-detail__hero--art .codex-detail__stamp {
+  bottom: calc(46px * var(--ui-scale));
 }
 
 .codex-detail__head {
@@ -292,6 +383,72 @@ defineExpose({ focus });
   margin: 0;
   color: var(--paper-200);
   font: var(--text-sm) / 1.9 var(--f-serif);
+}
+
+/* A card value keeps its own line breaks (a variants list is one line per
+   variant). */
+.codex-detail__text--field {
+  white-space: pre-line;
+}
+
+/* The research track: the prototype's `.hb-track`, two labelled steps. */
+.codex-detail__track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.codex-detail__track li {
+  display: grid;
+  gap: var(--sp-1);
+  color: var(--paper-500);
+  font: var(--text-sm) var(--f-display);
+  letter-spacing: 0.1em;
+}
+
+.codex-detail__track li small {
+  color: var(--paper-500);
+  font: var(--text-xs) var(--f-sans);
+  letter-spacing: 0;
+}
+
+.codex-detail__track li.is-on {
+  color: var(--paper-50);
+}
+
+.codex-detail__pip {
+  height: calc(10px * var(--ui-scale));
+  background: #0b0d10;
+  border: 1px solid var(--ink-600);
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+
+.codex-detail__track li.is-on .codex-detail__pip {
+  background: linear-gradient(90deg, var(--gold-600), var(--gold-400));
+  border-color: var(--gold-500);
+  box-shadow: 0 0 8px var(--gold-glow);
+}
+
+/* A locked field: the prototype's dashed `.hb-locked` box, no value. */
+.codex-detail__locked-box {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--paper-500);
+  font-size: var(--text-sm);
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
+}
+
+.codex-detail__locked-box svg {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
 }
 
 @media (prefers-reduced-motion: reduce) {

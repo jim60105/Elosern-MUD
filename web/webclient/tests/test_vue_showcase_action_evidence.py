@@ -152,7 +152,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Data/VitalsTrack",
                 "Data/ConditionChips",
                 "World/LocalMap", "World/ShopWindow",
-                "World/QuestDrawer", "World/LoreCodexDrawer",
+                "World/QuestDrawer", "World/LoreCodexTab",
                 "World/MapLattice",
                 "Overlays/CreationOverlay", "Overlays/HelpOverlay",
                 "Overlays/MapDrawer", "Overlays/MapEdgePointers", "Overlays/SettingsOverlay",
