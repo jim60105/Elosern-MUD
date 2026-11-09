@@ -315,8 +315,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "window.__elosernBridge.router.currentItem().key"
         )
 
-        # Top-navigation 任務 click opens the quest drawer frameless
-        page.locator('.desktop-navigation button', has_text="任務").click()
+        # Top-navigation 手帳 click opens the quest drawer frameless
+        page.locator('.desktop-navigation button', has_text="手帳").click()
         wait_for_store_state(page, lambda s: s.get("hudDrawer") == "quest")
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.activeSubDock; })()"),
