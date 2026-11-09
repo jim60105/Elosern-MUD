@@ -90,6 +90,7 @@ class SpeciesWriterTests(unittest.TestCase):
         self.push = patcher.start()
         self.addCleanup(patcher.stop)
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_first_sighting_records_the_species_once(self):
         species, _ = _species_keys()
         player = _player()
@@ -98,6 +99,7 @@ class SpeciesWriterTests(unittest.TestCase):
         self.assertIsNone(player.db.lore_species_defeated)
         self.assertEqual(self.push.call_count, 1)
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_defeat_implies_a_sighting(self):
         species, _ = _species_keys()
         player = _player()
@@ -114,6 +116,7 @@ class SpeciesWriterTests(unittest.TestCase):
         self.assertEqual(player.db.lore_species_defeated, {species})
         self.assertEqual(self.push.call_count, 1)
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_repeat_sighting_and_defeat_are_no_ops(self):
         species, _ = _species_keys()
         player = _player()
@@ -127,6 +130,7 @@ class SpeciesWriterTests(unittest.TestCase):
         self.assertEqual(player.db.lore_species_defeated, defeated)
         self.push.assert_not_called()
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_unknown_species_rejects_through_both_writers(self):
         species, _ = _species_keys()
         for writer in (record_species_sighting, record_species_defeat):
@@ -142,6 +146,7 @@ class SpeciesWriterTests(unittest.TestCase):
                     self.assertEqual(player.db.lore_species_defeated, {species})
         self.push.assert_not_called()
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_corrupt_defeated_record_is_never_repaired(self):
         species, _ = _species_keys()
         for corrupt in ({42}, "x", {"a:b"}, {""}, {"t_absent_species"}):
@@ -167,6 +172,7 @@ class SpeciesWriterTests(unittest.TestCase):
 
 @synthetic_registries("monster_species", "monster_tiers", extra=_SPECIES_EXTRA)
 class SpeciesReaderTests(unittest.TestCase):
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_reader_returns_sorted_keys(self):
         first, second = _species_keys()
         player = _player(lore_species_defeated={second, first})
@@ -175,6 +181,7 @@ class SpeciesReaderTests(unittest.TestCase):
     def test_absent_record_reads_as_empty(self):
         self.assertEqual(list_species_defeated(_player()), ())
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_tolerant_reader_keeps_a_vanished_key(self):
         first, _ = _species_keys()
         player = _player(lore_species_defeated={first, "t_vanished_species"})
@@ -198,6 +205,7 @@ class SpeciesReaderTests(unittest.TestCase):
 class SpeciesBestEffortTests(unittest.TestCase):
     """Outside a transaction Django runs on-commit callbacks immediately."""
 
+    @covers_requirement("lore-knowledge::monster-research-has-a-sighted-and-a-defeated-stage-under-dedicated-writers")
     def test_failing_callback_is_logged_with_its_stage(self):
         species, _ = _species_keys()
         cases = (
@@ -312,6 +320,7 @@ class _SessionFixture(BattlefieldIsolation, EvenniaTest):
 
 
 class SessionSightingTests(_SessionFixture):
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_an_engagement_sights_each_species_once(self):
         with patch(_PUSH), self.captureOnCommitCallbacks(execute=True):
             engage_group(self.player, [self.first_a, self.second, self.first_b])
@@ -359,6 +368,7 @@ class SessionSightingTests(_SessionFixture):
             [(self.player, _SECOND_SPECIES)],
         )
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_species_less_monster_records_nothing(self):
         plain = _plain_monster("t research plain", hp=1000)
         plain.location = self.room
@@ -368,6 +378,7 @@ class SessionSightingTests(_SessionFixture):
         self.assertIsNotNone(read_session(self.player))
         self.assertIsNone(self.player.db.lore_discovered)
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_rolled_back_engagement_records_nothing(self):
         with patch(_PUSH) as push, self.captureOnCommitCallbacks(execute=True):
             with self.assertRaises(RuntimeError):
@@ -412,6 +423,7 @@ class RoundDefeatTests(_SessionFixture):
             call.args for call in schedule.call_args_list
         ))
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_lethal_crossing_credits_every_session_player(self):
         monster = self.first_a
         battlefield = self._battlefield(self.player, self.ally, monster)
@@ -428,6 +440,7 @@ class RoundDefeatTests(_SessionFixture):
             ),
         )
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_an_unmapped_session_still_records_the_defeat(self):
         monster = self.second
         record = self._record(monster)
@@ -450,6 +463,7 @@ class RoundDefeatTests(_SessionFixture):
         )
         self.assertEqual(calls, [(int(self.player.pk), self.first_species)])
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_only_a_real_crossing_records(self):
         dead, hurt = self.first_a, self.second
         calls = self._run(
@@ -460,6 +474,7 @@ class RoundDefeatTests(_SessionFixture):
         )
         self.assertEqual(calls, [])
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_guild_examination_records_nothing(self):
         monster = self.first_a
         calls = self._run(
@@ -470,6 +485,7 @@ class RoundDefeatTests(_SessionFixture):
         )
         self.assertEqual(calls, [])
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_species_less_monster_records_nothing(self):
         plain = _plain_monster("t research plain foe", hp=5)
         self.assertIsNone(plain.species_key)
@@ -494,6 +510,7 @@ class RoundDefeatTests(_SessionFixture):
         )
         self.assertEqual(calls, [(int(self.player.pk), _SECOND_SPECIES)])
 
+    @covers_requirement("lore-knowledge::combat-records-the-species-it-sighted-and-defeated")
     def test_a_planned_target_defeated_event_stages_no_lore_effect(self):
         """Out-of-round defeats reach only the quest planner, which stages no
         species defeat and no tier reveal (the documented boundary).
