@@ -24,8 +24,8 @@ Prerequisite: `lore-species-research` is merged (`git grep -n "def list_species_
 
 ## 5. Gates
 
-- [ ] 5.1 Run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.observability_lint check`, and the focused labels `tests.test_evennia_test_optimization_contract` and `tests.test_webclient_frozen_contract`. All pass.
-- [ ] 5.2 Run `uv run --locked python -m tools.contract_gate --change lore-codex-schema-v2` (it tolerates the three REMOVED requirements) and `openspec validate lore-codex-schema-v2 --strict`. Both pass.
+- [x] 5.1 Run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.observability_lint check`, and the focused labels `tests.test_evennia_test_optimization_contract` and `tests.test_webclient_frozen_contract`. All pass.
+- [x] 5.2 Run `uv run --locked python -m tools.contract_gate --change lore-codex-schema-v2` (it tolerates the three REMOVED requirements) and `openspec validate lore-codex-schema-v2 --strict`. Both pass.
 
 ## Workflow follow-up
 
