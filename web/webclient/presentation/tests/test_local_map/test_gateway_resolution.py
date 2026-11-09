@@ -96,5 +96,123 @@ class LocalMapGatewayResolutionTests(unittest.TestCase):
         self.assertEqual(label, _t_region_display_for(*EAST_APPROACH))
 
 
+class GatewayTableMemoTests(unittest.TestCase):
+    """The registered-gateway table is built once per published input set.
+
+    Every entry is synthetic (point-shape, reusing a gate destination probed
+    from the live registry); only call counts and returned rows are asserted.
+    """
+
+    def setUp(self):
+        from web.webclient.presentation.local_map import gateways
+        from world.maps.published import SourceMemo
+
+        self.gateways = gateways
+        memo = patch.object(gateways, "_GATEWAY_TABLE", SourceMemo())
+        memo.start()
+        self.addCleanup(memo.stop)
+        self.gate = _city_gate_row_for(_NORTH_FACE).gate
+        self.gate_xy = SOUTH_GATE_XYZ[:2]
+        self.gate_z = SOUTH_GATE_XYZ[2]
+
+    def _point(self, anchor_key, origin_xy, shape=("#",)):
+        from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
+
+        return WildernessEntryPoint(
+            anchor_key=anchor_key,
+            shape=shape,
+            origin_xy=origin_xy,
+            gates=(WildernessGate("n", self.gate),),
+        )
+
+    def _registry(self, *entries):
+        return patch(
+            "world.lore.wilderness_entry.WILDERNESS_ENTRY_REGISTRY",
+            {entry.anchor_key: entry for entry in entries},
+        )
+
+    def _spies(self):
+        from world.maps import static_references
+
+        builds = patch.object(
+            self.gateways,
+            "_build_gateway_table",
+            wraps=self.gateways._build_gateway_table,
+        )
+        indexes = patch(
+            "world.maps.static_references.settlement_reference_index",
+            wraps=static_references.settlement_reference_index,
+        )
+        return builds, indexes
+
+    def test_repeated_lookups_build_one_table_and_one_settlement_index(self):
+        builds, indexes = self._spies()
+        with self._registry(
+            self._point("t_alpha", (10, 10)), self._point("t_beta", (12, 10))
+        ), builds as build_spy, indexes as index_spy:
+            self.assertEqual(len(self.gateways._registered_gateways()), 2)
+            for _ in range(20):
+                self.assertIsNotNone(self.gateways._wilderness_gateway_at(10, 10))
+                self.assertIsNotNone(
+                    self.gateways._grid_gateway_at(*self.gate_xy, self.gate_z)
+                )
+        self.assertEqual(build_spy.call_count, 1)
+        self.assertEqual(index_spy.call_count, 1)
+
+    def test_a_new_registry_or_settlement_graph_source_rebuilds_the_table(self):
+        from world.maps import map_data
+
+        builds, _ = self._spies()
+        with builds as build_spy:
+            with self._registry(self._point("t_alpha", (10, 10))):
+                self.assertEqual(
+                    [row[2] for row in self.gateways._registered_gateways()],
+                    ["t_alpha"],
+                )
+            with self._registry(self._point("t_beta", (14, 11))):
+                rows = self.gateways._registered_gateways()
+                self.assertEqual(
+                    rows, [((14, 11), (self.gate_xy, self.gate_z), "t_beta")]
+                )
+                self.assertIsNone(self.gateways._wilderness_gateway_at(10, 10))
+                self.assertEqual(build_spy.call_count, 2)
+                with patch.object(
+                    map_data,
+                    "SETTLEMENT_GRAPHS",
+                    dict(map_data.SETTLEMENT_GRAPHS.source),
+                ):
+                    self.assertEqual(self.gateways._registered_gateways(), rows)
+                    self.assertEqual(build_spy.call_count, 3)
+
+    def test_a_gate_without_an_approach_cell_is_skipped_without_error(self):
+        empty = self._point("t_empty", (20, 20), shape=(".",))
+        with self._registry(empty, self._point("t_valid", (10, 10))):
+            rows = self.gateways._registered_gateways()
+            self.assertEqual([row[2] for row in rows], ["t_valid"])
+            self.assertIsNone(self.gateways._wilderness_gateway_at(20, 20))
+
+    def test_duplicate_cells_return_the_first_registered_gate(self):
+        with self._registry(
+            self._point("t_first", (10, 10)), self._point("t_second", (10, 10))
+        ):
+            self.assertEqual(self.gateways._wilderness_gateway_at(10, 10)[2], "t_first")
+            self.assertEqual(
+                self.gateways._grid_gateway_at(*self.gate_xy, self.gate_z)[2],
+                "t_first",
+            )
+            self.assertEqual(
+                [row[2] for row in self.gateways._registered_gateways()],
+                ["t_first", "t_second"],
+            )
+
+    def test_mutating_the_returned_rows_does_not_change_the_table(self):
+        with self._registry(self._point("t_alpha", (10, 10))):
+            rows = self.gateways._registered_gateways()
+            expected = list(rows)
+            self.assertTrue(expected)
+            rows.clear()
+            self.assertEqual(self.gateways._registered_gateways(), expected)
+
+
 if __name__ == "__main__":
     unittest.main()
