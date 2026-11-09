@@ -3,7 +3,7 @@
 Covers:
 - ``reveal_lore_best_effort`` and ``schedule_lore_reveal_best_effort`` helpers
 - Arrival reveals: anchor, region, unremarkable room, repeat
-- Defeat reveals: registered tier, companion credit, simulated skip, untiered skip
+- Defeat parsing: simulated skip, untiered and unregistered tiers
 - Origin reveals: race, nation, guild rank, unresolvable values
 - Non-blocking guarantees: corrupt codex record, reveal failures during movement and combat
 - Sole-writer boundary: deterministic sources never bypass ``record_lore_reveal``
@@ -17,7 +17,9 @@ from unittest.mock import MagicMock, patch
 from tools.spec_traceability import covers_requirement
 
 from world.rules.lore_knowledge import (
+    list_species_defeated,
     record_lore_reveal,
+    record_species_defeat,
     reveal_lore_best_effort,
     schedule_lore_reveal_best_effort,
 )
@@ -26,6 +28,7 @@ from world.tests.synthetic_data import synthetic_registries
 from ._knowledge_probes import (
     live_anchor_registry,
     live_guild_rank_registry,
+    live_monster_species_registry,
     live_monster_tier_registry,
     live_nation_registry,
     live_race_registry,
@@ -40,6 +43,7 @@ _LORE_LOGICALS = (
     "subraces",
     "nations",
     "regions",
+    "monster_species",
     "monster_tiers",
     "elements",
     "magic_tiers",
@@ -74,6 +78,10 @@ def _subrace_key() -> str:
 
 def _monster_tier_key() -> str:
     return next(iter(live_monster_tier_registry()))
+
+
+def _monster_species_key() -> str:
+    return next(iter(live_monster_species_registry()))
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -375,7 +383,7 @@ class ArrivalLoreTests(unittest.TestCase):
 
 @synthetic_registries(*_LORE_LOGICALS)
 class DefeatLoreTests(unittest.TestCase):
-    """_make_defeat_lore_apply and _defeated_targets honour the spec."""
+    """_defeated_targets parses committed defeat entries for the quest planner."""
 
     def _make_event_log(self, entries):
         log = MagicMock()
@@ -388,7 +396,6 @@ class DefeatLoreTests(unittest.TestCase):
         entry.data = data
         return entry
 
-    @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_simulated_defeat_excluded_from_defeated_targets(self):
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
@@ -396,7 +403,6 @@ class DefeatLoreTests(unittest.TestCase):
         ])
         self.assertEqual(_defeated_targets(log), ())
 
-    @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_real_defeat_included_in_defeated_targets(self):
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
@@ -405,7 +411,6 @@ class DefeatLoreTests(unittest.TestCase):
         result = _defeated_targets(log)
         self.assertEqual(result, ((1, _monster_tier_key()),))
 
-    @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_untiered_defeat_yields_none_tier(self):
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
@@ -414,24 +419,8 @@ class DefeatLoreTests(unittest.TestCase):
         result = _defeated_targets(log)
         self.assertEqual(result, ((1, None),))
 
-    @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
-    @covers_requirement("lore-knowledge::the-codex-is-discoverable-with-every-generative-service-offline")
-    def test_make_defeat_lore_apply_factory_binds_correctly(self):
-        """_make_defeat_lore_apply returns a callable that invokes schedule_lore_reveal_best_effort."""
-        from world.quests.planner import _make_defeat_lore_apply
-
-        player = _player()
-        with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort") as mock_sched:
-            # Build the factory INSIDE the patch so the import in the factory body
-            # resolves to the mocked version and the lambda's closure captures it.
-            fn = _make_defeat_lore_apply(player, _monster_tier_key())
-            self.assertTrue(callable(fn))
-            fn()
-        mock_sched.assert_called_once_with(player, "monster", _monster_tier_key())
-
-    @covers_requirement("lore-knowledge::defeating-a-monster-reveals-its-tier")
     def test_unregistered_tier_not_in_monster_registry(self):
-        """A tier not in MONSTER_TIER_REGISTRY must produce no reveal effect."""
+        """An unregistered tier is parsed verbatim and resolves in no registry."""
         from world.quests.planner import _defeated_targets
         log = self._make_event_log([
             self._make_entry("target_defeated", target_id=1, monster_tier="ultra_super_rare")
@@ -439,25 +428,6 @@ class DefeatLoreTests(unittest.TestCase):
         result = _defeated_targets(log)
         tier = result[0][1]
         self.assertNotIn(tier, live_monster_tier_registry())
-
-    @covers_requirement("lore-knowledge::a-reveal-never-blocks-or-fails-the-play-that-triggered-it")
-    def test_defeat_lore_reveal_failure_does_not_raise(self):
-        """_make_defeat_lore_apply uses schedule_lore_reveal_best_effort which swallows exceptions."""
-        from world.quests.planner import _make_defeat_lore_apply
-
-        player = _player()
-        with patch("world.rules.lore_knowledge.schedule_lore_reveal_best_effort",
-                   side_effect=RuntimeError("boom")):
-            fn = _make_defeat_lore_apply(player, _monster_tier_key())
-        # schedule_lore_reveal_best_effort wraps its own internals in try-except; any
-        # error it encounters (import failure, on_commit failure) is logged, not raised.
-        # Verify that schedule_lore_reveal_best_effort guards unexpected failures:
-        with patch("world.rules.lore_knowledge.log_warn"):
-            with patch("world.rules.lore_knowledge.reveal_lore_best_effort",
-                       side_effect=RuntimeError("boom")):
-                # on_commit is called immediately in AUTOCOMMIT mode; the lambda raises;
-                # schedule_lore_reveal_best_effort's guard catches it.
-                schedule_lore_reveal_best_effort(player, "monster", _monster_tier_key())
 
 
 # ---------------------------------------------------------------------------
@@ -568,13 +538,13 @@ class SoleWriterBoundaryTests(unittest.TestCase):
     def test_offline_play_fills_codex_without_external_calls(self):
         """Purely deterministic reveals fill the codex without any LLM or network call."""
         player = _player()
-        race, nation, anchor, tier = (
-            _race_key(), _nation_key(), _anchor_key(), _monster_tier_key()
+        race, nation, anchor, species = (
+            _race_key(), _nation_key(), _anchor_key(), _monster_species_key()
         )
         reveal_lore_best_effort(player, "race", race)
         reveal_lore_best_effort(player, "nation", nation)
         reveal_lore_best_effort(player, "anchor", anchor)
-        reveal_lore_best_effort(player, "monster", tier)
+        record_species_defeat(player, species)
 
         self.assertEqual(
             player.db.lore_discovered,
@@ -582,9 +552,10 @@ class SoleWriterBoundaryTests(unittest.TestCase):
                 f"race:{race}",
                 f"nation:{nation}",
                 f"anchor:{anchor}",
-                f"monster:{tier}",
+                f"monster:{species}",
             },
         )
+        self.assertEqual(list_species_defeated(player), (species,))
 
 
 # ---------------------------------------------------------------------------

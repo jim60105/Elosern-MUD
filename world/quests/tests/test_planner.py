@@ -786,8 +786,8 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def _quest_log_writes(effects) -> list[str]:
         """The quest-log writes a plan stages.
 
-        A defeat entry always also stages the lore-codex reveal, which is an
-        independent effect; only the quest-log write advances the record.
+        A defeat stages no lore effect (species defeats are recorded by the
+        combat round itself); only the quest-log write advances the record.
         """
         return [
             effect.description
