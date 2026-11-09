@@ -207,8 +207,9 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
         # The codex with nothing discovered shares the same guidance form.
         codex = valid_lore_codex_panel()
         for category in codex["categories"]:
-            category["entries"] = []
-            category["count"] = 0
+            for group in category["groups"]:
+                group["slots"] = [{"placeholder": True} for _ in group["slots"]]
+            category["discovered"] = 0
         codex["discovered_total"] = 0
         inject_update(page, {"lore_codex": codex})
         _open_drawer(page, "lore")

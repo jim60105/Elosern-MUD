@@ -75,7 +75,11 @@ class synthetic_registries(ContextDecorator):
         self._logicals = tuple(names)
         self._extra = dict(extra or {})
         for logical in self._extra:
-            if logical not in REGISTRY_TARGETS and logical not in SETTLEMENT_TARGETS:
+            if (
+                logical not in REGISTRY_TARGETS
+                and logical not in GEOGRAPHY_TARGETS
+                and logical not in SETTLEMENT_TARGETS
+            ):
                 raise KeyError(f"unknown synthetic registry target {logical!r}")
 
     # -- scope lifecycle -----------------------------------------------------

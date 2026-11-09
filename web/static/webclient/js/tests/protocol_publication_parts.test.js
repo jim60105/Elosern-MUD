@@ -92,19 +92,35 @@ function codexPanel(width, last) {
     for (let field = 0; field < 8; field++) {
       card.push({ name: "field_" + field, value: value(entry * 8 + field) });
     }
-    entries.push({ key: "entry_" + entry, title: "條目", card: card });
+    entries.push({
+      key: "entry_" + entry,
+      title: "條目",
+      stage: null,
+      art: null,
+      card: card,
+      locked_fields: [],
+    });
   }
   const categories = CATEGORIES.map((key, position) => ({
     key: key,
     label: "類別" + position,
-    count: position === 0 ? entries.length : 0,
-    entries: position === 0 ? entries : [],
+    discovered: position === 0 ? entries.length : 0,
+    total: position === 0 ? entries.length : 0,
+    // Every entry sits in the first (non-monster) category.
+    groups: [
+      {
+        key: key,
+        label: key === "monster" ? "合成級" : null,
+        slots: position === 0 ? entries : [],
+      },
+    ],
   }));
   return {
-    schema_version: 1,
+    schema_version: 2,
     available: true,
-    categories: categories,
     discovered_total: entries.length,
+    total: entries.length,
+    categories: categories,
   };
 }
 

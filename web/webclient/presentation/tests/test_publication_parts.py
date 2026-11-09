@@ -127,6 +127,9 @@ def _lore_codex_panel(width: int, last: int) -> dict:
         {
             "key": f"entry_{entry}",
             "title": "條目",
+            "stage": None,
+            "art": None,
+            "locked_fields": [],
             "card": [
                 {"name": f"field_{field}", "value": value(entry * 8 + field)}
                 for field in range(8)
@@ -134,20 +137,31 @@ def _lore_codex_panel(width: int, last: int) -> dict:
         }
         for entry in range(8)
     ]
-    groups = [
-        {
-            "key": category,
-            "label": f"類別{position}",
-            "count": len(entries) if position == 0 else 0,
-            "entries": entries if position == 0 else [],
-        }
-        for position, category in enumerate(LORE_CODEX_CATEGORIES)
-    ]
+    categories = []
+    for position, category in enumerate(LORE_CODEX_CATEGORIES):
+        # Every entry sits in the first (non-monster) category.
+        slots = entries if position == 0 else []
+        categories.append(
+            {
+                "key": category,
+                "label": f"類別{position}",
+                "discovered": len(slots),
+                "total": len(slots),
+                "groups": [
+                    {
+                        "key": category,
+                        "label": "合成級" if category == "monster" else None,
+                        "slots": slots,
+                    }
+                ],
+            }
+        )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
-        "categories": groups,
         "discovered_total": len(entries),
+        "total": len(entries),
+        "categories": categories,
     }
 
 
@@ -187,8 +201,8 @@ def _near_cap_lore_codex() -> tuple[dict, int]:
 def _changed_codex(panel: dict) -> dict:
     """The same valid panel with a same-size content change."""
     changed = json.loads(json.dumps(panel))
-    value = changed["categories"][0]["entries"][0]["card"][0]["value"]
-    changed["categories"][0]["entries"][0]["card"][0]["value"] = "文" + value[1:]
+    entry = changed["categories"][0]["groups"][0]["slots"][0]
+    entry["card"][0]["value"] = "文" + entry["card"][0]["value"][1:]
     validate_lore_codex(changed)
     return changed
 

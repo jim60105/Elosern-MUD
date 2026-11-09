@@ -113,7 +113,7 @@ The drawer shows no total, so its existing non-disclosure requirement still hold
 ### D7. Fixtures and builders
 
 - `web/tests/browser/browser_helpers.py::valid_lore_codex_panel`: emit v2 with synthetic keys (one race entry, one anchor entry, placeholders elsewhere). Keep the existing `**overrides` contract.
-- `web/tests/browser/incremental_sync_fixture.py::oversized_payload`: build v2 with `per_category = LORE_CODEX_MAX_TOTAL_SLOTS // len(LORE_CODEX_CATEGORIES)` entry slots (art `null`, non-monster `stage` `null`, monster `stage` `"defeated"`), then grow card values to the byte target exactly as today. It must end with `validate_lore_codex(payload)`.
+- `web/tests/browser/incremental_sync_fixture.py::oversized_payload`: build v2 with `per_category = LORE_CODEX_MAX_TOTAL_SLOTS // len(LORE_CODEX_CATEGORIES) // 4` entry slots (16; each v2 entry slot carries a fixed field overhead, so 64 per category measure 107 477 bytes and 32 measure 54 229 bytes before any card value grows, above the envelope and the 45 000-byte smallest target) (art `null`, non-monster `stage` `null`, monster `stage` `"defeated"`), then grow card values to the byte target exactly as today. It must end with `validate_lore_codex(payload)`.
 - Every other v1-shaped fixture found by `git grep -n "\"entries\"\|'entries'" -- web/webclient/presentation/tests web/tests/browser web/static/webclient/js/tests web/webclient/tests | grep -i lore`: convert it to v2.
 
 ## Risks / Trade-offs

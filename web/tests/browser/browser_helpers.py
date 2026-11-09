@@ -1725,56 +1725,69 @@ def valid_art_panel() -> dict:
 def valid_lore_codex_panel(**overrides) -> dict:
     """A schema-valid available ``lore_codex`` panel for injected snapshots.
 
-    Mirrors the exact v1 shape the server presenter emits
+    Mirrors the exact v2 shape the server presenter emits
     (``web/webclient/presentation/lore_codex.py``): the eight codex
-    categories in ``CODE_CATEGORIES`` mapping order, ``count`` equal to each
-    category's entry length, and two discovered entries (one race, one
-    anchor) carrying renderer-shaped ``{name, value}`` card fields.
+    categories in ``CODE_CATEGORIES`` mapping order, each with its
+    ``discovered`` count, its registry ``total`` and its groups of slots.
+    Two entries are discovered (one race, one anchor) with renderer-shaped
+    ``{name, value}`` card fields; every other slot is an identity-free
+    placeholder. Keys are synthetic.
     """
 
-    def category(key: str, label: str, entries: list) -> dict:
-        return {"key": key, "label": label, "count": len(entries), "entries": entries}
+    placeholder = {"placeholder": True}
 
+    def entry(key: str, title: str, description: str) -> dict:
+        return {
+            "key": key,
+            "title": title,
+            "stage": None,
+            "art": None,
+            "card": [
+                {"name": "display_name_zh", "value": title},
+                {"name": "description", "value": description},
+            ],
+            "locked_fields": [],
+        }
+
+    def category(key: str, label: str, slots: list, group_label: str | None = None) -> dict:
+        return {
+            "key": key,
+            "label": label,
+            "discovered": sum(1 for slot in slots if "key" in slot),
+            "total": len(slots),
+            "groups": [
+                {
+                    "key": "t_tier" if key == "monster" else key,
+                    "label": group_label,
+                    "slots": slots,
+                }
+            ],
+        }
+
+    categories = [
+        category(
+            "race",
+            "種族",
+            [entry("t_plainsfolk", "平原族", "適應力最強的短命種，遍布灰河沿岸。"), dict(placeholder)],
+        ),
+        category("nation", "國家", [dict(placeholder)]),
+        category("region", "地域", [dict(placeholder)]),
+        category("monster", "魔物", [dict(placeholder)], group_label="合成級"),
+        category("element", "元素", [dict(placeholder)]),
+        category("magic", "魔法", [dict(placeholder)]),
+        category(
+            "anchor",
+            "地點",
+            [entry("t_mist_ford", "霧骨渡口", "灰河上的主要渡口，旅人與貨物的集散地。")],
+        ),
+        category("guild", "公會", [dict(placeholder)]),
+    ]
     panel = {
-        "schema_version": 1,
+        "schema_version": 2,
         "available": True,
-        "categories": [
-            category(
-                "race",
-                "種族",
-                [
-                    {
-                        "key": "human",
-                        "title": "平原族",
-                        "card": [
-                            {"name": "display_name_zh", "value": "平原族"},
-                            {"name": "description", "value": "適應力最強的短命種，遍布灰河沿岸。"},
-                        ],
-                    }
-                ],
-            ),
-            category("nation", "國家", []),
-            category("region", "地域", []),
-            category("monster", "魔物", []),
-            category("element", "元素", []),
-            category("magic", "魔法", []),
-            category(
-                "anchor",
-                "地點",
-                [
-                    {
-                        "key": "misty_ford",
-                        "title": "霧骨渡口",
-                        "card": [
-                            {"name": "display_name_zh", "value": "霧骨渡口"},
-                            {"name": "description", "value": "灰河上的主要渡口，旅人與貨物的集散地。"},
-                        ],
-                    }
-                ],
-            ),
-            category("guild", "公會", []),
-        ],
-        "discovered_total": 2,
+        "discovered_total": sum(c["discovered"] for c in categories),
+        "total": sum(c["total"] for c in categories),
+        "categories": categories,
     }
     panel.update(overrides)
     return panel
