@@ -382,13 +382,16 @@ export const useElosernStore = defineStore("elosern", () => {
     openHudDrawer: ctx.openHudDrawer,
     closeHudDrawer: ctx.closeHudDrawer,
     openNpcPersonaEditor: ctx.openNpcPersonaEditor,
+    // The handbook route entry (handbook-titles-tab): opens the quest
+    // drawer on one first-level tab through a sequenced route request.
+    openHandbook: ctx.openHandbook,
     clearDialogueFocus: (topicId) => {
       const changed = ctx.clearDialogueFocus(topicId);
       if (changed) ctx.publishView();
       return changed;
     },
     // H5 (task 5.3): the full-screen overlay controller — the single open
-    // entry (`openOverlay` over `map` / `settings` / `help` / `codex` / `gallery`,
+    // entry (`openOverlay` over `map` / `settings` / `help` / `gallery`,
     // unknown names
     // rejected, closes any open drawer for mutual exclusion, design D8)
     // and the single close entry (`closeOverlay`). The opener element is

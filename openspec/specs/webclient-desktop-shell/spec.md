@@ -349,7 +349,11 @@ drawers, and SHALL NOT push a keyboard menu frame.
 
 #### Scenario: Each tool opens its surface in one action
 - **WHEN** the shell renders in exploration mode with the command line collapsed and the `gallery` panel available, and the player activates 信件, then 稱號冊, then 角色肖像圖庫, then 說明, closing each surface in between
-- **THEN** each activation opens its overlay, and each close returns focus to the control that opened it
+- **THEN** each activation opens its surface (稱號冊 opens the handbook on its titles tab), and each close returns focus to the control that opened it
+
+#### Scenario: The title tool opens the handbook titles tab
+- **WHEN** the player activates the 稱號冊 control in the tool group, in exploration and in combat
+- **THEN** the quest drawer opens on its titles tab through the handbook route request, no overlay opens, and closing the drawer returns focus to the control
 
 #### Scenario: The codex tool opens the reference drawer
 - **WHEN** the player activates the 圖鑑 control in the tool group
@@ -373,11 +377,11 @@ drawers, and SHALL NOT push a keyboard menu frame.
 
 #### Scenario: The tool group carries the five tools in order
 - **WHEN** the tool group renders
-- **THEN** it carries, in order, 信件 for the letters drawer, 圖鑑 for the world-codex reference drawer, 稱號冊 for the title-codex overlay, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay; skill lineage is reached through the party window's 系譜 tab
+- **THEN** it carries, in order, 信件 for the letters drawer, 圖鑑 for the world-codex reference drawer, 稱號冊 for the handbook's titles tab, 角色肖像圖庫 for the portrait gallery overlay, and 說明 for the help overlay; skill lineage is reached through the party window's 系譜 tab
 
 #### Scenario: Each tool control names itself from the shared tool model
 - **WHEN** a tool control renders
-- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens, discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
+- **THEN** it carries an accessible name equal to its label, taken from the one tool model that also titles the header of the surface it opens (a tool that opens a handbook tab names that tab's surface, while the drawer header keeps the handbook's own title), discloses that label visually in the shared tool tooltip that the stable top-navigation placement requirement defines, carries no native `title` tooltip, and is reachable by sequential keyboard navigation
 
 #### Scenario: A tool opens through the opener-captured path
 - **WHEN** the player activates a tool control with one pointer action or one Enter press
@@ -393,7 +397,7 @@ drawers, and SHALL NOT push a keyboard menu frame.
 
 #### Scenario: The five surfaces have exactly one opener each
 - **WHEN** the rendered surfaces are inspected for openers of the five tool surfaces
-- **THEN** no surface other than the tool group carries a second opener for them, and the command line carries none
+- **THEN** no surface other than the tool group carries a second opener for them, except that the handbook window itself is also opened by its primary navigation entry, and the command line carries none
 
 #### Scenario: The tool group fits the 48px bar
 - **WHEN** the shell renders at the 1451x790 reference viewport with every navigation entry, the gallery control, and a maximum-length character name present

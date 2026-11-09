@@ -19,6 +19,11 @@ const memory = reactive({
   boardGrade: null,
   boardBasis: null,
   selectedByTab: {},
+  // handbook-titles-tab (design D4): the last titles rail entry, and the seq
+  // of the last route request the drawer applied, so a request is consumed
+  // once and never re-applied by a later mount.
+  titlesRail: null,
+  appliedRouteSeq: null,
 });
 
 function clear() {
@@ -27,6 +32,8 @@ function clear() {
   memory.boardGrade = null;
   memory.boardBasis = null;
   memory.selectedByTab = {};
+  memory.titlesRail = null;
+  memory.appliedRouteSeq = null;
 }
 
 // Returns the shared memory, reset first when the scope changed.

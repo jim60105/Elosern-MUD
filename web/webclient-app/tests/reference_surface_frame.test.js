@@ -81,7 +81,6 @@ describe("reference surface headers in the client", () => {
   it("draws each tool's own navigation glyph in the header of the surface it opens", async () => {
     await snapshot();
     const tools = [
-      ["nav-tool-codex", "稱號冊"],
       ["gallery-opener", "角色肖像圖庫"],
       ["nav-tool-help", "說明"],
       ["nav-settings", "設定"],
@@ -100,6 +99,23 @@ describe("reference surface headers in the client", () => {
       expect(document.activeElement, testid).toBe(opener.element);
     }
   }, 20000);
+
+  // handbook-titles-tab: 稱號冊 opens the 手帳 on its 稱號 tab; the drawer
+  // header keeps the handbook's own title and glyph.
+  it("opens the handbook on its titles tab from 稱號冊 under the handbook's own header", async () => {
+    await snapshot();
+    const opener = wrapper.get('[data-testid="nav-tool-codex"]');
+    opener.element.focus();
+    await opener.trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(store.view.hudDrawer).toBe("quest");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(wrapper.get('[data-testid="quest-drawer"]').attributes("data-tab")).toBe("titles");
+    expect(wrapper.findAll(".drawer-header")).toHaveLength(1);
+    expect(wrapper.get(".drawer-header__title").text()).toBe("手帳");
+    await wrapper.get(".drawer-header__close").trigger("click");
+    expect(document.activeElement).toBe(opener.element);
+  });
 
   it("opens the party window on 系譜 with the L hotkey from 隊伍 and returns focus on close", async () => {
     // webclient-party-lineage-tab: the lineage overlay is gone; since

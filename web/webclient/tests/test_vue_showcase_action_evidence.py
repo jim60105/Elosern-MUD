@@ -190,7 +190,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # manifest at 51: Core/DesktopNavigation and
                 # Core/ReferenceArtwork joined from the desktop redesign,
                 # World/TitleBallotMenu from the dock-workspace alignment,
-                # and the Overlays/LineagePanel (since retired) + Overlays/TitleCodexPanel
+                # and the Overlays/LineagePanel + Overlays/TitleCodexPanel (both since retired)
                 # big windows from the obsidian-gold wave.
                 "Core/DesktopNavigation",
                 "Core/ReferenceArtwork",
@@ -207,7 +207,6 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/ArtworkAlpha",
                 "Core/ArtworkFailure",
                 "World/TitleBallotMenu",
-                "Overlays/TitleCodexPanel",
                 # The gallery management surface refroze the manifest at 56:
                 # Data/GalleryPanel + Data/GalleryDetailRail joined from the
                 # gallery showcase wave, plus the three gallery overlay
@@ -278,6 +277,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "World/DetailFooter",
                 "World/TileWall",
                 "World/CodexDetail",
+                # The handbook titles tab replaced the title-codex big window
+                # (handbook-titles-tab).
+                "World/TitleCodexTab",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

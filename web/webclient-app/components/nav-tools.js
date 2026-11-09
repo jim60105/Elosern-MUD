@@ -4,13 +4,15 @@
 // it opens, and its `label` is at once the control's accessible name, its
 // visible tooltip, and the title of the surface's DrawerHeader, so the
 // opener, its tooltip and the opened header never disagree. 信件 and 圖鑑
-// open their drawers; the rest open overlays. Skill lineage is the party
+// open their drawers; 稱號冊 opens the 手帳 (the quest drawer) on its 稱號
+// tab through the store's handbook route request (handbook-titles-tab), so
+// the drawer header keeps the handbook's own title; the rest open overlays. Skill lineage is the party
 // window's 系譜 tab (隊伍 or the L hotkey), not a tool
 // (webclient-main-navigation-hotkeys).
 export const NAV_TOOLS = Object.freeze([
   { key: "letters", label: "信件", testid: "nav-tool-letters", drawer: "letters" },
   { key: "lore", label: "圖鑑", testid: "nav-tool-lore", drawer: "lore" },
-  { key: "codex", label: "稱號冊", testid: "nav-tool-codex" },
+  { key: "codex", label: "稱號冊", testid: "nav-tool-codex", handbook: "titles" },
   { key: "gallery", label: "角色肖像圖庫", testid: "gallery-opener" },
   { key: "help", label: "說明", testid: "nav-tool-help" },
 ]);

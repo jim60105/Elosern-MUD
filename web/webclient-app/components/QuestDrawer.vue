@@ -1,8 +1,9 @@
 <script setup>
-// QuestDrawer (quest-drawer-book-tab): the 任務 drawer's body — a two-level
-// icon-tabbed master/detail surface. The first level (a horizontal strip
-// under the drawer header) switches between the quest book and the guild
-// counter. The book adds a vertical state rail (in progress, completed,
+// QuestDrawer (quest-drawer-book-tab): the 手帳 (handbook) drawer's body — a
+// two-level icon-tabbed master/detail surface. The first level (a horizontal
+// strip under the drawer header) switches between the quest book, the guild
+// counter and the titles tab (handbook-titles-tab), and offers only the
+// titles tab in combat. The book adds a vertical state rail (in progress, completed,
 // failed) beside the list column and the detail column. The counter tab
 // (quest-drawer-guild-board-tab) has the same three columns for a registered
 // holder: a grade rail built from the guild section's `rank_ladder`, the rank
@@ -15,8 +16,12 @@
 // counter tab is disabled, yet focusable with its reason, while no usable
 // guild section exists; a remembered counter tab then falls back to the book.
 //
-// Every intent (book, board, registration, and examination) is forwarded as one
-// `action` event carrying the exact `{action_id, payload}`.
+// The titles tab is TitleCodexTab; its armed epithet removal is exposed to
+// the host as `closeGuard`. A handbook route request (`slot: "handbook"`)
+// selects the named first-level tab; every route request is applied once.
+//
+// Every intent (book, board, registration, examination, and title) is
+// forwarded as one `action` event carrying the exact `{action_id, payload}`.
 import { computed, nextTick, ref, useId, watch } from "vue";
 import EmptyState from "./EmptyState.vue";
 import GradeGem from "./GradeGem.vue";
@@ -24,6 +29,9 @@ import GuildRankCard from "./GuildRankCard.vue";
 import IconTabs from "./IconTabs.vue";
 import QuestDetail from "./QuestDetail.vue";
 import QuestList from "./QuestList.vue";
+import TitleCodexTab from "./handbook/TitleCodexTab.vue";
+import { HANDBOOK_TAB_META, handbookTabs } from "./handbook/handbook-tabs.js";
+import { titleCodexStatus } from "./handbook/title-codex-model.js";
 import {
   BOOK_STATES,
   bookActions,
@@ -57,6 +65,9 @@ const props = defineProps({
   // `<generation>|<epoch>`: a change discards the session memory.
   memoryScope: { type: String, default: "" },
   routeRequest: { type: Object, default: null },
+  combat: { type: Boolean, default: false },
+  // The committed `title_codex` v1 panel (null before the first commit).
+  titleCodex: { type: Object, default: null },
 });
 
 const emit = defineEmits(["action"]);
@@ -66,7 +77,10 @@ watch(
   () => props.routeRequest?.seq,
   () => {
     const request = props.routeRequest;
-    if (!request || request.slot !== "counter") return;
+    if (!request || request.seq === memory.appliedRouteSeq) return;
+    memory.appliedRouteSeq = request.seq;
+    if (request.slot === "handbook") memory.top = request.section;
+    if (request.slot !== "counter") return;
     memory.top = request.section === "report" ? "book" : "counter";
     if (request.section === "report") memory.bookState = "completed";
   },
@@ -82,14 +96,18 @@ const panelId = (key) => `quest-drawer-${uid}-${key}`;
 
 // ── First level ────────────────────────────────────────────────────────
 const counter = computed(() => counterTab(props.services));
-const top = computed(() => (memory.top === "counter" && counter.value.enabled ? "counter" : "book"));
+const titlesStatus = computed(() => titleCodexStatus(props.titleCodex));
+const titlesDisabled = computed(() => titlesStatus.value === "unavailable");
+const top = computed(() => {
+  if (props.combat) return "titles";
+  if (memory.top === "counter" && counter.value.enabled) return "counter";
+  if (memory.top === "titles" && !titlesDisabled.value) return "titles";
+  return "book";
+});
 
-const topTabs = computed(() => [
-  { key: "book", label: "任務簿", glyph: "quest_book", controls: panelId("book") },
-  {
-    key: "counter",
-    label: "公會櫃檯",
-    glyph: "guild_counter",
+const TAB_STATE = {
+  book: () => ({ controls: panelId("book") }),
+  counter: () => ({
     controls: counter.value.enabled ? panelId("counter") : undefined,
     disabled: !counter.value.enabled,
     reason: counter.value.enabled ? undefined : (counter.value.reason ?? undefined),
@@ -99,8 +117,16 @@ const topTabs = computed(() => [
       : props.services?.available === false
         ? { "data-testid": "quest-drawer__counter-unavailable", "data-reason-code": counter.value.reasonCode ?? undefined }
         : { "data-testid": "quest-drawer__counter-absent" },
-  },
-]);
+  }),
+  titles: () => ({
+    controls: titlesDisabled.value ? undefined : panelId("titles"),
+    disabled: titlesDisabled.value,
+    reason: titlesDisabled.value ? (props.titleCodex?.reason?.message ?? undefined) : undefined,
+  }),
+};
+const topTabs = computed(() =>
+  handbookTabs({ combat: props.combat }).map((key) => ({ key, ...HANDBOOK_TAB_META[key], ...TAB_STATE[key]() })),
+);
 
 function selectTop(key) {
   memory.top = key;
@@ -251,6 +277,9 @@ function forward(intent) {
   emit("action", intent);
 }
 
+const titlesTab = ref(null);
+defineExpose({ closeGuard: () => (top.value === "titles" ? (titlesTab.value?.guardClose() ?? true) : true) });
+
 function registerNow() {
   if (register.value?.enabled) {
     forward({ action_id: register.value.action_id, payload: { npc_id: counterProviderId.value } });
@@ -259,17 +288,21 @@ function registerNow() {
 </script>
 
 <template>
-  <section ref="root" class="quest-drawer" data-testid="quest-drawer" :data-tab="top" aria-label="任務">
+  <section ref="root" class="quest-drawer" data-testid="quest-drawer" :data-tab="top" aria-label="手帳">
     <div class="quest-drawer__head">
       <IconTabs
         class="quest-drawer__top-tabs"
         data-testid="quest-drawer__top-tabs"
         orientation="horizontal"
-        aria-label="任務分類"
+        aria-label="手帳分類"
         :tabs="topTabs"
         :model-value="top"
         @update:model-value="selectTop"
       />
+      <p v-if="top === 'titles' && titlesStatus === 'available'" class="quest-drawer__full-title" data-testid="handbook__full-title">
+        <span class="quest-drawer__full-title-kicker">全銜</span>
+        <span class="quest-drawer__full-title-text">{{ titleCodex.full_title || "（尚無全銜）" }}</span>
+      </p>
     </div>
 
     <div
@@ -303,6 +336,17 @@ function registerNow() {
       />
       <QuestDetail :detail="detail" :actions="actions" @action="forward" />
     </div>
+
+    <TitleCodexTab
+      v-else-if="top === 'titles'"
+      :id="panelId('titles')"
+      ref="titlesTab"
+      class="quest-drawer__body"
+      :codex="titleCodex"
+      :memory-scope="memoryScope"
+      :combat="combat"
+      @action="forward"
+    />
 
     <div
       v-else-if="registered && guild"
@@ -427,6 +471,34 @@ function registerNow() {
 
 .quest-drawer__top-tabs {
   align-self: flex-end;
+}
+
+/* The titles tab's full title at the head's trailing end (the approved
+   prototype's `.hb__full-title`, docs/design/handbook-codex-titles/
+   HandbookPrototype.vue). */
+.quest-drawer__full-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  min-width: 0;
+  margin: 0 0 0 auto;
+  align-self: center;
+}
+
+.quest-drawer__full-title-kicker {
+  flex: none;
+  color: var(--paper-500);
+  font: var(--text-xs) var(--f-display);
+  letter-spacing: 0.24em;
+}
+
+.quest-drawer__full-title-text {
+  overflow: hidden;
+  color: var(--gold-300);
+  font: var(--text-lg) var(--f-display);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .quest-drawer__body {

@@ -60,13 +60,6 @@ export function useIntentHandlers(store, dispatchIntent) {
     dispatchIntent(intent.action_id, intent.payload);
   }
 
-  // The 稱號冊 window (title-codex-removal): equip/remove/ballot intents ride
-  // the same single dispatch entry; the rules writer re-validates every gate
-  // at execution, so the window forwards without client-side rules.
-  function onTitleCodexAction(intent) {
-    dispatchIntent(intent.action_id, intent.payload);
-  }
-
   function onCreationAction(intent) {
     dispatchIntent(intent.action_id, intent.payload);
   }
@@ -125,7 +118,6 @@ export function useIntentHandlers(store, dispatchIntent) {
     onQuestAction,
     onSwitchCharacter,
     onTitleBallotAction,
-    onTitleCodexAction,
     onSubmitCommand,
   };
 }

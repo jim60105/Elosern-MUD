@@ -1673,7 +1673,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         expected_tools = (
             ("nav-tool-letters", '[data-testid="letters-panel"]'),
             ("nav-tool-lore", '[data-testid="lore-codex-drawer"]'),
-            ("nav-tool-codex", '[data-testid="overlay-host"][data-elosern-overlay="codex"]'),
+            ("nav-tool-codex", '[data-testid="handbook__titles"]'),
             ("gallery-opener", '[data-testid="gallery-panel"]'),
             ("nav-tool-help", '[data-testid="help-overlay"]'),
             ("nav-settings", '[data-testid="overlay-host"][data-elosern-overlay="settings"]'),

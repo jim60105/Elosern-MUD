@@ -1145,7 +1145,8 @@
       "index": 76,
       "name": "packed-66",
       "files_a": [
-        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_codex_window_renders_rows_flags_and_ballot_tab_verbatim"
+        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_codex_window_renders_rows_flags_and_ballot_tab_verbatim",
+        "web.tests.browser.test_browser_title_codex.TitleCodexBrowserTest.test_titles_tab_geometry_at_reference_viewports"
       ],
       "files_b": [
         "web.tests.browser.test_browser_creation_custom.CustomCreationJourneys.test_custom_form_keyboard_journey_to_activation"

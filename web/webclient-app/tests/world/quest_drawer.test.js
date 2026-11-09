@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import QuestDrawer from "../../components/QuestDrawer.vue";
-import { resetQuestDrawerMemory } from "../../components/quest-drawer-memory.js";
+import { resetQuestDrawerMemory, useQuestDrawerMemory } from "../../components/quest-drawer-memory.js";
+import { UNAVAILABLE_CODEX, titleCodex } from "../../stories/fixtures/title_codex_panels.js";
 import {
   QUEST_LOG_PANEL_EMPTY_SAMPLE,
   QUEST_LOG_PANEL_SAMPLE,
@@ -577,6 +578,96 @@ describe("QuestDrawer (quest-drawer-book-tab)", () => {
       mountDrawer({ services: SERVICES_PANEL_UNAVAILABLE_SAMPLE });
       expect(rowIds()).toEqual(["q_1042", "q_2077"]);
       expect(topTab("counter").attributes("aria-disabled")).toBe("true");
+    });
+  });
+
+  // handbook-titles-tab: the handbook's first-level tab set per mode, the
+  // route request, the titles tab's honest degradation and the close guard.
+  describe("the handbook titles tab", () => {
+    const topKeys = () =>
+      wrapper.findAll('[data-testid="quest-drawer__top-tabs"] [role="tab"]').map((tab) => tab.attributes("data-tab-key"));
+    const titlesRequest = (seq) => ({ seq, slot: "handbook", npcId: null, section: "titles" });
+
+    it("names the window 手帳 and carries the book, counter and titles tabs outside combat", () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      expect(topKeys()).toEqual(["book", "counter", "titles"]);
+      expect(wrapper.get('[data-testid="quest-drawer"]').attributes("aria-label")).toBe("手帳");
+      expect(wrapper.get('[data-testid="quest-drawer__top-tabs"]').attributes("aria-label")).toBe("手帳分類");
+    });
+
+    it("carries only the titles tab in combat, keeping a remembered book", () => {
+      mountDrawer({ titleCodex: titleCodex(), combat: true });
+      expect(topKeys()).toEqual(["titles"]);
+      expect(topTab("titles").attributes("aria-selected")).toBe("true");
+      expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+      expect(useQuestDrawerMemory("1|1").top).toBe("book");
+      reopen({ titleCodex: titleCodex() });
+      expect(topTab("book").attributes("aria-selected")).toBe("true");
+    });
+
+    it("switches an open drawer to the titles tab on a handbook request", async () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      expect(find("book").exists()).toBe(true);
+      await wrapper.setProps({ routeRequest: titlesRequest(1) });
+      expect(topTab("titles").attributes("aria-selected")).toBe("true");
+      expect(wrapper.find('[data-testid="handbook__titles"]').exists()).toBe(true);
+    });
+
+    it("never re-applies a consumed request on a later mount", async () => {
+      mountDrawer({ titleCodex: titleCodex(), routeRequest: titlesRequest(4) });
+      expect(topTab("titles").attributes("aria-selected")).toBe("true");
+      await topTab("book").trigger("click");
+      reopen({ titleCodex: titleCodex(), routeRequest: titlesRequest(4) });
+      expect(topTab("book").attributes("aria-selected")).toBe("true");
+    });
+
+    it("disables the titles tab with the panel's reason while the codex is unavailable", async () => {
+      mountDrawer({ titleCodex: UNAVAILABLE_CODEX });
+      const titles = topTab("titles");
+      expect(titles.attributes("aria-disabled")).toBe("true");
+      expect(titles.attributes("data-tip")).toBe("稱號 · 合成的稱號冊不可用原因");
+      expect(titles.attributes("aria-describedby")).toBeTruthy();
+      await titles.trigger("click");
+      expect(topTab("book").attributes("aria-selected")).toBe("true");
+    });
+
+    it("shows the full title verbatim only on the titles tab", async () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      expect(wrapper.find('[data-testid="handbook__full-title"]').exists()).toBe(false);
+      await topTab("titles").trigger("click");
+      expect(wrapper.get('[data-testid="handbook__full-title"]').text()).toContain("甲稱號　合成異名乙");
+    });
+
+    it("guards the close while an epithet removal is armed", async () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      expect(wrapper.vm.closeGuard()).toBe(true);
+      await topTab("titles").trigger("click");
+      await wrapper.get('[data-testid="handbook__titles-rail"] [data-tab-key="epithet"]').trigger("click");
+      await wrapper.get('[data-testid="handbook__remove"]').trigger("click");
+      await nextTick();
+      expect(wrapper.vm.closeGuard()).toBe(false);
+      await nextTick();
+      expect(wrapper.find('[data-testid="handbook__remove-confirm"]').exists()).toBe(false);
+      expect(wrapper.vm.closeGuard()).toBe(true);
+    });
+
+    it("forwards a title intent as one action", async () => {
+      mountDrawer({ titleCodex: titleCodex() });
+      await topTab("titles").trigger("click");
+      await wrapper.get('[data-testid="handbook__titles-rail"] [data-tab-key="guild"]').trigger("click");
+      await wrapper.get('[data-testid="handbook__equip"]').trigger("click");
+      expect(wrapper.emitted("action")).toEqual([[{ action_id: "title.equip", payload: { kind: "fixed", identifier: "g_x_rank" } }]]);
+    });
+
+    it("resets the titles rail and the applied route seq when the memory scope changes", async () => {
+      mountDrawer({ titleCodex: titleCodex(), routeRequest: titlesRequest(2) });
+      await wrapper.get('[data-testid="handbook__titles-rail"] [data-tab-key="epithet"]').trigger("click");
+      const memory = useQuestDrawerMemory("1|1");
+      expect(memory.titlesRail).toBe("epithet");
+      expect(memory.appliedRouteSeq).toBe(2);
+      await wrapper.setProps({ memoryScope: "2|1" });
+      expect(memory.titlesRail).toBeNull();
+      expect(memory.appliedRouteSeq).toBeNull();
     });
   });
 });

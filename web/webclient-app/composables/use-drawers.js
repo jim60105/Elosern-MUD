@@ -10,7 +10,7 @@ export function useDrawers(store, { panel, panelAvailable }) {
   // derived from the single open-drawer name the store publishes.
   const DRAWER_TITLES = {
     letters: "信件",
-    quest: "任務",
+    quest: "手帳",
     lore: "世界圖鑑",
   };
   const drawerTitle = computed(() => DRAWER_TITLES[store.view.hudDrawer] || "");

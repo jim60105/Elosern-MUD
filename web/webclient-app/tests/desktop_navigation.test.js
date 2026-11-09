@@ -58,9 +58,9 @@ async function tabTo(button) {
 }
 
 describe("DesktopNavigation", () => {
-  it("orders the whole bar: 隊伍, 任務, 地圖, the tool group, then 設定", () => {
+  it("orders the whole bar: 隊伍, 手帳, 地圖, the tool group, then 設定", () => {
     mountNav({ galleryAvailable: true });
-    expect(names(wrapper)).toEqual(["隊伍", "任務", "地圖", "信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明", "設定"]);
+    expect(names(wrapper)).toEqual(["隊伍", "手帳", "地圖", "信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明", "設定"]);
     // 設定 stands after the tool group, outside it.
     const settings = wrapper.get('[data-testid="nav-settings"]');
     expect(wrapper.get('[data-testid="nav-tools"]').element.contains(settings.element)).toBe(false);
@@ -87,7 +87,7 @@ describe("DesktopNavigation", () => {
   });
 
   it("declares no home emit", () => {
-    expect(DesktopNavigation.emits).toEqual(["navigate", "overlay", "drawer"]);
+    expect(DesktopNavigation.emits).toEqual(["navigate", "overlay", "drawer", "handbook"]);
   });
 
   it("draws each entry's hotkey as a decorative chip and exposes it as aria-keyshortcuts", () => {
@@ -96,7 +96,7 @@ describe("DesktopNavigation", () => {
     expect(buttons.map((b) => b.attributes("aria-keyshortcuts"))).toEqual(["P", "J", "M"]);
     expect(buttons.map((b) => b.get("kbd").text())).toEqual(["P", "J", "M"]);
     for (const button of buttons) expect(button.get("kbd").attributes("aria-hidden")).toBe("true");
-    expect(labels(wrapper)).toEqual(["隊伍", "任務", "地圖"]);
+    expect(labels(wrapper)).toEqual(["隊伍", "手帳", "地圖"]);
     expect(NAV_PRIMARY.map((entry) => entry.hotkey)).toEqual(["P", "J", "M"]);
   });
 
@@ -218,14 +218,15 @@ describe("DesktopNavigation", () => {
     expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("角色肖像圖庫");
   });
 
-  it("emits overlay for codex/gallery/help and drawer for letters and lore", async () => {
+  it("emits handbook for codex, overlay for gallery/help and drawer for letters and lore", async () => {
     mountNav({ galleryAvailable: true });
     await wrapper.get('[data-testid="nav-tool-letters"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-codex"]').trigger("click");
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
-    expect(wrapper.emitted("overlay")).toEqual([["codex"], ["gallery"], ["help"]]);
+    expect(wrapper.emitted("handbook")).toEqual([["titles"]]);
+    expect(wrapper.emitted("overlay")).toEqual([["gallery"], ["help"]]);
     expect(wrapper.emitted("drawer")).toEqual([["letters"], ["lore"]]);
   });
 
