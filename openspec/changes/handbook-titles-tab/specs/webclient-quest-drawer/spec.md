@@ -44,7 +44,7 @@ The quest drawer (the handbook window) SHALL present a first-level icon tablist 
 
 ### Requirement: A handbook route request opens the drawer on the named tab
 
-The store SHALL offer one handbook route entry that publishes a sequenced route request naming a first-level tab and opens the quest drawer. The drawer SHALL switch to that tab on every new request, including while already open. A tab outside the current mode's tab set SHALL be refused without opening anything. A handbook request SHALL NOT trigger a services read for a provider.
+The store SHALL offer one handbook route entry that publishes a sequenced route request naming a first-level tab and opens the quest drawer. The drawer SHALL switch to that tab once per new request, including while already open, and SHALL never re-apply a consumed request. A tab outside the mode's tab set SHALL be refused without opening anything. The request SHALL carry no provider and SHALL cause no read beyond the drawer's ordinary opening read.
 
 #### Scenario: A titles request opens the titles tab
 - **WHEN** the handbook route entry is called with the titles tab while the drawer is closed
@@ -59,8 +59,12 @@ The store SHALL offer one handbook route entry that publishes a sequenced route 
 - **THEN** it returns false, no drawer opens and no request is published
 
 #### Scenario: A handbook request reads no provider
-- **WHEN** a handbook route request is published
-- **THEN** no shop or counter services read is dispatched on its behalf
+- **WHEN** a handbook route request is published while the drawer is already open
+- **THEN** no shop or counter services read is dispatched, and opening a closed drawer this way dispatches exactly the reads a plain opening dispatches
+
+#### Scenario: A consumed request is not re-applied
+- **WHEN** a titles request opened the drawer, the player switched to the quest book and closed the drawer, and the drawer is reopened without a new request
+- **THEN** the quest book tab is selected
 
 ### Requirement: The titles tab organizes the committed title codex by rail
 
