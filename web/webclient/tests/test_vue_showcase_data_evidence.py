@@ -267,6 +267,11 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The wilderness travel stage story joined the frozen set with
                 # wilderness-travel-interface.
                 "World/WildernessTravel",
+                # The handbook's shared detail footer, tile wall and detail
+                # column joined with handbook-primitives.
+                "World/DetailFooter",
+                "World/TileWall",
+                "World/CodexDetail",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

@@ -83,7 +83,10 @@
     "Data/HoldingsStrip",
     "World/AreaMapView",
     "World/WorldMapView",
-    "World/WildernessTravel"
+    "World/WildernessTravel",
+    "World/DetailFooter",
+    "World/TileWall",
+    "World/CodexDetail"
   ],
   "frozen": true
 }

@@ -17,9 +17,9 @@ Run pnpm commands from the repository root, vitest as `pnpm exec vitest run <pat
 
 ## 3. Stories, manifest, evidence
 
-- [ ] 3.1 Add the stories and manifest entries per design D5. Verify with `pnpm run build-storybook && pnpm run showcase-coverage` and the focused labels for the four `web.webclient.tests.test_vue_showcase_*_evidence` modules.
-- [ ] 3.2 Create the evidence bridge per design D5 and register it in `.github/evennia-shards.json`. Verify with the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract`.
-- [ ] 3.3 Run `uv run --locked python -m tools.test_data_lint check`, the focused label `tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change handbook-primitives`, and `openspec validate handbook-primitives --strict`. All pass. The new testids are only referenced from vitest and Storybook, not from browser tests, so the frozen audit needs no edit. If `tests.test_webclient_frozen_contract` reports otherwise, add a `handbook__` family row to `docs/development/webclient-vue-frozen-contract-audit.md` §2.3.
+- [x] 3.1 Add the stories and manifest entries per design D5. Verify with `pnpm run build-storybook && pnpm run showcase-coverage` and the focused labels for the four `web.webclient.tests.test_vue_showcase_*_evidence` modules.
+- [x] 3.2 Create the evidence bridge per design D5 and register it in `.github/evennia-shards.json`. Verify with the focused labels `web.webclient.tests.test_vue_handbook_evidence` and `tests.test_evennia_test_optimization_contract`.
+- [x] 3.3 Run `uv run --locked python -m tools.test_data_lint check`, the focused label `tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change handbook-primitives`, and `openspec validate handbook-primitives --strict`. All pass. The new testids are only referenced from vitest and Storybook, not from browser tests, so the frozen audit needs no edit. If `tests.test_webclient_frozen_contract` reports otherwise, add a `handbook__` family row to `docs/development/webclient-vue-frozen-contract-audit.md` §2.3.
 
 ## Workflow follow-up
 

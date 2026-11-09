@@ -1020,6 +1020,7 @@
         "web.webclient.tests.test_vue_breakdown_evidence",
         "web.webclient.tests.test_vue_dream_stage_evidence",
         "web.webclient.tests.test_vue_gallery_ui_evidence",
+        "web.webclient.tests.test_vue_handbook_evidence",
         "web.webclient.tests.test_vue_hud_drawer_evidence",
         "web.webclient.tests.test_vue_image_loading_evidence",
         "web.webclient.tests.test_vue_showcase_action_evidence",
