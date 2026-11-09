@@ -29,12 +29,12 @@ Prerequisites: `handbook-titles-tab` and `lore-codex-schema-v2` are merged. Veri
 ## 5. Live-client browser acceptance
 
 - [x] 5.1 Update the browser tests listed in design D7 to the codex tab, keeping their method names and every annotation whose requirement still exists. Run each touched method alone with `uv run --locked python -m web.tests.browser.unittest_driver <module>.<Class>.<method>`, capturing output to a scratch file. All pass.
-- [ ] 5.2 Add `web/tests/browser/test_browser_handbook_codex.py` with class `HandbookCodexBrowserTest`, which injects a synthetic v2 panel through the existing `_inject_snapshot` helper (as `test_browser_contextual_hud_drawers.py` does) on the live client. Add these methods:
+- [x] 5.2 Add `web/tests/browser/test_browser_handbook_codex.py` with class `HandbookCodexBrowserTest`, which injects a synthetic v2 panel through the existing `_inject_snapshot` helper (as `test_browser_contextual_hud_drawers.py` does) on the live client. Add these methods:
   - `test_codex_tab_geometry_at_reference_viewports`: for (1451, 790) and (2560, 1440), the rail, wall and detail boxes do not overlap and lie inside the drawer body; the wall has `scrollWidth <= clientWidth`; every visible text node's computed font size is `>=` the computed `--text-xs`; each legend mark's width is `12 * --ui-scale` within 1px.
   - `test_monster_legend_stays_pinned_while_tiles_scroll`: with a synthetic monster category large enough to overflow, the legend box lies inside the wall's visible box at scroll top and at scroll bottom.
   - `test_codex_tool_opens_the_codex_tab_in_combat`: in an injected combat snapshot, `nav-tool-lore` opens the drawer with exactly the codex and titles tabs.
   Register the class's method labels in `.github/browser-shards.json`. Run each method alone as in 5.1. All pass.
-- [ ] 5.3 Run `grep -n -E "codex-tile|codex-wall|codex-art|lore-codex-tab|codex-detail|handbook__" web/webclient-app/styles/app-shell.css` and expect no output.
+- [x] 5.3 Run `grep -n -E "codex-tile|codex-wall|codex-art|lore-codex-tab|codex-detail|handbook__" web/webclient-app/styles/app-shell.css` and expect no output.
 
 ## 6. Evidence bridge and gates
 
