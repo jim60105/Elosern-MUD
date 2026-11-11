@@ -180,7 +180,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "32b7ce2133016cf50f2d6ad9513d2bf681ae551a2990df3379c9ae38ae1f464f",
+  "fingerprint": "44f3f63418f0781867b1525a38a7ee972964ef5aa12f180146d0d1b15c1bdd56",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1060,6 +1060,918 @@
     ],
     "zones": [
       {
+        "cell_capacity": 3,
+        "key": "capital_grandia_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_grandia_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1961,
+            1980,
+            1251,
+            1270
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "capital_grandia_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_grandia_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1930,
+            1949,
+            1251,
+            1270
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_imperial_ferry_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_imperial_ferry_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1992,
+            2011,
+            1115,
+            1134
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_imperial_ferry_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_imperial_ferry_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1964,
+            1983,
+            1115,
+            1134
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_spice_road_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_spice_road_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1981,
+            2000,
+            506,
+            525
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_spice_road_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_spice_road_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1953,
+            1972,
+            506,
+            525
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_starglow_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_starglow_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2036,
+            2055,
+            958,
+            977
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_starglow_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_starglow_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2008,
+            2027,
+            945,
+            964
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_twin_currents_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_twin_currents_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2072,
+            2091,
+            699,
+            718
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_twin_currents_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_twin_currents_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2044,
+            2063,
+            691,
+            710
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_wheatwave_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_wheatwave_east_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2087,
+            2106,
+            1512,
+            1531
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_wheatwave_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_wheatwave_west_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2059,
+            2078,
+            1512,
+            1531
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
         "cell_capacity": 5,
         "key": "eastern_cache_habitat",
         "lower_density": 1,
@@ -1227,6 +2139,918 @@
       },
       {
         "cell_capacity": 3,
+        "key": "eastern_road_01",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_01_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2333,
+            2352,
+            676,
+            695
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_02",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_02_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1617,
+            1636,
+            1040,
+            1059
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_03",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_03_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2206,
+            2225,
+            532,
+            551
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_04",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_04_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2241,
+            2260,
+            1445,
+            1464
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_05",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_05_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2481,
+            2500,
+            1308,
+            1327
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_06",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_06_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1790,
+            1809,
+            1289,
+            1308
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_07",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_07_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2419,
+            2438,
+            1035,
+            1054
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_08",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_08_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2170,
+            2189,
+            987,
+            1006
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_09",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_09_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2052,
+            2071,
+            1382,
+            1401
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_10",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_10_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1655,
+            1674,
+            636,
+            655
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_11",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_11_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1849,
+            1868,
+            1741,
+            1760
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eastern_road_12",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eastern_road_12_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1750,
+            1769,
+            1517,
+            1536
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "highland_forest_habitat",
         "lower_density": 1,
         "pool": [
@@ -1275,6 +3099,158 @@
       },
       {
         "cell_capacity": 3,
+        "key": "port_dawnlight_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_dawnlight_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_dawnlight_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_dawnlight_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_dawnlight_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2452,
+            2471,
+            1507,
+            1526
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_tide_wind_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_tide_wind_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_tide_wind_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_tide_wind_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_tide_wind_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2559,
+            2578,
+            1144,
+            1163
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "southwest_shore_habitat",
         "lower_density": 1,
         "pool": [
@@ -1319,6 +3295,842 @@
         "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_black_soil_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_black_soil_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_black_soil_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_black_soil_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_black_soil_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1628,
+            1647,
+            1412,
+            1431
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_crystal_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_crystal_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_crystal_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_crystal_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_crystal_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1876,
+            1895,
+            1617,
+            1636
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_east_pasture_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_east_pasture_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_pasture_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_pasture_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_pasture_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2305,
+            2324,
+            884,
+            903
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_emerald_lake_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_emerald_lake_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_emerald_lake_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_emerald_lake_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_emerald_lake_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1901,
+            1920,
+            890,
+            909
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_maple_foot_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_maple_foot_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_maple_foot_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_maple_foot_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_maple_foot_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1649,
+            1668,
+            1235,
+            1254
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_north_wood_keep_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_north_wood_keep_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_north_wood_keep_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_north_wood_keep_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_north_wood_keep_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1820,
+            1839,
+            1869,
+            1888
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_orange_blossom_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_orange_blossom_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_orange_blossom_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_orange_blossom_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_orange_blossom_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1810,
+            1829,
+            502,
+            521
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_silver_ridge_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_silver_ridge_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_silver_ridge_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_silver_ridge_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_silver_ridge_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1525,
+            1544,
+            745,
+            764
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_steed_plain_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_steed_plain_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_steed_plain_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_steed_plain_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_steed_plain_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1692,
+            1711,
+            848,
+            867
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_sunken_bell_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_sunken_bell_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunken_bell_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunken_bell_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunken_bell_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2229,
+            2248,
+            1707,
+            1726
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_sunrise_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_sunrise_hinterland_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunrise_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunrise_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunrise_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2399,
+            2418,
+            1448,
+            1467
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
         "wave_budget": 3
       },
       {
@@ -1577,8 +4389,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "0d42f4a45d4ae2e631d78d2a74a44da56e1b6dc242d87f818f126432922353d3",
-    "world/lore/monster_placement.py": "5080ed8741e2170e041fe9836e4b6633437976ac036309c0f8dc42fefd6509c2",
+    "world/lore/monster_activity.py": "aee0cffa3c4dc2462bac45dca33573f37bf5e64b2d0b8d4eebc3fb9ab40dbfd5",
+    "world/lore/monster_placement.py": "df1548bc950141e2f38fcd7ca443c70b3799a77f8f0594ac7423f463a38b1a6b",
     "world/lore/monster_species.py": "417e32c12808caaf91856784519470713bc1d09cd0d45427862ce3edeb69339e",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
