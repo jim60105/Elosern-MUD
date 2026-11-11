@@ -1550,3 +1550,81 @@ bone-breaker-vulture-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 霧燈蛾
+
+This section records the fourth delivered species of the central mountains Wave
+2. 霧燈蛾 (`mist_lamp_moth`) is a mid-tier, grade-D, solitary night flier whose
+ordinary default variant is 逐光型 (`lamp_seeker`), with the stronger 老翅型
+(`old_veil_moth`). Both carry the single dark strike 鱗粉撲翅
+(`veil_scale_flutter`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Fragile night flier: its hit points sit near the mid band's floor (115 against
+  the floor of 110) and its defense is at the floor (10), while its agility
+  (19) sits in the band's upper half.
+* 逐光型's MP pool holds three casts of the strike's 10 MP cost, and its SP pool
+  holds four casts of the 4 SP cost.
+* The rider (−3 agility for 15 s) equals the goat's shipped
+  `rock_echo_stagger_agility_flat` contribution and lifetime.
+* The stronger 老翅型 holds one lamp all night at grade C with a larger pool
+  (150 HP, 50 MP, 24 SP).
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it, so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, and its `EnemyRiderGroupMemberTests`
+derives the group's members from the shipped declarations, so both new variants
+are exercised on their own rider axis with no test edit.
+
+### Decision mode
+
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds a timed effect and a modifier
+rule, so the startup tuning fingerprint moved from `f8858072...` to
+`cd78725a...`; the selector report was regenerated under the new tuning, the
+activation record and its rollback fingerprint (`def7776d...`) were updated,
+and `activated` and `activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone from the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 106 tests, OK, run as two focused method-label batches (100 + 6) because the local focus guard blocks the class label at 106 discovered tests |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+mist-lamp-moth-species` and `openspec validate
+mist-lamp-moth-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
