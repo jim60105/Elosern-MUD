@@ -925,6 +925,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "updraft_glider",
         True,
     ),
+    MonsterSpecies(
+        "mist_lamp_moth",
+        "霧燈蛾",
+        "霧燈蛾是雙翅展開約兩臂寬的大型蛾類魔獸，獨自棲息於中央山脈終年雲霧繚繞的山腰林帶。",
+        "灰白翅膀上帶著兩枚暗色眼紋，翅緣垂著絨毛般的長鱗。"
+        "羽狀觸角寬如手掌，身軀覆著厚密白毛，停在樹幹上時像一片積著霜的樹皮。",
+        "牠白天收翅貼在霧中的樹幹上，入夜後循著光亮飛行，以花蜜與樹液為食。"
+        "山徑上的避難石屋在霧夜會點燈指路，燈火常引來霧燈蛾繞著燈籠撲飛，翅膀撞得燈罩搖晃。"
+        "牠的翅鱗帶著微弱暗屬性力量，鱗粉落在身上時會讓手腳短暫發沉；"
+        "撲翅擊中對手的那一下，鱗粉才會大量抖落。"
+        "守燈的人會在燈罩外加一層細網，讓燈光照得到山徑，蛾翅則碰不到燈火。"
+        "近身時，牠以厚重的翅膀撲打對手，撲中時抖落鱗粉，使對手動作短暫遲緩。",
+        ("central_mountains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；翅鱗暗屬性力量的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居蛾類：暗屬性翅鱗只在撲擊命中時抖落，作用為短暫手腳發沉，不造成中毒、睡眠、幻覺或持續傷害；戰鬥呈現為翅膀撲打與命中後短暫敏捷下降。連結山徑石屋的霧夜燈火。",
+        "（作者私有：尚未證實的猜想）翻越山徑的旅人之間流傳，霧燈蛾繞燈越久，隔天的霧散得越快，這種說法尚未證實。",
+        "lamp_seeker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1465,6 +1484,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "C",
         True,
         active_skill_keys=("grit_wing_strike",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "lamp_seeker",
+        "mist_lamp_moth",
+        "逐光型",
+        "普通版本，入夜後循著光亮在霧中飛行。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=115, mp=30, sp=16, atk_phys=18, agility=19, defense=10, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("veil_scale_flutter",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "old_veil_moth",
+        "mist_lamp_moth",
+        "老翅型",
+        "翅膀磨得破舊、體型最大的老個體，整夜守著同一盞燈火撲飛。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=150, mp=50, sp=24, atk_phys=23, agility=21, defense=11, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("veil_scale_flutter",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
     ),
