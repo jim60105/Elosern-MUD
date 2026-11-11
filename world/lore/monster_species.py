@@ -812,6 +812,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "hollow_roost_flier",
         True,
     ),
+    MonsterSpecies(
+        "hush_wing_owl",
+        "靜羽梟",
+        "靜羽梟是雙翼展開近一人高的大型貓頭鷹類魔獸，獨自或成對棲息於北部深林巨木高處的樹洞。",
+        "灰綠色羽毛帶著苔蘚般的斑紋，停在樹枝上時幾乎與樹皮融為一體。"
+        "圓臉盤中央是一對琥珀色大眼，腳爪粗壯，趾尖彎鉤。",
+        "牠在黃昏與深夜狩獵，以微弱風屬性力量梳開翼緣細羽，讓拍翼聲散進周圍的風裡，再貼著林冠滑向獵物。"
+        "這股風力作用在牠自己的羽翼周圍，飛行與攻擊的方向由牠的腳爪與身形決定。"
+        "牠捕食野兔、松鼠與落單的空木蝠，也會撲向夜裡在林間移動的小型馱獸。"
+        "獵人在深林營地過夜時，會留意頭頂樹枝上的琥珀色眼光，並把燈火留在馱獸身旁。"
+        "近身時，牠以腳爪掠擊對手，擊出後順勢藉風抬升，短暫變得更加靈活。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；靜羽風力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居獵食者：風屬性只梳開自身翼緣細羽，使拍翼聲散開，不造成隱形、催眠或改變他人感官；戰鬥呈現為腳爪掠擊與自身短暫敏捷提升。黃昏與深夜才主動接觸。",
+        "（作者私有：尚未證實的猜想）虎嘯城的獵人相信靜羽梟的叫聲預示天氣轉壞，這種說法尚未證實。",
+        "hush_wing_hunter",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1178,6 +1196,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("hollow_bat_bite",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "hush_wing_hunter",
+        "hush_wing_owl",
+        "夜獵型",
+        "普通版本，在黃昏與深夜沿林冠獵捕。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=120, mp=30, sp=20, atk_phys=21, agility=22, defense=10, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("hush_wing_swoop",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "old_hollow_owl",
+        "hush_wing_owl",
+        "古巢型",
+        "長年占據同一株巨木樹洞的老個體，育雛期間會撲向靠近巢樹的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=160, mp=50, sp=30, atk_phys=26, agility=24, defense=12, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("hush_wing_swoop",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
