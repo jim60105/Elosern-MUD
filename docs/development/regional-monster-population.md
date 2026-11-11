@@ -566,6 +566,50 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change highland-road-belts` | passed |
 | `openspec validate highland-road-belts --strict` | valid |
 
+### Near-settlement belts: north deep forest
+
+This change gives the north deep forest its first monster placement: a
+hinterland belt beside the hidden elven village 幽月谷村, forest-edge approach
+zones where the expeditions from 北林堡 and 虎嘯城 enter the wood, and deep-wild
+zones on the approaches to the dragon nest and the eternal-night dungeon. The
+region forbids roads, so the approach belt stands in for the corridor belt that
+other regions receive. The declarations remain the only authority for keys,
+rectangles, pools and bindings; this section repeats no coordinate, density or
+configured timing.
+
+**Species fit.** Mushroom colonies and porcupines belong on the fallen logs and
+forest edges the dossiers describe, so the hinterland and approach pools hold
+only those low-tier animals and the bats that roost in hollow trunks along the
+expedition routes. The deep wild adds the owl and the vine spider, whose
+dossiers tie them to the dark canopy and the game trails, with the same low
+company around them. No stronger or high-tier variant joins an ordinary pool,
+so a near-settlement encounter answers after engagement and keeps the
+light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
+
+**Sites.** The stronger variants occupy recoverable nests and camps: the
+mushroom elder's 菌環, the porcupine's 守洞 den, the bat colony's roost, the old
+owl's hollow and the path-blocking vine net. A remote clearing holds the
+one-shot stag site where 蒼冠 waits; clearing it is a durable authored victory
+until an author re-issues it. The sites answer only when an intruder enters
+their defended extent.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK, 43 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change north-deep-forest-placement` | passed |
+| `openspec validate north-deep-forest-placement --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

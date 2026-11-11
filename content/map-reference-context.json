@@ -187,7 +187,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "0586d2d7ed5cc9001e355719e2efde4c87475ac3c57029abe91093052fcf7e93",
+  "fingerprint": "23b789dd462e494001826ab777712e8970d2ac70d6c2486902752684753b744e",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -985,6 +985,150 @@
         "region_key": "western_hills_valleys"
       },
       {
+        "capacity": 3,
+        "composition_key": "fairy_ring_nest_group",
+        "coordinates": [
+          1700,
+          2000
+        ],
+        "individual_name_zh": null,
+        "key": "fairy_ring_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "spore_cap_mushroom",
+            "species_name_zh": "孢傘菇",
+            "variant_key": "ring_elder",
+            "variant_name_zh": "菌環型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "spore_cap_mushroom",
+            "species_name_zh": "孢傘菇",
+            "variant_key": "rotlog_sprout",
+            "variant_name_zh": "腐木型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "hollow_roost_camp_group",
+        "coordinates": [
+          880,
+          2300
+        ],
+        "individual_name_zh": null,
+        "key": "hollow_roost_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "hollow_tree_bat",
+            "species_name_zh": "空木蝠",
+            "variant_key": "colony_sentinel",
+            "variant_name_zh": "哨群型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "hollow_tree_bat",
+            "species_name_zh": "空木蝠",
+            "variant_key": "hollow_roost_flier",
+            "variant_name_zh": "棲洞型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "moss_crown_boss",
+        "coordinates": [
+          1300,
+          2400
+        ],
+        "individual_name_zh": "蒼冠",
+        "key": "moss_crown_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "moss_crown_stag",
+            "species_name_zh": "苔冠巨鹿",
+            "variant_key": "wood_crown_elder",
+            "variant_name_zh": "老冠型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "old_hollow_owl_nest_member",
+        "coordinates": [
+          1250,
+          2100
+        ],
+        "individual_name_zh": null,
+        "key": "old_hollow_owl_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "hush_wing_owl",
+            "species_name_zh": "靜羽梟",
+            "variant_key": "old_hollow_owl",
+            "variant_name_zh": "古巢型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "quill_den_nest_group",
+        "coordinates": [
+          1080,
+          1990
+        ],
+        "individual_name_zh": null,
+        "key": "quill_den_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "moss_quill_porcupine",
+            "species_name_zh": "苔棘豪豬",
+            "variant_key": "den_sentry",
+            "variant_name_zh": "守洞型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "moss_quill_porcupine",
+            "species_name_zh": "苔棘豪豬",
+            "variant_key": "quill_forager",
+            "variant_name_zh": "啃皮型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "north_deep_forest"
+      },
+      {
         "capacity": 1,
         "composition_key": "reservoir_crocodile_boss",
         "coordinates": [
@@ -1063,6 +1207,30 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "southeast_coast"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "trail_net_camp_member",
+        "coordinates": [
+          1840,
+          2120
+        ],
+        "individual_name_zh": null,
+        "key": "trail_net_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "vine_net_spider",
+            "species_name_zh": "藤網蛛",
+            "variant_key": "trail_netter",
+            "variant_name_zh": "封道型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "north_deep_forest"
       }
     ],
     "zones": [
@@ -2739,6 +2907,158 @@
         "wave_budget": 3
       },
       {
+        "cell_capacity": 3,
+        "key": "dragon_nest_lower_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "dragon_nest_lower_wild_hush_wing_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "hush_wing_owl",
+                "species_name_zh": "靜羽梟",
+                "variant_key": "hush_wing_hunter",
+                "variant_name_zh": "夜獵型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_lower_wild_vine_weaver",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "vine_net_spider",
+                "species_name_zh": "藤網蛛",
+                "variant_key": "vine_weaver",
+                "variant_name_zh": "織藤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_lower_wild_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_lower_wild_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1830,
+            1859,
+            2010,
+            2039
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "dragon_nest_upper_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "dragon_nest_upper_wild_hush_wing_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "hush_wing_owl",
+                "species_name_zh": "靜羽梟",
+                "variant_key": "hush_wing_hunter",
+                "variant_name_zh": "夜獵型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_upper_wild_vine_weaver",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "vine_net_spider",
+                "species_name_zh": "藤網蛛",
+                "variant_key": "vine_weaver",
+                "variant_name_zh": "織藤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_upper_wild_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "dragon_nest_upper_wild_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1770,
+            1799,
+            2085,
+            2114
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
         "cell_capacity": 5,
         "key": "eastern_cache_habitat",
         "lower_density": 1,
@@ -3818,6 +4138,158 @@
       },
       {
         "cell_capacity": 3,
+        "key": "eternal_night_lower_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eternal_night_lower_wild_hush_wing_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "hush_wing_owl",
+                "species_name_zh": "靜羽梟",
+                "variant_key": "hush_wing_hunter",
+                "variant_name_zh": "夜獵型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_lower_wild_vine_weaver",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "vine_net_spider",
+                "species_name_zh": "藤網蛛",
+                "variant_key": "vine_weaver",
+                "variant_name_zh": "織藤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_lower_wild_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_lower_wild_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            965,
+            994,
+            2020,
+            2049
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "eternal_night_upper_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "eternal_night_upper_wild_hush_wing_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "hush_wing_owl",
+                "species_name_zh": "靜羽梟",
+                "variant_key": "hush_wing_hunter",
+                "variant_name_zh": "夜獵型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_upper_wild_vine_weaver",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "vine_net_spider",
+                "species_name_zh": "藤網蛛",
+                "variant_key": "vine_weaver",
+                "variant_name_zh": "織藤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_upper_wild_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eternal_night_upper_wild_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            915,
+            944,
+            2200,
+            2229
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "highland_forest_habitat",
         "lower_density": 1,
         "pool": [
@@ -4132,6 +4604,144 @@
           ]
         ],
         "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "moonvale_outer_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "moonvale_outer_wild_hush_wing_hunter",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "hush_wing_owl",
+                "species_name_zh": "靜羽梟",
+                "variant_key": "hush_wing_hunter",
+                "variant_name_zh": "夜獵型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "moonvale_outer_wild_vine_weaver",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "vine_net_spider",
+                "species_name_zh": "藤網蛛",
+                "variant_key": "vine_weaver",
+                "variant_name_zh": "織藤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "moonvale_outer_wild_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "moonvale_outer_wild_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1590,
+            1619,
+            2140,
+            2169
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "north_wood_forest_edge",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "north_wood_forest_edge_rotlog_sprout",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "spore_cap_mushroom",
+                "species_name_zh": "孢傘菇",
+                "variant_key": "rotlog_sprout",
+                "variant_name_zh": "腐木型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_forest_edge_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_forest_edge_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1805,
+            1824,
+            1950,
+            1969
+          ]
+        ],
+        "region_key": "north_deep_forest",
         "replenishment_interval": 600,
         "upper_density": 3,
         "wave_budget": 3
@@ -5118,6 +5728,68 @@
           ]
         ],
         "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "tiger_roar_forest_edge",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "tiger_roar_forest_edge_rotlog_sprout",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "spore_cap_mushroom",
+                "species_name_zh": "孢傘菇",
+                "variant_key": "rotlog_sprout",
+                "variant_name_zh": "腐木型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "tiger_roar_forest_edge_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "tiger_roar_forest_edge_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            990,
+            1009,
+            1950,
+            1969
+          ]
+        ],
+        "region_key": "north_deep_forest",
         "replenishment_interval": 600,
         "upper_density": 3,
         "wave_budget": 3
@@ -6415,6 +7087,68 @@
         "wave_budget": 3
       },
       {
+        "cell_capacity": 3,
+        "key": "village_eolas_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "village_eolas_hinterland_rotlog_sprout",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "spore_cap_mushroom",
+                "species_name_zh": "孢傘菇",
+                "variant_key": "rotlog_sprout",
+                "variant_name_zh": "腐木型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_eolas_hinterland_quill_forager",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "moss_quill_porcupine",
+                "species_name_zh": "苔棘豪豬",
+                "variant_key": "quill_forager",
+                "variant_name_zh": "啃皮型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_eolas_hinterland_hollow_roost_flier",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "hollow_tree_bat",
+                "species_name_zh": "空木蝠",
+                "variant_key": "hollow_roost_flier",
+                "variant_name_zh": "棲洞型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1414,
+            1433,
+            2134,
+            2153
+          ]
+        ],
+        "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
         "cell_capacity": 5,
         "key": "western_cache_habitat",
         "lower_density": 1,
@@ -7304,8 +8038,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "7e6c756c73ff678235706d5f590365499622f183c043112578b6f20fc7fef292",
-    "world/lore/monster_placement.py": "6b3c6a42e57a410f26ad782cc8aeebb16aad58c39ca4104a925bf7c74cbbf7b4",
+    "world/lore/monster_activity.py": "2f04db3671441f23478ec998f04e34a6c341a4e12fa18d7c070f88df257382bd",
+    "world/lore/monster_placement.py": "65cfc2e0d406423976b2dc33e4a3a9aa36579e1d217f41c7bc613e0c1963d722",
     "world/lore/monster_species.py": "79e50f5be1117896429a0124ee2b68dd47a63cd49e6337f26a316541ada560a4",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
