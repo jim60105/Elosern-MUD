@@ -1148,6 +1148,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "mudflat_skipper",
         True,
     ),
+    MonsterSpecies(
+        "mast_wind_gull",
+        "桅風海鷗",
+        "桅風海鷗是雙翼展開約一臂半寬的鷗類魔獸，成群棲息於東南海岸的港口、碼頭與防波堤。",
+        "頭胸雪白，背羽淺灰，翼尖一截墨黑。"
+        "黃色的嘴粗壯帶鉤，下嘴尖有一點紅斑，雙腳是橘黃色的蹼足。",
+        "牠們在桅杆之間盤旋，盯著魚市攤上的漁獲與碼頭工人手裡的乾糧。"
+        "牠能以微弱風屬性力量在翼下聚起一股側風，從盤旋中驟然橫掠而下，叼走攤上的魚後一個轉身飛回桅頂；"
+        "這股風力在牠自己的雙翼下聚起，連續掠飛幾次就得停下來喘氣。"
+        "金穗港的魚市每天清晨開市，攤販得一手收錢、一手揮竿趕鷗，貨箱上的魚乾也常被整串叼走。"
+        "近身時，牠俯身啄擊對手，啄擊時翼下的側風一聚，短時間內身形更輕快。",
+        ("southeast_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；翼下側風的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居海鷗：風屬性只在自身翼下聚起側風以橫掠與轉身，不颳起海風、不影響船帆；戰鬥呈現為啄擊與自身短暫敏捷提升。連結金穗港魚市與碼頭貨箱。",
+        "（作者私有：尚未證實的猜想）南岬港的船員相信桅風海鷗聚在哪艘船的桅頂，那艘船下一趟就會滿載，這種說法尚未證實。",
+        "mast_circler",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2024,6 +2042,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("mud_tail_flick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "mast_circler",
+        "mast_wind_gull",
+        "繞桅型",
+        "普通版本，成群在港口的桅杆之間盤旋、搶食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=28, mp=20, sp=9, atk_phys=5, agility=11, defense=2, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("wind_snatch_dive",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "stack_colony_elder",
+        "mast_wind_gull",
+        "堤群型",
+        "在防波堤礁石上帶領整片鷗群的老個體，會帶頭撲向靠近繁殖礁石的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=50, mp=30, sp=15, atk_phys=9, agility=12, defense=4, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("wind_snatch_dive",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),

@@ -2560,3 +2560,91 @@ unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 桅風海鷗
+
+This section records the sixth delivered species of the Wave 3 species chain and
+the second southeast-coast species of that wave. 桅風海鷗 (`mast_wind_gull`) is a
+low-tier harbour gull whose ordinary default variant is 繞桅型 (`mast_circler`)
+and whose stronger variant is 堤群型 (`stack_colony_elder`). Both carry the
+single wind strike 掠風啄擊 (`wind_snatch_dive`), a dive peck that mounts its own
+agility lift on every resolved attempt.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* Light harbour flier: the ordinary variant's agility sits near the low band's
+  ceiling (3–12), its defense rests on the band's floor (2) and its hit points
+  sit in the band's lower part (25–70).
+* The peck costs 10 MP and 3 SP, so the ordinary variant's MP holds two casts
+  and its SP holds three; the stronger variant's MP holds three casts and its
+  SP holds five.
+* The gust (+2 agility for 15 s) is below the rat's shipped self agility rise
+  (+3).
+* The stronger 堤群型 leads a breakwater colony at grade E.
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. Its representative stays `burrow_maker`
+(築埂兔 `ridge_burrow_hare`): both new variant keys sort after it
+(`"burrow_maker" < "mast_circler"` and `"burrow_maker" < "stack_colony_elder"`),
+so the representative declaration and every shard, seed and smoke registration
+stay unchanged. The existing
+`world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the group's
+committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `burrow_maker`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.35. Neither
+variant authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds one timed effect and one modifier,
+so the startup tuning fingerprint moved from `75b74aa1...` to `5828d932...`; the
+selector report was regenerated under the new tuning, the activation record and
+its rollback fingerprint (`92205e80...` to `561da0df...`) were updated, and
+`activated` and `activation_bindings` are unchanged. The six archetype campaigns
+and the performance report were not rerun and remain historical harness evidence
+at `497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 115 tests, OK, run as two focused method-label batches (58 + 57) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check reports the 57 registered variants, and the remaining
+gates passed: `uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+mast-wind-gull-species` and `openspec validate mast-wind-gull-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
