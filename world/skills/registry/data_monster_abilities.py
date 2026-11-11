@@ -30,6 +30,9 @@ The hush-wing owl's swoop is assembled the same way with wind physical damage
 plus a self-mounted agility lift granted by every resolved attempt.
 The vine-net spider's thread cast is assembled the same way with elementless
 physical damage plus a hit-dependent agility debuff on the struck enemy.
+The moss-crown stag's two earth strikes are assembled the same way with
+physical-school damage that reads the actor's physical attack: one
+single-target charge and one area sweep, each paid in both MP and SP.
 """
 
 from world.skills.effects import (
@@ -573,6 +576,54 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "moss_crown_charge",
+        "苔冠衝撞",
+        "以土屬性力量硬化鹿角上的苔冠，衝撞單一敵方目標，造成土屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("moss_crown_stag",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.2, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "moss_crown_sweep",
+        "苔冠橫掃",
+        "甩動硬化的苔冠橫掃周圍所有敵方目標，對每個目標造成土屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("moss_crown_stag",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
         ),
     ),
 )

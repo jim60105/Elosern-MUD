@@ -134,6 +134,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 收緊棘根的苔土，以滿背硬棘撞向對手。",
         ),
     ),
+    NarrationRow(
+        "moss_crown_charge",
+        action=(
+            "{actor} 壓低苔冠，踏著深坑直衝而來。",
+            "{actor} 鹿角上的藤根一緊，整副苔冠撞向對手。",
+        ),
+    ),
+    NarrationRow(
+        "moss_crown_sweep",
+        action=(
+            "{actor} 甩動沉重的苔冠，朝四周橫掃。",
+            "{actor} 昂首一甩，垂藤與硬角掃過身旁眾人。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

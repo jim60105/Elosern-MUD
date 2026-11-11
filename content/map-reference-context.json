@@ -46,6 +46,7 @@
       "fog_mane_lynx",
       "hollow_tree_bat",
       "hush_wing_owl",
+      "moss_crown_stag",
       "moss_quill_porcupine",
       "mudfilm_slime",
       "ridge_burrow_hare",
@@ -185,7 +186,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2754a0b07f75800a799ae0b0acb8067f6c74c42dd809a67c7d7c041ea4b1efda",
+  "fingerprint": "fded69ebca3e857b47bc575ffe447233c5c037026aca693d001cf44e744b98f8",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -7304,7 +7305,7 @@
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "7e6c756c73ff678235706d5f590365499622f183c043112578b6f20fc7fef292",
     "world/lore/monster_placement.py": "6b3c6a42e57a410f26ad782cc8aeebb16aad58c39ca4104a925bf7c74cbbf7b4",
-    "world/lore/monster_species.py": "474a4424ded6ba19baf5ebcfb852341962ff86791eab420db52cd8a109abf77c",
+    "world/lore/monster_species.py": "56bed2bebf04d7b29ebd9d4b0da753172fb38bef6dd5ff7b273a4ab2d5786b9c",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
     "world/lore/names.py": "8a75cd6dca2f93ad173a31564fbb3fe752d4b8428a051110868a9de6f2ec834d",
