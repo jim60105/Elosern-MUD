@@ -1093,6 +1093,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "plain_runner",
         True,
     ),
+    MonsterSpecies(
+        "sluice_spear_heron",
+        "渠矛蒼鷺",
+        "渠矛蒼鷺是站起來與人齊高的鷺類魔獸，獨自涉行於東部大平原的灌溉渠、水門與魚塘邊。",
+        "背羽灰藍，頸部細長雪白，頭頂後方垂著兩根黑色飾羽。"
+        "暗黃色的長喙尖直如矛，雙腿細長，能在及膝的渠水裡一動也不動地站上半天。",
+        "牠縮著長頸站在水門下方的急流邊，等魚群與青蛙游近。"
+        "牠的頸部帶著異常的彈力，收縮的長頸能在眨眼間彈直，長喙刺進水裡的速度快得看不清。"
+        "平原上的灌溉渠沿線都有農家挖的魚塘，渠矛蒼鷺會守在同一座水門旁，把一整池魚苗啄個精光；"
+        "管水門的人走近時，牠也會揚喙刺向來人。"
+        "近身時，牠以長喙疾刺對手，刺中時順勢甩起一片水花撲在對手臉上，讓對手短暫看不準目標。",
+        ("eastern_plains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；頸部異常彈力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居涉禽：頸部彈力屬於身體能力，不帶元素、不造成失明或持續傷害；戰鬥呈現為長喙疾刺與命中後短暫命中下降（水花撲面）。連結灌溉渠水門與農家魚塘。",
+        "（作者私有：尚未證實的猜想）翠湖鎮的漁人說渠矛蒼鷺站在哪座水門下，那年那條渠的魚就最多，這種說法尚未證實。",
+        "sluice_wader",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1891,6 +1909,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("dust_gallop_kick",),
         passive_skill_keys=(),
         behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "sluice_wader",
+        "sluice_spear_heron",
+        "涉渠型",
+        "普通版本，獨自守在灌溉渠的水門下捕魚。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=125, mp=0, sp=24, atk_phys=22, agility=18, defense=10, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("spear_beak_jab",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "heronry_elder",
+        "sluice_spear_heron",
+        "林巢型",
+        "在渠邊柳林裡帶領整片鷺巢的老個體，孵育期會連續刺向走近巢樹的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=175, mp=0, sp=36, atk_phys=26, agility=19, defense=12, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("spear_beak_jab",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
