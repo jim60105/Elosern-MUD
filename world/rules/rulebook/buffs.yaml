@@ -627,6 +627,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（東南海岸第三波）：桅風海鷗掠風啄擊：每次已結算且具合法目標的施放都在翼下聚起側風，agility_flat +2 資料在 combat_modifiers.yaml 的 gull_updraft_agility_flat 列（wax_slip_agility_flat 的 agility_flat 先例）。
+- key: gull_updraft
+  duration: 15
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
