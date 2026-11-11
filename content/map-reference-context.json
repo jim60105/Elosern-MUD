@@ -181,7 +181,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "992648cd1ce5353ce31cd893aca3c8e2972c059e6964ed0da095ee9450f6bc41",
+  "fingerprint": "88acc7e994eed2e45f6b324524d3561c76037ea43a695931afb872e12c954a34",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1062,6 +1062,158 @@
     "zones": [
       {
         "cell_capacity": 3,
+        "key": "capital_altoria_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_altoria_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_east_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            867,
+            886,
+            1042,
+            1061
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "capital_altoria_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_altoria_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_west_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            837,
+            856,
+            1040,
+            1059
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "capital_grandia_east_hinterland",
         "lower_density": 2,
         "pool": [
@@ -1208,6 +1360,614 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_border_bridge_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_border_bridge_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_east_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            823,
+            842,
+            1347,
+            1366
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_border_bridge_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_border_bridge_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_west_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            802,
+            821,
+            1341,
+            1360
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_confluence_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_confluence_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_east_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            611,
+            630,
+            797,
+            816
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_confluence_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_confluence_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_west_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            582,
+            601,
+            804,
+            823
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_east_river_north_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_east_river_north_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_north_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_north_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_north_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1037,
+            1056,
+            1078,
+            1097
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_east_river_south_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_east_river_south_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_south_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_south_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_south_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1037,
+            1056,
+            1050,
+            1069
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_greyrock_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_greyrock_east_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_east_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_east_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_east_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            335,
+            354,
+            984,
+            1003
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_greyrock_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_greyrock_west_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_west_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_west_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_west_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            307,
+            326,
+            984,
+            1003
+          ]
+        ],
+        "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -3176,6 +3936,82 @@
       },
       {
         "cell_capacity": 3,
+        "key": "port_hills_mouth_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_hills_mouth_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_hills_mouth_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_hills_mouth_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_hills_mouth_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            160,
+            179,
+            821,
+            840
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "port_tide_wind_hinterland",
         "lower_density": 2,
         "pool": [
@@ -3246,6 +4082,158 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_west_ore_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_west_ore_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_west_ore_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_west_ore_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_west_ore_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            207,
+            226,
+            684,
+            703
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_westwind_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_westwind_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_westwind_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_westwind_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_westwind_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            137,
+            156,
+            993,
+            1012
+          ]
+        ],
+        "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -3452,6 +4440,82 @@
       },
       {
         "cell_capacity": 3,
+        "key": "town_east_ferry_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_east_ferry_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_ferry_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_ferry_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_ferry_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1132,
+            1151,
+            1337,
+            1356
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "town_east_pasture_hinterland",
         "lower_density": 2,
         "pool": [
@@ -3598,6 +4662,82 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_honey_vale_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_honey_vale_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_honey_vale_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_honey_vale_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_honey_vale_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1024,
+            1043,
+            675,
+            694
+          ]
+        ],
+        "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -3826,6 +4966,158 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_ruins_gate_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_ruins_gate_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_ruins_gate_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_ruins_gate_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_ruins_gate_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            510,
+            529,
+            1119,
+            1138
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_scarp_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_scarp_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_scarp_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_scarp_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_scarp_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1283,
+            1302,
+            693,
+            712
+          ]
+        ],
+        "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -4135,6 +5427,158 @@
         "wave_budget": 3
       },
       {
+        "cell_capacity": 3,
+        "key": "town_vineyard_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_vineyard_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_vineyard_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_vineyard_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_vineyard_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1001,
+            1020,
+            1145,
+            1164
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_west_ferry_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_west_ferry_hinterland_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ferry_hinterland_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ferry_hinterland_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ferry_hinterland_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            431,
+            450,
+            1320,
+            1339
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
         "cell_capacity": 5,
         "key": "western_cache_habitat",
         "lower_density": 1,
@@ -4235,6 +5679,640 @@
         "replenishment_interval": 600,
         "upper_density": 3,
         "wave_budget": 4
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_01",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_01_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_01_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_01_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1025,
+            1044,
+            506,
+            525
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_02",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_02_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_02_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_02_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1186,
+            1205,
+            858,
+            877
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_03",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_03_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_03_mudbank_dweller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "mudfilm_slime",
+                "species_name_zh": "泥膜史萊姆",
+                "variant_key": "mudbank_dweller",
+                "variant_name_zh": "濕岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_03_wax_cache_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "wax_pouch_rat",
+                "species_name_zh": "蠟囊鼠",
+                "variant_key": "wax_cache_forager",
+                "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_03_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            464,
+            483,
+            541,
+            560
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_04",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_04_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_04_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_04_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            674,
+            693,
+            1065,
+            1084
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_05",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_05_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_05_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_05_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1151,
+            1170,
+            692,
+            711
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_06",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_06_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_06_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_06_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            738,
+            757,
+            902,
+            921
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_07",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_07_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_07_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_07_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            556,
+            575,
+            690,
+            709
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_08",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_08_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_08_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_08_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            715,
+            734,
+            713,
+            732
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_09",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_09_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_09_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_09_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            293,
+            312,
+            595,
+            614
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "western_road_10",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "western_road_10_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_10_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_10_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            923,
+            942,
+            687,
+            706
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
       },
       {
         "cell_capacity": 3,
@@ -4390,8 +6468,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "aee0cffa3c4dc2462bac45dca33573f37bf5e64b2d0b8d4eebc3fb9ab40dbfd5",
-    "world/lore/monster_placement.py": "df1548bc950141e2f38fcd7ca443c70b3799a77f8f0594ac7423f463a38b1a6b",
+    "world/lore/monster_activity.py": "c2b31d8e070fee18ba1438f78497ef180be06451cb10183e679904d76ec218a2",
+    "world/lore/monster_placement.py": "f7a69bd0d91ec4a02e3e3383def25cb5d1c4636ba0dd03cfca1cf02b6793f861",
     "world/lore/monster_species.py": "5296dfe321b23177adc195239752b3714f3bf8865466010b2e6448debbd301c1",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",

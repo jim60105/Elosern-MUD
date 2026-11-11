@@ -447,6 +447,41 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change eastern-plains-near-belts` | passed |
 | `openspec validate eastern-plains-near-belts --strict` | valid |
 
+### Near-settlement belts: western hills and valleys
+
+This change adds near-settlement belts to the western hills and valleys: a
+hinterland belt beside every inhabited settlement and road-corridor belts along
+the hill transport routes between them. The declarations remain the only
+authority for keys, rectangles, pools and bindings; this section repeats no
+coordinate, density, count or timing.
+
+**Species fit.** The quarries, transport lanes and scrub around the hill towns
+suit the goblin (膠掌小鬼) and the rat (蠟囊鼠). The hare (築埂兔) and the slime
+(泥膜史萊姆) cover the valley fields and channels. The goat appears only on
+remote hill roads, so the ground just outside every town stays low tier.
+
+**Tiers.** No stronger or high-tier variant joins an ordinary pool. Settlement
+surroundings hold only low-tier passive individuals, so a hinterland encounter
+answers after engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 199.210s before the declarations and 350.207s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change western-hills-near-belts` | passed |
+| `openspec validate western-hills-near-belts --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
