@@ -42,6 +42,10 @@ The bone-breaker vulture's grit-wing strike is assembled the same way with wind
 physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 The mist-lamp moth's veil-scale flutter is assembled the same way with dark
 physical damage plus a hit-dependent agility debuff on the struck enemy.
+The rime-scale serpent's two ice strikes are assembled the same way with
+physical-school damage that reads the actor's physical attack: one single-target
+fang strike and one area tail lash, each paid in both MP and SP, and the area
+cast resolves every recipient's own hit and defense while the action pays once.
 """
 
 from world.skills.effects import (
@@ -737,6 +741,54 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "rime_fang_strike",
+        "霜牙噬擊",
+        "以冰屬性力量讓獠牙結霜，噬咬單一敵方目標，造成冰屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="ice",
+        effects=["damage:ice:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="ice",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("rime_scale_serpent",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.2, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "rime_tail_lash",
+        "霜尾橫掃",
+        "甩動結霜的長尾橫掃周圍所有敵方目標，對每個目標造成冰屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="ice",
+        effects=["damage:ice:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="ice",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("rime_scale_serpent",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
         ),
     ),
 )
