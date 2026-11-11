@@ -19,4 +19,4 @@ Begin after `clod-ball-beetle-species` is merged. Follow design.md verbatim. Eve
 
 ## 3. Handoff
 
-- [ ] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change dust-mane-horse-species` and `openspec validate dust-mane-horse-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
+- [x] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change dust-mane-horse-species` and `openspec validate dust-mane-horse-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
