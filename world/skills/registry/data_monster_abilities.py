@@ -26,6 +26,8 @@ physical damage plus a self-mounted defense guard granted by every resolved
 attempt.
 The hollow-tree bat's bite is assembled the same way with dark physical damage
 plus a hit-dependent fixed HP drain.
+The hush-wing owl's swoop is assembled the same way with wind physical damage
+plus a self-mounted agility lift granted by every resolved attempt.
 """
 
 from world.skills.effects import (
@@ -521,6 +523,31 @@ ROWS: tuple[SkillDef, ...] = (
                 requires_hit_from=0,
                 transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
             ),
+        ),
+    ),
+    _skill(
+        "hush_wing_swoop",
+        "靜羽掠爪",
+        "以風屬性力量收斂拍翼聲後掠爪攻擊單一敵方目標，造成物理傷害；出擊後藉風抬升，短暫提高自身敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 5},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical", "self_buff_apply:hush_lift"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("hush_wing_owl",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )
