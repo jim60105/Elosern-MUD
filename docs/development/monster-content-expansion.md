@@ -1954,3 +1954,93 @@ validate ore-vein-mole-species --strict`. The committed manifest files
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 掠藏獾
+
+This section records the ninth delivered species of the Wave 2 species chain
+and the fourth northwest-highland Wave 2 species. 掠藏獾
+(`cache_raider_wolverine`) is a mid-tier, grade-D, solitary wolverine whose
+ordinary default variant is 掠索型 (`trapline_raider`). It carries the
+single-target elementless strike 鉗顎扳咬 (`jaw_lock_bite`), the first monster
+ability that lowers the struck target's defense.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Tenacious ground raider: hit points sit in the mid band's lower half
+  (110–230, so at or below 170), defense at its middle (10–16), and agility in
+  its lower half (10–24); the stronger 冬穴型 sits in the band's upper half.
+* The kit spends no MP, so the MP pool is zero; the ordinary variant's SP pool
+  holds four casts of the bite's SP cost (4 × 6 = 24) and the stronger 冬穴型
+  holds six (6 × 6 = 36).
+* The rider (−2 defense for 15 s) is the first monster defense rider; its size
+  equals the goblin's shipped −2 rider, the smallest shipped hit-rider
+  magnitude.
+* The stronger 冬穴型 guards its snow cache at grade C.
+* The damage formula clamps the struck entity's defense at zero, so the −2
+  rider never amplifies damage against a defenseless target.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it (`"cliff_stepper" < "trapline_raider" <
+"winter_den_glutton"`), so the representative declaration and every shard, seed
+and smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `cliff_stepper`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds a timed effect and a modifier
+rule, so the startup tuning fingerprint moved from `abb0989c...` to
+`03ad9da4...`; the selector report was regenerated under the new tuning, the
+activation record and its rollback fingerprint (`1582c6d3...` to
+`66c7e8a0...`) were updated, and `activated` and `activation_bindings` are
+unchanged. The six archetype campaigns and the performance report were not
+rerun and remain historical harness evidence at `497df2c1...`, not evidence
+for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 110 tests, OK, run as two focused method-label batches (55 + 55) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+cache-raider-wolverine-species` (reference-context, traceability 2726/2726
+covered, observability, test-data, manifests and 19 contract tests) and
+`openspec validate cache-raider-wolverine-species --strict`. The committed
+manifest files `.github/evennia-shards.json`, `tools/test_data_lint_seed.json`
+and `tools/test_data_freeze.json` are unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
