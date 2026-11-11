@@ -210,7 +210,7 @@ status: delivered
 | --- | --- |
 | 沉骸型 | 普通版本，長年盤踞在海蝕洞或沉船殘骸裡的成年個體 |
 
-**委託背景示例。**南潮港西邊海崖下的沉船附近，這個月接連有四艘小漁船的纜繩被扯斷，漁籠整排失蹤。漁會判定是沉錨把覓食範圍擴到了漁船的泊位，向公會正式張貼討伐委託，請熟練的隊伍前往處理。
+**委託背景示例。**南潮港東邊海崖下的沉船附近，這個月接連有四艘小漁船的纜繩被扯斷，漁籠整排失蹤。漁會判定是沉錨把覓食範圍擴到了漁船的泊位，向公會正式張貼討伐委託，請熟練的隊伍前往處理。
 ````
 
 - `docs/development/bestiary-editorial-review.md`: append one row: `| `wreck_arm_octopus` | <implementation date> | read against the registry's published ecology field; the trouble is one octopus beside the moorings and trap lines near a cliff-foot wreck, local and avoidable, the water power acts on the sleeves of its own arms, and the local name 「沉錨」 is an observation rather than a new naming tradition | checked against the declared kit: the arm bind is a single-target water-element physical strike and the arm sweep reaches every eligible enemy with its own hit and defense outcome, both spend the octopus's own magic and stamina once per cast, and the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. Replace `<implementation date>` with the implementation date in `YYYY-MM-DD` form. Keep exactly six cells and put no `|` inside a cell. The reviewer may reword a cell after actually reading the section.
