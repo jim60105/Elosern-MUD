@@ -36,7 +36,10 @@ change adds one buff definition, one modifier rule and one activated variant;
 the recorded measurements are unchanged again. They were regenerated once more
 for `hush-wing-owl-species`, again because that content change adds one buff
 definition and one modifier rule and so moves the process's startup
-fingerprint; the recorded measurements are unchanged again.
+fingerprint; the recorded measurements are unchanged again. They were
+regenerated once more for `vine-net-spider-species`, for the same reason: that
+content change adds one buff definition and one modifier rule; the recorded
+measurements are unchanged again.
 
 ## Exact operations
 
