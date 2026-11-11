@@ -482,6 +482,48 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change western-hills-near-belts` | passed |
 | `openspec validate western-hills-near-belts --strict` | valid |
 
+### Near-settlement belts: both coasts
+
+This change adds near-settlement belts to both coasts: a hinterland belt beside
+every inhabited port and road-corridor belts along the coastal roads between the
+ports. The declarations remain the only authority for keys, rectangles, pools
+and bindings; this section repeats no coordinate, density, count or timing.
+
+**Species fit.** Every crab rectangle touches the sea or inland water, which
+matches the shore dossier (潮燈蟹). The south-east corridor lies beside the
+shipped reservoir backwater on the road to 金穗港, which suits the crocodile's
+(吞潮鱷) estuary ecology. The stronger variants `reef_warden`, `bay_warden` and
+`reservoir_warden` stay in sites.
+
+**Tiers.** No stronger or high-tier variant joins an ordinary pool. Settlement
+surroundings hold only low-tier passive individuals, so a hinterland encounter
+answers after engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Deferral.** The inland coastal settlements `city_salt_ferry`, `city_salt_road`
+and `town_olive_ferry` get no hinterland zone in Wave 1. The probe found no
+rectangle beside them with at least 12 water-adjacent cells, and the region has
+no inland low-tier species yet. Their zones arrive with the south-west coast
+species wave. No near-settlement south-east corridor qualified either, because
+no south-east road rectangle near a settlement had water cells.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 347.991s before the declarations and 405.022s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change coastal-near-belts` | passed |
+| `openspec validate coastal-near-belts --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

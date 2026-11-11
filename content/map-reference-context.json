@@ -182,7 +182,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c4083881ecb26ad58b8716bfcb912b8494dc5369632def1066d831a236026cb6",
+  "fingerprint": "46b0bcbe512922d5436132703f5e79443349f007fb2ba01e13a9938efda41e97",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -3937,6 +3937,192 @@
       },
       {
         "cell_capacity": 3,
+        "key": "port_east_bay_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_east_bay_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_east_bay_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_east_bay_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2385,
+            2404,
+            466,
+            485
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_fishers_cove_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_fishers_cove_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_fishers_cove_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_fishers_cove_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            415,
+            434,
+            157,
+            176
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_golden_sheaf_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_golden_sheaf_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_golden_sheaf_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_golden_sheaf_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2061,
+            2080,
+            242,
+            261
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "port_hills_mouth_hinterland",
         "lower_density": 2,
         "pool": [
@@ -4007,6 +4193,130 @@
           ]
         ],
         "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_south_cape_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_south_cape_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_cape_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_cape_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1704,
+            1723,
+            95,
+            114
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_south_tide_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_south_tide_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_tide_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_tide_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            604,
+            623,
+            96,
+            115
+          ]
+        ],
+        "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -4237,6 +4547,254 @@
         "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "port_white_sail_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "port_white_sail_hinterland_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_white_sail_hinterland_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_white_sail_hinterland_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            294,
+            313,
+            362,
+            381
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southeast_road_01",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southeast_road_01_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_01_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_01_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2066,
+            2085,
+            348,
+            367
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_01",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_01_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_01_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_01_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            349,
+            368,
+            268,
+            287
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_02",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_02_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_02_shore_walker_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_02_shore_walker_trio",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            378,
+            397,
+            211,
+            230
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
         "wave_budget": 3
       },
       {
@@ -6469,8 +7027,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "c2b31d8e070fee18ba1438f78497ef180be06451cb10183e679904d76ec218a2",
-    "world/lore/monster_placement.py": "f7a69bd0d91ec4a02e3e3383def25cb5d1c4636ba0dd03cfca1cf02b6793f861",
+    "world/lore/monster_activity.py": "175efc8cbd209793d2f25a58796156192d0026fe1a62256a57e741e46bacc3cd",
+    "world/lore/monster_placement.py": "211148f77adc3dadfee47f3fef9d21f64d01ee3b3f0df4d4a78408220c87efc8",
     "world/lore/monster_species.py": "d48a2d24a7497536e12be80ad9f59bec7db28b0f62bdbdd3be5000d838a77046",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
