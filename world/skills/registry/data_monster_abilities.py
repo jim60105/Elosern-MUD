@@ -33,6 +33,8 @@ physical damage plus a hit-dependent agility debuff on the struck enemy.
 The moss-crown stag's two earth strikes are assembled the same way with
 physical-school damage that reads the actor's physical attack: one
 single-target charge and one area sweep, each paid in both MP and SP.
+The mist-spring frog's tongue sip is assembled the same way with water
+physical damage plus a hit-dependent fixed MP drain.
 """
 
 from world.skills.effects import (
@@ -624,6 +626,35 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "mist_tongue_sip",
+        "霧舌汲取",
+        "以帶著水屬性力量的長舌拍擊單一敵方目標，造成物理傷害；命中時從對方身上汲走少量魔力，轉為自身的魔力。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 2},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="water",
+        effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:4"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="water",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("mist_spring_frog",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
+                transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+            ),
         ),
     ),
 )

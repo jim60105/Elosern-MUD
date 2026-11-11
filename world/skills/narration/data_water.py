@@ -126,6 +126,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 低伏在水線上，背脊的水紋聚成一片貼身的光膜。",
         ),
     ),
+    NarrationRow(
+        "mist_tongue_sip",
+        action=(
+            "{actor} 鼓起淡青喉囊，長舌倏地彈向對手。",
+            "{actor} 從濕岩上一躍，黏濕的舌尖拍上對方手臂。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

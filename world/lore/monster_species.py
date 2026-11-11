@@ -869,6 +869,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "wood_crown_elder",
         True,
     ),
+    MonsterSpecies(
+        "mist_spring_frog",
+        "霧泉蛙",
+        "霧泉蛙是約手掌大小的蛙類魔獸，成群棲息於中央山脈山腰的滲水岩壁與霧中泉眼。",
+        "灰藍色皮膚帶著細小水珠般的疣點，在霧裡泛著微光。"
+        "後腿修長，指端長著吸盤，能貼在濕滑的岩壁上；"
+        "喉囊鼓起時呈半透明的淡青色。",
+        "牠們白天貼在泉眼周圍的岩壁上，以皮膚吸取霧氣中的水分，傍晚才成群鳴叫、捕食飛蟲。"
+        "牠的舌尖帶著微弱水屬性力量，黏中獵物或對手時，會從對方身上汲走少量魔力，轉為自身的魔力；"
+        "每次汲取的分量有限，被汲走的魔力會隨休息逐步恢復。"
+        "翻越山徑的旅人與上山採藥的人都在這些泉眼補水，泉邊一旦擠滿霧泉蛙，取水的人就得先把蛙群趕開。"
+        "近身時，牠彈出長舌拍打對手，舌尖黏中時順勢汲取魔力。",
+        ("central_mountains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；舌尖水屬性力量的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居蛙類：水屬性舌尖只在命中時汲取少量魔力，不造成中毒、麻痺或持續傷害；戰鬥呈現為舌擊與命中後的固定魔力汲取。連結山徑泉眼的取水。",
+        "（作者私有：尚未證實的猜想）斷崖鎮的採藥人說霧泉蛙鳴叫得越早，當晚的霧就越濃，這種說法尚未證實。",
+        "seep_sipper",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1315,6 +1334,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("moss_crown_charge", "moss_crown_sweep",),
         passive_skill_keys=(),
         behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "seep_sipper",
+        "mist_spring_frog",
+        "汲泉型",
+        "普通版本，成群貼在泉眼周圍的岩壁上吸取霧氣。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=34, mp=20, sp=6, atk_phys=5, agility=8, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("mist_tongue_sip",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "spring_keeper",
+        "mist_spring_frog",
+        "泉主型",
+        "占據一整處泉池的老個體，體型大上一倍，喉囊鳴聲能壓過整群同伴。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=58, mp=30, sp=10, atk_phys=9, agility=8, defense=5, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("mist_tongue_sip",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 
