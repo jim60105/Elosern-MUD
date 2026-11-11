@@ -46,6 +46,8 @@ The rime-scale serpent's two ice strikes are assembled the same way with
 physical-school damage that reads the actor's physical attack: one single-target
 fang strike and one area tail lash, each paid in both MP and SP, and the area
 cast resolves every recipient's own hit and defense while the action pays once.
+The drum-wing grouse's wing burst is assembled the same way with wind physical
+damage plus a self-mounted agility lift granted by every resolved attempt.
 """
 
 from world.skills.effects import (
@@ -789,6 +791,31 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "drum_wing_burst",
+        "鼓翼驚飛",
+        "以風屬性力量鼓起翼下氣流後撲擊單一敵方目標，造成物理傷害；出擊後順勢驚飛，短暫提高自身敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 2},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical", "self_buff_apply:drum_burst"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("drum_wing_grouse",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )

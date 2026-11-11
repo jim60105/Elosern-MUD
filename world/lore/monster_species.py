@@ -964,6 +964,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "white_rime_coil",
         True,
     ),
+    MonsterSpecies(
+        "drum_wing_grouse",
+        "鼓翼松雞",
+        "鼓翼松雞是約小型犬大小的松雞類魔獸，成群生活於西北高地針葉林的林床與林間空地。",
+        "雄雞羽毛黑藍，眼上一道紅色肉冠，尾羽展開時像一面半圓扇；"
+        "雌雞羽色棕褐帶細斑，伏在林床上時與落針融成一片。",
+        "牠們在林床上啄食松針、嫩芽與漿果，受驚時以微弱風屬性力量讓翼下的氣流驟然鼓起，從腳邊轟然驚飛，再貼著樹幹急轉閃避；"
+        "這股風力作用在牠們自己的翅膀周圍。"
+        "每年春天，雄雞聚在固定的林間空地上展尾鳴叫、互相爭鬥，這些求偶場也是獸人部族世代相傳的春季獵場，年輕獵人會在這裡練習追蹤與埋伏。"
+        "求偶季的雄雞會撲向走進求偶場的任何身影，連牧人的山羊與獵人的獵犬也照撲不誤。"
+        "近身時，牠鼓翼撲擊對手，撲出後順勢驚飛，短暫變得更加靈活。",
+        ("northwest_highland_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；翼下風力的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居松雞：風屬性只鼓起自身翼下氣流以驚飛閃避，不造成擊退或改變他人移動；戰鬥呈現為鼓翼撲擊與自身短暫敏捷提升。連結獸人部族的春季獵場與年輕獵人的練習。",
+        "（作者私有：尚未證實的猜想）獵鷹鎮的獵人說領場型雄雞鳴叫的那天早上，整片林子的獵物都會變得警覺，這種說法尚未證實。",
+        "pine_floor_grouse",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1554,6 +1572,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("rime_fang_strike", "rime_tail_lash",),
         passive_skill_keys=(),
         behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "pine_floor_grouse",
+        "drum_wing_grouse",
+        "林床型",
+        "普通版本，成群在林床上啄食松針與漿果。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=32, mp=20, sp=6, atk_phys=4, agility=9, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("drum_wing_burst",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "lek_master_cock",
+        "drum_wing_grouse",
+        "領場型",
+        "在求偶場中央占據最好位置的老雄雞，尾扇最寬，會撲向走進求偶場的任何身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=56, mp=30, sp=10, atk_phys=9, agility=11, defense=4, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("drum_wing_burst",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 

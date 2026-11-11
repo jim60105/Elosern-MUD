@@ -464,6 +464,12 @@
 - code: veil_scale_agility_flat
   label: 鱗粉沉滯敏捷下降
   severity: harmful
+- code: drum_burst
+  label: 驚飛閃身
+  severity: beneficial
+- code: drum_burst_agility_flat
+  label: 驚飛閃身敏捷提升
+  severity: beneficial
 # 生理性疲勞投影（project-physiological-fatigue）：四個排他投影與三條戰鬥
 # 修正各自一個穩定代碼；嚴重度由這裡決定，呈現端不得自創。
 - code: fatigue_light
