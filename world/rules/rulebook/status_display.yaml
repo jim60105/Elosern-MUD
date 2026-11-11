@@ -518,6 +518,12 @@
 - code: gull_updraft_agility_flat
   label: 乘風輕身敏捷提升
   severity: beneficial
+- code: slick_topple
+  label: 滑倒失衡
+  severity: harmful
+- code: slick_topple_agility_flat
+  label: 滑倒失衡敏捷下降
+  severity: harmful
 # 生理性疲勞投影（project-physiological-fatigue）：四個排他投影與三條戰鬥
 # 修正各自一個穩定代碼；嚴重度由這裡決定，呈現端不得自創。
 - code: fatigue_light
