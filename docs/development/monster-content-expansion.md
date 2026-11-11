@@ -2648,3 +2648,89 @@ unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 臥堤海豹
+
+This section records the seventh delivered species of the Wave 3 species chain
+and the third southeast-coast species of that wave. 臥堤海豹 (`breakwater_seal`)
+is a mid-tier harbour seal whose ordinary default variant is 曬堤型
+(`pier_basker`) and whose stronger variant is 霸灘型 (`haulout_bull`). Both carry
+the single elementless strike 滑身壓撞 (`flipper_slide_slam`), a hit-rider that
+lowers the struck enemy's agility.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* Heavy colony slider: the ordinary variant's hit points and defense sit in the
+  middle of the mid band (110–230 hit points, 10–16 defense), the stronger
+  variant raises both, and both keep agility near the band's floor (10).
+* The kit spends no MP, so both MP pools are zero; the ordinary variant's SP
+  holds four casts of the slam's 6 SP cost, and the stronger variant holds six.
+* The rider (−3 agility for 15 s) equals the goat's shipped agility rider.
+* The stronger 霸灘型 holds a sandbar at grade C.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`: both
+new variant keys sort after it (`"cliff_stepper" < "haulout_bull"` and
+`"cliff_stepper" < "pier_basker"`), so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `cliff_stepper`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `pack_hunter` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.20. Neither
+variant authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds one timed effect and one modifier,
+so the startup tuning fingerprint moved from `5828d932...` to `ef4b4b14...`; the
+selector report was regenerated under the new tuning, the activation record and
+its rollback fingerprint (`561da0df...` to `5a57f049...`) were updated, and
+`activated` and `activation_bindings` are unchanged. The six archetype campaigns
+and the performance report were not rerun and remain historical harness evidence
+at `497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 116 tests, OK, run as two focused method-label batches (58 + 58) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check succeeds and the registry holds 59 variants
+(`len(MONSTER_VARIANT_REGISTRY)` printed 59); the remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+breakwater-seal-species` and `openspec validate breakwater-seal-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

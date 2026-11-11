@@ -43,6 +43,7 @@
     ],
     "monster_species": [
       "bone_breaker_vulture",
+      "breakwater_seal",
       "cache_raider_wolverine",
       "clod_ball_beetle",
       "drum_wing_grouse",
@@ -202,7 +203,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "f48548c8fe2cba0e7f5b4411a929e808ae32aa6ff1ea1761b1d75c586f00a75e",
+  "fingerprint": "f160d65b2fc042a321ee419f56c30ff9160a2dcd91648bd2063c1f83d0a378e9",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -11349,7 +11350,7 @@
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "73076ec3428e2307c46e05efaf078922eb4cf05c66479ad7c034ea95f8b9f470",
     "world/lore/monster_placement.py": "c27937628bbae792aff277376bffeb6c8b487f743223494c3ba0d4a0f48ae96e",
-    "world/lore/monster_species.py": "11dbe2a70c6b7b66c6c8788646854029e8395937797caa8be0936e407440e018",
+    "world/lore/monster_species.py": "048366fecff4dccdca2a3908b3f1880b0605cdbf8c9c0f06b424f8d1f865738c",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
     "world/lore/names.py": "8a75cd6dca2f93ad173a31564fbb3fe752d4b8428a051110868a9de6f2ec834d",
@@ -11617,11 +11618,11 @@
     "world/rules/quest_issuance.py": "8698b1c8f52cc8332fda539183ed54df2c67afa5f7a9ecfb156c69b0f9e7613f",
     "world/rules/rulebook/__init__.py": "9c6e9b3de3817bc32f9de33f76096e8e22c71184628871c295d643aa664ca1c1",
     "world/rules/rulebook/affinity.yaml": "2df4db4fefd5672c966d1cdb082a520a03f35fba14d8d20d866031432a8e2795",
-    "world/rules/rulebook/buffs.yaml": "cbd884ba40f8c3723315c80303ce3d7e52561c42748109703ca354d3185bb68c",
+    "world/rules/rulebook/buffs.yaml": "998c9c7990a8951f04112109bfce1ddc2ac6345f0dc9b6a18fb80b108d64ea96",
     "world/rules/rulebook/church.yaml": "a9831c5842acfd0d4d81f8342ecfec7f84d7df541ca5c23e7fb8e2d6a055b53e",
     "world/rules/rulebook/clock.yaml": "dc70d02e6394786f7e401f0bcef90d9703f746e9feda7a705fe821fa06011d64",
     "world/rules/rulebook/combat.yaml": "bb081b5a1b40b26487eb7c2e4da13cede4122db78771846472972e9645ef2528",
-    "world/rules/rulebook/combat_modifiers.yaml": "37f5c572935d240a04433101254e8d99477692b5b3092e8e243f71dfcedd060a",
+    "world/rules/rulebook/combat_modifiers.yaml": "c03bf6a98585310d1f59fe60f9117eec1ad16431d8474d18368686cd5a3303b1",
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
     "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
     "world/rules/rulebook/commerce/scales.yaml": "4b9f08d435abf5357f823dd2e134bc7c0717fc4789cbe681d821bd2cea3fae98",
@@ -11645,7 +11646,7 @@
     "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
     "world/rules/rulebook/sight.yaml": "3940feeb9f8b9dd419ed09df742126c3bf7276c0c9b18ac00568e5eb2c1cfe49",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
-    "world/rules/rulebook/status_display.yaml": "76c3d5d11438882a23c4c7be43a22861e72e2d858d66d4c9737bc6b09b1b2458",
+    "world/rules/rulebook/status_display.yaml": "2414e60ec3a5c121d7a63f0c33dd20e3c9f5e86196496df0fab66efb02147c21",
     "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
     "world/rules/service_messages.py": "0f79e5790c715c027ffe4bf0069698e5a5f82ee81a309507f8f1ea6fbfbb3192",
     "world/rules/service_targets.py": "5039f734ec0d0013ed257deec05d50ca2d7a3cdee791d794998450cccbd49708",
