@@ -2,6 +2,10 @@
 
 Begin after `western-hills-near-belts` is merged. Follow design.md verbatim, and transcribe the snippet files without editing any value.
 
+## 0. Environment
+
+- [ ] 0.1 Create the test environment file with `printf 'MUD_TEST_SETTINGS=1\n' > /tmp/mud-belts.env`. Check: the file holds that single line.
+
 ## 1. Declarations
 
 - [ ] 1.1 Append the two activity blocks of `snippets/monster_activity_rows.txt` (design D1). Check: `world.lore.tests.test_monster_activity` passes.
