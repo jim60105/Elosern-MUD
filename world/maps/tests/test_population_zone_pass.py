@@ -12,6 +12,7 @@ from evennia.contrib.grid.wilderness.wilderness import (
 )
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from world.lore.monster_placement import EcologyZone
 from world.maps import monster_sites, population_lifecycle
 from world.maps import regional_population as owner
@@ -132,6 +133,9 @@ class ZoneCountsIndexTests(TestCase):
             patch.object(owner, "_region_cells", lambda zone: _CELLS_BY_ZONE[zone])
         )
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_one_scan_serves_every_zone(self):
         self._use_seams()
         presence = _presence()
@@ -168,6 +172,9 @@ class ZoneCountsIndexTests(TestCase):
             zone_counts_from_presence((), positionless, wilderness=WILDERNESS), {}
         )
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_single_zone_reader_agrees(self):
         self._use_seams()
         presence = _presence()
@@ -232,6 +239,9 @@ class ZonePassDecodeTests(RegistryIsolationMixin, EvenniaTest):
             for key, value in self.wilderness.db.regional_population.items()
         }
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_note_pass_decodes_once(self):
         self._state()
         original = self._records()
@@ -250,6 +260,9 @@ class ZonePassDecodeTests(RegistryIsolationMixin, EvenniaTest):
             note_population_boundary(self.wilderness, key, tick=100)
             self.assertEqual(self._records()[key], batch[key])
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_due_reader_decodes_once_and_filters(self):
         self._state({"t_b": 50, "t_e": 50, "t_c": 500})
 
@@ -259,6 +272,9 @@ class ZonePassDecodeTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(due, ("t_b", "t_e"))
         self.assertEqual(decode.call_count, 1)
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_lifecycle_settles_only_due_zones(self):
         self._state({"t_b": 50, "t_e": 50, "t_c": 500})
 
@@ -277,6 +293,9 @@ class ZonePassDecodeTests(RegistryIsolationMixin, EvenniaTest):
 class ForecastZoneNoteTests(TestCase):
     """One projected zone note scans the projected presence once."""
 
+    @covers_requirement(
+        "regional-population::boundary-zone-passes-read-shared-population-facts-once-per-pass"
+    )
     def test_zone_note_scans_once(self):
         self.enterContext(patch.object(owner, "_zone", lambda key: _PLACEHOLDERS[key]))
         self.enterContext(
