@@ -1,0 +1,99 @@
+# --- highland-road-belts: append to the end of _ACTIVITY_AREA_DECLARATIONS ---
+    ActivityArea(
+        "highland_road_01_grounds",
+        "northwest_highland_forest",
+        ((908, 927, 1827, 1846),),
+    ),
+    ActivityArea(
+        "highland_road_02_grounds",
+        "northwest_highland_forest",
+        ((540, 559, 1784, 1803),),
+    ),
+    ActivityArea(
+        "highland_road_03_grounds",
+        "northwest_highland_forest",
+        ((257, 276, 1631, 1650),),
+    ),
+    ActivityArea(
+        "highland_road_04_grounds",
+        "northwest_highland_forest",
+        ((487, 506, 1537, 1556),),
+    ),
+    ActivityArea(
+        "highland_road_05_grounds",
+        "northwest_highland_forest",
+        ((800, 819, 1548, 1567),),
+    ),
+    ActivityArea(
+        "highland_road_06_grounds",
+        "northwest_highland_forest",
+        ((977, 996, 1434, 1453),),
+    ),
+    ActivityArea(
+        "highland_road_07_grounds",
+        "northwest_highland_forest",
+        ((784, 803, 1769, 1788),),
+    ),
+    ActivityArea(
+        "highland_road_08_grounds",
+        "northwest_highland_forest",
+        ((620, 639, 1706, 1725),),
+    ),
+
+# --- highland-road-belts: append to the end of _ACTIVITY_DECLARATIONS ---
+    MonsterActivity(
+        "highland_road_01_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_01_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_02_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_02_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_03_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_03_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_04_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_04_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_05_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_05_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_06_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_06_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_07_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_07_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
+    MonsterActivity(
+        "highland_road_08_wood_stalker_activity",
+        "solitary_roaming",
+        "highland_road_08_grounds",
+        60,
+        AggressionCondition("contact"),
+    ),
