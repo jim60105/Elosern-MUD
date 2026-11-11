@@ -19,4 +19,4 @@ Begin after `flat-leap-goby-species` is merged. Follow design.md verbatim. Every
 
 ## 3. Handoff
 
-- [ ] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change mast-wind-gull-species` and `openspec validate mast-wind-gull-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
+- [x] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change mast-wind-gull-species` and `openspec validate mast-wind-gull-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
