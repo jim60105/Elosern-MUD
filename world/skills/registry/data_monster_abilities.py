@@ -28,6 +28,8 @@ The hollow-tree bat's bite is assembled the same way with dark physical damage
 plus a hit-dependent fixed HP drain.
 The hush-wing owl's swoop is assembled the same way with wind physical damage
 plus a self-mounted agility lift granted by every resolved attempt.
+The vine-net spider's thread cast is assembled the same way with elementless
+physical damage plus a hit-dependent agility debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -548,6 +550,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "vine_thread_cast",
+        "藤絲纏擲",
+        "以前腳擲出摻著藤皮纖維的黏絲纏向單一敵方目標，造成物理傷害；命中後纏住腿腳，短暫降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:vine_snare"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("vine_net_spider",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )

@@ -140,6 +140,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 攀低身形，細長手指拽住對方的衣角猛力一拉。",
         ),
     ),
+    NarrationRow(
+        "vine_thread_cast",
+        action=(
+            "{actor} 甩動前腳，一束帶著藤皮的黏絲纏向對手腿腳。",
+            "{actor} 從藤網邊竄出，絲線接連繞上對方的小腿。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

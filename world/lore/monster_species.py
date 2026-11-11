@@ -830,6 +830,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "hush_wing_hunter",
         True,
     ),
+    MonsterSpecies(
+        "vine_net_spider",
+        "藤網蛛",
+        "藤網蛛是身軀約有圓盾大小的蜘蛛類魔獸，獨自生活在北部深林藤蔓糾結的林下與獸徑兩側。",
+        "暗綠色身軀覆著短硬毛，八條長腳的關節帶著樹皮般的褐色環紋。"
+        "腹部末端的紡器旁常黏著剝下的藤皮纖維。",
+        "牠會剝下藤蔓外皮，把纖維與自己吐出的絲撚在一起，織成能兜住小鹿的藤網，橫跨在獸徑兩側的樹幹之間。"
+        "藤網的顏色與周圍藤蔓相同，晨露沾上時才顯出網形。"
+        "牠守在網邊等待獵物，捕食鹿、野豬幼獸與誤闖的大型鳥類。"
+        "藤網的韌度來自藤皮纖維，火焰與利刃都能切開它，探險隊在深林開路時會帶著砍刀與火把清出通道。"
+        "近身時，牠以前腳擲出黏絲纏住對手的腿腳，命中後使對手短暫行動遲緩。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；藤皮纖維與絲線結合的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階伏擊型蜘蛛：絲線結合剝下的藤皮纖維形成藤網，戰鬥中的黏絲只在命中時短暫降低敏捷，不定身、不造成中毒或持續傷害。連結深林開路與獸徑狩獵。",
+        "（作者私有：尚未證實的猜想）北林堡的工匠相信藤網蛛的舊網纖維能編出最耐用的弓弦，這種說法尚未證實。",
+        "vine_weaver",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1226,6 +1244,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "C",
         True,
         active_skill_keys=("hush_wing_swoop",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "vine_weaver",
+        "vine_net_spider",
+        "織藤型",
+        "普通版本，守在獸徑旁的藤網邊等待獵物。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=125, mp=0, sp=24, atk_phys=19, agility=15, defense=12, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("vine_thread_cast",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "trail_netter",
+        "vine_net_spider",
+        "封道型",
+        "把藤網一路織到人走的林道上，占據整段通道的大型個體。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=175, mp=0, sp=36, atk_phys=25, agility=17, defense=14, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("vine_thread_cast",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
     ),
