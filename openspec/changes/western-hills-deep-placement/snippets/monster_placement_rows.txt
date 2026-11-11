@@ -1,0 +1,700 @@
+# --- western-hills-deep-placement: append to the end of _ENCOUNTER_COMPOSITION_DECLARATIONS ---
+    EncounterComposition(
+        "capital_south_wild_quarry_pit_lurker",
+        "capital_south_wild_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "capital_south_wild_cliff_stepper",
+        "capital_south_wild_cliff_stepper_activity",
+        (CompositionMember("cliff_stepper", 1, 1),),
+    ),
+    EncounterComposition(
+        "capital_south_wild_cellar_leaper",
+        "capital_south_wild_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "capital_south_wild_burrow_maker",
+        "capital_south_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "capital_south_wild_hanging_nest_forager",
+        "capital_south_wild_hanging_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 3),),
+    ),
+    EncounterComposition(
+        "confluence_southeast_wild_quarry_pit_lurker",
+        "confluence_southeast_wild_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "confluence_southeast_wild_cliff_stepper",
+        "confluence_southeast_wild_cliff_stepper_activity",
+        (CompositionMember("cliff_stepper", 1, 1),),
+    ),
+    EncounterComposition(
+        "confluence_southeast_wild_cellar_leaper",
+        "confluence_southeast_wild_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "confluence_southeast_wild_burrow_maker",
+        "confluence_southeast_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "confluence_southeast_wild_hanging_nest_forager",
+        "confluence_southeast_wild_hanging_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 3),),
+    ),
+    EncounterComposition(
+        "east_river_east_wild_quarry_pit_lurker",
+        "east_river_east_wild_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_east_wild_cliff_stepper",
+        "east_river_east_wild_cliff_stepper_activity",
+        (CompositionMember("cliff_stepper", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_east_wild_cellar_leaper",
+        "east_river_east_wild_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "east_river_east_wild_burrow_maker",
+        "east_river_east_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_east_wild_hanging_nest_forager",
+        "east_river_east_wild_hanging_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 3),),
+    ),
+    EncounterComposition(
+        "east_river_northeast_wild_quarry_pit_lurker",
+        "east_river_northeast_wild_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_northeast_wild_cliff_stepper",
+        "east_river_northeast_wild_cliff_stepper_activity",
+        (CompositionMember("cliff_stepper", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_northeast_wild_cellar_leaper",
+        "east_river_northeast_wild_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "east_river_northeast_wild_burrow_maker",
+        "east_river_northeast_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_river_northeast_wild_hanging_nest_forager",
+        "east_river_northeast_wild_hanging_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 3),),
+    ),
+    EncounterComposition(
+        "greyrock_northwest_wild_quarry_pit_lurker",
+        "greyrock_northwest_wild_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "greyrock_northwest_wild_cliff_stepper",
+        "greyrock_northwest_wild_cliff_stepper_activity",
+        (CompositionMember("cliff_stepper", 1, 1),),
+    ),
+    EncounterComposition(
+        "greyrock_northwest_wild_cellar_leaper",
+        "greyrock_northwest_wild_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "greyrock_northwest_wild_burrow_maker",
+        "greyrock_northwest_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "greyrock_northwest_wild_hanging_nest_forager",
+        "greyrock_northwest_wild_hanging_nest_forager_activity",
+        (CompositionMember("hanging_nest_forager", 2, 3),),
+    ),
+# --- compositions added to existing zones (same tuple) ---
+    EncounterComposition(
+        "capital_altoria_east_hinterland_cellar_leaper",
+        "capital_altoria_east_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "capital_altoria_west_hinterland_cellar_leaper",
+        "capital_altoria_west_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_border_bridge_east_hinterland_cellar_leaper",
+        "city_border_bridge_east_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_border_bridge_west_hinterland_cellar_leaper",
+        "city_border_bridge_west_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_confluence_east_hinterland_cellar_leaper",
+        "city_confluence_east_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_confluence_west_hinterland_cellar_leaper",
+        "city_confluence_west_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_east_river_north_hinterland_cellar_leaper",
+        "city_east_river_north_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_east_river_south_hinterland_cellar_leaper",
+        "city_east_river_south_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_greyrock_east_hinterland_cellar_leaper",
+        "city_greyrock_east_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "city_greyrock_west_hinterland_cellar_leaper",
+        "city_greyrock_west_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "port_hills_mouth_hinterland_cellar_leaper",
+        "port_hills_mouth_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "port_west_ore_hinterland_cellar_leaper",
+        "port_west_ore_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "port_westwind_hinterland_cellar_leaper",
+        "port_westwind_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_east_ferry_hinterland_cellar_leaper",
+        "town_east_ferry_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_honey_vale_hinterland_cellar_leaper",
+        "town_honey_vale_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_ruins_gate_hinterland_cellar_leaper",
+        "town_ruins_gate_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_scarp_hinterland_cellar_leaper",
+        "town_scarp_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_vineyard_hinterland_cellar_leaper",
+        "town_vineyard_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "town_west_ferry_hinterland_cellar_leaper",
+        "town_west_ferry_hinterland_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_01_quarry_pit_lurker",
+        "western_road_01_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_01_cellar_leaper",
+        "western_road_01_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_02_quarry_pit_lurker",
+        "western_road_02_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_02_cellar_leaper",
+        "western_road_02_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_03_cellar_leaper",
+        "western_road_03_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_04_quarry_pit_lurker",
+        "western_road_04_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_04_cellar_leaper",
+        "western_road_04_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_05_quarry_pit_lurker",
+        "western_road_05_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_05_cellar_leaper",
+        "western_road_05_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_06_quarry_pit_lurker",
+        "western_road_06_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_06_cellar_leaper",
+        "western_road_06_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_07_quarry_pit_lurker",
+        "western_road_07_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_07_cellar_leaper",
+        "western_road_07_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_08_quarry_pit_lurker",
+        "western_road_08_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_08_cellar_leaper",
+        "western_road_08_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_09_quarry_pit_lurker",
+        "western_road_09_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_09_cellar_leaper",
+        "western_road_09_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+    EncounterComposition(
+        "western_road_10_quarry_pit_lurker",
+        "western_road_10_quarry_pit_lurker_activity",
+        (CompositionMember("quarry_pit_lurker", 1, 1),),
+    ),
+    EncounterComposition(
+        "western_road_10_cellar_leaper",
+        "western_road_10_cellar_leaper_activity",
+        (CompositionMember("cellar_leaper", 2, 3),),
+    ),
+# --- site compositions (same tuple, after the zone compositions above) ---
+    EncounterComposition(
+        "old_shaft_leaper_shaft_group",
+        "old_shaft_leaper_shaft_activity",
+        (
+            CompositionMember("old_shaft_leaper", 1, 1),
+            CompositionMember("cellar_leaper", 2, 2),
+        ),
+    ),
+    EncounterComposition(
+        "spoil_heap_elder_pit_member",
+        "spoil_heap_elder_pit_activity",
+        (CompositionMember("spoil_heap_elder", 1, 1),),
+    ),
+    EncounterComposition(
+        "pass_warden_ledge_group",
+        "pass_warden_ledge_activity",
+        (
+            CompositionMember("pass_warden", 1, 1),
+            CompositionMember("cliff_stepper", 1, 1),
+        ),
+    ),
+
+# --- western-hills-deep-placement: append to the end of _ECOLOGY_ZONE_DECLARATIONS ---
+    EcologyZone(
+        "capital_south_wild",
+        "western_hills_valleys",
+        ((810, 839, 810, 839),),
+        (
+            WeightedComposition("capital_south_wild_quarry_pit_lurker", 1),
+            WeightedComposition("capital_south_wild_cliff_stepper", 1),
+            WeightedComposition("capital_south_wild_cellar_leaper", 1),
+            WeightedComposition("capital_south_wild_burrow_maker", 1),
+            WeightedComposition("capital_south_wild_hanging_nest_forager", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "confluence_southeast_wild",
+        "western_hills_valleys",
+        ((730, 759, 520, 549),),
+        (
+            WeightedComposition("confluence_southeast_wild_quarry_pit_lurker", 1),
+            WeightedComposition("confluence_southeast_wild_cliff_stepper", 1),
+            WeightedComposition("confluence_southeast_wild_cellar_leaper", 1),
+            WeightedComposition("confluence_southeast_wild_burrow_maker", 1),
+            WeightedComposition("confluence_southeast_wild_hanging_nest_forager", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "east_river_east_wild",
+        "western_hills_valleys",
+        ((1270, 1299, 940, 969),),
+        (
+            WeightedComposition("east_river_east_wild_quarry_pit_lurker", 1),
+            WeightedComposition("east_river_east_wild_cliff_stepper", 1),
+            WeightedComposition("east_river_east_wild_cellar_leaper", 1),
+            WeightedComposition("east_river_east_wild_burrow_maker", 1),
+            WeightedComposition("east_river_east_wild_hanging_nest_forager", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "east_river_northeast_wild",
+        "western_hills_valleys",
+        ((1240, 1269, 1140, 1169),),
+        (
+            WeightedComposition("east_river_northeast_wild_quarry_pit_lurker", 1),
+            WeightedComposition("east_river_northeast_wild_cliff_stepper", 1),
+            WeightedComposition("east_river_northeast_wild_cellar_leaper", 1),
+            WeightedComposition("east_river_northeast_wild_burrow_maker", 1),
+            WeightedComposition("east_river_northeast_wild_hanging_nest_forager", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "greyrock_northwest_wild",
+        "western_hills_valleys",
+        ((170, 199, 1250, 1279),),
+        (
+            WeightedComposition("greyrock_northwest_wild_quarry_pit_lurker", 1),
+            WeightedComposition("greyrock_northwest_wild_cliff_stepper", 1),
+            WeightedComposition("greyrock_northwest_wild_cellar_leaper", 1),
+            WeightedComposition("greyrock_northwest_wild_burrow_maker", 1),
+            WeightedComposition("greyrock_northwest_wild_hanging_nest_forager", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+
+# --- western-hills-deep-placement: append to the end of _SITE_DECLARATIONS ---
+    MonsterSite(
+        "old_shaft_leaper_shaft",
+        "camp",
+        "western_hills_valleys",
+        (390, 930),
+        "old_shaft_leaper_shaft_group",
+        None,
+        3,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "spoil_heap_elder_pit",
+        "nest",
+        "western_hills_valleys",
+        (270, 1080),
+        "spoil_heap_elder_pit_member",
+        None,
+        1,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "pass_warden_ledge",
+        "camp",
+        "western_hills_valleys",
+        (1150, 1230),
+        "pass_warden_ledge_group",
+        None,
+        2,
+        False,
+        86400,
+    ),
+
+# --- western-hills-deep-placement: replace the pool tuple of each existing EcologyZone row named below (rows landed by western-hills-near-belts) ---
+# capital_altoria_east_hinterland: the pool becomes
+        (
+            WeightedComposition("capital_altoria_east_hinterland_burrow_maker", 1),
+            WeightedComposition("capital_altoria_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("capital_altoria_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("capital_altoria_east_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("capital_altoria_east_hinterland_cellar_leaper", 1),
+        ),
+# capital_altoria_west_hinterland: the pool becomes
+        (
+            WeightedComposition("capital_altoria_west_hinterland_burrow_maker", 1),
+            WeightedComposition("capital_altoria_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("capital_altoria_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("capital_altoria_west_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("capital_altoria_west_hinterland_cellar_leaper", 1),
+        ),
+# city_border_bridge_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_border_bridge_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_border_bridge_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_border_bridge_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_border_bridge_east_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_border_bridge_east_hinterland_cellar_leaper", 1),
+        ),
+# city_border_bridge_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_border_bridge_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_border_bridge_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_border_bridge_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_border_bridge_west_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_border_bridge_west_hinterland_cellar_leaper", 1),
+        ),
+# city_confluence_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_confluence_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_confluence_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_confluence_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_confluence_east_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_confluence_east_hinterland_cellar_leaper", 1),
+        ),
+# city_confluence_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_confluence_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_confluence_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_confluence_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_confluence_west_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_confluence_west_hinterland_cellar_leaper", 1),
+        ),
+# city_east_river_north_hinterland: the pool becomes
+        (
+            WeightedComposition("city_east_river_north_hinterland_burrow_maker", 1),
+            WeightedComposition("city_east_river_north_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_east_river_north_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_east_river_north_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_east_river_north_hinterland_cellar_leaper", 1),
+        ),
+# city_east_river_south_hinterland: the pool becomes
+        (
+            WeightedComposition("city_east_river_south_hinterland_burrow_maker", 1),
+            WeightedComposition("city_east_river_south_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_east_river_south_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_east_river_south_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_east_river_south_hinterland_cellar_leaper", 1),
+        ),
+# city_greyrock_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_greyrock_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_greyrock_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_greyrock_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_greyrock_east_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_greyrock_east_hinterland_cellar_leaper", 1),
+        ),
+# city_greyrock_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_greyrock_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_greyrock_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_greyrock_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_greyrock_west_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("city_greyrock_west_hinterland_cellar_leaper", 1),
+        ),
+# port_hills_mouth_hinterland: the pool becomes
+        (
+            WeightedComposition("port_hills_mouth_hinterland_burrow_maker", 1),
+            WeightedComposition("port_hills_mouth_hinterland_mudbank_dweller", 1),
+            WeightedComposition("port_hills_mouth_hinterland_wax_cache_forager", 1),
+            WeightedComposition("port_hills_mouth_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("port_hills_mouth_hinterland_cellar_leaper", 1),
+        ),
+# port_west_ore_hinterland: the pool becomes
+        (
+            WeightedComposition("port_west_ore_hinterland_burrow_maker", 1),
+            WeightedComposition("port_west_ore_hinterland_mudbank_dweller", 1),
+            WeightedComposition("port_west_ore_hinterland_wax_cache_forager", 1),
+            WeightedComposition("port_west_ore_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("port_west_ore_hinterland_cellar_leaper", 1),
+        ),
+# port_westwind_hinterland: the pool becomes
+        (
+            WeightedComposition("port_westwind_hinterland_burrow_maker", 1),
+            WeightedComposition("port_westwind_hinterland_mudbank_dweller", 1),
+            WeightedComposition("port_westwind_hinterland_wax_cache_forager", 1),
+            WeightedComposition("port_westwind_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("port_westwind_hinterland_cellar_leaper", 1),
+        ),
+# town_east_ferry_hinterland: the pool becomes
+        (
+            WeightedComposition("town_east_ferry_hinterland_burrow_maker", 1),
+            WeightedComposition("town_east_ferry_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_east_ferry_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_east_ferry_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_east_ferry_hinterland_cellar_leaper", 1),
+        ),
+# town_honey_vale_hinterland: the pool becomes
+        (
+            WeightedComposition("town_honey_vale_hinterland_burrow_maker", 1),
+            WeightedComposition("town_honey_vale_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_honey_vale_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_honey_vale_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_honey_vale_hinterland_cellar_leaper", 1),
+        ),
+# town_ruins_gate_hinterland: the pool becomes
+        (
+            WeightedComposition("town_ruins_gate_hinterland_burrow_maker", 1),
+            WeightedComposition("town_ruins_gate_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_ruins_gate_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_ruins_gate_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_ruins_gate_hinterland_cellar_leaper", 1),
+        ),
+# town_scarp_hinterland: the pool becomes
+        (
+            WeightedComposition("town_scarp_hinterland_burrow_maker", 1),
+            WeightedComposition("town_scarp_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_scarp_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_scarp_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_scarp_hinterland_cellar_leaper", 1),
+        ),
+# town_vineyard_hinterland: the pool becomes
+        (
+            WeightedComposition("town_vineyard_hinterland_burrow_maker", 1),
+            WeightedComposition("town_vineyard_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_vineyard_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_vineyard_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_vineyard_hinterland_cellar_leaper", 1),
+        ),
+# town_west_ferry_hinterland: the pool becomes
+        (
+            WeightedComposition("town_west_ferry_hinterland_burrow_maker", 1),
+            WeightedComposition("town_west_ferry_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_west_ferry_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_west_ferry_hinterland_hanging_nest_forager", 1),
+            WeightedComposition("town_west_ferry_hinterland_cellar_leaper", 1),
+        ),
+# western_road_01: the pool becomes
+        (
+            WeightedComposition("western_road_01_cliff_stepper", 1),
+            WeightedComposition("western_road_01_burrow_maker", 1),
+            WeightedComposition("western_road_01_hanging_nest_forager", 1),
+            WeightedComposition("western_road_01_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_01_cellar_leaper", 1),
+        ),
+# western_road_02: the pool becomes
+        (
+            WeightedComposition("western_road_02_cliff_stepper", 1),
+            WeightedComposition("western_road_02_burrow_maker", 1),
+            WeightedComposition("western_road_02_hanging_nest_forager", 1),
+            WeightedComposition("western_road_02_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_02_cellar_leaper", 1),
+        ),
+# western_road_03: the pool becomes
+        (
+            WeightedComposition("western_road_03_burrow_maker", 1),
+            WeightedComposition("western_road_03_mudbank_dweller", 1),
+            WeightedComposition("western_road_03_wax_cache_forager", 1),
+            WeightedComposition("western_road_03_hanging_nest_forager", 1),
+            WeightedComposition("western_road_03_cellar_leaper", 1),
+        ),
+# western_road_04: the pool becomes
+        (
+            WeightedComposition("western_road_04_cliff_stepper", 1),
+            WeightedComposition("western_road_04_burrow_maker", 1),
+            WeightedComposition("western_road_04_hanging_nest_forager", 1),
+            WeightedComposition("western_road_04_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_04_cellar_leaper", 1),
+        ),
+# western_road_05: the pool becomes
+        (
+            WeightedComposition("western_road_05_cliff_stepper", 1),
+            WeightedComposition("western_road_05_burrow_maker", 1),
+            WeightedComposition("western_road_05_hanging_nest_forager", 1),
+            WeightedComposition("western_road_05_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_05_cellar_leaper", 1),
+        ),
+# western_road_06: the pool becomes
+        (
+            WeightedComposition("western_road_06_cliff_stepper", 1),
+            WeightedComposition("western_road_06_burrow_maker", 1),
+            WeightedComposition("western_road_06_hanging_nest_forager", 1),
+            WeightedComposition("western_road_06_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_06_cellar_leaper", 1),
+        ),
+# western_road_07: the pool becomes
+        (
+            WeightedComposition("western_road_07_cliff_stepper", 1),
+            WeightedComposition("western_road_07_burrow_maker", 1),
+            WeightedComposition("western_road_07_hanging_nest_forager", 1),
+            WeightedComposition("western_road_07_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_07_cellar_leaper", 1),
+        ),
+# western_road_08: the pool becomes
+        (
+            WeightedComposition("western_road_08_cliff_stepper", 1),
+            WeightedComposition("western_road_08_burrow_maker", 1),
+            WeightedComposition("western_road_08_hanging_nest_forager", 1),
+            WeightedComposition("western_road_08_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_08_cellar_leaper", 1),
+        ),
+# western_road_09: the pool becomes
+        (
+            WeightedComposition("western_road_09_cliff_stepper", 1),
+            WeightedComposition("western_road_09_burrow_maker", 1),
+            WeightedComposition("western_road_09_hanging_nest_forager", 1),
+            WeightedComposition("western_road_09_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_09_cellar_leaper", 1),
+        ),
+# western_road_10: the pool becomes
+        (
+            WeightedComposition("western_road_10_cliff_stepper", 1),
+            WeightedComposition("western_road_10_burrow_maker", 1),
+            WeightedComposition("western_road_10_hanging_nest_forager", 1),
+            WeightedComposition("western_road_10_quarry_pit_lurker", 1),
+            WeightedComposition("western_road_10_cellar_leaper", 1),
+        ),
