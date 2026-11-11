@@ -19,4 +19,4 @@ Begin after `ore-vein-mole-species` is merged. Follow design.md verbatim. Every 
 
 ## 3. Handoff
 
-- [ ] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change cache-raider-wolverine-species` and `openspec validate cache-raider-wolverine-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
+- [x] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change cache-raider-wolverine-species` and `openspec validate cache-raider-wolverine-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
