@@ -55,6 +55,7 @@
       "moss_quill_porcupine",
       "mud_dam_beaver",
       "mudfilm_slime",
+      "ore_nest_griffin",
       "ore_vein_mole",
       "ridge_burrow_hare",
       "rime_scale_serpent",
@@ -195,7 +196,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2acb18e624fe2ec08fb3a00267b763c655b2736cdd6cc0fe73aa2f04fb8e6989",
+  "fingerprint": "38a42824ea76794fec897d4a2f0b27aa07277960d7648dc3ce93f93fb61303b2",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -8928,7 +8929,7 @@
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "bfa9fadca080a7076b83a04a7c4431082be39d028655214c88a4a00434bbc611",
     "world/lore/monster_placement.py": "1679909716f7cef7a6f501b98ea389b8adcee3efbd39abf048145f5502df99c8",
-    "world/lore/monster_species.py": "d604016ca56d8a0886836bb02a192795355b38cba40b3847740d26fbfeea9dcd",
+    "world/lore/monster_species.py": "ff6ae299b193c6c5d76c6f1cc3a3e6f0dcfc85d10abc57e302ecd4456767d88d",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
     "world/lore/names.py": "8a75cd6dca2f93ad173a31564fbb3fe752d4b8428a051110868a9de6f2ec834d",
