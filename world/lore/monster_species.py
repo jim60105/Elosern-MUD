@@ -982,6 +982,23 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "pine_floor_grouse",
         True,
     ),
+    MonsterSpecies(
+        "mud_dam_beaver",
+        "泥壩河狸",
+        "泥壩河狸是約中型犬大小的河狸類魔獸，以家族為單位生活於西北高地的溪流與渡口上游。",
+        "濃密的深褐毛皮上常糊著一層乾泥，尾巴寬扁如槳，覆著鱗狀硬皮。"
+        "門牙橘黃粗大，啃斷手臂粗的松樹只需片刻。",
+        "牠們啃倒溪邊的樹木，以樹枝與溪泥築起橫跨溪流的水壩，再在壩後的水塘裡建造圓頂巢屋。"
+        "牠們能以微弱土屬性力量讓糊上的溪泥迅速緊實，水壩因此撐得過春季融雪的大水，糊在自己毛皮上的泥層也會變得堅硬。"
+        "西北高地的渡口聚落依靠穩定的溪水擺渡，河狸家族在上游築壩時，下游渡口的水位便忽高忽低，渡船的木樁也常被啃斷。"
+        "近身時，牠以寬尾拍擊對手，拍擊時讓毛皮上的泥層緊實硬化，更耐得住反擊。",
+        ("northwest_highland_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；溪泥緊實之力的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階家族群居河狸：土屬性力量只讓自身毛皮泥層與水壩溪泥緊實，不改變河道或操控水流；戰鬥呈現為尾擊與自身短暫防禦提升。連結渡口聚落的水位與渡船木樁。",
+        "（作者私有：尚未證實的猜想）松濤渡的船夫相信老壩型築的水壩能預告當年融雪的早晚，這種說法尚未證實。",
+        "dam_builder",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1602,6 +1619,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("drum_wing_burst",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "dam_builder",
+        "mud_dam_beaver",
+        "築壩型",
+        "普通版本，以家族為單位在溪流上築壩、啃樹。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=46, mp=20, sp=9, atk_phys=5, agility=4, defense=6, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("mud_pelt_slap",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "old_dam_keeper",
+        "mud_dam_beaver",
+        "老壩型",
+        "守著家族最老水壩的大型個體，毛皮上的泥層最厚，會正面迎向靠近水壩的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=68, mp=30, sp=15, atk_phys=10, agility=4, defense=8, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("mud_pelt_slap",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),

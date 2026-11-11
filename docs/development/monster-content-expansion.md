@@ -1790,3 +1790,85 @@ drum-wing-grouse-species --strict`. The committed manifest files
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 泥壩河狸
+
+This section records the seventh delivered species of the Wave 2 species chain
+and the second northwest-highland Wave 2 species. 泥壩河狸 (`mud_dam_beaver`) is
+a low-tier, grade-F, family-living beaver whose ordinary default variant is
+築壩型 (`dam_builder`). It carries the single-target earth strike 泥甲尾擊
+(`mud_pelt_slap`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Sturdy family builder: its defense equals the porcupine's ordinary variant
+  (6) and sits one above the crab's (5), while its agility stays below the
+  hare's ordinary variant (4 against 8).
+* 築壩型's MP pool holds two casts of the slap (2 × 10 = 20) and its SP pool
+  holds three casts (3 × 3 = 9); the stronger 老壩型 holds three casts in MP
+  (3 × 10 = 30 ≤ 30) and five in SP (5 × 3 = 15 ≤ 15).
+* The guard grants +2 defense for 20 s, matching the crab's and the porcupine's
+  shipped self-guard, the smallest shipped self-guard.
+* The stronger 老壩型 keeps the family's oldest dam at grade E with the low
+  band's defense ceiling (8).
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. Its representative stays `burrow_maker`:
+both new variant keys sort after it
+(`"burrow_maker" < "dam_builder" < "old_dam_keeper"`), so the representative
+declaration and every shard, seed and smoke registration stay unchanged. The
+existing `world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `burrow_maker` stays
+its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.35. Neither
+authors intelligence, a decision-mode override nor a `monster_behaviour.yaml`
+edit. This link adds a timed effect and a modifier rule, so the startup tuning
+fingerprint moved from `d65909aa...` to `3232b667...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`129487ea...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <labels>`:
+
+| labels | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` + `world.lore.tests.test_monster_visuals` | 24 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` + `world.rules.tests.test_tide_lamp_crab_resource_skill` + `world.rules.tests.test_rule_id_test_correspondence` + `world.rules.tests.test_status_display` | 10 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` + `world.skills.tests.test_skill_registry.test_narration_coverage` | 21 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 108 tests, OK, run as two focused method-label batches (100 + 8) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` + `.ActivationBindingTests` + `.RollbackTests` | 11 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+mud-dam-beaver-species` (reference-context, traceability 2726/2726 covered,
+observability, test-data, manifests and 19 contract tests) and `openspec
+validate mud-dam-beaver-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
