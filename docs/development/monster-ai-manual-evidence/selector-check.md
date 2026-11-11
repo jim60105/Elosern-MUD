@@ -1,8 +1,8 @@
 # Manual selector check (monster-ai-manual-evidence)
 
-- Baseline commit: `95cb8f923b478c581a1a5c795ede8b051206c1fc`
+- Baseline commit: `addec86009eb6aee2d3e797cb2935e2434cd509e`
 - Algorithm version: 5
-- Configuration fingerprint: `955832b54374c54e1eb1934a3f72fb0a167c40fe7dbbd13c422115b75805507a`
+- Configuration fingerprint: `b0dd9da6a87878909c04036f3742f485dd8154599837f90aff18f2e26ed241b0`
 - Seeds: 128 documented injected seeds at intelligence [10, 90]
 - Utility gap: 0.5
 

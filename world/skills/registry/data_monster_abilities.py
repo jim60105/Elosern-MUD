@@ -63,6 +63,8 @@ The clod-ball beetle's head shove is assembled the same way with earth physical
 damage plus a hit-dependent agility debuff on the struck enemy.
 The dust-mane horse's gallop kick is assembled the same way with wind physical
 damage plus a self-mounted agility lift granted by every resolved attempt.
+The sluice-spear heron's beak jab is assembled the same way with elementless
+physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -1006,6 +1008,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "spear_beak_jab",
+        "矛喙疾刺",
+        "以彈直的長頸驅使長喙疾刺單一敵方目標，造成物理傷害；命中後甩起水花撲向對手臉上，短暫降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:canal_splash"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("sluice_spear_heron",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )

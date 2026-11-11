@@ -154,6 +154,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 咬住對方不放，粗壯的脖子用力一扭。",
         ),
     ),
+    NarrationRow(
+        "spear_beak_jab",
+        action=(
+            "{actor} 縮起的長頸驟然彈直，長喙直刺對手。",
+            "{actor} 一喙刺出，帶起的水花撲了對方滿臉。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]
