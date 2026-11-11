@@ -935,3 +935,84 @@ and `openspec validate spore-cap-mushroom-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 苔棘豪豬
+
+This section records the second delivered species of the north deep forest
+Wave 1. 苔棘豪豬 (`moss_quill_porcupine`) is a low-tier, grade-F, solitary
+forager porcupine whose ordinary default variant is 啃皮型 (`quill_forager`),
+with the stronger 守洞型 (`den_sentry`). Both carry the single earth back ram
+固棘倒撞 (`quill_brace_ram`).
+
+### Role constraints and the chosen literals
+
+* Defensive forager: the ordinary variant's authored defense sits two below
+  the low band's ceiling and above every shipped low-tier ordinary variant
+  except the slime's; it ties the hare's stronger 護巢型. The design brief
+  described this as equal to the crab's and the highest shipped low-tier
+  ordinary defense, but the shipped crab ordinary carries 5 and the slime
+  ordinary carries 7, so this review records the actual relation instead.
+* A plodding walker: the authored agility is below the hare's and the rat's.
+* The authored MP pool holds two casts of the ram's MP cost, and the SP pool
+  holds three casts of its SP cost.
+* The guard (+2 defense for 20 s) matches the crab's, the smallest shipped
+  self-guard.
+* The stronger 守洞型 holds a den, so it carries the larger pool and the low
+  band's defense ceiling at grade E.
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. The guard declares no hit dependency,
+following the crab and hare kits, so it mounts on every resolved attempt
+including a miss. Its representative stays `burrow_maker`: both new variant
+keys sort after it, so the representative declaration and every shard, seed
+and smoke registration stay unchanged. The existing
+`world/rules/tests/test_monster_composition_coverage.py` derives every
+shipped variant's signature and proves both new variants join this group,
+while the existing `world/rules/tests/test_tide_lamp_crab_resource_skill.py`
+commits the group's representative evidence for `burrow_maker`; no
+per-variant smoke module is added for a reused signature.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.35. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. The new buff definition and modifier rule do
+move the startup tuning fingerprint, so the activation record and the
+selector evidence were re-fingerprinted; `activated` and
+`activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | blocked by the repository test guard at 101 discovered tests (the limit is 100); `CombatModifierTests.test_rule_quill_brace_defense` ran alone, 1 test OK, and the class had 100 tests before this change |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK after the re-fingerprint |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK after the re-fingerprint |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+moss-quill-porcupine-species` and
+`openspec validate moss-quill-porcupine-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

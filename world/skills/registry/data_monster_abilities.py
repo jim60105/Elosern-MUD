@@ -21,6 +21,9 @@ area sweep, each paid in both MP and SP, and the area cast resolves every
 recipient's own hit and defense while the action pays once.
 The spore-cap mushroom's cap bump is assembled the same way with dark physical
 damage plus a hit-dependent accuracy debuff on the struck enemy.
+The moss-quill porcupine's back ram is assembled the same way with earth
+physical damage plus a self-mounted defense guard granted by every resolved
+attempt.
 """
 
 from world.skills.effects import (
@@ -462,6 +465,31 @@ ROWS: tuple[SkillDef, ...] = (
                 audience=EffectAudience.ENEMIES,
                 requires_hit_from=0,
             ),
+        ),
+    ),
+    _skill(
+        "quill_brace_ram",
+        "固棘倒撞",
+        "以土屬性力量硬化棘根後轉身以背倒撞單一敵方目標，造成物理傷害；出招時短暫提高自身防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "self_buff_apply:quill_brace"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("moss_quill_porcupine",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )
