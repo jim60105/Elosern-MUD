@@ -48,6 +48,8 @@ fang strike and one area tail lash, each paid in both MP and SP, and the area
 cast resolves every recipient's own hit and defense while the action pays once.
 The drum-wing grouse's wing burst is assembled the same way with wind physical
 damage plus a self-mounted agility lift granted by every resolved attempt.
+The mud-dam beaver's pelt slap is assembled the same way with earth physical
+damage plus a self-mounted defense guard granted by every resolved attempt.
 """
 
 from world.skills.effects import (
@@ -815,6 +817,31 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "mud_pelt_slap",
+        "泥甲尾擊",
+        "以土屬性力量讓毛皮泥層緊實後，以寬尾拍擊單一敵方目標，造成物理傷害；出招時短暫提高自身防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "self_buff_apply:mud_pelt"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("mud_dam_beaver",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
