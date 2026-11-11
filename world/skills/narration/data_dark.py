@@ -119,6 +119,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 拍著薄翼貼近，一口咬住對方的手背。",
         ),
     ),
+    NarrationRow(
+        "veil_scale_flutter",
+        action=(
+            "{actor} 從霧裡撲出，厚翅拍得鱗粉四散。",
+            "{actor} 繞著光亮盤旋一圈，翅膀猛然打向對手。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

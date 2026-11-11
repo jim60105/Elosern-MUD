@@ -40,6 +40,8 @@ physical damage plus a self-mounted physical attack rise granted by every
 resolved attempt.
 The bone-breaker vulture's grit-wing strike is assembled the same way with wind
 physical damage plus a hit-dependent accuracy debuff on the struck enemy.
+The mist-lamp moth's veil-scale flutter is assembled the same way with dark
+physical damage plus a hit-dependent agility debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -709,6 +711,31 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "veil_scale_flutter",
+        "鱗粉撲翅",
+        "以帶著暗屬性鱗粉的翅膀撲打單一敵方目標，造成物理傷害；命中後抖落鱗粉，使對手手腳短暫發沉，降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 4},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="dark",
+        effects=["damage:dark:physical", "buff_apply:veil_scale"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="dark",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("mist_lamp_moth",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
