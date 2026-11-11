@@ -7,11 +7,14 @@ test asserts on the receipt or on the real failure instead of on a returned
 envelope.
 """
 
+import json
 from typing import Any
 
 from twisted.python.failure import Failure
 
+from web.webclient.presentation.protocol import UI_PUBLICATION_PART
 from web.webclient.presentation.publication import PublicationReceipt
+from web.webclient.presentation.publication_parts import validate_publication_part
 
 
 def publication_result(deferred: Any) -> Any:
@@ -59,6 +62,41 @@ def last_frame(session: Any, message: str) -> dict[str, Any]:
     if not frames:
         raise AssertionError(f"no {message} frame was sent")
     return frames[-1]
+
+
+def published_snapshot(session: Any, revision: int) -> dict[str, Any]:
+    """Return the logical snapshot at ``revision``, intact or reassembled.
+
+    A snapshot over one generic frame ships as bounded publication parts, so a
+    test that asserts on the complete snapshot reads it whichever way it was
+    transported: the intact ``ui_snapshot`` frame, or the one transfer's parts
+    joined in index order.
+    """
+    for frame in publication_frames(session, "ui_snapshot"):
+        if frame["revision"] == revision:
+            return frame
+    transfer: str | None = None
+    pieces: dict[int, bytes] = {}
+    header: dict[str, Any] = {}
+    for frame in publication_frames(session, UI_PUBLICATION_PART):
+        part_header, raw = validate_publication_part(frame)
+        if part_header["publication_kind"] != "snapshot" or part_header["revision"] != revision:
+            continue
+        if transfer is None:
+            transfer, header = part_header["transfer_id"], part_header
+        if part_header["transfer_id"] != transfer:
+            continue
+        if part_header["part_index"] in pieces:
+            raise AssertionError(f"duplicate snapshot part {part_header['part_index']}")
+        pieces[part_header["part_index"]] = raw
+    if transfer is None:
+        raise AssertionError(f"no snapshot was sent at revision {revision}")
+    if sorted(pieces) != list(range(header["part_count"])):
+        raise AssertionError(f"snapshot parts are incomplete: {sorted(pieces)}")
+    joined = b"".join(pieces[index] for index in sorted(pieces))
+    if len(joined) != header["total_bytes"]:
+        raise AssertionError("reassembled snapshot does not match total_bytes")
+    return json.loads(joined)
 
 
 def recorded_frames(calls: Any) -> list[dict[str, Any]]:

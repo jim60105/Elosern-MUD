@@ -26,7 +26,6 @@ from web.webclient.actions.skill_use_actions import (
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.ingress import build_presentation_context
-from web.webclient.presentation.protocol import json_byte_size
 from web.webclient.presentation.registry import build_production_registry
 from web.webclient.presentation.skill_use import (
     SKILL_USE_SCHEMA_VERSION,
@@ -37,7 +36,10 @@ from web.webclient.presentation.skill_use_selection import (
     SkillUseSelection,
     retire_skill_use_selection,
 )
-from web.webclient.presentation.tests._support import last_frame
+from web.webclient.presentation.tests._support import (
+    publication_receipt,
+    published_snapshot,
+)
 from world.rules.buffs import entity_active_buffs
 from world.rules.clock import get_world_clock, read_world_clock
 from world.rules.combat_session import (
@@ -889,11 +891,11 @@ class SkillUsePanelValidationTests(_SkillUseCase):
     @covers_requirement("webclient-skillbook-casting::skill-use-has-an-exact-on-demand-versioned-read-model")
     def test_upper_bound_choice_count_fits_a_full_snapshot(self):
         # The guarantee asserted here is the maximum CHOICE COUNT (64 targets
-        # and 64 monster openings) while every other panel is present, at
-        # realistic display-name lengths. The 8-character padding keeps the
-        # names representative; at the protocol's label bound the composed
-        # envelope exceeds 65,536 bytes, which is a separate panel-budget
-        # concern (skill_use has no per-panel byte guard yet).
+        # and 64 monster openings) reaching the client in a complete snapshot
+        # while every other panel is present, at realistic display-name
+        # lengths. A composed envelope over one 65,536-byte frame ships as
+        # bounded publication parts, so the logical snapshot is read whichever
+        # way it was transported (skill_use has no per-panel byte guard yet).
         padding = "長" * 8
         for index in range(64):
             self._wolf(f"horde wolf {index:02d} " + padding)
@@ -905,10 +907,14 @@ class SkillUsePanelValidationTests(_SkillUseCase):
         self.assertEqual(len(panel["skill"]["openings"]), 64)
         self.assertEqual(len(panel["skill"]["targets"]), 64)
         context = build_presentation_context(self.session, self.player)
-        self.coordinator.full_snapshot(context)
-        snapshot = last_frame(self.session, "ui_snapshot")
-        self.assertLessEqual(json_byte_size(snapshot), 65_536)
-        self.assertEqual(snapshot["panels"]["skill_use"]["available"], True)
+        receipt = publication_receipt(self.coordinator.full_snapshot(context))
+        self.assertEqual(receipt.kind, "snapshot")
+        self.assertTrue(receipt.published)
+        snapshot = published_snapshot(self.session, receipt.revision)
+        published = snapshot["panels"]["skill_use"]
+        self.assertEqual(published["available"], True)
+        self.assertEqual(len(published["skill"]["openings"]), 64)
+        self.assertEqual(len(published["skill"]["targets"]), 64)
 
     def test_overflowing_room_renders_unavailable_not_truncated(self):
         for index in range(64):
