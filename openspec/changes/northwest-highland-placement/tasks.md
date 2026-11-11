@@ -10,7 +10,7 @@ Begin after `central-mountains-placement` and `ore-nest-griffin-species` are mer
 
 - [ ] 1.1 Append the two activity blocks of `snippets/monster_activity_rows.txt` (design D1). Check: `world.lore.tests.test_monster_activity` passes.
 - [ ] 1.2 Append placement blocks 1–3 of `snippets/monster_placement_rows.txt` (design D1). Check: `uv run --locked python -c "import world.lore.monster_placement"` exits 0.
-- [ ] 1.3 Apply block 4: in `_ECOLOGY_ZONE_DECLARATIONS`, replace only the `pool` tuple of each `highland_road_01` … `highland_road_08` row with the tuple listed for it (design D1). Check: `git diff` shows, for each of those eight rows, exactly two added `WeightedComposition` lines and no other change to the row; `world.lore.tests.test_monster_placement`, `world.maps.tests.test_population_geometry` and `world.maps.tests.test_monster_sites` pass.
+- [ ] 1.3 Apply block 4: in `_ECOLOGY_ZONE_DECLARATIONS`, replace only the `pool` tuple of each `highland_road_01` … `highland_road_08` row with the tuple listed for it (design D1). Check: `uv run --locked python -c "import world.lore.monster_placement"` exits 0; `git diff` shows, for each of those eight rows, exactly two added `WeightedComposition` lines and no other change to the row; `world.lore.tests.test_monster_placement`, `world.maps.tests.test_population_geometry` and `world.maps.tests.test_monster_sites` pass.
 
 ## 2. Evidence and documentation
 
