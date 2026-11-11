@@ -38,6 +38,8 @@ physical damage plus a hit-dependent fixed MP drain.
 The warm-rock salamander's ember-skin bite is assembled the same way with fire
 physical damage plus a self-mounted physical attack rise granted by every
 resolved attempt.
+The bone-breaker vulture's grit-wing strike is assembled the same way with wind
+physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -683,6 +685,31 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "grit_wing_strike",
+        "揚礫撲擊",
+        "藉風屬性力量俯衝撲擊單一敵方目標，造成物理傷害；命中後振翅掀起碎石與雪粒，使對手短暫看不準目標，降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 5},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical", "buff_apply:grit_gust"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("bone_breaker_vulture",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )

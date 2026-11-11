@@ -906,6 +906,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "ledge_basker",
         True,
     ),
+    MonsterSpecies(
+        "bone_breaker_vulture",
+        "碎骨鷲",
+        "碎骨鷲是雙翼展開近兩人寬的大型鷲類魔獸，成對棲息於中央山脈雲霧上方的斷崖岩棚。",
+        "頭頸覆著淡黃羽毛，眼周一圈紅色，嘴基垂著一撮黑色鬚羽。"
+        "背羽灰黑，翼尖細長，飛行時翅膀幾乎一動也不動。",
+        "牠以動物骨骼為主食，會叼起獸骨飛到高處，丟在固定的岩板上摔碎，再吞下骨片與骨髓。"
+        "牠能以微弱風屬性力量讓翼下的冷風聚攏，在雲霧上方的上升氣流裡長時間懸停；"
+        "這股風力作用在牠自己的翅膀周圍。"
+        "每對碎骨鷲都有一塊用了多年的摔骨岩板，岩板四周鋪滿白色碎骨，牠會撲向靠近岩板的身影。"
+        "斷崖鎮的採藥人上山採崖苔時，會繞開這些鋪滿碎骨的岩棚。"
+        "近身時，牠俯衝撲擊對手，撲中後振翅掀起碎石與雪粒，使對手短暫看不準目標。",
+        ("central_mountains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；翼下風力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階成對棲息的鷲類：風屬性只聚攏自身翼下的氣流以懸停，不操控天氣或他人的移動；戰鬥呈現為俯衝撲擊與命中後短暫命中下降。連結採藥人的崖苔採集路線。",
+        "（作者私有：尚未證實的猜想）斷崖鎮的老採藥人說摔骨岩板附近的崖苔長得最好，這種說法尚未證實。",
+        "updraft_glider",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1416,6 +1435,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("ember_skin_bite",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "updraft_glider",
+        "bone_breaker_vulture",
+        "盤谷型",
+        "普通版本，在雲霧上方的上升氣流裡盤旋，尋找獸骨。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=135, mp=30, sp=20, atk_phys=21, agility=17, defense=11, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("grit_wing_strike",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "crag_nest_vulture",
+        "bone_breaker_vulture",
+        "崖巢型",
+        "孵育期守在巢邊岩棚的個體，會連續俯衝驅趕靠近巢崖的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=180, mp=50, sp=30, atk_phys=26, agility=18, defense=13, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("grit_wing_strike",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

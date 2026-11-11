@@ -1055,6 +1055,12 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    def test_rule_grit_gust_accuracy(self):
+        entity = self._entity()
+        rule = RULES["grit_gust_accuracy"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     def test_rule_mane_misdirection_accuracy(self):
         entity = self._entity()
         rule = RULES["mane_misdirection_accuracy"]

@@ -567,6 +567,12 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（中央山脈第二波）：碎骨鷲揚礫撲擊：命中後掀起碎石與雪粒的 mount，accuracy −3 資料在 combat_modifiers.yaml 的 grit_gust_accuracy 列（grain_rattle_accuracy 的 hit-rider 先例）。
+- key: grit_gust
+  duration: 12
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
