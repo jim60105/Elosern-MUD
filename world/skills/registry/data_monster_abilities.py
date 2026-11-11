@@ -50,6 +50,8 @@ The drum-wing grouse's wing burst is assembled the same way with wind physical
 damage plus a self-mounted agility lift granted by every resolved attempt.
 The mud-dam beaver's pelt slap is assembled the same way with earth physical
 damage plus a self-mounted defense guard granted by every resolved attempt.
+The ore-vein mole's grit claw scrape is assembled the same way with earth
+physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -843,6 +845,35 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "grit_claw_scrape",
+        "揚砂爪刨",
+        "以土屬性力量鬆動爪前土石後刨擊單一敵方目標，造成物理傷害；命中後揚起礦砂打在對手臉上，使對手短暫看不準目標，降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 2},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "buff_apply:ore_grit"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ore_vein_mole",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
+            ),
         ),
     ),
 )

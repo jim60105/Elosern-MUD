@@ -999,6 +999,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "dam_builder",
         True,
     ),
+    MonsterSpecies(
+        "ore_vein_mole",
+        "礦脈鼴",
+        "礦脈鼴是約貓大小的鼴類魔獸，獨自生活於西北高地礦脈裸露的岩壁下與林間空地的鬆土中。",
+        "黑灰色短絨毛摸起來像天鵝絨，沾著閃亮的礦砂。"
+        "前肢寬大如鏟，指爪粗厚，眼睛細小得藏在毛裡，粉紅色的鼻尖靈活地四處嗅探。",
+        "牠沿著礦脈下方的鬆土挖掘長隧道，捕食土中的甲蟲幼蟲與蚯蚓，挖出的土堆在地面排成一列。"
+        "牠能以微弱土屬性力量讓爪前的土石鬆動，挖起碎石層也很快；"
+        "這股力量作用在牠爪前方一小片地面上。"
+        "獸人部族在礦脈露頭處開採礦石，礦脈鼴的隧道常挖到採礦溝底下，溝壁因此坍落。"
+        "近身時，牠以前爪刨擊對手，刨中時揚起一把礦砂打在對手臉上，使對手短暫看不準目標。",
+        ("northwest_highland_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；爪前土石鬆動之力的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階獨居鼴類：土屬性力量只鬆動爪前一小片土石，不造成地陷、崩塌或大範圍地形改變；戰鬥呈現為爪刨與命中後短暫命中下降。連結獸人部族的露頭採礦。",
+        "（作者私有：尚未證實的猜想）鐵爪城的礦工說礦脈鼴挖出的土堆排成的那條線，就是礦脈延伸的方向，這種說法尚未證實。",
+        "vein_digger",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1651,6 +1669,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("mud_pelt_slap",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "vein_digger",
+        "ore_vein_mole",
+        "掘脈型",
+        "普通版本，沿著礦脈下方的鬆土挖掘隧道覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=36, mp=20, sp=8, atk_phys=6, agility=5, defense=4, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("grit_claw_scrape",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "deep_seam_mole",
+        "ore_vein_mole",
+        "深脈型",
+        "在礦脈深處挖出寬大巢室的老個體，前爪磨得發亮，會從隧道口迎向闖入者。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=60, mp=30, sp=12, atk_phys=10, agility=6, defense=7, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("grit_claw_scrape",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),
