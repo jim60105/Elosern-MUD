@@ -654,6 +654,59 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change central-mountains-placement` | passed |
 | `openspec validate central-mountains-placement --strict` | valid |
 
+### Near-settlement belts: northwest highland forest
+
+This change completes the region's near-settlement placement. Wave 1 deferred
+every hinterland belt here because the region had no low-tier species; the low
+tier has since arrived, so the ground beside 咆哮王城, each city and each town
+now holds a hinterland belt, chosen by the same rectangle, clearance and
+eligible-cell rules as the other regions. The deep-wild zones take the remote
+highland forest away from the settlements, and the trunk-road corridors that
+Wave 1 landed keep their rectangles, densities, capacities and timing exactly as
+they were. The declarations remain the only authority for keys, rectangles,
+pools and bindings; this section repeats no coordinate, density or configured
+timing.
+
+**Species fit.** The hinterland pools hold only the region's low-tier animals:
+pine-floor grouse lekking on the forest floor, beavers damming the fords, and
+ore-vein moles digging around the ore workings, all passive and tied to the
+ground the dossiers name beside the beastfolk hunting grounds. The deep wild
+adds the wolverine and the shipped lynx on the remote ground, with the same low
+company around them, because their dossiers put them on the trap lines and
+hunting trails of the highland forest. No stronger or high-tier variant joins
+an ordinary pool, so a near-settlement encounter answers after engagement and
+keeps the light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
+
+**Corridor edit.** The trunk-road corridors keep the lynx binding Wave 1 gave
+them and gain the grouse and the mole as low-tier passive company, so a
+traveller on the trunk roads meets more than one kind of animal. Only the
+composition mix changes; the ground itself is untouched.
+
+**Sites.** The stronger variants occupy recoverable places: the lek master's
+display ground, the old dam keeper's pond, the deep seam mole's chamber and the
+snow cache of the winter-den wolverine. On a remote ore cliff the one-shot
+griffin site holds 金翎, the windcrest elder; clearing it is a durable authored
+victory until an author re-issues it. The sites answer only when an intruder
+enters their defended extent.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK, 43 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 598.018s before the declarations and 931.751s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change northwest-highland-placement` | passed |
+| `openspec validate northwest-highland-placement --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

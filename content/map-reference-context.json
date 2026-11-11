@@ -196,7 +196,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "38a42824ea76794fec897d4a2f0b27aa07277960d7648dc3ce93f93fb61303b2",
+  "fingerprint": "cc366963d6b69b4189cf5a9c2f047b72160bfab22169077d8b42d0109e248bed",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -995,6 +995,30 @@
       },
       {
         "capacity": 1,
+        "composition_key": "deep_seam_mole_den_member",
+        "coordinates": [
+          1240,
+          1560
+        ],
+        "individual_name_zh": null,
+        "key": "deep_seam_mole_den",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ore_vein_mole",
+            "species_name_zh": "礦脈鼴",
+            "variant_key": "deep_seam_mole",
+            "variant_name_zh": "深脈型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "northwest_highland_forest"
+      },
+      {
+        "capacity": 1,
         "composition_key": "ember_bristle_boss",
         "coordinates": [
           710,
@@ -1050,6 +1074,30 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 1,
+        "composition_key": "golden_plume_boss",
+        "coordinates": [
+          290,
+          1440
+        ],
+        "individual_name_zh": "金翎",
+        "key": "golden_plume_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ore_nest_griffin",
+            "species_name_zh": "礦巢獅鷲",
+            "variant_key": "windcrest_elder",
+            "variant_name_zh": "巔巢型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "northwest_highland_forest"
+      },
+      {
         "capacity": 3,
         "composition_key": "hollow_roost_camp_group",
         "coordinates": [
@@ -1082,6 +1130,38 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 3,
+        "composition_key": "lek_master_lek_group",
+        "coordinates": [
+          1050,
+          1520
+        ],
+        "individual_name_zh": null,
+        "key": "lek_master_lek",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "drum_wing_grouse",
+            "species_name_zh": "鼓翼松雞",
+            "variant_key": "lek_master_cock",
+            "variant_name_zh": "領場型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "drum_wing_grouse",
+            "species_name_zh": "鼓翼松雞",
+            "variant_key": "pine_floor_grouse",
+            "variant_name_zh": "林床型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "northwest_highland_forest"
+      },
+      {
         "capacity": 1,
         "composition_key": "moss_crown_boss",
         "coordinates": [
@@ -1104,6 +1184,38 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "old_dam_keeper_dam_group",
+        "coordinates": [
+          320,
+          1700
+        ],
+        "individual_name_zh": null,
+        "key": "old_dam_keeper_dam",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "mud_dam_beaver",
+            "species_name_zh": "泥壩河狸",
+            "variant_key": "old_dam_keeper",
+            "variant_name_zh": "老壩型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "mud_dam_beaver",
+            "species_name_zh": "泥壩河狸",
+            "variant_key": "dam_builder",
+            "variant_name_zh": "築壩型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "northwest_highland_forest"
       },
       {
         "capacity": 1,
@@ -1368,6 +1480,30 @@
         "one_shot": false,
         "recover_after_ticks": 86400,
         "region_key": "central_mountains"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "winter_den_glutton_den_member",
+        "coordinates": [
+          282,
+          1902
+        ],
+        "individual_name_zh": null,
+        "key": "winter_den_glutton_den",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "cache_raider_wolverine",
+            "species_name_zh": "掠藏獾",
+            "variant_key": "winter_den_glutton",
+            "variant_name_zh": "冬穴型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "northwest_highland_forest"
       }
     ],
     "zones": [
@@ -1671,6 +1807,130 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "capital_valhalla_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_valhalla_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_valhalla_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_valhalla_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            718,
+            737,
+            1680,
+            1699
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "capital_valhalla_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "capital_valhalla_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_valhalla_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_valhalla_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            688,
+            707,
+            1680,
+            1699
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -2209,6 +2469,130 @@
       },
       {
         "cell_capacity": 3,
+        "key": "city_fox_fire_north_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_fox_fire_north_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_fox_fire_north_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_fox_fire_north_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1283,
+            1302,
+            1705,
+            1724
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_fox_fire_south_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_fox_fire_south_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_fox_fire_south_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_fox_fire_south_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1283,
+            1302,
+            1677,
+            1696
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "city_greyrock_east_hinterland",
         "lower_density": 2,
         "pool": [
@@ -2361,6 +2745,130 @@
       },
       {
         "cell_capacity": 3,
+        "key": "city_horn_plain_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_horn_plain_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_horn_plain_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_horn_plain_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            396,
+            415,
+            1645,
+            1664
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_horn_plain_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_horn_plain_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_horn_plain_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_horn_plain_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            368,
+            387,
+            1645,
+            1664
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "city_imperial_ferry_east_hinterland",
         "lower_density": 2,
         "pool": [
@@ -2507,6 +3015,502 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_iron_claw_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_iron_claw_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_iron_claw_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_iron_claw_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1180,
+            1199,
+            1589,
+            1608
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_iron_claw_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_iron_claw_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_iron_claw_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_iron_claw_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1152,
+            1171,
+            1589,
+            1608
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_moon_howl_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_moon_howl_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_moon_howl_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_moon_howl_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            474,
+            493,
+            1834,
+            1853
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_moon_howl_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_moon_howl_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_moon_howl_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_moon_howl_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            446,
+            465,
+            1834,
+            1853
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_mutual_market_north_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_mutual_market_north_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_mutual_market_north_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_mutual_market_north_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            821,
+            840,
+            1374,
+            1393
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_mutual_market_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_mutual_market_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_mutual_market_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_mutual_market_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            800,
+            819,
+            1368,
+            1387
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_shadow_wood_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_shadow_wood_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_shadow_wood_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_shadow_wood_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            191,
+            210,
+            1567,
+            1586
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_shadow_wood_north_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_shadow_wood_north_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_shadow_wood_north_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_shadow_wood_north_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            185,
+            204,
+            1588,
+            1607
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -2811,6 +3815,254 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_swift_wind_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_swift_wind_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_swift_wind_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_swift_wind_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            605,
+            624,
+            1424,
+            1443
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_swift_wind_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_swift_wind_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_swift_wind_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_swift_wind_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            577,
+            596,
+            1424,
+            1443
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_tiger_roar_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_tiger_roar_east_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_tiger_roar_east_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_tiger_roar_east_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1005,
+            1024,
+            1854,
+            1873
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_tiger_roar_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_tiger_roar_west_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_tiger_roar_west_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_tiger_roar_west_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            977,
+            996,
+            1854,
+            1873
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -4503,6 +5755,82 @@
       },
       {
         "cell_capacity": 3,
+        "key": "far_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "far_west_wild_trapline_raider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "cache_raider_wolverine",
+                "species_name_zh": "掠藏獾",
+                "variant_key": "trapline_raider",
+                "variant_name_zh": "掠索型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "far_west_wild_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "far_west_wild_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "far_west_wild_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            150,
+            179,
+            1295,
+            1324
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "fionnen_ridge_wild",
         "lower_density": 1,
         "pool": [
@@ -4781,6 +6109,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "highland_road_01_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_01_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4812,6 +6168,34 @@
                 "species_name_zh": "霧鬃山貓",
                 "variant_key": "wood_stalker",
                 "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_02_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_02_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
               }
             ],
             "weight": 1
@@ -4849,6 +6233,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "highland_road_03_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_03_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4880,6 +6292,34 @@
                 "species_name_zh": "霧鬃山貓",
                 "variant_key": "wood_stalker",
                 "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_04_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_04_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
               }
             ],
             "weight": 1
@@ -4917,6 +6357,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "highland_road_05_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_05_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4948,6 +6416,34 @@
                 "species_name_zh": "霧鬃山貓",
                 "variant_key": "wood_stalker",
                 "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_06_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_06_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
               }
             ],
             "weight": 1
@@ -4985,6 +6481,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "highland_road_07_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_07_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5019,6 +6543,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "highland_road_08_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "highland_road_08_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5033,6 +6585,82 @@
         "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "howl_ridge_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "howl_ridge_wild_trapline_raider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "cache_raider_wolverine",
+                "species_name_zh": "掠藏獾",
+                "variant_key": "trapline_raider",
+                "variant_name_zh": "掠索型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "howl_ridge_wild_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "howl_ridge_wild_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "howl_ridge_wild_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            630,
+            659,
+            1895,
+            1924
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -5309,6 +6937,82 @@
         "region_key": "north_deep_forest",
         "replenishment_interval": 600,
         "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "pine_ferry_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "pine_ferry_west_wild_trapline_raider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "cache_raider_wolverine",
+                "species_name_zh": "掠藏獾",
+                "variant_key": "trapline_raider",
+                "variant_name_zh": "掠索型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "pine_ferry_west_wild_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "pine_ferry_west_wild_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "pine_ferry_west_wild_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            885,
+            914,
+            1670,
+            1699
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -6561,6 +8265,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "town_ancestor_shrine_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_ancestor_shrine_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_ancestor_shrine_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_ancestor_shrine_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            734,
+            753,
+            1579,
+            1598
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "town_black_soil_hinterland",
         "lower_density": 2,
         "pool": [
@@ -6789,6 +8555,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "town_east_ford_camp_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_east_ford_camp_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_ford_camp_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_east_ford_camp_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1133,
+            1152,
+            1370,
+            1389
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "town_east_pasture_hinterland",
         "lower_density": 2,
         "pool": [
@@ -6935,6 +8763,192 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_falcon_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_falcon_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_falcon_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_falcon_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1098,
+            1117,
+            1439,
+            1458
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_frost_wind_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_frost_wind_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_frost_wind_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_frost_wind_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            217,
+            236,
+            1797,
+            1816
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_grizzly_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_grizzly_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_grizzly_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_grizzly_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            901,
+            920,
+            1473,
+            1492
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -7245,6 +9259,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "town_pine_ferry_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_pine_ferry_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_pine_ferry_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_pine_ferry_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1065,
+            1084,
+            1712,
+            1731
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "town_ruins_gate_hinterland",
         "lower_density": 2,
         "pool": [
@@ -7397,6 +9473,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "town_shaman_cave_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_shaman_cave_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_shaman_cave_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_shaman_cave_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1173,
+            1192,
+            1800,
+            1819
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "town_silver_ridge_hinterland",
         "lower_density": 2,
         "pool": [
@@ -7467,6 +9605,68 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_stag_ferry_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_stag_ferry_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_stag_ferry_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_stag_ferry_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            374,
+            393,
+            1752,
+            1771
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -7849,6 +10049,220 @@
         "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_west_ford_camp_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_west_ford_camp_hinterland_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ford_camp_hinterland_dam_builder",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mud_dam_beaver",
+                "species_name_zh": "泥壩河狸",
+                "variant_key": "dam_builder",
+                "variant_name_zh": "築壩型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ford_camp_hinterland_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            433,
+            452,
+            1352,
+            1371
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "valhalla_north_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "valhalla_north_wild_trapline_raider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "cache_raider_wolverine",
+                "species_name_zh": "掠藏獾",
+                "variant_key": "trapline_raider",
+                "variant_name_zh": "掠索型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_north_wild_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_north_wild_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_north_wild_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            780,
+            809,
+            1880,
+            1909
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "valhalla_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "valhalla_west_wild_trapline_raider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "cache_raider_wolverine",
+                "species_name_zh": "掠藏獾",
+                "variant_key": "trapline_raider",
+                "variant_name_zh": "掠索型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_west_wild_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_west_wild_pine_floor_grouse",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "drum_wing_grouse",
+                "species_name_zh": "鼓翼松雞",
+                "variant_key": "pine_floor_grouse",
+                "variant_name_zh": "林床型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "valhalla_west_wild_vein_digger",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ore_vein_mole",
+                "species_name_zh": "礦脈鼴",
+                "variant_key": "vein_digger",
+                "variant_name_zh": "掘脈型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            540,
+            569,
+            1670,
+            1699
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -8927,8 +11341,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "bfa9fadca080a7076b83a04a7c4431082be39d028655214c88a4a00434bbc611",
-    "world/lore/monster_placement.py": "1679909716f7cef7a6f501b98ea389b8adcee3efbd39abf048145f5502df99c8",
+    "world/lore/monster_activity.py": "73076ec3428e2307c46e05efaf078922eb4cf05c66479ad7c034ea95f8b9f470",
+    "world/lore/monster_placement.py": "c27937628bbae792aff277376bffeb6c8b487f743223494c3ba0d4a0f48ae96e",
     "world/lore/monster_species.py": "ff6ae299b193c6c5d76c6f1cc3a3e6f0dcfc85d10abc57e302ecd4456767d88d",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
