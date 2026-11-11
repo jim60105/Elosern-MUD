@@ -1701,3 +1701,92 @@ rime-scale-serpent-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 鼓翼松雞
+
+This section records the sixth delivered species of the Wave 2 species chain and
+the first northwest-highland Wave 2 species. 鼓翼松雞 (`drum_wing_grouse`) is a
+low-tier, grade-F, gregarious ground grouse whose ordinary default variant is
+林床型 (`pine_floor_grouse`). It carries the single-target wind strike 鼓翼驚飛
+(`drum_wing_burst`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Ground bird with burst flight: its agility sits in the low band's upper half
+  (9 for the ordinary variant and 11 for the stronger one, in 3–12), and its
+  defense equals the hare's ordinary variant (3).
+* 林床型's MP pool holds two casts of the burst (2 × 10 = 20) and its SP pool
+  holds three casts (3 × 2 = 6); the stronger 領場型 holds three casts in MP
+  (3 × 10 = 30 ≤ 30) and five in SP (5 × 2 = 10 ≤ 10).
+* The burst grants +2 agility for 15 s, one below the rat's and the owl's
+  shipped +3, a low-tier self rise.
+* The stronger 領場型 holds the lek centre at grade E with a larger pool (56 HP
+  against 32) and a stronger attack (9 against 4).
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. Its representative stays `burrow_maker`:
+both new variant keys sort after it
+(`"burrow_maker" < "lek_master_cock" < "pine_floor_grouse"`), so the
+representative declaration and every shard, seed and smoke registration stay
+unchanged. The existing
+`world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the group's
+committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `burrow_maker` stays
+its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.35. Neither
+authors intelligence, a decision-mode override nor a `monster_behaviour.yaml`
+edit. This link adds a timed effect and a modifier rule, so the startup tuning
+fingerprint moved from `cd78725a...` to `d65909aa...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`2fa5c405...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone from the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 107 tests, OK, run as two focused method-label batches (100 + 7) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+| `world.rules.tests.test_rule_id_test_correspondence` | 2 tests, OK |
+| `world.rules.tests.test_status_display` | 3 tests, OK |
+| `world.skills.tests.test_skill_registry.test_narration_coverage` | 15 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+drum-wing-grouse-species` and `openspec validate
+drum-wing-grouse-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

@@ -579,6 +579,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（西北高地第二波）：鼓翼松雞鼓翼驚飛：每次已結算且具合法目標的施放都順勢驚飛，敏捷提升資料在 combat_modifiers.yaml 的 drum_burst_agility_flat 列（wax_slip_agility_flat 的 agility_flat 先例）。
+- key: drum_burst
+  duration: 15
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
