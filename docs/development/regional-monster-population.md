@@ -524,6 +524,48 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change coastal-near-belts` | passed |
 | `openspec validate coastal-near-belts --strict` | valid |
 
+### Near-settlement belts: northwest highland forest roads
+
+This change adds road-corridor belts along the highland trunk roads between the
+region's settlements. Wave 1 adds no hinterland zone in this region; the
+deferral paragraph below records why. The declarations remain the only authority
+for keys, rectangles, pools and bindings; this section repeats no coordinate,
+density or configured timing.
+
+**Species fit.** The lynx dossier ties the animal to hunting trails and to
+following pack-animal trains through morning fog, and the remote stretches of
+the highland trunk roads are exactly that setting. Every rectangle lies at least
+80 cells from any settlement, so no ground near a town receives a mid-tier
+birth.
+
+**Tiers.** No stronger or high-tier variant joins an ordinary pool; the lynx's
+`trail_hunter` variant and every warden, guard or leader variant stay out.
+Settlement surroundings hold only low-tier passive individuals, so a
+near-settlement encounter answers after engagement and keeps the
+light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
+
+**Deferral.** None of the region's 18 settlements gets a hinterland zone in
+Wave 1. Hinterland pools are low-tier only, and the region has no low-tier
+species until its own species wave. Corridor points within 80 cells of a
+settlement are left unused for the same reason.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 404.004s before the declarations and 444.497s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change highland-road-belts` | passed |
+| `openspec validate highland-road-belts --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

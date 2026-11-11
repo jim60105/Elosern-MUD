@@ -183,7 +183,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "3c4650fd5aff5b96414c0b47535e416d6270de2ac934c5a43143abd76981319e",
+  "fingerprint": "f126196a0e362367f96dda347d9236ec66390268811deba63954d6e2c8c634e2",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -3862,6 +3862,278 @@
       },
       {
         "cell_capacity": 3,
+        "key": "highland_road_01",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_01_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            908,
+            927,
+            1827,
+            1846
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_02",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_02_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            540,
+            559,
+            1784,
+            1803
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_03",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_03_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            257,
+            276,
+            1631,
+            1650
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_04",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_04_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            487,
+            506,
+            1537,
+            1556
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_05",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_05_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            800,
+            819,
+            1548,
+            1567
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_06",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_06_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            977,
+            996,
+            1434,
+            1453
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_07",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_07_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            784,
+            803,
+            1769,
+            1788
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "highland_road_08",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "highland_road_08_wood_stalker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "fog_mane_lynx",
+                "species_name_zh": "霧鬃山貓",
+                "variant_key": "wood_stalker",
+                "variant_name_zh": "林伏型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            620,
+            639,
+            1706,
+            1725
+          ]
+        ],
+        "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "port_dawnlight_hinterland",
         "lower_density": 2,
         "pool": [
@@ -7028,8 +7300,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "175efc8cbd209793d2f25a58796156192d0026fe1a62256a57e741e46bacc3cd",
-    "world/lore/monster_placement.py": "211148f77adc3dadfee47f3fef9d21f64d01ee3b3f0df4d4a78408220c87efc8",
+    "world/lore/monster_activity.py": "7e6c756c73ff678235706d5f590365499622f183c043112578b6f20fc7fef292",
+    "world/lore/monster_placement.py": "6b3c6a42e57a410f26ad782cc8aeebb16aad58c39ca4104a925bf7c74cbbf7b4",
     "world/lore/monster_species.py": "013fbfd2898fac6216cdacda0133d636d27c9d2f42ce7091ab24248be8c7c810",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
