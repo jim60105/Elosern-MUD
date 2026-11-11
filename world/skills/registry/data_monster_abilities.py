@@ -52,6 +52,9 @@ The mud-dam beaver's pelt slap is assembled the same way with earth physical
 damage plus a self-mounted defense guard granted by every resolved attempt.
 The ore-vein mole's grit claw scrape is assembled the same way with earth
 physical damage plus a hit-dependent accuracy debuff on the struck enemy.
+The cache-raider wolverine's jaw lock bite is assembled the same way with
+elementless physical damage plus a hit-dependent defense debuff on the struck
+enemy.
 """
 
 from world.skills.effects import (
@@ -874,6 +877,29 @@ ROWS: tuple[SkillDef, ...] = (
                 audience=EffectAudience.ENEMIES,
                 requires_hit_from=0,
             ),
+        ),
+    ),
+    _skill(
+        "jaw_lock_bite",
+        "鉗顎扳咬",
+        "以顎部鉗住單一敵方目標猛力扳扭，造成物理傷害；命中後讓對手的護身架勢短暫鬆開，降低其防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:jaw_wrench"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("cache_raider_wolverine",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )
