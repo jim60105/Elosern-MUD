@@ -24,6 +24,8 @@ damage plus a hit-dependent accuracy debuff on the struck enemy.
 The moss-quill porcupine's back ram is assembled the same way with earth
 physical damage plus a self-mounted defense guard granted by every resolved
 attempt.
+The hollow-tree bat's bite is assembled the same way with dark physical damage
+plus a hit-dependent fixed HP drain.
 """
 
 from world.skills.effects import (
@@ -490,6 +492,35 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "hollow_bat_bite",
+        "空木吸咬",
+        "以帶著暗屬性的門牙咬向單一敵方目標，造成物理傷害；命中時從咬口吸取少量血氣，轉為自身的生命。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 2},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="dark",
+        effects=["damage:dark:physical", "gauge_transfer:hp:drain:fixed:4"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="dark",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("hollow_tree_bat",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
+                transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+            ),
         ),
     ),
 )
