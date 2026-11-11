@@ -1016,3 +1016,78 @@ moss-quill-porcupine-species` and
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 空木蝠
+
+This section records the third delivered species of the north deep forest
+Wave 1. 空木蝠 (`hollow_tree_bat`) is a low-tier, grade-F, agile colony flier
+whose ordinary default variant is 棲洞型 (`hollow_roost_flier`), with the
+stronger 哨群型 (`colony_sentinel`). Both carry the single dark bite
+空木吸咬 (`hollow_bat_bite`).
+
+### Role constraints and the chosen literals
+
+* Agile, fragile flier: the ordinary variant's authored agility is 11, one
+  below the low band's ceiling of 12, while its defense is the band floor of
+  2 and its hit points (28) sit near the band floor of 25.
+* 棲洞型's MP pool of 20 holds two casts of the bite's MP cost of 10, and its
+  SP pool of 6 holds three casts of the SP cost of 2. The stronger 哨群型
+  carries 30 MP and 10 SP, which holds three and five casts respectively.
+* The fixed HP drain (4) is far below the crocodile's fixed MP drain (10),
+  which suits a low-tier contact bite.
+* The stronger 哨群型 guards the roost mouth, so it carries a larger pool and
+  attack (hp 50, attack 9) at grade E.
+
+### Reuse of the contact drain representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "gauge_transfer", "enemies", 0))`,
+the shipped contact drain group. Its representative stays `bank_lurker`:
+both new variant keys sort after it, so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The drained gauge is
+HP instead of the crocodile's MP, but the signature reads only the effect
+family, audience and hit dependency, so the group is the same. The existing
+`world/rules/tests/test_crocodile_resource_skill.py` commits the group's
+representative evidence; no per-variant smoke module is added for a reused
+signature.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.35. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds no buff definition or modifier
+rule, so the startup tuning fingerprint does not move; the activation tests
+passed and the evidence was left untouched, with `activated` and
+`activation_bindings` unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_crocodile_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+hollow-tree-bat-species` and `openspec validate hollow-tree-bat-species
+--strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
