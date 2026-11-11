@@ -1130,6 +1130,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "wide_mound_elder",
         True,
     ),
+    MonsterSpecies(
+        "flat_leap_goby",
+        "灘跳魚",
+        "灘跳魚是約小臂長的鰕虎類魔獸，成群生活於東南海岸河口的潮間泥灘與鹽沼。",
+        "灰褐色的身體布滿藍色亮點，一對大眼長在頭頂，能各自轉動。"
+        "胸鰭粗壯，撐在泥上時形如一對短腿；"
+        "背鰭展開時是一面帶黑邊的小旗。",
+        "退潮後，牠們撐著胸鰭在泥灘上爬行，啃食泥面的藻類與小蟹。"
+        "牠的胸鰭與尾巴帶著異常的力氣，胸鰭一撐、尾巴一甩就能躍過一人高的距離，在泥灘上比人走得還快。"
+        "金穗港與東灣港的河口泥灘是漁家挖蛤、晾網的地方，灘跳魚群會把挖好的蛤坑占成自己的洞口，遇到有人靠近便成群跳起。"
+        "近身時，牠撲上前以尾巴拍擊對手，拍中時甩起一團濕泥糊在對手臉上，讓對手短暫看不準目標。",
+        ("southeast_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；胸鰭與尾巴異常力氣的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居鰕虎：胸鰭與尾巴的力氣屬於身體能力，不帶元素、不造成中毒或持續傷害；戰鬥呈現為尾擊與命中後短暫命中下降（濺泥）。連結河口漁家的挖蛤與晾網。",
+        "（作者私有：尚未證實的猜想）東灣港的挖蛤人說灘跳魚的泥塔築得越高，下個月的大潮就越大，這種說法尚未證實。",
+        "mudflat_skipper",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1976,6 +1994,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("lake_mound_bite", "lake_mound_quake",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "mudflat_skipper",
+        "flat_leap_goby",
+        "跳灘型",
+        "普通版本，成群在退潮後的泥灘上爬行、啃藻。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=32, mp=0, sp=9, atk_phys=5, agility=10, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("mud_tail_flick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "turret_keeper",
+        "flat_leap_goby",
+        "築塔型",
+        "在洞口堆起泥塔、守著一片泥灘的大型雄魚，會跳向任何走近泥塔的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=55, mp=0, sp=15, atk_phys=9, agility=10, defense=5, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("mud_tail_flick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 
