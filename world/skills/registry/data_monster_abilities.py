@@ -61,6 +61,8 @@ dive and one area wing gale, each paid in both MP and SP, and the area cast
 resolves every recipient's own hit and defense while the action pays once.
 The clod-ball beetle's head shove is assembled the same way with earth physical
 damage plus a hit-dependent agility debuff on the struck enemy.
+The dust-mane horse's gallop kick is assembled the same way with wind physical
+damage plus a self-mounted agility lift granted by every resolved attempt.
 """
 
 from world.skills.effects import (
@@ -979,6 +981,31 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "dust_gallop_kick",
+        "疾蹄踢擊",
+        "以風屬性力量把氣流聚在四蹄周圍，人立而起以前蹄踢擊單一敵方目標，造成物理傷害；出招時短暫提高自身敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 5},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical", "self_buff_apply:gale_hooves"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("dust_mane_horse",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )
