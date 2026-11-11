@@ -1056,6 +1056,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "windcrest_elder",
         True,
     ),
+    MonsterSpecies(
+        "clod_ball_beetle",
+        "滾土甲蟲",
+        "滾土甲蟲是約拳頭大小的甲蟲類魔獸，成對生活於東部大平原的牧場、官道與田埂一帶。",
+        "黑亮的甲殼泛著深綠光澤，頭部前端長著一片鏟狀寬板。"
+        "前腳扁平帶齒，適合推土與挖掘；"
+        "後腳細長，能倒退著推動比自己大上數倍的土球。",
+        "牠們把牧場的牛糞與田土揉成圓球，倒退著推回地洞，在土球裡產卵育幼。"
+        "牠能以微弱土屬性力量讓揉好的土球迅速壓實，壓實後的土球硬如石塊，推過碎石路也不會散開。"
+        "東部的官道兩側是牧場與田地，滾土甲蟲常把土球推上路面，牛車輪子壓到硬球就會顛簸卡住；"
+        "牠們埋在田邊的土球，也會堵住灌溉渠的小水門。"
+        "近身時，牠低頭以鏟狀頭板頂撞對手，同時把土球滾向對手腳邊，撞中時讓對手腳步一絆、短暫慢下來。",
+        ("eastern_plains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；壓實土球之力的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階成對生活的甲蟲：土屬性力量只讓自己揉成的土球壓實，不改變地形、不造成陷落；戰鬥呈現為頭板頂撞與命中後短暫敏捷下降（土讓腳下變壞）。連結官道牛車與灌溉渠水門。",
+        "（作者私有：尚未證實的猜想）東牧鎮的牧人說滾土甲蟲把土球推往哪個方向，隔天的風就往哪裡吹，這種說法尚未證實。",
+        "road_ball_roller",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1790,6 +1809,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("ore_crest_dive", "ore_crest_gale",),
         passive_skill_keys=(),
         behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "road_ball_roller",
+        "clod_ball_beetle",
+        "滾球型",
+        "普通版本，成對推著土球在牧場與官道之間來回。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=38, mp=20, sp=9, atk_phys=5, agility=4, defense=6, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("clod_ball_shove",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "heap_brood_keeper",
+        "clod_ball_beetle",
+        "育堆型",
+        "守著牧場邊一整座育幼土堆的大型個體，甲殼最厚，會正面頂撞靠近土堆的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=60, mp=30, sp=15, atk_phys=10, agility=4, defense=8, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("clod_ball_shove",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 

@@ -9,6 +9,7 @@ every magnitude lives once in its executable declaration under
 `world/skills/registry/data_monster_abilities.py` and
 `world/rules/rulebook/`. Sections from 孢傘菇 onward record the north deep
 forest species of the near-settlement programme's Wave 1. Sections from 霧泉蛙 onward record the central mountains and northwest highland forest species of the near-settlement programme's Wave 2.
+Sections from 滾土甲蟲 onward record the eastern plains and southeast coast species of the near-settlement programme's Wave 3.
 
 ## 泥膜史萊姆
 
@@ -2118,6 +2119,93 @@ The remaining gates also passed: the registry import check,
 `uv run --locked python -m tools.map_reference_context` followed by `--check`,
 `uv run --locked python -m tools.contract_gate --change
 ore-nest-griffin-species` and `openspec validate ore-nest-griffin-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
+
+## 滾土甲蟲
+
+This section records the first delivered species of the eastern plains Wave 3.
+滾土甲蟲 (`clod_ball_beetle`) is a low-tier scarab beetle whose ordinary default
+variant is 滾球型 (`road_ball_roller`) and whose stronger variant is 育堆型
+(`heap_brood_keeper`). Both carry the single earth strike 鏟頭滾球
+(`clod_ball_shove`), a hit-rider that lowers the struck enemy's flat agility.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* Armoured slow pusher: the ordinary variant's authored defense equals the
+  beaver's ordinary 築壩型, and its agility sits in the low band's lower half
+  (3–12).
+* MP holds two casts of the shove's MP cost on the ordinary variant and three
+  on 育堆型; the ordinary variant's SP holds three casts of its SP cost, while
+  育堆型 holds five.
+* The rider (−2 agility for 12 s) equals the goblin's shipped −2 agility rider,
+  the smallest shipped agility debuff.
+* The stronger 育堆型 guards a brood heap at grade E with the low band's defense
+  ceiling.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`: both
+new variant keys sort after it (`"cliff_stepper" < "heap_brood_keeper"` and
+`"cliff_stepper" < "road_ball_roller"`), so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `cliff_stepper`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.35. Neither
+variant authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds one timed effect and one modifier,
+so the startup tuning fingerprint moved from `03ad9da4...` to `5f4a4506...`; the
+selector report was regenerated under the new tuning, the activation record and
+its rollback fingerprint (`66c7e8a0...` to `cb5ead22...`) were updated, and
+`activated` and `activation_bindings` are unchanged. The six archetype campaigns
+and the performance report were not rerun and remain historical harness evidence
+at `497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 111 tests, OK, run as two focused method-label batches (56 + 55) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK |
+
+The registry import check reports the 48 registered variants, and the remaining
+gates passed: `uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+clod-ball-beetle-species` and `openspec validate clod-ball-beetle-species
 --strict`. The committed manifest files `.github/evennia-shards.json`,
 `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
 unchanged.

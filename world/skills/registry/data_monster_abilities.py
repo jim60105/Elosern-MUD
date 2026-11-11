@@ -59,6 +59,8 @@ The ore-nest griffin's two wind strikes are assembled the same way with
 physical-school damage that reads the actor's physical attack: one single-target
 dive and one area wing gale, each paid in both MP and SP, and the area cast
 resolves every recipient's own hit and defense while the action pays once.
+The clod-ball beetle's head shove is assembled the same way with earth physical
+damage plus a hit-dependent agility debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -952,6 +954,31 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "clod_ball_shove",
+        "鏟頭滾球",
+        "以土屬性力量壓實土球後，以鏟狀頭板頂撞單一敵方目標，造成物理傷害；命中後讓土球絆住對手腳步，短暫降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "buff_apply:clod_stumble"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("clod_ball_beetle",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )

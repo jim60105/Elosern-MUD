@@ -603,6 +603,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（東部大平原第三波）：滾土甲蟲鏟頭滾球：命中後土球絆住腳步的 mount，agility_flat −2 資料在 combat_modifiers.yaml 的 clod_stumble_agility_flat 列（sticky_palm_drag_agility_flat 的 agility_flat 先例）。
+- key: clod_stumble
+  duration: 12
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
