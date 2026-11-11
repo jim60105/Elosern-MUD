@@ -169,6 +169,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 倒退著推出土球，鏟狀頭板跟著撞了上去。",
         ),
     ),
+    NarrationRow(
+        "lake_mound_bite",
+        action=(
+            "{actor} 從泥水裡探出巨頭，一口咬向對手。",
+            "{actor} 粗大的頸子一伸，厚鈍的巨顎猛然合上。",
+        ),
+    ),
+    NarrationRow(
+        "lake_mound_quake",
+        action=(
+            "{actor} 撐起背甲猛力砸下，四周泥地一陣翻湧。",
+            "{actor} 整座背甲壓向地面，湧起的泥浪撞向身旁眾人。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]
