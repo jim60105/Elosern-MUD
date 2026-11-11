@@ -946,9 +946,9 @@ with the stronger 守洞型 (`den_sentry`). Both carry the single earth back ram
 
 ### Role constraints and the chosen literals
 
-* Defensive forager: the ordinary variant's authored defense sits one below
+* Defensive forager: the ordinary variant's authored defense sits two below
   the low band's ceiling and above every shipped low-tier ordinary variant
-  except the slime's; it ties the hare's stronger 守隘型. The design brief
+  except the slime's; it ties the hare's stronger 護巢型. The design brief
   described this as equal to the crab's and the highest shipped low-tier
   ordinary defense, but the shipped crab ordinary carries 5 and the slime
   ordinary carries 7, so this review records the actual relation instead.
@@ -969,9 +969,11 @@ following the crab and hare kits, so it mounts on every resolved attempt
 including a miss. Its representative stays `burrow_maker`: both new variant
 keys sort after it, so the representative declaration and every shard, seed
 and smoke registration stay unchanged. The existing
-`world/rules/tests/test_tide_lamp_crab_resource_skill.py` derives the group's
-members from the shipped declarations and exercises both new variants on
-their own self-guard axis without a test edit.
+`world/rules/tests/test_monster_composition_coverage.py` derives every
+shipped variant's signature and proves both new variants join this group,
+while the existing `world/rules/tests/test_tide_lamp_crab_resource_skill.py`
+commits the group's representative evidence for `burrow_maker`; no
+per-variant smoke module is added for a reused signature.
 
 ### Decision mode
 
