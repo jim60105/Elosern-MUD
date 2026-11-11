@@ -549,9 +549,9 @@ test("ui_action_result data slot accepts the server-legal shapes", () => {
     eight["key_" + index] = index;
   }
   assert.deepEqual(Protocol.validateActionResult(actionResult({ data: eight })).data, eight);
-  // Depth boundary pair: the slot sits at envelope depth 1, so ten list
-  // levels below the slot value (deepest leaf at depth 12) is legal.
-  assert.doesNotThrow(() => Protocol.validateActionResult(actionResult({ data: { k: nested(10) } })));
+  // Depth boundary pair: the slot sits at envelope depth 1, so MAX_DEPTH - 2
+  // list levels below the slot value (deepest leaf at MAX_DEPTH) is legal.
+  assert.doesNotThrow(() => Protocol.validateActionResult(actionResult({ data: { k: nested(Protocol.MAX_DEPTH - 2) } })));
 });
 
 test("ui_action_result data slot rejects the server-illegal shapes", () => {
@@ -584,8 +584,8 @@ test("ui_action_result data slot rejects the server-illegal shapes", () => {
     { data: { "session.id": "1" } },
     { data: { ok: { revision: 7 } } },
     { data: { ok: [{ epoch: "e" }] } },
-    // Depth: one level past the boundary (deepest leaf at envelope depth 13).
-    { data: { k: nested(11) } },
+    // Depth: one level past the boundary (deepest leaf at MAX_DEPTH + 1).
+    { data: { k: nested(Protocol.MAX_DEPTH - 1) } },
     // String ceiling.
     { data: { k: "x".repeat(2049) } },
     // Aggregate bytes: individually safe items over the result-data budget.
@@ -752,10 +752,10 @@ test("enforces global JSON-safety bounds", () => {
   const store = Protocol.createStore();
   store.beginTransport(1);
 
-  // Excessive depth: the bound is 12 (raised for the nested context_actions
-  // v3 shape); 13 nested wrappers must still be rejected.
+  // Excessive depth: the bound is MAX_DEPTH (raised for the nested
+  // lore_codex v2 art shape); wrappers past it must still be rejected.
   let deep = { panels: { status: validStatusPanel() } };
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < Protocol.MAX_DEPTH + 1; i++) {
     deep = { nest: deep };
   }
   assert.throws(() => Protocol.checkEnvelope(deep));

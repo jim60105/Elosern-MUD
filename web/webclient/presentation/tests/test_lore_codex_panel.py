@@ -50,6 +50,7 @@ from web.webclient.presentation.lore_codex import (
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     ProtocolValidationError,
+    check_json_safety,
     json_byte_size,
 )
 from web.webclient.presentation.registry import (
@@ -830,6 +831,47 @@ class LoreCodexPresenterTests(EvenniaTestCase):
         validate_artwork(region_art)
         self.assertEqual(region_art["subject_id"], f"codex:region:{T_ART_REGION}")
         self.assertIn(T_ART_ARCHETYPE, json.dumps(region_art))
+
+    @covers_requirement(
+        "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",
+    )
+    def test_entry_art_fits_the_global_depth_bound_inside_an_envelope(self):
+        # A codex slot nests its artwork descriptor under categories, groups
+        # and slots, so a resource's geometry leaf sits far below the envelope
+        # root; the whole snapshot must still pass the global bounds.
+        geometry = {
+            "image_size": {"width": 832, "height": 1216},
+            "face_rect": {"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.4},
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+            "aspect_ratio": "3:4",
+        }
+
+        def resource(name: str) -> dict:
+            return {
+                "resource_id": f"codex/{name}.png",
+                "version": "a" * 64,
+                "url": f"/art/codex/{name}.png",
+                "origin": "runtime",
+                "geometry": deepcopy(geometry),
+            }
+
+        descriptor = {
+            "subject_id": f"codex:region:{T_ART_REGION}",
+            "revision": "b" * 64,
+            "generation_subject": f"codex:region:{T_ART_REGION}",
+            "generation_state": "done",
+            "attempts": [
+                {"type": "image", "source_id": "codex.generated", "rank": 40, "resource": resource("attempt")}
+            ],
+            "terminal": {"kind": "alpha_mask", "source_id": "codex.mask", "rank": 100, "resource": resource("terminal")},
+            "retention_sources": [],
+        }
+        with patch.object(lore_codex_module, "_build_art", return_value=descriptor):
+            payload = self._render(_mock_player(lore_discovered={f"region:{T_ART_REGION}"}))
+        self.assertEqual(
+            _entry_slot(payload, "region", T_ART_REGION)["art"], validate_artwork(descriptor)
+        )
+        check_json_safety({"panels": {"lore_codex": payload}})
 
     @covers_requirement(
         "webclient-lore-codex-panel::codex-entries-carry-an-existing-art-descriptor-or-none",

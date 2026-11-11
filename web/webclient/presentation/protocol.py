@@ -30,14 +30,16 @@ UI_PUBLICATION_PART = "ui_publication_part"
 PROTOCOL_VERSION = 1
 
 # Global JSON-safety and bound table (design D1). Field-specific limits must be
-# equal or smaller than these ceilings. Depth 12 accommodates the nested
-# ``context_actions`` v3 shape (envelope → panels → panel → skills → category
-# → groups → skill group → skills → descriptor → cost/freeform_scales), whose
-# deepest legitimate leaf sits at depth 11. The list-item ceiling clears the
-# largest legitimate flat panel list: the ``context_actions`` exploration
-# form's affordance array (at most ``MAX_CONTEXT_AFFORDANCES`` = 320 entries).
+# equal or smaller than these ceilings. Depth 16 accommodates the nested
+# ``lore_codex`` v2 shape (envelope → panels → panel → categories → category →
+# groups → group → slots → slot → art → attempts → attempt → resource →
+# geometry → image_size → width), whose deepest legitimate leaf sits at depth
+# 15; the ``context_actions`` v3 skill descriptors reach depth 11. The
+# list-item ceiling clears the largest legitimate flat panel list: the
+# ``context_actions`` exploration form's affordance array (at most
+# ``MAX_CONTEXT_AFFORDANCES`` = 320 entries).
 MAX_CANONICAL_JSON_BYTES = 65_536
-MAX_DEPTH = 12
+MAX_DEPTH = 16
 MAX_FIELDS = 64
 MAX_LIST_ITEMS = 320
 MAX_STRING_CODE_POINTS = 2_048

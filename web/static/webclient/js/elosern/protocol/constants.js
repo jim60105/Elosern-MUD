@@ -4,11 +4,12 @@
 var PROTOCOL_VERSION = 1;
 var MAX_SAFE_INTEGER = 9007199254740991;
 var MAX_CANONICAL_JSON_BYTES = 65536;
-// Depth 12 accommodates the nested `context_actions` v3 shape (envelope ->
-// panels -> panel -> skills -> category -> groups -> skill group -> skills ->
-// descriptor -> cost/freeform_scales), whose deepest legitimate leaf sits at
-// depth 11; must match web.webclient.presentation.protocol.MAX_DEPTH.
-var MAX_DEPTH = 12;
+// Depth 16 accommodates the nested `lore_codex` v2 shape (envelope -> panels
+// -> panel -> categories -> category -> groups -> group -> slots -> slot ->
+// art -> attempts -> attempt -> resource -> geometry -> image_size -> width),
+// whose deepest legitimate leaf sits at depth 15; must match
+// web.webclient.presentation.protocol.MAX_DEPTH.
+var MAX_DEPTH = 16;
 var MAX_FIELDS = 64;
 // Clears the largest legitimate flat panel list: the `context_actions`
 // exploration form's affordance array (at most 320 entries).

@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
+    MAX_DEPTH,
     MAX_FIELDS,
     MAX_LIST_ITEMS,
     MAX_SAFE_INTEGER,
@@ -109,9 +110,9 @@ class JSONSafetyTests(unittest.TestCase):
         check_json_safety({"nested": [1, 2, 3]})
         value = {}
         node = value
-        # Depth 12 is the raised bound (nested context_actions v3 shape); the
-        # deepest legitimate leaf sits at depth 11, so 13 levels must fail.
-        for _ in range(13):
+        # MAX_DEPTH is the raised bound (nested lore_codex v2 art shape); one
+        # level past it must fail.
+        for _ in range(MAX_DEPTH + 1):
             node["child"] = {}
             node = node["child"]
         with self.assertRaises(JSONSafetyError):
@@ -432,11 +433,12 @@ class ResultEnvelopeTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_ui_action_result(_result(data={"ok": [{"epoch": "e"}]}))
         # Depth boundary pair relative to the envelope root: the slot sits at
-        # depth 1, so the deepest leaf at envelope depth 12 is legal (ten list
-        # levels below the slot value) and one level deeper is rejected.
-        validate_ui_action_result(_result(data={"k": _nested(10)}))
+        # depth 1, so the deepest leaf at envelope depth MAX_DEPTH is legal
+        # (MAX_DEPTH - 2 list levels below the slot value) and one level
+        # deeper is rejected.
+        validate_ui_action_result(_result(data={"k": _nested(MAX_DEPTH - 2)}))
         with self.assertRaises(JSONSafetyError):
-            validate_ui_action_result(_result(data={"k": _nested(11)}))
+            validate_ui_action_result(_result(data={"k": _nested(MAX_DEPTH - 1)}))
         # Strings keep the global code-point ceiling.
         with self.assertRaises(ProtocolValidationError):
             validate_ui_action_result(

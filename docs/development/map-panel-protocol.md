@@ -585,7 +585,7 @@ logs `map_panel_invalid`. Each intact world-map frame logs the debug event
 ## Bounded parts
 
 A map update that satisfies the generic frame bounds (65,536 canonical bytes,
-320-item lists, depth 12, 2,048-code-point strings), or the world-map
+320-item lists, depth 16, 2,048-code-point strings), or the world-map
 allowance above, ships as one ordinary `ui_update`. Otherwise:
 
 1. Any eager companion panels in the same update, including the dialogue
