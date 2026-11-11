@@ -1075,6 +1075,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "road_ball_roller",
         True,
     ),
+    MonsterSpecies(
+        "dust_mane_horse",
+        "揚塵野馬",
+        "揚塵野馬是肩高與人相當的野馬類魔獸，成小群奔馳於東部大平原的丘陵牧野與開闊草原。",
+        "沙褐色的短毛沾滿塵土，鬃毛與尾毛又長又粗，奔跑時在身後拖出一道灰黃。"
+        "四肢修長，蹄子寬大堅硬，蹄緣一圈顏色較深。",
+        "牠們以三五匹為一群，清晨與黃昏在草原上吃草，白天躲在丘陵背風處休息。"
+        "牠能以微弱風屬性力量讓氣流聚在四蹄周圍，起跑時一蹬就衝到全速，在草原上急轉也不會失足；"
+        "這股風力繞在牠自己的蹄邊，跑得越久越耗體力。"
+        "駿原鎮與東牧鎮靠養馬與放牧維生，野馬群常撞開牧場的木柵欄，啃光留給家畜的冬季草場，有時還把牧場的母馬引進野馬群裡。"
+        "近身時，牠人立而起以前蹄踢擊對手，踢擊時蹄邊捲起一陣風，短時間內腳步更快。",
+        ("eastern_plains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；蹄邊風力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階小群生活的野馬：風屬性只把氣流聚在自身四蹄周圍以加速與轉向，不颳起風暴、不推動他人；戰鬥呈現為前蹄踢擊與自身短暫敏捷提升。描寫維持動物體態，不與任何獸人亞種相比。連結駿原鎮的馬匹繁育與東牧鎮的牧場柵欄。",
+        "（作者私有：尚未證實的猜想）駿原鎮的馴馬師相信跟過野馬群一季的母馬，生下的小馬跑得特別快，這種說法尚未證實。",
+        "plain_runner",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1841,6 +1859,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("clod_ball_shove",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "plain_runner",
+        "dust_mane_horse",
+        "奔原型",
+        "普通版本，成小群在草原上吃草、奔馳。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=150, mp=30, sp=20, atk_phys=21, agility=20, defense=11, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("dust_gallop_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "herd_stallion",
+        "dust_mane_horse",
+        "頭馬型",
+        "帶領整群野馬的成年公馬，體型最大，會擋在馬群前方迎向靠近的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=200, mp=50, sp=30, atk_phys=26, agility=22, defense=13, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("dust_gallop_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
     ),
 )
 
