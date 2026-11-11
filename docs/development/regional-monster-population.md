@@ -610,6 +610,50 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change north-deep-forest-placement` | passed |
 | `openspec validate north-deep-forest-placement --strict` | valid |
 
+### Near-settlement belts: central mountains
+
+This change gives the central mountains their first monster placement: a
+hinterland belt beside each hidden elven village, 暗影谷村 and 翠綠森林村,
+approach zones on the mountain side of the foothill settlements 斷崖鎮, 銀嶺鎮,
+楓麓鎮 and 狐火城 where foot traffic climbs in, and deep-wild zones along the
+spine. No road enters the region, so the approach belt stands in for the
+corridor belt that other regions receive. The declarations remain the only
+authority for keys, rectangles, pools and bindings; this section repeats no
+coordinate, density or configured timing.
+
+**Species fit.** Frog colonies belong at the seeps the dossiers describe, and
+salamanders on the sunlit scree and shelter hearths beside the villages and
+paths, so the hinterland and approach pools hold only those low-tier animals.
+The deep wild adds the bone-breaker vulture and the mist-lamp moth, whose
+dossiers tie them to the cliff shelves and the night lamps of the high spine,
+with the same low company around them. No stronger or high-tier variant joins an
+ordinary pool, so a near-settlement encounter answers after engagement and keeps
+the light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
+
+**Sites.** The stronger variants occupy recoverable places: the spring keeper's
+泉池, the warm-vent dweller's 地熱裂縫, the vulture's 巢崖岩棚 and the moth's
+guide-lamp camp. A remote ravine at the southern end of the spine holds the
+one-shot serpent site where 霜環 waits; clearing it is a durable authored
+victory until an author re-issues it. The sites answer only when an intruder
+enters their defended extent.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK, 43 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 510.907s before the declarations and 596.968s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change central-mountains-placement` | passed |
+| `openspec validate central-mountains-placement --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
