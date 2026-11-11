@@ -8,7 +8,7 @@ every magnitude lives once in its executable declaration under
 `world/lore/monster_species.py`,
 `world/skills/registry/data_monster_abilities.py` and
 `world/rules/rulebook/`. Sections from 孢傘菇 onward record the north deep
-forest species of the near-settlement programme's Wave 1.
+forest species of the near-settlement programme's Wave 1. Sections from 霧泉蛙 onward record the central mountains and northwest highland forest species of the near-settlement programme's Wave 2.
 
 ## 泥膜史萊姆
 
@@ -1316,6 +1316,80 @@ The remaining gates also passed: the registry import check,
 `uv run --locked python -m tools.map_reference_context` followed by
 `--check`, `uv run --locked python -m tools.contract_gate --change
 moss-crown-stag-species` and `openspec validate moss-crown-stag-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
+
+## 霧泉蛙
+
+This section records the first delivered species of the central mountains
+Wave 2. 霧泉蛙 (`mist_spring_frog`) is a low-tier, grade-F, fragile colony
+hopper whose ordinary default variant is 汲泉型 (`seep_sipper`), with the
+stronger 泉主型 (`spring_keeper`). Both carry the single water tongue strike
+霧舌汲取 (`mist_tongue_sip`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Fragile colony hopper: the ordinary variant's hit points and defense sit
+  near the low band's floor, while its agility sits in that band's upper half.
+* 汲泉型's MP pool holds two casts of the tongue's MP cost, and its SP pool
+  holds three casts of the SP cost. The stronger 泉主型 carries a larger pool,
+  which holds three and five casts respectively.
+* The fixed MP drain (4) is far below the crocodile's fixed MP drain (10) and
+  equals the bat's fixed HP drain, which suits a low-tier contact strike.
+* The stronger 泉主型 holds a whole spring pool, so it carries a larger pool,
+  attack and defense at grade E.
+
+### Reuse of the contact drain representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "gauge_transfer", "enemies", 0))`,
+the shipped contact drain group. Its representative stays `bank_lurker`: both
+new variant keys sort after it, so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_crocodile_resource_skill.py` exercises the group's
+committed representative evidence; no per-variant smoke module is added for a
+reused signature.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.35. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds no buff definition or modifier
+rule, so the startup tuning fingerprint does not move; the activation tests
+passed and the evidence was left untouched, with `activated` and
+`activation_bindings` unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_crocodile_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+mist-spring-frog-species` and `openspec validate mist-spring-frog-species --strict`.
 
 ### Human review of the prose
 
