@@ -39,7 +39,11 @@ definition and one modifier rule and so moves the process's startup
 fingerprint; the recorded measurements are unchanged again. They were
 regenerated once more for `vine-net-spider-species`, for the same reason: that
 content change adds one buff definition and one modifier rule; the recorded
-measurements are unchanged again.
+measurements are unchanged again. They were regenerated once more for
+`bone-breaker-vulture-species` (baseline commit
+`d91de59c9719089ca80f8d2da80eb0b8a3e1e398`), again because that content change
+adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again.
 
 ## Exact operations
 
@@ -160,11 +164,11 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`3030d4a397f1bfd4ee264c129cf8bf133925982db8b005e881639e8f964a3f27` -- that
+`f8858072f828d4a5988f0391333ba07ab2d8ad21a34956e39a29afec50d3f8b2` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `fc1dd263...`, `8307fec8...`, `237f9a85...`, `a29fd4fa...`,
-`e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`, `3c18cea1...` and
-`2a04e1bc...` describe tunings production no longer loads and are superseded,
+the earlier values `3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`,
+`a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`,
+`3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and are superseded,
 not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 

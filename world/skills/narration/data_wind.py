@@ -126,6 +126,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 貼著枝葉俯衝，一爪抓出後隨風拔高。",
         ),
     ),
+    NarrationRow(
+        "grit_wing_strike",
+        action=(
+            "{actor} 收翅俯衝，落地時掀起一片碎石與雪粒。",
+            "{actor} 張開長翼撲下，翅風把砂礫打在對手臉上。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

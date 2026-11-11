@@ -1472,3 +1472,81 @@ warm-rock-salamander-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 碎骨鷲
+
+This section records the third delivered species of the central mountains Wave
+2. 碎骨鷲 (`bone_breaker_vulture`) is a mid-tier, grade-D, pair-living soaring
+flier whose ordinary default variant is 盤谷型 (`updraft_glider`), with the
+stronger 崖巢型 (`crag_nest_vulture`). Both carry the single wind strike
+揚礫撲擊 (`grit_wing_strike`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Soaring raider: the ordinary variant's agility sits in the mid band's middle,
+  between the goat's ordinary 踏崖型 (`cliff_stepper`, agility 16) and the
+  lynx's ordinary 林伏型 (`wood_stalker`, agility 20).
+* Lightly armoured: its defense is one above the mid band's floor.
+* 盤谷型's MP pool holds three casts of the strike's 10 MP cost, and its SP pool
+  holds four casts of the 5 SP cost.
+* The rider (−3 accuracy for 12 s) matches the sparrow's shipped accuracy
+  magnitude and is milder than the lynx's −5.
+* The stronger 崖巢型 guards a nest ledge at grade C with a larger pool.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it, so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, and its `EnemyRiderGroupMemberTests`
+derives the group's members from the shipped declarations, so both new variants
+are exercised on their own rider axis with no test edit.
+
+### Decision mode
+
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds a timed effect and a modifier
+rule, so the startup tuning fingerprint moved from `3030d4a3...` to
+`f8858072...`; the selector report was regenerated under the new tuning, the
+activation record and its rollback fingerprint (`a4c7376c...`) were updated,
+and `activated` and `activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone from the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 105 tests, OK (run through the Django test runner because the local focus guard caps `evennia test` discovery at 100) |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+bone-breaker-vulture-species` and `openspec validate
+bone-breaker-vulture-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
