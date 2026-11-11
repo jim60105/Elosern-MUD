@@ -82,7 +82,7 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
     _skill(
         "lake_mound_bite",
         "碎顎咬合",
-        "以土屬性力量繃緊頸部，探出粗大的頭部以厚鈍如石的巨顎咬住單一敵方目標，造成土屬性物理傷害。",
+        "以土屬性力量讓四足陷進泥地撐住身軀，探出粗大的頭部以厚鈍如石的巨顎咬住單一敵方目標，造成土屬性物理傷害。",
         SkillKind.ACTIVE,
         TargetSpec.SINGLE,
         cost={"mp": 12, "sp": 6},
