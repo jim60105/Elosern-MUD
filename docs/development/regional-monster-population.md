@@ -586,12 +586,12 @@ company around them. No stronger or high-tier variant joins an ordinary pool,
 so a near-settlement encounter answers after engagement and keeps the
 light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
 
-**Sites.** Each stronger variant holds one recoverable site: the mushroom
-elder's 菌環, the porcupine's 守洞 den, the bat colony's roost, the old owl's
-hollow and the path-blocking vine net. A remote clearing holds the one-shot
-stag site where 蒼冠 waits; clearing it is a durable authored victory until an
-author re-issues it. The sites answer only when an intruder enters their
-defended extent.
+**Sites.** The stronger variants occupy recoverable nests and camps: the
+mushroom elder's 菌環, the porcupine's 守洞 den, the bat colony's roost, the old
+owl's hollow and the path-blocking vine net. A remote clearing holds the
+one-shot stag site where 蒼冠 waits; clearing it is a durable authored victory
+until an author re-issues it. The sites answer only when an intruder enters
+their defended extent.
 
 **Verification.** Focused runs, each executed independently from the worktree
 root with the single-token environment file `/tmp/mud-belts.env`
