@@ -1244,3 +1244,80 @@ vine-net-spider-species` and `openspec validate vine-net-spider-species --strict
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 苔冠巨鹿
+
+This section records the sixth and last delivered species of the north deep
+forest Wave 1. 苔冠巨鹿 (`moss_crown_stag`) is a high-tier, grade-B, solitary
+giant-stag bruiser whose ordinary default variant is 老冠型
+(`wood_crown_elder`). It carries the single-target earth strike 苔冠衝撞
+(`moss_crown_charge`) and the area earth strike 苔冠橫掃 (`moss_crown_sweep`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile is 460 hit points / 48 MP / 30 SP / 32 attack / 18 agility / 26 defense.
+
+* Heavy bruiser: the authored hit points sit above the boar's shipped 380, the
+  defense sits in the upper half of the high band (18–32), and the agility sits
+  near that band's floor of 16.
+* The MP pool holds one charge and two sweeps (12 + 16 + 16 = 44 ≤ 48), and the
+  SP pool holds three of the larger sweeps (8 × 3 = 24 ≤ 30).
+* Costs and coefficients repeat the boar's shipped charge and sweep shape; only
+  the element differs (earth instead of fire).
+* Grade B marks a dangerous solitary site boss, below the A-grade 蓄潮型.
+
+### Reuse of the two-strike (single + area damage) representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "damage", "enemies", None))`,
+the shipped two-strike group. Its representative stays `warm_den_boar`: the new
+variant key sorts after it, so the representative declaration and every shard,
+seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_monster_composition_coverage.py` derives every shipped
+variant's signature and proves the new variant joins this group, while
+`world/rules/tests/test_ember_bristle_boar_resource_skill.py` exercises the
+group's single-target selection, area recipients, per-recipient hit and defense
+outcomes, one payment per cast and the committed reload; no per-variant smoke
+module is added for a reused signature.
+
+### Decision mode
+
+`wood_crown_elder` binds the shipped `pack_hunter` archetype and stays in the
+permanent legacy decision, so it carries that archetype's flee threshold of
+0.20. It authors neither intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. The kit adds no buff definition or modifier rule,
+so the startup tuning fingerprint did not move and the activation record and
+selector evidence stay untouched; `activated` and `activation_bindings` are
+unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_ember_bristle_boar_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+moss-crown-stag-species` and `openspec validate moss-crown-stag-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
