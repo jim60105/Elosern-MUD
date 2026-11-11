@@ -41,7 +41,7 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         "黑褐色濕潤皮膚上散布著橙紅斑點，體溫升高時斑點會隱約透出火光。"
         "頭部扁平，四肢短小，尾巴約與身體等長。",
         "山上冷霧終日不散，牠卻能以微弱火屬性力量讓自己的皮膚發熱，在其他小動物凍得遲緩的清晨照樣爬出岩縫捕食甲蟲與小蛇。"
-        "這股熱力停留在牠自己的皮膚上，發熱越久越耗力氣，所以牠大半時間趴在向陽的岩面上曬太陽。"
+        "這股熱力停留在牠自己的皮膚上，發熱越久越耗體力，所以牠大半時間趴在向陽的岩面上曬太陽。"
         "山徑旁的避難石屋留有火塘，夜裡餘溫不散，暖岩蠑螈常鑽進火塘邊的石縫過夜；"
         "旅人伸手撿柴時被咬，是石屋裡常聽到的小意外。"
         "近身時，牠咬住對手，同時讓斑點驟然發亮，短時間內咬勁更強。",
@@ -172,7 +172,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 
 ### D5. AI binding and activation evidence
 
-No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
+No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. Expect `ActivationRecordTests` and `RollbackTests` to fail on the fingerprint comparison (the `spore-cap-mushroom-species` and `moss-quill-porcupine-species` landings saw the same failure); this is the expected outcome, not a defect. Then re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
 
 1. Run `uv run --locked python tools/monster_ai_manual_reports.py selector` and copy `.var/monster-ai-manual-reports/selector-check.json` and `.md` over `docs/development/monster-ai-manual-evidence/`.
 2. Read the new `configuration_fingerprint` from the regenerated `selector-check.json`. Read the rollback fingerprint from the `RollbackTests` failure message.
@@ -215,7 +215,7 @@ status: delivered
 
 **生態與在地關係。**山上冷霧終日不散，牠在其他小動物凍得遲緩的清晨照樣爬出岩縫捕食甲蟲與小蛇，其餘時間大多趴在向陽的岩面上曬太陽。山徑旁的避難石屋留有火塘，夜裡餘溫不散，牠常鑽進火塘邊的石縫過夜；旅人伸手撿柴時被咬，是石屋裡常聽到的小意外。長年住在山腰地熱裂縫旁、斑點終日微亮的大型個體稱為熱縫型。
 
-**戰鬥中的表現。**牠以微弱火屬性力量讓自己的皮膚發熱，這股熱力停留在牠自己的皮膚上，發熱越久越耗力氣。近身時，牠咬住對手，同時讓斑點驟然發亮，短時間內咬勁更強。
+**戰鬥中的表現。**牠以微弱火屬性力量讓自己的皮膚發熱，這股熱力停留在牠自己的皮膚上，發熱越久越耗體力。近身時，牠咬住對手，同時讓斑點驟然發亮，短時間內咬勁更強。
 
 | 變體 | 核准方向 |
 | --- | --- |
@@ -229,7 +229,7 @@ status: delivered
 
 ### D7. Tests
 
-- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_ember_skin_atk_phys`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["ember_skin_atk_phys"]`.
+- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_ember_skin_atk_phys`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["ember_skin_atk_phys"]`. Copy those four lines exactly and assert no rule value of your own.
 
 ### D8. Developer review section
 
