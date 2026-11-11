@@ -521,17 +521,10 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
     return int(seed)
 
 
-def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
-    """One zone's committed selection state, or ``None`` when uninitialized.
-
-    A present record must be complete and must agree with the shared world
-    seed; contradictory owner state refuses rather than being silently
-    normalized.
-    """
-    _require_wilderness(wilderness)
-    record = _state_map(wilderness).get(zone_key)
-    if record is None:
-        return None
+def _zone_state_from_record(
+    zone_key: str, record: Mapping[str, object] | None, world_seed: int
+) -> ZonePopulationState | None:
+    """Validate one stored zone record against an already read world seed."""
     required = (
         "initialized",
         "seed",
@@ -552,13 +545,49 @@ def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
     due = record.get("recovery_due_tick")
     if due is not None:
         due = _require_int(due, "recovery_due_tick")
-    world_seed = read_population_seed(wilderness)
     if seed != world_seed:
         raise MalformedPopulationState(
             f"{MALFORMED_STATE}: zone {zone_key!r} seed {seed} disagrees with the "
             f"saved world seed {world_seed}"
         )
     return ZonePopulationState(zone_key, seed, sequence, due, settled)
+
+
+def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
+    """One zone's committed selection state, or ``None`` when uninitialized.
+
+    A present record must be complete and must agree with the shared world
+    seed; contradictory owner state refuses rather than being silently
+    normalized.
+    """
+    _require_wilderness(wilderness)
+    record = _state_map(wilderness).get(zone_key)
+    if record is None:
+        return None
+    return _zone_state_from_record(zone_key, record, read_population_seed(wilderness))
+
+
+def zone_states(wilderness: Any) -> dict[str, ZonePopulationState]:
+    """Every initialized zone's validated state from one decode, in key order."""
+    _require_wilderness(wilderness)
+    states = _state_map(wilderness)
+    if not states:
+        return {}
+    world_seed = read_population_seed(wilderness)
+    return {
+        key: _zone_state_from_record(key, states[key], world_seed)
+        for key in sorted(states)
+    }
+
+
+def due_recovery_zone_keys(wilderness: Any, *, tick: int) -> tuple[str, ...]:
+    """Zone keys whose recovery is due at or before ``tick``, in key order."""
+    _require_argument_int(tick, "tick")
+    return tuple(
+        key
+        for key, state in zone_states(wilderness).items()
+        if state.recovery_due_tick is not None and state.recovery_due_tick <= tick
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1443,6 +1472,43 @@ def zone_lower_bound(zone_key: str) -> int:
     return lower
 
 
+def zone_counts_from_presence(
+    zone_keys: Iterable[str],
+    presence: Mapping[object, PopulationPresence],
+    *,
+    wilderness: str,
+) -> dict[str, PopulationCounts]:
+    """Every listed zone's three measures from one scan of ``presence``."""
+    keys = tuple(dict.fromkeys(zone_keys))
+    owners: dict[tuple[int, int], tuple[str, ...]] = {}
+    for key in keys:
+        for cell in _region_cells(_zone(key)):
+            owners[cell] = owners.get(cell, ()) + (key,)
+    home: dict[str, set[int]] = {key: set() for key in keys}
+    cells: dict[str, dict[tuple[int, int], set[int]]] = {key: {} for key in keys}
+    for individual_id, fact in presence.items():
+        if not fact.alive:
+            continue
+        if fact.home_zone in home:
+            home[fact.home_zone].add(individual_id)
+        position = fact.position
+        if position is None or position.wilderness != wilderness:
+            continue
+        cell = (position.x, position.y)
+        for key in owners.get(cell, ()):
+            cells[key].setdefault(cell, set()).add(individual_id)
+    return {
+        key: PopulationCounts(
+            local_ids=frozenset(pk for occupants in cells[key].values() for pk in occupants),
+            home_ids=frozenset(home[key]),
+            cell_ids=MappingProxyType(
+                {cell: frozenset(occupants) for cell, occupants in cells[key].items()}
+            ),
+        )
+        for key in keys
+    }
+
+
 def counts_from_presence(
     zone_key: str, presence: Mapping[object, PopulationPresence], *, wilderness: str
 ) -> PopulationCounts:
@@ -1453,27 +1519,7 @@ def counts_from_presence(
     individuals physically inside its published region cells) to projected
     presence instead of live rows.
     """
-    local_cells = _region_cells(_zone(zone_key))
-    home: set[int] = set()
-    cells: dict[tuple[int, int], set[int]] = {}
-    for individual_id, fact in presence.items():
-        if not fact.alive:
-            continue
-        if fact.home_zone == zone_key:
-            home.add(individual_id)
-        position = fact.position
-        if position is None or position.wilderness != wilderness:
-            continue
-        cell = (position.x, position.y)
-        if cell in local_cells:
-            cells.setdefault(cell, set()).add(individual_id)
-    return PopulationCounts(
-        local_ids=frozenset(pk for occupants in cells.values() for pk in occupants),
-        home_ids=frozenset(home),
-        cell_ids=MappingProxyType(
-            {cell: frozenset(occupants) for cell, occupants in cells.items()}
-        ),
-    )
+    return zone_counts_from_presence((zone_key,), presence, wilderness=wilderness)[zone_key]
 
 
 def presence_fingerprint(wilderness: Any) -> tuple[Any, ...]:
@@ -1505,15 +1551,28 @@ def note_population_boundaries(
     if not keys:
         return
     presence = presence_at(wilderness, at_tick=tick)
-    states = _state_map(wilderness)
+    raw = _state_map(wilderness)
+    recorded = tuple(zone_key for zone_key in keys if zone_key in raw)
+    world_seed = read_population_seed(wilderness) if recorded else None
+    # A key without a record has no state and no fields to change, so its
+    # geometry is never resolved: the pass counts only the zones it notes.
+    counts = zone_counts_from_presence(
+        recorded, presence, wilderness=_wilderness_name(wilderness)
+    )
     changed = False
     for zone_key in keys:
-        fields = _boundary_fields(wilderness, zone_key, tick, presence)
+        record = raw.get(zone_key)
+        state = None if record is None else _zone_state_from_record(zone_key, record, world_seed)
+        if state is None:
+            continue
+        fields = _boundary_fields_from(
+            state, zone_key, tick, counts[zone_key], density_lower_bound(wilderness, zone_key)
+        )
         if fields:
-            states[zone_key] = {**states[zone_key], **fields}
+            raw[zone_key] = {**raw[zone_key], **fields}
             changed = True
     if changed:
-        _write_state(wilderness, states)
+        _write_state(wilderness, raw)
 
 
 def note_population_boundary(wilderness: Any, zone_key: str, *, tick: int) -> None:
@@ -1544,11 +1603,26 @@ def _boundary_fields(
     state = zone_state(wilderness, zone_key)
     if state is None:
         return {}
-    zone = _zone(zone_key)
-    lower = density_lower_bound(wilderness, zone_key)
-    counts = counts_from_presence(
-        zone_key, presence, wilderness=_wilderness_name(wilderness)
+    return _boundary_fields_from(
+        state,
+        zone_key,
+        tick,
+        counts_from_presence(zone_key, presence, wilderness=_wilderness_name(wilderness)),
+        density_lower_bound(wilderness, zone_key),
     )
+
+
+def _boundary_fields_from(
+    state: ZonePopulationState | None,
+    zone_key: str,
+    tick: int,
+    counts: PopulationCounts,
+    lower: int,
+) -> dict[str, object]:
+    """The zone record fields one settled boundary changes, from measured counts."""
+    if state is None:
+        return {}
+    zone = _zone(zone_key)
     below = len(counts.local_ids) < lower
     fields: dict[str, object] = {"settled_through_tick": max(state.settled_through_tick, tick)}
     if not below:
@@ -2449,6 +2523,7 @@ __all__ = [
     "current_population_tick",
     "density_lower_bound",
     "draw_index",
+    "due_recovery_zone_keys",
     "initialized_zone_keys",
     "initialize_population_seed",
     "initialize_zone",
@@ -2480,7 +2555,9 @@ __all__ = [
     "snapshot_regional_population_surfaces",
     "wilderness_registration_target",
     "zone_birth_cells",
+    "zone_counts_from_presence",
     "zone_lower_bound",
     "zone_region_cells",
     "zone_state",
+    "zone_states",
 ]

@@ -236,11 +236,7 @@ def capture_activity_snapshot(*, start_tick: int) -> ActivitySnapshot:
             recovery_due_tick=state.recovery_due_tick,
             settled_through_tick=state.settled_through_tick,
         )
-        for state in (
-            regional_population.zone_state(wilderness, key)
-            for key in regional_population.initialized_zone_keys(wilderness)
-        )
-        if state is not None
+        for state in regional_population.zone_states(wilderness).values()
     )
     sites: list[ProjectedSite] = []
     for key in sorted(MONSTER_SITE_REGISTRY):
@@ -527,11 +523,18 @@ class _Projection:
             self.member_source[member] = FORECAST_SOURCE_BIRTH
 
     def _note_zone_boundary(self, tick: int) -> None:
-        from world.maps.regional_population import ECOLOGY_ZONE_REGISTRY, zone_lower_bound
+        from world.maps.regional_population import (
+            ECOLOGY_ZONE_REGISTRY,
+            zone_counts_from_presence,
+            zone_lower_bound,
+        )
 
+        counts = zone_counts_from_presence(
+            sorted(self.zones), self.presence, wilderness=self.wilderness
+        )
         for key in sorted(self.zones):
             state = self.zones[key]
-            if len(self._counts(key).local_ids) >= zone_lower_bound(key):
+            if len(counts[key].local_ids) >= zone_lower_bound(key):
                 state.recovery_due_tick = None
             elif state.recovery_due_tick is None:
                 state.recovery_due_tick = (

@@ -997,6 +997,11 @@ class ChronologicalSettlementTests(ActivityFixture):
                 return_value=None,
             ),
             patch.object(
+                regional_population,
+                "due_recovery_zone_keys",
+                return_value=("t_zone",),
+            ),
+            patch.object(
                 activity_owner,
                 "settle_monster_activity_at",
                 side_effect=note("arrival"),
