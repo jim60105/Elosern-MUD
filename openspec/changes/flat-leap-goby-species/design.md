@@ -16,9 +16,9 @@ See proposal.md (Why). Facts at `ae9185c9` plus the planned Wave 1 and Wave 2 sp
 | Question | Answer |
 | --- | --- |
 | Familiar archetype | A mudskipper, the goby that walks on tidal mud. |
-| Special way of life | Its pectoral fins carry abnormal strength, so it vaults more than a person's height across the mud and outpaces a walker on the flats. |
+| Special way of life | Its pectoral fins and tail carry abnormal strength, so it vaults more than a person's height across the mud and outpaces a walker on the flats. |
 | World relation | The estuary flats of 金穗港 and 東灣港 where fishing families dig clams and dry nets (southeast coast: fish markets, estuaries, tidal marsh). |
-| Ability limits | The fin strength is a body ability with no element; it poisons no one and leaves no lasting harm. A landed slap throws mud into the face, a brief accuracy rider; a miss changes nothing. |
+| Ability limits | The fin and tail strength is a body ability with no element; it poisons no one and leaves no lasting harm. A landed slap throws mud into the face, a brief accuracy rider; a miss changes nothing. |
 | Local conflict | A colony takes over a clam flat before the spring tide, so the clam diggers ask for the fish to be driven back to the salt marsh. |
 
 Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile, slime, rat, goblin, boar), the Wave 1 species (spore-cap mushroom, moss-quill porcupine, hollow-tree bat, hush-wing owl, vine-net spider, moss-crown stag), the Wave 2 species (mountain frog, fire salamander, bearded vulture, giant moth, giant constrictor, capercaillie, beaver, mole, wolverine, griffin) and the other six Wave 3 species. It is an animal, clearly distinct from every beastfolk subspecies (wolf, cat, bear, rabbit, cattle, tiger, fox).
@@ -42,12 +42,12 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         "胸鰭粗壯，撐在泥上時形如一對短腿；"
         "背鰭展開時是一面帶黑邊的小旗。",
         "退潮後，牠們撐著胸鰭在泥灘上爬行，啃食泥面的藻類與小蟹。"
-        "牠的胸鰭帶著異常的力氣，一撐一甩就能躍過一人高的距離，在泥灘上比人走得還快。"
+        "牠的胸鰭與尾巴帶著異常的力氣，胸鰭一撐、尾巴一甩就能躍過一人高的距離，在泥灘上比人走得還快。"
         "金穗港與東灣港的河口泥灘是漁家挖蛤、晾網的地方，灘跳魚群會把挖好的蛤坑占成自己的洞口，遇到有人靠近便成群跳起。"
         "近身時，牠撲上前以尾巴拍擊對手，拍中時甩起一團濕泥糊在對手臉上，讓對手短暫看不準目標。",
         ("southeast_coast",),
-        "（作者私有：隱秘真相）本物種沒有已定的起源真相；胸鰭異常力氣的成因不在設定中交代。",
-        "（作者私有：作者解釋）低階群居鰕虎：胸鰭力氣屬於身體能力，不帶元素、不造成中毒或持續傷害；戰鬥呈現為尾擊與命中後短暫命中下降（濺泥）。連結河口漁家的挖蛤與晾網。",
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；胸鰭與尾巴異常力氣的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居鰕虎：胸鰭與尾巴的力氣屬於身體能力，不帶元素、不造成中毒或持續傷害；戰鬥呈現為尾擊與命中後短暫命中下降（濺泥）。連結河口漁家的挖蛤與晾網。",
         "（作者私有：尚未證實的猜想）東灣港的挖蛤人說灘跳魚的泥塔築得越高，下個月的大潮就越大，這種說法尚未證實。",
         "mudflat_skipper",
         True,
@@ -181,7 +181,7 @@ No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed ef
 
 - Overview row, inserted in the `## 收錄總覽` table after the last `| 低階 |` row:
 
-  `| 低階 | 灘跳魚 | 東南海岸河口的潮間泥灘與鹽沼 | 胸鰭一撐一甩就能躍過一人高的距離 | 跳灘型、築塔型 |`
+  `| 低階 | 灘跳魚 | 東南海岸河口的潮間泥灘與鹽沼 | 胸鰭一撐、尾巴一甩就能躍過一人高的距離 | 跳灘型、築塔型 |`
 
 - New section at the end of `## 低階魔物`, immediately before `## 中階魔物` (after every low section an earlier programme change added), transcribed exactly:
 
@@ -213,7 +213,7 @@ status: delivered
 
 **生態與在地關係。**退潮後，牠們撐著胸鰭在泥灘上爬行，啃食泥面的藻類與小蟹。金穗港與東灣港的河口泥灘是漁家挖蛤、晾網的地方，灘跳魚群會把挖好的蛤坑占成自己的洞口，遇到有人靠近便成群跳起。在洞口堆起泥塔、守著一片泥灘的大型雄魚稱為築塔型。
 
-**戰鬥中的表現。**牠的胸鰭帶著異常的力氣，一撐一甩就能躍過一人高的距離，在泥灘上比人走得還快。近身時，牠撲上前以尾巴拍擊對手，拍中時甩起一團濕泥糊在對手臉上，讓對手短暫看不準目標；拍空時泥點落在一旁。
+**戰鬥中的表現。**牠的胸鰭與尾巴帶著異常的力氣，胸鰭一撐、尾巴一甩就能躍過一人高的距離，在泥灘上比人走得還快。近身時，牠撲上前以尾巴拍擊對手，拍中時甩起一團濕泥糊在對手臉上，讓對手短暫看不準目標；拍空時泥點落在一旁。
 
 | 變體 | 核准方向 |
 | --- | --- |
@@ -223,7 +223,7 @@ status: delivered
 **委託背景示例。**東灣港外的挖蛤灘，這週被一隻築塔型帶著整群灘跳魚占住，挖蛤人一靠近就被甩得滿臉是泥。漁家委託公會把魚群趕回下游的鹽沼，讓大潮前的挖蛤能照常進行。
 ````
 
-- `docs/development/bestiary-editorial-review.md`: append one row: `| `flat_leap_goby` | <implementation date> | read against the registry's published ecology field; the trouble stays local to estuary clam flats and net-drying ground, and the leap comes from the fish's own fins | checked against the declared kit: the tail slap is a single-target elementless physical strike that spends SP, and the section states that the brief mud splash to the face follows a slap that lands, matching the declared hit dependency; the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. Replace `<implementation date>` with the implementation date in `YYYY-MM-DD` form. Keep exactly six cells and put no `|` inside a cell. The reviewer may reword a cell after actually reading the section.
+- `docs/development/bestiary-editorial-review.md`: append one row: `| `flat_leap_goby` | <implementation date> | read against the registry's published ecology field; the trouble stays local to estuary clam flats and net-drying ground, and the leap and the slap come from the fish's own fins and tail | checked against the declared kit: the tail slap is a single-target elementless physical strike that spends SP, and the section states that the brief mud splash to the face follows a slap that lands, matching the declared hit dependency; the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. Replace `<implementation date>` with the implementation date in `YYYY-MM-DD` form. Keep exactly six cells and put no `|` inside a cell. The reviewer may reword a cell after actually reading the section.
 
 ### D7. Tests
 
