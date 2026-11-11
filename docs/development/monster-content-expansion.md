@@ -2214,3 +2214,88 @@ unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 揚塵野馬
+
+This section records the second delivered species of the eastern plains Wave 3.
+揚塵野馬 (`dust_mane_horse`) is a mid-tier wild horse whose ordinary default
+variant is 奔原型 (`plain_runner`) and whose stronger variant is 頭馬型
+(`herd_stallion`). Both carry the single wind strike 疾蹄踢擊
+(`dust_gallop_kick`), whose brief self agility rise mounts on the caster for
+every resolved attempt.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* Herd runner: the ordinary variant's authored agility sits in the upper half of
+  the mid band (10–24) and equals the lynx's ordinary 林伏型, while its defense
+  is one above the band's floor.
+* MP holds three casts of the kick's MP cost on the ordinary variant; SP holds
+  four casts of its SP cost.
+* The gallop (+3 agility for 15 s) equals the rat's shipped self agility rise.
+* The stronger 頭馬型 leads the herd at grade C with a larger pool.
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. Its representative stays `burrow_maker`:
+both new variant keys sort after it (`"burrow_maker" < "herd_stallion"` and
+`"burrow_maker" < "plain_runner"`), so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the group's
+committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `burrow_maker`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `pack_hunter` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.20. Neither
+variant authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds one timed effect and one modifier,
+so the startup tuning fingerprint moved from `5f4a4506...` to `955832b5...`; the
+selector report was regenerated under the new tuning, the activation record and
+its rollback fingerprint (`cb5ead22...` to `4e289789...`) were updated, and
+`activated` and `activation_bindings` are unchanged. The six archetype campaigns
+and the performance report were not rerun and remain historical harness evidence
+at `497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 112 tests, OK, run as two focused method-label batches (56 + 56) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK |
+
+The registry import check reports the 50 registered variants, and the remaining
+gates passed: `uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+dust-mane-horse-species` and `openspec validate dust-mane-horse-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
