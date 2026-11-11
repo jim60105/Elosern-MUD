@@ -1017,6 +1017,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "vein_digger",
         True,
     ),
+    MonsterSpecies(
+        "cache_raider_wolverine",
+        "掠藏獾",
+        "掠藏獾是體型比一般獾大上一倍、身軀粗壯的獾類魔獸，獨自遊走於西北高地針葉林與高地雪原之間的廣大範圍。",
+        "深棕色長毛在兩側各有一道淡黃寬紋，從肩頭延伸到尾根。"
+        "四肢短而粗，腳掌寬大，爪子彎長，頭部寬短，顎部肌肉鼓起如拳。",
+        "牠一天能走過好幾座山頭，循著氣味找出埋在雪下的獸屍與其他動物藏起的食物。"
+        "牠的顎部帶著異常的咬合力，咬得開凍硬的獸骨，也扳得開鐵製獸夾。"
+        "獸人部族在季節性獵場佈下綿長的陷阱線，掠藏獾記得每一條走過的陷阱線，會沿線吃掉夾到的獵物，再把剩下的拖去藏起來。"
+        "獵人巡陷阱時若發現獸夾被扳開、獵物只剩一撮毛，就知道牠來過。"
+        "近身時，牠撲上去以顎部鉗住對手的手腳猛力扳扭，咬中時讓對手的護身架勢短暫鬆開。",
+        ("northwest_highland_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；異常咬合力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居掠食者：異常咬合力屬於身體能力，不帶元素、不造成骨折或持續傷害；戰鬥呈現為鉗顎咬擊與命中後短暫防禦下降。命名與外觀刻意避開狼與熊，避免與獸人亞種混淆。連結獸人部族季節性獵場的陷阱線。",
+        "（作者私有：尚未證實的猜想）霜風鎮的獵人說掠藏獾會故意避開設過兩次的陷阱，這種說法尚未證實。",
+        "trapline_raider",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1703,6 +1721,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("grit_claw_scrape",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "trapline_raider",
+        "cache_raider_wolverine",
+        "掠索型",
+        "普通版本，沿著獵人的陷阱線一路吃掉夾到的獵物。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=140, mp=0, sp=24, atk_phys=22, agility=14, defense=13, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("jaw_lock_bite",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "winter_den_glutton",
+        "cache_raider_wolverine",
+        "冬穴型",
+        "入冬前把整季食物藏進雪下巢穴的個體，守著儲糧，會撲向靠近巢穴的任何身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=190, mp=0, sp=36, atk_phys=27, agility=15, defense=15, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("jaw_lock_bite",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
