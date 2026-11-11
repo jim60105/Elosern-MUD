@@ -252,8 +252,8 @@ Append `## 滾土甲蟲` to `docs/development/monster-content-expansion.md`, wit
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
 * Armoured slow pusher: defense equal to the beaver's ordinary variant, agility in the low band's lower half.
-* MP holds two casts of the shove's MP cost; SP holds three casts of its SP cost.
-* The rider (−2 agility for 12 s) equals the goblin's shipped −2 agility rider, the smallest shipped agility magnitude.
+* MP holds two casts of the shove's MP cost on the ordinary variant (three on 育堆型); SP holds three casts of its SP cost.
+* The rider (−2 agility for 12 s) equals the goblin's shipped −2 agility rider, the smallest shipped agility debuff.
 * The stronger 育堆型 guards a brood heap at grade E with the low band's defense ceiling.
 - `### Reuse of the enemy hit-rider representative`: the signature, the unchanged representative `cliff_stepper`, and the existing module that exercises the group.
 - `### Decision mode`: legacy, the archetype named in D2, and the flee threshold that archetype carries.
