@@ -66,6 +66,12 @@ adds one buff definition and one modifier rule and so moves the process's
 startup fingerprint; the recorded measurements are unchanged again. The six
 archetype campaigns and the performance report were not rerun and remain
 historical harness evidence at `497df2c1...`, not evidence for this tuning.
+They were regenerated once more for `cache-raider-wolverine-species` (baseline
+commit `b088075a92cd000667cdcb6fef99bb6e989dc557`), again because that content
+change adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
 
 ## Exact operations
 
@@ -186,13 +192,13 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`abb0989cb3679b72ccb2195808ab04e9b863315369316dd68721de9d6f7b54fc` -- that
+`03ad9da4aa620172110103e7a7f097fd77571c0b521ec38d6335105baa40da3c` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `3232b667...`, `d65909aa...`, `cd78725a...`, `f8858072...`,
-`3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`, `a29fd4fa...`,
-`e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`, `3c18cea1...` and
-`2a04e1bc...` describe tunings production no longer loads and are superseded,
-not evidence for the changed tuning. See
+the earlier values `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`,
+`f8858072...`, `3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`,
+`a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`,
+`3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and
+are superseded, not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
