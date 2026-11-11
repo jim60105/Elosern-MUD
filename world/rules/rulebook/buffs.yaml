@@ -591,6 +591,12 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（西北高地第二波）：礦脈鼴揚砂爪刨：命中後揚起礦砂的 mount，accuracy −3 資料在 combat_modifiers.yaml 的 ore_grit_accuracy 列（earth_dust_veil_accuracy_penalty 的 accuracy 先例）。
+- key: ore_grit
+  duration: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，

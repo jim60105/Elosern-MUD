@@ -1872,3 +1872,85 @@ validate mud-dam-beaver-species --strict`. The committed manifest files
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 礦脈鼴
+
+This section records the eighth delivered species of the Wave 2 species chain
+and the third northwest-highland Wave 2 species. 礦脈鼴 (`ore_vein_mole`) is a
+low-tier, grade-F, solitary mole whose ordinary default variant is 掘脈型
+(`vein_digger`). It carries the single-target earth strike 揚砂爪刨
+(`grit_claw_scrape`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Solitary burrower: the ordinary variant's agility sits in the low band's
+  lower half (3–12, so at or below 7), and its defense sits between the hare's
+  ordinary variant (3) and the crab's ordinary variant (5).
+* 掘脈型's MP pool holds two casts of the scrape (2 × 10 = 20) and its SP pool
+  holds four casts (4 × 2 = 8), the scrape costing 10 MP and 2 SP.
+* The rider is −3 accuracy for 10 s, exactly the sparrow's shipped
+  `grain_rattle_accuracy` contribution and lifetime.
+* The stronger 深脈型 holds a deep nest chamber at grade E with the larger pool
+  and the higher defense of the pair.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it (`"cliff_stepper" < "deep_seam_mole" <
+"vein_digger"`), so the representative declaration and every shard, seed and
+smoke registration stay unchanged. The existing
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `cliff_stepper` stays
+its representative. No variant-specific test is added.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the permanent
+legacy decision, so they carry that archetype's flee threshold of 0.35. Neither
+authors intelligence, a decision-mode override nor a `monster_behaviour.yaml`
+edit. This link adds a timed effect and a modifier rule, so the startup tuning
+fingerprint moved from `3232b667...` to `abb0989c...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`129487ea...` to `1582c6d3...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <labels>`:
+
+| labels | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` + `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 6 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 109 tests, OK, run as two focused method-label batches (55 + 54) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` + `.ActivationBindingTests` + `.RollbackTests` | 11 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+ore-vein-mole-species` (reference-context, traceability 2726/2726 covered,
+observability, test-data, manifests and 19 contract tests) and `openspec
+validate ore-vein-mole-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
