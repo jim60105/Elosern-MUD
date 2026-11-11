@@ -36,7 +36,10 @@ change adds one buff definition, one modifier rule and one activated variant;
 the recorded measurements are unchanged again. They were regenerated once more
 for `hush-wing-owl-species`, again because that content change adds one buff
 definition and one modifier rule and so moves the process's startup
-fingerprint; the recorded measurements are unchanged again.
+fingerprint; the recorded measurements are unchanged again. They were
+regenerated once more for `vine-net-spider-species`, for the same reason: that
+content change adds one buff definition and one modifier rule; the recorded
+measurements are unchanged again.
 
 ## Exact operations
 
@@ -157,12 +160,12 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`2a04e1bc0d7c054ecd16a46ea8721acf3aeb9cae60563b4470792a9ece508325` -- that
+`fc1dd26350fccc5b9682fe62ca632f2c12931bb53504ad9f106d35cbd8c4f64f` -- that
 operation records the process's startup fingerprint, which this value now is;
 the earlier values `8307fec8...`, `237f9a85...`, `a29fd4fa...`, `e2677d39...`,
-`3ee653b9...`, `e583cb95...`, `c4d4e06b...` and `3c18cea1...` describe tunings
-production no longer loads and are superseded, not evidence for the changed
-tuning. See
+`3ee653b9...`, `e583cb95...`, `c4d4e06b...`, `3c18cea1...` and `2a04e1bc...`
+describe tunings production no longer loads and are superseded, not evidence
+for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
