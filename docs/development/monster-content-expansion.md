@@ -1704,10 +1704,11 @@ editorial review in the ledger.
 
 ## 鼓翼松雞
 
-This section records the sixth delivered species of the central mountains Wave
-2. 鼓翼松雞 (`drum_wing_grouse`) is a low-tier, grade-F, gregarious ground
-grouse whose ordinary default variant is 林床型 (`pine_floor_grouse`). It
-carries the single-target wind strike 鼓翼驚飛 (`drum_wing_burst`).
+This section records the sixth delivered species of the Wave 2 species chain and
+the first northwest-highland Wave 2 species. 鼓翼松雞 (`drum_wing_grouse`) is a
+low-tier, grade-F, gregarious ground grouse whose ordinary default variant is
+林床型 (`pine_floor_grouse`). It carries the single-target wind strike 鼓翼驚飛
+(`drum_wing_burst`).
 
 ### Role constraints and the chosen literals
 
@@ -1735,9 +1736,10 @@ both new variant keys sort after it
 representative declaration and every shard, seed and smoke registration stay
 unchanged. The existing
 `world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the group's
-committed representative evidence, and its scenario derives the group's members
-from the shipped declarations, so both new variants are exercised on their own
-rider axis with no test edit.
+committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `burrow_maker` stays
+its representative. No variant-specific test is added.
 
 ### Decision mode
 
