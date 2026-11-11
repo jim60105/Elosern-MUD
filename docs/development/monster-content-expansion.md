@@ -1091,3 +1091,78 @@ hollow-tree-bat-species` and `openspec validate hollow-tree-bat-species
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 靜羽梟
+
+This section records the fourth delivered species of the north deep forest
+Wave 1. 靜羽梟 (`hush_wing_owl`) is a mid-tier, grade-D, agile ambush owl
+whose ordinary default variant is 夜獵型 (`hush_wing_hunter`), with the
+stronger 古巢型 (`old_hollow_owl`). Both carry the single wind talon swoop
+靜羽掠爪 (`hush_wing_swoop`).
+
+### Role constraints and the chosen literals
+
+* Agile ambush predator: the ordinary variant's authored agility is 22, two
+  above the lynx's ordinary 林伏型 and below the mid band's ceiling of 24.
+* Lightly built: the authored defense is 10, the mid band's floor.
+* The ordinary MP pool of 30 holds three casts of the swoop's MP cost of 10,
+  and its SP pool of 20 holds four casts of the SP cost of 5.
+* The lift (+3 agility for 15 s) equals the rat's shipped self agility rise.
+* The stronger 古巢型 guards a nest tree at grade C with a larger pool
+  (hp 160, mp 50, sp 30, attack 26, agility 24, defense 12).
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. The lift declares no hit dependency,
+following the crab, hare and porcupine kits, so it mounts on every resolved
+attempt including a miss. Its representative stays `burrow_maker`: both new
+variant keys sort after it, so the representative declaration and every shard,
+seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_monster_composition_coverage.py` derives every shipped
+variant's signature and proves both new variants join this group, while the
+existing `world/rules/tests/test_tide_lamp_crab_resource_skill.py` commits the
+group's representative evidence for `burrow_maker`; no per-variant smoke module
+is added for a reused signature.
+
+### Decision mode
+
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. The new buff definition and modifier rule do
+move the startup tuning fingerprint, so the activation record and the
+selector evidence were re-fingerprinted; `activated` and
+`activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | blocked by the repository test guard as a single label at 102 discovered tests (the limit is 100); the class ran as two explicit method batches of 51 tests each, both OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK after the re-fingerprint |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK after the re-fingerprint |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+hush-wing-owl-species` and `openspec validate hush-wing-owl-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
