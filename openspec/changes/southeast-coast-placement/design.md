@@ -15,7 +15,7 @@ See proposal.md (Why). Facts at `253c7147` plus the planned open placement rows 
 - Belt rules the probe applied:
   - Corridor rectangle: 20×20, 3 cells from a road cell of `world/maps/data/road_network.json`, at least 30 cells from any settlement, and at least 45 cells (the remote corridor) or 15 cells (the corridor near 金穗港) from any other zone. A corridor point at least 80 cells from every settlement counts as remote.
   - Deep-wild rectangle: 30×30, at least 70 cells from every settlement, at least 8 cells from every other zone, area and site grounds, at least 60 cells from every other new deep-wild rectangle, at least 12 water-adjacent cells (the shore-dossier rule Wave 1 applied to the crab) and at least 600 eligible cells.
-  - Site: a valid wilderness cell whose 21×21 grounds lie wholly inside the region and hold at least 10 water-adjacent cells, at least 2 cells clear of every zone, area and other grounds, and at least 40 cells from every settlement.
+  - Site: a valid wilderness cell whose 21×21 grounds lie wholly inside the region and hold at least 10 water-adjacent cells, at an edge distance of at least 2 cells (at least one free cell between) from every zone, area and other grounds, and at least 40 cells from every settlement.
 - Deep-wild count: the region's remote ground holds five such rectangles only with the 60-cell spacing above; at the 120-cell spacing other regions used, two qualify. Five fully dry 30×30 rectangles also fit at 120-cell spacing, but they hold no water-adjacent cell, so a shore pool there would contradict every south-east dossier. This change places the five water-adjacent rectangles.
 
 ## Goals / Non-Goals
@@ -55,7 +55,7 @@ Corridors use densities 1..3; deep-wild zones are 30×30 with densities 1..2. Ev
 
 - Port hinterland additions: `mudflat_skipper` 2–3 (cohesive colony, passive) and `mast_circler` 2–3 (cohesive flock, passive) beside the three shipped crab compositions.
 - `southeast_road_01` addition: `mast_circler` 2–3 (cohesive flock, passive) beside the shipped crocodile and crab compositions.
-- New corridors: `mast_circler` 1 (solitary, passive), `mast_circler_pair` 2 (cohesive, passive) and `mast_circler_flock` 3 (cohesive, passive), following the crab's single/pair/trio precedent. Gulls follow the fish and grain carts on the trunk road; the road rectangles hold no water, so no crab, mudskipper, seal or crocodile is pooled there, and the remote corridor carries no mid-tier composition for the same reason.
+- New corridors: `mast_circler` 1 (solitary, passive), `mast_circler_pair` 2 (cohesive, passive) and `mast_circler_flock` 3 (cohesive, passive), following the crab's single/pair/trio precedent. Gulls follow the fish and grain carts on the trunk road; the road rectangles hold no water, so no crab, mudskipper, seal or crocodile is pooled there, and the remote corridor carries no mid-tier composition for the same reason. This is a recorded deviation from the corridor rule that remote stretches hold mid-tier ordinary variants: every south-east mid-tier ordinary variant (`pier_basker`, `bank_lurker`) is a shore animal.
 - Deep-wild pools: `pier_basker` 1–2 (cohesive colony, `contact`), `bank_lurker` 1 (solitary, `contact`, the shipped crocodile binding), and the low company `shore_walker` 1 (solitary, passive), `mudflat_skipper` 2–3 and `mast_circler` 2–3 (cohesive, passive).
 - Sites:
 
