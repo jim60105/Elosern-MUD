@@ -48,6 +48,12 @@ regenerated once more for `mist-lamp-moth-species` (baseline commit
 `899390670294a3b1195f0f489cb45468bbd7393b`), again because that content change
 adds one buff definition and one modifier rule and so moves the process's
 startup fingerprint; the recorded measurements are unchanged again.
+They were regenerated once more for `drum-wing-grouse-species` (baseline commit
+`ed1d2a995dcb9e038238397adf35ea8a92bfd121`), again because that content change
+adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
 
 ## Exact operations
 
@@ -168,11 +174,11 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`cd78725a5a37ad80718d6aefebb4e3dc072bf280dcf5f86f80568600f8421a09` -- that
+`d65909aa07359fd79c449b260a1604ef4a097ff81412ed1f743758b8e62d3931` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `f8858072...`, `3030d4a3...`, `fc1dd263...`, `8307fec8...`,
-`237f9a85...`, `a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`,
-`c4d4e06b...`, `3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and are superseded,
+the earlier values `cd78725a...`, `f8858072...`, `3030d4a3...`, `fc1dd263...`,
+`8307fec8...`, `237f9a85...`, `a29fd4fa...`, `e2677d39...`, `3ee653b9...`,
+`e583cb95...`, `c4d4e06b...`, `3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and are superseded,
 not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
