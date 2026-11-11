@@ -2044,3 +2044,85 @@ and `tools/test_data_freeze.json` are unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 礦巢獅鷲
+
+This section records the tenth delivered species of the Wave 2 species chain
+and the fifth northwest-highland Wave 2 species. 礦巢獅鷲
+(`ore_nest_griffin`) is a high-tier, grade-B griffin whose ordinary default
+variant is 巔巢型 (`windcrest_elder`). It carries two wind strikes: the
+single-target dive 俯衝裂爪 (`ore_crest_dive`) and the area wing gale
+振翼風壓 (`ore_crest_gale`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Aerial striker: agility sits near the high band's upper end (16–30, so 26),
+  hit points fall between the boar's (380) and the stag's (460), and defense
+  sits in the band's lower half (18–32, so 21).
+* MP holds one dive plus two gales (12 + 16 + 16 = 44 ≤ 48); SP holds three of
+  the larger casts (3 × 8 = 24 ≤ 30).
+* Costs and coefficients repeat the boar's and the stag's shipped
+  single-plus-area shape; only the element differs (wind).
+* Grade B marks a dangerous site boss, below the A-grade 蓄潮型.
+* `magic_power` is zero: the kit's riders are damage occurrences only, so no
+  timed effect, modifier or status row is authored.
+
+### Reuse of the two-strike (single + area damage) representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "damage", "enemies", None))`,
+the shipped two-strike group. Its representative stays `warm_den_boar`: the new
+variant key sorts after it (`"warm_den_boar" < "windcrest_elder"`), so the
+representative declaration and every shard, seed and smoke registration stay
+unchanged. The existing
+`world/rules/tests/test_ember_bristle_boar_resource_skill.py` exercises the
+group's committed representative evidence, while
+`world/rules/tests/test_monster_composition_coverage.py` derives the group's
+membership from the shipped declarations and confirms that `warm_den_boar`
+stays its representative. No variant-specific test is added.
+
+### Decision mode
+
+The variant binds the shipped `pack_hunter` archetype and stays in the
+permanent legacy decision, so it carries that archetype's flee threshold of
+0.20. It authors neither intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds no timed effect or modifier, so
+the startup tuning fingerprint did not move; the activation record, the
+rollback fingerprint and the selector evidence stay untouched, and `activated`
+and `activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_ember_bristle_boar_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+ore-nest-griffin-species` and `openspec validate ore-nest-griffin-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

@@ -55,6 +55,10 @@ physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 The cache-raider wolverine's jaw lock bite is assembled the same way with
 elementless physical damage plus a hit-dependent defense debuff on the struck
 enemy.
+The ore-nest griffin's two wind strikes are assembled the same way with
+physical-school damage that reads the actor's physical attack: one single-target
+dive and one area wing gale, each paid in both MP and SP, and the area cast
+resolves every recipient's own hit and defense while the action pays once.
 """
 
 from world.skills.effects import (
@@ -900,6 +904,54 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "ore_crest_dive",
+        "俯衝裂爪",
+        "以風屬性力量把氣流聚到翼下，俯衝以鷹爪擊打單一敵方目標，造成風屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ore_nest_griffin",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.2, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "ore_crest_gale",
+        "振翼風壓",
+        "在低空猛振雙翼，以翼下風壓撞擊周圍所有敵方目標，對每個目標造成風屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ore_nest_griffin",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
         ),
     ),
 )

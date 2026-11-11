@@ -140,6 +140,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 展開尾扇低聲鳴響，撲翅撞了上去。",
         ),
     ),
+    NarrationRow(
+        "ore_crest_dive",
+        action=(
+            "{actor} 從高空收翼俯衝，鷹爪直取對手。",
+            "{actor} 翼下氣流一聚，巨大的身影驟然撲落。",
+        ),
+    ),
+    NarrationRow(
+        "ore_crest_gale",
+        action=(
+            "{actor} 壓低身軀猛振雙翼，狂風撞向四周。",
+            "{actor} 張開巨翼一搧，翼下風壓掃過身旁眾人。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

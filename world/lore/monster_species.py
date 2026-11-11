@@ -1035,6 +1035,27 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "trapline_raider",
         True,
     ),
+    MonsterSpecies(
+        "ore_nest_griffin",
+        "礦巢獅鷲",
+        "礦巢獅鷲是雙翼展開超過四人寬的巨大有翼魔獸，生著鷹首與四足獸身，成對棲息於西北高地礦脈裸露的高崖。",
+        "金褐色的鷹首帶著彎鉤巨喙，頸羽向下逐漸轉為覆蓋獸身的黃褐短毛。"
+        "前足是鷹爪，後足是粗壯的四足獸腿，長尾末端垂著一簇深色毛。",
+        "牠在高崖上以枯枝築成寬大的巢，巢裡鋪滿從礦脈岩壁上啄下的閃亮礦石碎片。"
+        "牠以林間空地上的大型獸群為獵物，從高空盤旋鎖定落單的個體後俯衝而下。"
+        "牠能以風屬性力量把氣流聚到翼下，讓沉重的身軀從崖頂起飛、在空中驟然轉向；"
+        "這股風力作用在牠自己的雙翼周圍。"
+        "獸人部族的老獵人與礦工都認得那些崖頂閃著礦光的巢，開採礦脈時會避開巢崖下方。"
+        "牠以鷹爪俯衝擊打單一對手，也會在低空猛振雙翼，以翼下風壓撞向身旁所有對手；"
+        "兩者都耗費牠自身的魔力與體力。"
+        "首隻指定個體因頸羽在陽光下閃著金光，被稱為「金翎」。",
+        ("northwest_highland_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；翼下風力的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階成對棲息的有翼魔獸：風屬性只把氣流聚到自身翼下以起飛與轉向，不操控天氣、不造成擊退或持續傷害，也不具神性、守護寶物的使命或精靈關聯；收集礦石碎片是築巢習性。外觀以鷹首與四足獸身描寫，不寫成貓科或獸人。戰鬥呈現為風屬性物理俯衝與範圍翼壓，資源耗盡後回到普通攻擊。",
+        "（作者私有：尚未證實的猜想）鐵爪城的礦工相信礦巢獅鷲叼回巢裡的礦石碎片都來自最純的礦脈，這種說法尚未證實。",
+        "windcrest_elder",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1753,6 +1774,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("jaw_lock_bite",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "windcrest_elder",
+        "ore_nest_griffin",
+        "巔巢型",
+        "普通版本，占據同一座礦脈高崖多年的成年個體。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=430, mp=48, sp=30, atk_phys=33, agility=26, defense=21, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("ore_crest_dive", "ore_crest_gale",),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
     ),
 )
 
