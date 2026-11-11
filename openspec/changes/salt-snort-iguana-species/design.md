@@ -219,7 +219,7 @@ status: delivered
 | 曬崖型 | 普通版本，成群趴在曬暖的崖石上，退潮時潛到崖腳啃食海藻 |
 | 冠刺型 | 背刺最高、鹽殼最厚的大型雄蜥，帶著一群母蜥占住曬鹽場最溫暖的一段堤面，會頂向任何走上那段堤面的身影 |
 
-**委託背景示例。**漁灣鎮西邊海崖下的曬鹽場，這一季有整片鹽田被一群噴鹽鬣蜥占住，鹽工一靠近就被鹽水噴了滿臉。鹽場主委託公會把帶頭的冠刺型與蜥群趕回崖上，讓鹽工趕在秋風前收完今年的鹽。
+**委託背景示例。**漁灣鎮南邊海崖下的曬鹽場，這一季有整片鹽田被一群噴鹽鬣蜥占住，鹽工一靠近就被鹽水噴了滿臉。鹽場主委託公會把帶頭的冠刺型與蜥群趕回崖上，讓鹽工趕在秋風前收完今年的鹽。
 ````
 
 - `docs/development/bestiary-editorial-review.md`: append one row: `| `salt_snort_iguana` | <implementation date> | read against the registry's published ecology field; the trouble stays local to the dikes of a cliff-foot salt pan and a fishing village's drying seaweed, and the brine comes from the iguana's own nasal salt glands | checked against the declared kit: the head butt is a single-target elementless physical strike that spends SP, and the section states that the stinging brine follows a butt that lands, matching the declared hit dependency; the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. Replace `<implementation date>` with the implementation date in `YYYY-MM-DD` form. Keep exactly six cells and put no `|` inside a cell. The reviewer may reword a cell after actually reading the section.
