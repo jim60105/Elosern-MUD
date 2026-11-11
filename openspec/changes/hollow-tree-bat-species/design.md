@@ -42,12 +42,12 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         "尖耳大而薄，口中兩枚細長門牙向前突出。",
         "黃昏時，群體從同一株空心巨木湧出，在林冠下穿梭捕食飛蟲。"
         "牠們以叫聲辨認方向，在不透光的樹洞與岩縫裡也能自在飛行。"
-        "牠們會落在熟睡的鹿與馱獸身上，以帶著暗屬性的門牙咬開淺口，從咬口吸取少量血氣，轉成自己的體力；"
+        "牠們會落在熟睡的鹿與馱獸身上，以帶著暗屬性的門牙咬開淺口，從咬口吸取少量血氣，轉為自身的生命；"
         "每次咬合吸取的分量有限，傷口隔日即可癒合。"
         "深入迷宮的探險隊常在入口附近遇上整群空木蝠，夜裡守營的人會替馱獸蓋上厚布。",
         ("north_deep_forest",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；門牙暗屬性力量的成因不在設定中交代。",
-        "（作者私有：作者解釋）低階群居蝙蝠：暗屬性門牙只在咬合命中時吸取少量體力，不傳染疾病、不造成持續失血或永久傷害；戰鬥呈現為咬擊與命中後的固定體力吸取。連結迷宮入口與探險隊的夜間營地。",
+        "（作者私有：作者解釋）低階群居蝙蝠：暗屬性門牙只在咬合命中時吸取少量生命，不傳染疾病、不造成持續失血或永久傷害；戰鬥呈現為咬擊與命中後的固定生命吸取。連結迷宮入口與探險隊的夜間營地。",
         "（作者私有：尚未證實的猜想）探險者之間流傳空木蝠群聚的樹洞附近必有迷宮入口，這種說法尚未證實。",
         "hollow_roost_flier",
         True,
@@ -100,7 +100,7 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
     _skill(
         "hollow_bat_bite",
         "空木吸咬",
-        "以帶著暗屬性的門牙咬向單一敵方目標，造成物理傷害；命中時從咬口吸取少量體力轉入自身。",
+        "以帶著暗屬性的門牙咬向單一敵方目標，造成物理傷害；命中時從咬口吸取少量血氣，轉為自身的生命。",
         SkillKind.ACTIVE,
         TargetSpec.SINGLE,
         cost={"mp": 10, "sp": 2},
@@ -129,7 +129,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 ### D4. Rulebook and narration
 
 - No timed effect, modifier or status row: the kit's riders are a damage occurrence and, where present, a gauge transfer or a second damage occurrence.
-- `world/skills/narration/data_dark.py`, appended after the last monster row in that file:
+- `world/skills/narration/data_dark.py`, appended at the end of `ROWS`, before its closing parenthesis (when this design lists two rows for one file, append them in the listed order):
 
 ```python
     NarrationRow(
@@ -143,7 +143,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 
 ### D5. AI binding and activation evidence
 
-No `world/rules/rulebook/monster_behaviour.yaml` edit. Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
+No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds no timed effect or modifier, so the tuning fingerprint is expected to stay unchanged. Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
 
 1. Run `uv run --locked python tools/monster_ai_manual_reports.py selector` and copy `.var/monster-ai-manual-reports/selector-check.json` and `.md` over `docs/development/monster-ai-manual-evidence/`.
 2. Read the new `configuration_fingerprint` from the regenerated `selector-check.json`. Read the rollback fingerprint from the `RollbackTests` failure message.
@@ -154,7 +154,7 @@ No `world/rules/rulebook/monster_behaviour.yaml` edit. Each variant binds the sh
 
 - Overview row, inserted in the `## 收錄總覽` table after the last `| 低階 |` row:
 
-  `| 低階 | 空木蝠 | 北部深林巨木的中空樹幹與迷宮入口岩縫 | 咬合時以暗屬性門牙吸取少量體力 | 棲洞型、哨群型 |`
+  `| 低階 | 空木蝠 | 北部深林巨木的中空樹幹與迷宮入口岩縫 | 咬合時以暗屬性門牙吸取少量血氣 | 棲洞型、哨群型 |`
 
 - New section at the end of `## 低階魔物`, immediately before `## 中階魔物` (after any Wave 1 low section already added), transcribed exactly:
 
@@ -186,7 +186,7 @@ status: delivered
 
 **生態與在地關係。**黃昏時，群體從同一株空心巨木湧出，在林冠下穿梭捕食飛蟲，並以叫聲辨認方向。牠們也會落在熟睡的鹿與馱獸身上咬開淺口，傷口隔日即可癒合。深入迷宮的探險隊常在入口附近遇上整群空木蝠，夜裡守營的人會替馱獸蓋上厚布。棲群中體型最大、守在樹洞口的個體稱為哨群型。
 
-**戰鬥中的表現。**牠以帶著暗屬性的門牙咬向對手，咬中時從咬口吸取少量血氣，轉成自己的體力；吸取只發生在咬中的瞬間，每次咬合吸取的分量有限。
+**戰鬥中的表現。**牠以帶著暗屬性的門牙咬向對手，咬中時從咬口吸取少量血氣，轉為自身的生命；吸取只發生在咬中的瞬間，每次咬合吸取的分量有限。
 
 | 變體 | 核准方向 |
 | --- | --- |
@@ -196,7 +196,7 @@ status: delivered
 **委託背景示例。**前往永夜迷宮的補給隊在入口外紮營時，馱獸連續兩晚被空木蝠群叮咬。補給隊長委託公會清理營地上方那株空心巨木裡的棲群，讓隊伍能安心過夜。
 ````
 
-- `docs/development/bestiary-editorial-review.md`: append one row: `| `hollow_tree_bat` | <implementation date> | read against the registry's published ecology field; the trouble stays local to dungeon-approach camps and their pack animals, the bites heal by the next day, and the drain comes from the creature's own teeth | checked against the declared kit: the bite is a single-target dark-element physical strike, and the section states that the small HP draw follows a landed bite and a miss draws nothing, matching the declared hit dependency; the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. The reviewer may reword a cell after actually reading the section, but must keep all six cells.
+- `docs/development/bestiary-editorial-review.md`: append one row: `| `hollow_tree_bat` | <implementation date> | read against the registry's published ecology field; the trouble stays local to dungeon-approach camps and their pack animals, the bites heal by the next day, and the drain comes from the creature's own teeth | checked against the declared kit: the bite is a single-target dark-element physical strike, and the section states that the small HP draw follows a landed bite and a miss draws nothing, matching the declared hit dependency; the section names no command, buff identifier or resource field | current section read as current; the dated delivery appendices are behind the boundary marker and claim no current coverage | accepted: the affirmative prose describes bodies and observed behaviour, and narrative, boundary and delivery status agree |`. Replace `<implementation date>` with the implementation date in `YYYY-MM-DD` form. Keep exactly six cells and put no `|` inside a cell. The reviewer may reword a cell after actually reading the section.
 
 ### D7. Tests
 
@@ -223,4 +223,4 @@ Append `## 空木蝠` to `docs/development/monster-content-expansion.md`, with t
 
 ## Verification
 
-`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. From the repository root, run each label alone with `uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`: `world.lore.tests.test_monster_species_content`, `world.lore.tests.test_monster_visuals`, `world.lore.tests.test_bestiary_documentation`, `world.rules.tests.test_monster_composition_coverage`, `world.rules.tests.test_crocodile_resource_skill`, `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.rules.tests.test_monster_ai_activation.ActivationRecordTests`, `world.rules.tests.test_monster_ai_activation.ActivationBindingTests`, `world.rules.tests.test_monster_ai_activation.RollbackTests`. Then run `uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"`, `uv run --locked python -m tools.map_reference_context` followed by `--check`, `uv run --locked python -m tools.contract_gate --change hollow-tree-bat-species` and `openspec validate hollow-tree-bat-species --strict`.
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. From the repository root, run each label alone with `uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`: `world.lore.tests.test_monster_species_content`, `world.lore.tests.test_monster_visuals`, `world.lore.tests.test_bestiary_documentation`, `world.rules.tests.test_monster_composition_coverage`, `world.rules.tests.test_crocodile_resource_skill`, `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.skills.tests.test_skill_registry.test_out_of_combat_policy`, `world.rules.tests.test_monster_ai_activation.ActivationRecordTests`, `world.rules.tests.test_monster_ai_activation.ActivationBindingTests`, `world.rules.tests.test_monster_ai_activation.RollbackTests`. Then run `uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"`, `uv run --locked python -m tools.map_reference_context` followed by `--check`, `uv run --locked python -m tools.contract_gate --change hollow-tree-bat-species` and `openspec validate hollow-tree-bat-species --strict`.
