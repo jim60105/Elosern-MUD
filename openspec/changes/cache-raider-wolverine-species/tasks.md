@@ -10,7 +10,7 @@ Begin after `ore-vein-mole-species` is merged. Follow design.md verbatim. Every 
 
 - [ ] 1.1 Append the species and variant rows (design D1, D2). Check: `uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"` exits 0; `world.lore.tests.test_monster_species_content` and `world.lore.tests.test_monster_visuals` pass.
 - [ ] 1.2 Append the skill rows and the docstring sentence (design D3), plus the rulebook and narration rows (design D4) and the D7 test. Check: `AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.rules.tests.test_monster_composition_coverage` and `world.rules.tests.test_sway_whistle_sparrow_resource_skill` pass, and so does `CombatModifierTests`; the narration rows sit in data_martial.py.
-- [ ] 1.3 Run the activation tests and re-fingerprint only if one fails (design D5). Check: `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests` pass, and `activated` and `activation_bindings` are unchanged.
+- [ ] 1.3 Run the activation tests, expect `ActivationRecordTests` and `RollbackTests` to fail on the fingerprint comparison, and re-fingerprint with design D5 steps 1–4. Check: `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests` pass, and `activated` and `activation_bindings` are unchanged.
 
 ## 2. Documentation
 

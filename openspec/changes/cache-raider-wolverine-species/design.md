@@ -37,7 +37,7 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
     MonsterSpecies(
         "cache_raider_wolverine",
         "掠藏獾",
-        "掠藏獾是體型如中型犬、身軀粗壯的獾類魔獸，獨自遊走於西北高地針葉林與高地雪原之間的廣大範圍。",
+        "掠藏獾是體型比一般獾大上一倍、身軀粗壯的獾類魔獸，獨自遊走於西北高地針葉林與高地雪原之間的廣大範圍。",
         "深棕色長毛在兩側各有一道淡黃寬紋，從肩頭延伸到尾根。"
         "四肢短而粗，腳掌寬大，爪子彎長，頭部寬短，顎部肌肉鼓起如拳。",
         "牠一天能走過好幾座山頭，循著氣味找出埋在雪下的獸屍與其他動物藏起的食物。"
@@ -170,7 +170,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 
 ### D5. AI binding and activation evidence
 
-No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
+No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. Expect `ActivationRecordTests` and `RollbackTests` to fail on the fingerprint comparison (the `spore-cap-mushroom-species` and `moss-quill-porcupine-species` landings saw the same failure); this is the expected outcome, not a defect. Then re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
 
 1. Run `uv run --locked python tools/monster_ai_manual_reports.py selector` and copy `.var/monster-ai-manual-reports/selector-check.json` and `.md` over `docs/development/monster-ai-manual-evidence/`.
 2. Read the new `configuration_fingerprint` from the regenerated `selector-check.json`. Read the rollback fingerprint from the `RollbackTests` failure message.
@@ -207,7 +207,7 @@ public-fields:
 status: delivered
 ```
 
-**原型與棲地。**掠藏獾是體型如中型犬、身軀粗壯的獾類魔獸，獨自遊走於西北高地針葉林與高地雪原之間的廣大範圍。
+**原型與棲地。**掠藏獾是體型比一般獾大上一倍、身軀粗壯的獾類魔獸，獨自遊走於西北高地針葉林與高地雪原之間的廣大範圍。
 
 **外觀。**深棕色長毛在兩側各有一道淡黃寬紋，從肩頭延伸到尾根。四肢短而粗，腳掌寬大，爪子彎長，頭部寬短，顎部肌肉鼓起如拳。
 
@@ -227,17 +227,18 @@ status: delivered
 
 ### D7. Tests
 
-- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_jaw_wrench_defense`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["jaw_wrench_defense"]`.
+- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_jaw_wrench_defense`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["jaw_wrench_defense"]`. Copy those four lines exactly and assert no rule value of your own.
 
 ### D8. Developer review section
 
 Append `## 掠藏獾` to `docs/development/monster-content-expansion.md`, with these subsections:
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
-* Tenacious ground raider: hit points and defense in the mid band's upper half, agility in its lower half.
+* Tenacious ground raider: hit points in the mid band's lower half, defense at its middle and agility in its lower half; the stronger 冬穴型 sits in the band's upper half.
 * The kit spends no MP, so the MP pool is zero; SP holds four casts of the bite's SP cost.
 * The rider (−2 defense for 15 s) is the first monster defense rider; its size equals the goblin's shipped −2 rider, the smallest shipped hit-rider magnitude.
 * The stronger 冬穴型 guards its snow cache at grade C.
+* The damage formula clamps the struck entity's defense at zero, so the −2 rider never amplifies damage against a defenseless target.
 - `### Reuse of the enemy hit-rider representative`: the signature, the unchanged representative `cliff_stepper`, and the existing module that exercises the group.
 - `### Decision mode`: legacy, the archetype named in D2, and the flee threshold that archetype carries.
 - `### Focused commands and results`: the Verification commands and their observed results.
