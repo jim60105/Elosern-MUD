@@ -1,0 +1,960 @@
+# --- eastern-plains-deep-placement: append to the end of _ENCOUNTER_COMPOSITION_DECLARATIONS ---
+    EncounterComposition(
+        "black_soil_north_wild_plain_runner",
+        "black_soil_north_wild_plain_runner_activity",
+        (CompositionMember("plain_runner", 2, 3),),
+    ),
+    EncounterComposition(
+        "black_soil_north_wild_sluice_wader",
+        "black_soil_north_wild_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "black_soil_north_wild_road_ball_roller",
+        "black_soil_north_wild_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "black_soil_north_wild_grain_pecker",
+        "black_soil_north_wild_grain_pecker_activity",
+        (CompositionMember("grain_pecker", 1, 2),),
+    ),
+    EncounterComposition(
+        "black_soil_north_wild_burrow_maker",
+        "black_soil_north_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "crystal_north_wild_plain_runner",
+        "crystal_north_wild_plain_runner_activity",
+        (CompositionMember("plain_runner", 2, 3),),
+    ),
+    EncounterComposition(
+        "crystal_north_wild_sluice_wader",
+        "crystal_north_wild_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "crystal_north_wild_road_ball_roller",
+        "crystal_north_wild_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "crystal_north_wild_grain_pecker",
+        "crystal_north_wild_grain_pecker_activity",
+        (CompositionMember("grain_pecker", 1, 2),),
+    ),
+    EncounterComposition(
+        "crystal_north_wild_burrow_maker",
+        "crystal_north_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_pasture_east_wild_plain_runner",
+        "east_pasture_east_wild_plain_runner_activity",
+        (CompositionMember("plain_runner", 2, 3),),
+    ),
+    EncounterComposition(
+        "east_pasture_east_wild_sluice_wader",
+        "east_pasture_east_wild_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "east_pasture_east_wild_road_ball_roller",
+        "east_pasture_east_wild_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "east_pasture_east_wild_grain_pecker",
+        "east_pasture_east_wild_grain_pecker_activity",
+        (CompositionMember("grain_pecker", 1, 2),),
+    ),
+    EncounterComposition(
+        "east_pasture_east_wild_burrow_maker",
+        "east_pasture_east_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "north_wood_west_wild_plain_runner",
+        "north_wood_west_wild_plain_runner_activity",
+        (CompositionMember("plain_runner", 2, 3),),
+    ),
+    EncounterComposition(
+        "north_wood_west_wild_sluice_wader",
+        "north_wood_west_wild_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "north_wood_west_wild_road_ball_roller",
+        "north_wood_west_wild_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "north_wood_west_wild_grain_pecker",
+        "north_wood_west_wild_grain_pecker_activity",
+        (CompositionMember("grain_pecker", 1, 2),),
+    ),
+    EncounterComposition(
+        "north_wood_west_wild_burrow_maker",
+        "north_wood_west_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+    EncounterComposition(
+        "starglow_east_wild_plain_runner",
+        "starglow_east_wild_plain_runner_activity",
+        (CompositionMember("plain_runner", 2, 3),),
+    ),
+    EncounterComposition(
+        "starglow_east_wild_sluice_wader",
+        "starglow_east_wild_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "starglow_east_wild_road_ball_roller",
+        "starglow_east_wild_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "starglow_east_wild_grain_pecker",
+        "starglow_east_wild_grain_pecker_activity",
+        (CompositionMember("grain_pecker", 1, 2),),
+    ),
+    EncounterComposition(
+        "starglow_east_wild_burrow_maker",
+        "starglow_east_wild_burrow_maker_activity",
+        (CompositionMember("burrow_maker", 1, 1),),
+    ),
+# --- compositions added to existing zones (same tuple) ---
+    EncounterComposition(
+        "capital_grandia_east_hinterland_road_ball_roller",
+        "capital_grandia_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "capital_grandia_west_hinterland_road_ball_roller",
+        "capital_grandia_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_imperial_ferry_east_hinterland_road_ball_roller",
+        "city_imperial_ferry_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_imperial_ferry_west_hinterland_road_ball_roller",
+        "city_imperial_ferry_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_spice_road_east_hinterland_road_ball_roller",
+        "city_spice_road_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_spice_road_west_hinterland_road_ball_roller",
+        "city_spice_road_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_starglow_east_hinterland_road_ball_roller",
+        "city_starglow_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_starglow_west_hinterland_road_ball_roller",
+        "city_starglow_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_twin_currents_east_hinterland_road_ball_roller",
+        "city_twin_currents_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_twin_currents_west_hinterland_road_ball_roller",
+        "city_twin_currents_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_wheatwave_east_hinterland_road_ball_roller",
+        "city_wheatwave_east_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "city_wheatwave_west_hinterland_road_ball_roller",
+        "city_wheatwave_west_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_01_road_ball_roller",
+        "eastern_road_01_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_01_plain_runner",
+        "eastern_road_01_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_01_sluice_wader",
+        "eastern_road_01_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_02_road_ball_roller",
+        "eastern_road_02_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_02_plain_runner",
+        "eastern_road_02_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_02_sluice_wader",
+        "eastern_road_02_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_03_road_ball_roller",
+        "eastern_road_03_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_03_plain_runner",
+        "eastern_road_03_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_03_sluice_wader",
+        "eastern_road_03_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_04_road_ball_roller",
+        "eastern_road_04_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_04_plain_runner",
+        "eastern_road_04_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_04_sluice_wader",
+        "eastern_road_04_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_05_road_ball_roller",
+        "eastern_road_05_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_05_plain_runner",
+        "eastern_road_05_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_05_sluice_wader",
+        "eastern_road_05_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_06_road_ball_roller",
+        "eastern_road_06_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_06_plain_runner",
+        "eastern_road_06_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_06_sluice_wader",
+        "eastern_road_06_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_07_road_ball_roller",
+        "eastern_road_07_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_07_plain_runner",
+        "eastern_road_07_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_07_sluice_wader",
+        "eastern_road_07_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_08_road_ball_roller",
+        "eastern_road_08_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_08_plain_runner",
+        "eastern_road_08_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_08_sluice_wader",
+        "eastern_road_08_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_09_road_ball_roller",
+        "eastern_road_09_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_09_plain_runner",
+        "eastern_road_09_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_09_sluice_wader",
+        "eastern_road_09_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_10_road_ball_roller",
+        "eastern_road_10_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_10_plain_runner",
+        "eastern_road_10_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_10_sluice_wader",
+        "eastern_road_10_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_11_road_ball_roller",
+        "eastern_road_11_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_11_plain_runner",
+        "eastern_road_11_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_11_sluice_wader",
+        "eastern_road_11_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "eastern_road_12_road_ball_roller",
+        "eastern_road_12_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_12_plain_runner",
+        "eastern_road_12_plain_runner_activity",
+        (CompositionMember("plain_runner", 1, 2),),
+    ),
+    EncounterComposition(
+        "eastern_road_12_sluice_wader",
+        "eastern_road_12_sluice_wader_activity",
+        (CompositionMember("sluice_wader", 1, 1),),
+    ),
+    EncounterComposition(
+        "port_dawnlight_hinterland_road_ball_roller",
+        "port_dawnlight_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "port_tide_wind_hinterland_road_ball_roller",
+        "port_tide_wind_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_black_soil_hinterland_road_ball_roller",
+        "town_black_soil_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_crystal_hinterland_road_ball_roller",
+        "town_crystal_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_east_pasture_hinterland_road_ball_roller",
+        "town_east_pasture_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_emerald_lake_hinterland_road_ball_roller",
+        "town_emerald_lake_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_maple_foot_hinterland_road_ball_roller",
+        "town_maple_foot_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_north_wood_keep_hinterland_road_ball_roller",
+        "town_north_wood_keep_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_orange_blossom_hinterland_road_ball_roller",
+        "town_orange_blossom_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_silver_ridge_hinterland_road_ball_roller",
+        "town_silver_ridge_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_steed_plain_hinterland_road_ball_roller",
+        "town_steed_plain_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_sunken_bell_hinterland_road_ball_roller",
+        "town_sunken_bell_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+    EncounterComposition(
+        "town_sunrise_hinterland_road_ball_roller",
+        "town_sunrise_hinterland_road_ball_roller_activity",
+        (CompositionMember("road_ball_roller", 2, 2),),
+    ),
+# --- site compositions (same tuple, after the zone compositions above) ---
+    EncounterComposition(
+        "flock_leader_camp_group",
+        "flock_leader_camp_activity",
+        (
+            CompositionMember("flock_leader", 1, 1),
+            CompositionMember("grain_pecker", 2, 2),
+        ),
+    ),
+    EncounterComposition(
+        "nest_guard_nest_group",
+        "nest_guard_nest_activity",
+        (
+            CompositionMember("nest_guard", 1, 1),
+            CompositionMember("burrow_maker", 2, 2),
+        ),
+    ),
+    EncounterComposition(
+        "heap_brood_keeper_heap_group",
+        "heap_brood_keeper_heap_activity",
+        (
+            CompositionMember("heap_brood_keeper", 1, 1),
+            CompositionMember("road_ball_roller", 2, 2),
+        ),
+    ),
+    EncounterComposition(
+        "herd_stallion_camp_group",
+        "herd_stallion_camp_activity",
+        (
+            CompositionMember("herd_stallion", 1, 1),
+            CompositionMember("plain_runner", 2, 2),
+        ),
+    ),
+    EncounterComposition(
+        "heronry_elder_nest_group",
+        "heronry_elder_nest_activity",
+        (
+            CompositionMember("heronry_elder", 1, 1),
+            CompositionMember("sluice_wader", 1, 1),
+        ),
+    ),
+    EncounterComposition(
+        "white_reed_boss",
+        "white_reed_boss_activity",
+        (CompositionMember("wide_mound_elder", 1, 1),),
+    ),
+
+# --- eastern-plains-deep-placement: append to the end of _ECOLOGY_ZONE_DECLARATIONS ---
+    EcologyZone(
+        "black_soil_north_wild",
+        "eastern_plains",
+        ((1660, 1689, 1605, 1634),),
+        (
+            WeightedComposition("black_soil_north_wild_plain_runner", 1),
+            WeightedComposition("black_soil_north_wild_sluice_wader", 1),
+            WeightedComposition("black_soil_north_wild_road_ball_roller", 1),
+            WeightedComposition("black_soil_north_wild_grain_pecker", 1),
+            WeightedComposition("black_soil_north_wild_burrow_maker", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "crystal_north_wild",
+        "eastern_plains",
+        ((2005, 2034, 1890, 1919),),
+        (
+            WeightedComposition("crystal_north_wild_plain_runner", 1),
+            WeightedComposition("crystal_north_wild_sluice_wader", 1),
+            WeightedComposition("crystal_north_wild_road_ball_roller", 1),
+            WeightedComposition("crystal_north_wild_grain_pecker", 1),
+            WeightedComposition("crystal_north_wild_burrow_maker", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "east_pasture_east_wild",
+        "eastern_plains",
+        ((2500, 2529, 900, 929),),
+        (
+            WeightedComposition("east_pasture_east_wild_plain_runner", 1),
+            WeightedComposition("east_pasture_east_wild_sluice_wader", 1),
+            WeightedComposition("east_pasture_east_wild_road_ball_roller", 1),
+            WeightedComposition("east_pasture_east_wild_grain_pecker", 1),
+            WeightedComposition("east_pasture_east_wild_burrow_maker", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "north_wood_west_wild",
+        "eastern_plains",
+        ((1540, 1569, 1875, 1904),),
+        (
+            WeightedComposition("north_wood_west_wild_plain_runner", 1),
+            WeightedComposition("north_wood_west_wild_sluice_wader", 1),
+            WeightedComposition("north_wood_west_wild_road_ball_roller", 1),
+            WeightedComposition("north_wood_west_wild_grain_pecker", 1),
+            WeightedComposition("north_wood_west_wild_burrow_maker", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+    EcologyZone(
+        "starglow_east_wild",
+        "eastern_plains",
+        ((2290, 2319, 1170, 1199),),
+        (
+            WeightedComposition("starglow_east_wild_plain_runner", 1),
+            WeightedComposition("starglow_east_wild_sluice_wader", 1),
+            WeightedComposition("starglow_east_wild_road_ball_roller", 1),
+            WeightedComposition("starglow_east_wild_grain_pecker", 1),
+            WeightedComposition("starglow_east_wild_burrow_maker", 1),
+        ),
+        1,
+        2,
+        3,
+        3600,
+        600,
+        3,
+    ),
+
+# --- eastern-plains-deep-placement: append to the end of _SITE_DECLARATIONS ---
+    MonsterSite(
+        "flock_leader_camp",
+        "camp",
+        "eastern_plains",
+        (1700, 1100),
+        "flock_leader_camp_group",
+        None,
+        3,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "nest_guard_nest",
+        "nest",
+        "eastern_plains",
+        (2200, 1200),
+        "nest_guard_nest_group",
+        None,
+        3,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "heap_brood_keeper_heap",
+        "nest",
+        "eastern_plains",
+        (2150, 800),
+        "heap_brood_keeper_heap_group",
+        None,
+        3,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "herd_stallion_camp",
+        "camp",
+        "eastern_plains",
+        (2400, 750),
+        "herd_stallion_camp_group",
+        None,
+        3,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "heronry_elder_nest",
+        "nest",
+        "eastern_plains",
+        (1750, 1700),
+        "heronry_elder_nest_group",
+        None,
+        2,
+        False,
+        86400,
+    ),
+    MonsterSite(
+        "white_reed_boss_site",
+        "boss_site",
+        "eastern_plains",
+        (2150, 1830),
+        "white_reed_boss",
+        None,
+        1,
+        True,
+        individual_name_zh="白蘆",
+    ),
+
+# --- eastern-plains-deep-placement: replace the pool tuple of each existing EcologyZone row named below (rows landed by eastern-plains-near-belts) ---
+# capital_grandia_east_hinterland: the pool becomes
+        (
+            WeightedComposition("capital_grandia_east_hinterland_grain_pecker", 1),
+            WeightedComposition("capital_grandia_east_hinterland_burrow_maker", 1),
+            WeightedComposition("capital_grandia_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("capital_grandia_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("capital_grandia_east_hinterland_road_ball_roller", 1),
+        ),
+# capital_grandia_west_hinterland: the pool becomes
+        (
+            WeightedComposition("capital_grandia_west_hinterland_grain_pecker", 1),
+            WeightedComposition("capital_grandia_west_hinterland_burrow_maker", 1),
+            WeightedComposition("capital_grandia_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("capital_grandia_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("capital_grandia_west_hinterland_road_ball_roller", 1),
+        ),
+# city_imperial_ferry_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_imperial_ferry_east_hinterland_grain_pecker", 1),
+            WeightedComposition("city_imperial_ferry_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_imperial_ferry_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_imperial_ferry_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_imperial_ferry_east_hinterland_road_ball_roller", 1),
+        ),
+# city_imperial_ferry_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_imperial_ferry_west_hinterland_grain_pecker", 1),
+            WeightedComposition("city_imperial_ferry_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_imperial_ferry_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_imperial_ferry_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_imperial_ferry_west_hinterland_road_ball_roller", 1),
+        ),
+# city_spice_road_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_spice_road_east_hinterland_grain_pecker", 1),
+            WeightedComposition("city_spice_road_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_spice_road_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_spice_road_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_spice_road_east_hinterland_road_ball_roller", 1),
+        ),
+# city_spice_road_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_spice_road_west_hinterland_grain_pecker", 1),
+            WeightedComposition("city_spice_road_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_spice_road_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_spice_road_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_spice_road_west_hinterland_road_ball_roller", 1),
+        ),
+# city_starglow_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_starglow_east_hinterland_grain_pecker", 1),
+            WeightedComposition("city_starglow_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_starglow_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_starglow_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_starglow_east_hinterland_road_ball_roller", 1),
+        ),
+# city_starglow_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_starglow_west_hinterland_grain_pecker", 1),
+            WeightedComposition("city_starglow_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_starglow_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_starglow_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_starglow_west_hinterland_road_ball_roller", 1),
+        ),
+# city_twin_currents_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_twin_currents_east_hinterland_grain_pecker", 1),
+            WeightedComposition("city_twin_currents_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_twin_currents_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_twin_currents_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_twin_currents_east_hinterland_road_ball_roller", 1),
+        ),
+# city_twin_currents_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_twin_currents_west_hinterland_grain_pecker", 1),
+            WeightedComposition("city_twin_currents_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_twin_currents_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_twin_currents_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_twin_currents_west_hinterland_road_ball_roller", 1),
+        ),
+# city_wheatwave_east_hinterland: the pool becomes
+        (
+            WeightedComposition("city_wheatwave_east_hinterland_grain_pecker", 1),
+            WeightedComposition("city_wheatwave_east_hinterland_burrow_maker", 1),
+            WeightedComposition("city_wheatwave_east_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_wheatwave_east_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_wheatwave_east_hinterland_road_ball_roller", 1),
+        ),
+# city_wheatwave_west_hinterland: the pool becomes
+        (
+            WeightedComposition("city_wheatwave_west_hinterland_grain_pecker", 1),
+            WeightedComposition("city_wheatwave_west_hinterland_burrow_maker", 1),
+            WeightedComposition("city_wheatwave_west_hinterland_mudbank_dweller", 1),
+            WeightedComposition("city_wheatwave_west_hinterland_wax_cache_forager", 1),
+            WeightedComposition("city_wheatwave_west_hinterland_road_ball_roller", 1),
+        ),
+# eastern_road_01: the pool becomes
+        (
+            WeightedComposition("eastern_road_01_grain_pecker", 1),
+            WeightedComposition("eastern_road_01_burrow_maker", 1),
+            WeightedComposition("eastern_road_01_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_01_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_01_road_ball_roller", 1),
+            WeightedComposition("eastern_road_01_plain_runner", 1),
+            WeightedComposition("eastern_road_01_sluice_wader", 1),
+        ),
+# eastern_road_02: the pool becomes
+        (
+            WeightedComposition("eastern_road_02_grain_pecker", 1),
+            WeightedComposition("eastern_road_02_burrow_maker", 1),
+            WeightedComposition("eastern_road_02_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_02_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_02_road_ball_roller", 1),
+            WeightedComposition("eastern_road_02_plain_runner", 1),
+            WeightedComposition("eastern_road_02_sluice_wader", 1),
+        ),
+# eastern_road_03: the pool becomes
+        (
+            WeightedComposition("eastern_road_03_grain_pecker", 1),
+            WeightedComposition("eastern_road_03_burrow_maker", 1),
+            WeightedComposition("eastern_road_03_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_03_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_03_road_ball_roller", 1),
+            WeightedComposition("eastern_road_03_plain_runner", 1),
+            WeightedComposition("eastern_road_03_sluice_wader", 1),
+        ),
+# eastern_road_04: the pool becomes
+        (
+            WeightedComposition("eastern_road_04_grain_pecker", 1),
+            WeightedComposition("eastern_road_04_burrow_maker", 1),
+            WeightedComposition("eastern_road_04_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_04_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_04_road_ball_roller", 1),
+            WeightedComposition("eastern_road_04_plain_runner", 1),
+            WeightedComposition("eastern_road_04_sluice_wader", 1),
+        ),
+# eastern_road_05: the pool becomes
+        (
+            WeightedComposition("eastern_road_05_grain_pecker", 1),
+            WeightedComposition("eastern_road_05_burrow_maker", 1),
+            WeightedComposition("eastern_road_05_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_05_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_05_road_ball_roller", 1),
+            WeightedComposition("eastern_road_05_plain_runner", 1),
+            WeightedComposition("eastern_road_05_sluice_wader", 1),
+        ),
+# eastern_road_06: the pool becomes
+        (
+            WeightedComposition("eastern_road_06_grain_pecker", 1),
+            WeightedComposition("eastern_road_06_burrow_maker", 1),
+            WeightedComposition("eastern_road_06_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_06_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_06_road_ball_roller", 1),
+            WeightedComposition("eastern_road_06_plain_runner", 1),
+            WeightedComposition("eastern_road_06_sluice_wader", 1),
+        ),
+# eastern_road_07: the pool becomes
+        (
+            WeightedComposition("eastern_road_07_grain_pecker", 1),
+            WeightedComposition("eastern_road_07_burrow_maker", 1),
+            WeightedComposition("eastern_road_07_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_07_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_07_road_ball_roller", 1),
+            WeightedComposition("eastern_road_07_plain_runner", 1),
+            WeightedComposition("eastern_road_07_sluice_wader", 1),
+        ),
+# eastern_road_08: the pool becomes
+        (
+            WeightedComposition("eastern_road_08_grain_pecker", 1),
+            WeightedComposition("eastern_road_08_burrow_maker", 1),
+            WeightedComposition("eastern_road_08_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_08_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_08_road_ball_roller", 1),
+            WeightedComposition("eastern_road_08_plain_runner", 1),
+            WeightedComposition("eastern_road_08_sluice_wader", 1),
+        ),
+# eastern_road_09: the pool becomes
+        (
+            WeightedComposition("eastern_road_09_grain_pecker", 1),
+            WeightedComposition("eastern_road_09_burrow_maker", 1),
+            WeightedComposition("eastern_road_09_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_09_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_09_road_ball_roller", 1),
+            WeightedComposition("eastern_road_09_plain_runner", 1),
+            WeightedComposition("eastern_road_09_sluice_wader", 1),
+        ),
+# eastern_road_10: the pool becomes
+        (
+            WeightedComposition("eastern_road_10_grain_pecker", 1),
+            WeightedComposition("eastern_road_10_burrow_maker", 1),
+            WeightedComposition("eastern_road_10_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_10_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_10_road_ball_roller", 1),
+            WeightedComposition("eastern_road_10_plain_runner", 1),
+            WeightedComposition("eastern_road_10_sluice_wader", 1),
+        ),
+# eastern_road_11: the pool becomes
+        (
+            WeightedComposition("eastern_road_11_grain_pecker", 1),
+            WeightedComposition("eastern_road_11_burrow_maker", 1),
+            WeightedComposition("eastern_road_11_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_11_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_11_road_ball_roller", 1),
+            WeightedComposition("eastern_road_11_plain_runner", 1),
+            WeightedComposition("eastern_road_11_sluice_wader", 1),
+        ),
+# eastern_road_12: the pool becomes
+        (
+            WeightedComposition("eastern_road_12_grain_pecker", 1),
+            WeightedComposition("eastern_road_12_burrow_maker", 1),
+            WeightedComposition("eastern_road_12_mudbank_dweller", 1),
+            WeightedComposition("eastern_road_12_wax_cache_forager", 1),
+            WeightedComposition("eastern_road_12_road_ball_roller", 1),
+            WeightedComposition("eastern_road_12_plain_runner", 1),
+            WeightedComposition("eastern_road_12_sluice_wader", 1),
+        ),
+# port_dawnlight_hinterland: the pool becomes
+        (
+            WeightedComposition("port_dawnlight_hinterland_grain_pecker", 1),
+            WeightedComposition("port_dawnlight_hinterland_burrow_maker", 1),
+            WeightedComposition("port_dawnlight_hinterland_mudbank_dweller", 1),
+            WeightedComposition("port_dawnlight_hinterland_wax_cache_forager", 1),
+            WeightedComposition("port_dawnlight_hinterland_road_ball_roller", 1),
+        ),
+# port_tide_wind_hinterland: the pool becomes
+        (
+            WeightedComposition("port_tide_wind_hinterland_grain_pecker", 1),
+            WeightedComposition("port_tide_wind_hinterland_burrow_maker", 1),
+            WeightedComposition("port_tide_wind_hinterland_mudbank_dweller", 1),
+            WeightedComposition("port_tide_wind_hinterland_wax_cache_forager", 1),
+            WeightedComposition("port_tide_wind_hinterland_road_ball_roller", 1),
+        ),
+# town_black_soil_hinterland: the pool becomes
+        (
+            WeightedComposition("town_black_soil_hinterland_grain_pecker", 1),
+            WeightedComposition("town_black_soil_hinterland_burrow_maker", 1),
+            WeightedComposition("town_black_soil_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_black_soil_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_black_soil_hinterland_road_ball_roller", 1),
+        ),
+# town_crystal_hinterland: the pool becomes
+        (
+            WeightedComposition("town_crystal_hinterland_grain_pecker", 1),
+            WeightedComposition("town_crystal_hinterland_burrow_maker", 1),
+            WeightedComposition("town_crystal_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_crystal_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_crystal_hinterland_road_ball_roller", 1),
+        ),
+# town_east_pasture_hinterland: the pool becomes
+        (
+            WeightedComposition("town_east_pasture_hinterland_grain_pecker", 1),
+            WeightedComposition("town_east_pasture_hinterland_burrow_maker", 1),
+            WeightedComposition("town_east_pasture_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_east_pasture_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_east_pasture_hinterland_road_ball_roller", 1),
+        ),
+# town_emerald_lake_hinterland: the pool becomes
+        (
+            WeightedComposition("town_emerald_lake_hinterland_grain_pecker", 1),
+            WeightedComposition("town_emerald_lake_hinterland_burrow_maker", 1),
+            WeightedComposition("town_emerald_lake_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_emerald_lake_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_emerald_lake_hinterland_road_ball_roller", 1),
+        ),
+# town_maple_foot_hinterland: the pool becomes
+        (
+            WeightedComposition("town_maple_foot_hinterland_grain_pecker", 1),
+            WeightedComposition("town_maple_foot_hinterland_burrow_maker", 1),
+            WeightedComposition("town_maple_foot_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_maple_foot_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_maple_foot_hinterland_road_ball_roller", 1),
+        ),
+# town_north_wood_keep_hinterland: the pool becomes
+        (
+            WeightedComposition("town_north_wood_keep_hinterland_grain_pecker", 1),
+            WeightedComposition("town_north_wood_keep_hinterland_burrow_maker", 1),
+            WeightedComposition("town_north_wood_keep_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_north_wood_keep_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_north_wood_keep_hinterland_road_ball_roller", 1),
+        ),
+# town_orange_blossom_hinterland: the pool becomes
+        (
+            WeightedComposition("town_orange_blossom_hinterland_grain_pecker", 1),
+            WeightedComposition("town_orange_blossom_hinterland_burrow_maker", 1),
+            WeightedComposition("town_orange_blossom_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_orange_blossom_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_orange_blossom_hinterland_road_ball_roller", 1),
+        ),
+# town_silver_ridge_hinterland: the pool becomes
+        (
+            WeightedComposition("town_silver_ridge_hinterland_grain_pecker", 1),
+            WeightedComposition("town_silver_ridge_hinterland_burrow_maker", 1),
+            WeightedComposition("town_silver_ridge_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_silver_ridge_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_silver_ridge_hinterland_road_ball_roller", 1),
+        ),
+# town_steed_plain_hinterland: the pool becomes
+        (
+            WeightedComposition("town_steed_plain_hinterland_grain_pecker", 1),
+            WeightedComposition("town_steed_plain_hinterland_burrow_maker", 1),
+            WeightedComposition("town_steed_plain_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_steed_plain_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_steed_plain_hinterland_road_ball_roller", 1),
+        ),
+# town_sunken_bell_hinterland: the pool becomes
+        (
+            WeightedComposition("town_sunken_bell_hinterland_grain_pecker", 1),
+            WeightedComposition("town_sunken_bell_hinterland_burrow_maker", 1),
+            WeightedComposition("town_sunken_bell_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_sunken_bell_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_sunken_bell_hinterland_road_ball_roller", 1),
+        ),
+# town_sunrise_hinterland: the pool becomes
+        (
+            WeightedComposition("town_sunrise_hinterland_grain_pecker", 1),
+            WeightedComposition("town_sunrise_hinterland_burrow_maker", 1),
+            WeightedComposition("town_sunrise_hinterland_mudbank_dweller", 1),
+            WeightedComposition("town_sunrise_hinterland_wax_cache_forager", 1),
+            WeightedComposition("town_sunrise_hinterland_road_ball_roller", 1),
+        ),
