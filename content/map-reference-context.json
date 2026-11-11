@@ -191,7 +191,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "74ad6fc374c01a575721695a684b67332ad9a5e889cedd99e5bca3b9f93287a5",
+  "fingerprint": "8578487aaff481e5646842d50b72738f00cfa8eb55c12f526954f9951be491f4",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -966,6 +966,30 @@
       },
       {
         "capacity": 1,
+        "composition_key": "crag_nest_ledge_member",
+        "coordinates": [
+          1396,
+          604
+        ],
+        "individual_name_zh": null,
+        "key": "crag_nest_ledge",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "bone_breaker_vulture",
+            "species_name_zh": "碎骨鷲",
+            "variant_key": "crag_nest_vulture",
+            "variant_name_zh": "崖巢型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "central_mountains"
+      },
+      {
+        "capacity": 1,
         "composition_key": "ember_bristle_boss",
         "coordinates": [
           710,
@@ -1101,6 +1125,30 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 1,
+        "composition_key": "old_veil_lamp_camp_member",
+        "coordinates": [
+          1430,
+          900
+        ],
+        "individual_name_zh": null,
+        "key": "old_veil_lamp_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "mist_lamp_moth",
+            "species_name_zh": "霧燈蛾",
+            "variant_key": "old_veil_moth",
+            "variant_name_zh": "老翅型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "central_mountains"
+      },
+      {
         "capacity": 2,
         "composition_key": "quill_den_nest_group",
         "coordinates": [
@@ -1190,6 +1238,62 @@
       },
       {
         "capacity": 1,
+        "composition_key": "rime_coil_boss",
+        "coordinates": [
+          1406,
+          96
+        ],
+        "individual_name_zh": "霜環",
+        "key": "rime_coil_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "rime_scale_serpent",
+            "species_name_zh": "霜鱗巨蟒",
+            "variant_key": "white_rime_coil",
+            "variant_name_zh": "霜谷型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "central_mountains"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "spring_keeper_pool_group",
+        "coordinates": [
+          1420,
+          420
+        ],
+        "individual_name_zh": null,
+        "key": "spring_keeper_pool",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "mist_spring_frog",
+            "species_name_zh": "霧泉蛙",
+            "variant_key": "spring_keeper",
+            "variant_name_zh": "泉主型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "mist_spring_frog",
+            "species_name_zh": "霧泉蛙",
+            "variant_key": "seep_sipper",
+            "variant_name_zh": "汲泉型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "central_mountains"
+      },
+      {
+        "capacity": 1,
         "composition_key": "tide_mouth_boss",
         "coordinates": [
           2100,
@@ -1235,6 +1339,30 @@
         "one_shot": false,
         "recover_after_ticks": 86400,
         "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "vent_crack_den_member",
+        "coordinates": [
+          1420,
+          1300
+        ],
+        "individual_name_zh": null,
+        "key": "vent_crack_den",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "warm_rock_salamander",
+            "species_name_zh": "暖岩蠑螈",
+            "variant_key": "vent_crack_dweller",
+            "variant_name_zh": "熱縫型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "central_mountains"
       }
     ],
     "zones": [
@@ -1540,6 +1668,82 @@
         "region_key": "eastern_plains",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "ciaran_ridge_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "ciaran_ridge_wild_updraft_glider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "bone_breaker_vulture",
+                "species_name_zh": "碎骨鷲",
+                "variant_key": "updraft_glider",
+                "variant_name_zh": "盤谷型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "ciaran_ridge_wild_lamp_seeker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_lamp_moth",
+                "species_name_zh": "霧燈蛾",
+                "variant_key": "lamp_seeker",
+                "variant_name_zh": "逐光型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "ciaran_ridge_wild_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "ciaran_ridge_wild_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1351,
+            1380,
+            235,
+            264
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -4294,6 +4498,220 @@
       },
       {
         "cell_capacity": 3,
+        "key": "fionnen_ridge_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "fionnen_ridge_wild_updraft_glider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "bone_breaker_vulture",
+                "species_name_zh": "碎骨鷲",
+                "variant_key": "updraft_glider",
+                "variant_name_zh": "盤谷型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fionnen_ridge_wild_lamp_seeker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_lamp_moth",
+                "species_name_zh": "霧燈蛾",
+                "variant_key": "lamp_seeker",
+                "variant_name_zh": "逐光型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fionnen_ridge_wild_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fionnen_ridge_wild_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1365,
+            1394,
+            1005,
+            1034
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "fox_fire_high_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "fox_fire_high_wild_updraft_glider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "bone_breaker_vulture",
+                "species_name_zh": "碎骨鷲",
+                "variant_key": "updraft_glider",
+                "variant_name_zh": "盤谷型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fox_fire_high_wild_lamp_seeker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_lamp_moth",
+                "species_name_zh": "霧燈蛾",
+                "variant_key": "lamp_seeker",
+                "variant_name_zh": "逐光型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fox_fire_high_wild_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fox_fire_high_wild_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1360,
+            1389,
+            1545,
+            1574
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "fox_fire_pass_approach",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "fox_fire_pass_approach_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fox_fire_pass_approach_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "fox_fire_pass_approach_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1329,
+            1348,
+            1690,
+            1709
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "highland_forest_habitat",
         "lower_density": 1,
         "pool": [
@@ -4614,6 +5032,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "maple_foot_pass_approach",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "maple_foot_pass_approach_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "maple_foot_pass_approach_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "maple_foot_pass_approach_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1502,
+            1521,
+            1246,
+            1265
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "moonvale_outer_wild",
         "lower_density": 1,
         "pool": [
@@ -4684,6 +5164,82 @@
           ]
         ],
         "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "north_spine_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "north_spine_wild_updraft_glider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "bone_breaker_vulture",
+                "species_name_zh": "碎骨鷲",
+                "variant_key": "updraft_glider",
+                "variant_name_zh": "盤谷型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_spine_wild_lamp_seeker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_lamp_moth",
+                "species_name_zh": "霧燈蛾",
+                "variant_key": "lamp_seeker",
+                "variant_name_zh": "逐光型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_spine_wild_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_spine_wild_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1361,
+            1390,
+            1805,
+            1834
+          ]
+        ],
+        "region_key": "central_mountains",
         "replenishment_interval": 600,
         "upper_density": 2,
         "wave_budget": 3
@@ -5500,6 +6056,206 @@
         "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "scarp_pass_approach",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "scarp_pass_approach_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "scarp_pass_approach_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "scarp_pass_approach_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1309,
+            1328,
+            672,
+            691
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "silver_ridge_high_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "silver_ridge_high_wild_updraft_glider",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "bone_breaker_vulture",
+                "species_name_zh": "碎骨鷲",
+                "variant_key": "updraft_glider",
+                "variant_name_zh": "盤谷型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "silver_ridge_high_wild_lamp_seeker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_lamp_moth",
+                "species_name_zh": "霧燈蛾",
+                "variant_key": "lamp_seeker",
+                "variant_name_zh": "逐光型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "silver_ridge_high_wild_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "silver_ridge_high_wild_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1362,
+            1391,
+            745,
+            774
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "silver_ridge_pass_approach",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "silver_ridge_pass_approach_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "silver_ridge_pass_approach_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "silver_ridge_pass_approach_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1471,
+            1490,
+            751,
+            770
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 3,
         "wave_budget": 3
       },
       {
@@ -7092,6 +7848,68 @@
       },
       {
         "cell_capacity": 3,
+        "key": "village_ciaran_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "village_ciaran_hinterland_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_ciaran_hinterland_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_ciaran_hinterland_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1370,
+            1389,
+            538,
+            557
+          ]
+        ],
+        "region_key": "central_mountains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "village_eolas_hinterland",
         "lower_density": 2,
         "pool": [
@@ -7148,6 +7966,68 @@
           ]
         ],
         "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "village_fionnen_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "village_fionnen_hinterland_seep_sipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_fionnen_hinterland_seep_sipper_single",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mist_spring_frog",
+                "species_name_zh": "霧泉蛙",
+                "variant_key": "seep_sipper",
+                "variant_name_zh": "汲泉型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "village_fionnen_hinterland_ledge_basker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "warm_rock_salamander",
+                "species_name_zh": "暖岩蠑螈",
+                "variant_key": "ledge_basker",
+                "variant_name_zh": "曬岩型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1469,
+            1488,
+            1221,
+            1240
+          ]
+        ],
+        "region_key": "central_mountains",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -8042,8 +8922,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "2f04db3671441f23478ec998f04e34a6c341a4e12fa18d7c070f88df257382bd",
-    "world/lore/monster_placement.py": "65cfc2e0d406423976b2dc33e4a3a9aa36579e1d217f41c7bc613e0c1963d722",
+    "world/lore/monster_activity.py": "bfa9fadca080a7076b83a04a7c4431082be39d028655214c88a4a00434bbc611",
+    "world/lore/monster_placement.py": "1679909716f7cef7a6f501b98ea389b8adcee3efbd39abf048145f5502df99c8",
     "world/lore/monster_species.py": "86eecaa4845962faa6f861604df481322c68651b30a14d36823dd107538f7a8d",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
