@@ -944,6 +944,26 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "lamp_seeker",
         True,
     ),
+    MonsterSpecies(
+        "rime_scale_serpent",
+        "霜鱗巨蟒",
+        "霜鱗巨蟒是身長超過十人並列的巨大蟒類魔獸，獨自盤踞於中央山脈霧氣積聚的深谷。",
+        "灰白鱗片邊緣結著一層細霜，在霧中幾乎與覆雪的岩石融為一體。"
+        "頭部寬如門板，琥珀色豎瞳，腹側鱗片隨呼吸起伏時會抖落細碎冰屑。",
+        "牠以野山羊、碎骨鷲與誤入深谷的大型動物為食，一次飽食後能在谷底盤臥一整個月。"
+        "牠能以冰屬性力量讓自己的鱗片結霜，盤在霧中時看起來像一段覆著霜雪的岩脊；"
+        "結霜作用在牠自己的鱗片上。"
+        "牠盤踞的深谷四周少有人跡，只有銀嶺鎮的探礦隊偶爾沿谷壁尋找銀脈。"
+        "牠以結霜的獠牙噬咬單一對手，也會甩動長尾橫掃身旁的對手；"
+        "噬咬與橫掃都耗費牠自身的魔力與體力。"
+        "首隻指定個體因盤成一圈時像谷底的一道白霜環，被稱為「霜環」。",
+        ("central_mountains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；鱗片結霜的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階獨居巨蟒：冰屬性只讓自身鱗片結霜，不凍結他人、不改變天氣，也不具神性或守護山脈的使命，與寒風中的歌聲無關；戰鬥呈現為冰屬性物理噬咬與橫掃，資源耗盡後回到普通攻擊。",
+        "（作者私有：尚未證實的猜想）銀嶺鎮的老礦工說霜鱗巨蟒盤踞的深谷必定藏著銀脈，這種說法尚未證實。",
+        "white_rime_coil",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1518,6 +1538,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("veil_scale_flutter",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "white_rime_coil",
+        "rime_scale_serpent",
+        "霜谷型",
+        "普通版本，盤踞同一座霧谷多年的成年個體。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=500, mp=48, sp=30, atk_phys=31, agility=20, defense=24, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("rime_fang_strike", "rime_tail_lash",),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
     ),
 )
 

@@ -105,6 +105,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 的身形覆滿霜，四周的時間慢了下來。",
         ),
     ),
+    NarrationRow(
+        "rime_fang_strike",
+        action=(
+            "{actor} 從霧裡昂起寬大的頭，結霜的獠牙猛然咬下。",
+            "{actor} 盤身一縮，帶著冰屑的巨口噬向對手。",
+        ),
+    ),
+    NarrationRow(
+        "rime_tail_lash",
+        action=(
+            "{actor} 甩動長尾，結霜的鱗片掃過四周。",
+            "{actor} 擰身一甩，冰屑隨著長尾掃向身旁眾人。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]
