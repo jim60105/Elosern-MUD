@@ -2334,10 +2334,12 @@ both new variant keys sort after it (`"cliff_stepper" < "heronry_elder"` and
 `"cliff_stepper" < "sluice_wader"`), so the representative declaration and
 every shard, seed and smoke registration stay unchanged. The existing
 `world.rules.tests.test_sway_whistle_sparrow_resource_skill` exercises the
-group's committed representative evidence, while the `EnemyRiderGroupMemberTests`
-in `world.rules.tests.test_monster_composition_coverage` derives the group's
-membership from the shipped declarations and exercises each member's own rider
-axis. No variant-specific test is added.
+group's committed representative evidence, and its `EnemyRiderGroupMemberTests`
+derives the group's membership from the shipped declarations and exercises each
+member's own rider axis;
+`world.rules.tests.test_monster_composition_coverage` keeps the derivation that
+leaves `cliff_stepper` this group's representative. No variant-specific test is
+added.
 
 ### Decision mode
 
