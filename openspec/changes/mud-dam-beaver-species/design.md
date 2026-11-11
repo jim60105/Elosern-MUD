@@ -171,7 +171,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 
 ### D5. AI binding and activation evidence
 
-No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
+No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. Expect `ActivationRecordTests` and `RollbackTests` to fail on the fingerprint comparison (the `spore-cap-mushroom-species` and `moss-quill-porcupine-species` landings saw the same failure); this is the expected outcome, not a defect. Then re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
 
 1. Run `uv run --locked python tools/monster_ai_manual_reports.py selector` and copy `.var/monster-ai-manual-reports/selector-check.json` and `.md` over `docs/development/monster-ai-manual-evidence/`.
 2. Read the new `configuration_fingerprint` from the regenerated `selector-check.json`. Read the rollback fingerprint from the `RollbackTests` failure message.
@@ -228,14 +228,14 @@ status: delivered
 
 ### D7. Tests
 
-- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_mud_pelt_defense`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["mud_pelt_defense"]`.
+- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_mud_pelt_defense`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["mud_pelt_defense"]`. Copy those four lines exactly and assert no rule value of your own.
 
 ### D8. Developer review section
 
 Append `## 泥壩河狸` to `docs/development/monster-content-expansion.md`, with these subsections:
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
-* Sturdy family builder: defense equal to the porcupine's and the crab's ordinary variants, agility below the hare's.
+* Sturdy family builder: defense equal to the porcupine's ordinary variant and one above the crab's, agility below the hare's.
 * MP holds two casts of the slap's MP cost; SP holds three casts of its SP cost.
 * The guard (+2 defense for 20 s) matches the crab's and the porcupine's, the smallest shipped self-guard.
 * The stronger 老壩型 keeps the family's oldest dam at grade E with the low band's defense ceiling.
