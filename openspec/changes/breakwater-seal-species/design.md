@@ -233,7 +233,7 @@ status: delivered
 Append `## 臥堤海豹` to `docs/development/monster-content-expansion.md`, with these subsections:
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
-* Heavy colony slider: hit points and defense in the mid band's upper half, agility near its floor.
+* Heavy colony slider: hit points and defense in the mid band's middle, higher on the stronger 霸灘型, agility near the band's floor.
 * The kit spends no MP, so the MP pool is zero; SP holds four casts of the slam's SP cost.
 * The rider (−3 agility for 15 s) equals the goat's shipped agility rider.
 * The stronger 霸灘型 holds a sandbar at grade C.
