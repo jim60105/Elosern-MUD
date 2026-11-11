@@ -1628,3 +1628,76 @@ mist-lamp-moth-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 霜鱗巨蟒
+
+This section records the fifth delivered species of the central mountains Wave
+2. 霜鱗巨蟒 (`rime_scale_serpent`) is a high-tier, grade-B, solitary constrictor
+whose ordinary default variant is 霜谷型 (`white_rime_coil`). It carries the
+single-target ice strike 霜牙噬擊 (`rime_fang_strike`) and the area ice strike
+霜尾橫掃 (`rime_tail_lash`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Long-bodied ambusher: its hit points are above the stag's (500 against 460),
+  its defense is below the stag's and sits in the high band's middle (24 in
+  18–32), and its agility is a little above the band's floor (20 against 16).
+* 霜谷型's MP pool holds one fang strike plus two lashes (12 + 16 + 16 = 44 ≤
+  48), and its SP pool holds three of the larger casts (3 × 8 = 24 ≤ 30).
+* The costs and coefficients repeat the boar's and the stag's shipped
+  single-plus-area shape; only the element differs (ice).
+* Grade B marks a dangerous solitary site boss, below the A-grade 蓄潮型.
+
+### Reuse of the two-strike (single + area damage) representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "damage", "enemies", None))`,
+the shipped two-strike group. Its representative stays `warm_den_boar`:
+`"warm_den_boar" < "white_rime_coil"`, so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_ember_bristle_boar_resource_skill.py` exercises the
+group's committed representative evidence.
+
+### Decision mode
+
+The variant binds the shipped `pack_hunter` archetype and stays in the permanent
+legacy decision, so it carries that archetype's flee threshold of 0.20. It
+authors no intelligence, decision-mode override or `monster_behaviour.yaml`
+edit. This link adds no timed effect or modifier, so the startup tuning
+fingerprint did not move and the activation evidence was left untouched;
+`activated` and `activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone from the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_ember_bristle_boar_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 106 tests, OK, run as two focused method-label batches (100 + 6) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+rime-scale-serpent-species` and `openspec validate
+rime-scale-serpent-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
