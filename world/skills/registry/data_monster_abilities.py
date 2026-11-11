@@ -65,6 +65,10 @@ The dust-mane horse's gallop kick is assembled the same way with wind physical
 damage plus a self-mounted agility lift granted by every resolved attempt.
 The sluice-spear heron's beak jab is assembled the same way with elementless
 physical damage plus a hit-dependent accuracy debuff on the struck enemy.
+The lake-mound turtle's two earth strikes are assembled the same way with
+physical-school damage that reads the actor's physical attack: one single-target
+bite and one area shell slam, each paid in both MP and SP, and the area cast
+resolves every recipient's own hit and defense while the action pays once.
 """
 
 from world.skills.effects import (
@@ -1031,6 +1035,54 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "lake_mound_bite",
+        "碎顎咬合",
+        "以土屬性力量讓四足陷進泥地撐住身軀，探出粗大的頭部以厚鈍如石的巨顎咬住單一敵方目標，造成土屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("lake_mound_turtle",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.2, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "lake_mound_quake",
+        "背甲震地",
+        "撐起身軀把背甲猛力砸向地面，以土屬性力量讓泥地翻湧，對周圍每個敵方目標造成土屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("lake_mound_turtle",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
         ),
     ),
 )

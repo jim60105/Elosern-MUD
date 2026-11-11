@@ -1111,6 +1111,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "sluice_wader",
         True,
     ),
+    MonsterSpecies(
+        "lake_mound_turtle",
+        "湖丘巨龜",
+        "湖丘巨龜是背甲寬過一座小屋的巨大龜類魔獸，獨自棲息於東部大平原東北的湖沼深處。",
+        "背甲上糊著一層厚實的湖泥，長滿蘆葦與水草，露出水面時看起來是一座小土丘。"
+        "頭部粗大，鉤狀上顎的邊緣厚鈍如石，四肢粗短，覆著灰黑色的硬鱗。",
+        "牠一年裡大半時間靜臥在湖底，以路過的大魚與水鳥為食。"
+        "牠能以土屬性力量讓背甲上的湖泥結得緊實，泥層一年比一年厚，上頭的蘆葦也越長越高。"
+        "沉鐘鎮與周邊湖畔的漁人熟悉湖上每一座蘆葦小丘，下網時會避開會移動的那一座。"
+        "牠以巨顎咬住單一對手，也會撐起身軀把背甲猛力砸向地面，讓身旁的泥地一陣翻湧，撞向四周所有對手；"
+        "兩者都耗費牠自身的魔力與體力。"
+        "首隻指定個體的背甲上長著一叢秋天開白花的蘆葦，被稱為「白蘆」。",
+        ("eastern_plains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；背甲泥層緊實之力的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階獨居巨龜：土屬性只讓自身背甲上的湖泥緊實，並在砸地時讓身旁泥地翻湧，不引發地震、不改變湖岸地形；戰鬥呈現為土屬性物理咬擊與範圍震地，資源耗盡後回到普通攻擊。不具神性、守護使命或精靈關聯。連結沉鐘鎮湖畔漁人的下網習慣。",
+        "（作者私有：尚未證實的猜想）沉鐘鎮的老漁人說湖丘巨龜背上的蘆葦開花的那年，湖裡的魚會特別多，這種說法尚未證實。",
+        "wide_mound_elder",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1939,6 +1958,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "C",
         True,
         active_skill_keys=("spear_beak_jab",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "wide_mound_elder",
+        "lake_mound_turtle",
+        "丘背型",
+        "普通版本，背甲泥層積了多年、長滿蘆葦的成年個體。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=500, mp=48, sp=30, atk_phys=32, agility=16, defense=30, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("lake_mound_bite", "lake_mound_quake",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
     ),
