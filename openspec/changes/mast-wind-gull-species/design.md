@@ -237,7 +237,7 @@ Append `## 桅風海鷗` to `docs/development/monster-content-expansion.md`, wit
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
 * Light harbour flier: agility near the low band's ceiling, defense at its floor and hit points in its lower part.
-* MP holds two casts of the peck's MP cost; SP holds three casts of its SP cost.
+* MP holds two casts of the peck's MP cost on the ordinary variant (three on 堤群型); SP holds three casts of its SP cost.
 * The gust (+2 agility for 15 s) is below the rat's shipped self agility rise (+3).
 * The stronger 堤群型 leads a breakwater colony at grade E.
 - `### Reuse of the self-guard strike representative`: the signature, the unchanged representative `burrow_maker`, and the existing module that exercises the group.
