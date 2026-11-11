@@ -1395,3 +1395,80 @@ mist-spring-frog-species` and `openspec validate mist-spring-frog-species --stri
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 暖岩蠑螈
+
+This section records the second delivered species of the central mountains
+Wave 2. 暖岩蠑螈 (`warm_rock_salamander`) is a low-tier, grade-F, solitary
+crevice crawler whose ordinary default variant is 曬岩型 (`ledge_basker`), with
+the stronger 熱縫型 (`vent_crack_dweller`). Both carry the single fire strike
+燃斑咬擊 (`ember_skin_bite`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table.
+
+* Small solitary crawler: the ordinary variant's agility sits in the low band's
+  lower half, and its defense equals the hare's ordinary 掘巢型 (`burrow_maker`).
+* 曬岩型's MP pool holds two casts of the bite's MP cost, and its SP pool holds
+  three casts of the SP cost.
+* The flare (+2 physical attack for 15 s) is a low-tier self rise, below the
+  shipped `atk_phys` precedents (+5).
+* The stronger 熱縫型 lives by a warm vent, so it carries a larger pool and
+  attack at grade E.
+
+### Reuse of the self-guard strike representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self", None))`,
+the shipped self-guard strike group. Its representative stays `burrow_maker`:
+both new variant keys sort after it, so the representative declaration and every
+shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_tide_lamp_crab_resource_skill.py` exercises the group's
+committed representative evidence; no per-variant smoke module is added for a
+reused signature. The self mount raises physical attack rather than defense or
+agility, which the modifier vocabulary already carries.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.35. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. This link adds a timed effect and a modifier
+rule, so the startup tuning fingerprint moved from `fc1dd263...` to
+`3030d4a3...`; the selector report was regenerated under the new tuning, the
+activation record and its rollback fingerprint (`1a134a96...`) were updated,
+and `activated` and `activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone from the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 104 tests, OK (run through the Django test runner because the local focus guard caps `evennia test` discovery at 100) |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+warm-rock-salamander-species` and `openspec validate
+warm-rock-salamander-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

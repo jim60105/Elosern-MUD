@@ -446,6 +446,12 @@
 - code: vine_snare_agility_flat
   label: 藤絲纏縛敏捷下降
   severity: harmful
+- code: ember_skin
+  label: 燃斑發熱
+  severity: beneficial
+- code: ember_skin_atk_phys
+  label: 燃斑發熱攻擊提升
+  severity: beneficial
 # 生理性疲勞投影（project-physiological-fatigue）：四個排他投影與三條戰鬥
 # 修正各自一個穩定代碼；嚴重度由這裡決定，呈現端不得自創。
 - code: fatigue_light

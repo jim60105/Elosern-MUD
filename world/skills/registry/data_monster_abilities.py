@@ -35,6 +35,9 @@ physical-school damage that reads the actor's physical attack: one
 single-target charge and one area sweep, each paid in both MP and SP.
 The mist-spring frog's tongue sip is assembled the same way with water
 physical damage plus a hit-dependent fixed MP drain.
+The warm-rock salamander's ember-skin bite is assembled the same way with fire
+physical damage plus a self-mounted physical attack rise granted by every
+resolved attempt.
 """
 
 from world.skills.effects import (
@@ -655,6 +658,31 @@ ROWS: tuple[SkillDef, ...] = (
                 requires_hit_from=0,
                 transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
             ),
+        ),
+    ),
+    _skill(
+        "ember_skin_bite",
+        "燃斑咬擊",
+        "以火屬性力量讓皮膚斑點驟然發熱後咬向單一敵方目標，造成物理傷害；出招時短暫提高自身攻擊。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="fire",
+        effects=["damage:fire:physical", "self_buff_apply:ember_skin"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="fire",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("warm_rock_salamander",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )

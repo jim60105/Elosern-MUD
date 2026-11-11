@@ -160,12 +160,12 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`fc1dd26350fccc5b9682fe62ca632f2c12931bb53504ad9f106d35cbd8c4f64f` -- that
+`3030d4a397f1bfd4ee264c129cf8bf133925982db8b005e881639e8f964a3f27` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `8307fec8...`, `237f9a85...`, `a29fd4fa...`, `e2677d39...`,
-`3ee653b9...`, `e583cb95...`, `c4d4e06b...`, `3c18cea1...` and `2a04e1bc...`
-describe tunings production no longer loads and are superseded, not evidence
-for the changed tuning. See
+the earlier values `fc1dd263...`, `8307fec8...`, `237f9a85...`, `a29fd4fa...`,
+`e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`, `3c18cea1...` and
+`2a04e1bc...` describe tunings production no longer loads and are superseded,
+not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
