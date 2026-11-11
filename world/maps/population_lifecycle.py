@@ -90,7 +90,7 @@ def _settle_population_at(
     # each episode from the post-site counts before any regional wave is
     # considered, so a restored episode never survives into a later due time.
     noted = _note_boundary(wilderness, zone_keys, tick, noted=noted)
-    for zone_key in zone_keys:
+    for zone_key in regional_population.due_recovery_zone_keys(wilderness, tick=tick):
         events.extend(
             regional_population.settle_recovery_due(
                 wilderness, zone_key, tick=tick
@@ -152,9 +152,8 @@ def _next_population_boundary(
         resumed = protection.end_tick + 1
         if tick < resumed <= end_tick:
             candidates.append(resumed)
-    for zone_key in _zone_keys(wilderness):
-        state = regional_population.zone_state(wilderness, zone_key)
-        due = None if state is None else state.recovery_due_tick
+    for state in regional_population.zone_states(wilderness).values():
+        due = state.recovery_due_tick
         if due is not None and tick < due <= end_tick:
             candidates.append(due)
     return min(candidates) if candidates else None

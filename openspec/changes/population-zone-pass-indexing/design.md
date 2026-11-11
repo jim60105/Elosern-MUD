@@ -165,7 +165,7 @@ The calls counted are the `_state_map` decode, `presence.items()` and the batch 
 ## Risks / Trade-offs
 
 - [`zone_states` validates every record, so a malformed record in an unrelated zone now refuses inside the recovery loop, where before it surfaced only when that zone was visited] → the lifecycle already visited every zone at each boundary through `zone_state`, so the refusal surface does not widen.
-- [Behaviour drift during refactoring] → the existing suites `world.maps.tests.test_regional_population`, `world.maps.tests.test_regional_population_recovery`, `world.maps.tests.test_monster_activity` and the forecast users in `world.rules.tests.test_field_contact_boundaries` must stay green without edits.
+- [Behaviour drift during refactoring] → the existing suites `world.maps.tests.test_regional_population`, `world.maps.tests.test_regional_population_recovery`, `world.maps.tests.test_monster_activity` and the forecast users in `world.rules.tests.test_field_contact_boundaries` must stay green. The one fixture adjustment: `world.maps.tests.test_monster_activity.ChronologicalSettlementTests.test_same_tick_phases_run_arrivals_births_then_departures` asserts phase order with a record-less synthetic `t_zone`, so it now also patches `regional_population.due_recovery_zone_keys` to return that key; no assertion changed.
 
 ## Verification
 
