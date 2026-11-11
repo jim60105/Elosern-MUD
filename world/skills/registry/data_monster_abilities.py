@@ -69,6 +69,8 @@ The lake-mound turtle's two earth strikes are assembled the same way with
 physical-school damage that reads the actor's physical attack: one single-target
 bite and one area shell slam, each paid in both MP and SP, and the area cast
 resolves every recipient's own hit and defense while the action pays once.
+The flat-leap goby's tail flick is assembled the same way with elementless
+physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -1083,6 +1085,29 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "mud_tail_flick",
+        "甩尾濺泥",
+        "撲向單一敵方目標以尾巴拍擊，造成物理傷害；命中後甩起濕泥糊在對手臉上，短暫降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:mud_fleck"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("flat_leap_goby",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )
