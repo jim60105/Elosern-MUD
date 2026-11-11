@@ -776,6 +776,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "rotlog_sprout",
         True,
     ),
+    MonsterSpecies(
+        "moss_quill_porcupine",
+        "苔棘豪豬",
+        "苔棘豪豬是中型犬大小的豪豬類魔獸，生活於北部深林的林緣、倒木下的空洞與巨木根部的土穴。",
+        "背上密生長棘，棘根長著一層濕綠苔蘚。"
+        "圓鈍的頭部帶著短鬚，前爪粗短，啃過的樹皮上留著成排齒痕。",
+        "牠通常獨居，夜間沿固定路線啃食樹皮、嫩根與蕈類，特別喜歡舔食帶有鹽分的東西。"
+        "被汗水浸過的皮帶、鞍具與營地遺留的鹽漬食物，都會引牠靠近。"
+        "遇到威脅時，牠以土屬性力量讓棘根周圍的苔土緊縮硬化，整排長棘隨之挺立，再轉身以背部倒撞過去；"
+        "硬化維持片刻，作用在牠自己的棘根上。"
+        "探險隊在林緣紮營時會把鞍具吊高，免得隔天早上發現皮帶被啃斷。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；棘根苔層硬化的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階獨居豪豬：土屬性力量只硬化自身棘根周圍的苔土，不射出棘刺、不造成中毒或持續傷害；戰鬥呈現為背部倒撞與自身短暫防禦提升。舔鹽習性連結林緣營地的鞍具損耗。",
+        "（作者私有：尚未證實的猜想）北林堡的獵人說苔棘豪豬會記住給過鹽的人，這種說法尚未證實。",
+        "quill_forager",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1076,6 +1094,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("spore_puff_bump",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "quill_forager",
+        "moss_quill_porcupine",
+        "啃皮型",
+        "普通版本，夜間沿固定路線啃食樹皮與嫩根。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=44, mp=20, sp=9, atk_phys=6, agility=5, defense=6, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("quill_brace_ram",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "den_sentry",
+        "moss_quill_porcupine",
+        "守洞型",
+        "帶著幼獸占據倒木空洞的個體，棘根苔層更厚，守在洞口正面迎向來者。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=66, mp=30, sp=15, atk_phys=11, agility=5, defense=8, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("quill_brace_ram",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),
