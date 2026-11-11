@@ -2387,3 +2387,90 @@ unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 湖丘巨龜
+
+This section records the fourth delivered species of the eastern plains Wave 3
+and the high-tier link of that chain. 湖丘巨龜 (`lake_mound_turtle`) is a
+solitary giant snapping turtle whose ordinary and only variant is 丘背型
+(`wide_mound_elder`). It carries the two earth strikes 碎顎咬合
+(`lake_mound_bite`) and 背甲震地 (`lake_mound_quake`), the site's armoured
+bruiser kit.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py`
+and are band-checked at import.
+
+* Armoured lake boss: its defense sits near the high band's ceiling (30 of 32),
+  its agility is exactly at the band's floor (16), and its hit points (500) sit
+  between the boar's ordinary 380 and the A-grade 蓄潮型's 520.
+* MP holds one bite plus two slams (12 + 16 + 16 = 44 ≤ 48); SP holds three of
+  the larger casts (3 × 8 = 24 ≤ 30).
+* Costs and coefficients repeat the boar's, the stag's and the griffin's
+  shipped single-plus-area shape (1.2 single, 0.8 area, 12 + 6 / 16 + 8); the
+  element is earth, as for the stag.
+* Grade B: a dangerous site boss, below the A-grade 蓄潮型.
+
+### Reuse of the two-strike (single + area damage) representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "damage", "enemies", None))`,
+the shipped two-strike (single + area damage) group. Its representative stays
+`warm_den_boar`: the one new variant key sorts after it
+(`"warm_den_boar" < "wide_mound_elder"`), so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The existing
+`world.rules.tests.test_ember_bristle_boar_resource_skill` exercises the
+group's committed representative evidence, and
+`world.rules.tests.test_monster_composition_coverage` keeps the derivation that
+leaves `warm_den_boar` this group's representative. No variant-specific test is
+added.
+
+### Decision mode
+
+`wide_mound_elder` binds the shipped `ambush_predator` archetype and stays in
+the permanent legacy decision, so it carries that archetype's flee threshold of
+0.20. It authors neither intelligence nor a decision-mode override, and this
+link adds no timed effect, modifier or `monster_behaviour.yaml` edit. The
+startup tuning fingerprint therefore stayed at `b0dd9da6...`; no activation
+evidence was re-fingerprinted, and `activated` and `activation_bindings` are
+unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_ember_bristle_boar_resource_skill` | 1 test, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK |
+
+The registry import check reports the 53 registered variants, and the remaining
+gates passed: `uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+lake-mound-turtle-species` and `openspec validate lake-mound-turtle-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+The `world.rules.tests.test_combat_modifiers.CombatModifierTests` regression was
+also run, as two focused method-label batches (57 + 56) totalling 113 tests and
+both OK, because the local focus guard caps `evennia test` discovery at 100.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
