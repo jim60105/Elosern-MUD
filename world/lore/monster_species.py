@@ -888,6 +888,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "seep_sipper",
         True,
     ),
+    MonsterSpecies(
+        "warm_rock_salamander",
+        "暖岩蠑螈",
+        "暖岩蠑螈是約前臂長的蠑螈類魔獸，獨自棲息於中央山脈向陽的岩縫與碎石坡。",
+        "黑褐色濕潤皮膚上散布著橙紅斑點，體溫升高時斑點會隱約透出火光。"
+        "頭部扁平，四肢短小，尾巴約與身體等長。",
+        "山上冷霧終日不散，牠卻能以微弱火屬性力量讓自己的皮膚發熱，在其他小動物凍得遲緩的清晨照樣爬出岩縫捕食甲蟲與小蛇。"
+        "這股熱力停留在牠自己的皮膚上，發熱越久越耗體力，所以牠大半時間趴在向陽的岩面上曬太陽。"
+        "山徑旁的避難石屋留有火塘，夜裡餘溫不散，暖岩蠑螈常鑽進火塘邊的石縫過夜；"
+        "旅人伸手撿柴時被咬，是石屋裡常聽到的小意外。"
+        "近身時，牠咬住對手，同時讓斑點驟然發亮，短時間內咬勁更強。",
+        ("central_mountains",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；皮膚火屬性力量的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階獨居蠑螈：火屬性只讓自身皮膚發熱，不點燃周圍物品、不噴火、不造成燒傷狀態；戰鬥呈現為咬擊與自身短暫攻擊提升（燃身換爆發）。連結山徑避難石屋的火塘。",
+        "（作者私有：尚未證實的猜想）銀嶺鎮的礦工相信石屋火塘裡有暖岩蠑螈過夜，代表那座石屋整晚都會溫暖，這種說法尚未證實。",
+        "ledge_basker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1364,6 +1382,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("mist_tongue_sip",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "ledge_basker",
+        "warm_rock_salamander",
+        "曬岩型",
+        "普通版本，白天趴在向陽岩面上曬太陽，清晨出來捕食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=36, mp=20, sp=9, atk_phys=6, agility=5, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("ember_skin_bite",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "vent_crack_dweller",
+        "warm_rock_salamander",
+        "熱縫型",
+        "長年住在山腰地熱裂縫旁的大型個體，皮膚斑點終日微亮，咬勁更強。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=60, mp=30, sp=15, atk_phys=10, agility=6, defense=5, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("ember_skin_bite",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),

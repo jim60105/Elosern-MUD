@@ -285,6 +285,12 @@
   when: {buff_active: vine_snare}
   then: {agility_flat: -3}
 
+# 魔物資源技能（中央山脈第二波）：暖岩蠑螈燃斑咬擊的自身攻擊提升，
+# buff 列為 mount，+2 資料在此（retainer_martial_training_atk_phys_bonus 的 atk_phys 先例）。
+- id: ember_skin_atk_phys
+  when: {buff_active: ember_skin}
+  then: {atk_phys: 2}
+
 # 生理性疲勞的戰鬥修正（project-physiological-fatigue）：精神儲備投影的排他
 # 階段在此結算；敏捷為既有百分比詞彙，準度為既有的平坦加減值詞彙。
 # 基礎數值永遠不改寫，移動也只讀疲勞自身的步速倍率，不重複套用敏捷。
