@@ -2,10 +2,14 @@
 
 Begin after `hollow-tree-bat-species` is merged. Follow design.md verbatim. Every zh-TW string is copied from design.md and never recomposed.
 
+## 0. Environment
+
+- [ ] 0.1 Create the test environment file with `printf 'MUD_TEST_SETTINGS=1\n' > /tmp/mud-species.env`. Check: the file holds that single line.
+
 ## 1. Executable content
 
 - [ ] 1.1 Append the species and variant rows (design D1, D2). Check: `uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"` exits 0; `world.lore.tests.test_monster_species_content` and `world.lore.tests.test_monster_visuals` pass.
-- [ ] 1.2 Append the skill rows and the docstring sentence (design D3), plus the rulebook and narration rows (design D4) and the D7 test edits. Check: `AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.rules.tests.test_monster_composition_coverage` and `world.rules.tests.test_tide_lamp_crab_resource_skill` pass, and so does `CombatModifierTests`; the narration rows sit in data_wind.py.
+- [ ] 1.2 Append the skill rows and the docstring sentence (design D3), plus the rulebook and narration rows (design D4) and the D7 test. Check: `AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.rules.tests.test_monster_composition_coverage` and `world.rules.tests.test_tide_lamp_crab_resource_skill` pass, and so does `CombatModifierTests`; the narration rows sit in data_wind.py.
 - [ ] 1.3 Run the activation tests and re-fingerprint only if one fails (design D5). Check: `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests` pass, and `activated` and `activation_bindings` are unchanged.
 
 ## 2. Documentation
