@@ -30,7 +30,7 @@ its archetype's legacy mode; nothing supplies intelligence or a mode by tier,
 species, rank, stat or archetype.
 
 Tuning fingerprint of the activated configuration (algorithm version 5):
-`3c18cea173ab18d4ffeca113d9aa73ef8523519e13abf99075cbc4d3382b719f`.
+`2a04e1bc0d7c054ecd16a46ea8721acf3aeb9cae60563b4470792a9ece508325`.
 
 `reservoir-warden-variant` adds the high-tier 蓄潮型 `reservoir_warden` to the
 named set with its own authored intelligence of 62. Its new buff definition and
@@ -46,7 +46,7 @@ Every acceptance clause of the change, and where it is established:
 | --- | --- |
 | Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate` passes observability, test-data, shard manifests and the ownership contracts; its traceability gate reports the change's own four new capability IDs as `unknown-requirement-id`, which is the documented pre-sync state of an active change (its requirements enter the index only when the archive workflow syncs the delta; see `scripts/openspec-gates.sh`). Verified green against the equivalent delta-applied tree: 2189 requirements, 0 uncovered, 0 errors. The post-sync check is the authoritative one and belongs to the archive workflow. |
 | The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f` |
-| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `3c18cea1...` |
+| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `2a04e1bc...` |
 | Complete-policy performance | `performance.json`: warm utility p95 16.84 ms and p50 16.36 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
 | A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves legacy |
 | A real affected encounter | `RealEncounterTests`: one real `Monster` row of an activated variant decides inside a real round scope **through the production session adapter** (`_enemy_policy`), its selected candidate is the request that settlement receives, the round writes a damage entry and the defender's committed hit points fall, and the monster's own statistics, resources, kit and proficiency are unchanged |
@@ -153,8 +153,8 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
    tuning and the observation memory).
 
 Rollback fingerprint of the edited configuration:
-`e66f610738342f184aee86a4a97f421f3b3aa1f088cec98baadb47e1940c9cdb`. Recorded
-acceptance claims made under `3c18cea1...` do not describe it, which is exactly
+`ad07efc8f79f0c49456582ee9b206cf6b0fa6de79644de3ff1aa9241e1573d9b`. Recorded
+acceptance claims made under `2a04e1bc...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce.
 
 ## Expansion and retuning

@@ -33,7 +33,10 @@ startup fingerprint; the recorded measurements are unchanged again. They were
 regenerated once more for `reservoir-warden-variant` (baseline commit
 `0b0455b0ed68f61175a167f7b806f8cbbee0b4e1`), for the same reason: that content
 change adds one buff definition, one modifier rule and one activated variant;
-the recorded measurements are unchanged again.
+the recorded measurements are unchanged again. They were regenerated once more
+for `hush-wing-owl-species`, again because that content change adds one buff
+definition and one modifier rule and so moves the process's startup
+fingerprint; the recorded measurements are unchanged again.
 
 ## Exact operations
 
@@ -154,11 +157,12 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`3c18cea173ab18d4ffeca113d9aa73ef8523519e13abf99075cbc4d3382b719f` -- that
+`2a04e1bc0d7c054ecd16a46ea8721acf3aeb9cae60563b4470792a9ece508325` -- that
 operation records the process's startup fingerprint, which this value now is;
 the earlier values `8307fec8...`, `237f9a85...`, `a29fd4fa...`, `e2677d39...`,
-`3ee653b9...`, `e583cb95...` and `c4d4e06b...` describe tunings production no
-longer loads and are superseded, not evidence for the changed tuning. See
+`3ee653b9...`, `e583cb95...`, `c4d4e06b...` and `3c18cea1...` describe tunings
+production no longer loads and are superseded, not evidence for the changed
+tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 
 ## Results
