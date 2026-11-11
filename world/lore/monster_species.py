@@ -794,6 +794,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "quill_forager",
         True,
     ),
+    MonsterSpecies(
+        "hollow_tree_bat",
+        "空木蝠",
+        "空木蝠是翼展約一臂寬的蝙蝠類魔獸，成群棲息於北部深林巨木的中空樹幹與迷宮入口附近的岩縫。",
+        "深褐色短毛覆蓋小巧身軀，薄翼膜在火光下透出暗紅血管。"
+        "尖耳大而薄，口中兩枚細長門牙向前突出。",
+        "黃昏時，群體從同一株空心巨木湧出，在林冠下穿梭捕食飛蟲。"
+        "牠們以叫聲辨認方向，在不透光的樹洞與岩縫裡也能自在飛行。"
+        "牠們會落在熟睡的鹿與馱獸身上，以帶著暗屬性的門牙咬開淺口，從咬口吸取少量血氣，轉為自身的生命；"
+        "每次咬合吸取的分量有限，傷口隔日即可癒合。"
+        "深入迷宮的探險隊常在入口附近遇上整群空木蝠，夜裡守營的人會替馱獸蓋上厚布。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；門牙暗屬性力量的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居蝙蝠：暗屬性門牙只在咬合命中時吸取少量生命，不傳染疾病、不造成持續失血或永久傷害；戰鬥呈現為咬擊與命中後的固定生命吸取。連結迷宮入口與探險隊的夜間營地。",
+        "（作者私有：尚未證實的猜想）探險者之間流傳空木蝠群聚的樹洞附近必有迷宮入口，這種說法尚未證實。",
+        "hollow_roost_flier",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1126,6 +1144,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("quill_brace_ram",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "hollow_roost_flier",
+        "hollow_tree_bat",
+        "棲洞型",
+        "普通版本，成群棲息於中空樹幹，黃昏外出覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=28, mp=20, sp=6, atk_phys=5, agility=11, defense=2, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("hollow_bat_bite",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "colony_sentinel",
+        "hollow_tree_bat",
+        "哨群型",
+        "棲群中體型最大的個體，守在樹洞口最先迎向闖入者，以尖銳叫聲召回同伴。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=50, mp=30, sp=10, atk_phys=9, agility=12, defense=3, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("hollow_bat_bite",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),
