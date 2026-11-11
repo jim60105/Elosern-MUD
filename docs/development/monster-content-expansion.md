@@ -7,7 +7,8 @@ not a balance approval table and it never duplicates the authored literals:
 every magnitude lives once in its executable declaration under
 `world/lore/monster_species.py`,
 `world/skills/registry/data_monster_abilities.py` and
-`world/rules/rulebook/`.
+`world/rules/rulebook/`. Sections from 孢傘菇 onward record the north deep
+forest species of the near-settlement programme's Wave 1.
 
 ## 泥膜史萊姆
 
@@ -862,3 +863,75 @@ non-blocking ones; all were adopted:
   defense-zero recipient.
 * The review text described the SP arithmetic imprecisely. Adopted: it now
   states the actual remainder and the cheapest kit cost it falls below.
+
+## 孢傘菇
+
+This section records the north deep forest species of the near-settlement
+programme's Wave 1. The first delivered one is 孢傘菇 (`spore_cap_mushroom`):
+a low-tier, grade-F, slow colony fungus whose ordinary default variant is
+腐木型 (`rotlog_sprout`), with the stronger 菌環型 (`ring_elder`). Both carry
+the single dark bump 孢粉頂撞 (`spore_puff_bump`).
+
+### Role constraints and the chosen literals
+
+* Slow colony fungus: the authored agility is the low band's floor, tied with
+  the slime as the slowest of every shipped low-tier ordinary variant.
+* Sturdier than the evasive low animals: the authored defense lies between the
+  hare's and the slime's, inside the low defense band.
+* The authored MP pool holds two casts of the dark bump's MP cost, and the SP
+  pool holds four casts of its SP cost.
+* The stronger 菌環型 keeps the same kit with a larger pool, attack and
+  defense, inside the low band and at grade E.
+* The bump coefficient (0.8) and the accuracy penalty (−3) match the sparrow's
+  shipped peck and rider, the smallest shipped hit-rider magnitudes; the 12 s
+  lifetime is of the same order as the shipped 10-15 s hit riders.
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it, so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The existing
+`EnemyRiderGroupMemberTests` in
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py` derives the
+group's members from the shipped declarations and exercises both new variants
+on their own rider axis without a test edit.
+
+### Decision mode
+
+Both variants bind the shipped `instinctive` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.35. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 100 tests, OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context --check`,
+`uv run --locked python -m tools.contract_gate --change spore-cap-mushroom-species`
+and `openspec validate spore-cap-mushroom-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
