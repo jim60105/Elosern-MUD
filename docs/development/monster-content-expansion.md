@@ -1166,3 +1166,81 @@ hush-wing-owl-species` and `openspec validate hush-wing-owl-species --strict`.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 藤網蛛
+
+This section records the fifth delivered species of the north deep forest
+Wave 1. 藤網蛛 (`vine_net_spider`) is a mid-tier, grade-D, patient web-ambush
+spider whose ordinary default variant is 織藤型 (`vine_weaver`), with the
+stronger 封道型 (`trail_netter`). Both carry the single elementless thread cast
+藤絲纏擲 (`vine_thread_cast`).
+
+### Role constraints and the chosen literals
+
+* Patient web ambusher: the ordinary variant's authored agility is 15, in the
+  lower half of the mid band (10–24), below the owl's and the lynx's ordinary
+  variants.
+* Sturdy body: the authored defense of 12 matches the goat's ordinary 踏崖型
+  and the lynx's stronger 獵道型, and sits two above the lynx's ordinary
+  林伏型.
+* The kit spends no MP, so the MP pool is zero; the SP pool of 24 holds four
+  casts of the cast's SP cost of 6.
+* The rider (−3 agility for 15 s) equals the goat's shipped
+  `rock_echo_stagger_agility_flat` contribution and lifetime.
+* The stronger 封道型 holds a whole forest path at grade C with a larger pool
+  (hp 175, sp 36, attack 25, agility 17, defense 14).
+
+### Reuse of the enemy hit-rider representative
+
+The kit's composition signature is
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`,
+the shipped enemy hit-rider group. Its representative stays `cliff_stepper`:
+both new variant keys sort after it, so the representative declaration and
+every shard, seed and smoke registration stay unchanged. The existing
+`world/rules/tests/test_monster_composition_coverage.py` derives every shipped
+variant's signature and proves both new variants join this group, while
+`world/rules/tests/test_sway_whistle_sparrow_resource_skill.py`'s
+`EnemyRiderGroupMemberTests` derives the members from the shipped declarations
+and exercises each one's landed hit, miss and committed reload; no
+per-variant smoke module is added for a reused signature.
+
+### Decision mode
+
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. Neither authors intelligence, a decision-mode override nor a
+`monster_behaviour.yaml` edit. The new buff definition and modifier rule do
+move the startup tuning fingerprint, so the activation record and the
+selector evidence were re-fingerprinted; `activated` and
+`activation_bindings` are unchanged.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run
+alone with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | blocked by the repository test guard as a single label at 103 discovered tests (the limit is 100); the class ran as two explicit method batches of 52 and 51 tests, both OK |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK after the re-fingerprint |
+| `world.rules.tests.test_monster_ai_activation.ActivationBindingTests` | 4 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.RollbackTests` | 3 tests, OK after the re-fingerprint |
+
+The remaining gates also passed: the registry import check,
+`uv run --locked python -m tools.map_reference_context` followed by
+`--check`, `uv run --locked python -m tools.contract_gate --change
+vine-net-spider-species` and `openspec validate vine-net-spider-species --strict`.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
