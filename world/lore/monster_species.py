@@ -848,6 +848,27 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "vine_weaver",
         True,
     ),
+    MonsterSpecies(
+        "moss_crown_stag",
+        "苔冠巨鹿",
+        "苔冠巨鹿是肩高約兩人的巨大鹿類魔獸，獨自漫遊於北部深林巨木之間的林間空地。",
+        "寬闊的鹿角如枯枝般分岔，角上長滿苔蘚、蕨葉與垂落的細藤，遠看如同林間移動的一叢樹冠。"
+        "灰褐色長毛垂到膝下，蹄子寬大，每一步都在腐葉上壓出深坑。",
+        "牠以嫩枝、苔蘚與林間空地的草本植物為食，會把鹿角抵在巨木樹幹上磨擦，替角上的苔層換上新的藤葉。"
+        "牠能以土屬性力量讓角上的苔層與藤根緊實硬化，使整副鹿角沉重如盤根。"
+        "發情期間，牠會占據一片林間空地，把闖入的大型動物撞出空地。"
+        "往返深林的探險隊會在遠處認出那叢移動的樹冠，提早改走另一條路；"
+        "牠把空地選在探險隊的必經之處時，公會便會張貼討伐委託。"
+        "牠以硬化的苔冠衝撞單一對手，也會甩動鹿角橫掃身旁的對手；"
+        "衝撞與橫掃都耗費牠自身的魔力與體力。"
+        "首隻指定個體因角上蒼綠的苔冠被稱為「蒼冠」。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；鹿角苔層硬化的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階獨居巨鹿：土屬性力量只硬化自身鹿角上的苔層與藤根，不操縱植物、不改變地形，也不具神性或守護森林的使命；戰鬥呈現為土屬性物理衝撞與橫掃，資源耗盡後回到普通攻擊。",
+        "（作者私有：尚未證實的猜想）虎嘯城的長老說苔冠巨鹿是深林最古老的居民，這種說法尚未證實。",
+        "wood_crown_elder",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1278,6 +1299,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("vine_thread_cast",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "wood_crown_elder",
+        "moss_crown_stag",
+        "老冠型",
+        "普通版本，每年在同一片林間空地度過發情期的老雄鹿。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=460, mp=48, sp=30, atk_phys=32, agility=18, defense=26, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("moss_crown_charge", "moss_crown_sweep",),
+        passive_skill_keys=(),
+        behaviour_profile_key="pack_hunter",
     ),
 )
 
