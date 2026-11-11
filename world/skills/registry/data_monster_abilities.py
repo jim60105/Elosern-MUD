@@ -19,6 +19,8 @@ The boar's two fire strikes are assembled the same way with physical-school
 damage that reads the actor's physical attack: one single-target charge and one
 area sweep, each paid in both MP and SP, and the area cast resolves every
 recipient's own hit and defense while the action pays once.
+The spore-cap mushroom's cap bump is assembled the same way with dark physical
+damage plus a hit-dependent accuracy debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -430,6 +432,35 @@ ROWS: tuple[SkillDef, ...] = (
             EffectPolicy(
                 coefficient=0.8,
                 audience=EffectAudience.ENEMIES,
+            ),
+        ),
+    ),
+    _skill(
+        "spore_puff_bump",
+        "孢粉頂撞",
+        "以菌傘頂撞單一敵方目標，造成物理傷害；命中後揚起暗屬性孢粉，使對手短暫視線昏沉，降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 2},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="dark",
+        effects=["damage:dark:physical", "buff_apply:spore_haze"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="dark",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("spore_cap_mushroom",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
             ),
         ),
     ),

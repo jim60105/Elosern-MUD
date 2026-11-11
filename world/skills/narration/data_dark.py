@@ -105,6 +105,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 的身形融進黑暗，讓它漫過整片戰場。",
         ),
     ),
+    NarrationRow(
+        "spore_puff_bump",
+        action=(
+            "{actor} 壓低菌傘撞向對手，傘緣揚起一陣黃粉。",
+            "{actor} 晃動粗短菌柄，猛然以傘頂撞了上去。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

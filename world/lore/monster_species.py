@@ -756,6 +756,26 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "warm_den_boar",
         True,
     ),
+    MonsterSpecies(
+        "spore_cap_mushroom",
+        "孢傘菇",
+        "孢傘菇是約幼犬大小的步行蕈類魔物，生活於北部深林的倒木、腐葉堆與巨木根間。"
+        "牠以菌柄底部的短根緩慢挪動，從潮濕的腐木吸取養分。",
+        "灰褐色的寬大菌傘覆著細密褶紋，傘緣垂著淡黃色孢粉。"
+        "粗短菌柄底部分出數條短根，移動時在腐葉上留下細長拖痕。",
+        "孢傘菇成群停留在同一段倒木上，菌傘受到碰撞或擠壓時，會噴出帶著微弱暗屬性的孢粉。"
+        "吸入孢粉的動物會短暫視線昏沉，群落便趁這段時間挪回腐木深處。"
+        "孢粉飄散範圍約一臂之遠；"
+        "雨天時孢粉沾濕結團，噴出的量隨之減少。"
+        "往返深林邊緣的採集者與巫醫會留意傘緣的黃粉，因為群落常占據他們採藥與拾柴的倒木。"
+        "近身時，牠以菌傘頂撞對手，撞中後揚起孢粉，使對手短暫看不準目標。",
+        ("north_deep_forest",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；孢粉暗屬性的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居蕈類：孢粉只在菌傘受撞擊或擠壓時散出，作用為短暫的視線昏沉，不造成中毒、睡眠或持續傷害；戰鬥呈現為頂撞與命中後的短暫命中下降。連結深林邊緣的採藥與拾柴。",
+        "（作者私有：尚未證實的猜想）巫醫窟的藥師傳說菌環型站過的土壤能讓藥草長得更好，這種說法尚未證實。",
+        "rotlog_sprout",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -1026,6 +1046,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("ember_tusk_charge", "ember_bristle_sweep"),
         passive_skill_keys=(),
         behaviour_profile_key="pack_hunter",
+    ),
+    MonsterVariant(
+        "rotlog_sprout",
+        "spore_cap_mushroom",
+        "腐木型",
+        "普通版本，成群附著在倒木上，緩慢挪動覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=40, mp=20, sp=8, atk_phys=5, agility=3, defense=5, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("spore_puff_bump",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "ring_elder",
+        "spore_cap_mushroom",
+        "菌環型",
+        "生長在林間菌環中央的老個體，菌傘更寬、孢粉更濃，守著整圈菌群。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=62, mp=30, sp=12, atk_phys=9, agility=4, defense=7, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("spore_puff_bump",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 
