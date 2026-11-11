@@ -410,6 +410,43 @@ departs through a real journey, keeps its persistent identity and site
 ownership while absent, reloads with its actual departure HP/MP/SP, and is
 re-engaged at its destination with those same values.
 
+### Near-settlement belts: eastern plains
+
+This change adds near-settlement belts to the eastern plains: a hinterland belt
+beside every inhabited settlement and road-corridor belts along the trunk roads
+between them. The declarations remain the only authority for keys, rectangles,
+pools and bindings; this section repeats no coordinate, density, count or
+timing.
+
+**Species fit.** Field margins, irrigation side-channels and grain stores lie
+just outside every eastern town, so the sparrow (穗鳴雀), hare (築埂兔), slime
+(泥膜史萊姆) and rat (蠟囊鼠) fit the hinterland of a farming town. The slime's
+damp-cell deviation, already recorded under "Content expansion habitats",
+applies here too: each zone uses a bounded rectangle rather than individually
+damp cells.
+
+**Tiers.** No stronger or high-tier variant joins an ordinary pool. Settlement
+surroundings hold only low-tier passive individuals, so a hinterland encounter
+answers after engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | OK, 25 tests; non-gating observation: 68.527s before the declarations and 196.008s after |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change eastern-plains-near-belts` | passed |
+| `openspec validate eastern-plains-near-belts --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
