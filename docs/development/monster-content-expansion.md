@@ -2195,7 +2195,7 @@ the worktree root with
 | `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
 | `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK |
 | `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
-| `world.rules.tests.test_combat_modifiers.CombatModifierTests.test_rule_clod_stumble_agility_flat` | 1 test, OK (the class label discovers 111 tests, above the repository's 100-test focus guard) |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 111 tests, OK, run as two focused method-label batches (56 + 55) because the local focus guard caps `evennia test` discovery at 100 |
 | `world.skills.tests.test_narration_catalog` | 42 tests, OK |
 | `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
 | `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
