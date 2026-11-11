@@ -172,7 +172,7 @@ Also append one sentence to that module's docstring describing this kit's compos
 
 ### D5. AI binding and activation evidence
 
-No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. If they pass, the fingerprint did not move and the evidence stays untouched. If a fingerprint comparison fails, re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
+No `world/rules/rulebook/monster_behaviour.yaml` edit. This link adds a timed effect and a modifier, so the tuning fingerprint moves and `ActivationRecordTests` and `RollbackTests` are expected to fail until the evidence is re-fingerprinted (steps 1–4 below). Each variant binds the shipped archetype named in D2, and the legacy body selects the damage-bearing kit. Run `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests`. Expect `ActivationRecordTests` and `RollbackTests` to fail on the fingerprint comparison (the `spore-cap-mushroom-species` and `moss-quill-porcupine-species` landings saw the same failure); this is the expected outcome, not a defect. Then re-fingerprint following the `mudfilm-slime-species` precedent (archived change design D5, steps 1–4), without touching `activated` or `activation_bindings`:
 
 1. Run `uv run --locked python tools/monster_ai_manual_reports.py selector` and copy `.var/monster-ai-manual-reports/selector-check.json` and `.md` over `docs/development/monster-ai-manual-evidence/`.
 2. Read the new `configuration_fingerprint` from the regenerated `selector-check.json`. Read the rollback fingerprint from the `RollbackTests` failure message.
@@ -229,7 +229,7 @@ status: delivered
 
 ### D7. Tests
 
-- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_drum_burst_agility_flat`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["drum_burst_agility_flat"]`.
+- `world/rules/tests/test_combat_modifiers.py::CombatModifierTests`: add `test_rule_drum_burst_agility_flat`, copying the four lines of `test_rule_rock_echo_stagger_agility_flat` with `RULES["drum_burst_agility_flat"]`. Copy those four lines exactly and assert no rule value of your own.
 
 ### D8. Developer review section
 
