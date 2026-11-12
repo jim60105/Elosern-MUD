@@ -8,7 +8,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 2. Writer guards and adapter codes
 
-- [ ] 2.1 Add the five guards of design D4 in `world/art/gallery.py` and `world/art/service.py`. Verify new tests in `world/art/tests/test_gallery.py` (or the module that already tests `set_stage`; find with `rg -ln "def test.*stage" world/art/tests`) patch a declaration through the existing test patch seam of `_CAPABILITIES_BY_KIND_VALUE` and assert each refusal leaves the record unchanged, plus one test that monster `remove_card` is refused; annotate with the two ADDED `art-gallery-kind-capabilities` IDs.
+- [ ] 2.1 Add the four writer guards of design D4 in `world/art/gallery.py` and `world/art/service.py`. Verify new tests in `world/art/tests/test_gallery.py` (or the module that already tests `set_stage`; find with `rg -ln "def test.*stage" world/art/tests`) patch a declaration through the existing test patch seam of `_CAPABILITIES_BY_KIND_VALUE` and assert each refusal leaves the record unchanged; annotate with the two ADDED `art-gallery-kind-capabilities` IDs.
 - [ ] 2.2 Map the three refusals in `web/webclient/actions/gallery_actions.py::_error_code` with zh-TW messages. Verify tests in `web/webclient/actions/tests/` (find the gallery action test module with `rg -ln "gallery.card.delete" web/webclient/actions/tests`) assert `delete_unsupported` for a monster card and `stage_unsupported` under a patched declaration, each with the three-panel refresh; annotate with the ADDED management-actions ID. Update any existing test that deleted a monster card successfully to expect the refusal.
 
 ## 3. Gates

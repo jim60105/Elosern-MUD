@@ -8,7 +8,7 @@ Specification 3 in `docs/superpowers/specs/2026-11-12-gallery-window-design.md`)
 - depends-on: gallery-kind-card-capabilities
 - conflict: `world/art/gallery_kinds.py` (scene record values),
   `world/art/presenter.py` (scene chain), `world/art/queue.py`/`gallery.py`
-  guard messages; `scene-gallery-producers` and `scene-asset-migration` edit
+  guard messages; `scene-asset-migration` and `scene-classic-fallback-removal` edit
   `world/art/service.py` and the scene chain afterwards.
 
 ## Why
@@ -32,7 +32,7 @@ gallery's default card.
   declaration automatically (`commands/art.py` already routes by
   `has_gallery`).
 - Producers are unchanged here (room entry and startup still write classic
-  records; `scene-gallery-producers` switches them), so every intermediate
+  records; `scene-asset-migration` switches them), so every intermediate
   state keeps showing a generated background.
 - `art-staff-commands` stops claiming that no player-triggered generation
   surface exists.

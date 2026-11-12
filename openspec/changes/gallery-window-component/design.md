@@ -25,7 +25,7 @@
 **Goals:** an unmounted window with the full interaction contract.
 
 **Non-Goals:** mounting, nav entry, removal of old components
-(`gallery-window-mount`); collapsible groups (`gallery-people-client`);
+(`gallery-window-mount`); collapsible groups (`gallery-group-expansion`);
 landscape page (`gallery-landscape-page`).
 
 ## Decisions

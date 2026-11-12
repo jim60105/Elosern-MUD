@@ -30,8 +30,8 @@ and 重新生成) without comparing kinds.
   gallery-less here): all false.
 - The sole writer refuses, with a typed error, a face-rectangle update, a
   stage update, an official geometry component and a generation face rect for
-  a kind that does not declare the matching fact, and refuses `remove_card`
-  for a kind that does not declare deletion.
+  a kind that does not declare the matching fact; `gallery.card.delete`
+  refuses a kind that does not declare deletion.
 - The management adapters map these refusals to stable codes
   `face_rect_unsupported`, `stage_unsupported`, `delete_unsupported`.
 - **BREAKING (pre-release)**: `gallery.card.delete` on a monster card is now

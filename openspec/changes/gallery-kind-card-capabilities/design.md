@@ -55,11 +55,15 @@ declares none of them".
 - `gallery.set_stage`: same pattern, "declares no stage support".
 - `gallery.set_official_geometry`: refuse a non-None `face_rect` / `stage`
   component with the same messages.
-- `gallery.remove_card`: "declares no card deletion support".
 - `service.request_gallery_image`: refuse a non-None `face_rect` argument with
   the face-rectangle message before validating it.
-- `gallery_actions._error_code`: map the three message fragments to
-  `face_rect_unsupported`, `stage_unsupported`, `delete_unsupported`, checked
+- `gallery_actions._mutate`: for `gallery.card.delete`, refuse with
+  `delete_unsupported` before the card lookup when
+  `not capabilities_for(subject.kind.value).supports_card_delete`; the sole
+  writer's `remove_card` stays unguarded because internal callers (browser
+  support `_revoke_source`) remove cards for test staging.
+- `gallery_actions._error_code`: map the two message fragments to
+  `face_rect_unsupported`, `stage_unsupported`, checked
   before the existing `text.startswith("stage")` branch. Add zh-TW messages
   beside the existing code table (`此類圖片不能調整臉框。`,
   `此類圖片不能調整舞台位置。`, `此類圖片不能刪除，請改用重新生成。`).

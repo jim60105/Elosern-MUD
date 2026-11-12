@@ -27,24 +27,21 @@ refresh (`gallery-tile-completion-refresh`), the window and the deletion of
 
 ### D1. Rename, do not alias
 
-- `gallery_presenter` = former `build_gallery_v4`; `validate_gallery` =
-  former `validate_gallery_v4`; `GALLERY_SCHEMA_VERSION = 4`; delete the v3
-  bodies, `gallery_subjects`, `_character_subject`, `GALLERY_MAX_SUBJECTS`,
-  `_filters`, `PANEL_FIELDS` (v3) and rename `V4_*` constants to the plain
-  names. The registry registration keeps its import of `gallery_presenter`.
-- JS: `validateGalleryPanel` = former v4 function; delete v3 body and
-  `GALLERY_MAX_SUBJECTS`; `GALLERY_SCHEMA_VERSION = 4`;
+- Rename the v3 functions to `gallery_presenter_v3` / `validate_gallery_v3`
+  (dead, unregistered; deleted by `gallery-v3-removal`); `gallery_presenter`
+  = former `build_gallery_v4`; `validate_gallery` = former
+  `validate_gallery_v4`; `GALLERY_SCHEMA_VERSION = 4`. The registry
+  registration keeps its import of `gallery_presenter`.
+- JS: `validateGalleryPanel` = former v4 function; the v3 body becomes
+  `validateGalleryPanelV3` (dead); `GALLERY_SCHEMA_VERSION = 4`;
   `PANEL_ALLOWLIST.gallery = 4`; `protocol.js` re-exports follow.
 - Assert in a test that `gallery.GALLERY_CATEGORY_KEYS ==
   gallery_categories.CATEGORY_KEYS`.
 
 ### D2. Selection
 
-- `gallery_selection.py`: delete `GallerySelection`,
-  `gallery_selection_snapshot`, v3 `select_gallery_subject`; rename
-  `select_gallery_subject_v4` → `select_gallery_subject`.
-  `retire_gallery_selection` clears `ndb.gallery_view` only.
-- `PresentationContext.gallery_subject` removed; `ingress.py` stops filling it.
+- `gallery.subject.select` calls `select_gallery_subject_v4`; the v3 store
+  stays until `gallery-v3-removal`.
 - `web/webclient/presentation/art_push.py::_gallery_subject_keys` keeps reading
   `selected` only (wall refresh is `gallery-tile-completion-refresh`).
 
@@ -72,10 +69,14 @@ refresh (`gallery-tile-completion-refresh`), the window and the deletion of
 
 ### D4. Tests
 
-- `test_gallery_panel.py`: delete rail/truncation/filter tests; convert tests
-  that read `payload["subjects"]` to `payload["groups"]`; tests that select a
-  companion first dispatch/select `party`. Parity tests: the v3 cases are
-  deleted, the v4 class becomes the only parity class.
+- `test_gallery_panel.py`: tests that exercise the registered presenter
+  read `payload["groups"]`; tests that select a companion first select
+  `party`; rail/truncation/filter tests keep calling `gallery_presenter_v3`
+  directly with their requirement annotations dropped (they are deleted in
+  `gallery-v3-removal`). `test_vue_gallery_ui_evidence.py` line ~130 is
+  retargeted to the ADDED gallery-ui requirement.
+- Client fixtures: switch every importer listed in the proposal to
+  `gallery-fixtures-v4.js` and delete `gallery-fixtures.js`.
 - `test_art_push.py`: delete the `get_monster_visual_registry` patch (lines
   ~506–516); selection of a companion goes through `party`.
 - Vitest `tests/components/gallery.test.js`: delete filter/toggle tests; add

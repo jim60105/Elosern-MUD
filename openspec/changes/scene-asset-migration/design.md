@@ -26,8 +26,8 @@
 **Goals:** convert settled classic scene outputs; delete every classic scene
 record and file; idempotent.
 
-**Non-Goals:** touching monster or character classic records; producers and
-chain cleanup (`scene-gallery-producers`).
+**Non-Goals:** touching monster or character classic records; removing the
+scene chain's classic fallback (`scene-classic-fallback-removal`).
 
 ## Decisions
 
@@ -65,6 +65,27 @@ unlinked only after its record is deleted. The step name
 `art_scene_migration` is inserted before `art_gallery_prune` in the catalog
 tuple and wired with `_startup_step(..., lambda: _late("world.art.service",
 "migrate_classic_scene_records"))`.
+
+### D3. Producers switch in the same change
+
+Converting classic records while the producers still write them would delete
+and requeue every scene at each startup. So this change also:
+1. `ensure_scene_asset`: replace the classic `queue_ensure` lines with the
+   gallery ensure below; keep the archetype guard and the bounded warning.
+2. `_sync_registry_subjects`: the scene loop uses the same gallery ensure;
+   update the docstring.
+3. Gallery ensure for scenes: `record = gallery_api.record_for(subject)`; skip
+   when `record is not None and not gallery_api.cards_for(subject) and
+   record.db.last_error_code is None` (the empty record a deletion leaves:
+   `remove_card` keeps the record); otherwise call
+   `_ensure_gallery_subject(subject)`. A failed first generation leaves a
+   record with an error (`record_error` creates it), so it is retried.
+4. Verified: `_official_default_satisfies` answers False for a bare
+   `ArtSubject`, so scenes with an operator archetype image still
+   autogenerate as the classic path did.
+5. The deletion rule is a planner decision: Specification 3 says deleting
+   returns the archetype to its bundled image, which the shared guard alone
+   would undo on the next entry.
 
 ## Risks / Trade-offs
 

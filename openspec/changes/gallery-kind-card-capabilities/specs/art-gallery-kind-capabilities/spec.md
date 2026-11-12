@@ -12,15 +12,11 @@ Every capability record SHALL declare three booleans: whether a card may carry a
 - **THEN** it reports a violation naming that kind
 
 ### Requirement: The sole writer refuses card operations a kind does not declare
-The gallery writer SHALL refuse, with a typed error and no write, a face-rectangle update or official face-rectangle override for a kind not declaring face rectangles, a stage update or official stage override for a kind not declaring stage, a generation request carrying a face rectangle for a kind not declaring face rectangles, and a card removal for a kind not declaring deletion.
+The gallery writer SHALL refuse, with a typed error and no write, a face-rectangle update or official face-rectangle override for a kind not declaring face rectangles, a stage update or official stage override for a kind not declaring stage, and a generation request carrying a face rectangle for a kind not declaring face rectangles. Card deletion is enforced at the player action (see `webclient-gallery-management-actions`).
 
 #### Scenario: A changed declaration changes what the writer allows
 - **WHEN** a test patches a kind's declaration to `supports_stage` false and a stage update is attempted on its card
 - **THEN** a typed error is raised and the stored card is unchanged, with no edit to the enforcing module
-
-#### Scenario: Deletion follows the declaration
-- **WHEN** `remove_card` is called for a kind declaring `supports_card_delete` false
-- **THEN** a typed error is raised, the card and its file remain, and the default is unchanged
 
 #### Scenario: Declared operations keep working
 - **WHEN** the same operations are attempted for a kind declaring all three facts true

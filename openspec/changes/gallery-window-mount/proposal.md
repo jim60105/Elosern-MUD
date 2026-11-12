@@ -59,8 +59,8 @@ None.
 
 ## Impact
 
-- Estimate: 6 hours (mount and store keys 1.5 h, nav rename with tests 0.5 h,
-  deletions and test re-pointing 2 h, browser selectors 0.5 h, docs, dist
-  rebuild and gates 1.5 h).
+- Estimate: 7 hours (mount and store keys 1.5 h, nav rename with tests 0.5 h,
+  deletions and test re-pointing 2 h, showcase evidence files 1 h, browser
+  selectors 0.5 h, docs, dist rebuild and gates 1.5 h).
 - Review: the live window at 1451×790 and 2560×1440 is human-reviewed against
   the approved prototype (design "Review").

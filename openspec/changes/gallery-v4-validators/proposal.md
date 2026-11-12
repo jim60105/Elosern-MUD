@@ -40,6 +40,11 @@ a real contract before the wire cuts over.
   {category}` and `gallery.group.select {group}` so the client can send them
   once the server registers them.
 - Dual-direction parity cases for every v4 rule.
+- New shared client fixtures `web/webclient-app/stories/gallery-fixtures-v4.js`
+  (synthetic v4 panels: mine with a tray subject, party, monster tiers,
+  empty category, pending/failed/official rows, collapsed people groups) with a
+  Node test that every exported panel passes `validateGalleryPanelV4`. The v3
+  `gallery-fixtures.js` stays until `gallery-v4-cutover`.
 
 ## Capabilities
 
@@ -59,5 +64,5 @@ None.
 - Tests: `web/webclient/presentation/tests/test_gallery_panel.py` (new v4
   parity test class) and `web/static/webclient/js/tests/protocol_gallery_artwork.test.js`
   or a new `protocol_gallery_v4.test.js` (Node gate).
-- Estimate: 7 hours (Python validator 2 h, JS mirror 2 h, parity cases and Node
-  tests 2.5 h, spec and gates 0.5 h).
+- Estimate: 8 hours (Python validator 2 h, JS mirror 2 h, parity cases and Node
+  tests 2 h, v4 client fixtures with validity test 1.5 h, spec and gates 0.5 h).

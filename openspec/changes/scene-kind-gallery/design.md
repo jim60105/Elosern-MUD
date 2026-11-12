@@ -27,7 +27,7 @@
 **Goals:** declaration flip; scene chain reads the gallery first; staff
 commands follow.
 
-**Non-Goals:** producers (`scene-gallery-producers`); migrating classic
+**Non-Goals:** producers (`scene-asset-migration`); migrating classic
 records and removing the classic step (`scene-asset-migration`); listing
 scenes in the window (`gallery-scene-category`).
 

@@ -11,6 +11,10 @@ Run pnpm commands in `web/webclient-app`.
 
 - [ ] 2.1 Add `stories/Overlays/GalleryWindow.stories.js` (MyCharacters, FirstRelease with people/scene disabled, Party, OfficialImage, NoImages, Monsters; reference and full-HD variants) and the `Overlays/GalleryWindow` manifest entry. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
 
+## Evidence
+
+- [ ] E.1 Add `Overlays/GalleryWindow` to the pinned manifest sets in `web/webclient/tests/test_vue_showcase_data_evidence.py`, `test_vue_showcase_action_evidence.py`, `test_vue_showcase_world_evidence.py` and `test_vue_showcase_overlays_evidence.py` (each pins the manifest `required` set). Verify `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence` passes.
+
 ## 3. Gates
 
 - [ ] 3.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-window-component`; both pass.

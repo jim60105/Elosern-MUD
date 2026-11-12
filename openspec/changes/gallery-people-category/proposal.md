@@ -6,6 +6,7 @@ Gallery window programme, stage 2 ("Who is listed" and "Grouping and paging"
 of Specification 2 in `docs/superpowers/specs/2026-11-12-gallery-window-design.md`).
 
 - depends-on: met-person-record
+- depends-on: met-person-write-points
 - depends-on: gallery-window-mount
 - depends-on: gallery-mutation-admission
 - conflict: `web/webclient/presentation/gallery_categories.py`,

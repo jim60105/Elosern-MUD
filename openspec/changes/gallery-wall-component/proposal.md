@@ -49,7 +49,7 @@ None.
 ## Impact
 
 - New: the component, the model module, `stories/Data/GalleryWall.stories.js`,
-  fixtures in `stories/gallery-fixtures.js` (v4 shape, validated by the v4
+  fixtures in `stories/gallery-fixtures-v4.js` (v4 shape, validated by the v4
   validator that `gallery-v4-validators` exports),
   `tests/components/gallery_wall.test.js`; manifest line.
 - Estimate: 7 hours (component and tray placement 3 h, keyboard and focus 1.5 h,

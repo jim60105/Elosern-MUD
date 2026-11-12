@@ -19,7 +19,7 @@ the currently listed category is not a rejection; being in no category is.
 
 ## What Changes
 
-- The nine mutating gallery adapters (`gallery.generate`,
+- The ten mutating gallery adapters (`gallery.generate`,
   `gallery.default.set`, `gallery.card.delete`, `gallery.face_rect.update`,
   `gallery.stage.update`, `gallery.binding.save`, `gallery.official.select`,
   `gallery.official.clear_selection`, `gallery.official.geometry.set`,

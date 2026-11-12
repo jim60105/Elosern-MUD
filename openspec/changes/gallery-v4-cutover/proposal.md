@@ -34,10 +34,21 @@ smallest possible edit until the window replaces it.
   holds `gallery: 4`.
 - `gallery.subject.select` writes the v4 store (membership of the selected
   category).
-- Removed: `gallery_subjects`, `GALLERY_MAX_SUBJECTS`, `_filters`, the v3
-  validator bodies (both sides), `GallerySelection`, the v3
-  `select_gallery_subject`, `PresentationContext.gallery_subject`, the
-  truncation rule and its test, and the registry patch in `test_art_push.py`.
+- The v3 presenter, validators and store are left in place but unregistered
+  and unreachable; `gallery-v3-removal` deletes them right after this change so
+  this one stays within a working day. Tests annotated with the removed v3
+  requirements lose those annotations here.
+- The registry patch in `test_art_push.py` is removed.
+- Every client test and story that feeds a gallery panel switches from the v3
+  `stories/gallery-fixtures.js` to `stories/gallery-fixtures-v4.js`
+  (`app_client_gallery`, `app_client_drawers`, `app_client_party_window`,
+  `app_client_presence_rail`, `drawer_content_polish`,
+  `gallery_original_editors`, `stage_transform`, `reference_surface_frame`,
+  `tests/components/gallery.test.js`, `stories/Data/GalleryPanel.stories.js`,
+  `stories/Data/GalleryDetailRail.stories.js` and the gallery entries of
+  `stories/fixtures/*_panels.js`); the v3 fixture file is deleted.
+- `web/webclient/tests/test_vue_gallery_ui_evidence.py` retargets its
+  annotation of the removed "renders only committed panel facts" requirement.
 - **Transitional client edit** in `GalleryPanel.vue`: the subject `<nav>` is
   replaced by a category button row (`data-testid="gallery-category-<key>"`,
   disabled ones `aria-disabled` with their reason) and a flat list of the
@@ -67,11 +78,9 @@ None.
 
 ## Impact
 
-- Code and tests listed under conflict above; Storybook stories of
-  `GalleryPanel` keep their v3 fixtures (they still build; the window change
-  deletes them).
-- Estimate: 7.5 hours (registration and v3 removal both sides 2 h, subject
-  select on v4 store 0.5 h, Python test migration 2 h, transitional panel edit
-  with Vitest 1.5 h, browser journey 1 h, spec, dist rebuild and gates 0.5 h).
-  This is the largest stage-1 change; nothing else can move out of it without
-  leaving an intermediate commit invalid.
+- Code and tests listed above.
+- Estimate: 8 hours (registration swap both sides 0.5 h, subject select on
+  the v4 store 0.5 h, Python presenter/push test migration 2 h, transitional
+  panel edit 1 h, client fixture switch across suites and stories 2 h, browser
+  journey 1 h, evidence retarget, dist rebuild and gates 1 h). Deleting the
+  dead v3 code moved to `gallery-v3-removal` to stay within the cap.

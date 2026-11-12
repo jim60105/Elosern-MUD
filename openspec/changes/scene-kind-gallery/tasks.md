@@ -13,7 +13,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 3. Staff commands and generation seam
 
-- [ ] 3.1 Update the staff-command tests for scene requeue/retry (design D3) and add a seam test that a scene subject request queues one gallery job. Verify `<prefix>` on the `commands` art test module and the gallery generation test module passes.
+- [ ] 3.1 Update the staff-command tests for scene requeue/retry (design D3), including a failed classic scene record, which `@art retry` no longer re-drives through the classic arm because routing follows `has_gallery`; check `web/browser_support/unified_image_transitions.py` and `web/tests/browser/test_browser_art.py` for classic scene retry use and keep them passing and add a seam test that a scene subject request queues one gallery job. Verify `<prefix>` on the `commands` art test module and the gallery generation test module passes.
 
 ## 4. Gates
 

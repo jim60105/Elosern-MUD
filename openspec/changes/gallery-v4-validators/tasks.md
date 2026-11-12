@@ -14,7 +14,11 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 - [ ] 3.1 Add `GalleryV4ParityTests` to `web/webclient/presentation/tests/test_gallery_panel.py` per design D5, one test per ADDED scenario decorated with its requirement ID. Verify `<prefix> web.webclient.presentation.tests.test_gallery_panel` passes and `node --test web/static/webclient/js/tests/*.test.js` passes.
 
-## 4. Gates
+## 4. Client fixtures
 
-- [ ] 4.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-v4-validators`; both pass.
-- [ ] 4.2 Run `openspec validate gallery-v4-validators --strict`; it passes.
+- [ ] 4.1 Create `web/webclient-app/stories/gallery-fixtures-v4.js` per the proposal and `web/static/webclient/js/tests/gallery_fixtures_v4.test.js` validating every exported panel with `validateGalleryPanelV4`. Verify `node --test web/static/webclient/js/tests/gallery_fixtures_v4.test.js` passes.
+
+## 5. Gates
+
+- [ ] 5.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-v4-validators`; both pass.
+- [ ] 5.2 Run `openspec validate gallery-v4-validators --strict`; it passes.

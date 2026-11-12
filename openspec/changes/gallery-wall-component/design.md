@@ -104,7 +104,7 @@ export function trayInsertIndex(ownerIndex, columns, groupLength)
 - `stories/Data/GalleryWall.stories.js`: Mine (tray open on the live
   character), Party, Monster (tier groups, no tray), Empty, TrayStates
   (default/pending/failed/official), each at `atReference` and one at
-  `atFullHd`; fixtures in `stories/gallery-fixtures.js` built in the v4
+  `atFullHd`; fixtures in `stories/gallery-fixtures-v4.js` built in the v4
   shape. Add `"Data/GalleryWall"` to `component-manifest.json` `required`.
 - Fixture validity: a Node test validates every story fixture with the v4
   validator exported by `gallery-v4-validators` (`validateGalleryPanelV4`
