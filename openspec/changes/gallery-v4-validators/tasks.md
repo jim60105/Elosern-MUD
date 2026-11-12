@@ -16,7 +16,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 4. Client fixtures
 
-- [ ] 4.1 Create `web/webclient-app/stories/gallery-fixtures-v4.js` per the proposal and `web/static/webclient/js/tests/gallery_fixtures_v4.test.js` validating every exported panel with `validateGalleryPanelV4`. Verify `node --test web/static/webclient/js/tests/gallery_fixtures_v4.test.js` passes.
+- [x] 4.1 Create `web/webclient-app/stories/gallery-fixtures-v4.js` per the proposal and `web/static/webclient/js/tests/gallery_fixtures_v4.test.js` validating every exported panel with `validateGalleryPanelV4`. Verify `node --test web/static/webclient/js/tests/gallery_fixtures_v4.test.js` passes.
 
 ## 5. Gates
 
