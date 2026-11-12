@@ -26,11 +26,12 @@ from web.webclient.actions.dispatcher import handle_ui_action, _sequence_state
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation import gallery_selection
 from web.webclient.presentation.coordinator import attach_coordinator
+from web.webclient.presentation.gallery_categories import GalleryCategoryError
 from web.webclient.presentation.gallery_selection import (
     gallery_view_snapshot,
 )
 from web.webclient.presentation.ingress import build_presentation_context
-from web.webclient.presentation.protocol import validate_ui_action_result
+from web.webclient.presentation.protocol import ProtocolValidationError, validate_ui_action_result
 from web.webclient.presentation.registry import build_production_registry
 from world.art import gallery as api
 from world.art import official, official_refs
@@ -686,10 +687,152 @@ class GalleryActionIntegrationTests(EvenniaTest):
     def test_missing_and_deleted_subjects_never_mutate_cards(self):
         card = self.card(subject=self.companion_subject)
         self.companion.delete()
+        # A deleted or unknown subject belongs to no category, so admission
+        # refuses it before any resolution is attempted.
         for key in (self.companion_subject.full(), "portrait:character:t_unknown", "portrait:monster:t_unknown"):
             with self.subTest(subject=key):
-                self.assertEqual(self.dispatch("gallery.default.set", {"subject_key": key, "image_id": card["image_id"]})["code"], "unknown_subject")
+                self.assertEqual(self.dispatch("gallery.default.set", {"subject_key": key, "image_id": card["image_id"]})["code"], "subject_not_admitted")
         self.assertEqual(api.cards_for(self.companion_subject), [card])
+
+    # -- subject admission (gallery-mutation-admission) -------------------
+    def art_state(self):
+        """Every gallery and art-asset record attribute, for no-write checks."""
+        return [
+            [(record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
+             for record in model.objects.order_by("pk")]
+            for model in (api.GalleryRecord, ArtAssetRecord)
+        ]
+
+    def refused(self, action, payload):
+        """Dispatch one mutation that must fail admission before any card work.
+
+        The refusal is one warning, one publication of the declared three-panel
+        refresh, and no subject resolution or generation request at all.
+        """
+        with patch.object(
+            self.coordinator, "enqueue_publication", wraps=self.coordinator.enqueue_publication
+        ) as publish, patch.object(
+            actions, "resolve_gallery_subject_by_key", wraps=actions.resolve_gallery_subject_by_key
+        ) as resolve, patch.object(
+            actions, "monster_subject_for", wraps=actions.monster_subject_for
+        ) as monster, patch.object(actions, "request_gallery_image") as request, \
+                patch.object(actions, "log_warn") as warn, patch.object(actions, "log_info") as info:
+            result = self.dispatch(action, payload)
+        self.assertEqual(
+            (result["outcome"], result["code"], result["message"]),
+            ("rejected", "subject_not_admitted", actions.REJECTION_MESSAGES["subject_not_admitted"]),
+        )
+        # One publication request for the declared refresh; its transmitted
+        # delta (if any) carries only panels that differ from the baseline.
+        self.assertLessEqual(len([call for call in self.sent if "ui_update" in call]), 1)
+        self.assertNotIn("ui_snapshot", self.sent[0])
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
+        resolve.assert_not_called()
+        monster.assert_not_called()
+        request.assert_not_called()
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args, ("gallery_action",))
+        self.assertEqual(warn.call_args.kwargs["context"]["action_id"], action)
+        info.assert_not_called()
+        return result, warn
+
+    def stranger(self):
+        """A named NPC in the actor's room that no enabled category lists."""
+        self.character(NPC, "t_gallery_stranger")
+        return ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_stranger")
+
+    def test_a_strangers_gallery_cannot_be_edited(self):
+        subject = self.stranger()
+        first, second = self.card(1, subject=subject), self.card(2, subject=subject)
+        before = self.art_state()
+        self.refused("gallery.default.set", {"subject_key": subject.full(), "image_id": second["image_id"]})
+        self.assertEqual(before, self.art_state())
+        self.assertEqual(api.cards_for(subject), [first, second])
+
+    def test_every_mutating_adapter_refuses_a_subject_in_no_category(self):
+        subject = self.stranger()
+        card = self.card(subject=subject)
+        pair = {"subject_key": subject.full(), "image_id": card["image_id"]}
+        identity = {"subject_key": subject.full(), "identity": OFFICIAL_IDENTITY}
+        operations = [
+            ("gallery.generate", {"subject_key": subject.full(), "fields": [], "custom_prompt": ""}),
+            ("gallery.default.set", pair),
+            ("gallery.card.delete", pair),
+            ("gallery.face_rect.update", dict(pair, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3})),
+            ("gallery.stage.update", dict(pair, stage={"scale": 0.6, "x": -0.2, "y": 0})),
+            ("gallery.binding.save", dict(pair, slots=["armor"])),
+            # Admission precedes the official-identity refusal.
+            ("gallery.default.set", dict(pair, image_id=OFFICIAL_IDENTITY)),
+            ("gallery.official.select", identity),
+            ("gallery.official.clear_selection", {"subject_key": subject.full()}),
+            ("gallery.official.geometry.set", dict(identity, stage={"scale": 1, "x": 0, "y": 0})),
+            ("gallery.official.geometry.clear", identity),
+        ]
+        before = self.art_state()
+        for action, payload in operations:
+            with self.subTest(action=action, payload=payload):
+                self.refused(action, payload)
+        self.assertEqual(before, self.art_state())
+        self.assertEqual(api.cards_for(subject), [card])
+        self.assertEqual(queue.pending_gallery_jobs(subject), [])
+        self.assertTrue((self.root / card["stored_identity"]).exists())
+
+    def test_another_categorys_subject_is_admitted(self):
+        self.assertEqual(self.category_dispatch("monster")["outcome"], "success")
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor).category, "monster")
+        with patch.object(actions, "request_gallery_image", wraps=actions.request_gallery_image) as request:
+            result = self.generate(self.companion_subject)
+        self.assertEqual((result["outcome"], result["code"]), ("success", "gallery_queued"))
+        request.assert_called_once()
+        self.assertEqual(len(queue.pending_gallery_jobs(self.companion_subject)), 1)
+
+    def test_any_character_of_the_owning_account_is_admitted_and_no_other(self):
+        sibling = self.character(PlayerCharacter, "t_gallery_sibling")
+        sibling.account = self.account
+        self.account.characters.add(sibling)
+        sibling_subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_sibling")
+        sibling_card = self.card(subject=sibling_subject)
+        result = self.dispatch("gallery.default.set", {"subject_key": sibling_subject.full(), "image_id": sibling_card["image_id"]})
+        self.assertEqual(result["outcome"], "success")
+        other = self.character(PlayerCharacter, "t_gallery_other_account")
+        other.account = self.account2
+        self.account2.characters.add(other)
+        other_subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_other_account")
+        other_card = self.card(subject=other_subject)
+        before = self.art_state()
+        self.refused("gallery.default.set", {"subject_key": other_subject.full(), "image_id": other_card["image_id"]})
+        self.assertEqual(before, self.art_state())
+
+    def test_an_unsighted_species_is_refused(self):
+        payload = {"subject_key": self.monster_subject.full(), "fields": [], "custom_prompt": ""}
+        self.refused("gallery.generate", payload)
+        self.assertEqual(queue.pending_gallery_jobs(self.monster_subject), [])
+        # Admission precedes the kind's binding refusal.
+        self.refused("gallery.binding.save", {"subject_key": self.monster_subject.full(), "image_id": IMAGE, "slots": ["armor"]})
+        # Sighting the same species is what admits it.
+        with patch(
+            "web.webclient.presentation.gallery_categories.list_discovered",
+            return_value=(("monster", self.monster_subject.key),),
+        ):
+            self.assertEqual(self.dispatch("gallery.generate", payload)["outcome"], "success")
+        self.assertEqual(len(queue.pending_gallery_jobs(self.monster_subject)), 1)
+
+    def test_an_unresolvable_owner_admits_nothing(self):
+        card = self.card()
+        before = self.art_state()
+        failure = GalleryCategoryError("possessed actor has no live bound owner")
+        with patch.object(actions, "is_subject_admitted", side_effect=failure):
+            _, warn = self.refused("gallery.default.set", {"subject_key": SUBJECT, "image_id": card["image_id"]})
+        self.assertIs(warn.call_args.kwargs["exc"], failure)
+        self.assertEqual(before, self.art_state())
+
+    def test_subject_grammar_is_checked_before_admission(self):
+        with patch.object(actions, "is_subject_admitted") as admitted:
+            for adapter in (actions._gallery_default_set_adapter, actions._gallery_official_select_adapter):
+                with self.subTest(adapter=adapter.__name__), self.assertRaises(ProtocolValidationError):
+                    adapter(self.actor, {"subject_key": "scene:t_room", "image_id": IMAGE, "identity": OFFICIAL_IDENTITY}, self.transport)
+        admitted.assert_not_called()
 
     def category_dispatch(self, category, payload=None):
         """Dispatch one category selection, spying on the publication request.
@@ -863,7 +1006,8 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 warn.assert_not_called()
             with self.subTest(rejection=action), patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
                 result = self.dispatch(action, dict(payload, subject_key="portrait:character:t_absent"))
-                self.assertEqual(result["code"], "unknown_subject")
+                expected = "unknown_subject" if action == "gallery.subject.select" else "subject_not_admitted"
+                self.assertEqual(result["code"], expected)
                 self.assertEqual(warn.call_count, 1)
                 self.assertEqual(warn.call_args.args, ("gallery_action",))
                 self.assertEqual(warn.call_args.kwargs["context"]["action_id"], action)
@@ -1275,6 +1419,38 @@ class OfficialPreferenceActionTests(EvenniaTest):
                     "malformed_payload",
                 )
         self.assertEqual(self._world(), before)
+
+    def test_official_preference_writes_require_an_admitted_subject(self):
+        # The stranger is born from the same preset, so the identity lies inside
+        # its own content reference: only admission stands between the request
+        # and the preference write.
+        identity = self._index("a.png")
+        self._character("t_gallery_stranger", _PRESET_KEY)
+        stranger = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_stranger")
+        before = self._world()
+        payload = {"subject_key": stranger.full(), "identity": identity}
+        with patch.object(actions, "log_warn") as warn, patch.object(actions, "log_info") as info, patch.object(
+            actions, "_official_target", wraps=actions._official_target
+        ) as target, patch.object(
+            self.coordinator, "enqueue_publication", wraps=self.coordinator.enqueue_publication
+        ) as publish:
+            result = self._dispatch("gallery.official.select", payload)
+        self.assertEqual(
+            (result["outcome"], result["code"], result["message"]),
+            ("rejected", "subject_not_admitted", actions.REJECTION_MESSAGES["subject_not_admitted"]),
+        )
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
+        warn.assert_called_once()
+        info.assert_not_called()
+        target.assert_not_called()
+        self.assertIsNone(api.official_preferences_for(stranger).selection)
+        self.assertEqual(self._world(), before)
+        # The actor's own subject, with the same identity, is written.
+        self.assertEqual(
+            self._dispatch("gallery.official.select", dict(payload, subject_key=SUBJECT))["outcome"],
+            "success",
+        )
 
     @covers_requirement(
         "webclient-action-dispatch::completed-request-ids-are-deduplicated-within-a-bounded-session-cache"

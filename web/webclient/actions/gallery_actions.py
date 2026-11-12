@@ -14,12 +14,24 @@ card-reference mutation adapters refuse an official identity with the stable
 ``official_read_only`` code before any card read: the official image is shared
 read-only artwork, and the frontend's hidden affordances are never the
 guarantee.
+
+Every mutating adapter re-derives, before any card, record or preference read
+or write, that its subject belongs to an enabled gallery category for the
+acting actor (``gallery_categories.is_subject_admitted``). A subject in no
+enabled category is refused with ``subject_not_admitted``; one admitted
+through a category other than the selected one proceeds. The check follows
+subject-key grammar and precedes every kind-specific refusal, so a client can
+never edit, or even probe, the gallery of an arbitrary character in the world.
 """
 
 import re
 
 from web.webclient.presentation.gallery import validate_gallery_subject_key
-from web.webclient.presentation.gallery_categories import CATEGORY_KEYS
+from web.webclient.presentation.gallery_categories import (
+    CATEGORY_KEYS,
+    GalleryCategoryError,
+    is_subject_admitted,
+)
 from web.webclient.presentation.gallery_selection import (
     select_gallery_category,
     select_gallery_subject,
@@ -38,6 +50,7 @@ AFFECTED_GALLERY_PANELS = ("gallery", "art", "roster")
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 REJECTION_MESSAGES = {
     "unknown_subject": "找不到此肖像圖庫。",
+    "subject_not_admitted": "這個對象不在你的圖庫中。",
     "unknown_card": "找不到這張肖像。",
     "unknown_official_image": "找不到這張官方圖片。",
     "official_read_only": "官方圖片為唯讀，無法修改。",
@@ -315,11 +328,32 @@ def _gallery_category_select_adapter(actor, payload, session=None):
     return result
 
 
-def _mutate(action_id, payload):
+def _admission_refusal(actor, subject_key, context):
+    """The ``subject_not_admitted`` result, or ``None`` when the subject is admitted.
+
+    An owner that cannot be resolved, or a category source that fails to build
+    a subject, admits nothing. Exactly one warning is logged per refusal,
+    carrying the error when there is one.
+    """
+    try:
+        admitted = is_subject_admitted(actor, subject_key)
+    except (GalleryCategoryError, ArtSubjectError) as error:
+        log_warn("gallery_action", context=context, exc=error)
+        return _rejected("subject_not_admitted")
+    if admitted:
+        return None
+    log_warn("gallery_action", context=context)
+    return _rejected("subject_not_admitted")
+
+
+def _mutate(actor, action_id, payload):
     context = _context(action_id, payload)
     subject = None
     try:
         parsed = validate_gallery_subject_key(payload["subject_key"])
+        refusal = _admission_refusal(actor, payload["subject_key"], context)
+        if refusal is not None:
+            return refusal
         if parsed.kind is ArtSubjectKind.CHARACTER:
             subject, entity = resolve_gallery_subject_by_key(payload["subject_key"])
         elif parsed.kind is ArtSubjectKind.MONSTER:
@@ -379,27 +413,27 @@ def _mutate(action_id, payload):
 
 
 def _gallery_generate_adapter(actor, payload, session=None):
-    return _mutate("gallery.generate", payload)
+    return _mutate(actor, "gallery.generate", payload)
 
 
 def _gallery_default_set_adapter(actor, payload, session=None):
-    return _mutate("gallery.default.set", payload)
+    return _mutate(actor, "gallery.default.set", payload)
 
 
 def _gallery_card_delete_adapter(actor, payload, session=None):
-    return _mutate("gallery.card.delete", payload)
+    return _mutate(actor, "gallery.card.delete", payload)
 
 
 def _gallery_face_rect_update_adapter(actor, payload, session=None):
-    return _mutate("gallery.face_rect.update", payload)
+    return _mutate(actor, "gallery.face_rect.update", payload)
 
 
 def _gallery_stage_update_adapter(actor, payload, session=None):
-    return _mutate("gallery.stage.update", payload)
+    return _mutate(actor, "gallery.stage.update", payload)
 
 
 def _gallery_binding_save_adapter(actor, payload, session=None):
-    return _mutate("gallery.binding.save", payload)
+    return _mutate(actor, "gallery.binding.save", payload)
 
 
 def _official_target(subject, entity, identity):
@@ -470,13 +504,16 @@ def _merge_official_geometry(subject, identity, image, payload):
     )
 
 
-def _mutate_official(action_id, payload):
+def _mutate_official(actor, action_id, payload):
     """One personal official-art preference write, re-resolving its identity."""
     context = _context(action_id, payload)
     subject = None
     already_clear = False
     try:
         parsed = validate_gallery_subject_key(payload["subject_key"])
+        refusal = _admission_refusal(actor, payload["subject_key"], context)
+        if refusal is not None:
+            return refusal
         if parsed.kind is ArtSubjectKind.CHARACTER:
             subject, entity = resolve_gallery_subject_by_key(payload["subject_key"])
         elif parsed.kind is ArtSubjectKind.MONSTER:
@@ -525,16 +562,16 @@ def _mutate_official(action_id, payload):
 
 
 def _gallery_official_select_adapter(actor, payload, session=None):
-    return _mutate_official("gallery.official.select", payload)
+    return _mutate_official(actor, "gallery.official.select", payload)
 
 
 def _gallery_official_clear_selection_adapter(actor, payload, session=None):
-    return _mutate_official("gallery.official.clear_selection", payload)
+    return _mutate_official(actor, "gallery.official.clear_selection", payload)
 
 
 def _gallery_official_geometry_set_adapter(actor, payload, session=None):
-    return _mutate_official("gallery.official.geometry.set", payload)
+    return _mutate_official(actor, "gallery.official.geometry.set", payload)
 
 
 def _gallery_official_geometry_clear_adapter(actor, payload, session=None):
-    return _mutate_official("gallery.official.geometry.clear", payload)
+    return _mutate_official(actor, "gallery.official.geometry.clear", payload)
