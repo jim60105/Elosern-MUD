@@ -18,7 +18,10 @@
 
 **Goals:** both producers use the gallery ensure.
 
-**Non-Goals:** classic record migration or removal (`scene-asset-migration`).
+**Non-Goals:** converting classic records (done by `scene-asset-migration`,
+which lands first); removing the generic classic queue/worker code, which no
+producer reaches after this change but which still serves its specified
+contract.
 
 ## Decisions
 
@@ -35,9 +38,16 @@
    did. No branch is needed; add one test that a scene whose archetype has an
    operator official image still receives its gallery request.
 
+4. Scene chain: delete the classic branch that `scene-kind-gallery` kept
+   behind `_scene_gallery_card` (the `_scene_generated_resource` call over the
+   classic record, the classic generation state and the classic
+   current/prior-output retention for scenes). A scene with no gallery card
+   has no generated attempt; its generation state comes from gallery jobs and
+   the gallery record's error only.
+
 ## Risks / Trade-offs
 
-- [Archetypes with a classic `done` record get a fresh gallery request on the
-  first entry after this change] → intended: the gallery card then wins; the
-  classic output stays as fallback until migration, which converts instead of
-  regenerating where a classic output exists.
+- [A classic scene record created between the migration's startup run and this
+  change's deploy] → impossible in practice (both land through startup), and
+  the migration runs at every startup, so the next start converts it; this
+  change's removal only stops reading it.
