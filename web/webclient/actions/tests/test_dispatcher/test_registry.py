@@ -102,6 +102,7 @@ class RegistryTests(unittest.TestCase):
                     "title.remove",
                     "character.persona.update",
                     "gallery.subject.select",
+                    "gallery.category.select",
                     "gallery.generate",
                     "gallery.default.set",
                     "gallery.card.delete",

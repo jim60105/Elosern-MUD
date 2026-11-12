@@ -195,6 +195,7 @@ def build_production_action_registry() -> ActionRegistry:
     )
     from web.webclient.actions.gallery_actions import (
         _gallery_subject_select_adapter,
+        _gallery_category_select_adapter,
         _gallery_generate_adapter,
         _gallery_default_set_adapter,
         _gallery_card_delete_adapter,
@@ -206,6 +207,7 @@ def build_production_action_registry() -> ActionRegistry:
         _gallery_official_geometry_set_adapter,
         _gallery_official_geometry_clear_adapter,
         validate_gallery_subject_select_payload,
+        validate_gallery_category_select_payload,
         validate_gallery_generate_payload,
         validate_gallery_card_payload,
         validate_gallery_face_rect_update_payload,
@@ -788,6 +790,10 @@ def build_production_action_registry() -> ActionRegistry:
     registry.register(ActionSpec(
         "gallery.subject.select", validate_gallery_subject_select_payload,
         _gallery_subject_select_adapter, ("gallery",),
+    ))
+    registry.register(ActionSpec(
+        "gallery.category.select", validate_gallery_category_select_payload,
+        _gallery_category_select_adapter, ("gallery",),
     ))
     registry.register(ActionSpec(
         "gallery.generate", validate_gallery_generate_payload,

@@ -941,6 +941,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
   }
   for (const [actionId, payload] of [
     ["gallery.subject.select", { subject_key: gallerySubject }],
+    ["gallery.category.select", { category: "monster" }],
     ["gallery.generate", { subject_key: gallerySubject, fields: ["appearance"], custom_prompt: "光影" }],
     ["gallery.default.set", galleryCard],
     ["gallery.card.delete", galleryCard],
