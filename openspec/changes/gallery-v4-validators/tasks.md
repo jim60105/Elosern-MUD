@@ -20,5 +20,5 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 5. Gates
 
-- [ ] 5.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-v4-validators`; both pass.
-- [ ] 5.2 Run `openspec validate gallery-v4-validators --strict`; it passes.
+- [x] 5.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-v4-validators`; both pass.
+- [x] 5.2 Run `openspec validate gallery-v4-validators --strict`; it passes.
