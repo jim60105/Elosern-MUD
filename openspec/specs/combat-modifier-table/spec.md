@@ -285,35 +285,31 @@ percentage.
 - **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
 
 ### Requirement: Damage-estimation surfaces mirror the live adjusted damage math
-The overwhelm expected-damage estimator (`_expected_damage_per_attack`) and the monster
-highest-expected-damage skill-choice metric (`_choose_skill.expected_damage`) SHALL compute their
-attack and defense terms through the same adjusted-stat path as live damage resolution: an
-entity's `atk_phys` bundle value is added to the physical attack term and its `defense` bundle
-value to the defense term, exactly as in live damage.
+Overwhelm expected damage SHALL retain live adjusted attack and defense terms and its existing conservative shape. Reflex skill estimates SHALL read the actor own adjusted school attacking stat, including own buffs and modifier bundles, multiplied by primary damage coefficient and recipient count. Reflex SHALL omit defender terms and hit chance. Deliberation estimates and raw effective_power ranking SHALL remain unchanged.
 
 #### Scenario: Overwhelm expected damage includes the bundle adjustments
-- **WHEN** `_expected_damage_per_attack` is called on an attacker owning `t_retainer_martial_training`
-  against a defender owning `t_guardian_instinct`
-- **THEN** the estimate uses `effective_atk + 5` for the attack term and `effective_defense + 5`
-  for the defense term
+- **WHEN** synthetic attacker and defender each receive a flat modifier bonus of 5
+- **THEN** overwhelm uses adjusted attack and defense with those bonuses and its unchanged estimator shape
 
 #### Scenario: Monster skill choice ranks physical attacks with their atk_phys bonus
-- **WHEN** a monster owning (or granted) `t_retainer_martial_training` chooses between a physical and
-  a magic candidate skill
-- **THEN** the physical candidate's expected damage includes the flat `atk_phys` bundle value
+- **WHEN** synthetic physical and magic candidates compete and the actor receives a relevant own attacking-stat modifier or buff
+- **THEN** the affected school E includes that adjustment; the other school retains its own independent adjusted value
 
-#### Scenario: Only the stat terms mirror live resolution
-- **WHEN** the estimator computes an expected damage
-- **THEN** it keeps its existing conservative base-multiplier shape; only the stat terms
-  match live resolution
+#### Scenario: Defender changes do not change reflex scores
+- **WHEN** defender defense or agility changes while actor inputs, coefficients and living enemy count remain fixed
+- **THEN** reflex E and probabilities remain unchanged, even though actual settlement can differ
 
 #### Scenario: The power-ratio heuristic keeps ranking on raw stats
-- **WHEN** the overwhelm power-ratio heuristic (`effective_power`) ranks entities
-- **THEN** it keeps ranking by raw effective stats
+- **WHEN** effective_power ranks the same entities
+- **THEN** it continues using its raw effective-stat contract
+
+#### Scenario: Only the stat terms mirror live resolution
+- **WHEN** overwhelm expected damage and reflex own-output estimation read adjusted attacking stats
+- **THEN** overwhelm retains its existing conservative shape and adjusted defense; reflex uses exact A*c*R without a defender term or hit chance
 
 #### Scenario: Numerical mechanism examples are synthetic
-- **WHEN** the numerical examples above are exercised
-- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+- **WHEN** these estimator arithmetic scenarios are exercised
+- **THEN** fixed synthetic bonuses and coefficients supply independently known results without fixing shipped balance values
 
 ### Requirement: Preview, preflight, and resolve agree on adjusted resource costs
 `action_preview.py`'s skill-wide failure check SHALL apply the same `apply_cost_modifier`
@@ -614,4 +610,3 @@ resist scoring, and presentation all match identically.
 #### Scenario: Numerical mechanism examples are synthetic
 - **WHEN** the numerical examples above are exercised
 - **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
-

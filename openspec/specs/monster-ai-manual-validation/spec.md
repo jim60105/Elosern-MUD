@@ -6,7 +6,7 @@ Provide isolated manual encounter, paired-selector and whole-policy performance 
 ## Requirements
 
 ### Requirement: Manual campaign has the approved finite allocation
-Manual acceptance SHALL use six archetypes, six synthetic situations, two documented seeds and intelligence 10/90, totaling 24 encounters per archetype and 144 utility encounters. Intelligence SHALL be the only paired variant difference. Encounters SHALL use real production settlement and committed reload.
+Manual acceptance SHALL use six archetypes, six synthetic situations, two documented seeds and intelligence 10/90, totaling 24 encounters per archetype and 144 deliberation encounters. Intelligence SHALL be the only paired variant difference. Encounters SHALL use real production settlement and committed reload.
 
 #### Scenario: Six distinct situations
 - **WHEN** each archetype campaign executes
@@ -28,10 +28,10 @@ A standalone manual selector check SHALL compare exactly two legal candidates wi
 - **THEN** every chosen candidate repeats; the operation runs no encounters and reports no win-rate conclusion
 
 ### Requirement: Performance evidence measures the complete policy
-Manual performance SHALL time snapshot, legality, estimation, scoring, sampling and configured trace overhead using monotonic wall clock and actual ORM queries. The reference envelope SHALL use 16 live participants, up to 16 owned active skills and 256 candidate budget. Warm utility p95 SHALL be at most 50 ms on the recorded host.
+Manual performance SHALL time snapshot, legality, estimation, scoring, sampling and configured trace overhead using monotonic wall clock and actual ORM queries. The reference envelope SHALL use 16 live participants, up to 16 owned active skills and 256 candidate budget. Warm deliberation p95 SHALL be at most 50 ms on the recorded host.
 
 #### Scenario: Warm and cold comparison
-- **WHEN** legacy and utility performance are measured on fixed snapshot state
+- **WHEN** reflex and deliberation performance are measured on fixed snapshot state
 - **THEN** each has a separate cold first call, five warm-ups and 50 measurements; report p50/p95, examined/accepted/omitted candidates, queries and isolated dice state
 
 #### Scenario: Candidate query scaling

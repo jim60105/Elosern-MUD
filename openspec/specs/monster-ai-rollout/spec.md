@@ -6,7 +6,7 @@ Enable a small named variant set only after complete evidence and demonstrate le
 ## Requirements
 
 ### Requirement: Activation follows complete accepted evidence
-Existing production variants SHALL remain legacy until attack/tactics regressions, real production smoke, the approved manual campaign, selector threshold, complete-policy performance and repository contract gate pass. Initial utility activation SHALL name a small explicit registered variant set with independently authored intelligence.
+Existing production variants SHALL remain reflex until attack/tactics regressions, real production smoke, the approved manual campaign, selector threshold, complete-policy performance and repository contract gate pass. Initial deliberation activation SHALL name a small explicit registered variant set with independently authored intelligence.
 
 #### Scenario: Release prerequisite
 - **WHEN** any required behavior evidence, valid-action rate or performance criterion is missing or fails
@@ -14,28 +14,32 @@ Existing production variants SHALL remain legacy until attack/tactics regression
 
 #### Scenario: Named first activation
 - **WHEN** all prerequisites pass and selected variants are enabled
-- **THEN** the report records exact names, intelligence values, fingerprint and a real affected encounter; other variants remain legacy
+- **THEN** the report records exact names, intelligence values, fingerprint and a real affected encounter; other variants remain reflex
 
 ### Requirement: Expansion and retuning require affected evidence
-Expansion SHALL follow review of valid-action rates, wait/exclusion causes, resource use and observed behavior. Affected profile tuning edits SHALL rerun focused scenarios and produce new fingerprints. Old-fingerprint acceptance claims SHALL NOT be presented as evidence for changed tuning.
+Expansion SHALL follow review of valid-action rates, wait/exclusion causes, resource use and observed behavior. Changed mode values, reflex metric/sampling or temperature SHALL produce new fingerprints and fresh affected evidence. Old-fingerprint acceptance claims SHALL NOT be presented for changed tuning.
+
+#### Scenario: Rename and metric invalidate evidence
+- **WHEN** mode values or reflex algorithm/temperature/primary damage coefficient changes
+- **THEN** current evidence is regenerated under the resulting fingerprints; old reports remain superseded historical evidence
 
 #### Scenario: Focused retuning
-- **WHEN** weights or temperature for one affected profile change
-- **THEN** its focused scenarios are rerun without automatically executing every archetype; no combat stat rebalance is included
+- **WHEN** weights or temperature of an affected profile change later
+- **THEN** focused scenarios rerun without an automatic all-archetype campaign or combat stat rebalance
 
 ### Requirement: Legacy mode rollback is demonstrated
-Selected variants SHALL be switchable back to legacy without destructive migration or DB restoration. Changed on-disk tuning SHALL require restart to validate and load startup mode. New sessions SHALL use already-loaded startup tuning and SHALL NOT reload disk edits. Existing sessions SHALL retain recorded tuning until termination or restart. Restart SHALL clear tactical history.
+Selected variants SHALL be switchable to permanent reflex without data migration or DB restoration. Disk tuning edits SHALL require restart validation/loading. New sessions SHALL use loaded startup tuning without reloading disk. Existing sessions SHALL retain recorded tuning until termination or restart. Restart SHALL clear tactical history. Rollback SHALL use the current reflex skill contract rather than historical skill-dice behavior.
 
 #### Scenario: Rollback encounter
-- **WHEN** an activated variant's mode is edited to legacy and restart validates and loads that startup mode
-- **THEN** focused real smoke reproduces legacy target, skill, flee priority and dice behavior; non-monster delegation and transactions remain unchanged
+- **WHEN** an activated variant mode is edited to reflex and restart loads it
+- **THEN** real smoke exercises retained target/flee behavior and current first_owned or independently seeded output sampling; non-monster delegation and transactions remain unchanged
 
 #### Scenario: A new session does not reload configuration
-- **WHEN** mode is edited on disk while the process remains active and a new session begins
-- **THEN** the session uses the process's already-loaded startup configuration; new-session-only rollback evidence is valid only when that process already loaded the intended legacy mode
+- **WHEN** a disk mode is edited while the process stays active and a new session begins
+- **THEN** it uses already-loaded startup tuning; only a process that loaded reflex supplies valid reflex rollback evidence
 
 #### Scenario: Rollback error boundary
-- **WHEN** a database/resolver exception occurs during rollback verification
+- **WHEN** a DB or resolver exception occurs during rollback verification
 - **THEN** it retains its existing boundary and is never reported as an AI invalid-state warning
 
 ### Requirement: Release evidence is reproducible and scoped
