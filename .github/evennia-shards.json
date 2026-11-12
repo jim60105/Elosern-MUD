@@ -1349,6 +1349,7 @@
         "web.webclient.presentation.tests.test_art_panel",
         "web.webclient.presentation.tests.test_dream_artwork",
         "web.webclient.presentation.tests.test_gallery_panel",
+        "web.webclient.presentation.tests.test_gallery_categories",
         "web.webclient.presentation.tests.test_art_push",
         "web.webclient.presentation.tests.test_character_panel.test_full_title_presenter",
         "web.webclient.presentation.tests.test_character_panel.test_full_title_schema",
