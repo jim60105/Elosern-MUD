@@ -1006,6 +1006,8 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 warn.assert_not_called()
             with self.subTest(rejection=action), patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
                 result = self.dispatch(action, dict(payload, subject_key="portrait:character:t_absent"))
+                # Selection validates against the listed category itself; every
+                # mutation refuses a subject in no category at admission.
                 expected = "unknown_subject" if action == "gallery.subject.select" else "subject_not_admitted"
                 self.assertEqual(result["code"], expected)
                 self.assertEqual(warn.call_count, 1)
