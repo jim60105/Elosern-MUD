@@ -23,6 +23,16 @@ command prefix below: `uv run --locked --env-file=/tmp/mud-test.env evennia test
 - [x] 4.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.observability_lint check` and `uv run --locked python -m tools.contract_gate --change remove-baseline-visual-species`; all pass.
 - [x] 4.2 Run `openspec validate remove-baseline-visual-species --strict`; it passes.
 
+## Implementation notes
+
+- 1.2, 2.2, 3.2: per `docs/development/spec-test-traceability.md`, ADDED
+  requirement IDs exist only after archive sync. New tests for ADDED
+  requirements stay unannotated, and existing decorators naming the REMOVED
+  requirement IDs were kept unchanged; os-archive retargets them post-sync.
+- 2.2 also switched every other test that relied on a baseline key being a
+  registered visual species (subjects, prompts, gallery updates, monster
+  gallery, worker slices) to the synthetic kit species.
+
 ## Workflow follow-up
 
 - At archive sync, edit the Purpose of `openspec/specs/monster-visual-identity/spec.md` to drop "baseline wilderness monsters" wording.
