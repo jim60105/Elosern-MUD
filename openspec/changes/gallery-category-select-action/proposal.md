@@ -44,8 +44,10 @@ None.
 ## Impact
 
 - Code: `web/webclient/actions/gallery_actions.py`,
-  `web/webclient/actions/registry.py`.
+  `web/webclient/actions/registry.py`, and the silent entry in
+  `web/static/webclient/js/elosern/command_echo.js`.
 - Tests: the gallery action test module and the registry enumeration test
-  (`rg -ln "party.view_member" web/webclient/actions/tests`).
+  (`rg -ln "party.view_member" web/webclient/actions/tests`), plus the
+  command-echo coverage manifest and its Node and Vitest tables.
 - Estimate: 3 hours (adapter and validator 1 h, tests 1.5 h, spec and gates
   0.5 h).
