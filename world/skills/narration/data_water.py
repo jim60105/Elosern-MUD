@@ -133,6 +133,20 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 從濕岩上一躍，黏濕的舌尖拍上對方手臂。",
         ),
     ),
+    NarrationRow(
+        "wreck_arm_bind",
+        action=(
+            "{actor} 一條觸腕捲了過來，纏住對手猛然絞緊。",
+            "{actor} 裹著海水的觸腕越收越緊，吸盤吸住對方不放。",
+        ),
+    ),
+    NarrationRow(
+        "wreck_arm_sweep",
+        action=(
+            "{actor} 甩開八條觸腕，帶著水花橫掃一圈。",
+            "{actor} 沉重的觸腕掃過四周，濺起的海水打在眾人身上。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

@@ -87,6 +87,10 @@ enemy.
 The salt-snort iguana's brine snort butt is assembled the same way with
 elementless physical damage plus a hit-dependent accuracy debuff on the struck
 enemy.
+The wreck-arm octopus's two water strikes are assembled the same way with
+physical-school damage that reads the actor's physical attack: one single-target
+arm bind and one area arm sweep, each paid in both MP and SP, and the area cast
+resolves every recipient's own hit and defense while the action pays once.
 """
 
 from world.skills.effects import (
@@ -1264,6 +1268,54 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "wreck_arm_bind",
+        "觸腕絞纏",
+        "以水屬性力量讓海水裹住觸腕，纏住單一敵方目標絞緊，造成水屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 12, "sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="water",
+        effects=["damage:water:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="water",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("wreck_arm_octopus",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.2, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "wreck_arm_sweep",
+        "群腕橫掃",
+        "甩開裹著水套的全部觸腕橫掃一圈，以水屬性力量對周圍每個敵方目標造成水屬性物理傷害。",
+        SkillKind.ACTIVE,
+        TargetSpec.AREA,
+        cost={"mp": 16, "sp": 8},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        element="water",
+        effects=["damage:water:physical"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="water",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("wreck_arm_octopus",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
         ),
     ),
 )

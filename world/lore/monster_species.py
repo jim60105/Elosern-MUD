@@ -1255,6 +1255,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "seacliff_basker",
         True,
     ),
+    MonsterSpecies(
+        "wreck_arm_octopus",
+        "沉船巨蛸",
+        "沉船巨蛸是八條觸腕張開能蓋住一艘漁船的巨大章魚類魔獸，獨自棲息於西南海岸海崖下的海蝕洞與擱淺的沉船殘骸。",
+        "軟滑的身體泛著暗紅與褐色的斑紋，一對金黃的眼睛長在頭側，瞳孔是一道橫縫。"
+        "八條觸腕粗如船纜，內側排滿兩列碗口大的吸盤，腕根之間藏著一張鉤狀的硬喙。",
+        "牠白天縮在海蝕洞深處或沉船的船艙裡，夜裡伸出觸腕，在礁石間摸找蟹、魚與貝類。"
+        "牠能以水屬性力量讓海水沿著觸腕裹成一層沉重的水套，離開海面一整個潮汐仍保持濕潤，還能拖著身體爬上崖腳的礁岩。"
+        "南潮港一帶的漁家熟知哪幾處海蝕洞有牠出沒，收漁籠時會繞開那些洞口。"
+        "牠以單條觸腕纏住一名對手絞緊，也會甩開全部觸腕橫掃身旁每個對手；"
+        "兩者都耗費牠自身的魔力與體力。"
+        "首隻指定個體盤踞在一艘舊商船的殘骸裡，總是纏著船上那具生鏽的大錨，被稱為「沉錨」。",
+        ("southwest_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；觸腕水套之力的成因不在設定中交代。",
+        "（作者私有：作者解釋）高階獨居巨型章魚：水屬性只在自身觸腕裹成水套，讓牠離水時保持濕潤並加重擊打，不掀起浪潮、不拖沉船隻、不操控海流；戰鬥呈現為水屬性物理絞纏與範圍橫掃，資源耗盡後回到普通攻擊。不具神性、守護使命或精靈關聯，也不屬於遠洋魔獸。連結南潮港漁家收漁籠的習慣與海崖下的沉船。",
+        "（作者私有：尚未證實的猜想）南潮港的老船匠說沉錨纏著的那具大錨來自一艘載滿精工銀器的商船，這種說法尚未證實。",
+        "wreck_den_elder",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2325,6 +2344,22 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("brine_snort_butt",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "wreck_den_elder",
+        "wreck_arm_octopus",
+        "沉骸型",
+        "普通版本，長年盤踞在海蝕洞或沉船殘骸裡的成年個體。",
+        "high",
+        True,
+        MonsterCombatProfile(
+            hp=480, mp=48, sp=30, atk_phys=31, agility=22, defense=22, magic_power=0
+        ),
+        "B",
+        True,
+        active_skill_keys=("wreck_arm_bind", "wreck_arm_sweep",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
