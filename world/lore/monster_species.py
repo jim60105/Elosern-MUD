@@ -1202,6 +1202,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "salt_hauler",
         True,
     ),
+    MonsterSpecies(
+        "stiff_arm_starfish",
+        "硬腕海星",
+        "硬腕海星是五條腕足張開約一臂寬的海星類魔獸，成片棲息於西南海岸的潮池、蚵架與造船坊的下水滑道。",
+        "身體是五條粗短腕足連成的星形，背面橙紅，布滿顆粒狀的硬疣；"
+        "每條腕足的腹面排著兩列細密的管足。",
+        "牠們以管足沿著礁石與蚵架爬行，用腕足扳開蚵殼與貽貝，吃裡頭的肉。"
+        "牠的體壁帶著異常的變化力，平時柔軟，一受驚就在眨眼間硬得像石頭，緊貼在礁石上承受整道浪頭。"
+        "漁灣鎮與南潮港的漁家在潮間帶搭起蚵架，硬腕海星成片爬上架子，一夜就能吃空一整排蚵殼；"
+        "造船坊的下水滑道也常被牠們占住，木船滑下時刮傷船底。"
+        "近身時，牠撐起腕足撲壓到對手身上，撲壓時全身體壁一併硬化，短時間內更加堅固。",
+        ("southwest_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；體壁瞬間硬化的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群聚海星：體壁硬化屬於身體能力，不帶元素、不讓周圍環境變硬；戰鬥呈現為腕足撲壓與自身短暫防禦提升。連結漁家蚵架與造船坊的下水滑道。",
+        "（作者私有：尚未證實的猜想）漁灣鎮的老漁婦說硬腕海星背上的硬疣越紅，當年的蚵就越肥，這種說法尚未證實。",
+        "oyster_rack_creeper",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2174,6 +2192,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "E",
         True,
         active_skill_keys=("salt_jaw_haul",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "oyster_rack_creeper",
+        "stiff_arm_starfish",
+        "爬架型",
+        "普通版本，成片爬過潮池礁石與蚵架，扳開貝殼覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=40, mp=0, sp=9, atk_phys=4, agility=3, defense=6, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("stiff_arm_press",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "tide_pool_elder",
+        "stiff_arm_starfish",
+        "老礁型",
+        "占住崖腳一座深潮池的老個體，腕足最粗、硬疣最厚，會撲向任何涉進潮池的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=64, mp=0, sp=15, atk_phys=9, agility=3, defense=8, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("stiff_arm_press",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
     ),
