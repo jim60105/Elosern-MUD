@@ -1055,6 +1055,12 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    def test_rule_jaw_drag_agility_flat(self):
+        entity = self._entity()
+        rule = RULES["jaw_drag_agility_flat"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     def test_rule_ember_skin_atk_phys(self):
         entity = self._entity()
         rule = RULES["ember_skin_atk_phys"]

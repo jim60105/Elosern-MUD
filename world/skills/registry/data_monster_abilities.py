@@ -76,6 +76,8 @@ damage plus a self-mounted agility lift granted by every resolved attempt.
 The breakwater seal's flipper slide slam is assembled the same way with
 elementless physical damage plus a hit-dependent agility debuff on the struck
 enemy.
+The salt-column ant's jaw haul is assembled the same way with elementless
+physical damage plus a hit-dependent agility debuff on the struck enemy.
 """
 
 from world.skills.effects import (
@@ -1160,6 +1162,29 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "salt_jaw_haul",
+        "銜鹽拖咬",
+        "以大顎咬住單一敵方目標的腳踝向後拖拽，造成物理傷害；命中後讓對手腳下一沉，短暫降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:jaw_drag"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("salt_column_ant",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),

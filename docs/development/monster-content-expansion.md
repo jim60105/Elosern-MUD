@@ -10,6 +10,7 @@ every magnitude lives once in its executable declaration under
 `world/rules/rulebook/`. Sections from 孢傘菇 onward record the north deep
 forest species of the near-settlement programme's Wave 1. Sections from 霧泉蛙 onward record the central mountains and northwest highland forest species of the near-settlement programme's Wave 2.
 Sections from 滾土甲蟲 onward record the eastern plains and southeast coast species of the near-settlement programme's Wave 3.
+Sections from 負鹽蟻 onward record the southwest coast and western hills species of the near-settlement programme's Wave 4.
 
 ## 泥膜史萊姆
 
@@ -2732,6 +2733,82 @@ The registry import check succeeds and the registry holds 59 variants
 `uv run --locked python -m tools.map_reference_context` followed by `--check`,
 `uv run --locked python -m tools.contract_gate --change
 breakwater-seal-species` and `openspec validate breakwater-seal-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
+
+## 負鹽蟻
+
+This section records the first delivered species of the southwest coast Wave 4.
+負鹽蟻 (`salt_column_ant`) is a low-tier harvester ant whose ordinary default
+variant is 搬鹽型 (`salt_hauler`, grade F) and whose stronger variant is 守丘型
+(`salt_mound_soldier`, grade E); both own the single bite 銜鹽拖咬
+(`salt_jaw_haul`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Small column worker: the authored agility sits in the low band's middle,
+  while defense and hit points sit in their lower part.
+* The kit spends no MP, so the authored MP pool is zero; the SP pool holds
+  three casts of the bite's SP cost (five on 守丘型).
+* The rider (−2 agility for 12 s) equals the goblin's shipped −2 agility rider.
+* The stronger 守丘型 guards a salt-crusted nest mound at grade E.
+
+### Reuse of the enemy hit-rider representative
+
+The kit declares the shipped enemy hit-rider signature
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies",
+0))`. Its representative is unchanged: `cliff_stepper`, declared in
+`world.rules.tests.test_sway_whistle_sparrow_resource_skill`. Both new variant
+keys sort after that representative, so no smoke module, shard entry or seed
+entry is added; `EnemyRiderGroupMemberTests` derives the whole group from the
+shipped declarations and exercises both new members on their own rider axis.
+
+### Decision mode
+
+Both variants bind the legacy `instinctive` archetype: `first_owned` skill
+choice against the lowest-hit-point enemy, with that archetype's authored flee
+threshold of 0.35. No intelligence value, decision-mode override or
+`monster_behaviour.yaml` edit is authored. Because the archetype selects the
+first owned kit deterministically, the group-member contract does not depend on
+a damage tie-break.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 117 tests, OK, run as two exhaustive focused method-label batches (59 + 58) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check succeeds and the registry holds 61 variants
+(`len(MONSTER_VARIANT_REGISTRY)` printed 61); the remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+salt-column-ant-species` and `openspec validate salt-column-ant-species
 --strict`. The committed manifest files `.github/evennia-shards.json`,
 `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
 unchanged.
