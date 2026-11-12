@@ -6,10 +6,27 @@ campaign, and the focused test module
 (`world.rules.tests.test_monster_ai_manual_reports`) establishes the tool's own
 contracts without ever rerunning the allocation.
 
-Baseline commit: `ab8b457ddc4265482766d601d99a6555e3f88e82` (the implementation
+Baseline commit: `113014bf9dae5d5b2e354f4c4afdbe61006454e2` (the implementation
 commit these reports were generated from). Host: `Jim-Fedora`,
 `Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43`, CPython 3.13.14, Evennia
 `6.1.0 (rev ab8b457d)`.
+
+`monster-decision-modes-rename-and-reflex-area-estimate` reran **all eight**
+operations at algorithm version 6: the mode rename and the new reflex estimate
+change what an identical tuning decides, so no earlier report can stand as
+evidence for this tuning. The six campaigns and the performance report record
+their own harness fingerprint
+`6c8e5bdab452aa2b15963a91978e145bec3c6642b49e2b3da46f2b8f3c58f921`;
+`selector-check.json` / `.md` record the process's startup fingerprint
+`5b46ee570d95fc99507b303509e634f9387830a4a7fa87249d23a1d05bb9fba3`. Every
+earlier value below is superseded history, not evidence for the changed tuning.
+
+Those eight runs were produced from branch tip `113014bf...`, which is the
+`baseline_commit` each report records. The branch's following review-fix commit
+touches only a reflex branch the campaigns never reach (an authored AREA-only
+kit, where a SINGLE target domain is no longer resolved) plus comments and
+documentation, so these reports' tuning fingerprints still describe the tuning
+the process loads.
 
 The six archetype campaigns and the performance report were generated from that
 baseline, and their recorded configuration fingerprint is their own harness
@@ -182,8 +199,8 @@ The six archetypes are the authored behaviour profiles of
 `world/rules/rulebook/monster_behaviour.yaml`. Each `archetype` invocation runs
 exactly that archetype's 24 encounters (six situations x two documented seeds x
 intelligence 10/90, round cap 30) through the real combat-session
-round/resolver boundary; the six invocations total 144 utility encounters, 1242
-recorded monster decisions and 1198 committed rounds.
+round/resolver boundary; the six invocations total 144 deliberation encounters,
+1163 recorded monster decisions and 1119 committed rounds.
 
 ## What each encounter verifies
 
@@ -257,14 +274,14 @@ snapshot (`raw[].decision_records`). `examined` is the candidate set's own
 counter: accepted candidates plus rejections plus mandatory-filter exclusions.
 
 Configuration fingerprint (all campaign and performance reports):
-`497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f`
-(algorithm version 5): the campaigns build their own synthetic variant pairs and
+`6c8e5bdab452aa2b15963a91978e145bec3c6642b49e2b3da46f2b8f3c58f921`
+(algorithm version 6): the campaigns build their own synthetic variant pairs and
 copy only the archetypes from the shipped rulebook, so the shipped variant maps
 never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`bd82767e08a1857878c6f2802a81a5cd9ff5b88f42b90a2dca76a2cbdbb66ed5` -- that
+`5b46ee570d95fc99507b303509e634f9387830a4a7fa87249d23a1d05bb9fba3` -- that
 operation records the process's startup fingerprint, which this value now is;
 the earlier values `8b56d98c...`, `877fdd6d...`, `70e5f38d...`, `383b1eff...`, `ef4b4b14...`, `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`,
 `f8858072...`, `3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`,
@@ -292,12 +309,12 @@ Paired difference (high - low): **0.344** (required >= 0.15): met.
 
 | archetype | encounters | win | loss | capped | mean rounds | highest-utility fraction | decisions | selected illegal |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ambush_predator | 24 | 24 | 0 | 0 | 8.17 | 0.348 | 198 | 0 |
-| apex_predator | 24 | 24 | 0 | 0 | 8.42 | 0.370 | 216 | 0 |
-| brute | 24 | 24 | 0 | 0 | 7.96 | 0.404 | 198 | 0 |
-| instinctive | 24 | 24 | 0 | 0 | 8.71 | 0.240 | 217 | 0 |
-| pack_hunter | 24 | 24 | 0 | 0 | 8.42 | 0.446 | 204 | 0 |
-| tactical_caster | 24 | 24 | 0 | 0 | 8.25 | 0.349 | 209 | 0 |
+| ambush_predator | 24 | 24 | 0 | 0 | 7.83 | 0.359 | 192 | 0 |
+| apex_predator | 24 | 24 | 0 | 0 | 7.33 | 0.382 | 186 | 0 |
+| brute | 24 | 24 | 0 | 0 | 7.58 | 0.238 | 185 | 0 |
+| instinctive | 24 | 24 | 0 | 0 | 7.67 | 0.294 | 194 | 0 |
+| pack_hunter | 24 | 24 | 0 | 0 | 8.25 | 0.401 | 202 | 0 |
+| tactical_caster | 24 | 24 | 0 | 0 | 7.96 | 0.279 | 204 | 0 |
 
 Every archetype totals 24 encounters (144 across the six) and every encounter
 reached a terminal settlement: no encounter reached the 30-round bound in this
@@ -309,7 +326,7 @@ action was refused by settlement.
 
 Target concentration is reported over encounter-local roles (the decision's own
 target roles, never scratch dbrefs): per-archetype mean top-role share runs
-0.650-0.775, and 21-23 of each archetype's 24 encounters put at least half their
+0.573-0.624, and 19-24 of each archetype's 24 encounters put at least half their
 choices on one role - the monster really does focus, and that focus is
 distinguishable from choices spread across unrelated entities.
 
@@ -317,12 +334,12 @@ Each situation is distinct in the decisions it produces:
 
 | situation | encounters | decisions | committed rounds | chosen skills |
 | --- | ---: | ---: | ---: | --- |
-| finishing_choice | 24 | 99 | 109 | strike_1 38, basic_attack 26, strike_0 22, selfheal_0 5, area_0 5, heal_0 3 |
-| area_versus_single | 24 | 166 | 172 | basic_attack 61, strike_0 38, strike_1 35, area_0 14, selfheal_0 10, heal_0 8 |
-| resource_exhaustion | 24 | 215 | 227 | basic_attack 91, strike_0 79, selfheal_0 25, strike_1 18, heal_0 2 |
-| mandatory_targeting | 24 | 156 | 163 | strike_0 57, area_0 46, selfheal_0 32, heal_0 21 |
-| support_and_focus | 24 | 288 | 198 | basic_attack 104, strike_0 98, heal_0 40, selfheal_0 20, strike_1 18, area_0 8 |
-| long_lifecycle | 24 | 318 | 329 | basic_attack 96, strike_1 76, strike_0 70, area_0 28, selfheal_0 27, heal_0 21 |
+| finishing_choice | 24 | 91 | 103 | strike_1 24, basic_attack 29, strike_0 16, area_0 8, selfheal_0 8, heal_0 6 |
+| area_versus_single | 24 | 157 | 163 | basic_attack 63, strike_0 32, strike_1 26, area_0 13, heal_0 13, selfheal_0 10 |
+| resource_exhaustion | 24 | 192 | 202 | basic_attack 93, strike_0 57, selfheal_0 22, strike_1 14, heal_0 6 |
+| mandatory_targeting | 24 | 156 | 168 | area_0 50, strike_0 48, heal_0 29, selfheal_0 29 |
+| support_and_focus | 24 | 302 | 213 | basic_attack 146, strike_0 76, heal_0 42, selfheal_0 16, area_0 13, strike_1 9 |
+| long_lifecycle | 24 | 265 | 270 | basic_attack 88, strike_0 67, strike_1 42, area_0 28, selfheal_0 23, heal_0 17 |
 
 `strike_0` is the kit's magic-school single strike, `strike_1` and
 `basic_attack` are the physical, strike-class ones; `basic_attack` is the
@@ -342,12 +359,12 @@ budget 256; one cold call, five warm-ups and fifty measured decisions per mode.
 
 | mode | cold ms | p50 ms | p95 ms | queries | examined | accepted | omitted | dice isolated |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| legacy | 3.96 | 0.59 | 0.77 | 10 | 0 | 0 | 0 | False |
-| utility | 46.00 | 16.36 | 16.84 | 97 | 108 | 108 | 0 | True |
+| reflex | 3.96 | 0.60 | 0.77 | 10 | 0 | 0 | 0 | False |
+| deliberation | 46.81 | 16.86 | 17.18 | 97 | 108 | 108 | 0 | True |
 
-Warm utility p95 budget 50 ms: met. The utility policy draws from its own
-generator and never advances the combat dice stream; the legacy body is the
-retained rulebook policy and legitimately consumes it.
+Warm deliberation p95 budget 50 ms: met. The deliberation policy draws from its
+own generator and never advances the combat dice stream; the reflex body is the
+retained rulebook policy and legitimately consumes it for its target tie-break.
 
 The candidate-query scaling probe holds **one fixed reference roster and
 state** and varies only the decision's examined-proposal budget; every probe
@@ -360,7 +377,7 @@ so each one re-reads the same participants and skills:
 | 64 | 200 | 64 | 64 | 57 |
 | 256 | 200 | 108 | 108 | 0 |
 
-Query work stays at 168 queries while the examined proposals rise from 16 to
+Query work stays at 200 queries while the examined proposals rise from 16 to
 108 and the budget omissions fall from 105 to 0: the ORM work scales with the
 initial participant/skill read, never with the proposals a decision examined.
 This is a manual measurement on the recorded host, never a permanent timing

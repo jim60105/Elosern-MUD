@@ -1,14 +1,14 @@
 # Manual performance scenario (monster-ai-manual-evidence)
 
-- Baseline commit: `4bbe4f0c9372b745b68de43c1b2ba8a552ab8ba4`
-- Configuration fingerprint: `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f`
-- Host: `Jim-Fedora` / Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43 (clock monotonic)
+- Baseline commit: `113014bf9dae5d5b2e354f4c4afdbe61006454e2`
+- Configuration fingerprint: `6c8e5bdab452aa2b15963a91978e145bec3c6642b49e2b3da46f2b8f3c58f921`
+- Host: `Jim-Fedora` / Linux-7.2.15-200.fc44.x86_64-x86_64-with-glibc2.43 (clock monotonic)
 - Envelope: 16 participants, up to 16 owned active skills, candidate budget 256; 5 warm-ups then 50 measurements per mode, one cold call
 
 | mode | cold ms | p50 ms | p95 ms | queries | examined | accepted | omitted | dice isolated |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| legacy | 3.96 | 0.59 | 0.77 | 10 | 0 | 0 | 0 | False |
-| utility | 46.00 | 16.36 | 16.84 | 97 | 108 | 108 | 0 | True |
+| reflex | 3.96 | 0.60 | 0.77 | 10 | 0 | 0 | 0 | False |
+| deliberation | 46.81 | 16.86 | 17.18 | 97 | 108 | 108 | 0 | True |
 
 Warm p95 budget 50 ms: met.
 
