@@ -28,7 +28,7 @@ additively behind the v4 validator keeps master on v3 until the cutover.
   `description: null`, validated by `validate_gallery_v4`. Not registered.
 - A v4 session selection store in `gallery_selection.py`: one category and one
   subject per category, bound to the owning character (so possession keeps
-  it), retired with the presentation sequence like today; write functions
+  it), retired when the session puppets another owner or ends; write functions
   `select_gallery_category` and `select_gallery_subject_v4` that validate
   against the category sources. Not called by any action yet.
 - `PresentationContext.gallery_view` carries an immutable snapshot of that
