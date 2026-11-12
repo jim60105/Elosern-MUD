@@ -674,6 +674,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
         return result
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::category-selection-writes-only-session-presentation-state"
+    )
     def test_category_selection_stores_the_enabled_category_without_art_mutation(self):
         self.card()
         self.generate(self.companion_subject)
@@ -698,6 +701,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         )
         warn.assert_not_called()
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::category-selection-writes-only-session-presentation-state"
+    )
     def test_disabled_category_is_refused_without_a_write(self):
         with patch.dict(gallery_selection.DISABLED_REASONS, {"people": "disabled"}, clear=True):
             with patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
@@ -715,6 +721,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
             self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
             self.assertEqual(stored.category, "monster")
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::category-selection-writes-only-session-presentation-state"
+    )
     def test_malformed_category_payloads_never_reach_the_adapter(self):
         for name, payload, accepted in category_wire_cases():
             if accepted:
