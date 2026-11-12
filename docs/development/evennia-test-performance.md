@@ -623,3 +623,47 @@ chrome-headless-shell 與約 30 個系統套件；被節流的 job 就把 30 秒
 （原本的 53 與 57）在 42179475404 首次讓整個矩陣全綠時才被檢查到。兩者分別併入
 `maps-28`（44）與 `rules-3`（4），分片數由 81 減為 **79**，索引重新編號為 0–78；
 兩個合併後的分片在本機分別通過並各自產出 2.7 KB／2.9 KB 的證據檔。
+
+### 2026-11-12：怪物棲地資料成長下的啟動、物化與世界建構成本
+
+怪物內容（species／placement／activity）把
+`ECOLOGY_ZONE_REGISTRY` 從 9 帶到 155 個 zone（合計 74,500 個 zone 矩形格）、
+`WeightedComposition` 從 19 帶到 617。run 43140279866（commit `2756bfee`）對照
+最後一次全綠的 42935733556（`1c5b4791`），CI 實測顯示三個成本來源同時放大：
+
+| 觀測（全部取自 CI log） | 綠（`1c5b4791`） | 紅（`2756bfee`） |
+|---|---:|---:|
+| 瀏覽器 `harness timing … ready=` | 20–50 s | 170–200 s |
+| `LocalMapPerGateFootprintTests` 每個 method | ~9 s | ~195 s |
+| `RoadNetworkAdoptionTests`（只做 adoption） | 56 s | 233 s |
+| evennia 各分片 `Ran` 總和 | 7,068 s | 11,505 s |
+| browser 各分片 `Ran` 總和 | 15,195 s | 28,614 s |
+
+**三個來源與修法（皆不改斷言、不改旗標擁有權）：**
+
+1. **主大陸 ring 每次重驗**：`is_on_mainland` 每次都重新驗證 750 個頂點
+   （單次 adoption 內 12,932 次呼叫）。改以身分（不是值）快取驗證後的 ring：
+   `(False, 0)` 與 `(0, 0)` 相等，值快取會讓畸形邊界得到別人的驗證結果。附上
+   「暖快取後仍拒絕 bool／float 頂點」的回歸測試。
+2. **逐格的聚落排除**：`eligible_birth_cells` 對每個候選格掃過所有聚落 footprint
+   （74,500 格 × 聚落 × footprint）。改為一次建出排除集合，逐格只做一次成員查詢。
+3. **每個 zone 各付一次世界掃描**：`_provision_wilderness_script` 逐 zone 呼叫
+   `initialize_zone`，每個 zone 各付一次 surface snapshot 與（每個 wave）兩次全體
+   presence 掃描。新增 `initialize_zones`：整批共用一次 rollback surface、一次
+   tick 投影的 presence 讀取、一次 protected cell 讀取，每 wave 只寫一次座標註冊，
+   並把本批新建立的個體加進共用 presence。`initialize_zone` 保留為單 zone 入口並
+   委派；`commit_population_wave` 仍讀即時狀態與即時計數。
+
+**測試的物化宣告延伸到初始族群**：initial population 由 authored zone 決定，
+一個只宣告兩張地圖的測試或瀏覽器 journey 仍會初始化全部 155 個 zone 的 1,065 隻
+個體。現在 `sync_test_wilderness(settlement_ids)` 與瀏覽器啟動 hook 都以
+`world.tests.geography_fixture.zones_for_settlements(...)` 把宣告換算成「這些聚落
+所在區域的 zone」，並且世界把實際初始化的 zone 集合記錄在
+`population_zone_scope`；後續啟動驗證的就是那份記錄（production 記錄完整 roster，
+行為不變；記錄缺失時視為完整 roster）。`require_initialized_population` 因此對
+bounded 世界仍然嚴格：缺一個記錄的 zone 或多一個不在記錄內的 zone 都是同一個
+named refusal。
+
+**驗收方式**：`--durations 0`（evennia）與 driver 的 method／boundary 欄位
+（browser）本來就會把每測試實測寫進 job log；重新打包仍以那一輪 CI 的 job 時長為
+唯一依據，預算維持每分片 ≤ 6 分鐘（硬限 20 分鐘的 job timeout）。
