@@ -16,7 +16,8 @@ import {
   refitFaceRectOnLoad,
   resizeFaceRect,
 } from "../../components/face-rect-edit.js";
-import { GALLERY_DATE_UNAVAILABLE, galleryCardName, galleryDate } from "../../components/gallery-copy.js";
+import { GALLERY_CATEGORY_LABELS, GALLERY_DATE_UNAVAILABLE, galleryCardName, galleryDate } from "../../components/gallery-copy.js";
+import Protocol from "../../../static/webclient/js/elosern/protocol.js";
 import {
   GALLERY_V4_EMPTY,
   GALLERY_V4_MINE as GALLERY_SAMPLE,
@@ -77,6 +78,9 @@ describe("gallery panel facts and request settlement", () => {
   it("waits for subject publication rather than optimistically switching cards", async () => {
     const dispatch = vi.fn(() => "request:1");
     const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    // The subject already shown never re-dispatches.
+    await button(wrapper, "夜行者").trigger("click");
+    expect(dispatch).not.toHaveBeenCalled();
     await button(wrapper, "晨星").trigger("click");
     expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.subject.select", { subject_key: "portrait:character:7004" });
     expect(wrapper.findAll(".gallery-card")).toHaveLength(GALLERY_SAMPLE.cards.length);
@@ -158,6 +162,10 @@ describe("gallery panel facts and request settlement", () => {
 });
 
 describe("gallery categories and subjects", () => {
+  it("labels every category key of the mirrored wire contract", () => {
+    expect(Object.keys(GALLERY_CATEGORY_LABELS)).toEqual([...Protocol.GALLERY_CATEGORY_KEYS]);
+  });
+
   it("renders one control per committed category with its committed count", () => {
     const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
     const controls = wrapper.findAll('[data-testid^="gallery-category-"]');
