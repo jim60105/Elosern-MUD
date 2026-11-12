@@ -6,19 +6,24 @@
 // size; a subject capped at one image selects that image without a tray.
 // Group headings appear only when a group carries a label; a heading may
 // count the subjects seen out of the group's total, and unseen subjects get
-// no tile. Reference only.
+// no tile. A collapsible group (people, by place) draws its heading as a
+// button and shows its tiles only while it is the expanded group. Reference
+// only.
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps({
-  // [{ key, label | null, discovered?, total?, slots: [subject] }]
+  // [{ key, label | null, discovered?, total?, collapsible?, count?, slots: [subject] }]
   groups: { type: Array, required: true },
+  // The one expanded group of a collapsible category.
+  expandedGroup: { type: String, default: null },
   subjectKey: { type: String, default: null },
   imageId: { type: String, default: null },
   // "portrait" | "landscape"
   shape: { type: String, default: "portrait" },
   ariaLabel: { type: String, required: true },
 });
-const emit = defineEmits(["select-subject", "select-image", "generate"]);
+const emit = defineEmits(["select-subject", "select-image", "generate", "expand-group"]);
+const isOpen = (group) => !group.collapsible || group.key === props.expandedGroup;
 
 const root = ref(null);
 const cols = ref(5);
@@ -28,7 +33,7 @@ function measure() {
   if (!el) return;
   const style = getComputedStyle(el);
   const scale = parseFloat(style.getPropertyValue("--ui-scale")) || 1;
-  const min = (props.shape === "landscape" ? 168 : 92) * scale;
+  const min = (props.shape === "landscape" ? 150 : 92) * scale;
   const gap = 8 * scale;
   const width = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   cols.value = Math.max(2, Math.floor((width + gap) / (min + gap)));
@@ -65,12 +70,20 @@ function imageLabel(image, index) {
 <template>
   <div ref="root" class="gwall" :class="`gwall--${shape}`" :style="{ '--gwall-cols': cols }" role="tabpanel" :aria-label="ariaLabel">
     <section v-for="group in groups" :key="group.key" class="gwall__group" :aria-label="group.label || ariaLabel">
-      <h4 v-if="group.label" class="gwall__head">
+      <h4 v-if="group.label && group.collapsible" class="gwall__head gwall__head--toggle">
+        <button type="button" class="gwall__toggle" :aria-expanded="String(isOpen(group))" @click="emit('expand-group', group.key)">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          <span>{{ group.label }}</span>
+          <span class="gwall__rule" aria-hidden="true"></span>
+          <span class="gwall__n"><b>{{ group.count }}</b> 人</span>
+        </button>
+      </h4>
+      <h4 v-else-if="group.label" class="gwall__head">
         <span>{{ group.label }}</span>
         <span class="gwall__rule" aria-hidden="true"></span>
         <span v-if="group.total" class="gwall__n"><b>{{ group.discovered }}</b> / {{ group.total }}</span>
       </h4>
-      <div class="gwall__grid">
+      <div v-if="isOpen(group)" class="gwall__grid">
         <template v-for="(slot, index) in group.slots" :key="slot.key">
           <button
             type="button"
@@ -151,6 +164,10 @@ function imageLabel(image, index) {
 </template>
 
 <style scoped>
+.gwall:has(.gwall__toggle) {
+  gap: var(--sp-2);
+}
+
 .gwall {
   --gwall-gap: calc(8px * var(--ui-scale));
   --gwall-pad: var(--sp-4);
@@ -183,6 +200,54 @@ function imageLabel(image, index) {
   color: var(--gold-400);
   font: var(--text-md) var(--f-display);
   letter-spacing: 0.12em;
+}
+
+.gwall__head--toggle {
+  margin: 0;
+}
+
+.gwall__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-2);
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(185, 154, 96, 0.22);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.gwall__toggle:hover {
+  border-color: var(--gold-500);
+}
+
+.gwall__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.gwall__toggle svg {
+  flex: none;
+  width: calc(14px * var(--ui-scale));
+  height: calc(14px * var(--ui-scale));
+  transition: transform var(--motion-fast) ease;
+}
+
+.gwall__toggle[aria-expanded="true"] {
+  border-color: var(--gold-500);
+}
+
+.gwall__toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.gwall__head--toggle + .gwall__grid {
+  margin-top: var(--sp-2);
 }
 
 .gwall__rule {

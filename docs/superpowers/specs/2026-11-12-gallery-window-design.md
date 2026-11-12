@@ -40,13 +40,11 @@ OpenSpec change.
 
 0. **Remove the baseline art-only visual species** (see "Prerequisite").
    Small, and it removes a special case from everything after it.
-1. **Gallery window and category-scoped panel** (this document, in full).
-   Ships 我的角色, 隊友 and 魔物. 人物 and 背景 are present on the rail but
-   disabled with a reason. Resolves the handoff.
-2. **People category and the met-person record.** Outlined in "Later
-   specifications".
-3. **Scene category and the scene gallery.** Outlined in "Later
-   specifications".
+1. **Gallery window and category-scoped panel** (D1–D9). Ships 我的角色,
+   隊友 and 魔物. 人物 and 背景 are present on the rail but disabled with a
+   reason. Resolves the handoff.
+2. **People category and the met-person record** ("Specification 2").
+3. **Scene category and the scene gallery** ("Specification 3").
 
 The window, the wall, the page and the panel shape are designed for all five
 categories now, so specifications 2 and 3 add data and enable a tab without
@@ -89,9 +87,9 @@ plain strings with no link to these rows and stay.
 | --- | --- | --- | --- |
 | `mine` | 我的角色 | Every character of the account that owns the rendered puppet (the `roster` panel's set), the live one first and marked 操作中 | `MAX_NR_CHARACTERS` (≤ 10) |
 | `party` | 隊友 | The live character's active party companions (`live_companions`), party order | party capacity |
-| `people` | 人物 | Specification 2 | — |
+| `people` | 人物 | Named NPCs the live character has interacted with, grouped by place (specification 2) | one place per panel |
 | `monster` | 魔物 | Visual species the player has sighted, grouped by threat tier | visual registry size (authored) |
-| `scene` | 背景 | Specification 3 | — |
+| `scene` | 背景 | Scene archetypes the live character has entered (specification 3) | archetype registry size (authored) |
 
 The category set and order are closed and client-labelled. `mine` follows the
 account, not the puppet: while the player possesses a companion, `mine` still
@@ -172,6 +170,7 @@ confirmation step.
   categories: [{ key, count, enabled, reason }],   // all five, fixed order
   category: "<key>",                               // the selected one
   groups: [{ key, label, seen, total,              // label/seen/total nullable
+             expanded, count,                      // see "Group expansion"
              subjects: [{ subject_key, kind, display_name,
                           is_current, card_count, artwork }] }],
   selected: "<subject_key>" | null,
@@ -203,6 +202,11 @@ confirmation step.
 - A category that can grow without an author (people) must page, delivering
   complete content in parts. That is designed in specification 2.
 - Both validator mirrors (Python and JS) enforce the shape, fail closed.
+
+**Group expansion.** Every group carries `expanded` and `count`. A group with
+`expanded: false` carries its `count` and no `subjects`. In specification 1
+every group is expanded, so the fields are constant; they exist so the people
+category can page by group without reshaping the panel.
 
 **Stored selection.** The session remembers one category and one subject per
 category. Opening the gallery restores them. A remembered subject that is gone
@@ -285,28 +289,121 @@ component as is: tiles are not square and a tray interrupts the grid.
   `pnpm run build-storybook`, `pnpm run showcase-coverage`, and a rebuilt dist
   before the browser run.
 
-## Later specifications
+## Specification 2: people
 
-**2. People.** A new record of the people a character has met, written when
-they share a room: the place and the time of the last meeting. The place is the
-city or region, not the district, so a person who moves between home and shop
-keeps one group; the place is rewritten only when it changes. 人物 groups by
-that place, most recently visited first, and orders each group by most recent
-meeting. Open for that specification: whether other players' characters appear
-here, what happens to a met person whose NPC was reclaimed with its scene, and
-paging, since this is the one category that grows without an author.
+### Who is listed
 
-**3. Scenes.** The scene kind's capability record changes from gallery-less to
-gallery-bearing with one card, no bindings, no face rect and no stage
-transform. 背景 lists the scene archetypes the character has visited, derived
-from the visited-node record. Tiles and the page are landscape (already in the
-prototype).
+A subject appears under 人物 when all of these hold:
+
+- it is an NPC with a named portrait policy (`portrait_policy.mode ==
+  "named"`); NPCs on the generic built-in fallback have no gallery and are
+  never listed;
+- the live character has interacted with it (below);
+- it exists in the world now;
+- it is not in the live character's party (those are under 隊友).
+
+Other players' characters are never listed. A player manages their own
+characters under 我的角色 and nobody else's.
+
+### The met-person record
+
+- Owned by the character, like the lore record and the party. Switching
+  character switches the list.
+- One entry per named NPC, keyed by its portrait stable key: the place and the
+  time of the last interaction.
+- Written by exactly four player-initiated interactions that name the NPC as
+  their target: talk, look, using one of its services, and inviting it to the
+  party. Being attacked or addressed by the NPC writes nothing.
+- While the player possesses a companion, the interaction is recorded for the
+  character that owns that companion.
+- Every interaction updates the time. The place is rewritten only when it
+  differs from the stored one.
+- **Place** is the settlement the interaction happened in, or the wilderness
+  region when outside any settlement. Districts are not used: an NPC that
+  walks between home and shop would otherwise jump between groups.
+- One writer module. The presenter stays read-only. A read skips entries whose
+  NPC no longer exists; the writer drops such entries when it next writes, so
+  no cleanup job is needed.
+
+### Grouping and paging
+
+- One group per place. Groups are ordered by the most recent interaction in
+  them; subjects inside a group by most recent interaction.
+- Exactly one group is expanded. The panel carries every group's label and
+  `count`, and the subjects of the expanded group only.
+- `gallery.group.select {group}` expands another group and collapses the
+  current one — one server round trip, like a category switch. Group headings
+  in this category are buttons with `aria-expanded`; tier headings under 魔物
+  stay plain headings.
+- The session remembers the expanded place and the selected person per
+  character. A remembered place that is gone falls back to the most recent
+  one.
+- This is the only category that grows without an author, and place paging is
+  what keeps its content complete without a truncation rule.
+
+### Out of scope, recorded for later
+
+The project intends to stop reclaiming scene NPCs, so that they live on
+somewhere in the world. Nothing here depends on that: "exists in the world
+now" lists whoever exists. Once NPCs persist, this list only grows, which
+place paging already carries.
+
+## Specification 3: scenes
+
+### Current state
+
+- A scene subject is a scene archetype (`scene:<archetype>`), not a room;
+  rooms of one archetype share one image.
+- A room's background resolves in this order: the room's own official image,
+  the archetype's generated image, an operator's archetype image, the bundled
+  archetype image, a terminal image. A generated image therefore overrides the
+  bundled one.
+- Generated scene images are classic asset records with no gallery. Only the
+  staff command `@art requeue` regenerates them, and `art-staff-commands`
+  states that no player-triggered regeneration surface exists.
+
+### The scene kind becomes gallery-bearing
+
+- The capability record of the scene kind changes to: has a gallery, one card,
+  no bindings, no age precondition, no prompt field selection, no free text —
+  the monster kind's set, plus two new declared facts shared by every kind:
+  whether a card may carry a face rectangle and whether it may carry a stage
+  transform. Scenes declare neither; characters and monsters declare both. The
+  footer of D5 reads these instead of comparing kinds.
+- Existing scene asset records and image files migrate to gallery records. The
+  migration is idempotent and leaves no orphan file or record.
+- The generated step of the background chain reads the scene gallery's default
+  card. The order of the chain does not change; every scenario of
+  `scene-artwork-presentation` is re-verified against the new source.
+- Generation, pending and failed states, deletion and pushes go through the
+  gallery path the other kinds use. `@art requeue` and `@art retry` follow the
+  kind's new declaration.
+- `art-staff-commands` drops the statement that players cannot regenerate, for
+  the kinds the gallery window serves.
+
+### The category
+
+- Lists the archetypes the live character has entered. The fact is recorded at
+  the existing room-entry seam that ensures the scene asset, per character.
+- One unlabeled group; no tray, since the kind holds one card.
+- The page shows the image in effect for the archetype and says which it is:
+  生成圖 or 官方內建圖 (no generated card yet).
+- Footer: 刪除 and 重新生成 on a generated image; 生成新圖 on the bundled
+  one. Deleting returns the archetype to its bundled image. No face rectangle,
+  no stage transform, no bindings, no custom prompt.
+- Tiles are 16:9; the page puts the art above the facts.
+- Not listed: a room's own official image (authored, fixed, never generated)
+  and the dream throne scene (not an archetype).
+- Scene images are world assets, like NPC and monster images: a regeneration
+  changes the background for every player.
 
 ## Prototype
 
 `docs/design/gallery-window/` — `GalleryWindowPrototype.vue`, `GalleryWall.vue`,
 `prototype-data.js`, `GalleryWindow.stories.js`. Reference only, synthetic
 fixtures, not imported by the app. Stories: MyCharacters, FirstRelease, Party,
-OfficialImage, NoImages, Monsters, People, Scenes, and three at 1920×1080. The
+OfficialImage, NoImages, Monsters, People (place groups, one expanded), Scenes
+(a generated image), SceneBundled (the bundled image), and three at
+1920×1080. The
 prototype's tiles are plain buttons; the keyboard contract of D9 is specified
 here, not prototyped.

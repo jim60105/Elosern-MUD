@@ -35,11 +35,14 @@ export const NoImages = { ...atReference, args: { category: "party", subject: "n
 // 魔物: grouped by threat tier, one image each, so no tray; the heading counts
 // the unseen species.
 export const Monsters = { ...atReference, args: { category: "monster" } };
-// 人物 (second specification): grouped by where each person was last met.
+// 人物 (second specification): grouped by the place of the last interaction;
+// one place is expanded at a time and the others show only their count.
 export const People = { ...atReference, args: { category: "people" } };
 // 背景 (third specification): landscape tiles and a landscape page, no face
-// frame and no stage transform.
+// frame and no stage transform; a generated image can be deleted or redone.
 export const Scenes = { ...atReference, args: { category: "scene" } };
+// A scene without a generated image shows the bundled official one.
+export const SceneBundled = { ...atReference, args: { category: "scene", subject: "coastal_path" } };
 
 export const MyCharactersFullHd = { ...atFullHd, args: { category: "mine" } };
 export const MonstersFullHd = { ...atFullHd, args: { category: "monster" } };

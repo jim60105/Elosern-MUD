@@ -42,14 +42,20 @@ const monster = (key, name, extra = {}) => ({
   ...extra,
 });
 
-const scene = (key, name, sentence) => ({
+// A scene shows its generated image, or the bundled official one until a
+// generated image exists.
+const scene = (key, name, sentence, generated = true) => ({
   key,
   name,
   kind: "scene",
   art: S(key),
   maxCards: 1,
   sentence,
-  cards: [card(S(key), { label: "背景", date: "8 天前" })],
+  cards: [
+    generated
+      ? card(S(key), { label: "生成圖", date: "8 天前" })
+      : card(S(key), { label: "官方內建圖", bundled: true, date: "內建", exact: "" }),
+  ],
   official: [],
 });
 
@@ -106,12 +112,15 @@ export const GALLERY = {
   groups: {
     mine: [{ key: "mine", label: null, slots: MINE }],
     party: [{ key: "party", label: null, slots: PARTY }],
-    // Second specification: people grouped by where they were last met, most
-    // recently visited place first.
+    // Second specification: people grouped by where the character last
+    // interacted with them, most recent place first; one place is expanded
+    // at a time.
     people: [
       {
         key: "altoria",
         label: "阿爾托利亞",
+        collapsible: true,
+        count: 7,
         slots: [
           person("npc:21", "薇絲妲", "woman", 2),
           person("npc:22", "鐵匠波頓", "man"),
@@ -125,9 +134,11 @@ export const GALLERY = {
       {
         key: "southwest_coast",
         label: "西南海岸",
+        collapsible: true,
+        count: 3,
         slots: [person("npc:31", "燈塔看守人", "elder"), person("npc:32", "漁家少女", "girl"), person("npc:33", "船老大", "man")],
       },
-      { key: "western_hills", label: "西部丘陵", slots: [person("npc:41", "牧羊人", "boy"), person("npc:42", "行腳商人", "man")] },
+      { key: "western_hills", label: "西部丘陵", collapsible: true, count: 2, slots: [person("npc:41", "牧羊人", "boy"), person("npc:42", "行腳商人", "man")] },
     ],
     monster: [
       {
@@ -149,8 +160,8 @@ export const GALLERY = {
           scene("forest_path", "林間小徑", "陽光穿過層疊的枝葉，灑在一條蜿蜒的林間小徑上，四周寂靜得只剩下風聲。"),
           scene("tavern_interior", "酒館內部", "爐火映照的木造酒館內，酒客的低語與杯盤碰撞聲交織成喧鬧的背景。"),
           scene("city_street", "城市街道", "鋪著石板的主要街道上人來人往，攤販的叫賣聲與馬車的輪聲此起彼落。"),
-          scene("coastal_path", "海岸小徑", "海風挾著鹹味迎面吹來，浪濤拍打著岸邊的礁石，海平線延伸到視線盡頭。"),
-          scene("shrine_interior", "神殿內部", "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。"),
+          scene("coastal_path", "海岸小徑", "海風挾著鹹味迎面吹來，浪濤拍打著岸邊的礁石，海平線延伸到視線盡頭。", false),
+          scene("shrine_interior", "神殿內部", "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。", false),
         ],
       },
     ],

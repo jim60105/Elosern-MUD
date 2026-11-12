@@ -33,21 +33,31 @@ const tabs = computed(() =>
 
 const category = ref(props.category);
 const groups = computed(() => props.gallery.groups[category.value] ?? []);
-const subjects = computed(() => groups.value.flatMap((group) => group.slots));
+const expandedGroup = ref(null);
+const subjects = computed(() =>
+  groups.value.filter((group) => !group.collapsible || group.key === expandedGroup.value).flatMap((group) => group.slots),
+);
 const categoryRow = computed(() => props.gallery.categories.find((row) => row.key === category.value));
 
 const firstImage = (subject) =>
   (subject?.cards.find((card) => card.isDefault) ?? subject?.cards[0] ?? subject?.official[0])?.id ?? null;
 
+const lastIntent = ref(null);
 const subjectKey = ref(null);
 const imageId = ref(null);
 function selectSubject(key) {
   subjectKey.value = key;
   imageId.value = firstImage(subjects.value.find((row) => row.key === key));
 }
+function expandGroup(key) {
+  expandedGroup.value = key;
+  selectSubject(subjects.value[0]?.key ?? null);
+  lastIntent.value = `gallery.group.select ${key}`;
+}
 function selectCategory(key) {
   if (key in props.disabled) return;
   category.value = key;
+  expandedGroup.value = groups.value.find((group) => group.collapsible)?.key ?? null;
   const current = subjects.value.find((row) => row.current) ?? subjects.value[0];
   selectSubject(current?.key ?? null);
 }
@@ -69,13 +79,13 @@ const ribbon = computed(() => {
   return group ? `${label}・${group.label}` : label;
 });
 
-const lastIntent = ref(null);
 const footer = computed(() => {
   const row = subject.value;
   const item = image.value;
   if (!row) return null;
   const button = (key, label, tone = "plain", extra = {}) => ({ key, label, tone, testid: `gallery-proto__${key}`, ...extra });
   if (!item) return { buttons: [button("generate", "生成新圖", "primary")] };
+  if (item.bundled) return { buttons: [button("generate", "生成新圖", "primary")] };
   if (item.official) {
     return {
       buttons: [button("clear", "清除個人調整", "ghost"), button("face", "臉框"), button("stage", "舞台位置"), button("default", "設為預設", "primary")],
@@ -83,7 +93,7 @@ const footer = computed(() => {
   }
   if (item.status === "pending") return { reason: "生成中，完成後會自動出現。", buttons: [] };
   if (item.status === "failed") return { reason: item.label, reasonTone: "danger", buttons: [button("delete", "刪除", "danger"), button("generate", "重新生成", "primary")] };
-  if (row.kind === "scene") return { buttons: [button("generate", "重新生成", "primary")] };
+  if (row.kind === "scene") return { buttons: [button("delete", "刪除", "danger"), button("generate", "重新生成", "primary", { spacerBefore: true })] };
   if (row.kind === "monster") {
     return { buttons: [button("face", "臉框"), button("stage", "舞台位置"), button("generate", "重新生成", "primary")] };
   }
@@ -122,10 +132,12 @@ function press(key) {
         :subject-key="subjectKey"
         :image-id="imageId"
         :shape="shape"
+        :expanded-group="expandedGroup"
         :aria-label="categoryRow?.label ?? '圖庫'"
         @select-subject="selectSubject"
         @select-image="(id) => (imageId = id)"
         @generate="press('generate')"
+        @expand-group="expandGroup"
       />
 
       <article v-if="subject" :key="`${subject.key}:${imageId}`" class="gpage">
@@ -147,7 +159,9 @@ function press(key) {
                 <p class="gpage__text">{{ image.label }}<span v-if="image.isDefault" class="gpage__default">目前預設</span></p>
                 <p class="gpage__date">{{ image.date }}<small>{{ image.exact }}</small></p>
                 <p v-if="image.chips.length" class="gpage__chips"><span v-for="chip in image.chips" :key="chip">{{ chip }}</span></p>
-                <p v-if="subject.maxCards === 1" class="gpage__note">這個對象只保留一張圖，重新生成會替換原圖。</p>
+                <p v-if="image.bundled" class="gpage__note">尚未生成專屬圖片，目前使用官方內建圖。</p>
+                <p v-else-if="subject.kind === 'scene'" class="gpage__note">這個對象只保留一張圖，重新生成會替換原圖；刪除後回到官方內建圖。</p>
+                <p v-else-if="subject.maxCards === 1" class="gpage__note">這個對象只保留一張圖，重新生成會替換原圖。</p>
               </section>
               <section v-if="image.conditions.length" class="gpage__section">
                 <h4 class="gpage__label">綁定條件</h4>
@@ -261,24 +275,17 @@ function press(key) {
   font-size: var(--text-sm);
 }
 
-/* Landscape: the art spans the page width at 16:9, the facts sit under it. */
+/* Landscape: the art is 16:9 above the facts. It stops short of the full
+   page width so the facts stay visible without scrolling; the window keeps
+   one proportion across viewports through --ui-scale. */
 .gwin--landscape .gpage__scroll {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ink-600) transparent;
-  scrollbar-gutter: stable;
-}
-
-/* The landscape page scrolls as a whole, so its facts do not scroll again. */
-.gwin--landscape .gpage__facts {
-  overflow: visible;
-  scrollbar-gutter: auto;
+  gap: var(--sp-4);
 }
 
 .gwin--landscape .gpage__art {
-  width: 100%;
+  width: 78%;
   height: auto;
   aspect-ratio: 16 / 9;
 }
