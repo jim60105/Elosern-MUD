@@ -911,6 +911,68 @@ while the newly added inland hinterland and corridor rectangles hold none, and
 that every newly added site ground except the dry-ground ant mound is
 sea-adjacent.
 
+### Deep wild, corridor company and sites: western hills and valleys
+
+**Belts.** This change is the region's last placement link. The hinterlands and
+trunk-road corridors Wave 1 landed keep their rectangles, extents, densities,
+capacities and timing exactly as they were; only the composition mix inside them
+changes. Deep-wild zones now lie on remote hill ground away from the towns and
+from the inland ferry, and every one of them repeats its birth rectangle as its
+grounds. The declarations remain the only authority for keys, rectangles, pools
+and bindings, so this section repeats no authored coordinate, density parameter,
+configured timing or count.
+
+**Species fit.** The cave cricket (坑道灶馬) is the new low animal of the
+settled ground: its cellars, storerooms and mine mouths edge every hill town and
+port, so it joins each hinterland pool, and it follows every trunk-road corridor
+as the low company of the animals already there. The antlion (陷坑蟻獅) is the
+mid-tier animal of the worked hill ground: it digs its pits in the sandy verges
+and spoil beside the remote hill roads, so it joins the goat of 岩回山羊 on the
+remote corridors, and it heads the deep-wild pools with the shipped goat, hare
+and mole company around it. The antlion answers on contact while the cricket and
+the shipped low animals stay passive, so an ordinary encounter still waits for
+engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Recorded deviation.** No corridor is added. The region holds far more trunk
+road than the programme's corridor guidance would cover, and the corridor belt
+therefore stays as Wave 1 left it; this change only gives the remote corridors
+the mid-tier company that fits them, while the programme's deep-wild budget
+carries the new zones. This is recorded for human review, and a reviewer may add
+corridors later without any test edit.
+
+**Sites.** The stronger variants occupy recoverable places: the cricket's
+abandoned shaft mouth of 守坑型, the antlion's spoil-heap pit of 大坑型, and the
+goat's ledge of the shipped 守隘型. Each can re-form after clearing and answers
+only when an intruder enters its defended extent. The shipped hare nest, goat
+camp, transfer station and one-shot boar boss site stay as they are, and no
+stronger or high-tier variant joins an ordinary pool.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`), plus the non-gating observation below:
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK |
+| `world.maps.tests.test_bootstrap.test_bootstrap_grid` | Not run locally: non-gating observation, and the local command-duration budget forbids the label, so this change has no before and after duration; the durations the earlier placement changes recorded under the same label remain historical context only. |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change western-hills-deep-placement` | passed |
+| `openspec validate western-hills-deep-placement --strict` | valid |
+
+A local probe over the published world confirmed that `validate_ecology_geometry`
+and `activity_area_problems` report nothing for the new declarations, that every
+new rectangle and site ground lies wholly in the region, and that each new
+rectangle and site ground keeps the authored edge distance from every landed
+zone, activity area and site ground, including the grounds of the shipped boss
+sites.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

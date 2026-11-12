@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c3006998928b492a8939a9b53f7281017e846fd8aaaf96eb263334eeeb38392f",
+  "fingerprint": "a0fccefeeb2a0ac6780678274ff6e16f6a169daae252ab579821571c59627333",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1472,6 +1472,38 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 3,
+        "composition_key": "old_shaft_leaper_shaft_group",
+        "coordinates": [
+          390,
+          930
+        ],
+        "individual_name_zh": null,
+        "key": "old_shaft_leaper_shaft",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "shaft_leap_cricket",
+            "species_name_zh": "坑道灶馬",
+            "variant_key": "old_shaft_leaper",
+            "variant_name_zh": "守坑型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "shaft_leap_cricket",
+            "species_name_zh": "坑道灶馬",
+            "variant_key": "cellar_leaper",
+            "variant_name_zh": "躍窖型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "western_hills_valleys"
+      },
+      {
         "capacity": 1,
         "composition_key": "old_veil_lamp_camp_member",
         "coordinates": [
@@ -1494,6 +1526,38 @@
         "one_shot": false,
         "recover_after_ticks": 86400,
         "region_key": "central_mountains"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "pass_warden_ledge_group",
+        "coordinates": [
+          1150,
+          1230
+        ],
+        "individual_name_zh": null,
+        "key": "pass_warden_ledge",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "rock_echo_goat",
+            "species_name_zh": "岩響山羊",
+            "variant_key": "pass_warden",
+            "variant_name_zh": "守隘型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "rock_echo_goat",
+            "species_name_zh": "岩響山羊",
+            "variant_key": "cliff_stepper",
+            "variant_name_zh": "踏崖型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "western_hills_valleys"
       },
       {
         "capacity": 2,
@@ -1758,6 +1822,30 @@
         "one_shot": false,
         "recover_after_ticks": 86400,
         "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "spoil_heap_elder_pit_member",
+        "coordinates": [
+          270,
+          1080
+        ],
+        "individual_name_zh": null,
+        "key": "spoil_heap_elder_pit",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "pit_sand_antlion",
+            "species_name_zh": "陷坑蟻獅",
+            "variant_key": "spoil_heap_elder",
+            "variant_name_zh": "大坑型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "western_hills_valleys"
       },
       {
         "capacity": 3,
@@ -2183,6 +2271,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_east_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -2256,6 +2358,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_altoria_west_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -2453,6 +2569,96 @@
         "region_key": "eastern_plains",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "capital_south_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "capital_south_wild_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_south_wild_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_south_wild_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_south_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_south_wild_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            810,
+            839,
+            810,
+            839
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -2715,6 +2921,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_east_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -2788,6 +3008,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_border_bridge_west_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -2867,6 +3101,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_east_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -2940,6 +3188,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_confluence_west_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -3019,6 +3281,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_north_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -3092,6 +3368,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_east_river_south_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -3295,6 +3585,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_east_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -3368,6 +3672,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_greyrock_west_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -5405,6 +5723,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "confluence_southeast_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "confluence_southeast_wild_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "confluence_southeast_wild_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "confluence_southeast_wild_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "confluence_southeast_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "confluence_southeast_wild_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            730,
+            759,
+            520,
+            549
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "crystal_north_wild",
         "lower_density": 1,
         "pool": [
@@ -5821,6 +6229,186 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "east_river_east_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "east_river_east_wild_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_east_wild_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_east_wild_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_east_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_east_wild_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1270,
+            1299,
+            940,
+            969
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "east_river_northeast_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "east_river_northeast_wild_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_northeast_wild_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_northeast_wild_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_northeast_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_river_northeast_wild_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1240,
+            1269,
+            1140,
+            1169
+          ]
+        ],
+        "region_key": "western_hills_valleys",
         "replenishment_interval": 600,
         "upper_density": 2,
         "wave_budget": 3
@@ -8121,6 +8709,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "greyrock_northwest_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "greyrock_northwest_wild_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "greyrock_northwest_wild_cliff_stepper",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "rock_echo_goat",
+                "species_name_zh": "岩響山羊",
+                "variant_key": "cliff_stepper",
+                "variant_name_zh": "踏崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "greyrock_northwest_wild_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "greyrock_northwest_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "greyrock_northwest_wild_hanging_nest_forager",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "sticky_palm_goblin",
+                "species_name_zh": "膠掌小鬼",
+                "variant_key": "hanging_nest_forager",
+                "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            170,
+            199,
+            1250,
+            1279
+          ]
+        ],
+        "region_key": "western_hills_valleys",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "highland_forest_habitat",
         "lower_density": 1,
         "pool": [
@@ -9601,6 +10279,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_hills_mouth_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9947,6 +10639,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_west_ore_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -10020,6 +10726,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_westwind_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -11943,6 +12663,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_east_ferry_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -12447,6 +13181,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_honey_vale_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -12917,6 +13665,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_ruins_gate_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -12990,6 +13752,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_scarp_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -13553,6 +14329,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_vineyard_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -13626,6 +14416,20 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_west_ferry_hinterland_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -14193,6 +14997,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "western_road_01_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_01_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -14252,6 +15084,34 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_02_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_02_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -14331,6 +15191,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "western_road_03_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -14390,6 +15264,34 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_04_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_04_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -14455,6 +15357,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "western_road_05_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_05_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -14514,6 +15444,34 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_06_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_06_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -14579,6 +15537,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "western_road_07_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_07_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -14638,6 +15624,34 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_08_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_08_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -14703,6 +15717,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "western_road_09_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_09_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -14762,6 +15804,34 @@
                 "species_name_zh": "膠掌小鬼",
                 "variant_key": "hanging_nest_forager",
                 "variant_name_zh": "懸巢型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_10_quarry_pit_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "pit_sand_antlion",
+                "species_name_zh": "陷坑蟻獅",
+                "variant_key": "quarry_pit_lurker",
+                "variant_name_zh": "伏坑型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "western_road_10_cellar_leaper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "shaft_leap_cricket",
+                "species_name_zh": "坑道灶馬",
+                "variant_key": "cellar_leaper",
+                "variant_name_zh": "躍窖型"
               }
             ],
             "weight": 1
@@ -15025,8 +16095,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "43fed5f72929a064b7a8aa90124414e487cfe2a3cf916526fc11ac8239cf10f5",
-    "world/lore/monster_placement.py": "0258cf1a8875edb1a4f46c6e041183cd99337a8d0f8fc53c64a02cbaeb4d9809",
+    "world/lore/monster_activity.py": "9cff7fdae097e0a9b56721e732faaaaa74a9928f784c758a4cf3f2e066849101",
+    "world/lore/monster_placement.py": "d4a34afaae63cb95383dd6efa56c28163f87a7f25ce856cf3941c732712663e3",
     "world/lore/monster_species.py": "a26bc1664c5e976320e3b44b2d35d313b10d2419a824239623536aa7ad8440d4",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
