@@ -2817,3 +2817,89 @@ unchanged.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 硬腕海星
+
+This section records the second delivered species of the southwest coast Wave 4.
+硬腕海星 (`stiff_arm_starfish`) is a low-tier sea star whose ordinary default
+variant is 爬架型 (`oyster_rack_creeper`, grade F) and whose stronger variant is
+老礁型 (`tide_pool_elder`, grade E); both own the single arm press 硬腕撲壓
+(`stiff_arm_press`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Slow armoured creeper: the authored defense sits in the low band's upper part,
+  agility at its floor, and hit points in its middle.
+* The kit spends no MP, so the authored MP pool is zero; the SP pool holds three
+  casts of the press's SP cost (five on 老礁型).
+* The guard (+2 defense for 20 s) equals the crab's shipped self guard.
+* The stronger 老礁型 holds a deep cliff-foot pool at grade E with the low band's
+  defense ceiling.
+
+### Reuse of the self-guard strike representative
+
+The kit declares the shipped self-guard strike signature
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self",
+None))`. Its representative is unchanged: `burrow_maker`, declared in
+`world.rules.tests.test_tide_lamp_crab_resource_skill`, whose production smoke
+exercises the representative and the derived group. Both new variant keys sort
+after that representative, so no smoke module, shard entry or seed entry is
+added; `world.rules.tests.test_monster_composition_coverage` derives the whole
+group from the shipped declarations and checks the representative wiring.
+
+### Decision mode
+
+Both variants bind the legacy `instinctive` archetype: `first_owned` skill
+choice against the lowest-hit-point enemy, with that archetype's authored flee
+threshold of 0.35. No intelligence value, decision-mode override or
+`monster_behaviour.yaml` edit is authored. Because the archetype selects the
+first owned kit deterministically, the group-member and parallel-gauge contracts
+do not depend on a damage tie-break.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 118 tests, OK, run as two exhaustive disjoint focused method-label batches (59 + 59) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check succeeds and the registry holds 63 variants
+(`len(MONSTER_VARIANT_REGISTRY)` printed 63); the remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+stiff-arm-starfish-species` and `openspec validate
+stiff-arm-starfish-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+This link adds one timed effect and one modifier, so the startup tuning
+fingerprint moved from `383b1eff...` to `70e5f38d...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`ca010d35...` to `c99f82a5...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
