@@ -191,7 +191,7 @@ Real candidate geometry SHALL satisfy the exact bounded finite triple contract; 
 
 #### Scenario: Every field carries its documented bound
 - **WHEN** gallery descriptors are validated
-- **THEN** existing row/chip/warning bounds remain; generated original URLs keep their 129 bound, official URLs keep 256, canonical attempts are bounded and the 65,536-byte envelope fails closed
+- **THEN** existing row/chip/warning bounds remain; generated original URLs keep their 129 bound, official URLs keep 256, canonical attempts are bounded and the panel carries no byte limit of its own
 
 #### Scenario: Warnings name unique visible cards newest-first
 - **WHEN** warning entries are validated
@@ -202,8 +202,8 @@ Real candidate geometry SHALL satisfy the exact bounded finite triple contract; 
 - **THEN** both validators reject it
 
 #### Scenario: The oversized gallery fails closed at the JSON limit
-- **WHEN** a character gallery exceeds the existing 65,536-byte canonical JSON limit
-- **THEN** it fails closed and does not silently truncate cards
+- **WHEN** a gallery exceeds the publication logical ceiling, the only byte ceiling the panel has
+- **THEN** it fails closed and does not silently truncate cards; a structurally valid gallery larger than one intact frame is accepted and delivered whole
 
 #### Scenario: Invalid stage fails both wire validators
 - **WHEN** a canonical original candidate carries invalid stage or a row carries old url/face_rect/stage keys

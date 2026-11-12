@@ -14,7 +14,6 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 - [ ] 3.1 Add `build_gallery_v4(context)` and `_resolve_view` per design D3–D4; do not register it. Verify by 3.2.
 - [ ] 3.2 Create `web/webclient/presentation/tests/test_gallery_v4_presenter.py` (`EvenniaTest`, synthetic species, synthetic account characters and companions) with one test per ADDED scenario, decorated with its requirement ID; every built payload must pass `validate_gallery_v4`. Register the module in `.github/evennia-shards.json`. Verify `<prefix> web.webclient.presentation.tests.test_gallery_v4_presenter tests.test_evennia_test_optimization_contract` passes.
-- [ ] 3.3 Record the non-blocking size note of design D5 in the apply report (no file in the repository).
 
 ## 4. Gates
 

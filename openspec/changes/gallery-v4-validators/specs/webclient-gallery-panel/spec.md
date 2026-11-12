@@ -56,6 +56,13 @@ Both validators SHALL reject a version-4 payload listing more than 256 subjects 
 - **WHEN** a payload lists 257 subjects
 - **THEN** both validators reject it, and a payload listing 256 otherwise valid subjects is accepted
 
+### Requirement: The version-4 panel has no byte limit of its own
+The version-4 validators SHALL bound the panel by its structural limits alone. They SHALL NOT reject a payload for exceeding the size of one intact transport frame; the only byte ceiling applied SHALL be the publication logical ceiling shared with the transport.
+
+#### Scenario: A panel larger than one frame is valid
+- **WHEN** a structurally valid version-4 payload serializes to more canonical bytes than one intact frame allows
+- **THEN** both validators accept it
+
 ### Requirement: The version-4 validators are exact mirrors
 Every version-4 rule SHALL be enforced identically by the Python and JavaScript validators, and the dual-direction parity cases SHALL fail when a payload is accepted on one side and rejected on the other.
 

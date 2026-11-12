@@ -98,13 +98,6 @@ def select_gallery_subject_v4(session, actor, subject_key) -> dict
   `gallery-v4-validators` when nothing is selected; `description: None`.
 - Return `validate_gallery_v4(payload)`.
 
-### D5. Size note (non-blocking)
-
-After tests pass, build the projection for the `monster` category with every
-shipped species sighted in a scratch script and record its JSON byte size in
-the apply report. This is information for the cutover, not a gate and not a
-test.
-
 ## Risks / Trade-offs
 
 - [Helper extraction changes v3 output] → v3 tests in `test_gallery_panel.py`

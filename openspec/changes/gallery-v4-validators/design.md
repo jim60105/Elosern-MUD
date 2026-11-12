@@ -67,7 +67,25 @@ payloads (`gallery-v4-presenter`), client rendering.
 - `selected is None` iff no expanded group lists a subject. Then cards == [],
   official_entries == [], binding_warnings == [], equipment_summary is None,
   capabilities is None, error_state is None, description is None.
-- Envelope: `check_json_safety` and `json_byte_size(payload) <= MAX_CANONICAL_JSON_BYTES`.
+- JSON safety: `check_json_safety(payload, max_bytes=PUBLICATION_MAX_BYTES)`.
+  The version-4 panel declares no byte limit of its own; see D1a.
+
+### D1a. No panel-local byte limit
+
+The v3 validator rejects a gallery above `MAX_CANONICAL_JSON_BYTES` (65,536).
+That number is the size of one intact transport frame, not a transport limit:
+`publication_parts` fragments a larger logical document and the reassembled
+document is checked against panel bounds only, up to `PUBLICATION_MAX_BYTES`.
+Kept on v4 it would bind before the 256-subject ceiling and turn a complete,
+valid panel into the unavailable form.
+
+Every part of the v4 panel is already bounded by structure (subjects, groups,
+rows, string lengths, descriptor attempts), so its size is bounded without a
+byte rule. A byte limit beside those bounds is either never reached or rejects
+valid content. The v4 validators therefore apply no panel-local byte limit:
+both pass the publication logical ceiling to the JSON-safety check, which
+still needs a number, and drop the separate `json_byte_size` comparison. The
+v3 validator keeps its 65,536 rule until `gallery-v3-removal`.
 
 ### D2. `description` (planner decision, flagged)
 
@@ -106,8 +124,4 @@ fixture shapes.
 
 ## Risks / Trade-offs
 
-- [The envelope bound is reached before the subject ceiling when many species
-  with descriptors are sighted] → validators fail closed (unavailable form);
-  `gallery-v4-presenter` records the shipped payload size as a non-blocking
-  note so the risk is visible before cutover.
 - [Two v4 rule copies drift] → parity cases are the single acceptance gate.
