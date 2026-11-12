@@ -2,7 +2,7 @@
 
 Pure ``unittest.TestCase`` covers the round's Taunt winner resolution and the
 round execution context; ``EvenniaTestCase`` covers the deterministic enemy
-policy paths (the delegated non-``Monster`` policy, the Monster legacy body,
+policy paths (the delegated non-``Monster`` policy, the Monster reflex body,
 and a real persistent session) on synthetic entities. No shipped skill,
 element, tier or archetype key is named by a resolvable literal: the archetype
 used for the area case is resolved from the live rulebook by predicate.
@@ -70,13 +70,13 @@ from ._combat_session_helpers import (
 from .combat_fixtures import FakeEntity
 from world.rules.combat_identity import stable_actor_id
 
-#: A legacy archetype that prefers an AREA action against several enemies,
+#: A reflex archetype that prefers an AREA action against several enemies,
 #: resolved from the live rulebook by predicate (never a shipped literal).
 AREA_ARCHETYPE = next(
     key
     for key, profile in BEHAVIOUR_PROFILES.items()
     if profile.prefer_area_when_multiple_enemies
-    and profile.decision_mode is DecisionMode.LEGACY
+    and profile.decision_mode is DecisionMode.REFLEX
 )
 
 #: A registered AREA damage skill for the area-freedom case.
@@ -326,7 +326,7 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
     @covers_requirement(
         "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
     )
-    def test_the_legacy_policy_attacks_the_winner_over_a_weaker_ally(self):
+    def test_the_reflex_policy_attacks_the_winner_over_a_weaker_ally(self):
         # The ally is the lowest-HP target, so without the taunt the policy
         # would pick it; the active winner overrides that ordinary choice.
         self.other.traits.hp.base = 40
@@ -378,7 +378,7 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
     )
     def test_a_taunted_enemy_still_uses_its_area_action(self):
         self.assertEqual(
-            BEHAVIOUR_PROFILES[AREA_ARCHETYPE].decision_mode, DecisionMode.LEGACY
+            BEHAVIOUR_PROFILES[AREA_ARCHETYPE].decision_mode, DecisionMode.REFLEX
         )
         self.monster.behaviour_tree = AREA_ARCHETYPE
         self.monster.db.skills = {"active": [AREA_SKILL.key], "passive": []}

@@ -293,7 +293,7 @@ def _rulebook():
                 "skill_choice": "first_owned",
                 "prefer_area_when_multiple_enemies": False,
                 "flee_hp_fraction": None,
-                "decision_mode": "utility",
+                "decision_mode": "deliberation",
                 "utility_weights": dict(WEIGHTS),
             },
             SUPPORT_ARCHETYPE: {
@@ -301,12 +301,15 @@ def _rulebook():
                 "skill_choice": "first_owned",
                 "prefer_area_when_multiple_enemies": False,
                 "flee_hp_fraction": None,
-                "decision_mode": "utility",
+                "decision_mode": "deliberation",
                 "utility_weights": dict(SUPPORT_WEIGHTS),
             },
         },
         "variant_intelligence": {VARIANT: 50, VARIANT_SUPPORT: 50},
-        "variant_decision_mode": {VARIANT: "utility", VARIANT_SUPPORT: "utility"},
+        "variant_decision_mode": {
+            VARIANT: "deliberation",
+            VARIANT_SUPPORT: "deliberation",
+        },
         "candidate_budget": 64,
     }
 

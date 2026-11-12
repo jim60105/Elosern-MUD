@@ -1,13 +1,13 @@
-"""Data-contract test: staged activation of the named production variant set: real registry binding, one settled production encounter, the release record and the legacy rollback restart seam
+"""Data-contract test: staged activation of the named production variant set: real registry binding, one settled production encounter, the release record and the reflex rollback restart seam
 
 This module is the evidence carrier for ``monster-ai-rollout``. It names the
 shipped bestiary on purpose: what it establishes is the *production* result of
 this slice -- which registered variants the shipped rulebook activates, that
 each one resolves through the real species/variant registry, that one affected
-variant really decides through the utility path and settles a committed round,
-that every other registered variant keeps the permanent legacy decision, and
-that the release record's fingerprints are the ones this tuning actually
-produces.
+variant really decides through the deliberation path and settles a committed
+round, that every other registered variant keeps the permanent reflex
+decision, and that the release record's fingerprints are the ones this tuning
+actually produces.
 
 The synthetic-mechanism contracts of the earlier slices live in their own
 modules; this one carries the shipped-content claims that only shipped data can
@@ -82,7 +82,8 @@ ACTIVATION_RECORD = (
 # annotation below, because the traceability gate reads string literals only:
 # ``activation-follows-complete-accepted-evidence``,
 # ``expansion-and-retuning-require-affected-evidence``,
-# ``legacy-mode-rollback-is-demonstrated`` and
+# ``legacy-mode-rollback-is-demonstrated`` (heading retained; the body defines
+# the current reflex rollback) and
 # ``release-evidence-is-reproducible-and-scoped``.
 
 #: One activation evidence UUID per documented operation (see the record).
@@ -100,8 +101,8 @@ def _activated() -> dict[str, int]:
     return dict(_record()["activated"])
 
 
-def _legacy_edited_tuning():
-    """Load the shipped rulebook with the activation's modes edited back to legacy.
+def _reflex_edited_tuning():
+    """Load the shipped rulebook with the activation's modes edited back to reflex.
 
     This is the restart seam: the edited tuning is written to a temporary YAML
     file and read back through the production loader (``_load_rulebook`` ->
@@ -161,7 +162,7 @@ def _authored_surface(entity) -> tuple:
 
 
 def _first_owned_damage_key(entity) -> str:
-    """The authored legacy contract's own skill choice: the first owned damage row.
+    """The authored reflex contract's own skill choice: the first owned damage row.
 
     ``skill_choice: first_owned`` selects the first affordable active damage
     skill in the entity's owned order, so the expectation is written here from
@@ -210,7 +211,7 @@ class ActivationRecordTests(EvenniaTestCase):
         )
         for key, mode in MONSTER_AI_TUNING.variant_decision_mode.items():
             with self.subTest(variant=key):
-                self.assertIs(mode, DecisionMode.UTILITY)
+                self.assertIs(mode, DecisionMode.DELIBERATION)
                 self.assertIn(key, MONSTER_VARIANT_REGISTRY)
         # The named set is a small one: the rest of the registry authors neither
         # an intelligence nor a mode override.
@@ -248,7 +249,9 @@ class ActivationRecordTests(EvenniaTestCase):
         self.assertTrue(performance["budget_met"])
         budget = float(performance["envelope"]["budget_ms"])
         utility = [
-            timing for timing in performance["timings"] if timing["mode"] == "utility"
+            timing
+            for timing in performance["timings"]
+            if timing["mode"] == "deliberation"
         ]
         self.assertEqual(len(utility), 1)
         self.assertLessEqual(float(utility[0]["p95_ms"]), budget)
@@ -272,7 +275,7 @@ class ActivationRecordTests(EvenniaTestCase):
 
 
 class ActivationBindingTests(EvenniaTestCase):
-    """The named set binds through the real registry; everything else is legacy."""
+    """The named set binds through the real registry; everything else is reflex."""
 
     @covers_requirement("monster-ai-rollout::activation-follows-complete-accepted-evidence")
     def test_the_named_set_resolves_through_the_real_species_variant_registry(self):
@@ -285,7 +288,7 @@ class ActivationBindingTests(EvenniaTestCase):
             with self.subTest(variant=key):
                 resolution = resolve_monster_ai(monster)
                 self.assertIsNotNone(resolution)
-                self.assertIs(resolution.mode, DecisionMode.UTILITY)
+                self.assertIs(resolution.mode, DecisionMode.DELIBERATION)
                 self.assertIsNone(resolution.invalid_reason)
                 self.assertEqual(resolution.intelligence, intelligence)
                 self.assertEqual(resolution.variant_key, key)
@@ -297,19 +300,19 @@ class ActivationBindingTests(EvenniaTestCase):
                 )
 
     @covers_requirement("monster-ai-rollout::activation-follows-complete-accepted-evidence")
-    def test_every_other_registered_variant_stays_legacy(self):
+    def test_every_other_registered_variant_stays_reflex(self):
         activated = set(_activated())
         others = [key for key in _variant_keys() if key not in activated]
         self.assertEqual(len(others), len(_variant_keys()) - len(activated))
         for key in others:
             variant = MONSTER_VARIANT_REGISTRY[key]
             monster = construct_species_individual(
-                variant.species_key, key, individual_name=f"legacy {key}"
+                variant.species_key, key, individual_name=f"reflex {key}"
             )
             with self.subTest(variant=key):
                 resolution = resolve_monster_ai(monster)
                 self.assertIsNotNone(resolution)
-                self.assertIs(resolution.mode, DecisionMode.LEGACY)
+                self.assertIs(resolution.mode, DecisionMode.REFLEX)
                 self.assertIsNone(resolution.invalid_reason)
                 self.assertIsNone(resolution.intelligence)
                 self.assertEqual(resolution.variant_key, key)
@@ -317,10 +320,10 @@ class ActivationBindingTests(EvenniaTestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_every_shipped_support_kit_binds_utility(self):
-        # The shipped startup tuning must resolve an effective utility mode for
-        # every registered variant that owns a support active; otherwise the
-        # permanent legacy body can never select that owned kit. The check
+    def test_every_shipped_support_kit_binds_deliberation(self):
+        # The shipped startup tuning must resolve an effective deliberation mode
+        # for every registered variant that owns a support active; otherwise the
+        # permanent reflex body can never select that owned kit. The check
         # reports instead of rejecting a load, so a rollback tuning still runs.
         self.assertEqual(support_kit_mode_violations(MONSTER_AI_TUNING), ())
 
@@ -382,12 +385,14 @@ class ActivationBindingTests(EvenniaTestCase):
             weight_tuning.fingerprint, record["configuration_fingerprint"]
         )
         with patch.object(behaviour, "MONSTER_AI_TUNING", weight_tuning):
-            self.assertIs(resolve_monster_ai(monster).mode, DecisionMode.UTILITY)
+            self.assertIs(
+                resolve_monster_ai(monster).mode, DecisionMode.DELIBERATION
+            )
         self.assertEqual(_authored_surface(monster), surface)
 
 
 class RealEncounterTests(EvenniaTestCase):
-    """One affected real encounter decides and settles through the utility path."""
+    """One affected real encounter decides and settles through deliberation."""
 
     def setUp(self):
         super().setUp()
@@ -467,7 +472,7 @@ class RealEncounterTests(EvenniaTestCase):
                 self._decide,
                 decision_scope_base=ExecutionScopeBase(SESSION, 1, engagement_id=f"{SESSION}:1"),
             )
-        # The decision really was the utility decision, in this session's scope.
+        # The decision really was the deliberation decision, in this scope.
         self.assertEqual(len(self.traces), 1)
         trace = self.traces[0]
         self.assertGreaterEqual(trace.candidates, 1)
@@ -491,7 +496,7 @@ class RealEncounterTests(EvenniaTestCase):
         self.assertLess(_stored(self.defender, "hp"), before_hp)
         # The session recorded the tuning it actually decided with.
         recorded = session_ai_tuning(SESSION)[f"dbref:{self.monster.pk}"]
-        self.assertIs(recorded.mode, DecisionMode.UTILITY)
+        self.assertIs(recorded.mode, DecisionMode.DELIBERATION)
         self.assertEqual(recorded.tuning_fingerprint, MONSTER_AI_TUNING.fingerprint)
         # Nothing about the monster itself moved: no statistic, resource, owned
         # skill or proficiency is carried by the activation.
@@ -500,7 +505,7 @@ class RealEncounterTests(EvenniaTestCase):
 
 
 class RollbackTests(EvenniaTestCase):
-    """Editing the mode back to legacy and restarting restores the legacy decision."""
+    """Editing the mode back to reflex and restarting restores the reflex decision."""
 
     def setUp(self):
         super().setUp()
@@ -550,9 +555,9 @@ class RollbackTests(EvenniaTestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_restart_loading_the_edited_mode_reproduces_the_legacy_smoke(self):
-        record = _record()["legacy_rollback"]
-        rollback = _legacy_edited_tuning()
+    def test_a_restart_loading_the_edited_mode_reproduces_the_reflex_smoke(self):
+        record = _record()["reflex_rollback"]
+        rollback = _reflex_edited_tuning()
         self.assertIsInstance(rollback, behaviour.MonsterAITuning)
         self.assertEqual(rollback.fingerprint, record["configuration_fingerprint"])
         self.assertEqual(dict(rollback.variant_decision_mode), {})
@@ -560,12 +565,12 @@ class RollbackTests(EvenniaTestCase):
             dict(rollback.variant_intelligence), _activated()
         )
         with patch.object(behaviour, "MONSTER_AI_TUNING", rollback):
-            # Target and skill: the permanent legacy rule chooses the lowest-HP
+            # Target and skill: the permanent reflex rule chooses the lowest-HP
             # living enemy and its first owned damage skill, with no dice spent.
             with patch.object(
                 behaviour.dice,
                 "roll_d100",
-                side_effect=AssertionError("legacy selection consumes no dice"),
+                side_effect=AssertionError("reflex selection consumes no dice"),
             ):
                 request = monster_behaviour_policy(
                     self.monster, self.field, context=BattlefieldActionContext(self.field)
@@ -574,7 +579,7 @@ class RollbackTests(EvenniaTestCase):
             self.assertEqual(str(request.targets[0].key), str(self.weak.key))
             self.assertEqual(request.skill_key, _first_owned_damage_key(self.monster))
             self.assertEqual(request.scale, 1.0)
-            # The same restarted tuning through a real round: the legacy action
+            # The same restarted tuning through a real round: the reflex action
             # reaches the real resolver, damages the lowest-hit-point enemy only,
             # commits, and leaves the untouched recipient exactly as it was.
             before_weak = _stored(self.weak, "hp")
@@ -595,10 +600,10 @@ class RollbackTests(EvenniaTestCase):
             self.assertLess(_stored(self.weak, "hp"), before_weak)
             self.assertEqual(_stored(self.strong, "hp"), before_strong)
             settled = session_ai_tuning(ROLLBACK_SESSION)[f"dbref:{self.monster.pk}"]
-            self.assertIs(settled.mode, DecisionMode.LEGACY)
+            self.assertIs(settled.mode, DecisionMode.REFLEX)
             self.assertEqual(settled.tuning_fingerprint, rollback.fingerprint)
             # Flee priority: at or below the archetype's authored fraction the
-            # legacy body flees instead of attacking, at its own threshold, and
+            # reflex body flees instead of attacking, at its own threshold, and
             # that request settles as a real disengage attempt and not damage.
             profile = behaviour.BEHAVIOUR_PROFILES[self.variant.behaviour_profile_key]
             self.assertIsNotNone(profile.flee_hp_fraction)
@@ -642,7 +647,7 @@ class RollbackTests(EvenniaTestCase):
     def test_a_new_session_never_applies_a_fresh_disk_edit_without_a_restart(self):
         startup = behaviour.MONSTER_AI_TUNING
         loaded_rulebook = behaviour.MONSTER_BEHAVIOUR_YAML
-        rollback = _legacy_edited_tuning()
+        rollback = _reflex_edited_tuning()
         record = _record()
         self.assertEqual(startup.fingerprint, record["configuration_fingerprint"])
         self.assertNotEqual(rollback.fingerprint, startup.fingerprint)
@@ -684,7 +689,7 @@ class RollbackTests(EvenniaTestCase):
             self.variant.species_key, self.variant_key, individual_name="rollback new session"
         )
         before_restart = record_session_ai_tuning(SESSION, new_session)
-        self.assertIs(before_restart.mode, DecisionMode.UTILITY)
+        self.assertIs(before_restart.mode, DecisionMode.DELIBERATION)
         self.assertEqual(before_restart.tuning_fingerprint, startup.fingerprint)
         self.assertIs(behaviour.MONSTER_AI_TUNING, startup)
         self.assertIs(behaviour.MONSTER_BEHAVIOUR_YAML, loaded_rulebook)
@@ -698,12 +703,12 @@ class RollbackTests(EvenniaTestCase):
         self.assertEqual(session_observations(ROLLBACK_SESSION), ())
         with patch.object(behaviour, "MONSTER_AI_TUNING", rollback):
             after_restart = record_session_ai_tuning(ROLLBACK_SESSION, new_session)
-        self.assertIs(after_restart.mode, DecisionMode.LEGACY)
+        self.assertIs(after_restart.mode, DecisionMode.REFLEX)
         self.assertEqual(after_restart.tuning_fingerprint, rollback.fingerprint)
 
     @covers_requirement("monster-ai-rollout::legacy-mode-rollback-is-demonstrated")
     def test_a_database_failure_keeps_its_own_boundary_during_rollback(self):
-        rollback = _legacy_edited_tuning()
+        rollback = _reflex_edited_tuning()
         failure = DatabaseError("stored read failed")
         with (
             patch.object(behaviour, "MONSTER_AI_TUNING", rollback),

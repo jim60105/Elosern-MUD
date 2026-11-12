@@ -339,7 +339,7 @@ class TimingAssemblyTests(unittest.TestCase):
     def test_percentiles_queries_and_budget_are_reported(self):
         samples = [float(value) for value in range(1, 51)]
         timing = reports.build_policy_timing(
-            mode="utility",
+            mode="deliberation",
             cold_ms=99.0,
             samples_ms=samples,
             queries=7,
@@ -373,7 +373,7 @@ class TimingAssemblyTests(unittest.TestCase):
         self.assertEqual(report.scaling[0].examined, 4)
         self.assertTrue(report.budget_met)
         over = reports.build_policy_timing(
-            mode="utility", cold_ms=1.0, samples_ms=[100.0], queries=0,
+            mode="deliberation", cold_ms=1.0, samples_ms=[100.0], queries=0,
             examined=0, accepted=0, omitted=0, dice_isolated=True,
         )
         self.assertFalse(
@@ -489,7 +489,7 @@ class ReportPayloadTests(unittest.TestCase):
             measurements=50,
             timings=(
                 reports.build_policy_timing(
-                    mode="utility", cold_ms=1.0, samples_ms=[1.0], queries=2,
+                    mode="deliberation", cold_ms=1.0, samples_ms=[1.0], queries=2,
                     examined=3, accepted=3, omitted=0, dice_isolated=True,
                 ),
             ),
@@ -1040,19 +1040,24 @@ class PerformanceHarnessTests(EvenniaTestCase):
         self.addCleanup(harness.__exit__, None, None, None)
         harness.__enter__()
         report = harness.run_performance_scenario(warmups=1, measurements=3)
-        self.assertEqual({timing.mode for timing in report.timings}, {"legacy", "utility"})
+        self.assertEqual(
+            {timing.mode for timing in report.timings},
+            {"reflex", "deliberation"},
+        )
         for timing in report.timings:
             self.assertGreaterEqual(timing.cold_ms, 0.0)
             self.assertEqual(len(timing.samples_ms), 3)
             self.assertGreaterEqual(timing.queries, 1)
-        utility = next(t for t in report.timings if t.mode == "utility")
-        legacy = next(t for t in report.timings if t.mode == "legacy")
-        # The utility policy draws from its own generator, so it never advances
-        # the combat dice stream; the legacy body is the retained rulebook
-        # policy and does consume it.
-        self.assertTrue(utility.dice_isolated)
-        self.assertFalse(legacy.dice_isolated)
-        self.assertGreater(utility.examined, 0)
+        deliberation = next(
+            t for t in report.timings if t.mode == "deliberation"
+        )
+        reflex = next(t for t in report.timings if t.mode == "reflex")
+        # The deliberation policy draws from its own generator, so it never
+        # advances the combat dice stream; the reflex body is the retained
+        # rulebook policy and does consume it for its target tie-break.
+        self.assertTrue(deliberation.dice_isolated)
+        self.assertFalse(reflex.dice_isolated)
+        self.assertGreater(deliberation.examined, 0)
         # The scaling probe holds ONE fixed battlefield and varies only the
         # examined-proposal budget, reporting the real examined/accepted/
         # omitted counters at each setting.
@@ -1069,7 +1074,9 @@ class PerformanceHarnessTests(EvenniaTestCase):
         # envelope leaves every participant's stored traits byte-identical,
         # and the warm p95 budget is reported rather than asserted, so no
         # host-speed gate ever enters permanent tests.
-        decider, battlefield = harness._performance_field("utility", enemies=8)
+        decider, battlefield = harness._performance_field(
+            "deliberation", enemies=8
+        )
         before = {
             entity.key: traits.stored_trait_records(entity)
             for entity in battlefield.roster.values()

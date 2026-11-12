@@ -7,13 +7,13 @@ through the production construction entry points. No shipped key, threshold or
 catalog symbol is named by a resolvable literal.
 
 The tests establish this slice's contract: the flee threshold, the inclusive
-HP boundary and the flee priority are the *legacy* body's behavior, while a
-monster whose effective decision mode is ``utility`` never voluntarily flees --
-it proposes its own scored selection, keeps its own no-action boundary when no
-legal candidate exists, and never enumerates, scores or returns the canonical
-flee key. The configured typed-invalid-state fallback keeps its own contract,
-which is the one deliberate path by which a utility-mode monster still reaches
-the legacy body, inclusive flee request included.
+HP boundary and the flee priority are the *reflex* body's behavior, while a
+monster whose effective decision mode is ``deliberation`` never voluntarily
+flees -- it proposes its own scored selection, keeps its own no-action boundary
+when no legal candidate exists, and never enumerates, scores or returns the
+canonical flee key. The configured typed-invalid-state fallback keeps its own
+contract, which is the one deliberate path by which a deliberation-mode
+monster still reaches the reflex body, inclusive flee request included.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -58,14 +58,14 @@ MAX_HP = 100
 BOUNDARY_HP = 50
 
 #: The single archetype both cases resolve to: identical in every authored
-#: field, with a non-null threshold and a legacy declaration, so the only
+#: field, with a non-null threshold and a reflex declaration, so the only
 #: difference between the paired monsters is the variant's mode override.
 ARCHETYPE_FIELDS = {
     "target_strategy": "lowest_hp",
     "skill_choice": "first_owned",
     "prefer_area_when_multiple_enemies": False,
     "flee_hp_fraction": BOUNDARY_HP / MAX_HP,
-    "decision_mode": DecisionMode.LEGACY.value,
+    "decision_mode": DecisionMode.REFLEX.value,
     "utility_weights": {
         name: 1.0 for name in behaviour.UTILITY_WEIGHT_NAMES
     },
@@ -105,7 +105,7 @@ def _recorded_enumerations():
 
 
 class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
-    """The flee boundary belongs to legacy mode; utility mode never flees."""
+    """The flee boundary belongs to reflex; deliberation never flees."""
 
     def setUp(self):
         _scope(self)
@@ -128,7 +128,7 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
             _suppress_innate_skills(self)
         self.open_tuning(
             archetypes={ARCHETYPE: dict(ARCHETYPE_FIELDS)},
-            modes={} if mode is DecisionMode.LEGACY else {VARIANT: mode.value},
+            modes={} if mode is DecisionMode.REFLEX else {VARIANT: mode.value},
             intelligence={VARIANT: 50},
         )
         monster = construct_species_individual(
@@ -150,10 +150,10 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
         "monster-flee-policy::the-policy-checks-current-to-maximum-true-hp-at-an-inclusive-boundary",
         "monster-flee-policy::utility-mode-never-voluntarily-flees",
     )
-    def test_only_legacy_mode_flees_at_the_shared_authored_boundary(self):
+    def test_only_reflex_mode_flees_at_the_shared_authored_boundary(self):
         for mode, expected in (
-            (DecisionMode.LEGACY, FLEE_SKILL_KEY),
-            (DecisionMode.UTILITY, STRIKE.key),
+            (DecisionMode.REFLEX, FLEE_SKILL_KEY),
+            (DecisionMode.DELIBERATION, STRIKE.key),
         ):
             with self.subTest(mode=mode.value):
                 monster, field = self._case(mode, hp=BOUNDARY_HP)
@@ -164,7 +164,7 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
                     )
                 self.assertIsNotNone(request)
                 self.assertEqual(request.skill_key, expected)
-                if mode is DecisionMode.UTILITY:
+                if mode is DecisionMode.DELIBERATION:
                     # The request is the scored selection the decision made,
                     # and it is never the flee key it kept out of its own
                     # candidate set.
@@ -190,8 +190,8 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
                 self.assertEqual(above.skill_key, STRIKE.key)
 
     @covers_requirement("monster-flee-policy::utility-mode-never-voluntarily-flees")
-    def test_below_the_boundary_the_utility_decision_still_scores(self):
-        monster, field = self._case(DecisionMode.UTILITY, hp=1)
+    def test_below_the_boundary_the_deliberation_decision_still_scores(self):
+        monster, field = self._case(DecisionMode.DELIBERATION, hp=1)
         first = monster_behaviour_policy(monster, field)
         self.assertIsNotNone(first)
         self.assertEqual(first.skill_key, STRIKE.key)
@@ -201,11 +201,11 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(replay.targets, first.targets)
 
     @covers_requirement("monster-flee-policy::utility-mode-never-voluntarily-flees")
-    def test_an_empty_utility_candidate_set_stays_no_action(self):
+    def test_an_empty_deliberation_candidate_set_stays_no_action(self):
         for hp in (1, BOUNDARY_HP):
             with self.subTest(hp=hp):
                 monster, field = self._case(
-                    DecisionMode.UTILITY, hp=hp, owned=()
+                    DecisionMode.DELIBERATION, hp=hp, owned=()
                 )
                 # The stored ownership is empty: no active row, no passive row
                 # and no innate order. (``owned_keys()`` additionally appends
@@ -217,18 +217,20 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
                     patch("world.rules.monster_behaviour.log_warn") as warning,
                     patch(
                         "world.rules.monster_behaviour._should_flee",
-                        side_effect=AssertionError("the legacy flee gate ran"),
+                        side_effect=AssertionError("the reflex flee gate ran"),
                     ),
                 ):
                     request = monster_behaviour_policy(monster, field)
                 # No action is the decision's own boundary: no flee request is
-                # built and the legacy body is never consulted.
+                # built and the reflex body is never consulted.
                 self.assertIsNone(request)
                 warning.assert_not_called()
 
     @covers_requirement("monster-flee-policy::utility-mode-never-voluntarily-flees")
     def test_the_owned_flee_key_is_no_enumerated_candidate(self):
-        monster, field = self._case(DecisionMode.UTILITY, hp=MAX_HP, innate=True)
+        monster, field = self._case(
+            DecisionMode.DELIBERATION, hp=MAX_HP, innate=True
+        )
         self.assertIn(FLEE_SKILL_KEY, monster.skills.owned_keys())
         for hp in (MAX_HP, BOUNDARY_HP, BOUNDARY_HP - 1, 1):
             with self.subTest(hp=hp):
@@ -257,18 +259,18 @@ class FleeModeScopeTests(SyntheticTuningMixin, EvenniaTestCase):
                 self.assertIn(request.skill_key, legal)
 
     @covers_requirement("monster-flee-policy::utility-mode-never-voluntarily-flees")
-    def test_the_typed_invalid_state_fallback_keeps_the_legacy_body(self):
-        monster, field = self._case(DecisionMode.UTILITY, hp=BOUNDARY_HP)
-        self.assertIs(invalid_state_fallback(), InvalidStateFallback.LEGACY)
+    def test_the_typed_invalid_state_fallback_keeps_the_reflex_body(self):
+        monster, field = self._case(DecisionMode.DELIBERATION, hp=BOUNDARY_HP)
+        self.assertIs(invalid_state_fallback(), InvalidStateFallback.REFLEX)
         with (
             patch(
-                "world.rules.monster_behaviour._utility_action",
-                side_effect=MonsterAIStateError("a raised utility state"),
+                "world.rules.monster_behaviour._deliberation_action",
+                side_effect=MonsterAIStateError("a raised deliberation state"),
             ),
             patch("world.rules.monster_behaviour.log_warn") as warning,
         ):
             request = monster_behaviour_policy(monster, field)
-        # The fallback's legacy decision, inclusive flee request included.
+        # The fallback's reflex decision, inclusive flee request included.
         self.assertIsNotNone(request)
         self.assertEqual(request.skill_key, FLEE_SKILL_KEY)
         self.assertEqual(request.targets, [monster])

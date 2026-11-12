@@ -8,7 +8,7 @@ in the test, so no shipped key, display string or catalog symbol is named.
 from tools.spec_traceability import covers_requirement
 
 import unittest
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
@@ -42,6 +42,7 @@ from world.rules.monster_behaviour import (
     support_kit_mode_violations,
 )
 from world.rules.monster_individual import construct_species_individual
+from world.skills.effects import EffectPolicy
 from world.skills.registry import FactionConstraint, SkillKind, TargetSpec
 from world.tests.synthetic_data import (
     make_monster_species,
@@ -111,7 +112,7 @@ _VARIANT_ROWS = {
     ),
 }
 #: A registered variant whose species relationship resolves nowhere: it can
-#: never author tuning, so it pins its own archetype to legacy.
+#: never author tuning, so it pins its own archetype to reflex.
 _ORPHAN_ROW = make_monster_variant(
     ORPHAN,
     species_key=ABSENT_SPECIES,
@@ -119,10 +120,13 @@ _ORPHAN_ROW = make_monster_variant(
     behaviour_profile_key=ARCHETYPE,
 )
 #: Every registered variant whose authored binding resolves to each archetype:
-#: authoring that archetype as utility obliges startup to see a validated
+#: authoring that archetype as deliberation obliges startup to see a validated
 #: intelligence value for exactly these keys.
 PATROL_VARIANTS = (ORDINARY, OTHER_VARIANT)
 AMBUSH_VARIANTS = (STRONGER,)
+
+#: The sentinel one archetype case passes as ``temperature`` to author none.
+_OMITTED = object()
 
 
 def _intelligence(keys, value=50, **extra):
@@ -132,15 +136,16 @@ def _intelligence(keys, value=50, **extra):
 
 def _archetype(
     *,
-    mode="legacy",
+    mode="reflex",
     weights=None,
     target_strategy="lowest_hp",
     skill_choice="first_owned",
     prefer_area=False,
     flee=None,
+    temperature=_OMITTED,
 ):
-    """One synthetic archetype entry carrying the complete legacy contract."""
-    return {
+    """One synthetic archetype entry carrying the complete behaviour contract."""
+    fields = {
         "target_strategy": target_strategy,
         "skill_choice": skill_choice,
         "prefer_area_when_multiple_enemies": prefer_area,
@@ -148,6 +153,14 @@ def _archetype(
         "decision_mode": mode,
         "utility_weights": dict(WEIGHTS) if weights is None else weights,
     }
+    if temperature is _OMITTED:
+        # The evaluating choice authors the temperature it samples by; the
+        # deterministic one only gets it when a case supplies it explicitly.
+        if skill_choice == "highest_expected_damage":
+            fields["reflex_temperature"] = 10.0
+    else:
+        fields["reflex_temperature"] = temperature
+    return fields
 
 
 def _archetypes(*, patrol=None, ambush=None):
@@ -300,7 +313,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
-    def test_each_mandatory_legacy_field_is_required(self):
+    def test_each_mandatory_behaviour_field_is_required(self):
         for field in MANDATORY_FIELDS:
             with self.subTest(field=field):
                 # One field leaves an otherwise complete, otherwise valid table.
@@ -357,18 +370,18 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_decision_mode_and_budget_are_strictly_typed(self):
-        for mode in ("berserk", True, 1, None, ["legacy"]):
+        for mode in ("berserk", True, 1, None, ["reflex"], "legacy", "utility"):
             with self.subTest(mode=mode):
                 rulebook = _rulebook(
                     archetypes=_archetypes(patrol={"mode": mode})
                 )
                 with self.assertRaises(MonsterBehaviourConfigError):
                     self._profiles(rulebook)
-        # An authoring that omits the optional mode is legacy, not an error.
+        # An authoring that omits the optional mode is reflex, not an error.
         complete = _archetypes()
         del complete[ARCHETYPE]["decision_mode"]
         profiles = self._profiles(_rulebook(archetypes=complete))
-        self.assertIs(profiles[ARCHETYPE].decision_mode, DecisionMode.LEGACY)
+        self.assertIs(profiles[ARCHETYPE].decision_mode, DecisionMode.REFLEX)
         for budget in (0, 4097, BUDGET * 1.0, True, "256", None):
             with self.subTest(budget=budget):
                 with self.assertRaises(MonsterBehaviourConfigError):
@@ -376,6 +389,63 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         for budget in (1, 4096):
             with self.subTest(budget=budget):
                 self.assertEqual(_tuning(budget=budget).candidate_budget, budget)
+
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
+    def test_reflex_temperature_is_conditionally_required(self):
+        # A highest_expected_damage profile must author a finite positive
+        # non-boolean temperature: that is what its reflex sampling reads, and
+        # the requirement holds on the authored choice even while the profile's
+        # effective mode is deliberation, so a rollback can switch it back
+        # without authoring a new value.
+        missing = _archetypes()
+        del missing[OTHER_ARCHETYPE]["reflex_temperature"]
+        malformed = {
+            "missing": missing,
+            "null": _archetypes(ambush={"temperature": None}),
+            "zero": _archetypes(ambush={"temperature": 0}),
+            "negative": _archetypes(ambush={"temperature": -1.0}),
+            "boolean": _archetypes(ambush={"temperature": True}),
+            "string": _archetypes(ambush={"temperature": "10"}),
+            "nan": _archetypes(ambush={"temperature": float("nan")}),
+            "infinite": _archetypes(ambush={"temperature": float("inf")}),
+        }
+        for label, table in malformed.items():
+            with self.subTest(case=label):
+                with self.assertRaises(MonsterBehaviourConfigError):
+                    self._profiles(_rulebook(archetypes=table))
+        # Two independently known temperatures are accepted and recorded.
+        for value in (0.5, 10.0):
+            with self.subTest(value=value):
+                profiles = self._profiles(
+                    _rulebook(
+                        archetypes=_archetypes(ambush={"temperature": value})
+                    )
+                )
+                self.assertEqual(profiles[OTHER_ARCHETYPE].reflex_temperature, value)
+        # A first_owned profile needs none, and one it supplies is validated
+        # exactly as strictly even though its decisions never read it.
+        profiles = self._profiles(_rulebook(archetypes=_archetypes()))
+        self.assertIsNone(profiles[ARCHETYPE].reflex_temperature)
+        supplied = self._profiles(
+            _rulebook(archetypes=_archetypes(patrol={"temperature": 2.5}))
+        )
+        self.assertEqual(supplied[ARCHETYPE].reflex_temperature, 2.5)
+        for value in (0, -3, True, "2.5", float("nan")):
+            with self.subTest(invalid=value):
+                with self.assertRaises(MonsterBehaviourConfigError):
+                    self._profiles(
+                        _rulebook(
+                            archetypes=_archetypes(patrol={"temperature": value})
+                        )
+                    )
+        # The demand follows the authored skill choice, not the effective mode:
+        # this archetype stays authored reflex.
+        self.assertIs(
+            self._profiles(_rulebook(archetypes=_archetypes()))[
+                OTHER_ARCHETYPE
+            ].decision_mode,
+            DecisionMode.REFLEX,
+        )
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_tier_default_mapping_must_cover_exactly_the_tier_registry(self):
@@ -412,8 +482,10 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(intelligence={ORPHAN: 50}, variants=orphaned)
         malformed_modes = {
-            "unregistered-key": {"t_ai_absent_variant": "utility"},
+            "unregistered-key": {"t_ai_absent_variant": "deliberation"},
             "unrecognized": {ORDINARY: "berserk"},
+            "former-mode": {ORDINARY: "legacy"},
+            "former-other-mode": {ORDINARY: "utility"},
             "primitive-type": {ORDINARY: 1},
             "wrong-container": (ORDINARY,),
         }
@@ -422,19 +494,19 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 with self.assertRaises(MonsterBehaviourConfigError):
                     _tuning(modes=modes)
         with self.assertRaises(MonsterBehaviourConfigError):
-            _tuning(modes={ORPHAN: "utility"}, variants=orphaned)
+            _tuning(modes={ORPHAN: "deliberation"}, variants=orphaned)
 
     @covers_requirement("monster-behaviour-profile::variant-intelligence-is-explicit-and-independent")
-    def test_utility_activation_coverage_requires_intelligence(self):
-        utility_archetypes = _archetypes(patrol={"mode": "utility"})
+    def test_deliberation_activation_coverage_requires_intelligence(self):
+        deliberation_archetypes = _archetypes(patrol={"mode": "deliberation"})
         with self.assertRaises(MonsterBehaviourConfigError):
-            _tuning(archetypes=utility_archetypes)
+            _tuning(archetypes=deliberation_archetypes)
         with self.assertRaises(MonsterBehaviourConfigError):
-            _tuning(modes={ORDINARY: "utility"})
-        # Authored coverage is accepted, and an inactive legacy value is
-        # validated exactly as strictly as an active utility one.
+            _tuning(modes={ORDINARY: "deliberation"})
+        # Authored coverage is accepted, and an inactive reflex value is
+        # validated exactly as strictly as an active deliberation one.
         covered = _tuning(
-            archetypes=utility_archetypes,
+            archetypes=deliberation_archetypes,
             intelligence=_intelligence(PATROL_VARIANTS, 90),
         )
         self.assertEqual(
@@ -443,7 +515,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         )
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(
-                archetypes=utility_archetypes,
+                archetypes=deliberation_archetypes,
                 intelligence=_intelligence(PATROL_VARIANTS, 90, **{ORDINARY: 101}),
             )
         with self.assertRaises(MonsterBehaviourConfigError):
@@ -462,24 +534,25 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
             _tuning(variants=broken)
 
     def test_the_optional_fields_are_additive(self):
-        # A legacy archetype may stop at the four mandatory fields: no mode,
+        # A reflex archetype may stop at the four mandatory fields: no mode,
         # no weights, and the load still succeeds.
         minimal = {name: _archetype()[name] for name in MANDATORY_FIELDS}
         table = _archetypes()
         table[ARCHETYPE] = minimal
         profiles = self._profiles(_rulebook(archetypes=table))
-        self.assertIs(profiles[ARCHETYPE].decision_mode, DecisionMode.LEGACY)
+        self.assertIs(profiles[ARCHETYPE].decision_mode, DecisionMode.REFLEX)
         self.assertIsNone(profiles[ARCHETYPE].utility_weights)
+        self.assertIsNone(profiles[ARCHETYPE].reflex_temperature)
         # "Not scored yet" is a decision input of its own.
         self.assertNotEqual(
             _tuning().fingerprint, _tuning(archetypes=table).fingerprint
         )
-        # Authoring that same archetype utility needs both its intelligence
+        # Authoring that same archetype deliberation needs both its intelligence
         # and its weights to be usable.
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(
                 archetypes={
-                    ARCHETYPE: dict(minimal, decision_mode="utility"),
+                    ARCHETYPE: dict(minimal, decision_mode="deliberation"),
                     OTHER_ARCHETYPE: _archetypes()[OTHER_ARCHETYPE],
                 },
                 intelligence=_intelligence(PATROL_VARIANTS, 10),
@@ -511,7 +584,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 )
             )
 
-    def test_all_legacy_tuning_loads_with_empty_variant_maps(self):
+    def test_all_reflex_tuning_loads_with_empty_variant_maps(self):
         tuning = _tuning()
         self.assertEqual(tuning.algorithm_version, AI_ALGORITHM_VERSION)
         self.assertEqual(tuning.candidate_budget, BUDGET)
@@ -520,7 +593,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         self.assertEqual(tuning.variant_bindings, {})
         self.assertEqual(set(tuning.behaviour_profiles), set(_archetypes()))
         for profile in tuning.behaviour_profiles.values():
-            self.assertIs(profile.decision_mode, DecisionMode.LEGACY)
+            self.assertIs(profile.decision_mode, DecisionMode.REFLEX)
             self.assertEqual(
                 set(profile.utility_weights.as_payload()), set(UTILITY_WEIGHT_NAMES)
             )
@@ -561,6 +634,9 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
             "flee-threshold": _tuning(
                 archetypes=_archetypes(patrol={"flee": 0.5})
             ),
+            "reflex-temperature": _tuning(
+                archetypes=_archetypes(ambush={"temperature": 5.0})
+            ),
         }
         for label, tuning in changed.items():
             with self.subTest(case=label):
@@ -571,15 +647,15 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         self.assertNotEqual(
             _tuning(intelligence=authored).fingerprint,
             _tuning(
-                archetypes=_archetypes(patrol={"mode": "utility"}),
+                archetypes=_archetypes(patrol={"mode": "deliberation"}),
                 intelligence=authored,
             ).fingerprint,
         )
         # A referenced variant's authored binding is a decision input, while a
         # display-only rename of that same variant is not.
-        named = _tuning(modes={ORDINARY: "legacy"})
+        named = _tuning(modes={ORDINARY: "reflex"})
         rebinding = _tuning(
-            modes={ORDINARY: "legacy"},
+            modes={ORDINARY: "reflex"},
             variants={
                 **_VARIANT_ROWS,
                 ORDINARY: make_monster_variant(
@@ -592,7 +668,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         )
         self.assertNotEqual(named.fingerprint, rebinding.fingerprint)
         renamed = _tuning(
-            modes={ORDINARY: "legacy"},
+            modes={ORDINARY: "reflex"},
             variants={
                 **_VARIANT_ROWS,
                 ORDINARY: make_monster_variant(
@@ -606,13 +682,45 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         )
         self.assertEqual(named.fingerprint, renamed.fingerprint)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
+    def test_a_primary_damage_coefficient_is_a_fingerprint_input(self):
+        # A reflex decision reads the primary damage occurrence's coefficient,
+        # so editing one must invalidate a recorded fingerprint even though no
+        # authored tuning field moved.
+        skill = synth_damage_skill("t_ai_coefficient_probe", "合成係數探針")
+        base = _tuning().fingerprint
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY", {skill.key: skill}
+        ):
+            authored = _tuning().fingerprint
+            self.assertNotEqual(authored, base)
+            stronger = replace(
+                skill,
+                effect_policies=(EffectPolicy(coefficient=2.0),),
+            )
+            with patch.dict(
+                "world.skills.registry.SKILL_REGISTRY", {skill.key: stronger}
+            ):
+                self.assertNotEqual(_tuning().fingerprint, authored)
+        # The registry entry is gone again: the base tuning reproduces.
+        self.assertEqual(base, _tuning().fingerprint)
+
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
+    def test_equivalent_input_in_any_insertion_order_is_one_fingerprint(self):
+        base = _tuning().fingerprint
+        reordered = _tuning(
+            defaults={OTHER_TIER: OTHER_ARCHETYPE, TIER: ARCHETYPE},
+            archetypes=dict(reversed(list(_archetypes().items()))),
+        ).fingerprint
+        self.assertEqual(base, reordered)
+
 
 class SupportKitModeTests(unittest.TestCase):
-    """Only an effective utility mode can select an owned support active."""
+    """Only an effective deliberation mode can select an owned support active."""
 
     def setUp(self):
         # One self-only support active: it carries no ``damage:`` effect, so
-        # the permanent legacy body can never propose it.
+        # the permanent reflex body can never propose it.
         self.support = make_skill(
             "t_ai_support_shell",
             effects=["self_buff_apply:t_support_shell"],
@@ -620,7 +728,7 @@ class SupportKitModeTests(unittest.TestCase):
             target_spec=TargetSpec.SELF,
             faction_constraint=FactionConstraint.SELF_ONLY,
         )
-        # One damage active, the only shape the legacy body proposes.
+        # One damage active, the only shape the reflex body proposes.
         self.damage = make_skill(
             "t_ai_claw_kit",
             effects=["damage:none:physical"],
@@ -649,7 +757,7 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_legacy_bound_support_owner_is_reported(self):
+    def test_a_reflex_bound_support_owner_is_reported(self):
         tuning = _tuning(variants=self.support_variants)
         self.assertEqual(
             self._violations(tuning, self.support_variants),
@@ -659,10 +767,10 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_validated_utility_override_is_accepted(self):
+    def test_a_validated_deliberation_override_is_accepted(self):
         tuning = _tuning(
             variants=self.support_variants,
-            modes={ORDINARY: "utility"},
+            modes={ORDINARY: "deliberation"},
             intelligence={ORDINARY: 50},
         )
         self.assertEqual(self._violations(tuning, self.support_variants), ())
@@ -670,10 +778,10 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_utility_archetype_is_accepted(self):
+    def test_a_deliberation_archetype_is_accepted(self):
         tuning = _tuning(
             variants=self.support_variants,
-            archetypes=_archetypes(patrol={"mode": "utility"}),
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
             intelligence=_intelligence(PATROL_VARIANTS, 50),
         )
         self.assertEqual(self._violations(tuning, self.support_variants), ())
@@ -681,7 +789,7 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_damage_only_legacy_kit_is_accepted(self):
+    def test_a_damage_only_reflex_kit_is_accepted(self):
         damage_variants = {
             **_VARIANT_ROWS,
             ORDINARY: make_monster_variant(
@@ -698,9 +806,9 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_an_explicit_binding_beats_a_utility_tier_default(self):
-        # The authored reference is a legacy archetype while the variant's tier
-        # default is utility: only the explicit binding may decide the mode.
+    def test_an_explicit_binding_beats_a_deliberation_tier_default(self):
+        # The authored reference is a reflex archetype while the variant's tier
+        # default is deliberation: only the explicit binding decides the mode.
         bound_to_other = {
             **_VARIANT_ROWS,
             ORDINARY: make_monster_variant(
@@ -713,7 +821,7 @@ class SupportKitModeTests(unittest.TestCase):
         }
         tuning = _tuning(
             variants=bound_to_other,
-            archetypes=_archetypes(patrol={"mode": "utility"}),
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
             intelligence=_intelligence(PATROL_VARIANTS, 50),
         )
         self.assertEqual(
@@ -724,12 +832,12 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_an_explicit_legacy_override_beats_a_utility_archetype(self):
+    def test_an_explicit_reflex_override_beats_a_deliberation_archetype(self):
         tuning = _tuning(
             variants=self.support_variants,
-            archetypes=_archetypes(patrol={"mode": "utility"}),
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
             intelligence=_intelligence(PATROL_VARIANTS, 50),
-            modes={ORDINARY: "legacy"},
+            modes={ORDINARY: "reflex"},
         )
         self.assertEqual(
             self._violations(tuning, self.support_variants),
@@ -739,9 +847,9 @@ class SupportKitModeTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_legacy_tier_default_binding_is_reported(self):
+    def test_a_reflex_tier_default_binding_is_reported(self):
         # No authored reference: the variant's tier default resolves the mode,
-        # so a legacy default reports and a utility default accepts.
+        # so a reflex default reports and a deliberation default accepts.
         fallback_variants = {
             **_VARIANT_ROWS,
             ORDINARY: make_monster_variant(
@@ -752,29 +860,29 @@ class SupportKitModeTests(unittest.TestCase):
                 active_skill_keys=(self.support.key,),
             ),
         }
-        legacy_default = _tuning(
+        reflex_default = _tuning(
             variants=fallback_variants,
             defaults={TIER: OTHER_ARCHETYPE, OTHER_TIER: OTHER_ARCHETYPE},
         )
         self.assertEqual(
-            self._violations(legacy_default, fallback_variants),
+            self._violations(reflex_default, fallback_variants),
             ((ORDINARY, self.support.key),),
         )
-        utility_default = _tuning(
+        deliberation_default = _tuning(
             variants=fallback_variants,
-            archetypes=_archetypes(patrol={"mode": "utility"}),
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
             defaults={TIER: ARCHETYPE, OTHER_TIER: ARCHETYPE},
             intelligence=_intelligence(PATROL_VARIANTS, 50),
         )
         self.assertEqual(
-            self._violations(utility_default, fallback_variants), ()
+            self._violations(deliberation_default, fallback_variants), ()
         )
 
     @covers_requirement(
         "monster-behaviour-profile::owned-support-actives-bind-an-effective-utility-decision"
     )
-    def test_a_legacy_load_accepts_a_resolvable_support_kit(self):
-        # The loader must keep accepting a legacy tuning whose variant owns a
+    def test_a_reflex_load_accepts_a_resolvable_support_kit(self):
+        # The loader must keep accepting a reflex tuning whose variant owns a
         # registered support active: the check reports, it never rejects.
         open_synthetic_scope(
             self, "skills", extra={"skills": self.skills}
@@ -863,19 +971,19 @@ class MonsterAIDecisionTests(unittest.TestCase):
     def test_a_variant_override_wins_over_the_archetype_mode(self):
         paired = self._resolve(
             FakeAIMonster("t_ai_u", species_key=SPECIES, variant_key=ORDINARY),
-            modes={ORDINARY: "utility"},
+            modes={ORDINARY: "deliberation"},
             intelligence={ORDINARY: 70},
         )
-        self.assertIs(paired.mode, DecisionMode.UTILITY)
+        self.assertIs(paired.mode, DecisionMode.DELIBERATION)
         self.assertEqual(paired.intelligence, 70)
         self.assertIsNone(paired.invalid_reason)
         overridden = self._resolve(
             FakeAIMonster("t_ai_l", species_key=SPECIES, variant_key=ORDINARY),
-            archetypes=_archetypes(patrol={"mode": "utility"}),
-            modes={ORDINARY: "legacy"},
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
+            modes={ORDINARY: "reflex"},
             intelligence=_intelligence(PATROL_VARIANTS, 70),
         )
-        self.assertIs(overridden.mode, DecisionMode.LEGACY)
+        self.assertIs(overridden.mode, DecisionMode.REFLEX)
         self.assertEqual(overridden.archetype_key, ARCHETYPE)
 
     @covers_requirement(
@@ -888,10 +996,10 @@ class MonsterAIDecisionTests(unittest.TestCase):
             FakeAIMonster(
                 "t_ai_repaired", species_key=SPECIES, variant_key=OTHER_VARIANT
             ),
-            modes={ORDINARY: "utility"},
+            modes={ORDINARY: "deliberation"},
             intelligence={ORDINARY: 70},
         )
-        self.assertIs(repaired.mode, DecisionMode.LEGACY)
+        self.assertIs(repaired.mode, DecisionMode.REFLEX)
         self.assertIsNone(repaired.variant_key)
         self.assertIsNone(repaired.intelligence)
 
@@ -916,15 +1024,15 @@ class MonsterAIDecisionTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
     )
-    def test_utility_without_a_pair_or_intelligence_is_typed_invalid(self):
+    def test_deliberation_without_a_pair_or_intelligence_is_typed_invalid(self):
         unpaired = self._resolve(
             FakeAIMonster("t_ai_tier_only"),
-            archetypes=_archetypes(patrol={"mode": "utility"}),
+            archetypes=_archetypes(patrol={"mode": "deliberation"}),
             intelligence=_intelligence(PATROL_VARIANTS, 50),
         )
         self.assertIs(unpaired.invalid_reason, InvalidDecisionReason.INVALID_IDENTITY)
         # The pair resolves, but a repaired binding moved the monster onto an
-        # archetype authored utility while it authors no intelligence itself.
+        # archetype authored deliberation while it authors no intelligence.
         unvalued = self._resolve(
             FakeAIMonster(
                 "t_ai_unvalued",
@@ -932,19 +1040,19 @@ class MonsterAIDecisionTests(unittest.TestCase):
                 species_key=SPECIES,
                 variant_key=ORDINARY,
             ),
-            archetypes=_archetypes(ambush={"mode": "utility"}),
+            archetypes=_archetypes(ambush={"mode": "deliberation"}),
             intelligence=_intelligence(AMBUSH_VARIANTS, 50),
         )
         self.assertIs(
             unvalued.invalid_reason, InvalidDecisionReason.MISSING_INTELLIGENCE
         )
-        # An untuned legacy variant reaches a usable decision instead.
-        legacy = self._resolve(
+        # An untuned reflex variant reaches a usable decision instead.
+        reflex = self._resolve(
             FakeAIMonster("t_ai_legacy", species_key=SPECIES, variant_key=ORDINARY)
         )
-        self.assertIsNone(legacy.invalid_reason)
-        self.assertIs(legacy.mode, DecisionMode.LEGACY)
-        self.assertNotEqual(legacy, unvalued)
+        self.assertIsNone(reflex.invalid_reason)
+        self.assertIs(reflex.mode, DecisionMode.REFLEX)
+        self.assertNotEqual(reflex, unvalued)
 
     @covers_requirement("monster-behaviour-profile::variant-intelligence-is-explicit-and-independent")
     def test_independent_variants_keep_their_own_intelligence(self):
@@ -969,9 +1077,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
     @covers_requirement(
         "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
     )
-    def test_tier_only_and_unregistered_monsters_stay_legacy(self):
+    def test_tier_only_and_unregistered_monsters_stay_reflex(self):
         tier_only = self._resolve(FakeAIMonster("t_ai_tier_only"))
-        self.assertIs(tier_only.mode, DecisionMode.LEGACY)
+        self.assertIs(tier_only.mode, DecisionMode.REFLEX)
         self.assertIsNone(tier_only.variant_key)
         self.assertIsNone(tier_only.intelligence)
         unregistered = self._resolve(
@@ -979,7 +1087,7 @@ class MonsterAIDecisionTests(unittest.TestCase):
                 "t_ai_orphan", species_key=ABSENT_SPECIES, variant_key=ORPHAN
             )
         )
-        self.assertIs(unregistered.mode, DecisionMode.LEGACY)
+        self.assertIs(unregistered.mode, DecisionMode.REFLEX)
         self.assertIsNone(unregistered.variant_key)
 
     @covers_requirement(
@@ -1035,7 +1143,7 @@ class SessionAITuningTests(unittest.TestCase):
         # The view is a copy, and the record itself is frozen: a caller can
         # never edit recorded tuning through one of its own containers.
         with self.assertRaises(FrozenInstanceError):
-            recorded["fixture:t_ai_first"].mode = DecisionMode.UTILITY
+            recorded["fixture:t_ai_first"].mode = DecisionMode.DELIBERATION
         with self.assertRaises(TypeError):
             recorded["t_ai_first"] = recorded["fixture:t_ai_first"]
         self.assertEqual(len(session_ai_tuning(SESSION)), 2)
@@ -1090,7 +1198,7 @@ class SessionAITuningTests(unittest.TestCase):
         record_session_ai_tuning(SESSION, monster, tuning=restarted)
         recorded = session_ai_tuning(SESSION)["fixture:t_ai_restart"]
         self.assertEqual(recorded.tuning_fingerprint, restarted.fingerprint)
-        self.assertIs(recorded.mode, DecisionMode.LEGACY)
+        self.assertIs(recorded.mode, DecisionMode.REFLEX)
 
     @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_recording_re_resolves_a_repaired_binding(self):
@@ -1179,7 +1287,7 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
         rows_before = ObjectDB.objects.count()
         recorded = self._record(SESSION)
         self.assertEqual(recorded.tuning_fingerprint, self.tuning.fingerprint)
-        self.assertIs(recorded.mode, DecisionMode.LEGACY)
+        self.assertIs(recorded.mode, DecisionMode.REFLEX)
         self.assertEqual(recorded.variant_key, ORDINARY)
         self.assertIsNone(recorded.invalid_reason)
         self.assertEqual(ObjectDB.objects.count(), rows_before)
