@@ -1,10 +1,7 @@
 """Gallery projections and exact wire schemas.
 
 No mutation or service probe. The registered panel is version 4
-(``gallery_presenter`` / ``validate_gallery``). The version-3 rail presenter
-and validator stay below, renamed ``gallery_presenter_v3`` /
-``validate_gallery_v3``, unregistered and unreachable until
-``gallery-v3-removal`` deletes them.
+(``gallery_presenter`` / ``validate_gallery``): one category at a time.
 """
 
 import hashlib
@@ -13,9 +10,6 @@ import math
 import re
 import uuid
 
-from evennia.objects.models import ObjectDB
-
-from typeclasses.entities import LivingEntity
 from world.art import gallery as gallery_api
 from world.art import official as official_api
 from world.art import descriptors
@@ -28,14 +22,9 @@ from world.art.presenter import (
     GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, describe_portrait, media_url_for,
 )
 from world.art.queue import MAX_PENDING_GALLERY_JOBS, pending_gallery_jobs
-from world.art.subjects import (
-    ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
-    monster_subject_for, parse_subject,
-)
-from world.lore.monster_visuals import get_monster_visual_registry
+from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind, parse_subject
 from world.lore.items import ITEM_REGISTRY
 from world.observability import log_warn
-from world.rules.party import live_companions
 
 from . import artwork as artwork_wire
 from .context import PresentationContext
@@ -43,16 +32,13 @@ from .gallery_categories import (
     DISABLED_REASONS, GalleryCategoryError, category_groups, gallery_categories,
 )
 from .protocol import (
-    MAX_CANONICAL_JSON_BYTES, MAX_LIST_ITEMS, MAX_SAFE_INTEGER,
-    ProtocolValidationError, _require_exact_fields, check_json_safety, json_byte_size,
+    MAX_LIST_ITEMS, MAX_SAFE_INTEGER, ProtocolValidationError, _require_exact_fields,
+    check_json_safety,
 )
 from .publication_parts import PUBLICATION_MAX_BYTES
 from .registry import PanelUnavailableError
 
 GALLERY_SCHEMA_VERSION = 4
-# The dead version-3 validator's own discriminator (gallery-v3-removal).
-_V3_SCHEMA_VERSION = 3
-GALLERY_MAX_SUBJECTS = 24
 GALLERY_MAX_LABEL = 128
 GALLERY_MAX_NAME = 64
 GALLERY_MAX_CHIP = 16
@@ -78,21 +64,11 @@ OFFICIAL_ROW_FIELDS = ("identity", "artwork", "is_current", "is_catalog_default"
 SLOT_LABELS = {"weapon_main": "主手", "weapon_off": "副手", "armor": "防具", "accessories": "飾品"}
 SLOTS = gallery_api.SLOT_ORDER
 FIELDS = GALLERY_PROMPT_FIELDS
-CAPABILITY_FIELDS = (
-    "supports_bindings", "supports_field_selection", "supports_free_text",
-    "supports_personal_official_preferences", "max_cards"
-)
 CARD_FIELDS = {
     "image_id", "status", "label", "artwork", "is_default", "chips",
     "requested_fields", "binding_present", "created_at",
 }
-PANEL_FIELDS = {
-    "schema_version", "available", "kind", "subjects", "selected", "filters", "cards",
-    "official_entries", "equipment_summary", "capabilities", "binding_warnings",
-    "error_state",
-}
-
-# Version 4 (change gallery-v4-validators): one category at a time. Declared
+# One category at a time (change gallery-v4-validators). Declared
 # here rather than imported from gallery_categories so this contract stays
 # independent of the category sources; a test asserts the two agree.
 GALLERY_CATEGORY_KEYS = ("mine", "party", "people", "monster", "scene")
@@ -101,15 +77,15 @@ GALLERY_MAX_GROUPS = 64
 GALLERY_MAX_REASON = 64
 GALLERY_MAX_DESCRIPTION = 512
 GALLERY_GROUP_KEY_PATTERN = r"[a-z0-9_:.-]{1,96}"
-V4_PANEL_FIELDS = (
+PANEL_FIELDS = (
     "schema_version", "available", "kind", "categories", "category", "groups",
     "selected", "description", "cards", "official_entries", "equipment_summary",
     "capabilities", "binding_warnings", "error_state",
 )
-V4_CATEGORY_FIELDS = ("key", "count", "enabled", "reason")
-V4_GROUP_FIELDS = ("key", "label", "seen", "total", "expanded", "count", "subjects")
-V4_SUBJECT_FIELDS = ("subject_key", "kind", "display_name", "is_current", "card_count", "artwork")
-V4_CAPABILITY_FIELDS = (
+CATEGORY_FIELDS = ("key", "count", "enabled", "reason")
+GROUP_FIELDS = ("key", "label", "seen", "total", "expanded", "count", "subjects")
+SUBJECT_FIELDS = ("subject_key", "kind", "display_name", "is_current", "card_count", "artwork")
+CAPABILITY_FIELDS = (
     "supports_bindings", "supports_field_selection", "supports_free_text",
     "supports_personal_official_preferences", "supports_face_rect", "supports_stage",
     "supports_card_delete", "max_cards",
@@ -157,16 +133,6 @@ def validate_gallery_subject_key(value) -> ArtSubject:
 def _uuid(value):
     if gallery_api._canonical_uuid_text(value) is None:
         raise ProtocolValidationError("image_id must be a canonical UUID")
-
-
-def _filters(cards):
-    return {
-        "all": len(cards),
-        "defaults": sum(row["is_default"] for row in cards),
-        "bound": sum(row["binding_present"] for row in cards),
-        "pending": sum(row["status"] == "pending" for row in cards),
-        "failed": sum(row["status"] == "failed" for row in cards),
-    }
 
 
 def _validate_equipment(summary):
@@ -360,10 +326,10 @@ def _validate_official_entries(entries):
         raise ProtocolValidationError("at most one current/catalog-default official row")
 
 
-def _validate_capabilities(capability, fields):
+def _validate_capabilities(capability):
     """One selected subject's capability record: boolean flags, then the card cap."""
-    _exact(capability, fields, "capabilities")
-    for field in fields[:-1]:
+    _exact(capability, CAPABILITY_FIELDS, "capabilities")
+    for field in CAPABILITY_FIELDS[:-1]:
         if type(capability[field]) is not bool:
             raise ProtocolValidationError("capability flags must be booleans")
     if capability["max_cards"] is not None and _integer(capability["max_cards"], "max_cards") != 1:
@@ -371,11 +337,10 @@ def _validate_capabilities(capability, fields):
 
 
 def _validate_card_facts(payload, capability, selected):
-    """The selected subject's card fields, shared by every panel version.
+    """The selected subject's card fields.
 
     Equipment, official entries, card rows, the default/pending/failed limits,
-    the error state and the binding warnings. Returns the per-status row
-    counts, which the version-three panel also publishes as ``filters``.
+    the error state and the binding warnings.
     """
     if capability["supports_bindings"]:
         _validate_equipment(payload["equipment_summary"])
@@ -428,8 +393,10 @@ def _validate_card_facts(payload, capability, selected):
         expected = slot_chips + face_chips + (["目前預設"] if row["is_default"] else [])
         if chips != expected or bool(slot_chips) != row["binding_present"]:
             raise ProtocolValidationError("incoherent chips")
-    counts = _filters(cards)
-    if counts["defaults"] > 1 or counts["pending"] > MAX_PENDING_GALLERY_JOBS or counts["failed"] > 1:
+    defaults = sum(row["is_default"] for row in cards)
+    pending = sum(row["status"] == "pending" for row in cards)
+    failed = sum(row["status"] == "failed" for row in cards)
+    if defaults > 1 or pending > MAX_PENDING_GALLERY_JOBS or failed > 1:
         raise ProtocolValidationError("too many default/pending/failed rows")
     error = payload["error_state"]
     if error is not None:
@@ -438,7 +405,7 @@ def _validate_card_facts(payload, capability, selected):
         if re.fullmatch(r"[a-z0-9_]+", code) is None:
             raise ProtocolValidationError("invalid error identifier")
         _number(error["at"], "error timestamp")
-    if bool(counts["failed"]) != (error is not None):
+    if bool(failed) != (error is not None):
         raise ProtocolValidationError("error state differs from failed row")
     warnings = payload["binding_warnings"]
     if not isinstance(warnings, list) or len(warnings) > GALLERY_MAX_WARNINGS or warnings and not capability["supports_bindings"]:
@@ -458,60 +425,25 @@ def _validate_card_facts(payload, capability, selected):
         warning_ids.append(warning["image_id"])
     if len(set(warning_ids)) != len(warning_ids) or warning_ids != [row["image_id"] for row in cards if row["image_id"] in warning_ids]:
         raise ProtocolValidationError("warnings must be unique and newest first")
-    return counts
 
 
-def validate_gallery_v3(payload):
-    """Dead version-3 validator: unregistered, deleted by ``gallery-v3-removal``."""
-    _exact(payload, PANEL_FIELDS, "gallery")
-    if _integer(payload["schema_version"], "schema_version") != _V3_SCHEMA_VERSION or payload["available"] is not True or payload["kind"] != "gallery":
-        raise ProtocolValidationError("invalid gallery discriminator")
-    subjects = payload["subjects"]
-    if not isinstance(subjects, list) or not 1 <= len(subjects) <= GALLERY_MAX_SUBJECTS:
-        raise ProtocolValidationError("invalid subject rail")
-    seen = set()
-    for index, row in enumerate(subjects):
-        _exact(row, ("subject_key", "kind", "display_name", "is_puppet"), "subject row")
-        subject = validate_gallery_subject_key(row["subject_key"])
-        if row["kind"] != subject.kind.value or row["subject_key"] in seen or row["is_puppet"] is not (index == 0):
-            raise ProtocolValidationError("incoherent subject rail")
-        if index == 0 and subject.kind is not ArtSubjectKind.CHARACTER:
-            raise ProtocolValidationError("puppet must be a character")
-        _text(row["display_name"], GALLERY_MAX_NAME, "subject display name")
-        seen.add(row["subject_key"])
-    selected = validate_gallery_subject_key(payload["selected"])
-    if payload["selected"] not in seen:
-        raise ProtocolValidationError("selected is not in the rail")
-    capability = payload["capabilities"]
-    _validate_capabilities(capability, CAPABILITY_FIELDS)
-    counts = _validate_card_facts(payload, capability, selected)
-    filters = payload["filters"]
-    _exact(filters, ("all", "defaults", "bound", "pending", "failed"), "filters")
-    if any(_integer(value, "filter count") < 0 for value in filters.values()) or filters != counts:
-        raise ProtocolValidationError("filter counts differ from rows")
-    check_json_safety(payload)
-    if json_byte_size(payload) > MAX_CANONICAL_JSON_BYTES:
-        raise ProtocolValidationError("gallery exceeds envelope size")
-    return payload
-
-
-def _v4_count(value, maximum, name):
-    """One version-4 bounded non-negative integer."""
+def _count(value, maximum, name):
+    """One bounded non-negative integer."""
     if not 0 <= _integer(value, name) <= maximum:
         raise ProtocolValidationError(f"{name} out of range")
     return value
 
 
-def _validate_v4_categories(categories):
+def _validate_categories(categories):
     """The five categories in their closed order; returns them by key."""
     if not isinstance(categories, list) or len(categories) != len(GALLERY_CATEGORY_KEYS):
         raise ProtocolValidationError("invalid gallery categories")
     by_key = {}
     for key, row in zip(GALLERY_CATEGORY_KEYS, categories):
-        _exact(row, V4_CATEGORY_FIELDS, "gallery category")
+        _exact(row, CATEGORY_FIELDS, "gallery category")
         if row["key"] != key:
             raise ProtocolValidationError("categories must list the closed keys in order")
-        _v4_count(row["count"], GALLERY_MAX_PANEL_SUBJECTS, "category count")
+        _count(row["count"], GALLERY_MAX_PANEL_SUBJECTS, "category count")
         if type(row["enabled"]) is not bool:
             raise ProtocolValidationError("category enabled must be a boolean")
         if row["enabled"]:
@@ -523,14 +455,14 @@ def _validate_v4_categories(categories):
     return by_key
 
 
-def _validate_v4_groups(groups):
+def _validate_groups(groups):
     """The selected category's groups; returns (listed subject keys, summed counts)."""
     if not isinstance(groups, list) or len(groups) > GALLERY_MAX_GROUPS:
         raise ProtocolValidationError("invalid gallery groups")
     group_keys, listed = set(), set()
     total_count = currents = 0
     for group in groups:
-        _exact(group, V4_GROUP_FIELDS, "gallery group")
+        _exact(group, GROUP_FIELDS, "gallery group")
         key = group["key"]
         if not isinstance(key, str) or re.fullmatch(GALLERY_GROUP_KEY_PATTERN, key) is None or key in group_keys:
             raise ProtocolValidationError("invalid or duplicate group key")
@@ -541,12 +473,12 @@ def _validate_v4_groups(groups):
         if (seen is None) != (total is None):
             raise ProtocolValidationError("group seen and total are paired")
         if seen is not None:
-            _v4_count(total, GALLERY_MAX_PANEL_SUBJECTS, "group total")
-            if _v4_count(seen, GALLERY_MAX_PANEL_SUBJECTS, "group seen") > total:
+            _count(total, GALLERY_MAX_PANEL_SUBJECTS, "group total")
+            if _count(seen, GALLERY_MAX_PANEL_SUBJECTS, "group seen") > total:
                 raise ProtocolValidationError("group seen exceeds total")
         if type(group["expanded"]) is not bool:
             raise ProtocolValidationError("group expanded must be a boolean")
-        count = _v4_count(group["count"], GALLERY_MAX_PANEL_SUBJECTS, "group count")
+        count = _count(group["count"], GALLERY_MAX_PANEL_SUBJECTS, "group count")
         total_count += count
         subjects = group["subjects"]
         if not isinstance(subjects, list) or len(subjects) != (count if group["expanded"] else 0):
@@ -557,7 +489,7 @@ def _validate_v4_groups(groups):
         if len(listed) + len(subjects) > GALLERY_MAX_PANEL_SUBJECTS:
             raise ProtocolValidationError("gallery lists too many subjects")
         for row in subjects:
-            _exact(row, V4_SUBJECT_FIELDS, "gallery subject")
+            _exact(row, SUBJECT_FIELDS, "gallery subject")
             subject = validate_gallery_subject_key(row["subject_key"])
             if row["kind"] != subject.kind.value or row["subject_key"] in listed:
                 raise ProtocolValidationError("incoherent or duplicate subject")
@@ -566,7 +498,7 @@ def _validate_v4_groups(groups):
             if type(row["is_current"]) is not bool:
                 raise ProtocolValidationError("is_current must be a boolean")
             currents += row["is_current"]
-            _v4_count(row["card_count"], MAX_LIST_ITEMS, "card_count")
+            _count(row["card_count"], MAX_LIST_ITEMS, "card_count")
             if row["artwork"] is not None:
                 artwork_wire.validate_artwork(row["artwork"])
     if currents > 1:
@@ -579,17 +511,17 @@ def validate_gallery(payload):
 
     Unavailable forms belong to the registry.
     """
-    _exact(payload, V4_PANEL_FIELDS, "gallery")
+    _exact(payload, PANEL_FIELDS, "gallery")
     if (
         _integer(payload["schema_version"], "schema_version") != GALLERY_SCHEMA_VERSION
         or payload["available"] is not True or payload["kind"] != "gallery"
     ):
         raise ProtocolValidationError("invalid gallery discriminator")
-    categories = _validate_v4_categories(payload["categories"])
+    categories = _validate_categories(payload["categories"])
     category = payload["category"]
     if not isinstance(category, str) or category not in categories or not categories[category]["enabled"]:
         raise ProtocolValidationError("category must name an enabled category")
-    listed, total_count = _validate_v4_groups(payload["groups"])
+    listed, total_count = _validate_groups(payload["groups"])
     if total_count != categories[category]["count"]:
         raise ProtocolValidationError("group counts differ from the category count")
     if not listed:
@@ -607,61 +539,13 @@ def validate_gallery(payload):
         if payload["description"] is not None:
             _text(payload["description"], GALLERY_MAX_DESCRIPTION, "description")
         capability = payload["capabilities"]
-        _validate_capabilities(capability, V4_CAPABILITY_FIELDS)
+        _validate_capabilities(capability)
         _validate_card_facts(payload, capability, selected)
     # No panel-local byte limit (design D1a): structure bounds the panel, and
     # the only byte ceiling is the publication logical one. check_json_safety
     # does not compare bytes itself; the argument records that ceiling.
     check_json_safety(payload, max_bytes=PUBLICATION_MAX_BYTES)
     return payload
-
-
-def _character_subject(entity, *, puppet=False):
-    try:
-        subject = character_subject_for(entity)
-    except ArtSubjectError as exc:
-        log_warn("gallery_subject_invalid", context={"char": entity.pk}, exc=exc)
-        subject = None
-    if subject is None and (puppet or getattr(entity, "account", None) is not None):
-        numeric = ArtSubject(ArtSubjectKind.CHARACTER, str(entity.pk))
-        if puppet or gallery_api.record_for(numeric) is not None:
-            subject = numeric
-    return subject
-
-
-def gallery_subjects(actor):
-    """Ordered rail entries with their typed identities and read-only entity refs."""
-    puppet = _character_subject(actor, puppet=True)
-    def entry(subject, entity=None, *, is_puppet=False, name=None):
-        return ({
-            "subject_key": subject.full(), "kind": subject.kind.value,
-            "display_name": str(name if name is not None else entity.key)[:GALLERY_MAX_NAME],
-            "is_puppet": is_puppet,
-        }, subject, entity)
-    rail = [entry(puppet, actor, is_puppet=True)]
-    seen = {puppet.full()}
-    visual_registry = get_monster_visual_registry()
-    # Reserve up to 23 stable-key visual species after the puppet
-    species_keys = sorted(visual_registry.keys())[:min(len(visual_registry), GALLERY_MAX_SUBJECTS - 1)]
-    monsters = [entry(monster_subject_for(key), name=visual_registry[key].display_label) for key in species_keys]
-    remaining = max(0, GALLERY_MAX_SUBJECTS - 1 - len(monsters))
-    companions = live_companions(actor)
-    companion_ids = {entity.pk for entity in companions}
-    # Process the small priority group first; then stream candidates in PK order.
-    candidates = (sorted(companions, key=lambda entity: entity.pk), ObjectDB.objects.order_by("pk").iterator())
-    for group_index, group in enumerate(candidates):
-        for entity in group:
-            if not remaining:
-                break
-            if entity.pk == actor.pk or not isinstance(entity, LivingEntity) or group_index == 1 and entity.pk in companion_ids:
-                continue
-            subject = _character_subject(entity)
-            if subject is None or subject.full() in seen:
-                continue
-            rail.append(entry(subject, entity))
-            seen.add(subject.full())
-            remaining -= 1
-    return rail + monsters
 
 
 def _item_name(key):
@@ -970,12 +854,11 @@ def _official_entries(subject, entity, generation, terminal) -> list[dict]:
 
 
 def _selected_subject_fields(subject, entity) -> dict:
-    """The selected subject's card facts, shared by every panel version.
+    """The selected subject's card facts.
 
     Returns ``cards``, ``official_entries``, ``equipment_summary``,
-    ``capabilities`` (the version-three capability record), ``binding_warnings``,
-    ``error_state`` and ``filters`` (only version three publishes it). Reads
-    never create or consolidate records.
+    ``capabilities``, ``binding_warnings`` and ``error_state``. Reads never
+    create or consolidate records.
     """
     capability = capabilities_for(subject.kind.value)
     # Observe jobs first: if one settles before the card read, dedupe favors the card.
@@ -1033,28 +916,12 @@ def _selected_subject_fields(subject, entity) -> dict:
         ))
     rows.sort(key=lambda row: -row["created_at"])
     return {
-        "filters": _filters(rows), "cards": rows,
+        "cards": rows,
         "official_entries": _official_entries(subject, entity, generation, terminal),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
         "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,
     }
-
-
-def gallery_presenter_v3(context: PresentationContext):
-    """Dead version-3 rail presenter: unregistered, deleted by ``gallery-v3-removal``."""
-    from .coordinator import PresentationCoordinator
-
-    if PresentationCoordinator.mode_for(context) != "exploration":
-        raise PanelUnavailableError
-    rail = gallery_subjects(context.actor)
-    selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
-    subject, entity = selected[1:]
-    return validate_gallery_v3({
-        "schema_version": _V3_SCHEMA_VERSION, "available": True, "kind": "gallery",
-        "subjects": [entry[0] for entry in rail], "selected": subject.full(),
-        **_selected_subject_fields(subject, entity),
-    })
 
 
 def _resolve_category(view) -> str:
@@ -1156,14 +1023,6 @@ def gallery_presenter(context: PresentationContext):
     else:
         subject = selected.subject
         fields = _selected_subject_fields(subject, selected.entity)
-        del fields["filters"]
-        capability = capabilities_for(subject.kind.value)
-        fields["capabilities"] = {
-            **fields["capabilities"],
-            "supports_face_rect": capability.supports_face_rect,
-            "supports_stage": capability.supports_stage,
-            "supports_card_delete": capability.supports_card_delete,
-        }
         fields["selected"] = subject.full()
     return validate_gallery({
         "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",

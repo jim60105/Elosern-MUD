@@ -43,7 +43,7 @@ from web.webclient.presentation.gallery_selection import (
     GalleryViewSelection,
     gallery_view_snapshot,
     select_gallery_category,
-    select_gallery_subject_v4,
+    select_gallery_subject,
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
@@ -983,9 +983,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
         # Select A then B through the real selection store.
         with patch("web.webclient.presentation.ingress.is_webclient", return_value=True):
             self.assertEqual(select_gallery_category(session, self.player, "monster")["outcome"], "success")
-            res_a = select_gallery_subject_v4(session, self.player, sub_a.full())
+            res_a = select_gallery_subject(session, self.player, sub_a.full())
             self.assertEqual(res_a["outcome"], "success")
-            res_b = select_gallery_subject_v4(session, self.player, sub_b.full())
+            res_b = select_gallery_subject(session, self.player, sub_b.full())
             self.assertEqual(res_b["outcome"], "success")
         self.assertEqual(
             gallery_view_snapshot(session, self.player).subjects, (("monster", sub_b.full()),)

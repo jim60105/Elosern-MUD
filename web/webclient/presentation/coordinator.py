@@ -439,9 +439,6 @@ class PresentationCoordinator:
 
     def reset(self) -> None:
         """Start a fresh presentation sequence (reconnect or puppet change)."""
-        from web.webclient.presentation.gallery_selection import retire_gallery_selection
-
-        retire_gallery_selection(self.session)
         self._retire_pending()
         self._latest_travel = None
         self._epoch = new_presentation_epoch()
@@ -1508,15 +1505,12 @@ def publish_panel_update(
 
 def detach_coordinator(session: Any) -> None:
     """Drop the ephemeral coordinator (transport or puppet change)."""
-    from web.webclient.presentation.gallery_selection import retire_gallery_selection
-
     ndb = getattr(session, "ndb", None)
     coordinator = getattr(ndb, "elosern_coordinator", None) if ndb is not None else None
     if coordinator is not None:
         # Retire the old sequence's baseline and queued work before dropping
         # the reference, so nothing it captured can publish afterwards.
         coordinator.reset()
-    retire_gallery_selection(session)
     if ndb is not None:
         session.ndb.elosern_coordinator = None
 
