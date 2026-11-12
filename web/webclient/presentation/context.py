@@ -99,6 +99,11 @@ class PresentationContext:
             Session-scoped and non-persistent; it survives a possession
             transition because it is bound to the commander, and it never
             authorizes anything.
+        gallery_view: The copied version-4 gallery view of this session (a
+            ``gallery_selection.GalleryViewSelection``, or ``None``): one
+            category and one subject per category, bound to the owning
+            character so it survives possession. Only the version-4 gallery
+            builder reads it; it never authorizes anything.
         travel_events: The immutable travel notices
             (``world.rules.travel_events.TravelEvent``) of the causal group
             being published, or of the latest published batch on a replay.
@@ -116,6 +121,7 @@ class PresentationContext:
     party_actor: int | None = field(default=None)
     unlocks: Mapping[int, MemberUnlocks] = field(default=_EMPTY_UNLOCKS)
     party_view: Any = field(default=None)
+    gallery_view: Any = field(default=None)
     travel_events: tuple[Any, ...] = field(default=())
 
 
