@@ -20,6 +20,7 @@ from evennia.typeclasses.tags import Tag
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
@@ -163,6 +164,9 @@ class GalleryV4PresenterTests(EvenniaTest):
 
     # -- the projection -----------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-projection-carries-one-category-with-tile-artwork"
+    )
     def test_only_the_selected_categorys_subjects_are_listed(self):
         self._add_character("測者乙")
         companion = self._companion("同行甲", "t_v4_companion_a")
@@ -182,6 +186,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         })
         self.assertIsNotNone(companion)
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-projection-carries-one-category-with-tile-artwork"
+    )
     def test_a_tile_carries_its_default_artwork_without_a_selection(self):
         self._companion("同行甲", "t_v4_companion_a")
         self._companion("同行乙", "t_v4_companion_b")
@@ -226,6 +233,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         warn.assert_called_once()
         self.assertEqual(warn.call_args.args[0], "gallery_tile_artwork_failed")
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-projection-carries-one-category-with-tile-artwork"
+    )
     def test_building_twice_changes_nothing(self):
         self._companion("同行甲", "t_v4_companion_a")
         self._card("t_v4_actor")
@@ -247,6 +257,9 @@ class GalleryV4PresenterTests(EvenniaTest):
 
     # -- the stored selection -----------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_a_fresh_session_opens_on_the_live_character(self):
         self._add_character("測者乙")
         session = self._session()
@@ -256,6 +269,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         self.assertEqual(_listed(panel)[0], "portrait:character:t_v4_actor")
         self.assertIsNone(session.ndb.__dict__.get("gallery_view"))
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_each_category_keeps_its_own_subject(self):
         self._companion("同行甲", "t_v4_companion_a")
         self._companion("同行乙", "t_v4_companion_b")
@@ -275,6 +291,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         select_gallery_category(session, self.actor, "monster")
         self.assertEqual(self._build(session)["selected"], f"portrait:monster:{T_B}")
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_a_vanished_subject_falls_back_to_the_category_default(self):
         companion_a = self._companion("同行甲", "t_v4_companion_a")
         companion_b = self._companion("同行乙", "t_v4_companion_b")
@@ -295,12 +314,18 @@ class GalleryV4PresenterTests(EvenniaTest):
         # A fallback is a read: the remembered selection stays as stored.
         self.assertIs(session.ndb.gallery_view, stored)
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_a_disabled_remembered_category_falls_back_to_mine(self):
         session = self._session()
         session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "people", ())
         panel = self._build(session)
         self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_v4_actor"))
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_possession_keeps_the_stored_selection(self):
         get_world_clock()
         player = create_object(PlayerCharacter, key="測試勇者", location=self.room1)
@@ -330,6 +355,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         panel = self._build(self.session, npc)
         self.assertEqual((panel["category"], panel["selected"]), ("monster", f"portrait:monster:{T_A}"))
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_puppeting_another_owner_retires_the_view(self):
         session = self._session()
         select_gallery_category(session, self.actor, "monster")
@@ -359,6 +387,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         session.ndb.gallery_view = GalleryViewSelection(other.pk, "monster", ())
         self.assertIsNone(gallery_view_snapshot(session, self.actor))
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-selection-is-remembered-per-category-with-fallbacks"
+    )
     def test_unknown_or_disabled_targets_are_refused_without_a_write(self):
         self._companion("同行甲", "t_v4_companion_a")
         record_species_sighting(self.actor, T_A)
