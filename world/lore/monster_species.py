@@ -1220,6 +1220,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "oyster_rack_creeper",
         True,
     ),
+    MonsterSpecies(
+        "shell_crack_shrimp",
+        "碎殼蝦",
+        "碎殼蝦是體長約有半個人高的螳螂蝦類魔獸，獨自穴居於西南海岸港灣的淺灘、礁縫與石砌海堤。",
+        "甲殼泛著綠、紅、藍交錯的光澤，一對長在短柄上的眼睛各自轉動。"
+        "胸前收著一對錘狀的捕肢，平時折疊貼在身下，末端圓鈍堅硬，形如兩柄小錘。",
+        "牠在淺灘的沙底與海堤的石縫裡挖出洞穴，守在洞口等待路過的蟹與貝。"
+        "牠的錘狀捕肢帶著異常的爆發力，彈出時快得看不清，一擊就能敲碎蟹殼與厚實的蚵殼。"
+        "西南海岸的小港靠著精工器物的買賣維生，碼頭上常堆著待裝船的上釉陶罐與玻璃浮球；"
+        "碎殼蝦把洞挖在碼頭石階下，夜裡出洞時會把擋路的陶罐敲出裂痕。"
+        "近身時，牠彈出錘狀捕肢重擊對手，擊中時震裂對手的護具表面，短時間內防禦下降。",
+        ("southwest_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；錘狀捕肢爆發力的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居螳螂蝦：捕肢的爆發力屬於身體能力，不帶元素、不發出衝擊波或雷光；戰鬥呈現為重擊與命中後短暫防禦下降。描寫維持甲殼類體態。連結港口碼頭待裝船的陶罐與玻璃浮球。",
+        "（作者私有：尚未證實的猜想）南潮港的陶器商說聽得見碎殼蝦在石階下敲殼的夜晚，隔天的海面必定平靜，這種說法尚未證實。",
+        "reef_burrow_striker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2226,6 +2244,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("stiff_arm_press",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "reef_burrow_striker",
+        "shell_crack_shrimp",
+        "穴擊型",
+        "普通版本，守在淺灘與礁縫的洞口伏擊路過的蟹貝。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=125, mp=0, sp=24, atk_phys=24, agility=18, defense=11, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("club_limb_strike",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "seawall_den_holder",
+        "shell_crack_shrimp",
+        "深穴型",
+        "在港口石砌海堤裡挖出深穴的大型老個體，捕肢最粗，會擊向任何在洞口前停步的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=175, mp=0, sp=36, atk_phys=28, agility=18, defense=13, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("club_limb_strike",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

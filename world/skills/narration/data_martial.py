@@ -189,6 +189,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 腕足一收，硬化的身體猛力壓向對手。",
         ),
     ),
+    NarrationRow(
+        "club_limb_strike",
+        action=(
+            "{actor} 錘狀捕肢猛然彈出，正中對手胸前。",
+            "{actor} 一記快得看不清的彈擊，對方護具上多了一道裂痕。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]

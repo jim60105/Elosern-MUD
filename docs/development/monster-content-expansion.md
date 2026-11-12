@@ -2903,3 +2903,95 @@ performance report were not rerun and remain historical harness evidence at
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 碎殼蝦
+
+This section records the third delivered species of the southwest coast Wave 4.
+碎殼蝦 (`shell_crack_shrimp`) is a mid-tier mantis shrimp whose ordinary default
+variant is 穴擊型 (`reef_burrow_striker`, grade D) and whose stronger variant is
+深穴型 (`seawall_den_holder`, grade C); both own the single club strike 錘肢彈擊
+(`club_limb_strike`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Burrow ambusher: the authored attack sits in the mid band's upper part,
+  agility above the band's middle, and defense and hit points in its lower
+  part.
+* The kit spends no MP, so the authored MP pool is zero; the SP pool holds four
+  casts of the strike's SP cost (six on 深穴型).
+* The rider (−2 defense for 15 s) equals the wolverine's shipped −2 defense
+  rider.
+* The stronger 深穴型 holds a seawall den at grade C with the mid band's attack
+  ceiling.
+
+### Reuse of the enemy hit-rider representative
+
+The kit declares the shipped enemy hit-rider composition signature
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`.
+Its representative is unchanged: `cliff_stepper`, declared in
+`world.rules.tests.test_sway_whistle_sparrow_resource_skill`, whose production
+smoke exercises the representative and the derived group. Both new variant keys
+sort after that representative, so no smoke module, shard entry or seed entry is
+added; `world.rules.tests.test_monster_composition_coverage` derives the whole
+group from the shipped declarations and checks the representative wiring, and
+`EnemyRiderGroupMemberTests` in the same module exercises every derived member,
+including both of these, on its own rider axis.
+
+### Decision mode
+
+Both variants bind the legacy `ambush_predator` archetype: `first_owned` skill
+choice against the lowest-hit-point enemy, with that archetype's authored flee
+threshold of 0.20. No intelligence value, decision-mode override or
+`monster_behaviour.yaml` edit is authored. Because `first_owned` selects the
+only owned kit deterministically, the group-member and parallel-gauge contracts
+do not depend on a damage tie-break, so no deterministic-profile deviation from
+the design was needed; the group-member and resource contract labels were run
+twice consecutively with identical results.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 119 tests, OK, run as two exhaustive disjoint focused method-label batches (60 + 59) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check succeeds and the registry holds 65 variants
+(`len(MONSTER_VARIANT_REGISTRY)` printed 65); the remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+shell-crack-shrimp-species` and `openspec validate
+shell-crack-shrimp-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+This link adds one timed effect and one modifier, so the startup tuning
+fingerprint moved from `70e5f38d...` to `877fdd6d...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`c99f82a5...` to `3bc2239f...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

@@ -1193,6 +1193,12 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    def test_rule_guard_crack_defense(self):
+        entity = self._entity()
+        rule = RULES["guard_crack_defense"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     def test_rule_fatigue_light_penalty(self):
         # The light stage fires its own penalty row and nothing else: an
         # unstaged body carries no modifier at all.

@@ -81,6 +81,9 @@ physical damage plus a hit-dependent agility debuff on the struck enemy.
 The stiff-arm starfish's arm press is assembled the same way with elementless
 physical damage plus a self-mounted defense lift granted by every resolved
 attempt.
+The shell-crack shrimp's club limb strike is assembled the same way with
+elementless physical damage plus a hit-dependent defense debuff on the struck
+enemy.
 """
 
 from world.skills.effects import (
@@ -1212,6 +1215,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "club_limb_strike",
+        "錘肢彈擊",
+        "彈出錘狀捕肢重擊單一敵方目標，造成物理傷害；命中後震裂對手的護具表面，短暫降低其防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:guard_crack"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("shell_crack_shrimp",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )
