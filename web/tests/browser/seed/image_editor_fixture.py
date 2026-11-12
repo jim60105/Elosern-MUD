@@ -9,7 +9,7 @@ Installed only when ``ELOSERN_BROWSER_UNIFIED_IMAGES=1`` (one real committed
 original card on the activated player character, written through the production
 ``world/art/gallery.py`` writers and fixed valid PNG bytes under the runtime art
 store, plus the family's bounded test-only transition cmdset), and/or when
-``ELOSERN_BROWSER_GALLERY_ROWS=1`` (the v3 official, pending and failed rows),
+``ELOSERN_BROWSER_GALLERY_ROWS=1`` (the official, pending and failed rows),
 and/or when ``ELOSERN_BROWSER_PORTRAIT_DESCRIPTORS=1`` (the portrait mode: the
 player's own roster portrait, one co-located live party companion, one focused
 present entity and one combat participant all admitted to the same bounded art
@@ -27,7 +27,7 @@ import os
 
 
 def _image_editor_fixture(character) -> None:
-    """Seed the unified-image editor card, the gallery v3 rows and the portrait mode."""
+    """Seed the unified-image editor card, the gallery rows and the portrait mode."""
     _original_card(character)
     _gallery_rows(character)
     _portrait_descriptors(character)
@@ -99,7 +99,7 @@ def _portrait_descriptors(character) -> None:
 
 
 def _gallery_rows(character) -> None:
-    """Seed the gallery's v3 official, pending and failed rows with real writers.
+    """Seed the gallery's official, pending and failed rows with real writers.
 
     The official row comes from a real operator root: the fixture writes one
     valid PNG plus its manifest under ``ART_OFFICIAL_ROOT`` (which the journey
@@ -110,7 +110,9 @@ def _gallery_rows(character) -> None:
     never the puppet — because a pending row is newest-first and would otherwise
     reorder the puppet's own card rail under the loading-core journeys. Both use
     the production writers (``enqueue_gallery_job``, ``record_error``), so the
-    panel projects them exactly as it projects a live request.
+    panel projects them exactly as it projects a live request. The puppet
+    sights that species through the lore writer, so the gallery's monster
+    category lists it.
     """
     if os.environ.get("ELOSERN_BROWSER_GALLERY_ROWS") != "1":
         return
@@ -124,8 +126,12 @@ def _gallery_rows(character) -> None:
         seed_official_content,
     )
 
+    from world.rules.lore_knowledge import record_species_sighting
+
     seeded = seed_official_content(character)
     monster = seed_pending_and_failed_rows()
+    if monster is not None:
+        record_species_sighting(character, monster.rsplit(":", 1)[1])
     print(
         "seeded gallery rows official="
         f"{seeded} pending={GALLERY_PENDING_IMAGE_ID} "
