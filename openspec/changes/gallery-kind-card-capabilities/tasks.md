@@ -4,7 +4,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 1. Declaration
 
-- [ ] 1.1 Add `supports_face_rect`, `supports_stage`, `supports_card_delete` to `GalleryKindCapabilities` (slots, constructor, freeze, `as_dict`, `__repr__`) and declare character (true, true, true), monster (true, true, false), scene (false, false, false); extend `validate_declaration_contract` per design D3. Verify the existing kind-capability contract tests (`rg -ln "validate_declaration_contract" world/art/tests`) pass under the prefix and a new test asserts a gallery-less entry declaring `supports_stage` is a violation.
+- [x] 1.1 Add `supports_face_rect`, `supports_stage`, `supports_card_delete` to `GalleryKindCapabilities` (slots, constructor, freeze, `as_dict`, `__repr__`) and declare character (true, true, true), monster (true, true, false), scene (false, false, false); extend `validate_declaration_contract` per design D3. Verify the existing kind-capability contract tests (`rg -ln "validate_declaration_contract" world/art/tests`) pass under the prefix and a new test asserts a gallery-less entry declaring `supports_stage` is a violation.
 
 ## 2. Writer guards and adapter codes
 

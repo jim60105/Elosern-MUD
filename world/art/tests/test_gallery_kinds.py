@@ -117,6 +117,9 @@ class DeclarationContractTests(unittest.TestCase):
             "requires_age_precondition",
             "supports_field_selection",
             "supports_free_text",
+            "supports_face_rect",
+            "supports_stage",
+            "supports_card_delete",
         ):
             with self.subTest(field=flag):
                 violations = _violations_with(monster_value, **{flag: 0})
@@ -153,6 +156,9 @@ class DeclarationContractTests(unittest.TestCase):
             "requires_age_precondition",
             "supports_field_selection",
             "supports_free_text",
+            "supports_face_rect",
+            "supports_stage",
+            "supports_card_delete",
         ):
             with self.subTest(case=f"no-gallery kind claiming {flag}"):
                 violations = _violations_with(scene_value, **{flag: True})
@@ -178,6 +184,9 @@ class DeclarationContractTests(unittest.TestCase):
                 "requires_age_precondition",
                 "supports_field_selection",
                 "supports_free_text",
+                "supports_face_rect",
+                "supports_stage",
+                "supports_card_delete",
             ):
                 self.assertIsInstance(getattr(record, flag), bool)
         self.assertEqual(character.store_directory, "character")
@@ -192,6 +201,15 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertFalse(monster.requires_age_precondition)
         self.assertFalse(monster.supports_field_selection)
         self.assertFalse(monster.supports_free_text)
+        # The per-card operation facts (gallery-kind-card-capabilities): the
+        # character declares all three; the monster declares both geometry
+        # facts but no deletion.
+        self.assertTrue(character.supports_face_rect)
+        self.assertTrue(character.supports_stage)
+        self.assertTrue(character.supports_card_delete)
+        self.assertTrue(monster.supports_face_rect)
+        self.assertTrue(monster.supports_stage)
+        self.assertFalse(monster.supports_card_delete)
 
     @covers_requirement(
         "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
@@ -224,6 +242,8 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertIsNone(scene.store_directory)
         self.assertIsNone(scene.max_cards)
         self.assertFalse(scene.supports_bindings)
+        for flag in ("supports_face_rect", "supports_stage", "supports_card_delete"):
+            self.assertIs(getattr(scene, flag), False, flag)
         # A no-gallery kind contributes no store directory segment.
         self.assertNotIn("scene", gallery_kinds.gallery_store_directory_segments())
         self.assertEqual(
@@ -273,6 +293,35 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertIn("portrait:pet", str(caught.exception))
         with self.assertRaises(KeyError):
             gallery_kinds.has_gallery("portrait:pet")
+
+
+class CardOperationDeclarationTests(unittest.TestCase):
+    """The three per-card operation facts (gallery-kind-card-capabilities)."""
+
+    def test_every_record_reports_the_three_card_operation_facts_as_booleans(self):
+        for value in _ALL_KIND_VALUES:
+            record = gallery_kinds.capabilities_for(value)
+            for flag in ("supports_face_rect", "supports_stage", "supports_card_delete"):
+                with self.subTest(kind=value, flag=flag):
+                    self.assertIs(type(getattr(record, flag)), bool)
+                    self.assertIn(f"{flag}=", repr(record))
+
+    def test_a_gallery_less_entry_claiming_stage_support_fails_naming_it(self):
+        scene_value = ArtSubjectKind.SCENE.value
+        violations = _violations_with(scene_value, supports_stage=True)
+        self.assertEqual(len(violations), 1, violations)
+        self.assertIn(scene_value, violations[0])
+        self.assertIn("supports_stage", violations[0])
+
+    def test_the_copy_seam_carries_the_three_facts(self):
+        monster = gallery_kinds.capabilities_for(ArtSubjectKind.MONSTER.value)
+        copy = monster.with_values(supports_card_delete=True)
+        self.assertTrue(copy.supports_card_delete)
+        self.assertEqual(
+            (copy.supports_face_rect, copy.supports_stage),
+            (monster.supports_face_rect, monster.supports_stage),
+        )
+        self.assertFalse(monster.supports_card_delete)
 
 
 class DeclarationImmutabilityTests(unittest.TestCase):
