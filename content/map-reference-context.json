@@ -203,7 +203,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "fb89e86efe223b990e11588c3187f35f613b1ea0a0283dda970831774ccfae43",
+  "fingerprint": "dce200cd559449fb3e896539deb7e0e1b03c04a9debf988b5cbeaf96ca702cc4",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1081,6 +1081,38 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 3,
+        "composition_key": "flock_leader_camp_group",
+        "coordinates": [
+          1700,
+          1100
+        ],
+        "individual_name_zh": null,
+        "key": "flock_leader_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "sway_whistle_sparrow",
+            "species_name_zh": "穗鳴雀",
+            "variant_key": "flock_leader",
+            "variant_name_zh": "領群型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "sway_whistle_sparrow",
+            "species_name_zh": "穗鳴雀",
+            "variant_key": "grain_pecker",
+            "variant_name_zh": "啄穗型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "eastern_plains"
+      },
+      {
         "capacity": 1,
         "composition_key": "golden_plume_boss",
         "coordinates": [
@@ -1103,6 +1135,102 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "northwest_highland_forest"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "heap_brood_keeper_heap_group",
+        "coordinates": [
+          2150,
+          800
+        ],
+        "individual_name_zh": null,
+        "key": "heap_brood_keeper_heap",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "clod_ball_beetle",
+            "species_name_zh": "滾土甲蟲",
+            "variant_key": "heap_brood_keeper",
+            "variant_name_zh": "育堆型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "clod_ball_beetle",
+            "species_name_zh": "滾土甲蟲",
+            "variant_key": "road_ball_roller",
+            "variant_name_zh": "滾球型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "eastern_plains"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "herd_stallion_camp_group",
+        "coordinates": [
+          2400,
+          750
+        ],
+        "individual_name_zh": null,
+        "key": "herd_stallion_camp",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "dust_mane_horse",
+            "species_name_zh": "揚塵野馬",
+            "variant_key": "herd_stallion",
+            "variant_name_zh": "頭馬型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "dust_mane_horse",
+            "species_name_zh": "揚塵野馬",
+            "variant_key": "plain_runner",
+            "variant_name_zh": "奔原型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "eastern_plains"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "heronry_elder_nest_group",
+        "coordinates": [
+          1750,
+          1700
+        ],
+        "individual_name_zh": null,
+        "key": "heronry_elder_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "sluice_spear_heron",
+            "species_name_zh": "渠矛蒼鷺",
+            "variant_key": "heronry_elder",
+            "variant_name_zh": "林巢型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "sluice_spear_heron",
+            "species_name_zh": "渠矛蒼鷺",
+            "variant_key": "sluice_wader",
+            "variant_name_zh": "涉渠型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "eastern_plains"
       },
       {
         "capacity": 3,
@@ -1191,6 +1319,38 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "nest_guard_nest_group",
+        "coordinates": [
+          2200,
+          1200
+        ],
+        "individual_name_zh": null,
+        "key": "nest_guard_nest",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "ridge_burrow_hare",
+            "species_name_zh": "築埂兔",
+            "variant_key": "nest_guard",
+            "variant_name_zh": "護巢型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "ridge_burrow_hare",
+            "species_name_zh": "築埂兔",
+            "variant_key": "burrow_maker",
+            "variant_name_zh": "掘巢型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "eastern_plains"
       },
       {
         "capacity": 3,
@@ -1490,6 +1650,30 @@
       },
       {
         "capacity": 1,
+        "composition_key": "white_reed_boss",
+        "coordinates": [
+          2150,
+          1830
+        ],
+        "individual_name_zh": "白蘆",
+        "key": "white_reed_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "lake_mound_turtle",
+            "species_name_zh": "湖丘巨龜",
+            "variant_key": "wide_mound_elder",
+            "variant_name_zh": "丘背型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "eastern_plains"
+      },
+      {
+        "capacity": 1,
         "composition_key": "winter_den_glutton_den_member",
         "coordinates": [
           282,
@@ -1514,6 +1698,96 @@
       }
     ],
     "zones": [
+      {
+        "cell_capacity": 3,
+        "key": "black_soil_north_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "black_soil_north_wild_plain_runner",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "black_soil_north_wild_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "black_soil_north_wild_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "black_soil_north_wild_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "black_soil_north_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1660,
+            1689,
+            1605,
+            1634
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
       {
         "cell_capacity": 3,
         "key": "capital_altoria_east_hinterland",
@@ -1726,6 +2000,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -1799,6 +2087,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "capital_grandia_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -2934,6 +3236,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -3007,6 +3323,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_imperial_ferry_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -3582,6 +3912,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -3655,6 +3999,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_spice_road_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -3734,6 +4092,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -3807,6 +4179,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_starglow_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -4134,6 +4520,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4207,6 +4607,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_twin_currents_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -4286,6 +4700,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_east_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4362,6 +4790,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "city_wheatwave_west_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4376,6 +4818,96 @@
         "region_key": "eastern_plains",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "crystal_north_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "crystal_north_wild_plain_runner",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "crystal_north_wild_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "crystal_north_wild_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "crystal_north_wild_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "crystal_north_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2005,
+            2034,
+            1890,
+            1919
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -4526,6 +5058,96 @@
           ]
         ],
         "region_key": "north_deep_forest",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "east_pasture_east_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "east_pasture_east_wild_plain_runner",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_pasture_east_wild_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_pasture_east_wild_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_pasture_east_wild_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_pasture_east_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2500,
+            2529,
+            900,
+            929
+          ]
+        ],
+        "region_key": "eastern_plains",
         "replenishment_interval": 600,
         "upper_density": 2,
         "wave_budget": 3
@@ -4756,6 +5378,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_01_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4829,6 +5493,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_02_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -4908,6 +5614,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_03_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -4981,6 +5729,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_04_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -5060,6 +5850,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_05_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5133,6 +5965,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_06_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -5212,6 +6086,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_07_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5285,6 +6201,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_08_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -5364,6 +6322,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_09_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5437,6 +6437,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_10_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -5516,6 +6558,48 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_11_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -5589,6 +6673,48 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_plain_runner",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "eastern_road_12_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
               }
             ],
             "weight": 1
@@ -6948,6 +8074,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "north_wood_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "north_wood_west_wild_plain_runner",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_west_wild_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_west_wild_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_west_wild_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "north_wood_west_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1540,
+            1569,
+            1875,
+            1904
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "pine_ferry_west_wild",
         "lower_density": 1,
         "pool": [
@@ -7079,6 +8295,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_dawnlight_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -7541,6 +8771,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_tide_wind_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -8210,6 +9454,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "starglow_east_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "starglow_east_wild_plain_runner",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "dust_mane_horse",
+                "species_name_zh": "揚塵野馬",
+                "variant_key": "plain_runner",
+                "variant_name_zh": "奔原型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "starglow_east_wild_sluice_wader",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "sluice_spear_heron",
+                "species_name_zh": "渠矛蒼鷺",
+                "variant_key": "sluice_wader",
+                "variant_name_zh": "涉渠型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "starglow_east_wild_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "starglow_east_wild_grain_pecker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "sway_whistle_sparrow",
+                "species_name_zh": "穗鳴雀",
+                "variant_key": "grain_pecker",
+                "variant_name_zh": "啄穗型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "starglow_east_wild_burrow_maker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "ridge_burrow_hare",
+                "species_name_zh": "築埂兔",
+                "variant_key": "burrow_maker",
+                "variant_name_zh": "掘巢型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2290,
+            2319,
+            1170,
+            1199
+          ]
+        ],
+        "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "tiger_roar_forest_edge",
         "lower_density": 1,
         "pool": [
@@ -8392,6 +9726,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_black_soil_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -8465,6 +9813,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_crystal_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -8682,6 +10044,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_east_pasture_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -8755,6 +10131,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_emerald_lake_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -9096,6 +10486,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_maple_foot_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9172,6 +10576,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_north_wood_keep_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9245,6 +10663,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_orange_blossom_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -9600,6 +11032,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_silver_ridge_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9738,6 +11184,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_steed_plain_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9814,6 +11274,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "town_sunken_bell_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9887,6 +11361,20 @@
                 "species_name_zh": "蠟囊鼠",
                 "variant_key": "wax_cache_forager",
                 "variant_name_zh": "藏穀型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_sunrise_hinterland_road_ball_roller",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "clod_ball_beetle",
+                "species_name_zh": "滾土甲蟲",
+                "variant_key": "road_ball_roller",
+                "variant_name_zh": "滾球型"
               }
             ],
             "weight": 1
@@ -11348,8 +12836,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "73076ec3428e2307c46e05efaf078922eb4cf05c66479ad7c034ea95f8b9f470",
-    "world/lore/monster_placement.py": "c27937628bbae792aff277376bffeb6c8b487f743223494c3ba0d4a0f48ae96e",
+    "world/lore/monster_activity.py": "e687948834572aece677cfae0bdeb49d81f17993cc7990909909aa52885a0012",
+    "world/lore/monster_placement.py": "0201e20ff36befc44c406e18a3d86af9376adc81bf9e2bec84c356129482b47c",
     "world/lore/monster_species.py": "4f320369d8d461682d6621c319678b557d5b234e776058be2efb35016a4ff122",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",

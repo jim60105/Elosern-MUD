@@ -707,6 +707,67 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change northwest-highland-placement` | passed |
 | `openspec validate northwest-highland-placement --strict` | valid |
 
+### Deep wild and sites: eastern plains
+
+This change gives the eastern plain its own deep wild and its own sites. New
+deep-wild zones spread across the remote ground of the plain, away from the
+farm towns and the trunk roads, so the farthest parts of the region now hold
+authored animals instead of bare ground. The hinterland and corridor
+rectangles Wave 1 landed keep their shape, extent and configured behaviour
+exactly as they were; only the composition mix inside them changes. The
+declarations remain the only authority for keys, rectangles, pools and
+bindings; this section repeats no coordinate, density or configured timing.
+
+**Species fit.** The plain is Grandia's farm heartland, so the dung beetle
+(滾土甲蟲) is passive company beside every farming town and on the official
+roads, rolling its ball through the roadside dirt. The wild horse (揚塵野馬)
+and the canal heron (渠矛蒼鷺) are the mid-tier animals of the remote
+corridors and the deep wild, each with the same low company around it. The
+heron's dossier puts it on the irrigation canals and fish ponds, and the
+published map draws no inland water in the eastern plain; following the slime
+precedent recorded under "Content expansion habitats", a bounded rectangle
+stands in for the canal cells the map does not draw. No stronger or high-tier
+variant joins an ordinary pool, so an ordinary encounter still answers only
+after engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Pool edits.** The hinterland belt beside each town gains the beetle, and the
+remote trunk-road corridors gain the beetle, the horse and the heron, so a
+traveller between towns on a remote road can meet a mid-tier animal instead of
+only the low species Wave 1 left there. The pools of the deep-wild zones
+carry the horse and the heron with the beetle, the sparrow (穗鳴雀) and the
+hare (築埂兔) around them. Only the composition mix changes; every rectangle,
+density, capacity and timing stays as landed.
+
+**Sites.** The stronger variants occupy recoverable places: the sparrow flock
+camp of 領群型, the hare warren of 護巢型, the beetle brood heap of 育堆型, the
+stallion's herd pasture of 頭馬型 and the heronry of 林巢型. On the lake
+district north-west of 沉鐘鎮 the one-shot boss site holds 白蘆, the 丘背型
+turtle; clearing it is a durable authored victory until an author re-issues
+it. Every site answers only when an intruder enters its defended extent.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK, 57 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK, 28 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK, 27 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK, 43 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK, 8 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_bootstrap.test_bootstrap_grid` | Not run locally: this assignment forbids the label because it alone exceeds the 10-minute local command budget, so no before/after duration exists for this change (non-gating). Historical context only: the preceding placement change `northwest-highland-placement` observed 598.018s before its declarations and 931.751s after. |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK, 29 tests |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK, 19 tests |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change eastern-plains-deep-placement` | passed |
+| `openspec validate eastern-plains-deep-placement --strict` | valid |
+
+A local planning probe over the published registries confirmed that every new
+rectangle keeps its edge clearance from every landed zone, activity area and
+site ground, and that the new rectangles keep it from each other.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
