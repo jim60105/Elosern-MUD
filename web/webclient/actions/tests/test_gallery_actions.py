@@ -962,6 +962,43 @@ class OfficialPreferenceActionTests(EvenniaTest):
             [card["image_id"]],
         )
 
+    def test_an_undeclared_official_component_is_refused_and_never_carried(self):
+        from world.art import gallery_kinds
+
+        identity = self._index("a.png")
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        api.set_official_geometry(self.subject, identity, face_rect=dict(rect), stage=dict(stage))
+        undeclared = gallery_kinds.capabilities_for(ArtSubjectKind.CHARACTER.value).with_values(
+            supports_face_rect=False
+        )
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: undeclared},
+        ):
+            refused = self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "face_rect": dict(rect)},
+            )
+            self.assertEqual((refused["outcome"], refused["code"]), ("rejected", "face_rect_unsupported"))
+            self.assertEqual(
+                api.official_preferences_for(self.subject).geometry,
+                {identity: {"face_rect": rect, "stage": stage}},
+            )
+            # A stage-only edit still succeeds: the stored rectangle the kind
+            # no longer declares is not re-sent to the writer.
+            moved = {"scale": 0.8, "x": 0.1, "y": 0.0}
+            self.assertEqual(
+                self._dispatch(
+                    "gallery.official.geometry.set",
+                    {"subject_key": SUBJECT, "identity": identity, "stage": dict(moved)},
+                )["outcome"],
+                "success",
+            )
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry, {identity: {"stage": moved}}
+        )
+
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
     )

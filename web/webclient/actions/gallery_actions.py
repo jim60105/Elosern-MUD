@@ -419,16 +419,20 @@ def _merge_official_geometry(subject, identity, image, payload):
     ``official-art-personalization``'s update tolerance).
     """
     stored = gallery_api.official_preferences_for(subject).geometry.get(identity, {})
+    capability = capabilities_for(subject.kind.value)
     merged = {}
+    # A stored component the kind no longer declares is not carried through:
+    # re-sending it would make the sole writer refuse an edit of the OTHER,
+    # still-declared component.
     if "face_rect" in payload:
         merged["face_rect"] = gallery_api.validate_face_rect(
             payload["face_rect"], image_size=image.image_size
         )
-    elif stored.get("face_rect") is not None:
+    elif stored.get("face_rect") is not None and capability.supports_face_rect:
         merged["face_rect"] = dict(stored["face_rect"])
     if "stage" in payload:
         merged["stage"] = gallery_api.validate_stage(payload["stage"])
-    elif stored.get("stage") is not None:
+    elif stored.get("stage") is not None and capability.supports_stage:
         merged["stage"] = dict(stored["stage"])
     if not merged:
         raise gallery_api.GalleryRecordError(
