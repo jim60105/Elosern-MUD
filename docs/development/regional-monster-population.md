@@ -768,6 +768,80 @@ A local planning probe over the published registries confirmed that every new
 rectangle keeps its edge clearance from every landed zone, activity area and
 site ground, and that the new rectangles keep it from each other.
 
+### Deep wild, corridors and sites: south-east coast
+
+This change gives the south-east coast its own deep wild belt, its own corridor
+companions and its own sites. The port hinterlands Wave 1 landed keep their
+shape, extent and configured behaviour exactly as they were; only the
+composition mix inside them changes. The declarations remain the only authority
+for keys, rectangles, pools and bindings, so this section repeats no
+coordinate, density, configured timing or count.
+
+**Belts.** New trunk-road corridors follow the route north from 金穗港, and
+deep-wild zones spread across the remote shore away from the ports and the
+roads. Every south-east settlement is a port that already received its Wave 1
+hinterland zone (金穗港, 東灣港 and 南岬港), so no deferred hinterland applies
+here; the inland coastal settlements Wave 1 deferred (鹽津城, 鹽道城 and 橄欖津)
+belong to the south-west coast.
+
+**Species fit.** The mudskipper (灘跳魚) and the harbour gull (桅風海鷗) are the
+new low company beside the ports, joining the crab (潮燈蟹) on ground the
+fishing families already work: the mudskipper on the estuary flats where they
+dig for clams and dry their nets, the gull around the masts and the fish
+market. The gull alone follows the added trunk-road corridors, which hold no
+water of their own and therefore pool no crab, mudskipper, seal or crocodile;
+it trails the fish and grain carts between the ports, the way the crab already
+occupies the shore corridor Wave 1 landed. The harbour seal (臥堤海豹) and the
+crocodile (吞潮鱷) are the mid-tier animals of the deep wild, the seal as
+cohesive company on the breakwater rocks and the crocodile solitary in the
+shallows, each with the crab, the mudskipper and the gull around it. Every
+deep-wild zone touches water, so a shore pool never sits on dry ground. The
+seal and the crocodile answer on contact while the low company stays passive,
+so an ordinary encounter still waits for engagement and keeps the
+light-adventure tone of `docs/lore/monster-creation-guidelines.md` §5.
+
+**Deep-wild spacing.** The remote shore carries its water-adjacent rectangles
+only at a closer spacing than the other regions used. Fully dry rectangles do
+fit at the wider spacing, but they were set aside: a shore pool there would
+hold the seal and the crocodile away from the shore and so contradict every
+south-east dossier. The human review may drop a deep-wild zone without any test
+edit.
+
+**Sites.** The stronger variants occupy recoverable places: the crab's reef of
+守礁型, the crocodile's backwater of 守灣型, the mudskipper's turret flat of
+築塔型, the gull colony rocks of 堤群型 and the seal's sandbar of 霸灘型. Each
+re-forms after clearing and answers only when an intruder enters its defended
+extent. The shipped crocodile boss sites stay as they are. No stronger or
+high-tier variant joins an ordinary pool.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change southeast-coast-placement` | passed |
+| `openspec validate southeast-coast-placement --strict` | valid |
+
+`world.maps.tests.test_bootstrap.test_bootstrap_grid` was not run locally: the
+local command-duration budget forbids the label, and the change does not gate
+on it (non-gating observation). No before and after duration exists for this
+change as a result; the durations the earlier placement changes recorded remain
+historical context only.
+
+A local probe over the published registries confirmed that every new zone,
+activity area and site ground keeps the authored edge distance from every other
+landed one, that each new deep-wild rectangle holds water-adjacent ground, and
+that the added compositions initialize within their zones' existing bounds.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into

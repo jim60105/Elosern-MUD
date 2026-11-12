@@ -203,7 +203,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "dce200cd559449fb3e896539deb7e0e1b03c04a9debf988b5cbeaf96ca702cc4",
+  "fingerprint": "9fc4c617784701c6073e36a0cdef746c63c855f73e399723e1371f6c0ac5bd31",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -945,6 +945,30 @@
         "region_key": "western_hills_valleys"
       },
       {
+        "capacity": 1,
+        "composition_key": "bay_warden_bay_member",
+        "coordinates": [
+          2262,
+          404
+        ],
+        "individual_name_zh": null,
+        "key": "bay_warden_bay",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "tide_devouring_crocodile",
+            "species_name_zh": "吞潮鱷",
+            "variant_key": "bay_warden",
+            "variant_name_zh": "守灣型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southeast_coast"
+      },
+      {
         "capacity": 2,
         "composition_key": "cliff_echo_camp_group",
         "coordinates": [
@@ -1135,6 +1159,38 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "northwest_highland_forest"
+      },
+      {
+        "capacity": 2,
+        "composition_key": "haulout_bull_sandbar_group",
+        "coordinates": [
+          2284,
+          406
+        ],
+        "individual_name_zh": null,
+        "key": "haulout_bull_sandbar",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "breakwater_seal",
+            "species_name_zh": "臥堤海豹",
+            "variant_key": "haulout_bull",
+            "variant_name_zh": "霸灘型"
+          },
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "breakwater_seal",
+            "species_name_zh": "臥堤海豹",
+            "variant_key": "pier_basker",
+            "variant_name_zh": "曬堤型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southeast_coast"
       },
       {
         "capacity": 3,
@@ -1465,6 +1521,38 @@
         "region_key": "north_deep_forest"
       },
       {
+        "capacity": 3,
+        "composition_key": "reef_warden_reef_group",
+        "coordinates": [
+          1822,
+          98
+        ],
+        "individual_name_zh": null,
+        "key": "reef_warden_reef",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "tide_lamp_crab",
+            "species_name_zh": "潮燈蟹",
+            "variant_key": "reef_warden",
+            "variant_name_zh": "守礁型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "tide_lamp_crab",
+            "species_name_zh": "潮燈蟹",
+            "variant_key": "shore_walker",
+            "variant_name_zh": "灘行型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southeast_coast"
+      },
+      {
         "capacity": 1,
         "composition_key": "reservoir_crocodile_boss",
         "coordinates": [
@@ -1577,6 +1665,38 @@
         "region_key": "central_mountains"
       },
       {
+        "capacity": 3,
+        "composition_key": "stack_colony_elder_rocks_group",
+        "coordinates": [
+          1962,
+          138
+        ],
+        "individual_name_zh": null,
+        "key": "stack_colony_elder_rocks",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "mast_wind_gull",
+            "species_name_zh": "桅風海鷗",
+            "variant_key": "stack_colony_elder",
+            "variant_name_zh": "堤群型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "mast_wind_gull",
+            "species_name_zh": "桅風海鷗",
+            "variant_key": "mast_circler",
+            "variant_name_zh": "繞桅型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southeast_coast"
+      },
+      {
         "capacity": 1,
         "composition_key": "tide_mouth_boss",
         "coordinates": [
@@ -1623,6 +1743,38 @@
         "one_shot": false,
         "recover_after_ticks": 86400,
         "region_key": "north_deep_forest"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "turret_keeper_flat_group",
+        "coordinates": [
+          2122,
+          302
+        ],
+        "individual_name_zh": null,
+        "key": "turret_keeper_flat",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "flat_leap_goby",
+            "species_name_zh": "灘跳魚",
+            "variant_key": "turret_keeper",
+            "variant_name_zh": "築塔型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "flat_leap_goby",
+            "species_name_zh": "灘跳魚",
+            "variant_key": "mudflat_skipper",
+            "variant_name_zh": "跳灘型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southeast_coast"
       },
       {
         "capacity": 1,
@@ -5064,6 +5216,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "east_bay_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "east_bay_west_wild_pier_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "breakwater_seal",
+                "species_name_zh": "臥堤海豹",
+                "variant_key": "pier_basker",
+                "variant_name_zh": "曬堤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_bay_west_wild_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_bay_west_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_bay_west_wild_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "east_bay_west_wild_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2220,
+            2249,
+            380,
+            409
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "east_pasture_east_wild",
         "lower_density": 1,
         "pool": [
@@ -7178,6 +7420,276 @@
       },
       {
         "cell_capacity": 3,
+        "key": "golden_sheaf_northeast_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "golden_sheaf_northeast_wild_pier_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "breakwater_seal",
+                "species_name_zh": "臥堤海豹",
+                "variant_key": "pier_basker",
+                "variant_name_zh": "曬堤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_northeast_wild_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_northeast_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_northeast_wild_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_northeast_wild_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2130,
+            2159,
+            330,
+            359
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "golden_sheaf_southwest_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "golden_sheaf_southwest_wild_pier_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "breakwater_seal",
+                "species_name_zh": "臥堤海豹",
+                "variant_key": "pier_basker",
+                "variant_name_zh": "曬堤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_southwest_wild_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_southwest_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_southwest_wild_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_southwest_wild_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1870,
+            1899,
+            120,
+            149
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "golden_sheaf_west_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "golden_sheaf_west_wild_pier_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "breakwater_seal",
+                "species_name_zh": "臥堤海豹",
+                "variant_key": "pier_basker",
+                "variant_name_zh": "曬堤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_west_wild_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_west_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_west_wild_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "golden_sheaf_west_wild_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1960,
+            1989,
+            150,
+            179
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "highland_forest_habitat",
         "lower_density": 1,
         "pool": [
@@ -8374,6 +8886,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_east_bay_hinterland_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_east_bay_hinterland_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -8495,6 +9035,34 @@
                 "species_name_zh": "潮燈蟹",
                 "variant_key": "shore_walker",
                 "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_golden_sheaf_hinterland_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_golden_sheaf_hinterland_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
               }
             ],
             "weight": 1
@@ -8633,6 +9201,34 @@
                 "species_name_zh": "潮燈蟹",
                 "variant_key": "shore_walker",
                 "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_cape_hinterland_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_cape_hinterland_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
               }
             ],
             "weight": 1
@@ -9220,6 +9816,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "south_cape_east_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "south_cape_east_wild_pier_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "breakwater_seal",
+                "species_name_zh": "臥堤海豹",
+                "variant_key": "pier_basker",
+                "variant_name_zh": "曬堤型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_cape_east_wild_bank_lurker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_devouring_crocodile",
+                "species_name_zh": "吞潮鱷",
+                "variant_key": "bank_lurker",
+                "variant_name_zh": "潛岸型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_cape_east_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_cape_east_wild_mudflat_skipper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "flat_leap_goby",
+                "species_name_zh": "灘跳魚",
+                "variant_key": "mudflat_skipper",
+                "variant_name_zh": "跳灘型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_cape_east_wild_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1780,
+            1809,
+            80,
+            109
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "southeast_road_01",
         "lower_density": 1,
         "pool": [
@@ -9264,6 +9950,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_01_mast_circler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9273,6 +9973,130 @@
             2085,
             348,
             367
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southeast_road_02",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southeast_road_02_mast_circler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_02_mast_circler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_02_mast_circler_flock",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2060,
+            2079,
+            477,
+            496
+          ]
+        ],
+        "region_key": "southeast_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southeast_road_03",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southeast_road_03_mast_circler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_03_mast_circler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southeast_road_03_mast_circler_flock",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "mast_wind_gull",
+                "species_name_zh": "桅風海鷗",
+                "variant_key": "mast_circler",
+                "variant_name_zh": "繞桅型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            2059,
+            2078,
+            307,
+            326
           ]
         ],
         "region_key": "southeast_coast",
@@ -12836,8 +13660,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "e687948834572aece677cfae0bdeb49d81f17993cc7990909909aa52885a0012",
-    "world/lore/monster_placement.py": "0201e20ff36befc44c406e18a3d86af9376adc81bf9e2bec84c356129482b47c",
+    "world/lore/monster_activity.py": "f466bd65e753a92506689c0b6bffa684e94270625f2fc52ec8980f2300239f34",
+    "world/lore/monster_placement.py": "b1cc3bce1c18cb7b40af0d764037d73d59e30d46a07a5c0e97c79c1b3487441b",
     "world/lore/monster_species.py": "4f320369d8d461682d6621c319678b557d5b234e776058be2efb35016a4ff122",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
