@@ -1183,6 +1183,25 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "pier_basker",
         True,
     ),
+    MonsterSpecies(
+        "salt_column_ant",
+        "負鹽蟻",
+        "負鹽蟻是約手掌長的蟻類魔獸，成群生活於西南海岸的鹽道、曬鹽場堤岸與橄欖林的乾地。",
+        "赤褐色的身體分成頭、胸、腹三節，表面光滑發亮。"
+        "頭部方大，一對鉗狀大顎的邊緣帶著細齒；"
+        "六條腿細長，觸角在頭前不停擺動。",
+        "牠們在乾燥的土坡下挖出深巢，排成長列外出覓食，專找鹽粒、橄欖與掉落的乾果。"
+        "牠的大顎與頸部帶著異常的力氣，一隻就能銜起比自己重上好幾倍的鹽塊，拖著倒退回巢；"
+        "巢口的土丘因此結著一層白鹽殼。"
+        "鹽道城往海邊的鹽道上，運鹽的驢車常被蟻列攔住，麻袋被咬開，鹽粒一路漏進蟻巢。"
+        "近身時，牠以大顎咬住對手的腳踝向後拖拽，咬中時讓對手腳下一沉，短時間內步伐遲緩。",
+        ("southwest_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；大顎異常力氣的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居螞蟻：大顎的力氣屬於身體能力，不帶元素、不噴酸、不造成中毒；戰鬥呈現為咬住拖拽與命中後短暫敏捷下降。描寫維持昆蟲體態。連結鹽道城的運鹽驢車與巢口鹽殼。",
+        "（作者私有：尚未證實的猜想）鹽道城的趕驢人說負鹽蟻把巢口的鹽殼加厚的那年，雨季會來得特別晚，這種說法尚未證實。",
+        "salt_hauler",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2125,6 +2144,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("flipper_slide_slam",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "salt_hauler",
+        "salt_column_ant",
+        "搬鹽型",
+        "普通版本，排成長列在鹽道與曬鹽場之間搬運鹽粒。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=34, mp=0, sp=9, atk_phys=5, agility=8, defense=4, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("salt_jaw_haul",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "salt_mound_soldier",
+        "salt_column_ant",
+        "守丘型",
+        "頭部特別大、大顎特別寬的兵蟻，守在結著鹽殼的巢丘上，會咬向任何踩上巢丘的身影。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=58, mp=0, sp=15, atk_phys=10, agility=7, defense=6, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("salt_jaw_haul",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 
