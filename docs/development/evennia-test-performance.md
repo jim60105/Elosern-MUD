@@ -718,5 +718,11 @@ named refusal。
 測試）、`WildernessWindowTests`（333 s／9）、`LocalMapWildernessGatewayTests`
 （330 s／12）、`WildernessBootstrapTests`（521 s／19，依「物化／初始族群／
 gate 修復」切三）與 `SelectedSettlementSyncTests`（328 s／11，依「選取規則／
-預設選取結果」切二）。共用 fixture 以 mixin 形式提供，避免基底類別自己也被
-收集成一個測試類別。
+預設選取結果」切二）。其中兩處的共用 fixture 改以 mixin 提供，因為繼承自
+`EvenniaTest` 的基底類別本身也會被收集成一個（空的）測試類別。
+
+切分後的複驗（run 43173159602，commit `cb964338`）：`maps-28-1` 588 → 393 s、
+`maps-33` 242 → 212 s、`maps-29` 278 → 234 s、`commands-20` 391 → 282 s。
+`maps-34-5` 仍在 395–430 s 之間浮動：它剩下的重類別是 `MetricCutoverTests`
+與選取類別，屬類別層級分配（每個 worker 拿一整個類別）的長尾，仍有硬限
+20 分鐘的 36%。
