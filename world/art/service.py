@@ -644,14 +644,15 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     return image_id
 
 
-def _gallery_job_is_unclaimable(record) -> bool:
+def _gallery_job_is_unclaimable(record, registered_monster_keys=None) -> bool:
     """True when a gallery job record can never be claimed or published again.
 
-    A whose-subject-no-longer-resolves row and a row whose status is neither
-    ``pending`` nor ``in_progress`` can never publish. A lease-expired
-    ``in_progress`` job is RETAINED — reclaiming it to ``pending`` is the
-    shared queue's lease-reclaim job, so a job whose worker died is retried,
-    not silently dropped.
+    A whose-subject-no-longer-resolves row, a monster row whose key is not a
+    registered visual species (when the registered key set is known), and a
+    row whose status is neither ``pending`` nor ``in_progress`` can never
+    publish. A lease-expired ``in_progress`` job is RETAINED — reclaiming it
+    to ``pending`` is the shared queue's lease-reclaim job, so a job whose
+    worker died is retried, not silently dropped.
     """
     try:
         parse_subject(f"{record.db.kind}:{record.db.subject_key}")
@@ -663,35 +664,166 @@ def _gallery_job_is_unclaimable(record) -> bool:
             exc=error,
         )
         return True
+    if (
+        registered_monster_keys is not None
+        and str(record.db.kind or "") == ArtSubjectKind.MONSTER.value
+        and record.db.subject_key not in registered_monster_keys
+    ):
+        return True
     status = str(record.db.status or "")
     return status not in (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS)
 
 
-def prune_gallery_orphans() -> dict:
-    """Idempotent startup reclaim of orphan gallery files and spent job records.
+def _registered_monster_keys() -> frozenset[str] | None:
+    """The registered visual species keys, built once per prune, or ``None``.
 
-    Deletes every file under the store root's ``gallery/`` tree that no card
-    of any gallery record references (read-only through the gallery API), and
-    every gallery job record that can
-    never be claimed or published again (unresolvable subject, or a status
-    outside ``pending``/``in_progress``). Every path is resolved through the
-    single store-root confinement helper, so nothing outside
-    ``ART_STORE_ROOT`` is ever unlinked, and a referenced file is NEVER
-    deleted. Every failure phase is bounded: an unreadable tree or a failing
-    deletion is a named diagnostic and the prune continues; the function
-    itself never raises, so startup never aborts because of it.
+    ``None`` disables every unregistered-key deletion for this pass: a
+    registry that fails to build, or builds empty, cannot prove that any
+    stored monster key is unregistered, and the deletion is irreversible.
+    """
+    try:
+        keys = frozenset(get_monster_visual_registry())
+    except Exception as error:  # noqa: BLE001 - bounded: skip the unregistered-key phases
+        log_error("gallery_prune_failed", context={"phase": "registry"}, exc=error)
+        return None
+    if not keys:
+        log_warn(
+            "gallery_prune_failed",
+            context={"phase": "registry", "reason": "empty_registry"},
+        )
+        return None
+    return keys
+
+
+def _delete_unregistered_classic_records(
+    registered_monster_keys: frozenset[str], referenced: set[str]
+) -> tuple[int, int]:
+    """Delete classic monster records of unregistered keys and their own files.
+
+    Classic outputs live outside ``gallery/``, so the file phase cannot reach
+    them: each record's ``output_identity`` and ``prior_output_identity`` are
+    unlinked here, through store-root confinement, unless a gallery card
+    references the same identity. Files go first and the record only after
+    every one of them is gone: a failed unlink keeps the record, so the next
+    pass retries instead of leaving a file no record can ever reach again. A
+    record whose files are already missing is simply deleted. Returns
+    ``(records, files)`` deleted.
+    """
+    records_deleted = 0
+    files_deleted = 0
+    for record in list(ArtAssetRecord.objects.all()):
+        try:
+            if is_gallery_job(record):
+                continue
+            if str(record.db.kind or "") != ArtSubjectKind.MONSTER.value:
+                continue
+            if record.db.subject_key in registered_monster_keys:
+                continue
+            record_name = str(record.db_key)
+            unlink_failed = False
+            for identity in (record.db.output_identity, record.db.prior_output_identity):
+                if not isinstance(identity, str) or not identity or identity in referenced:
+                    continue
+                resolved = resolved_under_store_root(identity)
+                if resolved is None:
+                    continue
+                try:
+                    if not resolved.is_file():
+                        continue
+                    resolved.unlink()
+                    files_deleted += 1
+                except OSError as error:
+                    unlink_failed = True
+                    log_warn(
+                        "gallery_prune_failed",
+                        context={"phase": "classic-file", "record": record_name, "path": identity},
+                        exc=error,
+                    )
+            if unlink_failed:
+                continue
+            record.delete()
+            records_deleted += 1
+        except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
+            log_warn(
+                "gallery_prune_failed",
+                context={"phase": "classic-record", "record": str(record.db_key)},
+                exc=error,
+            )
+    return records_deleted, files_deleted
+
+
+def prune_gallery_orphans() -> dict:
+    """Idempotent startup reclaim of orphan gallery files and spent records.
+
+    Phases, in order:
+
+    1. Every monster gallery record whose key is not a registered visual
+       species is deleted (through the gallery API's sole writer).
+    2. The gallery reference set is read (read-only through the gallery API).
+    3. Every gallery job record that can never be claimed or published again
+       (unresolvable subject, unregistered monster key, or a status outside
+       ``pending``/``in_progress``) is deleted, and every classic monster
+       record of an unregistered key is deleted together with its own
+       unreferenced output files.
+    4. Every file under the store root's ``gallery/`` tree that no card of
+       any remaining gallery record references is deleted — including the
+       cards of the records phase 1 removed.
+
+    The unregistered-key rules run only when the visual registry builds
+    non-empty; the classic phase also needs the reference set. Every path is
+    resolved through the single store-root confinement helper, so nothing
+    outside ``ART_STORE_ROOT`` is ever unlinked, and a referenced file is
+    NEVER deleted. Every failure phase is bounded: an unreadable tree or a
+    failing deletion is a named diagnostic and the prune continues; the
+    function itself never raises, so startup never aborts because of it.
 
     Reads happen on the reactor thread during ``at_server_start``, before the
-    scheduler can claim or publish anything — the gallery and queue locks are
-    deliberately not taken here. A future mid-game re-use must take them.
+    scheduler can claim or publish anything — the queue lock is deliberately
+    not taken here (the gallery record phase takes ``gallery_lock`` through
+    the gallery API). A future mid-game re-use must take the queue lock too.
     """
     files_deleted = 0
     records_deleted = 0
+    records_unregistered = 0
+    registered = _registered_monster_keys()
+    if registered is not None:
+        try:
+            records_unregistered += gallery_api.delete_unregistered_monster_records(registered)
+        except Exception as error:  # noqa: BLE001 - bounded: the remaining phases still run
+            log_error("gallery_prune_failed", context={"phase": "gallery-records"}, exc=error)
     referenced = None
     try:
         referenced = gallery_api.referenced_stored_identities()
-    except Exception as error:  # noqa: BLE001 - bounded: skip the file phase, still prune records
+    except Exception as error:  # noqa: BLE001 - bounded: skip the file phases, still prune job records
         log_error("gallery_prune_failed", context={"phase": "references"}, exc=error)
+    try:
+        for record in list(ArtAssetRecord.objects.all()):
+            try:
+                if not is_gallery_job(record):
+                    continue
+                if _gallery_job_is_unclaimable(record, registered):
+                    record.delete()
+                    records_deleted += 1
+            except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
+                log_warn(
+                    "gallery_prune_failed",
+                    context={"phase": "record", "job": record.db_key},
+                    exc=error,
+                )
+    except Exception as error:  # noqa: BLE001 - bounded scan failure
+        log_error("gallery_prune_failed", context={"phase": "record-scan"}, exc=error)
+    if registered is not None and referenced is not None:
+        # Without the reference set a classic file cannot be proven
+        # unreferenced, so its record is kept for the next pass instead of
+        # being deleted with its files left behind.
+        try:
+            classic_records, classic_files = _delete_unregistered_classic_records(
+                registered, referenced
+            )
+            records_unregistered += classic_records
+            files_deleted += classic_files
+        except Exception as error:  # noqa: BLE001 - bounded scan failure
+            log_error("gallery_prune_failed", context={"phase": "classic-records"}, exc=error)
     if referenced is not None:
         # Without the reference set NOTHING may be deleted: a prune must
         # never remove a file a card references, and an unreadable set cannot
@@ -719,24 +851,17 @@ def prune_gallery_orphans() -> dict:
                         )
         except Exception as error:  # noqa: BLE001 - an unreadable tree never aborts the prune
             log_error("gallery_prune_failed", context={"phase": "tree"}, exc=error)
-    try:
-        for record in list(ArtAssetRecord.objects.all()):
-            try:
-                if not is_gallery_job(record):
-                    continue
-                if _gallery_job_is_unclaimable(record):
-                    record.delete()
-                    records_deleted += 1
-            except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
-                log_warn(
-                    "gallery_prune_failed",
-                    context={"phase": "record", "job": record.db_key},
-                    exc=error,
-                )
-    except Exception as error:  # noqa: BLE001 - bounded scan failure
-        log_error("gallery_prune_failed", context={"phase": "record-scan"}, exc=error)
+    result = {
+        "files": files_deleted,
+        "records": records_deleted,
+        "records_unregistered": records_unregistered,
+    }
+    # The registered species count makes a partial registry diagnosable.
     log_info(
         "gallery_orphans_pruned",
-        context={"files": files_deleted, "records": records_deleted},
+        context={
+            **result,
+            "registered_species": len(registered) if registered is not None else None,
+        },
     )
-    return {"files": files_deleted, "records": records_deleted}
+    return result

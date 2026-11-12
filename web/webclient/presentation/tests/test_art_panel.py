@@ -49,10 +49,9 @@ from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
-from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
-from world.tests.synthetic_data import SYNTH_ARCHETYPES
+from world.tests.synthetic_data import SYNTH_ARCHETYPES, SYNTH_MONSTER_SPECIES
 from world.rules.combat_session import engage
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
@@ -270,9 +269,9 @@ def _valid_payload(**overrides):
 
 T_BAZAAR = "t_synth_bazaar"
 T_BAZAAR_LABEL = SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh
-# Monster art membership is a registered VISUAL species key, resolved at
-# runtime from the authored baseline rows (never a threat-tier value).
-_MONSTER_VISUAL_KEY = BASELINE_VISUAL_ROWS[0].stable_key
+# Monster art membership is a registered VISUAL species key: the synthetic
+# kit's species, stored as species provenance (never a threat-tier value).
+_MONSTER_VISUAL_KEY = sorted(SYNTH_MONSTER_SPECIES)[0]
 
 # A deterministic decodable 1x1 PNG: the official catalog admits an image from
 # its header alone, which is all this surface needs.
@@ -911,7 +910,7 @@ def _monster(key="art goblin", hp=100):
     monster = create_object(Monster, key=key)
     monster.threat_tier = "low"
     monster.apply_monster_tier("floor")
-    monster.art_species_key = _MONSTER_VISUAL_KEY
+    monster.attributes.add("species_key", _MONSTER_VISUAL_KEY)
     monster.traits.hp.base = hp
     monster.traits.hp.current = hp
     return monster
@@ -921,7 +920,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         # Scene presentation re-validates the room archetype against the live
         # registry: run the surface on the kit archetype rows.
-        open_synthetic_scope(self, "archetypes")
+        open_synthetic_scope(self, "archetypes", "monster_species")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -1436,7 +1435,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
     def setUp(self):
         # Snapshot rooms carry kit archetype keys; the combat path stays on
         # the live skill/monster data (no skills or monster-tier patching).
-        open_synthetic_scope(self, "archetypes")
+        open_synthetic_scope(self, "archetypes", "monster_species")
         super().setUp()
         import evennia
         from server.conf.tests.test_inputfuncs import _make_session
@@ -1649,7 +1648,7 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         monster = create_object(Monster, key="森林哥布林", location=room)
         monster.threat_tier = "low"
         monster.apply_monster_tier("floor")
-        monster.art_species_key = "goblin"
+        monster.attributes.add("species_key", _MONSTER_VISUAL_KEY)
 
         envelope = self._sync()
         coordinator = __import__(
@@ -1697,8 +1696,9 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         monster_entry = catalog[str(monster.pk)]["artwork"]
         # The descriptor names the monster's OWN registered visual species,
         # never a threat tier or a display name.
-        species_key = getattr(monster, "species_key", None) or monster.art_species_key
-        self.assertEqual(monster_entry["subject_id"], f"portrait:monster:{species_key}")
+        self.assertEqual(
+            monster_entry["subject_id"], f"portrait:monster:{_MONSTER_VISUAL_KEY}"
+        )
         self.assertEqual(monster_entry["attempts"], [])
         terminal = monster_entry["terminal"]["resource"]
         self.assertEqual(terminal["origin"], "silhouette")

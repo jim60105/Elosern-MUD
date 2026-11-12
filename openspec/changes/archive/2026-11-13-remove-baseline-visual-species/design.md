@@ -69,8 +69,12 @@ gains a record phase that runs BEFORE its file phase:
    outside `gallery/`, so the file phase cannot reach them.
 4. The existing file phase then deletes the now-unreferenced gallery files.
 
-Order inside `prune_gallery_orphans`: gallery records → job and classic
-records → reference read → file phase. Each phase keeps the existing bounded
+Order inside `prune_gallery_orphans`: registered key set (built once) →
+gallery records → reference read → job and classic records → file phase. The
+reference read precedes the classic phase so a classic file a card still
+references is never unlinked; a classic record keeps its record until all its
+files are gone, so a failed unlink is retried next pass. An empty or failing
+registry build disables every unregistered-key deletion for that pass. Each phase keeps the existing bounded
 `gallery_prune_failed` diagnostics; the final `gallery_orphans_pruned` event
 gains a `records_unregistered` context count.
 

@@ -650,6 +650,38 @@ def referenced_stored_identities() -> set[str]:
     return identities
 
 
+def delete_unregistered_monster_records(registered_keys: frozenset[str]) -> int:
+    """Delete every monster gallery record whose key is not a registered species.
+
+    The startup prune's record phase (``art-gallery-generation``): a monster
+    record whose ``subject_key`` is outside ``registered_keys`` can never be
+    resolved, presented or generated again, so the record itself goes. Card
+    files are NOT unlinked here: once the record is gone they are
+    unreferenced, and the prune's file phase reclaims them through store-root
+    confinement. The caller supplies the registered key set (built once per
+    prune) so this module never reads the lore registry. One failing record
+    is a bounded diagnostic and never stops the sweep. Returns the number of
+    records deleted.
+    """
+    deleted = 0
+    with gallery_lock:
+        for record in list(GalleryRecord.objects.all()):
+            try:
+                if str(record.db.kind or "") != ArtSubjectKind.MONSTER.value:
+                    continue
+                if record.db.subject_key in registered_keys:
+                    continue
+                record.delete()
+                deleted += 1
+            except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
+                log_warn(
+                    "gallery_prune_failed",
+                    context={"phase": "gallery-record", "record": str(record.db_key)},
+                    exc=error,
+                )
+    return deleted
+
+
 @dataclass(frozen=True)
 class GallerySubjectState:
     """One record's read-only summary: subject, cards, default, last error."""

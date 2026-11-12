@@ -707,15 +707,13 @@ def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:
     exactly what presentation has always applied — the explicit named policy,
     both canonical integer age fields, and the registered visual species —
     and is never inferred from a display name, a quest role, or a key shape.
-    A monster's provenance is resolved from ``species_key`` when present, else
-    ``art_species_key``.
+    A monster's only provenance is its stored ``species_key``; without one it
+    has no subject.
     """
     from typeclasses.monsters import Monster
 
     if isinstance(entity, Monster):
         visual_key = getattr(entity, "species_key", None)
-        if visual_key is None:
-            visual_key = getattr(entity, "art_species_key", None)
         if visual_key is None:
             return None, "ineligible"
         try:

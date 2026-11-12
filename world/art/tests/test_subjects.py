@@ -32,6 +32,7 @@ from world.prompts.loader import PromptUnavailableError
 from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     SYNTH_RACES,
     SYNTH_SUBRACES,
@@ -43,6 +44,7 @@ from world.tests.synthetic_data import (
 # and key-validation tests keep plain t_-prefixed identity literals.
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
 _SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+_SYNTH_SPECIES = sorted(SYNTH_MONSTER_SPECIES)[0]
 _SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
 # The prompt names the RACE, never the project-invented subrace label.
 _SYNTH_RACE_LABEL = SYNTH_RACES[SYNTH_SUBRACES[_SYNTH_SUBRACE].race_key].display_name_zh
@@ -171,7 +173,7 @@ class StableKeyContractTests(unittest.TestCase):
         return character
 
 
-@synthetic_registries("archetypes", "monster_tiers")
+@synthetic_registries("archetypes", "monster_tiers", "monster_species")
 class RegistryResolutionTests(unittest.TestCase):
     """Resolution runs against the kit catalogs (built in test bodies only)."""
 
@@ -182,8 +184,8 @@ class RegistryResolutionTests(unittest.TestCase):
     def test_registered_archetypes_resolve(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         self.assertEqual(subject.full(), f"scene:{_SYNTH_SCENE}")
-        monster = monster_subject_for("goblin")
-        self.assertEqual(monster.full(), "portrait:monster:goblin")
+        monster = monster_subject_for(_SYNTH_SPECIES)
+        self.assertEqual(monster.full(), f"portrait:monster:{_SYNTH_SPECIES}")
         with self.assertRaises(ArtSubjectError):
             monster_subject_for(_SYNTH_TIER)
 
@@ -275,7 +277,7 @@ class PortraitPolicyTests(EvenniaTestCase):
                     character_subject_for(self._character(bad))
 
 
-@synthetic_registries("archetypes", "monster_tiers", "races", "subraces")
+@synthetic_registries("archetypes", "monster_tiers", "monster_species", "races", "subraces")
 class DescriptionTests(PromptFixture):
     """Description composition resolves the archetype sentence, the monster
     visual species appearance text and the race label through the catalogs;
@@ -308,7 +310,7 @@ class DescriptionTests(PromptFixture):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_scene_and_monster_descriptions_are_registry_text(self):
         scene = scene_subject_for(_SYNTH_SCENE)
-        monster = monster_subject_for("goblin")
+        monster = monster_subject_for(_SYNTH_SPECIES)
         first = description_for(scene)
         second = description_for(scene)
         self.assertEqual(first, second)
@@ -589,7 +591,7 @@ class AppearanceDescriptionTests(PromptFixture):
         self.assertNotIn("240", text)
 
 
-@synthetic_registries("archetypes", "monster_tiers", "subraces")
+@synthetic_registries("archetypes", "monster_tiers", "monster_species", "subraces")
 class MonsterDescriptionSeamTests(PromptFixture):
     """The monster seam supplies both public identity values of the row."""
 
@@ -605,9 +607,9 @@ class MonsterDescriptionSeamTests(PromptFixture):
             "  art.monster_description: '{description}|{display_name}'\n",
         )
         self.load()
-        row = get_monster_visual_registry()["goblin"]
+        row = get_monster_visual_registry()[_SYNTH_SPECIES]
         self.assertEqual(
-            monster_description(monster_subject_for("goblin")),
+            monster_description(monster_subject_for(_SYNTH_SPECIES)),
             f"{row.published_appearance_zh}|{row.display_label}",
         )
 
@@ -619,9 +621,9 @@ class MonsterDescriptionSeamTests(PromptFixture):
             "  art.monster_description: '{display_name}'\n",
         )
         self.load()
-        row = get_monster_visual_registry()["goblin"]
+        row = get_monster_visual_registry()[_SYNTH_SPECIES]
         self.assertEqual(
-            monster_description(monster_subject_for("goblin")),
+            monster_description(monster_subject_for(_SYNTH_SPECIES)),
             row.display_label,
         )
 

@@ -15,29 +15,6 @@ joins only at the official reference layer, so the two identity layers can never
 
 ## Requirements
 
-### Requirement: A species-backed individual resolves the species-keyed official content reference
-A monster whose persistent identity carries a registered visual-species provenance SHALL resolve its official
-content reference as the `monster` kind keyed by exactly that visual species key, derived solely from stored
-visual provenance. Resolution SHALL be a pure read of stored identity plus the startup catalog
-snapshot.
-
-#### Scenario: Species key is the whole reference
-- **WHEN** a species-backed monster with species key `<s>` presents while the mounted catalog holds `monster/<s>/`
-- **THEN** the official reference resolves as `(monster, <s>)` and the official default image is presented through the existing chain step
-
-#### Scenario: Variants share the species image
-- **WHEN** two individuals of one species with different registered variants resolve
-- **THEN** both resolve the same species reference, and their personal selections and geometry remain independent through the existing personalization machinery
-
-#### Scenario: Tier-only individuals resolve nothing new
-- **WHEN** a tier-built baseline individual carries valid explicit visual provenance
-- **THEN** its reference is monster/<visual-key>; without valid visual provenance it resolves no species subject and carries monster_anon
-
-#### Scenario: The reference is never derived from tier, name, or variant
-- **WHEN** a species-backed individual resolves its official reference
-- **THEN** the reference is never derived from the threat tier, the display name, or the variant key
-- **AND** an individual's distinctness comes from its personal selection and geometry overrides, not from a different reference
-
 ### Requirement: Tier substitution for a missing official species image is prohibited with honest fall-through
 When a species' official package is absent from the mounted catalog, resolution SHALL fall through to
 the existing runtime/silhouette/placeholder chain, and no code path SHALL present another species'
@@ -77,3 +54,23 @@ A monster SHALL resolve reusable cards and valid classic identities only inside 
 #### Scenario: Broken species images degrade without substitution
 - **WHEN** a valid species image fails admission or a browser image load fails
 - **THEN** presentation uses monster_anon without reaching another species, a tier image or the deprecated humanoid SVG
+
+### Requirement: A species-backed monster resolves its species-keyed official reference
+A monster whose persistent identity carries a registered visual-species provenance SHALL resolve its official content reference as the `monster` kind keyed by exactly that species key, derived solely from stored provenance as a pure read of stored identity plus the startup catalog snapshot. A monster without species provenance SHALL resolve no reference.
+
+#### Scenario: Species key is the whole reference
+- **WHEN** a species-backed monster with species key `<s>` presents while the mounted catalog holds `monster/<s>/`
+- **THEN** the official reference resolves as `(monster, <s>)` and the official default image is presented through the existing chain step
+
+#### Scenario: Variants share the species image
+- **WHEN** two individuals of one species with different registered variants resolve
+- **THEN** both resolve the same species reference, and their personal selections and geometry remain independent through the existing personalization machinery
+
+#### Scenario: A monster without species provenance resolves nothing
+- **WHEN** a tier-built monster carries no species provenance
+- **THEN** it resolves no official reference and no species subject, and it carries monster_anon
+
+#### Scenario: The reference is never derived from tier, name, or variant
+- **WHEN** a species-backed individual resolves its official reference
+- **THEN** the reference is never derived from the threat tier, the display name, or the variant key
+- **AND** an individual's distinctness comes from its personal selection and geometry overrides, not from a different reference

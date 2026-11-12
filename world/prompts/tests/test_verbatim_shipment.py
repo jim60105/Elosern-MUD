@@ -28,6 +28,7 @@ from tools.spec_traceability import covers_requirement
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
@@ -197,7 +198,7 @@ class LibrarySourceTests(unittest.TestCase):
             ),
         )
 
-    @synthetic_registries("archetypes", "races", "subraces")
+    @synthetic_registries("archetypes", "monster_species", "races", "subraces")
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_descriptions_render_from_the_library_solely(self):
         from unittest.mock import Mock
@@ -244,8 +245,8 @@ class LibrarySourceTests(unittest.TestCase):
 
         # A registered visual species: the seam supplies both public identity
         # values of the selected row, so the description IS the library render.
-        monster = monster_subject_for("goblin")
-        row = get_monster_visual_registry()["goblin"]
+        monster = monster_subject_for(sorted(SYNTH_MONSTER_SPECIES)[0])
+        row = get_monster_visual_registry()[sorted(SYNTH_MONSTER_SPECIES)[0]]
         self.assertEqual(
             monster_description(monster),
             render_prompt(

@@ -21,7 +21,7 @@ from world.art.subjects import ArtSubjectKind
 from world.art.translate import TranslateError
 import world.art.worker as worker
 
-from ._support import WorkerStoreIsolation
+from ._support import WorkerStoreIsolation, _SYNTH_MONSTER
 
 
 class _ExplodingTranslator:
@@ -49,7 +49,7 @@ class TranslationStageTests(WorkerStoreIsolation):
         subjects = (
             self._subject("t_synth_translation", ArtSubjectKind.SCENE),
             self._subject("42", ArtSubjectKind.CHARACTER),
-            self._subject("goblin", ArtSubjectKind.MONSTER),
+            self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER),
         )
         originals = {}
         for subject in subjects:

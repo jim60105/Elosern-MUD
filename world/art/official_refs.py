@@ -124,7 +124,6 @@ NPC_PROFILE_PROVENANCE_ATTRIBUTE = "npc_profile_key"
 # arm treats ``None`` as "no stored identity" (silent) and any other value as a
 # declared key, so a falsy non-``None`` default (an empty string) would make
 # every tier-only monster emit one bounded diagnostic per process.
-ART_SPECIES_PROVENANCE_ATTRIBUTE = "art_species_key"
 SPECIES_PROVENANCE_ATTRIBUTE = "species_key"
 
 # The one bounded diagnostic id for a declared-but-unresolvable reference.
@@ -329,14 +328,9 @@ def _species_content_reference(entity: Any) -> OfficialContentReference | None:
     attributes = _entity_attributes(entity)
     if attributes is None:
         return None
-    species_val = attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)
-    if species_val is not None:
-        declared = species_val
-    elif attributes.get(ART_SPECIES_PROVENANCE_ATTRIBUTE) is not None:
-        declared = attributes.get(ART_SPECIES_PROVENANCE_ATTRIBUTE)
-    else:
+    declared = attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)
+    if declared is None:
         return None
-
     return _declared_reference(OFFICIAL_KIND_MONSTER, declared, entity)
 
 
@@ -378,7 +372,6 @@ __all__ = [
     "OFFICIAL_KIND_NPC",
     "OFFICIAL_KIND_PRESET",
     "PRESET_PROVENANCE_ATTRIBUTE",
-    "ART_SPECIES_PROVENANCE_ATTRIBUTE",
     "SPECIES_PROVENANCE_ATTRIBUTE",
     "UNRESOLVED_REFERENCE_EVENT",
     "OfficialContentReference",

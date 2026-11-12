@@ -46,6 +46,7 @@ from tools.spec_traceability import covers_requirement
 
 from ._support import (
     WorkerStoreIsolation,
+    _SYNTH_MONSTER,
     _OpaqueClient,
     _opaque_portrait_png,
 )
@@ -106,7 +107,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_an_arbitrary_exception_is_still_bounded(self):
-        subject = self._subject("goblin", ArtSubjectKind.MONSTER)
+        subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         self._record(subject)
         with override_settings(
             ART_REMBG_ENABLED=True,
@@ -155,7 +156,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
     def test_one_failing_portrait_does_not_fail_its_batch(self):
         scene = self._subject()
         failing = self._subject("42", ArtSubjectKind.CHARACTER)
-        succeeding = self._subject("goblin", ArtSubjectKind.MONSTER)
+        succeeding = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         for subject in (scene, failing, succeeding):
             self._record(subject)
         fake = FakeCutoutBackend()
@@ -182,7 +183,7 @@ class CutoutFailureTests(WorkerStoreIsolation):
         self.assertEqual(succeeding_record.db.status, ArtAssetStatus.DONE)
         self._assert_not_in_progress({scene_record, failing_record, succeeding_record})
         self._assert_region_transparent(
-            self.root / "portrait" / "monster" / "goblin.png"
+            self.root / "portrait" / "monster" / f"{_SYNTH_MONSTER}.png"
         )
         self.assertFalse((self.root / "portrait" / "character" / "42.png").exists())
 

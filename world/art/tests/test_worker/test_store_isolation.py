@@ -47,6 +47,7 @@ from tools.spec_traceability import covers_requirement
 
 from ._support import (
     WorkerStoreIsolation,
+    _SYNTH_MONSTER,
     _MixedOutcomeClient,
 )
 
@@ -95,14 +96,14 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_portrait_subject_writes_the_exact_portrait_identity(self):
-        subject = self._subject("goblin", ArtSubjectKind.MONSTER)
+        subject = self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER)
         self._record(subject)
         with self._client(FakeSDWebUIClient()):
             drain_synchronous(10)
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(record.db.output_identity, "portrait/monster/goblin.png")
-        self.assertTrue((self.root / "portrait" / "monster" / "goblin.png").is_file())
+        self.assertEqual(record.db.output_identity, f"portrait/monster/{_SYNTH_MONSTER}.png")
+        self.assertTrue((self.root / "portrait" / "monster" / f"{_SYNTH_MONSTER}.png").is_file())
 
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     def test_atomic_write_never_leaves_a_temporary_file_behind(self):
@@ -426,7 +427,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         client.outcomes["crash"] = RuntimeError("unexpected")
         subjects = [
             self._subject("t_synth_forest"),
-            self._subject("goblin", ArtSubjectKind.MONSTER),
+            self._subject(_SYNTH_MONSTER, ArtSubjectKind.MONSTER),
             self._subject("t_synth_city"),
         ]
         for subject, description in zip(subjects, ("ok", "boom", "crash")):
@@ -439,7 +440,7 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
             statuses[subject.key] = (record.db.status, record.db.last_error_code)
         self.assertEqual(statuses["t_synth_forest"], (ArtAssetStatus.DONE, None))
         self.assertEqual(
-            statuses["goblin"], (ArtAssetStatus.FAILED, "sd_http_error")
+            statuses[_SYNTH_MONSTER], (ArtAssetStatus.FAILED, "sd_http_error")
         )
         self.assertEqual(
             statuses["t_synth_city"], (ArtAssetStatus.FAILED, "sd_internal_error")
