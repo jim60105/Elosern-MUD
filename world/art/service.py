@@ -701,11 +701,13 @@ def _delete_unregistered_classic_records(
     """Delete classic monster records of unregistered keys and their own files.
 
     Classic outputs live outside ``gallery/``, so the file phase cannot reach
-    them: each deleted record's ``output_identity`` and
-    ``prior_output_identity`` are unlinked here, through store-root
-    confinement, unless a gallery card references the same identity. The
-    record is deleted before its files, so a failed delete never leaves a
-    record pointing at a missing file. Returns ``(records, files)`` deleted.
+    them: each record's ``output_identity`` and ``prior_output_identity`` are
+    unlinked here, through store-root confinement, unless a gallery card
+    references the same identity. Files go first and the record only after
+    every one of them is gone: a failed unlink keeps the record, so the next
+    pass retries instead of leaving a file no record can ever reach again. A
+    record whose files are already missing is simply deleted. Returns
+    ``(records, files)`` deleted.
     """
     records_deleted = 0
     files_deleted = 0
@@ -717,12 +719,28 @@ def _delete_unregistered_classic_records(
                 continue
             if record.db.subject_key in registered_monster_keys:
                 continue
-            identities = [
-                identity
-                for identity in (record.db.output_identity, record.db.prior_output_identity)
-                if isinstance(identity, str) and identity
-            ]
             record_name = str(record.db_key)
+            unlink_failed = False
+            for identity in (record.db.output_identity, record.db.prior_output_identity):
+                if not isinstance(identity, str) or not identity or identity in referenced:
+                    continue
+                resolved = resolved_under_store_root(identity)
+                if resolved is None:
+                    continue
+                try:
+                    if not resolved.is_file():
+                        continue
+                    resolved.unlink()
+                    files_deleted += 1
+                except OSError as error:
+                    unlink_failed = True
+                    log_warn(
+                        "gallery_prune_failed",
+                        context={"phase": "classic-file", "record": record_name, "path": identity},
+                        exc=error,
+                    )
+            if unlink_failed:
+                continue
             record.delete()
             records_deleted += 1
         except Exception as error:  # noqa: BLE001 - one bad record never stops the sweep
@@ -731,24 +749,6 @@ def _delete_unregistered_classic_records(
                 context={"phase": "classic-record", "record": str(record.db_key)},
                 exc=error,
             )
-            continue
-        for identity in identities:
-            if identity in referenced:
-                continue
-            resolved = resolved_under_store_root(identity)
-            if resolved is None:
-                continue
-            try:
-                if not resolved.is_file():
-                    continue
-                resolved.unlink()
-                files_deleted += 1
-            except OSError as error:
-                log_warn(
-                    "gallery_prune_failed",
-                    context={"phase": "classic-file", "record": record_name, "path": identity},
-                    exc=error,
-                )
     return records_deleted, files_deleted
 
 
@@ -856,5 +856,12 @@ def prune_gallery_orphans() -> dict:
         "records": records_deleted,
         "records_unregistered": records_unregistered,
     }
-    log_info("gallery_orphans_pruned", context=dict(result))
+    # The registered species count makes a partial registry diagnosable.
+    log_info(
+        "gallery_orphans_pruned",
+        context={
+            **result,
+            "registered_species": len(registered) if registered is not None else None,
+        },
+    )
     return result

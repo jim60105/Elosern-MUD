@@ -343,3 +343,23 @@ class UnregisteredMonsterPruneTests(EvenniaTestCase):
         self.assertEqual(self._records_naming(_GONE), [self.gone_classic.db_key])
         self.assertTrue(self.gone_output.exists())
         self.assertTrue(self.gone_prior.exists())
+
+    def test_a_failed_classic_unlink_keeps_the_record_for_the_next_pass(self):
+        real_unlink = Path.unlink
+
+        def failing_for_classic(path, *args, **kwargs):
+            if path.name.startswith(_GONE) and "portrait" in path.parts:
+                raise OSError("busy")
+            return real_unlink(path, *args, **kwargs)
+
+        with _species_scope(_KEPT):
+            with patch("pathlib.Path.unlink", failing_for_classic):
+                prune_gallery_orphans()
+            # The record survives so its files stay reachable...
+            self.assertEqual(self._records_naming(_GONE), [self.gone_classic.db_key])
+            self.assertTrue(self.gone_output.exists())
+            # ...and the next healthy pass reclaims both.
+            prune_gallery_orphans()
+        self.assertEqual(self._records_naming(_GONE), [])
+        self.assertFalse(self.gone_output.exists())
+        self.assertFalse(self.gone_prior.exists())
