@@ -992,6 +992,31 @@ def clear_official_selection(subject: ArtSubject, *, entity: Any = None) -> None
         )
 
 
+def _refuse_undeclared_geometry(
+    subject: ArtSubject, *, face_rect: bool = False, stage: bool = False
+) -> None:
+    """Refuse a face-rectangle or stage write the subject's kind does not declare.
+
+    Read from the kind's capability declaration (``gallery-kind-card-capabilities``)
+    before any validation, lock, or record read, so a refusal never writes. A
+    kind declared without any gallery is left to the writer's own established
+    no-gallery refusal, keeping that diagnostic unchanged. The message text is
+    the stable fragment the management adapters translate into
+    ``face_rect_unsupported`` / ``stage_unsupported``.
+    """
+    capability = gallery_kinds.capabilities_for(subject.kind.value)
+    if not capability.has_gallery:
+        return
+    if face_rect and not capability.supports_face_rect:
+        raise GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no face rectangle support"
+        )
+    if stage and not capability.supports_stage:
+        raise GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no stage support"
+        )
+
+
 def set_official_geometry(
     subject: ArtSubject,
     identity: str,
@@ -1005,11 +1030,16 @@ def set_official_geometry(
     The two components are independently nullable and stored verbatim after
     validation: the caller that knows the catalog image's decoded size checks
     the rectangle's squareness before calling (the management adapter does),
-    because this writer knows no image. Both ``None`` is a typed refusal — the
+    because this writer knows no image. A non-``None`` component the kind's
+    declaration does not admit is refused before anything else. Both ``None``
+    is a typed refusal — the
     removal of an override is :func:`clear_official_geometry`. A NEW identity
     beyond the bounded map's ceiling is refused rather than evicting another
     identity's adjustment. Files are never touched.
     """
+    _refuse_undeclared_geometry(
+        subject, face_rect=face_rect is not None, stage=stage is not None
+    )
     validated_identity = validate_official_identity(identity)
     stored: dict = {}
     if face_rect is not None:
@@ -1154,7 +1184,12 @@ def _update_card_field(subject: ArtSubject, image_id: str, field: str, value) ->
 
 
 def set_stage(subject: ArtSubject, image_id: str, stage: object) -> dict:
-    """Replace one card's whole presentation triple through the sole writer."""
+    """Replace one card's whole presentation triple through the sole writer.
+
+    A kind whose declaration admits no stage transform is refused before any
+    validation or record read.
+    """
+    _refuse_undeclared_geometry(subject, stage=True)
     validated = validate_stage(stage)
     with gallery_lock:
         updated = _update_card_field(subject, image_id, "stage", validated)
@@ -1175,8 +1210,10 @@ def update_card_face_rect(subject: ArtSubject, image_id: str, face_rect) -> dict
     missing entry match is the ``remove_card`` miss form — reported once by
     the shared writer's tolerant locate, so this pre-check stays silent —
     and one ``gallery_card_updated`` facade event closes a successful update.
-    Returns the updated stored card.
+    Returns the updated stored card. A kind whose declaration admits no face
+    rectangle is refused before any record read.
     """
+    _refuse_undeclared_geometry(subject, face_rect=True)
     with gallery_lock:
         record = record_for(subject)
         if record is None:

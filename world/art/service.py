@@ -600,9 +600,13 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
             f"subject kind {subject.kind.value!r} declares no binding support; "
             "a binding argument is rejected"
         )
-    # The face rectangle is shared gallery-card metadata, not a kind
-    # capability: a supplied rect is validated for every gallery kind, and
-    # ``None`` keeps the shared default downstream.
+    # A supplied face rectangle is accepted only where the kind declares
+    # face-rectangle support (the same text the sole writer raises), and is
+    # then validated; ``None`` keeps the shared default downstream.
+    if face_rect is not None and not capability.supports_face_rect:
+        raise gallery_api.GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no face rectangle support"
+        )
     if face_rect is not None:
         planned_image_size = {
             "width": int(settings.ART_SD_PORTRAIT_WIDTH),
