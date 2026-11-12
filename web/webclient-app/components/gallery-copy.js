@@ -7,13 +7,15 @@ export const GALLERY_FIELDS = [
   { id: "accessories", label: "飾品", note: "使用目前裝備的飾品", glyph: "◇" },
 ];
 export const GALLERY_SLOTS = GALLERY_FIELDS.slice(1);
-export const GALLERY_FILTERS = [
-  { id: "all", label: "全部" },
-  { id: "defaults", label: "預設" },
-  { id: "bound", label: "已綁定" },
-  { id: "pending", label: "生成中" },
-  { id: "failed", label: "失敗" },
-];
+// The client labels of the committed category keys (the payload carries the
+// keys, counts, enabled flags and disabled reasons; never these labels).
+export const GALLERY_CATEGORY_LABELS = Object.freeze({
+  mine: "我的角色",
+  party: "隊友",
+  people: "人物",
+  monster: "魔物",
+  scene: "背景",
+});
 
 // The official-entry chrome (change official-art-personalization): client
 // vocabulary only. Every FACT — identity, URL, rectangle, and both markers —

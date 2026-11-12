@@ -1,13 +1,20 @@
 import { h, ref, toRaw } from "vue";
 import GalleryPanel from "../../components/GalleryPanel.vue";
 import OverlayHost from "../../components/OverlayHost.vue";
-import { GALLERY_EMPTY, GALLERY_MONSTER, GALLERY_SAMPLE, galleryStoryModel } from "../gallery-fixtures.js";
+import {
+  GALLERY_V4_EMPTY,
+  GALLERY_V4_MINE,
+  GALLERY_V4_MINE_BLANK,
+  GALLERY_V4_MONSTER,
+  GALLERY_V4_PARTY,
+  galleryStoryModel,
+} from "../gallery-fixtures-v4.js";
 
 export default { title: "Data/GalleryPanel", component: GalleryPanel };
 export const Populated = { args: { model: galleryStoryModel() } };
-export const Empty = { args: { model: galleryStoryModel(GALLERY_EMPTY) } };
-export const Monster = { args: { model: galleryStoryModel(GALLERY_MONSTER) } };
-export const Unavailable = { args: { model: { schema_version: 3, available: false, reason: { code: "gallery_unavailable", message: "目前無法讀取肖像圖庫。" } } } };
+export const Empty = { args: { model: galleryStoryModel(GALLERY_V4_MINE_BLANK) } };
+export const Monster = { args: { model: galleryStoryModel(GALLERY_V4_MONSTER) } };
+export const Unavailable = { args: { model: { schema_version: 4, available: false, reason: { code: "gallery_unavailable", message: "目前無法讀取肖像圖庫。" } } } };
 export const Locked = { args: { model: galleryStoryModel(), disabled: true } };
 
 // The two empty-guidance frames the storyboard publishes explicitly: three
@@ -15,7 +22,9 @@ export const Locked = { args: { model: galleryStoryModel(), disabled: true } };
 // no card rows at all. Both reuse the committed fixtures and route through
 // galleryStoryModel, so the offline build serves committed local artwork and
 // needs no game, AI, or image service.
-const OFFICIAL_ONLY = { ...GALLERY_EMPTY, official_entries: GALLERY_SAMPLE.official_entries };
+const OFFICIAL_ONLY = { ...GALLERY_V4_MINE_BLANK, official_entries: GALLERY_V4_MINE.official_entries };
+// The committed panel the story server publishes for each category.
+const BY_CATEGORY = { mine: GALLERY_V4_MINE, party: GALLERY_V4_PARTY, monster: GALLERY_V4_MONSTER };
 
 // Explicit fixture publications, not a second runtime service. The operator
 // chooses success/rejection so every state is deterministic and inspectable.
@@ -44,12 +53,18 @@ export const Storyboard = {
         const next = structuredClone(toRaw(model.value));
         const { action, payload } = request;
         if (success) {
-          if (action === "gallery.subject.select") {
-            model.value = galleryStoryModel(payload.subject_key.startsWith("portrait:monster:") ? GALLERY_MONSTER : GALLERY_EMPTY);
-            model.value.selected = payload.subject_key;
+          if (action === "gallery.category.select") {
+            model.value = galleryStoryModel(BY_CATEGORY[payload.category] ?? { ...GALLERY_V4_EMPTY, category: payload.category });
+          } else if (action === "gallery.subject.select") {
+            // Another listed subject of the same category: the story server
+            // publishes it with no artwork yet.
+            const base = BY_CATEGORY[next.category] ?? GALLERY_V4_MINE;
+            model.value = galleryStoryModel(payload.subject_key === base.selected ? base : {
+              ...base, selected: payload.subject_key, cards: [], official_entries: [], binding_warnings: [], error_state: null,
+            });
           } else {
             if (action === "gallery.generate") {
-              const pending = structuredClone(GALLERY_SAMPLE.cards[6]);
+              const pending = structuredClone(GALLERY_V4_MINE.cards.find((row) => row.status === "pending"));
               next.cards = next.cards.filter((row) => row.status !== "pending");
               pending.created_at = 1700000900;
               next.cards.unshift(pending);
@@ -71,13 +86,6 @@ export const Storyboard = {
               row.binding_present = true;
               log.value = "展示用綁定已提交；條件由後續伺服器資料提供。";
             }
-            // Explicit story-server counts; never production renderer logic.
-            next.filters = {
-              all: next.cards.length, defaults: next.cards.filter((row) => row.is_default).length,
-              bound: next.cards.filter((row) => row.binding_present).length,
-              pending: next.cards.filter((row) => row.status === "pending").length,
-              failed: next.cards.filter((row) => row.status === "failed").length,
-            };
             next.binding_warnings = next.binding_warnings.filter((warning) => next.cards.some((row) => row.image_id === warning.image_id));
             model.value = next;
           }
@@ -104,7 +112,7 @@ export const Storyboard = {
           h("button", { disabled: !waiting.value, onClick: () => publish(false) }, "發布拒絕"),
           h("button", { onClick: () => { model.value = galleryStoryModel(); revision.value++; } }, "發布初始圖庫"),
           h("button", { onClick: () => { model.value = galleryStoryModel(OFFICIAL_ONLY); revision.value++; } }, "發布官方三列"),
-          h("button", { onClick: () => { model.value = galleryStoryModel(GALLERY_EMPTY); revision.value++; } }, "發布無官方空圖庫"),
+          h("button", { onClick: () => { model.value = galleryStoryModel(GALLERY_V4_MINE_BLANK); revision.value++; } }, "發布無官方空圖庫"),
           h("span", { role: "status" }, log.value),
           h("details", [h("summary", "檢視操作意圖"), h("pre", { style: "position:absolute;top:50px;right:0;background:#111;padding:16px;max-width:480px;max-height:200px;overflow:auto" }, JSON.stringify(last.value, null, 2))]),
         ]),

@@ -1,5 +1,5 @@
 import ArtworkPreview from "../../components/ArtworkPreview.vue";
-import { galleryStoryModel } from "../gallery-fixtures.js";
+import { galleryStoryModel } from "../gallery-fixtures-v4.js";
 
 // ArtworkPreview is the shared descriptor position: one canonical descriptor in,
 // the exact original or the subject's silhouette out. The story model remaps the

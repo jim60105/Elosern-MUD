@@ -90,8 +90,8 @@ def _art_portrait_catalog_keys(payload: dict[str, Any]) -> set[str]:
 def _gallery_subject_keys(payload: dict[str, Any]) -> set[str]:
     """Return the subject keys the rendered gallery payload matches.
 
-    Per D2, gallery matches on rendered ``selected`` only, not every rail
-    ``subjects`` entry.
+    Per D2, gallery matches on rendered ``selected`` only (null when the
+    selected category lists no subject), never on the listed category tiles.
     """
     selected = payload.get("selected")
     if isinstance(selected, str) and selected:

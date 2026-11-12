@@ -22,7 +22,7 @@ from web.webclient.presentation.gallery import validate_gallery_subject_key
 from web.webclient.presentation.gallery_categories import CATEGORY_KEYS
 from web.webclient.presentation.gallery_selection import (
     select_gallery_category,
-    select_gallery_subject,
+    select_gallery_subject_v4,
 )
 from world.art import gallery as gallery_api
 from world.art.gallery_kinds import capabilities_for
@@ -292,7 +292,8 @@ def _context(action_id, payload):
 
 
 def _gallery_subject_select_adapter(actor, payload, session=None):
-    result = dict(select_gallery_subject(session, actor, payload["subject_key"]))
+    # Copy: a refusal returns the shared module-level result constant.
+    result = dict(select_gallery_subject_v4(session, actor, payload["subject_key"]))
     result["affected_panels"] = AFFECTED_GALLERY_PANELS
     context = _context("gallery.subject.select", payload)
     if result["outcome"] == "success":

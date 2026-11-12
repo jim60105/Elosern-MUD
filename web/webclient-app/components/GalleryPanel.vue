@@ -7,7 +7,7 @@ import GalleryFaceRectModal from "./GalleryFaceRectModal.vue";
 import GalleryStageTransformModal from "./GalleryStageTransformModal.vue";
 import ArtworkPreview from "./ArtworkPreview.vue";
 import {
-  GALLERY_FILTERS,
+  GALLERY_CATEGORY_LABELS,
   GALLERY_OFFICIAL_CHIPS,
   GALLERY_OFFICIAL_LABEL,
   galleryCardName,
@@ -27,8 +27,6 @@ const props = defineProps({
 });
 const emit = defineEmits(["character", "log"]);
 const root = ref(null);
-const filter = ref("all");
-const layout = ref("grid");
 const selected = ref(null);
 const selectedOfficial = ref(null);
 const editor = ref(null);
@@ -48,23 +46,22 @@ onBeforeUnmount(() => clearInterval(clock));
 const available = computed(() => props.model?.available === true);
 const locked = computed(() => props.disabled || !available.value);
 const cards = computed(() => available.value ? props.model.cards || [] : []);
+// The committed categories and the selected category's listed subjects, in
+// payload order: a flat run across every expanded group, each group's
+// committed label (when it has one) heading its own subjects.
+const categories = computed(() => available.value ? props.model.categories || [] : []);
+const groups = computed(() => available.value ? (props.model.groups || []).filter((group) => group.subjects.length) : []);
+const hasSubject = computed(() => available.value && props.model.selected != null);
 const selectedCard = computed(() => cards.value.find((row) => row.image_id === selected.value) || null);
 // The committed official read model of the selected subject: read-only,
-// selectable rows that are never cards and never counted by the filter tabs.
+// selectable rows that are never cards and never listed with them.
 const officialEntries = computed(() => available.value ? props.model.official_entries || [] : []);
 const selectedEntry = computed(() => officialEntries.value.find((row) => row.identity === selectedOfficial.value) || null);
 const cardDates = computed(() => new Map(cards.value.map((card) => [card.image_id, galleryDate(card.created_at, now.value)])));
-const visibleCards = computed(() => cards.value.filter((card) => {
-  if (filter.value === "all") return true;
-  if (filter.value === "defaults") return card.is_default;
-  if (filter.value === "bound") return card.binding_present;
-  return card.status === filter.value;
-}));
 watch([() => props.model?.selected, available], () => {
   closeEditor();
   selected.value = cards.value[0]?.image_id ?? null;
   selectedOfficial.value = null;
-  filter.value = "all";
 }, { immediate: true });
 watch(cards, () => {
   if (!selectedCard.value) {
@@ -95,7 +92,7 @@ watch(() => [props.result, props.revision], () => {
   }
 });
 function openEditor(name) {
-  if (locked.value || pending.value || (name !== "generate" && selectedCard.value?.status !== "card")) return;
+  if (locked.value || pending.value || !hasSubject.value || (name !== "generate" && selectedCard.value?.status !== "card")) return;
   opener = document.activeElement;
   rejected.value = false;
   entryEditor.value = null;
@@ -170,11 +167,17 @@ function submitOfficialGeometry(component, value) {
   }
   sendOfficial("gallery.official.geometry.set", { [component]: value }, component === "face_rect" ? "face" : "stage");
 }
+// Category and subject selection carry exactly their committed key; every
+// other action names the committed selected subject (and, for a card action,
+// the selected card).
+const SELECTION_ACTIONS = ["gallery.category.select", "gallery.subject.select"];
 function send(action, extra = {}) {
   if (locked.value || pending.value || !props.dispatch) return;
-  const isCard = !["gallery.generate", "gallery.subject.select"].includes(action);
+  const isSelection = SELECTION_ACTIONS.includes(action);
+  if (!isSelection && !hasSubject.value) return;
+  const isCard = !isSelection && action !== "gallery.generate";
   if (isCard && selectedCard.value?.status !== "card") return;
-  const payload = { subject_key: props.model.selected, ...extra };
+  const payload = isSelection ? { ...extra } : { subject_key: props.model.selected, ...extra };
   if (isCard) payload.image_id = selectedCard.value.image_id;
   const id = props.dispatch(action, payload);
   if (id) {
@@ -182,8 +185,16 @@ function send(action, extra = {}) {
     pending.value = { id, editor: editor.value };
   }
 }
+// A disabled category stays focusable so its committed reason is announced,
+// but it never dispatches; neither does the category already shown. The
+// surface keeps rendering the committed panel until the next one arrives.
+function selectCategory(category) {
+  if (!category.enabled || category.key === props.model.category) return;
+  send("gallery.category.select", { category: category.key });
+}
 function selectSubject(subject) {
-  if (!locked.value) send("gallery.subject.select", { subject_key: subject.subject_key });
+  if (subject.subject_key === props.model.selected) return;
+  send("gallery.subject.select", { subject_key: subject.subject_key });
 }
 </script>
 
@@ -197,23 +208,37 @@ function selectSubject(subject) {
              primary action. -->
         <div class="gallery-panel__heading">
           <span class="gallery-muted">依裝備狀態管理切換，或手動指定預設圖。</span>
-          <button class="gallery-primary" :disabled="locked" @click="openEditor('generate')">生成新圖</button>
+          <button class="gallery-primary" :disabled="locked || !hasSubject" @click="openEditor('generate')">生成新圖</button>
         </div>
-        <nav class="gallery-panel__subjects" aria-label="肖像圖庫角色">
-          <button v-for="subject in model.subjects" :key="subject.subject_key" :aria-pressed="subject.subject_key === model.selected" :disabled="locked" @click="selectSubject(subject)">{{ subject.display_name }}</button>
-        </nav>
-        <div class="gallery-panel__toolbar">
-          <div class="gallery-panel__filters" role="group" aria-label="肖像篩選">
-            <button v-for="tab in GALLERY_FILTERS" :key="tab.id" :aria-pressed="filter === tab.id" @click="filter = tab.id">{{ tab.label }}<template v-if="model.filters?.[tab.id] !== undefined">（{{ model.filters[tab.id] }}）</template></button>
-          </div>
-          <span class="gallery-muted">最新優先</span>
-          <div class="gallery-panel__view" role="group" aria-label="顯示方式">
-            <button aria-label="網格檢視" :aria-pressed="layout === 'grid'" @click="layout = 'grid'">▦</button>
-            <button aria-label="清單檢視" :aria-pressed="layout === 'list'" @click="layout = 'list'">☷</button>
+        <!-- The committed categories: one control each, in payload order. A
+             disabled category is aria-disabled (still focusable) and points at
+             its committed reason; the count is the committed subject count. -->
+        <div class="gallery-panel__categories" role="group" aria-label="圖庫分類">
+          <button v-for="category in categories" :key="category.key" type="button" class="gallery-category"
+            :class="{ 'gallery-category--disabled': !category.enabled }"
+            :data-testid="`gallery-category-${category.key}`"
+            :aria-pressed="category.key === model.category"
+            :aria-disabled="category.enabled && !locked ? null : 'true'"
+            :aria-describedby="category.enabled ? null : `gallery-category-reason-${category.key}`"
+            :title="category.enabled ? null : category.reason"
+            @click="selectCategory(category)">
+            <span class="gallery-category__label">{{ GALLERY_CATEGORY_LABELS[category.key] ?? category.key }}</span>
+            <span class="gallery-category__count">{{ category.count }}</span>
+            <span v-if="!category.enabled" :id="`gallery-category-reason-${category.key}`" class="gallery-visually-hidden">{{ category.reason }}</span>
+          </button>
+        </div>
+        <!-- The selected category's listed subjects, committed order. -->
+        <div v-if="groups.length" class="gallery-panel__subjects">
+          <div v-for="group in groups" :key="group.key" class="gallery-subject-group" role="group" :aria-label="group.label ?? GALLERY_CATEGORY_LABELS[model.category] ?? model.category">
+            <span v-if="group.label" class="gallery-subject-group__label" aria-hidden="true">{{ group.label }}</span>
+            <button v-for="subject in group.subjects" :key="subject.subject_key" type="button" class="gallery-subject"
+              data-testid="gallery-subject" :data-subject-key="subject.subject_key"
+              :aria-pressed="subject.subject_key === model.selected" :disabled="locked"
+              @click="selectSubject(subject)">{{ subject.display_name }}</button>
           </div>
         </div>
-        <div class="gallery-panel__cards" :class="{ 'gallery-panel__cards--list': layout === 'list' }">
-          <button v-for="card in visibleCards" :key="card.image_id" class="gallery-card" :class="`gallery-card--${card.status}`" :aria-pressed="selected === card.image_id" :data-image-id="card.image_id" @click="selectCard(card.image_id)">
+        <div class="gallery-panel__cards">
+          <button v-for="card in cards" :key="card.image_id" class="gallery-card" :class="`gallery-card--${card.status}`" :aria-pressed="selected === card.image_id" :data-image-id="card.image_id" @click="selectCard(card.image_id)">
             <div class="gallery-card__visual">
               <ArtworkPreview v-if="card.status === 'card'" class="gallery-card__artwork" :artwork="card.artwork" :panel="model" :view-subject-id="card.image_id" :alt="galleryCardName(card)" />
               <span v-else-if="card.status === 'pending'" class="gallery-card__spinner" aria-hidden="true"></span>
@@ -229,12 +254,11 @@ function selectSubject(subject) {
         </div>
         <!-- The paragraph may only claim missing artwork when the committed
              read model has no official rows either: official entries are this
-             subject's available artwork regardless of which card subset the
-             selected filter shows, and they render separately below. -->
-        <p v-if="!visibleCards.length && !officialEntries.length" class="gallery-panel__empty">此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。</p>
+             subject's available artwork and they render separately below. -->
+        <p v-if="!cards.length && !officialEntries.length" class="gallery-panel__empty">此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。</p>
         <!-- The official read model: shared read-only artwork of this
              subject's content reference. Selectable and previewable, never a
-             card, and never counted by the filter tabs above; the operations
+             card, and never listed with the cards above; the operations
              the backend refuses for an official entry are not rendered. -->
         <section v-if="officialEntries.length" class="gallery-official" aria-label="官方圖片">
           <h4 class="gallery-muted">官方圖片（唯讀，共 {{ officialEntries.length }} 張）</h4>
@@ -251,7 +275,7 @@ function selectSubject(subject) {
         </section>
         <p v-if="rejected && !editor && !entryEditor" class="gallery-feedback" role="status">操作未完成。<button @click="emit('log')">查看伺服器訊息</button></p>
       </div>
-      <GalleryDetailRail :panel="model" :card="selectedCard" :entry="selectedEntry" :now="now" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
+      <GalleryDetailRail :panel="model" :card="selectedCard" :entry="selectedEntry" :now="now" :capabilities="model.capabilities ?? {}" :warnings="model.binding_warnings" :disabled="locked || !hasSubject"
         @default="send('gallery.default.set')" @delete="send('gallery.card.delete')"
         @generate="openEditor('generate')" @binding="openEditor('binding')" @face="openEditor('face')" @stage="openEditor('stage')"
         @official-select="sendOfficial('gallery.official.select')" @official-clear="sendOfficial('gallery.official.clear_selection')"
@@ -281,14 +305,22 @@ function selectSubject(subject) {
 .gallery-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: calc(18px * var(--ui-scale)); margin-bottom: calc(18px * var(--ui-scale)); }
 .gallery-panel__heading .gallery-muted { font-size: var(--text-md); }
 .gallery-panel__heading > button { min-width: calc(140px * var(--ui-scale)); min-height: calc(44px * var(--ui-scale)); font-size: var(--text-lg); letter-spacing: .06em; }
-.gallery-panel__subjects { display: flex; flex-wrap: wrap; gap: calc(7px * var(--ui-scale)); margin: 0 0 calc(18px * var(--ui-scale)); }
-.gallery-panel__subjects button { padding: calc(5px * var(--ui-scale)) calc(11px * var(--ui-scale)); font-size: var(--text-xs); border-radius: var(--radius); }
-.gallery-panel__toolbar { display: flex; align-items: center; gap: calc(12px * var(--ui-scale)); margin-bottom: calc(14px * var(--ui-scale)); flex-wrap: wrap; }
-.gallery-panel__filters { display: flex; flex-wrap: wrap; flex: 1; }
-.gallery-panel__filters button { padding: calc(8px * var(--ui-scale)) calc(10px * var(--ui-scale)); font-size: var(--text-xs); border-radius: 0; }
 .gallery-panel button[aria-pressed="true"] { border-color: #d2b56e; color: #ecd596; background-color: #6d522526; box-shadow: inset 0 0 0 1px #d2b56e25; }
-.gallery-panel__view { display: flex; }
-.gallery-panel__view button { padding: calc(3px * var(--ui-scale)) calc(9px * var(--ui-scale)); font-size: var(--text-xl); }
+/* Category row: one engraved tab strip under a hairline, the committed
+   category lifted in gold. */
+.gallery-panel__categories { display: flex; flex-wrap: wrap; gap: calc(6px * var(--ui-scale)); padding-bottom: calc(12px * var(--ui-scale)); margin-bottom: calc(14px * var(--ui-scale)); border-bottom: 1px solid #a5967738; }
+.gallery-panel .gallery-category { display: inline-flex; align-items: baseline; gap: calc(9px * var(--ui-scale)); min-height: calc(44px * var(--ui-scale)); padding: calc(8px * var(--ui-scale)) calc(16px * var(--ui-scale)); font-size: var(--text-md); letter-spacing: .08em; border-radius: var(--radius-sm); }
+.gallery-category__count { min-width: calc(24px * var(--ui-scale)); padding: 0 calc(6px * var(--ui-scale)); font-size: var(--text-xs); font-variant-numeric: tabular-nums lining-nums; text-align: center; color: var(--paper-500); border: 1px solid #a5967745; border-radius: calc(999px * var(--ui-scale)); }
+.gallery-panel .gallery-category[aria-pressed="true"] { background: linear-gradient(180deg, #6d52253a, #2a22140f); box-shadow: inset 0 -2px 0 #d2b56e, 0 0 calc(10px * var(--ui-scale)) #c6a96222; }
+.gallery-category[aria-pressed="true"] .gallery-category__count { color: #ecd596; border-color: #d2b56e88; }
+.gallery-panel .gallery-category--disabled { color: var(--paper-500); border-style: dashed; background: transparent; cursor: not-allowed; opacity: .7; }
+.gallery-panel .gallery-category--disabled:hover { border-color: #85818c65; color: var(--paper-500); }
+/* Subject row: the selected category's listed subjects as pills, each
+   committed group label heading its own run. */
+.gallery-panel__subjects { display: flex; flex-wrap: wrap; align-items: center; gap: calc(10px * var(--ui-scale)) calc(18px * var(--ui-scale)); margin: 0 0 calc(18px * var(--ui-scale)); }
+.gallery-subject-group { display: flex; flex-wrap: wrap; align-items: center; gap: calc(7px * var(--ui-scale)); }
+.gallery-subject-group__label { font-family: var(--f-display); font-size: var(--text-xs); letter-spacing: .12em; color: var(--gold-400); padding-right: calc(2px * var(--ui-scale)); }
+.gallery-panel .gallery-subject { padding: calc(6px * var(--ui-scale)) calc(14px * var(--ui-scale)); font-size: var(--text-sm); border-radius: calc(999px * var(--ui-scale)); }
 .gallery-panel__cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(15px * var(--ui-scale)); }
 .gallery-panel .gallery-card { display: flex; flex-direction: column; padding: calc(4px * var(--ui-scale)); min-width: 0; text-align: left; overflow: hidden; background: #14151c; border: 1px solid #6e6a665e; border-radius: var(--radius); }
 .gallery-panel .gallery-card[aria-pressed="true"] { box-shadow: 0 0 calc(12px * var(--ui-scale)) #c6a96240, inset 0 0 0 1px #d2b56e55; }
@@ -305,10 +337,6 @@ function selectSubject(subject) {
 .gallery-card--failed .gallery-card__visual { background: radial-gradient(ellipse at top, #40242c, #18151d); }
 .gallery-card--failed strong { color: #f29699; }
 .gallery-panel__empty { padding: calc(60px * var(--ui-scale)) calc(20px * var(--ui-scale)); text-align: center; color: var(--paper-500); border: 1px dashed #a5967755; }
-.gallery-panel__cards--list { grid-template-columns: 1fr; }
-.gallery-panel__cards--list .gallery-card { flex-direction: row; gap: calc(14px * var(--ui-scale)); }
-.gallery-panel__cards--list .gallery-card__visual { width: calc(100px * var(--ui-scale)); height: calc(100px * var(--ui-scale)); flex: none; }
-.gallery-panel__cards--list .gallery-card__caption { justify-content: center; }
 .gallery-official { margin-top: calc(22px * var(--ui-scale)); }
 .gallery-official h4 { margin-bottom: calc(9px * var(--ui-scale)); font-size: var(--text-sm); font-weight: 400; }
 .gallery-official__rows { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(15px * var(--ui-scale)); }
@@ -321,6 +349,6 @@ function selectSubject(subject) {
 .gallery-official__caption strong { font-size: var(--text-sm); font-weight: 500; }
 .gallery-official__identity { font-size: var(--text-xs); direction: rtl; text-align: left; }
 @keyframes gallery-spin { to { transform: rotate(360deg); } }
-@media (max-width: 1250px) { .gallery-panel__cards, .gallery-official__rows { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gallery-panel__cards--list { grid-template-columns: 1fr; } .gallery-panel { grid-template-columns: minmax(0, 1fr) calc(245px * var(--ui-scale)); } }
-@media (max-width: 850px) { .gallery-panel { grid-template-columns: 1fr; } .gallery-panel__cards, .gallery-official__rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gallery-panel__cards--list { grid-template-columns: 1fr; } }
+@media (max-width: 1250px) { .gallery-panel__cards, .gallery-official__rows { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gallery-panel { grid-template-columns: minmax(0, 1fr) calc(245px * var(--ui-scale)); } }
+@media (max-width: 850px) { .gallery-panel { grid-template-columns: 1fr; } .gallery-panel__cards, .gallery-official__rows { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

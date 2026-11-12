@@ -39,7 +39,12 @@ from web.webclient.presentation.coordinator import (
     attach_coordinator,
     read_world_clock_calendar,
 )
-from web.webclient.presentation.gallery_selection import GallerySelection
+from web.webclient.presentation.gallery_selection import (
+    GalleryViewSelection,
+    gallery_view_snapshot,
+    select_gallery_category,
+    select_gallery_subject_v4,
+)
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
 from world.art.queue import ensure, record_key, settle
@@ -47,12 +52,13 @@ from world.art.signals import asset_completed
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monster_visuals import get_monster_visual_registry
+from world.rules.lore_knowledge import record_species_sighting
 from world.rules.dialogue import open_or_refresh_dialogue
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 
 # Registered VISUAL species keys (never threat tiers), resolved at runtime
-# from the active visual registry. The bounded gallery rail lists the first
-# sorted keys, so these two are always selectable.
+# from the active visual registry. A test sights a species before the gallery's
+# monster category can list (and so select) it.
 _MONSTER_VISUAL_KEYS = tuple(sorted(get_monster_visual_registry()))
 _MONSTER_KEY_A = _MONSTER_VISUAL_KEYS[0]
 _MONSTER_KEY_B = _MONSTER_VISUAL_KEYS[1]
@@ -136,7 +142,7 @@ class ArtPushPureGateTests(unittest.TestCase):
         self.assertEqual(
             _gallery_subject_keys({
                 "selected": "portrait:character:hero",
-                "subjects": [{"subject_key": "portrait:character:other"}],
+                "groups": [{"subjects": [{"subject_key": "portrait:character:other"}]}],
             }),
             {"portrait:character:hero"},
         )
@@ -360,6 +366,26 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session.sent.clear()
         return session
 
+    def _own_player(self):
+        """Give the player an owning account: the gallery opens on "mine"."""
+        from evennia.utils.create import create_account
+
+        account = create_account("t_gallery_owner", "tg@example.test", "testpassword", typeclass=Account)
+        account.characters.add(self.player)
+        self.player.account = account
+        return account
+
+    def _view(self, session, category, subject_key):
+        """Store the session's gallery view on one category's subject.
+
+        A monster subject is sighted first so the monster category lists it.
+        """
+        if category == "monster":
+            record_species_sighting(self.player, subject_key.rsplit(":", 1)[1])
+        session.ndb.gallery_view = GalleryViewSelection(
+            self.player.pk, category, ((category, subject_key),)
+        )
+
     def _complete_scene(self):
         ensure(self.subject, "desc")
         from world.art.queue import claim
@@ -473,9 +499,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         other_key = ArtSubject(ArtSubjectKind.CHARACTER, f"ally_{self.player.pk}").full()
         # Session selects char_subject
         session = self._make_session()
-        session.ndb.gallery_selection = GallerySelection(
-            self.player.pk, session.ndb.elosern_coordinator.epoch, char_key
-        )
+        self._view(session, "mine", char_key)
 
         # Queue a gallery job
         image_id = request_gallery_image(other_char, fields=[], custom_prompt="")
@@ -497,30 +521,15 @@ class ArtPushPresenterTests(EvenniaTestCase):
             image_size={"width": 1000, "height": 1000},
         )
 
-        # The rail spends its budget on the visual-species prefix first, so a
-        # shipped roster larger than the rail would push every character out
-        # and this character-gallery publication could never be observed. The
-        # rail's own truncation rule is a different contract; here the two
-        # species this module uses keep the character selectable without
-        # depending on how many species ship today.
-        visual_registry = {
-            key: get_monster_visual_registry()[key]
-            for key in (_MONSTER_KEY_A, _MONSTER_KEY_B)
-        }
         with (
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
-            patch(
-                "web.webclient.presentation.gallery.get_monster_visual_registry",
-                return_value=visual_registry,
-            ),
         ):
-            # Selected is also set to other_key so gallery matches, art catalog references it, and make account own other_char too so roster matches!
+            # The account owns other_char too, so "mine" lists it (gallery
+            # matches once selected) and the roster references it.
             account.characters.add(other_char)
             other_char.account = account
-            session.ndb.gallery_selection = GallerySelection(
-                self.player.pk, session.ndb.elosern_coordinator.epoch, other_key
-            )
+            self._view(session, "mine", other_key)
             on_asset_completed(subject_key=other_key)
 
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
@@ -570,10 +579,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
             parents=True, exist_ok=True
         )
 
+        self._own_player()
         session = self._make_session()
-        session.ndb.gallery_selection = GallerySelection(
-            self.player.pk, session.ndb.elosern_coordinator.epoch, monster_key
-        )
+        self._view(session, "monster", monster_key)
 
         image_id = request_gallery_image(monster_sub, fields=[], custom_prompt="")
         claimed = claim(10)
@@ -674,9 +682,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
             checkpoint="sd_v1-5",
             image_size={"width": 1000, "height": 1000},
         )
-        session.ndb.gallery_selection = GallerySelection(
-            self.player.pk, coordinator.epoch, char_key
-        )
+        self._view(session, "mine", char_key)
         # Patch art presenter in registry to return unavailable
         orig_render = session.ndb.elosern_coordinator.registry.render
         def fake_render(name, ctx):
@@ -970,14 +976,20 @@ class ArtPushPresenterTests(EvenniaTestCase):
         # Use two registered visual species keys
         sub_a = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_A)
         sub_b = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_B)
+        self._own_player()
+        record_species_sighting(self.player, _MONSTER_KEY_A)
+        record_species_sighting(self.player, _MONSTER_KEY_B)
         session = self._make_session()
-        # Select A then B
-        from web.webclient.presentation.gallery_selection import select_gallery_subject, gallery_selection_snapshot
-        res_a = select_gallery_subject(session, self.player, sub_a.full())
-        self.assertEqual(res_a["outcome"], "success")
-        res_b = select_gallery_subject(session, self.player, sub_b.full())
-        self.assertEqual(res_b["outcome"], "success")
-        self.assertEqual(gallery_selection_snapshot(session, self.player), sub_b.full())
+        # Select A then B through the real selection store.
+        with patch("web.webclient.presentation.ingress.is_webclient", return_value=True):
+            self.assertEqual(select_gallery_category(session, self.player, "monster")["outcome"], "success")
+            res_a = select_gallery_subject_v4(session, self.player, sub_a.full())
+            self.assertEqual(res_a["outcome"], "success")
+            res_b = select_gallery_subject_v4(session, self.player, sub_b.full())
+            self.assertEqual(res_b["outcome"], "success")
+        self.assertEqual(
+            gallery_view_snapshot(session, self.player).subjects, (("monster", sub_b.full()),)
+        )
 
         # A completes while B is selected
         session.sent.clear()
@@ -996,10 +1008,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
             parents=True, exist_ok=True
         )
 
+        self._own_player()
         session = self._make_session()
-        session.ndb.gallery_selection = GallerySelection(
-            self.player.pk, session.ndb.elosern_coordinator.epoch, monster_key
-        )
+        self._view(session, "monster", monster_key)
 
         image_id = request_gallery_image(monster_sub, fields=[], custom_prompt="")
         claimed = claim(10)

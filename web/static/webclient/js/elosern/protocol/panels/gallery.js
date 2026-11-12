@@ -1,6 +1,8 @@
 "use strict";
 
-// Exact gallery v3 mirror (change unified-gallery-image-contract). Display
+// Exact gallery mirror, registered at version 4 (change gallery-v4-cutover):
+// validateGalleryPanel is the category-scoped v4 form; validateGalleryPanelV3
+// is the dead rail form kept until gallery-v3-removal. Display
 // labels and matching facts are server-owned; every image fact is a canonical
 // artwork descriptor validated by ../artwork.js. The v2 flat row fields
 // (url/face_rect/stage) are deliberately absent: this validator rejects them,
@@ -27,7 +29,9 @@ var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
 
 // The mirrored gallery bounds. The runtime media URL ceiling is READ from the
 // canonical descriptor vocabulary's origin table so the two can never drift.
-var GALLERY_SCHEMA_VERSION = 3;
+var GALLERY_SCHEMA_VERSION = 4;
+// The dead version-3 validator's own discriminator (gallery-v3-removal).
+var V3_SCHEMA_VERSION = 3;
 var GALLERY_MAX_SUBJECTS = 24;
 var GALLERY_MAX_LABEL = 128;
 var GALLERY_MAX_NAME = 64;
@@ -66,10 +70,7 @@ var GALLERY_FALLBACK_EXTENSION = ".webp";
 var GALLERY_FALLBACK_KEYS = ["man", "woman", "boy", "girl", "elder", "monster_anon"];
 
 // Version 4 (change gallery-v4-validators), mirrored name for name from
-// web/webclient/presentation/gallery.py: one category at a time. Exported but
-// not registered — PANEL_ALLOWLIST keeps gallery at version 3 until the
-// cutover.
-var GALLERY_V4_SCHEMA_VERSION = 4;
+// web/webclient/presentation/gallery.py: one category at a time.
 var GALLERY_CATEGORY_KEYS = Object.freeze(["mine", "party", "people", "monster", "scene"]);
 var GALLERY_MAX_PANEL_SUBJECTS = 256;
 var GALLERY_MAX_GROUPS = 64;
@@ -450,13 +451,14 @@ function compareCodePoints(a, b) {
   return left.length - right.length;
 }
 
-function validateGalleryPanel(payload) {
+// Dead version-3 rail form: unregistered, deleted by gallery-v3-removal.
+function validateGalleryPanelV3(payload) {
   requireExactFields(payload, "gallery", [
     "schema_version", "available", "kind", "subjects", "selected", "filters",
     "cards", "official_entries", "equipment_summary", "capabilities",
     "binding_warnings", "error_state"
   ], []);
-  if (payload.schema_version !== GALLERY_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
+  if (payload.schema_version !== V3_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
     throw new Error("invalid gallery discriminator");
   }
   if (!Array.isArray(payload.subjects) || payload.subjects.length < 1 || payload.subjects.length > GALLERY_MAX_SUBJECTS) {
@@ -660,10 +662,10 @@ function validateGalleryV4Groups(groups) {
   return { listed: listed, totalCount: totalCount };
 }
 
-// Exact version-4 available form, mirror of gallery.py::validate_gallery_v4.
-function validateGalleryPanelV4(payload) {
+// Exact version-4 available form, mirror of gallery.py::validate_gallery.
+function validateGalleryPanel(payload) {
   requireExactFields(payload, "gallery", V4_PANEL_FIELDS, []);
-  if (payload.schema_version !== GALLERY_V4_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
+  if (payload.schema_version !== GALLERY_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
     throw new Error("invalid gallery discriminator");
   }
   var categories = validateGalleryV4Categories(payload.categories);
@@ -701,7 +703,7 @@ function isEmptyList(value) {
 
 module.exports = {
   validateGalleryPanel: validateGalleryPanel,
-  validateGalleryPanelV4: validateGalleryPanelV4,
+  validateGalleryPanelV3: validateGalleryPanelV3,
   validateGalleryActionPayload: validateGalleryActionPayload,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
   GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
@@ -718,7 +720,6 @@ module.exports = {
   GALLERY_CARD_FIELDS: GALLERY_CARD_FIELDS,
   GALLERY_RANK_ORIGINAL: GALLERY_RANK_ORIGINAL,
   GALLERY_RANK_ALPHA: GALLERY_RANK_ALPHA,
-  GALLERY_V4_SCHEMA_VERSION: GALLERY_V4_SCHEMA_VERSION,
   GALLERY_CATEGORY_KEYS: GALLERY_CATEGORY_KEYS,
   GALLERY_MAX_PANEL_SUBJECTS: GALLERY_MAX_PANEL_SUBJECTS,
   GALLERY_MAX_GROUPS: GALLERY_MAX_GROUPS,

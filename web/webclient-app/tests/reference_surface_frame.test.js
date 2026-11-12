@@ -15,7 +15,7 @@ import GalleryGenerateDrawer from "../components/GalleryGenerateDrawer.vue";
 import { glyphPath } from "../components/dock-icons.js";
 import { resetQuestDrawerMemory } from "../components/quest-drawer-memory.js";
 import { useElosernStore } from "../stores/elosern.js";
-import { GALLERY_SAMPLE } from "../stories/gallery-fixtures.js";
+import { GALLERY_V4_MINE as GALLERY_SAMPLE } from "../stories/gallery-fixtures-v4.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 describe("DrawerHeader", () => {

@@ -248,7 +248,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: A selected gallery refreshes without an art or roster match
 
 - **WHEN** a settled gallery job's subject equals a session's rendered selected gallery but is absent from its current art scene/catalog and roster portraits
-- **THEN** that session receives one newer update containing gallery and not art or roster, with settled card/error facts and recomputed filter counts
+- **THEN** that session receives one newer update containing gallery and not art or roster, with settled card/error facts
 
 #### Scenario: An off-room roster sibling refreshes without an art or gallery match
 
@@ -273,7 +273,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Failed gallery settlement removes the stale spinner truthfully
 
 - **WHEN** a selected subject's gallery job settles failed and emits its completion notification
-- **THEN** a newer gallery update removes that job's pending row, renders the canonical failed row and error state with recomputed counts, creates no card or default, and any qualifying art/roster values follow their existing resolver fallback behavior
+- **THEN** a newer gallery update removes that job's pending row, renders the canonical failed row and error state, creates no card or default, and any qualifying art/roster values follow their existing resolver fallback behavior
 
 #### Scenario: Per-session selections and failures stay isolated
 

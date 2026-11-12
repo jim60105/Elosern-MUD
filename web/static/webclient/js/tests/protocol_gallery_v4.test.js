@@ -1,10 +1,10 @@
 /*
  * gallery v4 validator gate (change gallery-v4-validators).
  *
- * The version-4 panel carries one category at a time. Its JS mirror
- * `validateGalleryPanelV4` is exported beside v3 but NOT registered:
- * PANEL_ALLOWLIST keeps gallery at version 3 until the cutover. The Python
- * mirror (web/webclient/presentation/gallery.py::validate_gallery_v4) is
+ * The version-4 panel carries one category at a time. Since
+ * gallery-v4-cutover its JS mirror `validateGalleryPanel` is the registered
+ * gallery validator (PANEL_ALLOWLIST.gallery === 4). The Python mirror
+ * (web/webclient/presentation/gallery.py::validate_gallery) is
  * asserted against the same case shapes by GalleryV4ParityTests in
  * web/webclient/presentation/tests/test_gallery_panel.py.
  */
@@ -141,20 +141,22 @@ function subjects(value, count) {
   value.categories[0].count = count;
 }
 
-const accepts = (value) => assert.doesNotThrow(() => Protocol.validateGalleryPanelV4(value));
-const rejects = (value) => assert.throws(() => Protocol.validateGalleryPanelV4(value));
+const accepts = (value) => assert.doesNotThrow(() => Protocol.validateGalleryPanel(value));
+const rejects = (value) => assert.throws(() => Protocol.validateGalleryPanel(value));
 
-test("v4 is exported beside v3 and not registered", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.gallery, 3);
-  assert.equal(Protocol.GALLERY_SCHEMA_VERSION, 3);
-  assert.equal(Protocol.GALLERY_V4_SCHEMA_VERSION, 4);
+test("v4 is the registered gallery version", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.gallery, 4);
+  assert.equal(Protocol.GALLERY_SCHEMA_VERSION, 4);
   assert.deepEqual([...Protocol.GALLERY_CATEGORY_KEYS], ["mine", "party", "people", "monster", "scene"]);
   assert.equal(Protocol.GALLERY_MAX_PANEL_SUBJECTS, 256);
   assert.ok(Object.isFrozen(Protocol.GALLERY_CATEGORY_KEYS));
   accepts(panel());
-  // Neither validator admits the other version.
-  assert.throws(() => Protocol.validateGalleryPanel(panel()));
+  // The version-3 rail shape is rejected outright: no dual-shape adapter.
   rejects(variant((p) => { p.schema_version = 3; }));
+  rejects(variant((p) => {
+    p.subjects = p.groups[0].subjects;
+    p.filters = { all: 1, defaults: 1, bound: 0, pending: 0, failed: 0 };
+  }));
 });
 
 test("the category list is closed, ordered, and names an enabled category", () => {

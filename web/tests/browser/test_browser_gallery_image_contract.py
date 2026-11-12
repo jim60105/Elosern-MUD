@@ -5,10 +5,11 @@ One real committed gallery selection: the seed appends the character's exact
 original card through the production writers, writes a real operator content
 directory under the journey's own ``ART_OFFICIAL_ROOT`` before startup (so the
 official rows come from the real catalog snapshot), and enqueues one real
-pending request plus one real recorded failure on a monster subject.
+pending request plus one real recorded failure on a monster subject the puppet
+has sighted (so the version-4 monster category lists it).
 
 The journey then intercepts *only* the selected original's own media URL after
-the server resolved and serialized the committed v3 panel and answers it with
+the server resolved and serialized the committed panel and answers it with
 invalid bytes, and asserts the contract's boundary: the subject's silhouette
 alpha mask replaces the broken figure, the reached failure keeps a persistent
 keyboard-accessible marker, the card's identity/status/default and the job state
@@ -24,9 +25,10 @@ from urllib.parse import urlsplit
 
 from tools.spec_traceability import covers_requirement
 
-from .browser_base import BrowserAcceptanceTest
+from .browser_base import DEFAULT_VIEWPORT, BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
+    login_and_open,
     press_control,
     sent_action_count,
     store_state,
@@ -43,6 +45,12 @@ _DETAIL = '[data-testid="gallery-detail"]'
 _MARKER = '[data-testid="artwork-failure"]'
 _ALPHA = '[data-testid="artwork-alpha"]'
 _FACE_BUTTON = f"{_DETAIL} button:has-text(\"臉部框選\")"
+_MONSTER_CATEGORY = f'{_GALLERY} [data-testid="gallery-category-monster"]'
+
+
+def _subject(subject_key: str) -> str:
+    """The committed subject button of one exact subject key."""
+    return f'{_GALLERY} [data-testid="gallery-subject"][data-subject-key="{subject_key}"]'
 
 
 def _card(card_id: str) -> str:
@@ -119,9 +127,17 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
     def _cards(self, page) -> list[dict]:
         return store_state(page)["panels"]["gallery"]["cards"]
 
+    def _wait_for_panel(self, page, ready) -> dict:
+        """Poll the committed gallery panel until ``ready(panel)`` holds."""
+        for _ in range(60):
+            panel = store_state(page)["panels"]["gallery"]
+            if ready(panel):
+                return panel
+            page.wait_for_timeout(500)
+        self.fail(f"the committed gallery never reached the expected state: {panel}")
+
     @covers_requirement(
         "art-gallery-resolution::gallery-urls-are-built-only-from-validated-card-identities",
-        "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts",
         "webclient-gallery-ui::gallery-previews-retain-exact-image-identity-and-reached-failures",
     )
     def test_original_404_falls_back_with_local_failure(self) -> None:
@@ -129,13 +145,19 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
             SEEDED_ORIGINAL_IMAGE_ID,
         )
 
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
+        # The interception is installed before login: the live character's
+        # roster and stage portrait name the same exact original, and a load
+        # there before the route existed would serve the gallery card from the
+        # browser cache instead of the intercepted request.
+        page = self.new_page(DEFAULT_VIEWPORT, "off")
         self._fail_original_media(page)
+        login_and_open(page, self.webclient_url, self.base_url)
+        install_outbound_recorder(page)
         self._open_gallery(page)
 
-        # The committed selection is the seed's exact original card, and its
-        # descriptor is the v3 canonical shape: one rank-10 runtime candidate
+        # The gallery opens on "mine" with the live character selected; its
+        # committed card is the seed's exact original, and its descriptor is
+        # the canonical shape: one rank-10 runtime candidate
         # naming that exact image plus the subject's silhouette terminal.
         page.wait_for_selector(_card(SEEDED_ORIGINAL_IMAGE_ID), timeout=30000)
         committed = next(
@@ -161,9 +183,11 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
         self.assertTrue(self._media_requests, "the original media URL was never requested")
         # Interception is counted by the canonical source resource's own path
         # (the browser reports the absolute request URL; the descriptor carries
-        # the same-origin route).
+        # the same-origin route). The live character's stage figure may request
+        # the same exact original too, so every intercepted request names that
+        # one resource and nothing else.
         self.assertEqual(
-            [urlsplit(url).path for url in self._media_requests], [candidate["url"]]
+            {urlsplit(url).path for url in self._media_requests}, {candidate["url"]}
         )
 
         # The reached failure keeps a persistent, keyboard-accessible marker
@@ -182,9 +206,11 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
         )
         self.assertEqual(after, committed)
         self.assertEqual(page.locator(_card(SEEDED_ORIGINAL_IMAGE_ID)).count(), 1)
+        panel = store_state(page)["panels"]["gallery"]
+        self.assertEqual(panel["category"], "mine")
         self.assertEqual(
-            store_state(page)["panels"]["gallery"]["filters"],
-            {"all": 1, "defaults": 1, "bound": 0, "pending": 0, "failed": 0},
+            [(row["image_id"], row["status"]) for row in panel["cards"]],
+            [(SEEDED_ORIGINAL_IMAGE_ID, "card")],
         )
         # The detail rail still presents that same exact image as the original.
         page.locator(_card(SEEDED_ORIGINAL_IMAGE_ID)).first.click()
@@ -206,6 +232,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel",
         "webclient-gallery-ui::official-entries-render-as-selectable-read-only-rows-with-personal-geometry-affordances",
+        "webclient-gallery-ui::the-gallery-surface-renders-committed-categories-subjects-and-rows",
     )
     def test_official_and_synthetic_rows_carry_their_own_truth(self) -> None:
         page = self.logged_in_page()
@@ -226,19 +253,25 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
         # The official row is committed presentation data, never a card.
         self.assertNotIn(row["identity"], [card["image_id"] for card in panel["cards"]])
 
-        # The monster subject carries the seeded in-flight request and recorded
-        # failure as truthful synthetic rows with no image at all. The subject
-        # rail is the real selection route: clicking it dispatches the ordinary
-        # `gallery.subject.select` action and the server re-publishes the panel.
-        monster = next(
-            subject for subject in panel["subjects"] if subject["kind"] == "portrait:monster"
+        # The sighted monster carries the seeded in-flight request and recorded
+        # failure as truthful synthetic rows with no image at all. The category
+        # row and the subject list are the real selection route: each click
+        # dispatches its ordinary action and the server re-publishes the panel.
+        page.locator(_MONSTER_CATEGORY).click()
+        monster_panel = self._wait_for_panel(page, lambda value: value["category"] == "monster")
+        monsters = [
+            subject for group in monster_panel["groups"] for subject in group["subjects"]
+            if subject["kind"] == "portrait:monster"
+        ]
+        self.assertTrue(monsters, "the sighted species is not listed in the monster category")
+        monster_key = monsters[0]["subject_key"]
+        page.locator(_subject(monster_key)).click()
+        self._wait_for_panel(
+            page, lambda value: value["selected"] == monster_key and value["cards"]
         )
-        page.get_by_role("button", name=monster["display_name"]).first.click()
-        for _ in range(60):
-            selected = store_state(page)["panels"]["gallery"]
-            if selected["selected"] == monster["subject_key"] and selected["cards"]:
-                break
-            page.wait_for_timeout(500)
+        self.assertEqual(
+            page.locator(_subject(monster_key)).get_attribute("aria-pressed"), "true"
+        )
         rows = self._cards(page)
         self.assertTrue(rows, "the monster subject published no synthetic rows")
         statuses = {row["status"] for row in rows}
@@ -252,6 +285,10 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
             self.assertEqual(row["artwork"]["generation_state"], row["status"])
             self.assertFalse(row["is_default"])
             self.assertEqual(row["chips"], [])
+            # The rendered row shows its committed state and no image element.
+            rendered = page.locator(_card(row["image_id"]))
+            self.assertEqual(rendered.count(), 1)
+            self.assertEqual(rendered.locator("img").count(), 0)
 
 
 if __name__ == "__main__":

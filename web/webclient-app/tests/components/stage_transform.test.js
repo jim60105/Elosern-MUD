@@ -3,7 +3,7 @@ import { mount } from "@vue/test-utils";
 import Modal from "../../components/GalleryStageTransformModal.vue";
 import ReferenceArtwork from "../../components/ReferenceArtwork.vue";
 import { clampStage, editStageField, moveStage } from "../../components/stage-transform-edit.js";
-import { galleryStoryModel } from "../../stories/gallery-fixtures.js";
+import { galleryStoryModel } from "../../stories/gallery-fixtures-v4.js";
 import {
   artworkDescriptor,
   artworkResource,
@@ -12,7 +12,7 @@ import {
 // One committed figure position: the canonical descriptor plus the committed
 // panel it is judged against. The stage placement lives in the presented
 // candidate resource's own geometry.
-const PANEL = { schema_version: 3, available: true };
+const PANEL = { schema_version: 4, available: true };
 function portraitDescriptor(stage) {
   return artworkDescriptor({
     subject_id: "portrait:character:1",

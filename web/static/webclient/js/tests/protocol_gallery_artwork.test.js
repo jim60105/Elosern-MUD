@@ -1,6 +1,7 @@
 /*
- * gallery v3 + canonical artwork descriptor gate (change
- * unified-gallery-image-contract).
+ * gallery + canonical artwork descriptor gate (change
+ * unified-gallery-image-contract), on the registered version-4 panel since
+ * gallery-v4-cutover.
  *
  * The gallery panel no longer carries flat url/face_rect/stage row fields:
  * every image fact is a canonical descriptor validated by
@@ -82,13 +83,28 @@ function card(changes = {}) {
 
 function panel(changes = {}) {
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "gallery",
-    subjects: [{ subject_key: SUBJECT, kind: "portrait:character", display_name: "夜行者", is_puppet: true }],
+    categories: [
+      { key: "mine", count: 1, enabled: true, reason: null },
+      { key: "party", count: 0, enabled: true, reason: null },
+      { key: "people", count: 0, enabled: false, reason: "尚未開放" },
+      { key: "monster", count: 0, enabled: true, reason: null },
+      { key: "scene", count: 0, enabled: false, reason: "尚未開放" },
+    ],
+    category: "mine",
+    groups: [{
+      key: "mine", label: null, seen: null, total: null, expanded: true, count: 1,
+      subjects: [{ subject_key: SUBJECT, kind: "portrait:character", display_name: "夜行者", is_current: true, card_count: 1, artwork: null }],
+    }],
     selected: SUBJECT,
-    filters: { all: 1, defaults: 1, bound: 0, pending: 0, failed: 0 },
-    capabilities: { supports_bindings: true, supports_field_selection: true, supports_free_text: true, supports_personal_official_preferences: true, max_cards: null },
+    description: null,
+    capabilities: {
+      supports_bindings: true, supports_field_selection: true, supports_free_text: true,
+      supports_personal_official_preferences: true, supports_face_rect: true,
+      supports_stage: true, supports_card_delete: true, max_cards: null,
+    },
     cards: [card()],
     equipment_summary: {
       weapon_main: { value: null, display_name: "未裝備" },
@@ -107,9 +123,9 @@ function withCard(changes) {
   return panel({ cards: [card(changes)] });
 }
 
-test("gallery v3 is in the production allowlist and the canonical panel validates", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.gallery, 3);
-  assert.equal(Protocol.GALLERY_SCHEMA_VERSION, 3);
+test("gallery v4 is in the production allowlist and the canonical panel validates", () => {
+  assert.equal(Protocol.PANEL_ALLOWLIST.gallery, 4);
+  assert.equal(Protocol.GALLERY_SCHEMA_VERSION, 4);
   assert.doesNotThrow(() => Protocol.validateGalleryPanel(panel()));
   // The v2 shape is gone: the old version is rejected outright.
   assert.throws(() => Protocol.validateGalleryPanel(panel({ schema_version: 2 })));
@@ -227,13 +243,11 @@ test("a synthetic row carries no image at all", () => {
   });
   assert.doesNotThrow(() => Protocol.validateGalleryPanel(panel({
     cards: [pending],
-    filters: { all: 1, defaults: 0, bound: 0, pending: 1, failed: 0 },
   })));
   const fabricated = structuredClone(pending);
   fabricated.artwork.attempts = cardDescriptor().attempts;
   assert.throws(() => Protocol.validateGalleryPanel(panel({
     cards: [fabricated],
-    filters: { all: 1, defaults: 0, bound: 0, pending: 1, failed: 0 },
   })));
 });
 
@@ -314,12 +328,11 @@ test("an official row carries its exact candidate and no stage", () => {
     is_current: false,
     is_catalog_default: true,
   };
-  const official = panel({ cards: [], official_entries: [row], filters: { all: 0, defaults: 0, bound: 0, pending: 0, failed: 0 } });
+  const official = panel({ cards: [], official_entries: [row] });
   assert.doesNotThrow(() => Protocol.validateGalleryPanel(official));
   // The retired flat row shape is rejected on this row kind too.
   assert.throws(() => Protocol.validateGalleryPanel(panel({
     cards: [],
-    filters: { all: 0, defaults: 0, bound: 0, pending: 0, failed: 0 },
     official_entries: [{ ...row, url: row.artwork.attempts[0].resource.url }],
   })));
   // A candidate that names another identity is refused.
@@ -366,7 +379,6 @@ test("an official row keeps its retained faults but only ONE image candidate", (
   const official = panel({
     cards: [],
     official_entries: [row],
-    filters: { all: 0, defaults: 0, bound: 0, pending: 0, failed: 0 },
   });
   assert.doesNotThrow(() => Protocol.validateGalleryPanel(official));
 

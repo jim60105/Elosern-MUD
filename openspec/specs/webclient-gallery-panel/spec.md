@@ -13,17 +13,20 @@ of rendering, and never reachable by any mutation path.
 
 ### Requirement: The gallery panel is an exact read-only version-2 presentation panel
 
-The presentation registry SHALL register a `gallery` panel at schema version 3,
-available in exploration mode. Its available form SHALL contain exactly
-`schema_version`, `available`, `kind` (the literal `gallery`), `subjects`,
-`selected`, `filters`, `cards`, `official_entries`, `equipment_summary`, `capabilities`,
-`binding_warnings`, and `error_state`. The registered unavailable form SHALL keep the common field set,
-reason, and semantics.
+The presentation registry SHALL register a `gallery` panel at schema version 4,
+available in exploration mode, whose available form is exactly the version-4
+category-scoped shape. The registered unavailable form SHALL keep the common
+field set, reason, and semantics.
+
+#### Scenario: The available form carries exactly the version-4 fields
+
+- **WHEN** an available `gallery` panel is published
+- **THEN** it carries exactly `schema_version`, `available`, `kind` (the literal `gallery`), `categories`, `category`, `groups`, `selected`, `description`, `cards`, `official_entries`, `equipment_summary`, `capabilities`, `binding_warnings`, and `error_state`
 
 #### Scenario: An empty gallery is available, not unavailable
 
 - **WHEN** a puppet whose character has no gallery record and no pending job receives a full snapshot
-- **THEN** the `gallery` panel is available with `cards: []`, every filter count zero, and the puppet named as `selected`
+- **THEN** the `gallery` panel is available with category `mine`, `cards: []`, and the puppet named as `selected`
 
 #### Scenario: The presenter mutates nothing
 
@@ -33,7 +36,7 @@ reason, and semantics.
 #### Scenario: Official entries appear without touching cards
 
 - **WHEN** the selected subject's content reference resolves a catalog directory holding three admitted images, one of them the subject's retained personal selection
-- **THEN** `official_entries` carries exactly three official rows with the personal selection marked `is_current`, `cards` still lists only the runtime rows, and no filter count changed
+- **THEN** `official_entries` carries exactly three official rows with the personal selection marked `is_current`, `cards` still lists only the runtime rows, and no card row was added or removed
 
 #### Scenario: No reference or empty catalog means no official rows
 
@@ -88,93 +91,47 @@ reason, and semantics.
 - **THEN** capabilities.supports_personal_official_preferences is false, official rows remain previewable, and both validators enforce the new boolean; eligible character rows retain true
 
 #### Scenario: Gallery consumers cut over together
-- **WHEN** gallery schema 3 is shipped
-- **THEN** all previews, detail/binding/generation readers and both original editors consume descriptors directly; old url/face_rect/stage row fields are rejected, without a dual-shape adapter
-
-### Requirement: The subject rail names every gallery-bearing subject with companion-first ordering
-
-`subjects` SHALL be a bounded ordered list (at most 24 rows) of
-`{subject_key, kind, display_name, is_puppet}` entries: first the rendered
-puppet's own character subject; then live character subjects with a gallery —
-active-party companions before all other characters (design §8.3), ordering
-facts taken from the party surface; then registered visual-species entries in stable-key order
-resolved through the monster kind's typed producer.
-
-#### Scenario: Active party companions precede other characters
-
-- **WHEN** the puppet's account owns a live companion in the puppet's active party and another live character not in the party
-- **THEN** the rail lists the party companion before the non-party character
-
-#### Scenario: The bestiary is listed without any scene subject
-- **WHEN** the rail is built for a puppet
-- **THEN** registered visual-species subjects are eligible in stable-key order within the 24-row budget, retired tiers and scene subjects never appear
-
-#### Scenario: Gallery-less kinds never appear on the rail
-
-- **WHEN** a subject's kind has a capability declaration granting no gallery (the scene kind)
-- **THEN** that subject never appears on the rail
-
-#### Scenario: Selection always names a rail entry
-
-- **WHEN** the panel renders
-- **THEN** `selected` names one entry of `subjects`
-
-#### Scenario: Truncation preserves the puppet and bestiary
-- **WHEN** the puppet, eligible character candidates and visual-species candidates exceed 24 rows
-- **THEN** the puppet is retained; reserve at most 23 slots for visual-species rows, taking their stable-key prefix, and fill remaining slots with companions then other characters in numeric identity order; never exceed 24 or reserve an unbounded species count
-
-#### Scenario: Subject keys are unique across the world gallery
-
-- **WHEN** the rail is assembled
-- **THEN** full subject keys are unique, and this world gallery is not an account-subject roster
-
-#### Scenario: A malformed candidate is skipped alone
-
-- **WHEN** a subject candidate is malformed
-- **THEN** it is skipped independently without affecting the other rows
-
-#### Scenario: Named policies and records gate eligibility
-
-- **WHEN** character subjects are deemed eligible for the rail
-- **THEN** named character policies are eligible even without a gallery record, and account characters without a named policy require an existing numeric subject record — except the puppet, whose numeric identity is always eligible
+- **WHEN** gallery schema 4 is shipped
+- **THEN** the server presenter, both validators, `PANEL_ALLOWLIST` and the client surface switch together; the version-3 rail, filters and their validators are removed without a dual-shape adapter, and old url/face_rect/stage row fields stay rejected
 
 ### Requirement: Subject selection is session presentation state retired with the options layer
 
 Canonical requirement ID: `webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer`.
 
-The selected subject SHALL be stored per live WebSocket-and-puppet presentation
-sequence, defaulting to the puppet. The store SHALL be retired at disconnect,
-unpuppet, and account character switch, exactly like the session options state.
+The selected category and the selected subject of each category SHALL be stored
+per live WebSocket presentation sequence for the owning character, defaulting to
+`mine` and the live character. The store SHALL be retired at disconnect, unpuppet,
+and account character switch, exactly like the session options state.
 
 #### Scenario: Selecting a companion re-renders the companion's gallery
 
-- **WHEN** a client dispatches `gallery.subject.select` naming a listed companion subject
-- **THEN** the result succeeds, one update contains freshly rendered gallery, art, and roster with gallery's `selected` naming that subject, and no `GalleryRecord` was touched
+- **WHEN** a client dispatches `gallery.category.select` for `party` and then `gallery.subject.select` naming a listed companion subject
+- **THEN** both results succeed, the last update contains freshly rendered gallery, art, and roster with gallery's `category` `party` and `selected` naming that subject, and no `GalleryRecord` was touched
 
 #### Scenario: A retired selection falls back to the puppet
 
-- **WHEN** the selected subject's character is destroyed and the panel is re-rendered
-- **THEN** `selected` names the puppet again and the panel is available
+- **WHEN** the selected companion is destroyed and the panel is re-rendered
+- **THEN** `selected` falls back to the category default (the first listed companion, or null for an empty party) and the panel is available
 
 #### Scenario: Unpuppet clears the selection
 
 - **WHEN** the session unpuppets and later puppets again
-- **THEN** the new sequence's selection is the new puppet and no prior selection survives
+- **THEN** the new sequence opens on `mine` with the new puppet selected and no prior selection survives
 
 #### Scenario: A stale selection silently re-selects the puppet
 
-- **WHEN** the stored selection names no current rail entry
-- **THEN** the panel re-selects the puppet at render time without an error
+- **WHEN** the stored selection names a subject no longer listed in its category, or a category that is disabled
+- **THEN** the panel re-selects the category default, or `mine`, at render time without an error
 
 #### Scenario: The write API validates rail-grammar keys
 
-- **WHEN** the store's write API is called with a rail-grammar subject key
-- **THEN** it reports `unknown_subject` for a key naming no rail entry
+- **WHEN** the store's write API is called with a grammar-valid subject key
+- **THEN** it reports `unknown_subject` for a key not listed in the selected category
 
 #### Scenario: The ui_action adapter is the store's only caller
 
-- **WHEN** the gallery subject-selection `ui_action` adapter writes a selection
-- **THEN** it is the store's only caller, writes nothing else, and publishes one affected-panel update containing freshly rendered `gallery`, `art`, and `roster` panels on success or domain rejection under the gallery-management action contract
+- **WHEN** the gallery subject-selection or category-selection `ui_action` adapter writes a selection
+- **THEN** those two adapters are the store's only callers, write nothing else, and publishes one affected-panel update containing freshly rendered `gallery`, `art`, and `roster` panels on success or domain rejection under the gallery-management action contract
 
 #### Scenario: Selection state touches no domain data
 
@@ -259,7 +216,7 @@ one `status: "failed"` row.
 #### Scenario: A pending job renders the spinner row
 
 - **WHEN** a gallery job is queued and not yet settled when the panel renders
-- **THEN** exactly one pending row for that image id appears and the 生成中 filter count is at least one
+- **THEN** exactly one pending row for that image id appears with `status: "pending"`
 
 #### Scenario: The failed row carries the bounded authored message
 
@@ -314,64 +271,11 @@ bound — ordered newest-first, at most five entries.
 - **WHEN** any client renders binding warnings
 - **THEN** no matching rule exists in any client; the binding editor renders these facts verbatim
 
-### Requirement: Filter counts and the equipment summary are server-computed
-
-`filters` SHALL be the server-computed counts `{all, defaults, bound, pending,
-failed}` over exactly the rows the panel lists. For a kind declaring binding
-support, `equipment_summary` SHALL list the four slots with each slot's
-currently equipped normalized value and registry display name, read from stored
-equipment state without materializing a handler; otherwise it SHALL be null.
-
-#### Scenario: Monster subjects carry no binding affordances
-
-- **WHEN** the selected subject is a monster visual-species subject
-- **THEN** `equipment_summary` is null and `capabilities.supports_bindings` is false
-
-#### Scenario: Counts match the listed rows exactly
-
-- **WHEN** the panel lists two bound cards, one default unbound card, one pending row, and one failed row
-- **THEN** filters are all 5, defaults 1, bound 2, pending 1, failed 1
-
-#### Scenario: Each filter count names its rows
-
-- **WHEN** the server counts filter rows
-- **THEN** 全部 = every row; 預設 counts the default card; 已綁定 counts cards with a binding; 生成中 counts pending rows; 失敗 counts failed rows
-
-#### Scenario: Accessories summarize as a bounded sorted list
-
-- **WHEN** the equipment summary renders the accessories slot
-- **THEN** accessories appear as a sorted list with an equipped-count of at most five
-
-#### Scenario: The summary mirrors the kind's declared capabilities
-
-- **WHEN** the panel presents `capabilities`
-- **THEN** it mirrors the subject kind's declaration fields the management surface needs (`supports_bindings`, `supports_field_selection`, `supports_free_text`, `max_cards` or null, plus the server-resolved `supports_personal_official_preferences` context flag)
-
-#### Scenario: error_state carries the record's last error
-
-- **WHEN** the panel presents `error_state`
-- **THEN** it is the record's last error code and timestamp or null
-
-#### Scenario: The equipment summary has the exact slot shape
-
-- **WHEN** `equipment_summary` is validated
-- **THEN** it has exactly `weapon_main`, `weapon_off`, `armor`, and `accessories`; a single slot contains exactly `{value, display_name}`, with a null value for no equipment; accessories contain exactly `{value, display_names, equipped_count}`, sorted by Unicode code point with corresponding names and at most five values
-
-#### Scenario: Keys and names are short nonempty strings
-
-- **WHEN** summary keys and display names are validated
-- **THEN** each is a nonempty string of at most 64 code points
-
-#### Scenario: error_state is exactly code and timestamp
-
-- **WHEN** `error_state` is validated
-- **THEN** it is exactly `{code, at}` or null; the code matches `[a-z0-9_]{1,64}` and the timestamp is a finite epoch number within the safe JSON numeric range
-
 ### Requirement: The gallery payload is exactly version-mirrored across server and client
 
 The panel's schema version SHALL be one server-side constant shared by the
 presenter and the registry registration; `web/static/webclient/js/elosern/protocol.js`
-SHALL register `gallery: 3` in `PANEL_ALLOWLIST` and mirror every bound in an
+SHALL register `gallery: 4` in `PANEL_ALLOWLIST` and mirror every bound in an
 exact per-panel validator, and the dual-direction parity tests SHALL reject a
 payload accepted on one side and rejected on the other. No existing other
 panel's schema or envelope changes. Server and client SHALL ship together.
@@ -380,11 +284,11 @@ panel's schema or envelope changes. Server and client SHALL ship together.
 - **WHEN** a gallery payload carries a field outside the mirrored exact schema
 - **THEN** both validators reject it and the panel degrades to its recovery path
 
-Real candidate geometry SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL validate canonical descriptor attempts and reject obsolete row geometry keys. Schema version SHALL be 3.
+Real candidate geometry SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL validate canonical descriptor attempts and reject obsolete row geometry keys. Schema version SHALL be 4.
 
 #### Scenario: Both validators enforce identity, ordering, and URL facts
 - **WHEN** either validator side checks a gallery payload
-- **THEN** it enforces unique canonical UUID image IDs, unique full subject keys, selected membership, puppet-first ordering, positive confined face rectangles, gallery URLs bound to the selected subject and image with the closed store extensions, coherent status/flags/chips/provenance, and exact nonnegative filter counts
+- **THEN** it enforces unique canonical UUID image IDs, unique full subject keys, selected membership in an expanded group, the fixed category order, positive confined face rectangles, gallery URLs bound to the selected subject and image with the closed store extensions, and coherent status/flags/chips/provenance
 
 #### Scenario: Synthetic rows are bounded and neutralized
 - **WHEN** synthetic rows are validated
@@ -392,7 +296,7 @@ Real candidate geometry SHALL satisfy the exact bounded finite triple contract; 
 
 #### Scenario: Every field carries its documented bound
 - **WHEN** gallery descriptors are validated
-- **THEN** existing row/chip/warning bounds remain; generated original URLs keep their 129 bound, official URLs keep 256, canonical attempts are bounded and the 65,536-byte envelope fails closed
+- **THEN** existing row/chip/warning bounds remain; generated original URLs keep their 129 bound, official URLs keep 256, canonical attempts are bounded and the panel carries no byte limit of its own
 
 #### Scenario: Warnings name unique visible cards newest-first
 - **WHEN** warning entries are validated
@@ -403,8 +307,8 @@ Real candidate geometry SHALL satisfy the exact bounded finite triple contract; 
 - **THEN** both validators reject it
 
 #### Scenario: The oversized gallery fails closed at the JSON limit
-- **WHEN** a character gallery exceeds the existing 65,536-byte canonical JSON limit
-- **THEN** it fails closed and does not silently truncate cards
+- **WHEN** a gallery exceeds the publication logical ceiling, the only byte ceiling the panel has
+- **THEN** it fails closed and does not silently truncate cards; a structurally valid gallery larger than one intact frame is accepted and delivered whole
 
 #### Scenario: Invalid stage fails both wire validators
 - **WHEN** a canonical original candidate carries invalid stage or a row carries old url/face_rect/stage keys
@@ -412,7 +316,7 @@ Real candidate geometry SHALL satisfy the exact bounded finite triple contract; 
 
 #### Scenario: Null synthetic stage is accepted at the existing version
 - **WHEN** otherwise valid pending/failed rows carry canonical descriptors without real-image geometry
-- **THEN** both validators accept schema version 3 without new chips or counts
+- **THEN** both validators accept schema version 4 without new chips or counts
 
 ### Requirement: The personal selection state is server-authored in the panel payload
 
@@ -534,3 +438,26 @@ The session SHALL remember one category and one subject per category for the own
 #### Scenario: Unknown or disabled targets are refused without a write
 - **WHEN** the store is asked to select the disabled `people` category, or a subject not listed in the selected category
 - **THEN** it returns the `unknown_category` or `unknown_subject` rejection and the stored selection is unchanged
+
+### Requirement: The equipment summary and capabilities are server-computed
+For a kind declaring binding support, `equipment_summary` SHALL list the four slots with each slot's currently equipped normalized value and registry display name, read from stored equipment state without materializing a handler; otherwise it SHALL be null. `capabilities` SHALL mirror the selected subject kind's declaration and `error_state` SHALL carry the record's last error.
+
+#### Scenario: Monster subjects carry no binding affordances
+- **WHEN** the selected subject is a monster visual-species subject
+- **THEN** `equipment_summary` is null and `capabilities.supports_bindings` is false
+
+#### Scenario: Capabilities mirror the declaration
+- **WHEN** the panel presents `capabilities` for a selected subject
+- **THEN** it carries `supports_bindings`, `supports_field_selection`, `supports_free_text`, `supports_face_rect`, `supports_stage`, `supports_card_delete` and `max_cards` from the kind's declaration, plus the server-resolved `supports_personal_official_preferences`
+
+#### Scenario: Accessories summarize as a bounded sorted list
+- **WHEN** the equipment summary renders the accessories slot
+- **THEN** accessories appear as a sorted list with an equipped-count of at most five
+
+#### Scenario: The equipment summary has the exact slot shape
+- **WHEN** `equipment_summary` is validated
+- **THEN** it has exactly `weapon_main`, `weapon_off`, `armor`, and `accessories`; a single slot contains exactly `{value, display_name}`, with a null value for no equipment; accessories contain exactly `{value, display_names, equipped_count}`, sorted by Unicode code point with corresponding names and at most five values
+
+#### Scenario: error_state is exactly code and timestamp
+- **WHEN** `error_state` is validated
+- **THEN** it is exactly `{code, at}` or null; the code matches `[a-z0-9_]{1,64}` and the timestamp is a finite epoch number within the safe JSON numeric range

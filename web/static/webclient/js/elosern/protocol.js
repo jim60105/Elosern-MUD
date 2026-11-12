@@ -218,10 +218,7 @@ var publication_parts = require("./protocol/publication_parts.js");
     GALLERY_MAX_OFFICIAL_ENTRIES: gallery.GALLERY_MAX_OFFICIAL_ENTRIES,
     GALLERY_MAX_OFFICIAL_IDENTITY: gallery.GALLERY_MAX_OFFICIAL_IDENTITY,
     GALLERY_MAX_OFFICIAL_URL: gallery.GALLERY_MAX_OFFICIAL_URL,
-    // Version-4 gallery contract (gallery-v4-validators): exported, not yet
-    // registered in PANEL_ALLOWLIST.
-    validateGalleryPanelV4: gallery.validateGalleryPanelV4,
-    GALLERY_V4_SCHEMA_VERSION: gallery.GALLERY_V4_SCHEMA_VERSION,
+    // Version-4 gallery contract bounds (registered since gallery-v4-cutover).
     GALLERY_CATEGORY_KEYS: gallery.GALLERY_CATEGORY_KEYS,
     GALLERY_MAX_PANEL_SUBJECTS: gallery.GALLERY_MAX_PANEL_SUBJECTS,
     GALLERY_MAX_GROUPS: gallery.GALLERY_MAX_GROUPS,

@@ -193,14 +193,19 @@ def main() -> None:
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
     is_persona_test = os.environ.get("ELOSERN_BROWSER_NPC_PERSONA") == "1"
     is_companion_lineup = os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1"
+    # The gallery-rows journey opens the version-4 gallery, whose "mine"
+    # category reads the same account roster as the companion lineup.
+    is_gallery_rows = os.environ.get("ELOSERN_BROWSER_GALLERY_ROWS") == "1"
+    parks_superuser = is_persona_test or is_companion_lineup or is_gallery_rows
 
-    if is_persona_test or is_companion_lineup:
+    if parks_superuser:
         # For NPC persona tests, #1 is an admin superuser account so Evennia initial_setup
         # wipe of superuser attributes does not touch BROWSER_ACCOUNT, and admin actions (e.g. @tel)
         # can be performed via admin_dummy without demoting browserplayer for other suites. The
         # companion-lineup journey reads the roster panel, whose data lives in exactly the
         # superuser-account attributes that the first server boot's initial_setup wipes, so the
-        # wipe must be parked on the dummy account there too.
+        # wipe must be parked on the dummy account there too (and for the gallery-rows journey,
+        # whose "mine" category reads that roster).
         superuser = create_account(
             "admin_dummy",
             "admin_dummy@example.test",
@@ -216,11 +221,31 @@ def main() -> None:
         dummy_char.home = dummy_room
         dummy_char.save()
         superuser.db._last_puppet = dummy_char
-        dummy_req = CharacterCreationRequest(
-            mode="preset",
-            preset_key="t_pale_wren" if synth else "t_pale_wren",
-            skip_portrait=True,
-        )
+        if synth:
+            dummy_req = CharacterCreationRequest(
+                mode="preset",
+                preset_key="t_pale_wren",
+                skip_portrait=True,
+            )
+        else:
+            # The gallery-rows journey runs on the shipped catalogs, where the
+            # kit preset does not exist: activate the dummy from the shipped
+            # base race exactly like the browser character below.
+            from web.browser_support.browser_fixtures_data import (
+                SHIPPED_BASE_RACE,
+                SHIPPED_BASE_SUBRACE,
+            )
+
+            dummy_req = CharacterCreationRequest(
+                mode="custom",
+                display_name="AdminDummyChar",
+                age=20,
+                apparent_age=20,
+                race=SHIPPED_BASE_RACE,
+                subrace=SHIPPED_BASE_SUBRACE,
+                allocations=balanced_allocations(SHIPPED_BASE_RACE, SHIPPED_BASE_SUBRACE),
+                skip_portrait=True,
+            )
         activate_player_character(superuser, dummy_char, dummy_req)
 
     account = create_account(
@@ -228,7 +253,7 @@ def main() -> None:
         BROWSER_ACCOUNT_EMAIL,
         BROWSER_ACCOUNT_PASSWORD,
         typeclass=Account,
-        is_superuser=not (is_persona_test or is_companion_lineup),
+        is_superuser=not parks_superuser,
     )
     character = create_object(PlayerCharacter, key=BROWSER_CHARACTER_NAME, nohome=True)
     account.at_post_create_character(character)
