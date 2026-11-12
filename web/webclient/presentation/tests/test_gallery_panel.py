@@ -792,6 +792,9 @@ process.stdout.write(JSON.stringify(results));
                 if js_accepts:
                     self.assertEqual(validate_gallery_v4(echoed), value)
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
+    )
     def test_disabled_category_is_rejected(self):
         self.assert_parity([
             ("valid", payload_v4(), True),
@@ -799,6 +802,9 @@ process.stdout.write(JSON.stringify(results));
             ("disabled scene", v4_case(lambda p: p.update(category="scene")), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
+    )
     def test_reordered_or_partial_category_list_is_rejected(self):
         def swap(p):
             p["categories"][1], p["categories"][3] = p["categories"][3], p["categories"][1]
@@ -812,6 +818,9 @@ process.stdout.write(JSON.stringify(results));
             ("extra category", v4_case(lambda p: p["categories"].append(dict(p["categories"][1]))), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
+    )
     def test_reason_accompanies_only_disabled_categories(self):
         self.assert_parity([
             ("enabled with reason", v4_case(lambda p: p["categories"][1].update(reason="原因")), False),
@@ -821,11 +830,17 @@ process.stdout.write(JSON.stringify(results));
             ("reason over cap", v4_case(lambda p: p["categories"][2].update(reason="由" * 65)), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::version-4-groups-carry-ordered-subjects-or-a-collapsed-count"
+    )
     def test_collapsed_group_with_subjects_is_rejected(self):
         self.assert_parity([
             ("collapsed with subjects", v4_case(lambda p: p["groups"][0].update(expanded=False)), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::version-4-groups-carry-ordered-subjects-or-a-collapsed-count"
+    )
     def test_group_counts_sum_to_the_category_count(self):
         def collapsed_not_summed(p):
             v4_collapsed(p)
@@ -836,6 +851,9 @@ process.stdout.write(JSON.stringify(results));
             ("collapsed count not summed", v4_case(collapsed_not_summed), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::version-4-groups-carry-ordered-subjects-or-a-collapsed-count"
+    )
     def test_collapsed_group_is_accepted(self):
         def collapsed_only(p):
             v4_empty(p, "mine")
@@ -850,6 +868,9 @@ process.stdout.write(JSON.stringify(results));
             ("integral float count", v4_case(integral_float), True),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::version-4-groups-carry-ordered-subjects-or-a-collapsed-count"
+    )
     def test_seen_and_total_are_paired_and_bounded(self):
         def tier(**changes):
             return v4_case(lambda p: p["groups"][0].update(changes))
@@ -865,6 +886,9 @@ process.stdout.write(JSON.stringify(results));
             ("fractional total", tier(seen=1, total=2.5), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::selection-decides-the-version-4-card-fields"
+    )
     def test_empty_category_carries_no_card_facts(self):
         cases = [("empty category", v4_case(v4_empty), True)]
         for field, value in (
@@ -883,6 +907,9 @@ process.stdout.write(JSON.stringify(results));
             cases.append((f"empty with {field}", v4_case(modify), False))
         self.assert_parity(cases)
 
+    @covers_requirement(
+        "webclient-gallery-panel::selection-decides-the-version-4-card-fields"
+    )
     def test_selection_outside_listed_subjects_is_rejected(self):
         def collapsed_selection(p):
             v4_empty(p, "mine")
@@ -894,6 +921,9 @@ process.stdout.write(JSON.stringify(results));
             ("null selection with a listed subject", v4_case(lambda p: p.update(selected=None)), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::selection-decides-the-version-4-card-fields"
+    )
     def test_capabilities_carry_the_declared_card_operations(self):
         cases = []
         for field in ("supports_face_rect", "supports_stage", "supports_card_delete"):
@@ -903,6 +933,9 @@ process.stdout.write(JSON.stringify(results));
         cases.append(("null capabilities with a selection", v4_case(lambda p: p.update(capabilities=None)), False))
         self.assert_parity(cases)
 
+    @covers_requirement(
+        "webclient-gallery-panel::a-panel-past-the-subject-ceiling-is-unavailable-never-truncated"
+    )
     def test_one_subject_over_the_ceiling_fails_closed(self):
         def over_split(p):
             # Two groups whose counts are each in range, still one past the ceiling.
@@ -915,11 +948,18 @@ process.stdout.write(JSON.stringify(results));
             ("257 subjects in two groups", v4_case(over_split), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-panel-has-no-byte-limit-of-its-own"
+    )
     def test_panel_larger_than_one_frame_is_valid(self):
         value = v4_case(lambda p: v4_subjects(p, GALLERY_MAX_PANEL_SUBJECTS, artwork=True))
         self.assertGreater(json_byte_size(value), MAX_CANONICAL_JSON_BYTES)
         self.assert_parity([("larger than one frame", value, True)])
 
+    @covers_requirement(
+        "webclient-gallery-panel::the-version-4-validators-are-exact-mirrors",
+        "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape",
+    )
     def test_parity_cases_cover_every_rule(self):
         cases = [("valid", payload_v4(), True)]
 
