@@ -9,6 +9,7 @@ passed ``validate_gallery_v4``; the tests re-validate each one explicitly.
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
+from unittest.mock import patch
 import uuid
 
 from django.test import override_settings
@@ -22,6 +23,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
+from web.webclient.presentation import gallery as gallery_module
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.gallery import build_gallery_v4, validate_gallery_v4
 from web.webclient.presentation.gallery_selection import (
@@ -200,6 +202,30 @@ class GalleryV4PresenterTests(EvenniaTest):
         self.assertEqual(unselected["card_count"], 0)
         self.assertIsNone(unselected["artwork"])
 
+    def test_one_failing_tile_degrades_only_itself(self):
+        self._companion("同行甲", "t_v4_companion_a")
+        self._companion("同行乙", "t_v4_companion_b")
+        self._card("t_v4_companion_a", number=1)
+        self._card("t_v4_companion_b", number=2)
+        real = gallery_module.describe_portrait
+
+        def flaky(subject, entity=None):
+            if subject.key == "t_v4_companion_b":
+                raise RuntimeError("t_synthetic_failure")
+            return real(subject, entity)
+
+        session = self._session()
+        select_gallery_category(session, self.actor, "party")
+        with patch.object(gallery_module, "describe_portrait", side_effect=flaky), \
+                patch.object(gallery_module, "log_warn") as warn:
+            panel = self._build(session)
+        rows = {row["subject_key"]: row for row in panel["groups"][0]["subjects"]}
+        self.assertIsNotNone(rows["portrait:character:t_v4_companion_a"]["artwork"])
+        self.assertIsNone(rows["portrait:character:t_v4_companion_b"]["artwork"])
+        self.assertEqual(rows["portrait:character:t_v4_companion_b"]["card_count"], 1)
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args[0], "gallery_tile_artwork_failed")
+
     def test_building_twice_changes_nothing(self):
         self._companion("同行甲", "t_v4_companion_a")
         self._card("t_v4_actor")
@@ -320,6 +346,15 @@ class GalleryV4PresenterTests(EvenniaTest):
         stray.db.possessed_by = self.actor.pk
         SIGNAL_OBJECT_POST_PUPPET.send(sender=stray, session=session, account=self.account)
         self.assertIsNone(session.ndb.gallery_view)
+        # An unexpected owner failure clears the view and never breaks puppeting.
+        session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "monster", ())
+        with patch(
+            "web.webclient.presentation.gallery_selection.gallery_owner",
+            side_effect=RuntimeError("t_synthetic_failure"),
+        ), patch("web.webclient.presentation.gallery_selection.log_warn") as warn:
+            SIGNAL_OBJECT_POST_PUPPET.send(sender=self.actor, session=session, account=self.account)
+        self.assertIsNone(session.ndb.gallery_view)
+        self.assertEqual(warn.call_args.args[0], "gallery_view_retire_failed")
         # The snapshot itself refuses a view of another owner.
         session.ndb.gallery_view = GalleryViewSelection(other.pk, "monster", ())
         self.assertIsNone(gallery_view_snapshot(session, self.actor))

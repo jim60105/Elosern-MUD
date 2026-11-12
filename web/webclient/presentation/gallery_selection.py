@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET, SIGNAL_OBJECT_POST_UNPUPPET
 
-from world.observability import log_info
+from world.observability import log_info, log_warn
 
 from .gallery_categories import CATEGORY_KEYS, DISABLED_REASONS, GalleryCategoryError, gallery_owner
 
@@ -127,9 +127,14 @@ def _on_puppet(sender, session=None, **kwargs) -> None:
     # owner itself, so both keep the owner and the view.
     ndb = getattr(session, "ndb", None)
     view = getattr(ndb, "gallery_view", None)
-    if view is not None and (
-        not isinstance(view, GalleryViewSelection) or view.owner_id != _owner_id(sender)
-    ):
+    if view is None:
+        return
+    try:
+        keep = isinstance(view, GalleryViewSelection) and view.owner_id == _owner_id(sender)
+    except Exception as exc:  # observability: ignore R2: logged below; a receiver must never break puppeting
+        log_warn("gallery_view_retire_failed", context={"puppet": getattr(sender, "pk", None)}, exc=exc)
+        keep = False
+    if not keep:
         ndb.gallery_view = None
 
 
