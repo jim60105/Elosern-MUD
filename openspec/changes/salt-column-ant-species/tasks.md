@@ -14,8 +14,8 @@ Begin after `breakwater-seal-species` is merged. Follow design.md verbatim. Ever
 
 ## 2. Documentation
 
-- [ ] 2.1 Add the overview row, the bestiary section and the ledger row (design D6), plus the seventh-batch approval notes (design D6a). Check: `world.lore.tests.test_bestiary_documentation` passes, and the section names no skill key, buff id or resource field.
-- [ ] 2.2 Add the developer review section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
+- [x] 2.1 Add the overview row, the bestiary section and the ledger row (design D6), plus the seventh-batch approval notes (design D6a). Check: `world.lore.tests.test_bestiary_documentation` passes, and the section names no skill key, buff id or resource field.
+- [x] 2.2 Add the developer review section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
 
 ## 3. Handoff
 
