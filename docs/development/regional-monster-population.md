@@ -854,8 +854,9 @@ their rectangle, extent and configured behaviour exactly as they were; only the
 composition mix inside them changes. New trunk-road corridors follow the salt
 road and the routes between the ports and the inland towns, and deep-wild zones
 lie on the remote shore. The declarations remain the only authority for keys,
-rectangles, pools and bindings, so this section repeats no coordinate, density,
-configured timing or count.
+rectangles, pools and bindings, so this section repeats no authored coordinate,
+per-zone density parameter, configured timing or count; the programme-level
+corridor-spacing rule is cited only in the deviations below.
 
 **Species fit.** The salt-column ant (負鹽蟻) is the new low animal of the dry
 ground: it forages the salt road, the olive groves and the storehouse ground
@@ -887,7 +888,7 @@ sites stay as they are. No stronger or high-tier variant joins an ordinary pool.
 
 **Verification.** Focused runs, each executed independently from the worktree
 root with the single-token environment file `/tmp/mud-belts.env`
-(`MUD_TEST_SETTINGS=1`):
+(`MUD_TEST_SETTINGS=1`), plus the non-gating observation below:
 
 | Command | Result |
 | --- | --- |
@@ -903,11 +904,12 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change southwest-coast-placement` | passed |
 | `openspec validate southwest-coast-placement --strict` | valid |
 
-A local probe over the published registries confirmed that every new zone,
-activity area and site ground keeps the authored edge distance from every other
-landed one, that each new deep-wild rectangle holds sea-adjacent ground while
-the hinterland and corridor rectangles hold none, and that every site ground
-except the dry-ground ant mound is sea-adjacent.
+A local probe over the published registries confirmed that every newly added
+zone, activity area and site ground keeps the authored edge distance from every
+other landed one, that each new deep-wild rectangle holds sea-adjacent ground
+while the newly added inland hinterland and corridor rectangles hold none, and
+that every newly added site ground except the dry-ground ant mound is
+sea-adjacent.
 
 ## Assertion roles and requirement mapping
 
