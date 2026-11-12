@@ -10,6 +10,7 @@ from evennia.typeclasses.tags import Tag
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -115,11 +116,17 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- closed category set ------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-gallery-has-a-closed-ordered-category-set"
+    )
     def test_categories_arrive_in_the_fixed_order(self):
         keys = tuple(category.key for category in gallery_categories(self.actor))
         self.assertEqual(keys, ("mine", "party", "people", "monster", "scene"))
         self.assertEqual(keys, CATEGORY_KEYS)
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-gallery-has-a-closed-ordered-category-set"
+    )
     def test_unreleased_categories_are_disabled_with_a_reason(self):
         record_species_sighting(self.actor, T_A)
         by_key = {category.key: category for category in gallery_categories(self.actor)}
@@ -137,6 +144,9 @@ class GalleryCategoryTests(EvenniaTest):
         with self.assertRaises(KeyError):
             category_groups(self.actor, "t_unknown_category")
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-gallery-has-a-closed-ordered-category-set"
+    )
     def test_building_reads_only(self):
         self._companion("同行測者", self.actor, stable_key="t_reader_companion")
         record_species_sighting(self.actor, T_A)
@@ -159,6 +169,9 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- mine ---------------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-mine-category-lists-the-owning-account-s-characters"
+    )
     def test_the_live_character_comes_first(self):
         self._add_character("測者乙")
         self._add_character("測者丙")
@@ -175,6 +188,9 @@ class GalleryCategoryTests(EvenniaTest):
         self.assertEqual(refs[1].subject.full(), f"portrait:character:{low.pk}")
         self.assertEqual(category_of_subject(high, f"portrait:character:{low.pk}"), "mine")
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-mine-category-lists-the-owning-account-s-characters"
+    )
     def test_an_invalid_policy_falls_back_to_the_numeric_identity_in_mine(self):
         self.actor.db.portrait_policy = {"mode": "named", "stable_key": "bad/key"}
         refs = category_groups(self.actor, "mine")[0].subjects
@@ -182,6 +198,9 @@ class GalleryCategoryTests(EvenniaTest):
             [ref.subject.full() for ref in refs], [f"portrait:character:{self.actor.pk}"]
         )
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-mine-category-lists-the-owning-account-s-characters"
+    )
     def test_possession_keeps_the_account_characters(self):
         other = self._add_character("測者丁")
         companion = self._companion("附身測者", other, stable_key="t_possessed_companion")
@@ -210,6 +229,9 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- party --------------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-party-category-lists-the-owner-s-live-companions"
+    )
     def test_party_order_is_kept(self):
         first = create_object(NPC, key="先測者", location=self.room1)
         second = create_object(NPC, key="後測者", location=self.room1)
@@ -228,6 +250,9 @@ class GalleryCategoryTests(EvenniaTest):
             self._subject_keys(groups), ["portrait:character:t_companion_b", "portrait:character:t_companion_a"]
         )
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-party-category-lists-the-owner-s-live-companions"
+    )
     def test_a_companion_without_a_gallery_subject_is_skipped_alone(self):
         self._companion("無像測者", self.actor)
         self._companion("有像測者", self.actor, stable_key="t_portrait_companion")
@@ -240,6 +265,9 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- monster ------------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-monster-category-lists-sighted-species-by-threat-tier"
+    )
     def test_unseen_species_get_no_subject(self):
         record_species_sighting(self.actor, T_A)
         group = self._group(T_LOW)
@@ -248,6 +276,9 @@ class GalleryCategoryTests(EvenniaTest):
         self.assertEqual((group.seen, group.total), (1, 2))
         self.assertIsNone(group.subjects[0].entity)
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-monster-category-lists-sighted-species-by-threat-tier"
+    )
     def test_an_all_unseen_tier_still_draws_its_group(self):
         record_species_sighting(self.actor, T_A)
         groups = category_groups(self.actor, "monster")
@@ -258,11 +289,17 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- admission ----------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::admission-is-membership-of-any-enabled-category"
+    )
     def test_a_party_companion_is_admitted_whichever_category_is_selected(self):
         self._companion("隊伍測者", self.actor, stable_key="t_admitted_companion")
         self.assertTrue(is_subject_admitted(self.actor, "portrait:character:t_admitted_companion"))
         self.assertEqual(category_of_subject(self.actor, "portrait:character:t_admitted_companion"), "party")
 
+    @covers_requirement(
+        "webclient-gallery-categories::admission-is-membership-of-any-enabled-category"
+    )
     def test_an_unsighted_species_is_not_admitted(self):
         record_species_sighting(self.actor, T_A)
         self.assertFalse(is_subject_admitted(self.actor, f"portrait:monster:{T_B}"))
