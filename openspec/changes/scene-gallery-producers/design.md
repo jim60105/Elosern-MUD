@@ -44,6 +44,14 @@ contract.
    current/prior-output retention for scenes). A scene with no gallery card
    has no generated attempt; its generation state comes from gallery jobs and
    the gallery record's error only.
+5. Deleted scenes stay deleted (planner decision, flagged): Specification 3
+   says "Deleting returns the archetype to its bundled image", but the shared
+   guard requests a new image whenever the gallery is empty, which would
+   regenerate a deleted scene on the next entry. Both scene producers
+   therefore first check `gallery_api.record_for(subject) is None` and skip
+   the request when a record exists (a player's deletion leaves the empty
+   record in place; `remove_card` never deletes the record). First-time
+   archetypes have no record and still autogenerate.
 
 ## Risks / Trade-offs
 

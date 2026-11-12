@@ -36,6 +36,10 @@ routing each subject by whether its kind declares a gallery.
 - **WHEN** startup synchronization meets a scene archetype whose gallery already holds a card or an in-flight job
 - **THEN** no gallery request is made for it and the sync is idempotent
 
+#### Scenario: A scene emptied by deletion stays on its bundled image
+- **WHEN** startup synchronization or a room entry meets a scene archetype whose gallery record exists with no card because its card was deleted
+- **THEN** no gallery request is made, so the archetype keeps resolving its bundled image until a player requests a new one
+
 #### Scenario: Records are created only under the queue lock
 - **WHEN** the sync needs to create a record for a subject that has none
 - **THEN** the record is created only through an atomic find-or-create under the queue lock, so
@@ -72,8 +76,8 @@ added after startup. A room with a `None` or unresolvable archetype SHALL be a s
 #### Scenario: Entering a scene-bearing room ensures its asset
 - **WHEN** a player enters a grid or instance room whose `scene_archetype` resolves in the registry
 - **THEN** the scene subject's gallery is ensured through the shared automatic-generation guard: one
-  gallery request when it holds no card and no in-flight job, nothing otherwise, and no classic record
-  is created
+  gallery request only when the subject has no gallery record at all and no in-flight job, nothing
+  otherwise, and no classic record is created
 
 #### Scenario: A room without a resolvable archetype is a no-op
 - **WHEN** a player enters a room with a `None` or unresolvable `scene_archetype`
