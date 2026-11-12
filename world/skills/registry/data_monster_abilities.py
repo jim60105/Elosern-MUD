@@ -84,6 +84,9 @@ attempt.
 The shell-crack shrimp's club limb strike is assembled the same way with
 elementless physical damage plus a hit-dependent defense debuff on the struck
 enemy.
+The salt-snort iguana's brine snort butt is assembled the same way with
+elementless physical damage plus a hit-dependent accuracy debuff on the struck
+enemy.
 """
 
 from world.skills.effects import (
@@ -1233,6 +1236,29 @@ ROWS: tuple[SkillDef, ...] = (
         eligibility=SkillEligibility(
             allowed_actor_kinds=("monster",),
             allowed_species=("shell_crack_shrimp",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "brine_snort_butt",
+        "噴鹽頂撞",
+        "以鈍圓的頭頂撞單一敵方目標，造成物理傷害；命中後從鼻孔噴出濃鹽水刺進對手眼中，短暫降低其命中。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:brine_sting"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("salt_snort_iguana",),
         ),
         prerequisites=(),
         effect_policies=(

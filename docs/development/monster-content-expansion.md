@@ -2995,3 +2995,94 @@ performance report were not rerun and remain historical harness evidence at
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 噴鹽鬣蜥
+
+This section records the fourth delivered species of the southwest coast Wave 4.
+噴鹽鬣蜥 (`salt_snort_iguana`) is a mid-tier marine iguana whose ordinary default
+variant is 曬崖型 (`seacliff_basker`, grade D) and whose stronger variant is
+冠刺型 (`salt_dike_holder`, grade C); both own the single head butt 噴鹽頂撞
+(`brine_snort_butt`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Heavy basker: the authored defense sits in the mid band's upper part, agility
+  near its floor, and hit points just below the band's middle.
+* The kit spends no MP, so the authored MP pool is zero; the SP pool holds four
+  casts of the butt's SP cost (six on 冠刺型).
+* The rider (−3 accuracy for 15 s) matches the mushroom's shipped −3 accuracy
+  rider in size and lasts three seconds longer.
+* The stronger 冠刺型 holds the warmest dike stretch at grade C with the mid
+  band's defense ceiling.
+
+### Reuse of the enemy hit-rider representative
+
+The kit declares the shipped enemy hit-rider composition signature
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`.
+Its representative is unchanged: `cliff_stepper`, declared in
+`world.rules.tests.test_sway_whistle_sparrow_resource_skill`, whose production
+smoke exercises the representative and the derived group. Both new variant keys
+sort after that representative, so no smoke module, shard entry or seed entry is
+added; `world.rules.tests.test_monster_composition_coverage` derives the whole
+group from the shipped declarations and checks the representative wiring, and
+`EnemyRiderGroupMemberTests` in the same module exercises every derived member,
+including both of these, on its own rider axis.
+
+### Decision mode
+
+Both variants bind the legacy `instinctive` archetype: `first_owned` skill
+choice against the lowest-hit-point enemy, with that archetype's authored flee
+threshold of 0.35. No intelligence value, decision-mode override or
+`monster_behaviour.yaml` edit is authored. Because `first_owned` selects the
+only owned kit deterministically, the group-member and resource contract
+contracts do not depend on a damage tie-break, so no deterministic-profile
+deviation from the design was needed; the group-member and resource contract
+labels were run twice consecutively with identical results.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 120 tests, OK, run as two exhaustive disjoint focused method-label batches (60 + 60) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, `ActivationRecordTests` failed 1 of 4 and `RollbackTests` failed 2 of 3, each on the recorded fingerprint comparison, as designed |
+
+The registry import check succeeds and the registry holds 67 variants
+(`len(MONSTER_VARIANT_REGISTRY)` printed 67); the remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+salt-snort-iguana-species` and `openspec validate
+salt-snort-iguana-species --strict`. The committed manifest files
+`.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and
+`tools/test_data_freeze.json` are unchanged.
+
+This link adds one timed effect and one modifier, so the startup tuning
+fingerprint moved from `877fdd6d...` to `8b56d98c...`; the selector report was
+regenerated under the new tuning, the activation record and its rollback
+fingerprint (`3bc2239f...` to `4c696e11...`) were updated, and `activated` and
+`activation_bindings` are unchanged. The six archetype campaigns and the
+performance report were not rerun and remain historical harness evidence at
+`497df2c1...`, not evidence for this tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
