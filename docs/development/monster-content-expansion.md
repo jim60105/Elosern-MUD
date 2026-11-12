@@ -2689,9 +2689,15 @@ stays its representative. No variant-specific test is added.
 
 ### Decision mode
 
-Both variants bind the shipped `pack_hunter` archetype and stay in the permanent
-legacy decision, so they carry that archetype's flee threshold of 0.20. Neither
-variant authors intelligence, a decision-mode override nor a
+Both variants bind the shipped `ambush_predator` archetype and stay in the
+permanent legacy decision, so they carry that archetype's flee threshold of
+0.20. The design originally named `pack_hunter`, but its
+`highest_expected_damage` ranking weighs an elementless physical kit level with
+the innate `basic_attack` and breaks the tie with a die, while the shipped
+`EnemyRiderGroupMemberTests` contract requires a legacy member's own decision to
+return its kit; `ambush_predator` keeps the same `lowest_hp` target strategy and
+the same 0.20 threshold and selects the kit deterministically through
+`first_owned`. Neither variant authors intelligence, a decision-mode override nor a
 `monster_behaviour.yaml` edit. This link adds one timed effect and one modifier,
 so the startup tuning fingerprint moved from `5828d932...` to `ef4b4b14...`; the
 selector report was regenerated under the new tuning, the activation record and

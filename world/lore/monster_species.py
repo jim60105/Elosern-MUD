@@ -2108,7 +2108,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         True,
         active_skill_keys=("flipper_slide_slam",),
         passive_skill_keys=(),
-        behaviour_profile_key="pack_hunter",
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "haulout_bull",
@@ -2124,7 +2124,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         True,
         active_skill_keys=("flipper_slide_slam",),
         passive_skill_keys=(),
-        behaviour_profile_key="pack_hunter",
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
