@@ -19,7 +19,11 @@ guarantee.
 import re
 
 from web.webclient.presentation.gallery import validate_gallery_subject_key
-from web.webclient.presentation.gallery_selection import select_gallery_subject
+from web.webclient.presentation.gallery_categories import CATEGORY_KEYS
+from web.webclient.presentation.gallery_selection import (
+    select_gallery_category,
+    select_gallery_subject,
+)
 from world.art import gallery as gallery_api
 from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_prompt import (
@@ -130,6 +134,16 @@ def _payload(payload, keys):
 def validate_gallery_subject_select_payload(payload):
     """Accept exactly one grammar-valid rail key; membership is domain state."""
     return _payload(payload, ("subject_key",))
+
+
+def validate_gallery_category_select_payload(payload):
+    """Accept exactly one of the five category keys; enablement is domain state."""
+    if not isinstance(payload, dict) or set(payload) != {"category"}:
+        raise GalleryActionError("gallery payload requires exactly its declared fields")
+    category = payload["category"]
+    if not isinstance(category, str) or category not in CATEGORY_KEYS:
+        raise GalleryActionError("category must be one of the gallery category keys")
+    return dict(payload)
 
 
 def validate_gallery_generate_payload(payload):
@@ -281,6 +295,18 @@ def _gallery_subject_select_adapter(actor, payload, session=None):
     result = dict(select_gallery_subject(session, actor, payload["subject_key"]))
     result["affected_panels"] = AFFECTED_GALLERY_PANELS
     context = _context("gallery.subject.select", payload)
+    if result["outcome"] == "success":
+        log_info("gallery_action", context=context)
+    else:
+        log_warn("gallery_action", context=context)
+    return result
+
+
+def _gallery_category_select_adapter(actor, payload, session=None):
+    # Copy: a refusal returns the shared module-level result constant.
+    result = dict(select_gallery_category(session, actor, payload["category"]))
+    result["affected_panels"] = AFFECTED_GALLERY_PANELS
+    context = {"category": payload["category"], "action_id": "gallery.category.select"}
     if result["outcome"] == "success":
         log_info("gallery_action", context=context)
     else:

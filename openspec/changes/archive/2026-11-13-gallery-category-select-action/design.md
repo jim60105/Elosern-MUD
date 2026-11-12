@@ -18,15 +18,21 @@ client dispatch (window).
 
 ## Decisions
 
-- `validate_gallery_category_select_payload(payload)`: `_payload(payload,
-  ("category",))`, then the value must be one of
-  `("mine", "party", "people", "monster", "scene")` else
-  `ProtocolValidationError` (→ `malformed_payload`).
+- `validate_gallery_category_select_payload(payload)`: an exact key set of
+  `{"category"}` checked directly (the shared `_payload` helper always
+  validates `subject_key`, which this payload does not carry), then the value
+  must be one of `CATEGORY_KEYS` (`"mine"`, `"party"`, `"people"`,
+  `"monster"`, `"scene"`) else `GalleryActionError`, the `ValueError` every
+  gallery validator raises (→ `malformed_payload`).
 - `_gallery_category_select_adapter(actor, payload, session=None)`: same shape
   as `_gallery_subject_select_adapter`. `_context` today reads
   `payload["subject_key"]`; give this adapter its own context dict
   `{"category": payload["category"], "action_id": "gallery.category.select"}`.
 - Register beside `gallery.subject.select` in `registry.py`.
+- The command-echo catalog pins every registered action: the id joins the
+  silent presentation controls in `command_echo.js`, both lists of
+  `command_echo_coverage_manifest.json`, and the Node and Vitest coverage
+  tables, beside `gallery.subject.select`. It has no typed-command equivalent.
 
 ## Risks / Trade-offs
 
