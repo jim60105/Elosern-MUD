@@ -1238,6 +1238,23 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "reef_burrow_striker",
         True,
     ),
+    MonsterSpecies(
+        "salt_snort_iguana",
+        "噴鹽鬣蜥",
+        "噴鹽鬣蜥是體長超過一人的鬣蜥類魔獸，成群棲息於西南海岸的黑色海崖與崖下的曬鹽場。",
+        "深灰近黑的鱗皮粗糙如岩，背脊上一排尖刺從頸後延伸到尾根。"
+        "頭部短而鈍圓，鼻孔周圍與頭頂結著一層白色鹽殼，四肢粗壯，爪子彎長。",
+        "牠們白天成群趴在被太陽曬暖的崖石上，退潮時潛到崖腳啃食礁石上的海藻。"
+        "牠鼻內的鹽腺帶著異常的力氣，能把吃進的海鹽濃成鹽水，猛力從鼻孔噴出，頭頂因此結著一層厚實的白鹽殼。"
+        "海崖下的曬鹽場以石堤圍出成排的鹽田，堤面被太陽曬得溫熱，噴鹽鬣蜥常整群爬上堤面曬太陽，壓碎剛結好的鹽層，也把漁村攤在礁石上晾曬的海藻吃個精光。"
+        "近身時，牠以鈍圓的頭頂撞對手，撞中時從鼻孔噴出一股濃鹽水，刺得對手短時間內看不準目標。",
+        ("southwest_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；鼻內鹽腺異常力氣的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階群居鬣蜥：鹽腺噴鹽屬於身體能力，不帶元素、不造成中毒或持續傷害；戰鬥呈現為頂撞與命中後短暫命中下降。描寫維持蜥蜴體態，不與鱷魚或蠑螈混同。連結海崖下的曬鹽場鹽田與漁村晾曬的海藻。",
+        "（作者私有：尚未證實的猜想）曬鹽場的鹽工說噴鹽鬣蜥一整天都留在崖上的日子，隔天必定下雨，這種說法尚未證實。",
+        "seacliff_basker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2276,6 +2293,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("club_limb_strike",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "seacliff_basker",
+        "salt_snort_iguana",
+        "曬崖型",
+        "普通版本，成群趴在曬暖的崖石上，退潮時潛到崖腳啃食海藻。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=150, mp=0, sp=24, atk_phys=20, agility=12, defense=14, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("brine_snort_butt",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "salt_dike_holder",
+        "salt_snort_iguana",
+        "冠刺型",
+        "背刺最高、鹽殼最厚的大型雄蜥，帶著一群母蜥占住曬鹽場最溫暖的一段堤面，會頂向任何走上那段堤面的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=205, mp=0, sp=36, atk_phys=25, agility=12, defense=16, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("brine_snort_butt",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 

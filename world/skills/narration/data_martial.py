@@ -196,6 +196,13 @@ ROWS: tuple[NarrationRow, ...] = (
             "{actor} 一記快得看不清的彈擊，對方護具上多了一道裂痕。",
         ),
     ),
+    NarrationRow(
+        "brine_snort_butt",
+        action=(
+            "{actor} 低頭一頂，鼻孔裡噴出一股鹽水。",
+            "{actor} 結著鹽殼的頭撞了過來，鹽水濺得對方睜不開眼。",
+        ),
+    ),
 )
 
 __all__ = ["ROWS"]
