@@ -23,8 +23,12 @@ from typeclasses.npcs import NPC
 from web.webclient.actions import gallery_actions as actions
 from web.webclient.actions.dispatcher import handle_ui_action, _sequence_state
 from web.webclient.actions.registry import build_production_action_registry
+from web.webclient.presentation import gallery_selection
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
+from web.webclient.presentation.gallery_selection import (
+    gallery_selection_snapshot,
+    gallery_view_snapshot,
+)
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import validate_ui_action_result
 from web.webclient.presentation.registry import build_production_registry
@@ -157,6 +161,22 @@ def wire_cases():
     return cases
 
 
+CATEGORY_KEYS = ("mine", "party", "people", "monster", "scene")
+
+
+def category_wire_cases():
+    """Category selection corpus: the five keys pass, anything else is malformed."""
+    cases = [(f"category {key}", {"category": key}, True) for key in CATEGORY_KEYS]
+    cases += [
+        ("category extra field", {"category": "monster", "subject_key": SUBJECT}, False),
+        ("category missing", {}, False),
+        ("category renamed", {"group": "monster"}, False),
+    ]
+    for value in (None, 7, True, ["monster"], "", "Monster", " monster", "unknown", "monsters"):
+        cases.append((f"category bad value {value!r}", {"category": value}, False))
+    return cases
+
+
 class GalleryActionWireTests(unittest.TestCase):
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
@@ -185,6 +205,30 @@ process.stdout.write(JSON.stringify(results));
                     with self.assertRaises(ValueError):
                         validator(payload)
                     self.assertFalse(accepted)
+
+    def test_category_selection_payload_matches_node_boundaries(self):
+        validator = build_production_action_registry().spec("gallery.category.select").validate_payload
+        cases = category_wire_cases()
+        script = """
+const fs = require('node:fs');
+const p = require('./web/static/webclient/js/elosern/protocol.js');
+const results = JSON.parse(fs.readFileSync(0, 'utf8')).map(([name, payload]) => {
+  try { return [true, p.validateGalleryActionPayload('gallery.category.select', payload)]; }
+  catch (_) { return [false, null]; }
+});
+process.stdout.write(JSON.stringify(results));
+"""
+        wire = [[name, payload] for name, payload, _ in cases]
+        output = subprocess.run(["node", "-e", script], input=json.dumps(wire), text=True, capture_output=True, cwd=ROOT, check=True)
+        for (name, payload, expected), (accepted, echoed) in zip(cases, json.loads(output.stdout), strict=True):
+            with self.subTest(case=name):
+                self.assertEqual(accepted, expected)
+                if expected:
+                    self.assertEqual(validator(payload), payload)
+                    self.assertEqual(validator(echoed), payload)
+                else:
+                    with self.assertRaises(ValueError):
+                        validator(payload)
 
     def test_nonfinite_rectangles_reject_without_json_coercion(self):
         for value in (float("nan"), float("inf"), -float("inf")):
@@ -610,6 +654,77 @@ class GalleryActionIntegrationTests(EvenniaTest):
             with self.subTest(subject=key):
                 self.assertEqual(self.dispatch("gallery.default.set", {"subject_key": key, "image_id": card["image_id"]})["code"], "unknown_subject")
         self.assertEqual(api.cards_for(self.companion_subject), [card])
+
+    def category_dispatch(self, category, payload=None):
+        """Dispatch one category selection, spying on the publication request.
+
+        The registered version-3 panels do not read the version-4 view store,
+        so the transmitted delta may be empty; the publication request and its
+        declared panels are the observable "one update".
+        """
+        with patch.object(
+            self.coordinator, "enqueue_publication", wraps=self.coordinator.enqueue_publication
+        ) as publish:
+            result = self.dispatch("gallery.category.select", payload or {"category": category})
+        results = [call for call in self.sent if "ui_action_result" in call]
+        self.assertEqual(len(results), 1)
+        self.assertNotIn("ui_snapshot", self.sent[0])
+        self.assertLessEqual(len([call for call in self.sent if "ui_update" in call]), 1)
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
+        return result
+
+    def test_category_selection_stores_the_enabled_category_without_art_mutation(self):
+        self.card()
+        self.generate(self.companion_subject)
+        def art_state():
+            return [
+                [(record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
+                 for record in model.objects.order_by("pk")]
+                for model in (api.GalleryRecord, ArtAssetRecord)
+            ]
+        before = (art_state(), api.cards_for(self.subject), queue.pending_gallery_jobs(self.companion_subject))
+        with patch.dict(gallery_selection.DISABLED_REASONS, {"people": "disabled"}, clear=True), \
+                patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
+            result = self.category_dispatch("monster")
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor).category, "monster")
+        self.assertEqual(
+            before,
+            (art_state(), api.cards_for(self.subject), queue.pending_gallery_jobs(self.companion_subject)),
+        )
+        info.assert_called_once_with(
+            "gallery_action", context={"category": "monster", "action_id": "gallery.category.select"}
+        )
+        warn.assert_not_called()
+
+    def test_disabled_category_is_refused_without_a_write(self):
+        with patch.dict(gallery_selection.DISABLED_REASONS, {"people": "disabled"}, clear=True):
+            with patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
+                result = self.category_dispatch("people")
+            self.assertEqual((result["outcome"], result["code"]), ("rejected", "unknown_category"))
+            self.assertIsNone(gallery_view_snapshot(self.transport, self.actor))
+            warn.assert_called_once_with(
+                "gallery_action", context={"category": "people", "action_id": "gallery.category.select"}
+            )
+            info.assert_not_called()
+            self.assertEqual(self.category_dispatch("monster")["outcome"], "success")
+            stored = gallery_view_snapshot(self.transport, self.actor)
+            result = self.category_dispatch("people")
+            self.assertEqual((result["outcome"], result["code"]), ("rejected", "unknown_category"))
+            self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
+            self.assertEqual(stored.category, "monster")
+
+    def test_malformed_category_payloads_never_reach_the_adapter(self):
+        for name, payload, accepted in category_wire_cases():
+            if accepted:
+                continue
+            with self.subTest(case=name), patch.object(actions, "select_gallery_category") as select:
+                result = self.dispatch("gallery.category.select", payload)
+                self.assertEqual(result["code"], "malformed_payload")
+                select.assert_not_called()
+                self.assertEqual(len(self.sent), 1)
+        self.assertIsNone(gallery_view_snapshot(self.transport, self.actor))
 
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
