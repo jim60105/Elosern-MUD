@@ -42,6 +42,7 @@ from world.art.subjects import (
 )
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     synthetic_registries,
 )
@@ -587,7 +588,7 @@ class CardBindingUpdateTests(EvenniaTestCase):
 
 class SubjectKeyResolverTests(EvenniaTestCase):
     def setUp(self):
-        _open_synthetic_scope(self, "archetypes", "monster_tiers")
+        _open_synthetic_scope(self, "archetypes", "monster_tiers", "monster_species")
         super().setUp()
         self.player = create_object(PlayerCharacter, key="resolver-player")
         self.player.db.age = 22
@@ -629,7 +630,7 @@ class SubjectKeyResolverTests(EvenniaTestCase):
         "art-gallery-model::one-public-read-only-seam-resolves-a-serialized-subject-key-to-subject-and-entity"
     )
     def test_a_registered_monster_tier_key_resolves_through_the_producer(self):
-        visual_key = "goblin"
+        visual_key = sorted(SYNTH_MONSTER_SPECIES)[0]
         subject, entity = resolve_gallery_subject_by_key(f"portrait:monster:{visual_key}")
         self.assertEqual(subject, monster_subject_for(visual_key))
         self.assertIsNone(entity)

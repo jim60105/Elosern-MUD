@@ -1,7 +1,6 @@
 """Behavior tests for the monster visual-species registry (synthetic rows only).
 
-The registry composes the authored baseline art declarations with a projection
-of each complete combat species. These tests use a file-local synthetic species
+The registry is exactly the projection of each complete combat species. These tests use a file-local synthetic species
 so no shipped row is echoed, and they assert the registry's own closure rules
 instead of pinning the authored roster.
 """
@@ -11,7 +10,6 @@ from dataclasses import asdict, fields, replace
 
 from world.lore.monster_species import MonsterSpecies
 from world.lore.monster_visuals import (
-    BASELINE_VISUAL_ROWS,
     RESERVED_KEYS,
     adapt_combat_species,
     build_monster_visual_registry,
@@ -19,6 +17,7 @@ from world.lore.monster_visuals import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, synthetic_registries
 
 
 # Invented vocabulary: no shipped key, label or appearance string appears here.
@@ -34,7 +33,7 @@ _CONJECTURE = "合成作者私有：未經證實的合成猜想。"
 
 # A declaration is appearance-only; a combat profile owns the numeric slots.
 _DECLARATION_SLOTS = frozenset(
-    {"stable_key", "display_label", "published_appearance_zh", "is_baseline_art_only"}
+    {"stable_key", "display_label", "published_appearance_zh"}
 )
 _COMBAT_SLOTS = frozenset(
     {
@@ -74,34 +73,34 @@ class VisualDeclarationShapeTests(unittest.TestCase):
     @covers_requirement(
         "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
     )
-    def test_baseline_declarations_are_appearance_only_never_combat_profiles(self):
-        self.assertTrue(BASELINE_VISUAL_ROWS)
-        for row in BASELINE_VISUAL_ROWS:
-            with self.subTest(key=row.stable_key):
-                self.assertTrue(row.is_baseline_art_only)
-                self.assertTrue(row.stable_key)
-                self.assertTrue(row.display_label)
-                self.assertTrue(row.published_appearance_zh)
-                declared = {field.name for field in fields(row)}
+    def test_declarations_are_appearance_only_never_combat_profiles(self):
+        registry = build_monster_visual_registry({_T_SPECIES: _species()})
+        for key, declaration in registry.items():
+            with self.subTest(key=key):
+                declared = {field.name for field in fields(declaration)}
                 self.assertEqual(declared, set(_DECLARATION_SLOTS))
                 self.assertFalse(declared & _COMBAT_SLOTS)
-                self.assertNotIn(row.stable_key, RESERVED_KEYS)
 
     @covers_requirement(
         "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
     )
-    def test_baseline_keys_are_unique_art_identities_without_a_combat_species_row(self):
-        keys = [row.stable_key for row in BASELINE_VISUAL_ROWS]
-        self.assertEqual(len(keys), len(set(keys)))
-        # The merge raises on a baseline/combat key collision, so a successful
-        # composition is the closure proof that no art-only identity was
-        # fabricated as a combat species row.
-        registry = build_monster_visual_registry()
-        for row in BASELINE_VISUAL_ROWS:
-            with self.subTest(key=row.stable_key):
-                self.assertIn(row.stable_key, registry)
-                self.assertIs(registry[row.stable_key], row)
-                self.assertTrue(is_registered_monster_visual_key(row.stable_key))
+    def test_the_registry_is_exactly_the_combat_species_projection(self):
+        first, second = f"{_T_SPECIES}_a", f"{_T_SPECIES}_b"
+        combat = {first: _species(key=first), second: _species(key=second)}
+        registry = build_monster_visual_registry(combat)
+        self.assertEqual(set(registry), {first, second})
+        for key, species in combat.items():
+            with self.subTest(key=key):
+                self.assertEqual(registry[key], adapt_combat_species(species))
+        # A key no combat species holds is never a visual species.
+        self.assertNotIn(f"{_T_SPECIES}_c", registry)
+
+    def test_a_key_without_a_combat_species_is_not_registered(self):
+        with synthetic_registries("monster_species"):
+            for key in SYNTH_MONSTER_SPECIES:
+                with self.subTest(key=key):
+                    self.assertTrue(is_registered_monster_visual_key(key))
+            self.assertFalse(is_registered_monster_visual_key(_T_SPECIES))
 
 
 class CombatSpeciesProjectionTests(unittest.TestCase):
@@ -116,7 +115,6 @@ class CombatSpeciesProjectionTests(unittest.TestCase):
         self.assertEqual(
             declaration.published_appearance_zh, species.published_appearance_zh
         )
-        self.assertFalse(declaration.is_baseline_art_only)
         # The projection never carries hidden truth, ecology or the longer
         # published description into the artwork prompt.
         rendered = repr(asdict(declaration))
@@ -147,7 +145,6 @@ class VisualRegistryClosureTests(unittest.TestCase):
         registry = build_monster_visual_registry({_T_SPECIES: _species()})
         declaration = registry[_T_SPECIES]
         self.assertEqual(declaration.published_appearance_zh, _APPEARANCE)
-        self.assertFalse(declaration.is_baseline_art_only)
         # Composition is live rather than a cached shipped snapshot: the same
         # key is absent when the injected registry omits it.
         self.assertNotIn(_T_SPECIES, build_monster_visual_registry({}))
@@ -155,10 +152,13 @@ class VisualRegistryClosureTests(unittest.TestCase):
     @covers_requirement(
         "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
     )
-    def test_a_key_collision_with_a_baseline_row_is_an_authoring_error(self):
-        baseline_key = BASELINE_VISUAL_ROWS[0].stable_key
+    def test_a_mapping_key_that_disagrees_with_its_row_is_an_authoring_error(self):
+        # Two entries declaring one row key: the second cannot pass silently.
+        other = f"{_T_SPECIES}_alias"
         with self.assertRaises(ValueError):
-            build_monster_visual_registry({baseline_key: _species(key=baseline_key)})
+            build_monster_visual_registry(
+                {_T_SPECIES: _species(), other: _species(key=_T_SPECIES)}
+            )
 
     @covers_requirement(
         "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"

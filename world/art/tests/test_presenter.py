@@ -61,6 +61,7 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.art_view import SceneTarget
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     synthetic_registries,
 )
@@ -70,6 +71,7 @@ from tools.spec_traceability import covers_requirement
 
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
 _SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+_SYNTH_SPECIES = sorted(SYNTH_MONSTER_SPECIES)[0]
 
 
 def candidate(descriptor: dict) -> dict | None:
@@ -144,8 +146,9 @@ class ArtPresenterTests(EvenniaTestCase):
 
     def setUp(self):
         # Scene-keyed records are opaque identities below; the one archetype
-        # resolution test resolves a kit archetype against the patched catalog.
-        open_synthetic_scope(self, "archetypes")
+        # resolution test resolves a kit archetype against the patched catalog;
+        # monster records name the kit's registered species.
+        open_synthetic_scope(self, "archetypes", "monster_species")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -383,15 +386,15 @@ class ArtPresenterTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_foreign_directory_identity_resolves_to_unavailable(self):
-        subject = ArtSubject(ArtSubjectKind.MONSTER, "goblin")
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)
         ensure(subject, "desc")
-        self._write_asset("scene/goblin.png")
+        self._write_asset(f"scene/{_SYNTH_SPECIES}.png")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/goblin.png",
+            output_identity=f"scene/{_SYNTH_SPECIES}.png",
             error=None,
         )
         # A monster identity living outside portrait/monster/ fails the
@@ -439,8 +442,9 @@ class ResolveEntityTests(EvenniaTestCase):
     def setUp(self):
         # The monster dispatch arm validates threat_tier against the monster
         # tier catalog and applies its traits, so the entity is built inside a
-        # synthetic tier scope and asserted against a kit tier key.
-        open_synthetic_scope(self, "monster_tiers")
+        # synthetic tier scope and asserted against a kit tier key; its stored
+        # species provenance names the kit's species.
+        open_synthetic_scope(self, "monster_tiers", "monster_species")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name)
@@ -456,8 +460,8 @@ class ResolveEntityTests(EvenniaTestCase):
         }
         self.monster = create_object(Monster, key="entity-wolf")
         self.monster.threat_tier = _SYNTH_TIER
-        self.monster.art_species_key = "goblin"
         self.monster.apply_monster_tier("floor")
+        self.monster.attributes.add("species_key", _SYNTH_SPECIES)
 
     def tearDown(self):
         self.art_settings.disable()
@@ -510,7 +514,9 @@ class ResolveEntityTests(EvenniaTestCase):
     def test_generic_monster_resolves_its_archetype_subject(self):
         with patch("world.observability.log_info"):
             descriptor = describe_entity(self.monster)
-        self.assertEqual(descriptor["generation_subject"], "portrait:monster:goblin")
+        self.assertEqual(
+            descriptor["generation_subject"], f"portrait:monster:{_SYNTH_SPECIES}"
+        )
         # Filled seam: an artless monster resolves the monster_anon default as
         # its decorative silhouette.
         self.assertIsNone(candidate(descriptor))
@@ -550,8 +556,8 @@ class ResolveEntityTests(EvenniaTestCase):
     @covers_requirement(
         "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
     )
-    def test_an_unregistered_art_species_key_falls_back_to_placeholder(self):
-        self.monster.art_species_key = "mythical"
+    def test_an_unregistered_species_key_falls_back_to_placeholder(self):
+        self.monster.attributes.add("species_key", "t_synth_unregistered_species")
         descriptor = describe_entity(self.monster)
         self.assertIsNone(candidate(descriptor))
         self.assertIsNone(descriptor["generation_subject"])

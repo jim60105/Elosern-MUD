@@ -34,6 +34,7 @@ from world.prompts.tests.fixtures import PromptFixture
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
@@ -225,7 +226,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
         self.assertEqual(LLMNPC._thinking_text(npc), "")
 
-    @synthetic_registries("archetypes", "races", "subraces")
+    @synthetic_registries("archetypes", "monster_species", "races", "subraces")
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_broken_art_file_degrades_to_deterministic_fallback_descriptions(self):
         from unittest.mock import Mock
@@ -274,10 +275,10 @@ class BoundedFailureDegradeTests(PromptFixture):
         # The monster half rides a registered visual species (a threat-tier key
         # is not a visual key), and its degraded text IS that row's own
         # published appearance projection.
-        monster = monster_subject_for("goblin")
+        monster = monster_subject_for(sorted(SYNTH_MONSTER_SPECIES)[0])
         self.assertEqual(
             monster_description(monster),
-            get_monster_visual_registry()["goblin"].published_appearance_zh,
+            get_monster_visual_registry()[sorted(SYNTH_MONSTER_SPECIES)[0]].published_appearance_zh,
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")

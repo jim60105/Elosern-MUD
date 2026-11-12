@@ -38,6 +38,7 @@ from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     synthetic_registries,
 )
@@ -62,7 +63,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     def setUp(self):
         # The seam resolves the monster kind through the tier catalog and
         # composes its registry-driven description; run against kit tiers.
-        open_synthetic_scope(self, "monster_tiers")
+        open_synthetic_scope(self, "monster_tiers", "monster_species")
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
@@ -73,7 +74,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         )
         self.art_settings.enable()
         self.addCleanup(self.art_settings.disable)
-        self.tier = "goblin"
+        self.tier = sorted(SYNTH_MONSTER_SPECIES)[0]
         self.subject = monster_subject_for(self.tier)
 
     def _gallery_jobs(self):

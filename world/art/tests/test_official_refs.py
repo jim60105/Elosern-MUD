@@ -28,7 +28,6 @@ from world.art.gallery_fallback import (
     PRESET_PROVENANCE_ATTRIBUTE as FALLBACK_PRESET_ATTRIBUTE,
 )
 from world.art.official_refs import (
-    ART_SPECIES_PROVENANCE_ATTRIBUTE,
     MAX_UNRESOLVED_DIAGNOSTICS,
     NPC_PROFILE_PROVENANCE_ATTRIBUTE,
     OFFICIAL_CONTENT_KINDS,
@@ -409,7 +408,6 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 PRESET_PROVENANCE_ATTRIBUTE,
                 NPC_PROFILE_PROVENANCE_ATTRIBUTE,
                 SPECIES_PROVENANCE_ATTRIBUTE,
-                ART_SPECIES_PROVENANCE_ATTRIBUTE,
             ],
         )
 
@@ -531,7 +529,6 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 PRESET_PROVENANCE_ATTRIBUTE,
                 NPC_PROFILE_PROVENANCE_ATTRIBUTE,
                 SPECIES_PROVENANCE_ATTRIBUTE,
-                ART_SPECIES_PROVENANCE_ATTRIBUTE,
             ],
         )
         # The species arm reads its name and also answers nothing: an identity

@@ -46,6 +46,11 @@ from world.art.worker import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, synthetic_registries
+
+# Monster subjects are admitted only for registered visual species; the kit's
+# species is registered inside the base class's ``monster_species`` scope.
+_SYNTH_MONSTER = sorted(SYNTH_MONSTER_SPECIES)[0]
 
 class _MixedOutcomeClient:
     """A deterministic client whose outcome is scripted per description.
@@ -91,6 +96,11 @@ def _opaque_portrait_png(size=(16, 12)) -> bytes:
 
 class WorkerStoreIsolation(EvenniaTest):
     def setUp(self):
+        # The scope opens first so every record a test builds resolves its
+        # monster subject against the kit's registered species.
+        scope = synthetic_registries("monster_species")
+        scope.__enter__()
+        self.addCleanup(scope.__exit__, None, None, None)
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)

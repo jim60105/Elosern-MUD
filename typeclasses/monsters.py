@@ -80,7 +80,6 @@ class Monster(LivingEntity):
     variant_key: str | None = _GuardedIdentityKey(
         guard_individual_variant_key_write, default=None, autocreate=False
     )
-    art_species_key: str | None = AttributeProperty(default=None, autocreate=False)
     # The individual's own name (monster-individual-names): the only stored
     # copy of a name a species-backed individual owns. ``None`` means it has no
     # name of its own and reads by its species name; ``key`` is only the

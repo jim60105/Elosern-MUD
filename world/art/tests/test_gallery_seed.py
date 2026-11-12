@@ -37,6 +37,7 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monster_visuals
 
 from tools.spec_traceability import covers_requirement
+from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, synthetic_registries
 
 # Deterministic 1x1 valid PNG bytes so Pillow decodes a valid size
 _SEED_BYTES = base64.b64decode(
@@ -61,10 +62,10 @@ def _monster_key() -> str:
     """A registered visual species key.
 
     Seed admission is membership-checked, so a monster directory must name a
-    declared visual species rather than an arbitrary string. The key is read
-    from the authored declarations, never restated here.
+    declared visual species rather than an arbitrary string. The key is the
+    synthetic kit's species, so callers run inside a ``monster_species`` scope.
     """
-    return monster_visuals.BASELINE_VISUAL_ROWS[0].stable_key
+    return sorted(SYNTH_MONSTER_SPECIES)[0]
 
 
 def _character(key):
@@ -298,6 +299,7 @@ class SeedRootSkipTests(_TempRoots):
         self.assertEqual(cards_for(_character("heron")), [])
 
 
+@synthetic_registries("monster_species")
 class SyncIdempotencyTests(_TempRoots):
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_first_run_appends_one_card_per_file_and_the_second_copies_nothing(self):
@@ -591,6 +593,7 @@ class ManifestSyncTests(_TempRoots):
         self.assertEqual(record_for(subject).db.default_image_id, second["image_id"])
 
 
+@synthetic_registries("monster_species")
 class MonsterCapTests(_TempRoots):
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_a_monster_subject_receives_only_the_candidate_card(self):

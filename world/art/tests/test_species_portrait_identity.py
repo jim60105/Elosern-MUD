@@ -89,7 +89,6 @@ from world.art.subjects import (
     monster_subject_for,
     parse_subject,
 )
-from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 from world.tests.synthetic_data import (
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
@@ -121,11 +120,6 @@ VARIANT_ATTRIBUTE = "variant_key"
 # stored key rather than "whatever the catalog happens to hold".
 _OTHER_SPECIES = "t_synth_other_species"
 _UNREGISTERED_SPECIES = "t_synth_unregistered_species"
-
-# A registered ART-ONLY visual identity and a distinct complete species: two
-# monsters of one combat tier that must never share runtime state. The key is
-# read from the authored declarations rather than restated here.
-_ART_ONLY_KEY = BASELINE_VISUAL_ROWS[0].stable_key
 
 # The catalog's load-time geometry for a 4x4 test image (pixel-square).
 _OFFICIAL_RECT = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}
@@ -640,12 +634,11 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
     )
     def test_same_tier_species_never_borrow_each_others_runtime_card(self):
         backed = self._monster(species=_SYNTH_SPECIES)
-        bystander = self._monster()
-        bystander.art_species_key = _ART_ONLY_KEY
-        # One combat tier, two distinct declared visual species.
+        bystander = self._monster(species=_OTHER_SPECIES)
+        # One combat tier, two distinct registered visual species.
         self.assertEqual(backed.threat_tier, bystander.threat_tier)
         subject = self._subject()
-        other_subject = monster_subject_for(_ART_ONLY_KEY)
+        other_subject = monster_subject_for(_OTHER_SPECIES)
         self.assertNotEqual(subject, other_subject)
         image_id = "00000000-0000-4000-8000-0000000000aa"
         identity = f"gallery/monster/{_SYNTH_SPECIES}/{image_id}.png"
@@ -676,30 +669,40 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
     @covers_requirement(
         "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
     )
-    def test_an_invalid_complete_species_never_borrows_a_valid_art_only_key(self):
+    def test_an_unregistered_species_provenance_resolves_no_art(self):
         monster = self._monster(species=_UNREGISTERED_SPECIES)
-        monster.art_species_key = _ART_ONLY_KEY
-        # The art-only key is a valid identity in its own right...
-        self.assertIsNotNone(monster_subject_for(_ART_ONLY_KEY))
-        # ...but a declared, unresolvable complete species does not fall back
-        # to it: the individual resolves no art identity at all.
+        before = self._state(monster)
         payload = describe_entity(monster)
+        self.assertIsNone(official_content_reference_for_entity(monster))
         self.assertIsNone(candidate(payload))
         self.assertIsNone(payload["generation_subject"])
+        self.assertIn("monster_anon", terminal(payload)["url"])
+        self.assertEqual(before, self._state(monster))
+
+    def test_a_monster_without_species_provenance_resolves_nothing(self):
+        # A tier-built individual: a threat tier, a display name, no species.
+        monster = self._monster()
+        monster.key = _SYNTH_SPECIES
+        self._index(_SYNTH_SPECIES)
+        before = self._state(monster)
+        payload = describe_entity(monster)
+        self.assertIsNone(official_content_reference_for_entity(monster))
         self.assertIsNone(candidate(payload))
+        self.assertIsNone(payload["generation_subject"])
+        self.assertIn("monster_anon", terminal(payload)["url"])
+        self.assertEqual(before, self._state(monster))
 
     @covers_requirement(
         "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
     )
     def test_renaming_a_monster_never_changes_its_art_identity(self):
-        monster = self._monster()
-        monster.art_species_key = _ART_ONLY_KEY
+        monster = self._monster(species=_SYNTH_SPECIES)
         before = describe_entity(monster)
         monster.key = "renamed-display-name"
         after = describe_entity(monster)
         self.assertEqual(before["generation_subject"], after["generation_subject"])
         self.assertEqual(
-            before["generation_subject"], monster_subject_for(_ART_ONLY_KEY).full()
+            before["generation_subject"], monster_subject_for(_SYNTH_SPECIES).full()
         )
 
     # -- purity -----------------------------------------------------------
