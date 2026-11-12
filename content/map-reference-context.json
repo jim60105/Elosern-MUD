@@ -78,7 +78,8 @@
       "tide_lamp_crab",
       "vine_net_spider",
       "warm_rock_salamander",
-      "wax_pouch_rat"
+      "wax_pouch_rat",
+      "wreck_arm_octopus"
     ],
     "monster_tiers": [
       "calamity",
@@ -207,7 +208,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c32deb37b9c53897df734ba7f705e4731de0f9f8b91913605dacb7ad9596c94f",
+  "fingerprint": "742932a70c769ef6c1ac48ce120d0fa8d719e580d6f109dc93adca3b7e0e68e6",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -13666,7 +13667,7 @@
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
     "world/lore/monster_activity.py": "f466bd65e753a92506689c0b6bffa684e94270625f2fc52ec8980f2300239f34",
     "world/lore/monster_placement.py": "b1cc3bce1c18cb7b40af0d764037d73d59e30d46a07a5c0e97c79c1b3487441b",
-    "world/lore/monster_species.py": "a8b4294060632fb5e687332f8e0c2fdcd6d7d58b3a1abefbd5325a470679c521",
+    "world/lore/monster_species.py": "28c365f2a8183e7ec71b462907db63f04a75bdb5f0ae8533e468f2cafe80566d",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",
     "world/lore/names.py": "8a75cd6dca2f93ad173a31564fbb3fe752d4b8428a051110868a9de6f2ec834d",
