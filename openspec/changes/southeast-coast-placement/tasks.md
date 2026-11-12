@@ -15,8 +15,9 @@ Begin after `eastern-plains-deep-placement` and `breakwater-seal-species` are me
 ## 2. Evidence and documentation
 
 - [x] 2.1 Run the remaining Verification labels and record the non-gating bootstrap duration observation (design D4 item 5). Check: every label passes.
+  - Note: `world.maps.tests.test_bootstrap.test_bootstrap_grid` is the one label not run — design D4 makes it a non-gating observation and the local command-duration budget forbids the label — so no before or after duration was collected and D4 item 5's duration is explicitly unfulfilled (recorded in the review subsection). Every other Verification label passed.
 - [x] 2.2 Write the review subsection (design D4) and regenerate `content/map-reference-context.json` (design D5). Check: `uv run --locked python -m tools.map_reference_context --check` exits 0, and the subsection contains no coordinate, density, count or timing.
 
 ## 3. Handoff
 
-- [ ] 3.1 Run `uv run --locked python -m tools.contract_gate --change southeast-coast-placement` and `openspec validate southeast-coast-placement --strict`. Check: both exit 0, and no test file or shard manifest changed.
+- [x] 3.1 Run `uv run --locked python -m tools.contract_gate --change southeast-coast-placement` and `openspec validate southeast-coast-placement --strict`. Check: both exit 0, and no test file or shard manifest changed.
