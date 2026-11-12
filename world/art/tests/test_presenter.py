@@ -554,7 +554,7 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIsNone(candidate(descriptor))
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+        "monster-visual-identity::stored-species-provenance-is-the-only-monster-visual-identity"
     )
     def test_an_unregistered_species_key_falls_back_to_placeholder(self):
         self.monster.attributes.add("species_key", "t_synth_unregistered_species")

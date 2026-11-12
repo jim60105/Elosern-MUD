@@ -71,7 +71,7 @@ def _species(key: str = _T_SPECIES) -> MonsterSpecies:
 
 class VisualDeclarationShapeTests(unittest.TestCase):
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_declarations_are_appearance_only_never_combat_profiles(self):
         registry = build_monster_visual_registry({_T_SPECIES: _species()})
@@ -82,7 +82,7 @@ class VisualDeclarationShapeTests(unittest.TestCase):
                 self.assertFalse(declared & _COMBAT_SLOTS)
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_the_registry_is_exactly_the_combat_species_projection(self):
         first, second = f"{_T_SPECIES}_a", f"{_T_SPECIES}_b"
@@ -95,6 +95,9 @@ class VisualDeclarationShapeTests(unittest.TestCase):
         # A key no combat species holds is never a visual species.
         self.assertNotIn(f"{_T_SPECIES}_c", registry)
 
+    @covers_requirement(
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
+    )
     def test_a_key_without_a_combat_species_is_not_registered(self):
         with synthetic_registries("monster_species"):
             for key in SYNTH_MONSTER_SPECIES:
@@ -105,7 +108,7 @@ class VisualDeclarationShapeTests(unittest.TestCase):
 
 class CombatSpeciesProjectionTests(unittest.TestCase):
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_a_complete_species_projects_only_its_public_appearance(self):
         species = _species()
@@ -128,7 +131,7 @@ class CombatSpeciesProjectionTests(unittest.TestCase):
             self.assertNotIn(excluded, rendered)
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_a_missing_public_appearance_falls_back_to_the_label_only(self):
         blank = replace(_species(), published_appearance_zh="")
@@ -139,7 +142,7 @@ class CombatSpeciesProjectionTests(unittest.TestCase):
 
 class VisualRegistryClosureTests(unittest.TestCase):
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_the_merge_projects_the_injected_registry_and_admits_its_key(self):
         registry = build_monster_visual_registry({_T_SPECIES: _species()})
@@ -150,7 +153,7 @@ class VisualRegistryClosureTests(unittest.TestCase):
         self.assertNotIn(_T_SPECIES, build_monster_visual_registry({}))
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_a_mapping_key_that_disagrees_with_its_row_is_an_authoring_error(self):
         # Two entries declaring one row key: the second cannot pass silently.
@@ -161,7 +164,7 @@ class VisualRegistryClosureTests(unittest.TestCase):
             )
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+        "monster-visual-identity::the-monster-visual-registry-is-the-combat-species-projection"
     )
     def test_reserved_malformed_and_unknown_keys_are_never_admitted(self):
         reserved = sorted(RESERVED_KEYS)[0]

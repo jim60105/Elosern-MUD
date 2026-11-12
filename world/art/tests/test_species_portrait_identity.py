@@ -192,7 +192,7 @@ class SpeciesReferenceTests(unittest.TestCase):
         return reference, _unresolved_events(warned)
 
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_a_stored_species_key_is_the_whole_reference(self):
         entity = _ProvenanceEntity(**{SPECIES_PROVENANCE_ATTRIBUTE: _SYNTH_SPECIES})
@@ -223,7 +223,7 @@ class SpeciesReferenceTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_every_variant_of_one_species_resolves_that_same_species_reference(self):
         self.assertGreaterEqual(len(_VARIANTS_OF_SPECIES), 2, _VARIANTS_OF_SPECIES)
@@ -247,7 +247,7 @@ class SpeciesReferenceTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_a_variant_key_is_never_a_species_key(self):
         variant_key = _VARIANTS_OF_SPECIES[0]
@@ -259,7 +259,7 @@ class SpeciesReferenceTests(unittest.TestCase):
         self.assertEqual(events[0].kwargs["context"]["reason"], "unregistered_key")
 
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_a_tier_only_individual_resolves_no_reference_silently(self):
         entity = _ProvenanceEntity(threat_tier=_SYNTH_TIER)
@@ -293,7 +293,7 @@ class SpeciesReferenceTests(unittest.TestCase):
             monster_subject_for(_SYNTH_TIER)
 
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_a_display_name_or_entity_key_never_produces_a_reference(self):
         entity = _ProvenanceEntity()
@@ -439,7 +439,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
 
     # -- the official default presents -----------------------------------
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_a_catalog_backed_species_presents_its_official_image(self):
         identity = self._index(
@@ -667,7 +667,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertNotIn(identity, json.dumps(bystander_payload, sort_keys=True))
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+        "monster-visual-identity::stored-species-provenance-is-the-only-monster-visual-identity"
     )
     def test_an_unregistered_species_provenance_resolves_no_art(self):
         monster = self._monster(species=_UNREGISTERED_SPECIES)
@@ -693,7 +693,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(before, self._state(monster))
 
     @covers_requirement(
-        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+        "monster-visual-identity::stored-species-provenance-is-the-only-monster-visual-identity"
     )
     def test_renaming_a_monster_never_changes_its_art_identity(self):
         monster = self._monster(species=_SYNTH_SPECIES)
@@ -707,7 +707,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
 
     # -- purity -----------------------------------------------------------
     @covers_requirement(
-        "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
+        "species-portrait-identity::a-species-backed-monster-resolves-its-species-keyed-official-reference"
     )
     def test_resolution_reads_only_stored_identity_and_the_loaded_snapshot(self):
         self._index(

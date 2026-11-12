@@ -284,6 +284,9 @@ class UnregisteredMonsterPruneTests(EvenniaTestCase):
             ]
         )
 
+    @covers_requirement(
+        "art-gallery-generation::the-startup-prune-reclaims-stored-art-of-unregistered-monster-keys"
+    )
     def test_an_unregistered_species_leaves_nothing_behind(self):
         self.assertEqual(len(self._records_naming(_GONE)), 3)
         with _species_scope(_KEPT):
@@ -296,6 +299,9 @@ class UnregisteredMonsterPruneTests(EvenniaTestCase):
         self.assertEqual(result["records"], 1)
         self.assertEqual(result["files"], 3)
 
+    @covers_requirement(
+        "art-gallery-generation::the-startup-prune-reclaims-stored-art-of-unregistered-monster-keys"
+    )
     def test_a_registered_species_is_untouched(self):
         before = gallery_api.record_for(self.kept)
         cards_before = list(before.db.cards)
@@ -309,6 +315,9 @@ class UnregisteredMonsterPruneTests(EvenniaTestCase):
         self.assertEqual(after.db.default_image_id, default_before)
         self.assertTrue(self.kept_card.is_file())
 
+    @covers_requirement(
+        "art-gallery-generation::the-startup-prune-reclaims-stored-art-of-unregistered-monster-keys"
+    )
     def test_the_prune_stays_idempotent(self):
         with _species_scope(_KEPT):
             prune_gallery_orphans()

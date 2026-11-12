@@ -660,7 +660,7 @@ class MonsterBoundaryTests(unittest.TestCase):
         "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
     )
     @covers_requirement(
-        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+        "monster-visual-identity::stored-species-provenance-is-the-only-monster-visual-identity"
     )
     def test_a_monster_with_no_stored_species_identity_resolves_no_reference(self):
         # Tier text and display text are the substitution candidates: neither
