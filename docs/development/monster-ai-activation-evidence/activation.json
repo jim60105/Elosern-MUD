@@ -1,7 +1,7 @@
 {
   "schema": "monster-ai-activation-evidence/1",
   "algorithm_version": 5,
-  "configuration_fingerprint": "877fdd6d59ec7c58b55f1f9cf97c7f4e5d5988d2ad507e42f8ac2c36e3b88bda",
+  "configuration_fingerprint": "8b56d98c1221048d0ea7a4dc39dc5613cdafbf692e78d895204456ae464e9968",
   "activated": {
     "flock_leader": 58,
     "mudbank_dweller": 20,
@@ -20,7 +20,7 @@
   },
   "legacy_rollback": {
     "edit": "variant_decision_mode: {} (the six named entries removed; variant_intelligence is kept and stays validated)",
-    "configuration_fingerprint": "3bc2239fa7a0243a5423bfca45577f9e15d489a1a1d971b33006327f60661c73",
+    "configuration_fingerprint": "4c696e11b35e77699fae116667b52ac10142d40734c45899672d040f54fed551",
     "restart_required": true,
     "migration": "none",
     "database_restore": "none",
@@ -29,7 +29,7 @@
   "evidence": [
     {
       "path": "docs/development/monster-ai-manual-evidence/selector-check.json",
-      "fingerprint": "877fdd6d59ec7c58b55f1f9cf97c7f4e5d5988d2ad507e42f8ac2c36e3b88bda",
+      "fingerprint": "8b56d98c1221048d0ea7a4dc39dc5613cdafbf692e78d895204456ae464e9968",
       "claim": "paired selector evidence, regenerated under this tuning because the operation records the process's startup fingerprint"
     },
     {
