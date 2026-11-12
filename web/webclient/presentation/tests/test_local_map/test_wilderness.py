@@ -267,8 +267,8 @@ class LocalMapWildernessTests(EvenniaTestCase):
         self.assertNotEqual(node["action"]["exit_ref"], str(int(extra.id)))
 
 
-class LocalMapWildernessGatewayTests(EvenniaTest):
-    """Remembered wilderness nodes are stood-on map gateways (waves 3, 5, 6).
+class _RememberedGatewayFixture:
+    """The full-evennia fixture shared by the remembered-gateway journeys.
 
     ``EvenniaTest`` (not ``EvenniaTestCase``): ``enter_wilderness`` teleports
     need the full-evennia fixture, same as ``LocalMapPerGateFootprintTests``.
@@ -293,6 +293,20 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         entered = enter_wilderness(self.char1, coordinates=coordinates, name=WILDERNESS_NAME)
         self.assertTrue(entered, coordinates)
         record_arrival(self.char1)
+
+    def _render_counting_gateway_lookups(self):
+        """Render ``local_map`` and count the layer's per-cell approach lookups."""
+        with patch(
+            "web.webclient.presentation.local_map.wilderness._wilderness_gateway_at",
+            wraps=gateways._wilderness_gateway_at,
+        ) as lookup:
+            payload = self._registry().render("local_map", _context(self.char1))
+        self.assertTrue(payload["available"])
+        return lookup.call_count
+
+
+class LocalMapWildernessGatewayTests(_RememberedGatewayFixture, EvenniaTest):
+    """Remembered wilderness nodes are stood-on map gateways (waves 3, 5, 6)."""
 
     @covers_requirement("webclient-local-map::visibility-states-are-current-visible-unvisited-visible-visited-and-remembered")
     def test_only_stood_on_gateways_are_remembered_in_the_wilderness(self):
@@ -486,15 +500,8 @@ class LocalMapWildernessGatewayTests(EvenniaTest):
         )
         self.assertEqual(len(set(remembered.values())), 2)
 
-    def _render_counting_gateway_lookups(self):
-        """Render ``local_map`` and count the layer's per-cell approach lookups."""
-        with patch(
-            "web.webclient.presentation.local_map.wilderness._wilderness_gateway_at",
-            wraps=gateways._wilderness_gateway_at,
-        ) as lookup:
-            payload = self._registry().render("local_map", _context(self.char1))
-        self.assertTrue(payload["available"])
-        return lookup.call_count
+class LocalMapRememberedGatewayTests(_RememberedGatewayFixture, EvenniaTest):
+    """Recency, ceiling and robustness of the remembered gateway nodes."""
 
     @covers_requirement("webclient-local-map::remembered-wilderness-boundaries-do-not-probe-every-visited-cell")
     def test_gateway_lookups_do_not_grow_with_visited_cells(self):

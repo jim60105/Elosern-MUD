@@ -184,6 +184,9 @@ class WildernessWindowTests(_WildernessFixture):
                     {"length", "kind", "terrain", "band", "passable"},
                 )
 
+class WildernessOverviewRungTests(_WildernessFixture):
+    """The overview's adaptive kilometre ladder and its forced party cell."""
+
     @covers_requirement(
         "wilderness-area-map-reveal::the-overview-is-bounded-by-an-adaptive-kilometre-ladder"
     )
