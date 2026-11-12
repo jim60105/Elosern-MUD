@@ -14,9 +14,9 @@ Begin after `wreck-arm-octopus-species` is merged. Follow design.md verbatim. Ev
 
 ## 2. Documentation
 
-- [ ] 2.1 Add the overview row, the bestiary section and the ledger row (design D6). Check: `world.lore.tests.test_bestiary_documentation` passes, and the section names no skill key, buff id or resource field.
-- [ ] 2.2 Add the developer review section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
+- [x] 2.1 Add the overview row, the bestiary section and the ledger row (design D6). Check: `world.lore.tests.test_bestiary_documentation` passes, and the section names no skill key, buff id or resource field.
+- [x] 2.2 Add the developer review section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
 
 ## 3. Handoff
 
-- [ ] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change shaft-leap-cricket-species` and `openspec validate shaft-leap-cricket-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
+- [x] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change shaft-leap-cricket-species` and `openspec validate shaft-leap-cricket-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.
