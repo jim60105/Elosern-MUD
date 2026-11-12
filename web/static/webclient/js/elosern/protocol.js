@@ -208,7 +208,6 @@ var publication_parts = require("./protocol/publication_parts.js");
     validateGalleryPanel: gallery.validateGalleryPanel,
     validateGalleryActionPayload: gallery.validateGalleryActionPayload,
     GALLERY_SCHEMA_VERSION: gallery.GALLERY_SCHEMA_VERSION,
-    GALLERY_MAX_SUBJECTS: gallery.GALLERY_MAX_SUBJECTS,
     GALLERY_MAX_LABEL: gallery.GALLERY_MAX_LABEL,
     GALLERY_MAX_NAME: gallery.GALLERY_MAX_NAME,
     GALLERY_MAX_CHIP: gallery.GALLERY_MAX_CHIP,

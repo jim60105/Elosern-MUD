@@ -1,9 +1,8 @@
 "use strict";
 
 // Exact gallery mirror, registered at version 4 (change gallery-v4-cutover):
-// validateGalleryPanel is the category-scoped v4 form; validateGalleryPanelV3
-// is the dead rail form kept until gallery-v3-removal. Display
-// labels and matching facts are server-owned; every image fact is a canonical
+// validateGalleryPanel is the category-scoped form. Display labels and
+// matching facts are server-owned; every image fact is a canonical
 // artwork descriptor validated by ../artwork.js. The v2 flat row fields
 // (url/face_rect/stage) are deliberately absent: this validator rejects them,
 // so no reader can keep a second shape alive.
@@ -14,7 +13,6 @@ var artwork = require("../artwork.js");
 
 var codePoints = core.codePoints;
 var utf8Bytes = core.utf8Bytes;
-var jsonByteSize = core.jsonByteSize;
 var checkGlobalSafety = core.checkGlobalSafety;
 var requireExactFields = core.requireExactFields;
 var requireInt = core.requireInt;
@@ -23,16 +21,12 @@ var requireString = core.requireString;
 var hasLoneSurrogate = core.hasLoneSurrogate;
 
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
-var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 var MAX_LIST_ITEMS = C.MAX_LIST_ITEMS;
 var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
 
 // The mirrored gallery bounds. The runtime media URL ceiling is READ from the
 // canonical descriptor vocabulary's origin table so the two can never drift.
 var GALLERY_SCHEMA_VERSION = 4;
-// The dead version-3 validator's own discriminator (gallery-v3-removal).
-var V3_SCHEMA_VERSION = 3;
-var GALLERY_MAX_SUBJECTS = 24;
 var GALLERY_MAX_LABEL = 128;
 var GALLERY_MAX_NAME = 64;
 var GALLERY_MAX_CHIP = 16;
@@ -52,10 +46,6 @@ var GALLERY_MAX_OFFICIAL_ENTRIES = 32;
 var GALLERY_MAX_OFFICIAL_IDENTITY = 192;
 var GALLERY_OFFICIAL_URL_PREFIX = "/art/official/";
 var GALLERY_OFFICIAL_ROW_FIELDS = ["identity", "artwork", "is_current", "is_catalog_default"];
-var GALLERY_CAPABILITY_FIELDS = [
-  "supports_bindings", "supports_field_selection", "supports_free_text",
-  "supports_personal_official_preferences", "max_cards"
-];
 var GALLERY_CARD_FIELDS = [
   "image_id", "status", "label", "artwork", "is_default", "chips",
   "requested_fields", "binding_present", "created_at"
@@ -451,45 +441,6 @@ function compareCodePoints(a, b) {
   return left.length - right.length;
 }
 
-// Dead version-3 rail form: unregistered, deleted by gallery-v3-removal.
-function validateGalleryPanelV3(payload) {
-  requireExactFields(payload, "gallery", [
-    "schema_version", "available", "kind", "subjects", "selected", "filters",
-    "cards", "official_entries", "equipment_summary", "capabilities",
-    "binding_warnings", "error_state"
-  ], []);
-  if (payload.schema_version !== V3_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
-    throw new Error("invalid gallery discriminator");
-  }
-  if (!Array.isArray(payload.subjects) || payload.subjects.length < 1 || payload.subjects.length > GALLERY_MAX_SUBJECTS) {
-    throw new Error("invalid subject rail");
-  }
-  var subjects = new Set();
-  payload.subjects.forEach(function (row, index) {
-    requireExactFields(row, "subject row", ["subject_key", "kind", "display_name", "is_puppet"], []);
-    var subject = gallerySubject(row.subject_key);
-    if (row.kind !== subject.kind || subjects.has(row.subject_key) || row.is_puppet !== (index === 0) ||
-        (index === 0 && subject.directory !== "character")) {
-      throw new Error("incoherent subject rail");
-    }
-    galleryText(row.display_name, GALLERY_MAX_NAME, "subject display name");
-    subjects.add(row.subject_key);
-  });
-  var selected = gallerySubject(payload.selected);
-  if (!subjects.has(payload.selected)) throw new Error("selected is not in rail");
-  var capability = payload.capabilities;
-  validateGalleryCapabilities(capability, GALLERY_CAPABILITY_FIELDS);
-  var counts = validateGalleryCardFacts(payload, capability, selected);
-  requireExactFields(payload.filters, "filters", ["all", "defaults", "bound", "pending", "failed"], []);
-  Object.keys(counts).forEach(function (key) {
-    requireInt(payload.filters[key], key, 0, MAX_SAFE_INTEGER);
-    if (payload.filters[key] !== counts[key]) throw new Error("filter counts differ from rows");
-  });
-  checkGlobalSafety(payload);
-  if (jsonByteSize(payload) > MAX_CANONICAL_JSON_BYTES) throw new Error("gallery exceeds envelope size");
-  return payload;
-}
-
 // One selected subject's capability record: boolean flags, then the card cap.
 function validateGalleryCapabilities(capability, fields) {
   requireExactFields(capability, "capabilities", fields, []);
@@ -499,17 +450,15 @@ function validateGalleryCapabilities(capability, fields) {
   if (capability.max_cards !== null && capability.max_cards !== 1) throw new Error("invalid card cap");
 }
 
-// The selected subject's card fields, shared by every panel version:
-// equipment, official entries, card rows, the default/pending/failed limits,
-// the error state and the binding warnings. Returns the per-status row
-// counts, which the version-3 panel also publishes as `filters`.
+// The selected subject's card fields: equipment, official entries, card rows,
+// the default/pending/failed limits, the error state and the binding warnings.
 function validateGalleryCardFacts(payload, capability, selected) {
   if (capability.supports_bindings) validateGalleryEquipment(payload.equipment_summary);
   else if (payload.equipment_summary !== null) throw new Error("unsupported equipment summary");
   validateGalleryOfficialEntries(payload.official_entries);
   if (!Array.isArray(payload.cards) || payload.cards.length > MAX_LIST_ITEMS) throw new Error("invalid cards");
   var byId = new Map(), previous = Infinity;
-  var counts = { all: payload.cards.length, defaults: 0, bound: 0, pending: 0, failed: 0 };
+  var counts = { defaults: 0, pending: 0, failed: 0 };
   payload.cards.forEach(function (row) {
     requireExactFields(row, "gallery row", GALLERY_CARD_FIELDS, []);
     galleryUuid(row.image_id);
@@ -524,7 +473,6 @@ function validateGalleryCardFacts(payload, capability, selected) {
     requireBool(row.is_default, "is_default");
     requireBool(row.binding_present, "binding_present");
     counts.defaults += Number(row.is_default);
-    counts.bound += Number(row.binding_present);
     if (row.status === "pending") counts.pending++;
     if (row.status === "failed") counts.failed++;
     var chips = row.chips, fields = row.requested_fields;
@@ -581,7 +529,6 @@ function validateGalleryCardFacts(payload, capability, selected) {
   if (new Set(warningIds).size !== warningIds.length || JSON.stringify(warningIds) !== JSON.stringify(orderedWarnings)) {
     throw new Error("warnings must be unique and newest first");
   }
-  return counts;
 }
 
 // One version-4 bounded non-negative integer (an integral float such as 7.0
@@ -703,10 +650,8 @@ function isEmptyList(value) {
 
 module.exports = {
   validateGalleryPanel: validateGalleryPanel,
-  validateGalleryPanelV3: validateGalleryPanelV3,
   validateGalleryActionPayload: validateGalleryActionPayload,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
-  GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
   GALLERY_MAX_LABEL: GALLERY_MAX_LABEL,
   GALLERY_MAX_NAME: GALLERY_MAX_NAME,
   GALLERY_MAX_CHIP: GALLERY_MAX_CHIP,
