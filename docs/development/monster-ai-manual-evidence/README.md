@@ -108,6 +108,12 @@ adds one buff definition and one modifier rule and so moves the process's
 startup fingerprint; the recorded measurements are unchanged again. The six
 archetype campaigns and the performance report were not rerun and remain
 historical harness evidence at `497df2c1...`, not evidence for this tuning.
+They were regenerated once more for `salt-column-ant-species` (baseline commit
+`40866b9cf647bfb75702ab8a820683959c36a2b5`), again because that content change
+adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
 
 ## Exact operations
 
@@ -228,9 +234,9 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`ef4b4b1463e46c6346330aaae183c463a69071008c1f12509260aaecdb830061` -- that
+`383b1eff83cbae5592a5ea4ba2998249ecb95a024582c76b8a74e99bcc4436af` -- that
 operation records the process's startup fingerprint, which this value now is;
-the earlier values `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`,
+the earlier values `ef4b4b14...`, `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`,
 `f8858072...`, `3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`,
 `a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`,
 `3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and
