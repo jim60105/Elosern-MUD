@@ -20,7 +20,9 @@ tuple in absolute kilometres; boundary points count as land. Elevation polygon
 helpers take unclosed cell-coordinate vertices with implicit closure.
 
 Every function is pure and deterministic: no game, database, clock or random
-input, and no cache outside the arguments it is given.
+input. The one memoized helper keys its validation by argument identity, so a
+cached answer can only ever come from the very argument object that produced
+it, and a rejected boundary is rejected on every call.
 """
 
 from __future__ import annotations
@@ -98,10 +100,39 @@ def _ring(boundary: Iterable[Point]) -> tuple[Point, ...]:
     return vertices
 
 
+#: Validated rings by boundary object identity, each entry holding the object
+#: itself so a recycled ``id`` can never answer for a different boundary.
+_RING_MEMO: dict[int, tuple[tuple[Point, ...], tuple[Point, ...]]] = {}
+_RING_MEMO_LIMIT = 16
+
+
+def _ring_of(boundary: Iterable[Point]) -> tuple[Point, ...]:
+    """The validated ring of ``boundary``, validated once per ring object.
+
+    A mainland boundary carries hundreds of vertices and ``is_on_mainland``
+    re-validated every one of them on each call. The memo is keyed by object
+    IDENTITY, never by value: ``(False, False)`` compares equal to ``(0, 0)``,
+    and a value-keyed memo could answer a malformed boundary with another
+    boundary's validation. A ring that fails validation is never stored.
+    """
+
+    if not isinstance(boundary, tuple):
+        return _ring(boundary)
+    key = id(boundary)
+    cached = _RING_MEMO.get(key)
+    if cached is not None and cached[0] is boundary:
+        return cached[1]
+    ring = _ring(boundary)
+    if len(_RING_MEMO) >= _RING_MEMO_LIMIT:
+        _RING_MEMO.pop(next(iter(_RING_MEMO)))
+    _RING_MEMO[key] = (boundary, ring)
+    return ring
+
+
 def polygon_area_km2(boundary: Iterable[Point]) -> float:
     """Shoelace area of a closed boundary ring, square kilometres."""
 
-    vertices = _ring(boundary)
+    vertices = _ring_of(boundary)
     doubled = sum(
         vertices[index][0] * vertices[(index + 1) % len(vertices)][1]
         - vertices[(index + 1) % len(vertices)][0] * vertices[index][1]
@@ -134,7 +165,7 @@ def is_on_mainland(
     ``boundary`` is the closed mainland ring; boundary points count as land.
     """
 
-    vertices = _ring(boundary)
+    vertices = _ring_of(boundary)
     if _on_boundary(vertices, east_km, north_km):
         return True
     inside = False

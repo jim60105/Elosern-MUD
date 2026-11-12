@@ -88,6 +88,19 @@ class TestMetricTransforms:
         with pytest.raises(ValueError):
             polygon_area_km2(((0, 0), (1, 1)))
 
+    def test_ring_validation_survives_a_warm_memo(self):
+        # The validated ring is memoized per boundary object, so a
+        # value-equal but malformed boundary must still be rejected after the
+        # valid one has warmed the memo (``(False, 0) == (0, 0)``).
+        square = ((0, 0), (4, 0), (4, 4), (0, 4))
+        assert is_on_mainland(square, 2, 2)
+        for malformed in (
+            ((False, 0), (4, 0), (4, 4), (0, 4)),
+            ((0, 0.0), (4, 0), (4, 4), (0, 4)),
+        ):
+            with pytest.raises(ValueError):
+                is_on_mainland(malformed, 2, 2)
+
     def test_polygon_simplicity_checks(self):
         # Valid triangle
         assert is_simple_polygon(((0, 0), (10, 0), (0, 10))) == (True, "", "")
