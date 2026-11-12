@@ -1020,12 +1020,24 @@ population_counts(wilderness, zone_key) -> PopulationCounts     # pure read
 plan_population_wave(wilderness, zone_key, *, tick) -> PopulationWavePlan   # pure read
 commit_population_wave(wilderness, plan) -> tuple[int, ...]     # atomic
 initialize_zone(wilderness, zone_key, *, seed, tick) -> tuple[int, ...]  # once, atomic
+initialize_zones(wilderness, zone_keys, *, seed, tick) -> dict[str, tuple[int, ...]]
+                                                       # once per roster, one presence read
 register_explicit_individual(wilderness, individual, coordinates, *, tick) -> None
 wilderness_registration_target(room) -> (wilderness, cell) | None
 snapshot_population_surfaces(wilderness) -> dict[id(obj), SurfaceSnapshot]
 restore_population_surfaces(snapshot) -> None
 snapshot_regional_population_surfaces(start_tick, end_tick) -> dict[int, SurfaceSnapshot]
 ```
+
+`initialize_zone` is the single-zone entry point and delegates to
+`initialize_zones`. The roster-wide call keeps the same per-zone outcome -- one
+committed state record, constrained waves until the local lower bound or no
+lawful complete birth remains, nothing for an already-initialized zone -- but
+it pays the pass-wide costs once: one rollback surface, one presence read
+projected at the tick, one protected-cell read, and one durable registration
+write per wave. That read is what a fresh wilderness provisioning pass needs:
+the alternative scans every living individual twice per planned wave of every
+zone, and the authored roster is large enough for that to dominate startup.
 
 Reading rules a later slice must preserve:
 
