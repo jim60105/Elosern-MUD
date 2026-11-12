@@ -422,21 +422,30 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         from world.maps import bootstrap
         from world.maps import regional_population
 
-        real_initialize = regional_population.initialize_zone
-        calls: list[str] = []
+        # Provisioning initializes the whole roster in one pass, so the
+        # failure is injected at the wave commit of the SECOND zone: the first
+        # zone has already created individuals by then, which is what the
+        # rollback assertions prove are gone.
+        real_commit = regional_population._commit_planned_wave
+        committed_zones: list[str] = []
 
-        def initialize_once(wilderness, zone_key, *, seed, tick):
-            calls.append(zone_key)
-            if len(calls) == 2:
-                raise RuntimeError("injected later-zone failure")
-            return real_initialize(wilderness, zone_key, seed=seed, tick=tick)
+        def commit_until_the_second_zone(wilderness, plan, **kwargs):
+            if plan.zone_key not in committed_zones:
+                committed_zones.append(plan.zone_key)
+                if len(committed_zones) == 2:
+                    raise RuntimeError("injected later-zone failure")
+            return real_commit(wilderness, plan, **kwargs)
 
-        with patch.object(regional_population, "initialize_zone", initialize_once):
+        with patch.object(
+            regional_population,
+            "_commit_planned_wave",
+            commit_until_the_second_zone,
+        ):
             with self.assertRaises(RuntimeError):
                 bootstrap._provision_wilderness_script()
 
-        self.assertEqual(len(calls), 2)
-        self.assertNotEqual(calls[0], calls[1])
+        self.assertEqual(len(committed_zones), 2)
+        self.assertNotEqual(committed_zones[0], committed_zones[1])
         self.assertFalse(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists())
         self.assertEqual(Monster.objects.count(), 0)
 

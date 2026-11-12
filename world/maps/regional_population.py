@@ -2040,8 +2040,41 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
     generation sequence.
     """
     _require_wilderness(wilderness)
+    if plan.is_blocked:
+        return ()
+    return tuple(
+        individual.pk
+        for individual in _commit_planned_wave(
+            wilderness,
+            plan,
+            state=zone_state(wilderness, plan.zone_key),
+            counts=population_counts(wilderness, plan.zone_key, at_tick=plan.tick),
+            protected=_protected_cells(wilderness, at_tick=plan.tick),
+            snapshot=snapshot_population_surfaces(wilderness),
+        )
+    )
+
+
+def _commit_planned_wave(
+    wilderness: Any,
+    plan: PopulationWavePlan,
+    *,
+    state: ZonePopulationState | None,
+    counts: PopulationCounts,
+    protected: frozenset[tuple[int, int]],
+    snapshot: Mapping[int, SurfaceSnapshot] | None,
+) -> tuple[Monster, ...]:
+    """Commit one planned wave from the caller's already measured presence.
+
+    ``counts`` and ``protected`` are the measures the plan was derived from, so
+    the staleness check re-runs the shared decision core on them instead of
+    scanning every individual again. That lets a bulk caller that owns one
+    presence read commit every wave of a fresh world without rescanning, while
+    keeping the exact rejection semantics of :func:`commit_population_wave`.
+    ``snapshot=None`` means an enclosing owner operation already holds the
+    rollback surface for this write.
+    """
     zone = _zone(plan.zone_key)
-    state = zone_state(wilderness, plan.zone_key)
     if plan.is_blocked:
         return ()
     if (
@@ -2050,27 +2083,36 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
         or plan.expected_generation_sequence != state.generation_sequence
     ):
         raise PopulationPlanStale(f"{STALE_PLAN}: {plan.zone_key!r} state changed since planning")
-    fresh = plan_population_wave(wilderness, plan.zone_key, tick=plan.tick)
+    fresh = plan_population_wave_from(
+        plan.zone_key,
+        state=state,
+        counts=counts,
+        protected=protected,
+        tick=plan.tick,
+    )
     if fresh.is_blocked or fresh.placements != plan.placements:
         raise PopulationPlanStale(
             f"{STALE_PLAN}: {plan.zone_key!r} no longer commits the planned group"
         )
 
     placement = plan.placements[0]
-    surfaces = snapshot_population_surfaces(wilderness)
     created: list[Monster] = []
     try:
         with transaction.atomic():
+            registration = dict(wilderness.db.itemcoordinates or {})
+            room = (wilderness.db.rooms or {}).get(placement.cell)
             for variant_key, count in placement.groups:
                 species_key = variant_species_key(variant_key)
                 for _ in range(count):
                     individual = construct_species_individual(species_key, variant_key)
                     individual.db.home_ecology_zone = zone.key
-                    wilderness.db.itemcoordinates[individual] = placement.cell
-                    room = (wilderness.db.rooms or {}).get(placement.cell)
+                    registration[individual] = placement.cell
                     if room is not None:
                         _attach(individual, room)
                     created.append(individual)
+            # One durable write for the wave's whole registration instead of
+            # one full-dictionary save per individual.
+            wilderness.db.itemcoordinates = registration
             from world.maps import monster_activity
 
             # One group per movement unit: each row resolves the site-free
@@ -2109,9 +2151,10 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
             _write_state(wilderness, states)
             _emit("monster_population_wave", _wave_context(zone, plan, created, placement))
     except Exception:
-        restore_population_surfaces(surfaces)
+        if snapshot is not None:
+            restore_population_surfaces(snapshot)
         raise
-    return tuple(individual.pk for individual in created)
+    return tuple(created)
 
 
 def initialize_zone(wilderness: Any, zone_key: str, *, seed: int, tick: int) -> tuple[int, ...]:
@@ -2124,8 +2167,24 @@ def initialize_zone(wilderness: Any, zone_key: str, *, seed: int, tick: int) -> 
     and keeps its stored seed, sequence and individuals -- a restart, a source
     reread, or a room preparation never refills or rerolls it.
     """
+    return initialize_zones(wilderness, (zone_key,), seed=seed, tick=tick)[zone_key]
+
+
+def initialize_zones(
+    wilderness: Any, zone_keys: Iterable[str], *, seed: int, tick: int
+) -> dict[str, tuple[int, ...]]:
+    """Initialize every listed zone in one pass over one presence read.
+
+    Each zone keeps the semantics of :func:`initialize_zone`: one committed
+    state record plus constrained waves until the local lower bound or no
+    lawful complete birth remains, and nothing for a zone that is already
+    initialized. What one fresh world shares across its whole roster -- the
+    rollback surface, the individual presence read, the protected cells and
+    the durable registration write -- is paid once here instead of once per
+    zone, because every wave of that pass plans from the same measured facts
+    plus the individuals it has just committed.
+    """
     _require_wilderness(wilderness)
-    zone = _zone(zone_key)
     _require_argument_int(tick, "tick")
     if isinstance(seed, bool) or not isinstance(seed, int):
         raise ValueError(f"seed must be an integer, got {seed!r}")
@@ -2134,51 +2193,93 @@ def initialize_zone(wilderness: Any, zone_key: str, *, seed: int, tick: int) -> 
         raise PopulationSeedMismatch(
             f"{SEED_MISMATCH}: requested {seed} but the saved world seed is {world_seed}"
         )
-    if zone_state(wilderness, zone_key) is not None:
-        return ()
+    keys = tuple(dict.fromkeys(zone_keys))
+    pending = tuple(key for key in keys if zone_state(wilderness, key) is None)
+    if not pending:
+        return {key: () for key in keys}
 
+    wilderness_name = _wilderness_name(wilderness)
     surfaces = snapshot_population_surfaces(wilderness)
-    created: list[int] = []
+    initialized: dict[str, tuple[int, ...]] = {}
     try:
         with transaction.atomic():
-            states = _state_map(wilderness)
-            states[zone_key] = {
-                "initialized": True,
-                "seed": world_seed,
-                "generation_sequence": 0,
-                "recovery_due_tick": None,
-                "settled_through_tick": tick,
-            }
-            _write_state(wilderness, states)
-            birth_cells = _birth_cells(zone)
-            if not birth_cells:
-                raise MalformedPopulationState(
-                    f"{MALFORMED_STATE}: zone {zone_key!r} has no eligible birth cell"
+            presence = presence_at(wilderness, at_tick=tick)
+            protected = _protected_cells(wilderness, at_tick=tick)
+            for zone_key in pending:
+                zone = _zone(zone_key)
+                states = _state_map(wilderness)
+                states[zone_key] = {
+                    "initialized": True,
+                    "seed": world_seed,
+                    "generation_sequence": 0,
+                    "recovery_due_tick": None,
+                    "settled_through_tick": tick,
+                }
+                _write_state(wilderness, states)
+                birth_cells = _birth_cells(zone)
+                if not birth_cells:
+                    raise MalformedPopulationState(
+                        f"{MALFORMED_STATE}: zone {zone_key!r} has no eligible birth cell"
+                    )
+                lower, upper = density_bounds(
+                    len(birth_cells), zone.lower_density, zone.upper_density
                 )
-            _lower, upper = density_bounds(
-                len(birth_cells), zone.lower_density, zone.upper_density
-            )
-            for _ in range(upper + 1):
-                wave = plan_population_wave(wilderness, zone_key, tick=tick)
-                if wave.is_blocked:
-                    break
-                created.extend(commit_population_wave(wilderness, wave))
-            else:
-                raise MalformedPopulationState(
-                    f"{MALFORMED_STATE}: zone {zone_key!r} did not converge on initialization"
+                created: list[int] = []
+                counts = counts_from_presence(
+                    zone_key, presence, wilderness=wilderness_name
                 )
-            # An initialization blocked below the lower bound establishes its
-            # first delayed episode here; a converged zone keeps no due time.
-            if len(population_counts(wilderness, zone_key, at_tick=tick).local_ids) < _lower:
-                _write_zone_fields(
-                    wilderness,
-                    zone_key,
-                    recovery_due_tick=tick + zone.recovery_delay,
-                )
+                for _ in range(upper + 1):
+                    wave = plan_population_wave_from(
+                        zone_key,
+                        state=zone_state(wilderness, zone_key),
+                        counts=counts,
+                        protected=protected,
+                        tick=tick,
+                    )
+                    if wave.is_blocked:
+                        break
+                    members = _commit_planned_wave(
+                        wilderness,
+                        wave,
+                        state=zone_state(wilderness, zone_key),
+                        counts=counts,
+                        protected=protected,
+                        snapshot=None,
+                    )
+                    cell = wave.placements[0].cell
+                    for individual in members:
+                        # The facts this pass itself committed: the individual
+                        # now stands at the wave's cell and carries this zone's
+                        # home marker, exactly what a presence scan would read.
+                        presence[individual.pk] = PopulationPresence(
+                            True,
+                            PopulationPosition(
+                                wilderness_name, cell[0], cell[1]
+                            ),
+                            zone_key,
+                            None,
+                        )
+                        created.append(individual.pk)
+                    counts = counts_from_presence(
+                        zone_key, presence, wilderness=wilderness_name
+                    )
+                else:
+                    raise MalformedPopulationState(
+                        f"{MALFORMED_STATE}: zone {zone_key!r} did not converge on initialization"
+                    )
+                # An initialization blocked below the lower bound establishes
+                # its first delayed episode here; a converged zone keeps none.
+                if len(counts.local_ids) < lower:
+                    _write_zone_fields(
+                        wilderness,
+                        zone_key,
+                        recovery_due_tick=tick + zone.recovery_delay,
+                    )
+                initialized[zone_key] = tuple(created)
     except Exception:
         restore_population_surfaces(surfaces)
         raise
-    return tuple(created)
+    return {key: initialized.get(key, ()) for key in keys}
 
 
 # ---------------------------------------------------------------------------
@@ -2527,6 +2628,7 @@ __all__ = [
     "initialized_zone_keys",
     "initialize_population_seed",
     "initialize_zone",
+    "initialize_zones",
     "live_wilderness",
     "mapped_population_cell",
     "note_population_boundary",

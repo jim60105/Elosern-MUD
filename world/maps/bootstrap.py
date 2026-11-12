@@ -1488,7 +1488,7 @@ def _provision_wilderness_script() -> None:
         INITIAL_POPULATION_SEED,
         current_population_tick,
         initialize_population_seed,
-        initialize_zone,
+        initialize_zones,
         require_initialized_population,
         restore_population_surfaces,
         snapshot_population_surfaces,
@@ -1513,13 +1513,12 @@ def _provision_wilderness_script() -> None:
                 seed=INITIAL_POPULATION_SEED,
                 tick=tick,
             )
-            for zone_key in sorted(ECOLOGY_ZONE_REGISTRY):
-                initialize_zone(
-                    script,
-                    zone_key,
-                    seed=INITIAL_POPULATION_SEED,
-                    tick=tick,
-                )
+            initialize_zones(
+                script,
+                sorted(ECOLOGY_ZONE_REGISTRY),
+                seed=INITIAL_POPULATION_SEED,
+                tick=tick,
+            )
     except Exception:
         restore_population_surfaces(surfaces)
         raise
