@@ -14,12 +14,14 @@ of rendering, and never reachable by any mutation path.
 ### Requirement: The gallery panel is an exact read-only version-2 presentation panel
 
 The presentation registry SHALL register a `gallery` panel at schema version 4,
-available in exploration mode. Its available form SHALL be exactly the version-4
-category-scoped shape: `schema_version`, `available`, `kind` (the literal `gallery`),
-`categories`, `category`, `groups`, `selected`, `description`, `cards`,
-`official_entries`, `equipment_summary`, `capabilities`, `binding_warnings`, and
-`error_state`. The registered unavailable form SHALL keep the common field set,
-reason, and semantics.
+available in exploration mode, whose available form is exactly the version-4
+category-scoped shape. The registered unavailable form SHALL keep the common
+field set, reason, and semantics.
+
+#### Scenario: The available form carries exactly the version-4 fields
+
+- **WHEN** an available `gallery` panel is published
+- **THEN** it carries exactly `schema_version`, `available`, `kind` (the literal `gallery`), `categories`, `category`, `groups`, `selected`, `description`, `cards`, `official_entries`, `equipment_summary`, `capabilities`, `binding_warnings`, and `error_state`
 
 #### Scenario: An empty gallery is available, not unavailable
 
