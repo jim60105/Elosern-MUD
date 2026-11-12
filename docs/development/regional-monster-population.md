@@ -903,6 +903,12 @@ root with the single-token environment file `/tmp/mud-belts.env`
 | `uv run --locked python -m tools.contract_gate --change southwest-coast-placement` | passed |
 | `openspec validate southwest-coast-placement --strict` | valid |
 
+A local probe over the published registries confirmed that every new zone,
+activity area and site ground keeps the authored edge distance from every other
+landed one, that each new deep-wild rectangle holds sea-adjacent ground while
+the hinterland and corridor rectangles hold none, and that every site ground
+except the dry-ground ant mound is sea-adjacent.
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
