@@ -554,6 +554,12 @@
 - code: coiled_legs_agility_flat
   label: 蓄腿待躍敏捷提升
   severity: beneficial
+- code: sand_slide
+  label: 腳下沙陷
+  severity: harmful
+- code: sand_slide_agility_flat
+  label: 腳下沙陷敏捷下降
+  severity: harmful
 # 生理性疲勞投影（project-physiological-fatigue）：四個排他投影與三條戰鬥
 # 修正各自一個穩定代碼；嚴重度由這裡決定，呈現端不得自創。
 - code: fatigue_light

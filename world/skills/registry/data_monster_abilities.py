@@ -94,6 +94,9 @@ resolves every recipient's own hit and defense while the action pays once.
 The shaft-leap cricket's coiled hind kick is assembled the same way with
 elementless physical damage plus a self-mounted agility lift granted by every
 resolved attempt.
+The pit-sand antlion's sand-toss pincer is assembled the same way with
+elementless physical damage plus a hit-dependent agility debuff on the struck
+enemy.
 """
 
 from world.skills.effects import (
@@ -1342,6 +1345,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "sand_toss_pincer",
+        "揚沙鉗咬",
+        "甩頭把沙土揚向單一敵方目標的腳下，再以長顎鉗咬，造成物理傷害；命中後讓對手腳下沙土滑落，短暫降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:sand_slide"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("pit_sand_antlion",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )
