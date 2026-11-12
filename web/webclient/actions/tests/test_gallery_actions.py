@@ -572,6 +572,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(api.record_for(self.monster_subject).db.default_image_id, new["image_id"])
         self.assertTrue((self.root / new["stored_identity"]).exists())
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::undeclared-card-operations-reject-with-stable-codes"
+    )
     def test_undeclared_card_operations_reject_with_stable_codes(self):
         from world.art import gallery_kinds
 

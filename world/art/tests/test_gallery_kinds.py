@@ -298,6 +298,9 @@ class DeclarationContractTests(unittest.TestCase):
 class CardOperationDeclarationTests(unittest.TestCase):
     """The three per-card operation facts (gallery-kind-card-capabilities)."""
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::each-kind-declares-its-card-face-rectangle-stage-and-deletion-support"
+    )
     def test_every_record_reports_the_three_card_operation_facts_as_booleans(self):
         for value in _ALL_KIND_VALUES:
             record = gallery_kinds.capabilities_for(value)
@@ -306,6 +309,9 @@ class CardOperationDeclarationTests(unittest.TestCase):
                     self.assertIs(type(getattr(record, flag)), bool)
                     self.assertIn(f"{flag}=", repr(record))
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::each-kind-declares-its-card-face-rectangle-stage-and-deletion-support"
+    )
     def test_a_gallery_less_entry_claiming_stage_support_fails_naming_it(self):
         scene_value = ArtSubjectKind.SCENE.value
         violations = _violations_with(scene_value, supports_stage=True)

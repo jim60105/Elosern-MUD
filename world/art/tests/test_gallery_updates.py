@@ -631,6 +631,9 @@ class CardGeometryCapabilityGateTests(EvenniaTestCase):
     def _state(self):
         return _raw_cards(self.subject), official_preferences_for(self.subject).geometry
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
     def test_an_undeclared_stage_is_refused_with_no_write(self):
         before = self._state()
         with _declared(ArtSubjectKind.CHARACTER, supports_stage=False):
@@ -652,6 +655,9 @@ class CardGeometryCapabilityGateTests(EvenniaTestCase):
         self.assertEqual(after_cards[0]["stage"], before[0][0]["stage"])
         self.assertEqual(after_geometry, {_OFFICIAL: {"face_rect": _OFFICIAL_RECT}})
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
     def test_an_undeclared_face_rect_is_refused_with_no_write(self):
         before = self._state()
         with _declared(ArtSubjectKind.CHARACTER, supports_face_rect=False):
@@ -696,6 +702,9 @@ class CardGeometryCapabilityGateTests(EvenniaTestCase):
                 write()
             self.assertEqual(str(refused.exception), "this subject has no gallery record")
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
     def test_declared_operations_keep_working(self):
         stage = {"scale": 0.6, "x": 0.1, "y": 0}
         rect = {"x": 0, "y": 0, "w": 0.4, "h": 0.3}

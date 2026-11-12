@@ -165,6 +165,9 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         self.assertEqual(self._gallery_jobs(), [])
         self.assertIsNone(gallery_api.record_for(self.subject))
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
     def test_a_face_rect_is_accepted_only_where_the_kind_declares_it(self):
         # gallery-kind-card-capabilities: the generation seam reads the
         # face-rectangle declaration; a re-declared kind refuses the argument
