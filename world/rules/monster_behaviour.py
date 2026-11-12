@@ -4,17 +4,25 @@ Startup loads and validates one AI tuning rulebook and publishes four things:
 the immutable resolved tuning (:data:`MONSTER_AI_TUNING`) with its reproducible
 fingerprint, the typed per-monster resolution (:func:`resolve_monster_ai`) that
 honours the *actual* stored ``behaviour_tree`` and the registered
-species/variant pair, the legacy decision body, and the utility decision
+species/variant pair, the reflex decision body, and the deliberation decision
 dispatch that scores the decision's own bounded candidates and samples one
 with an independent, scope-seeded RNG.
+
+The two permanent modes are named for what they do. ``reflex`` (本能模式) keeps
+the target order, skill order, flee priority and dice sequence of the retained
+rulebook decision, compares affordable authored damage kits by the exact
+``E = A * c * R`` own-output estimate and, for ``highest_expected_damage``,
+samples them with an independent scope-seeded RNG. ``deliberation`` (權衡模式)
+scores bounded legal candidates with the authored utility weights and samples
+them with its intelligence-derived temperature.
 
 Intelligence is authored per registered variant and never inferred (design
 section 5/6): no tier, species, danger grade, rank, stat or archetype supplies
 one, and an authored value comes from that variant's own setting rather than
 from any ordering of those axes. The rulebook's ``variant_decision_mode`` names
 the small activated set introduced by ``monster-ai-staged-activation``; every
-other registered variant is still authored ``legacy`` and keeps returning
-exactly the action the legacy body returned.
+other registered variant keeps its archetype's ``reflex`` mode and returns
+exactly the action the reflex body returned.
 
 A typed invalid runtime AI state is the one narrow failure this boundary owns:
 it is reported through the facade and resolved by the configured invalid-state
@@ -31,6 +39,7 @@ from json import dumps
 from math import isfinite
 from numbers import Real
 from pathlib import Path
+from random import Random
 from types import MappingProxyType
 from typing import Any, Callable
 
@@ -57,12 +66,22 @@ from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_individual import _registered_variant
 from world.rules.progression import can_use_skill
 from world.rules.world_escape import AbstractEscapeContext
+from world.skills.effects import DamageEffect, EffectPolicy
 from world.skills.registry import (
     SKILL_REGISTRY,
     SkillDef,
     SkillKind,
     TargetSpec,
 )
+from world.skills.handler import INNATE_SKILL_KEYS
+
+
+#: The innate attack a reflex decision falls back to when no authored damage
+#: kit is usable. It is the one owned active every combatant carries, and a
+#: variant that abandoned it for a reflex guess could not use its own riders.
+INNATE_ATTACK_KEY = "basic_attack"
+if INNATE_ATTACK_KEY not in INNATE_SKILL_KEYS:
+    raise RuntimeError("INNATE_ATTACK_KEY must be one of the innate skill keys")
 
 
 class MonsterBehaviourConfigError(ValueError):
@@ -101,8 +120,12 @@ MONSTER_BEHAVIOUR_YAML = _load_rulebook(
 #: control term. Version 5 is the observed-coordination slice: a decision now
 #: also scores the eligible settled history's observed allied pressure as an
 #: intelligence-scaled focus term and lets the threat-valuing target strategy
-#: average each opponent's static rank with its observed-threat rank.
-AI_ALGORITHM_VERSION = 5
+#: average each opponent's static rank with its observed-threat rank. Version 6
+#: is the reflex-estimate slice: a reflex decision now competes affordable
+#: authored SINGLE and AREA kits by the exact ``A * c * R`` own-output estimate
+#: and samples them with the profile's authored ``reflex_temperature``, and the
+#: permanent modes are named ``reflex`` and ``deliberation``.
+AI_ALGORITHM_VERSION = 6
 
 #: The authored candidate-budget bounds (attack design section 4).
 MIN_CANDIDATE_BUDGET = 1
@@ -132,13 +155,17 @@ OBSERVATION_WINDOW_ROUNDS = 3
 class DecisionMode(StrEnum):
     """One monster's effective decision mode (design section 5).
 
-    ``LEGACY`` is a permanent product mode, not a compatibility shim: its
-    target order, skill order, flee priority and dice sequence are the retained
-    contract.
+    ``REFLEX`` (本能模式) is a permanent product mode, not a compatibility
+    shim: its target order, skill order, flee priority and dice sequence are
+    the retained contract, and its authored-kit comparison is the exact
+    ``A * c * R`` own-output estimate. ``DELIBERATION`` (權衡模式) scores the
+    bounded legal candidate set with the authored utility weights. Neither
+    value has an alias, and the former names are rejected like any other
+    unrecognized mode.
     """
 
-    LEGACY = "legacy"
-    UTILITY = "utility"
+    REFLEX = "reflex"
+    DELIBERATION = "deliberation"
 
 
 #: The complete named utility-weight schema (attack design section 6). A
@@ -180,9 +207,9 @@ class InvalidDecisionReason(StrEnum):
     #: The actual stored binding names no archetype this process knows, so no
     #: profile -- and therefore no mode -- can be established at all.
     INVALID_BINDING = "invalid_binding"
-    #: Utility was requested without a registered species/variant pair.
+    #: Deliberation was requested without a registered species/variant pair.
     INVALID_IDENTITY = "invalid_identity"
-    #: Utility was requested for a variant that authors no intelligence.
+    #: Deliberation was requested for a variant that authors no intelligence.
     MISSING_INTELLIGENCE = "missing_intelligence"
 
 
@@ -227,7 +254,16 @@ class MonsterAITuning:
 
 @dataclass(frozen=True)
 class BehaviourProfile:
-    """Tunable leaves for the shared monster decision tree."""
+    """Tunable leaves for the shared monster decision tree.
+
+    ``reflex_temperature`` is the authored softmax temperature a
+    ``highest_expected_damage`` reflex decision samples its own-output
+    estimates with. It is in raw ``E`` units, so it is authored per evaluating
+    archetype rather than derived from intelligence; a ``first_owned`` profile
+    may omit it and the value then has no effect on its decisions.
+    ``prefer_area_when_multiple_enemies`` keeps its key and validation but only
+    deliberation scores it -- reflex shapes compete through ``R(s)`` instead.
+    """
 
     target_strategy: str
     skill_choice: str
@@ -235,6 +271,7 @@ class BehaviourProfile:
     flee_hp_fraction: float | None
     decision_mode: DecisionMode
     utility_weights: UtilityWeights | None
+    reflex_temperature: float | None
 
 
 _MANDATORY_PROFILE_FIELDS = frozenset(
@@ -245,7 +282,9 @@ _MANDATORY_PROFILE_FIELDS = frozenset(
         "flee_hp_fraction",
     }
 )
-_OPTIONAL_PROFILE_FIELDS = frozenset({"decision_mode", "utility_weights"})
+_OPTIONAL_PROFILE_FIELDS = frozenset(
+    {"decision_mode", "utility_weights", "reflex_temperature"}
+)
 _TOP_LEVEL_FIELDS = frozenset(
     {
         "tier_default_archetype",
@@ -255,10 +294,10 @@ _TOP_LEVEL_FIELDS = frozenset(
         "candidate_budget",
     }
 )
-#: An archetype that declares no mode is legacy, and one that declares no
+#: An archetype that declares no mode is reflex, and one that declares no
 #: weights is simply not scored yet (design section 5; attack design section 2
 #: makes both fields additive).
-_DEFAULT_DECISION_MODE = DecisionMode.LEGACY
+_DEFAULT_DECISION_MODE = DecisionMode.REFLEX
 _TARGET_STRATEGIES = frozenset({"lowest_hp", "highest_effective_power"})
 _SKILL_CHOICES = frozenset({"first_owned", "highest_expected_damage"})
 
@@ -293,8 +332,9 @@ def _validated_mode(value: Any, where: str) -> DecisionMode:
 def _validated_weights(value: Any, where: str) -> UtilityWeights | None:
     """Return the complete named weight schema, or ``None`` when unauthored.
 
-    The field is additive: an archetype may stop at the four mandatory legacy
-    fields, and a supplied mapping must then declare exactly the named schema.
+    The field is additive: an archetype may stop at the four mandatory
+    behaviour fields, and a supplied mapping must then declare exactly the
+    named schema.
     """
     if value is None:
         return None
@@ -318,6 +358,35 @@ def _validated_weights(value: Any, where: str) -> UtilityWeights | None:
             raise _configuration_error(f"{where} has a negative {name} weight")
         resolved[name] = float(weight)
     return UtilityWeights(**resolved)
+
+
+def _validated_temperature(
+    value: Any,
+    where: str,
+    *,
+    skill_choice: str,
+) -> float | None:
+    """Return the authored reflex temperature, or ``None`` when unauthored.
+
+    A ``highest_expected_damage`` profile must author one, because that is the
+    profile whose reflex decisions sample by it -- and the requirement holds
+    even while the profile's *effective* mode is deliberation, since a rollback
+    must be able to switch it back without a data edit. A ``first_owned``
+    profile may omit it; a value it does supply is validated exactly as
+    strictly, it simply has no effect on its decisions.
+    """
+    if value is None:
+        if skill_choice == "highest_expected_damage":
+            raise _configuration_error(
+                f"{where} must declare a finite positive reflex_temperature "
+                f"for highest_expected_damage"
+            )
+        return None
+    if not _finite_real(value) or value <= 0:
+        raise _configuration_error(
+            f"{where} has invalid reflex_temperature {value!r}"
+        )
+    return float(value)
 
 
 def _load_behaviour_profiles(
@@ -395,6 +464,11 @@ def _load_behaviour_profiles(
             utility_weights=_validated_weights(
                 values.get("utility_weights"), f"archetype {key!r}"
             ),
+            reflex_temperature=_validated_temperature(
+                values.get("reflex_temperature"),
+                f"archetype {key!r}",
+                skill_choice=skill_choice,
+            ),
         )
 
     if set(defaults) != tier_keys:
@@ -453,7 +527,7 @@ def _validated_intelligence(
     species: Any,
     variants: Any,
 ) -> dict[str, int]:
-    """Return validated per-variant intelligence, inactive legacy entries included."""
+    """Return validated per-variant intelligence, inactive entries included."""
     declared = _validated_variant_keys(
         value, "variant_intelligence", species, variants
     )
@@ -482,14 +556,14 @@ def _validated_variant_modes(
     }
 
 
-def _validate_utility_coverage(
+def _validate_deliberation_coverage(
     profiles: Mapping[str, BehaviourProfile],
     defaults: Mapping[str, str],
     variants: Any,
     intelligence: Mapping[str, int],
     modes: Mapping[str, DecisionMode],
 ) -> None:
-    """Require every effective utility variant to author its intelligence.
+    """Require every effective deliberation variant to author its intelligence.
 
     The authored binding is used here (the variant's own archetype reference,
     else its tier default), because startup can only validate authored data;
@@ -505,16 +579,84 @@ def _validate_utility_coverage(
             raise _configuration_error(
                 f"variant {key!r} references unknown archetype {archetype_key!r}"
             )
-        if modes.get(key, profile.decision_mode) is DecisionMode.UTILITY:
+        if modes.get(key, profile.decision_mode) is DecisionMode.DELIBERATION:
             if key not in intelligence:
                 raise _configuration_error(
-                    f"utility variant {key!r} declares no intelligence"
+                    f"deliberation variant {key!r} declares no intelligence"
                 )
             if profile.utility_weights is None:
                 raise _configuration_error(
-                    f"utility variant {key!r} binds an archetype with no "
+                    f"deliberation variant {key!r} binds an archetype with no "
                     f"utility weights"
                 )
+
+
+@dataclass(frozen=True, slots=True)
+class PrimaryDamageDescriptor:
+    """The one authored damage occurrence a reflex estimate reads.
+
+    ``ordinal`` is the occurrence's authored position in the skill's effect
+    list and ``coefficient`` that occurrence's own policy coefficient, so the
+    skill key plus these two numbers identify exactly what a reflex decision
+    consumes. ``school`` is the parsed occurrence's school, never a guess from
+    the skill's name or element.
+    """
+
+    skill_key: str
+    ordinal: int
+    school: str
+    coefficient: float
+
+    def as_payload(self) -> dict[str, Any]:
+        """Return the canonical projection the tuning fingerprint covers."""
+        return {
+            "skill_key": self.skill_key,
+            "ordinal": self.ordinal,
+            "school": self.school,
+            "coefficient": self.coefficient,
+        }
+
+
+def _primary_damage_descriptor(skill: SkillDef) -> PrimaryDamageDescriptor | None:
+    """Return the first damage occurrence's descriptor, or ``None``.
+
+    The occurrence is taken from the parsed effects paired with their own
+    policies, so a skill that opens with a non-damage effect of a different
+    coefficient (a self-buff, a heal) never has that policy's coefficient read
+    as the damage one. Additional damage occurrences, strike counts and riders
+    are deliberately outside this simple heuristic.
+    """
+    for ordinal, (effect, policy) in enumerate(
+        zip(skill.parsed_effects, skill.effect_policies)
+    ):
+        if isinstance(effect, DamageEffect):
+            return PrimaryDamageDescriptor(
+                skill_key=skill.key,
+                ordinal=ordinal,
+                school=effect.school,
+                coefficient=float(policy.coefficient),
+            )
+    return None
+
+
+def _primary_damage_payload() -> list[dict[str, Any]]:
+    """Return every registered damage skill's primary-damage projection.
+
+    A reflex decision consumes whichever authored damage kit its variant owns,
+    so the coefficient and school of every registered active damage occurrence
+    are decision-relevant inputs: editing one changes what an identical
+    resolved tuning decides. They are carried in canonical skill-key order and
+    never by name alone.
+    """
+    payload: list[dict[str, Any]] = []
+    for key in sorted(SKILL_REGISTRY):
+        skill = SKILL_REGISTRY[key]
+        if skill.kind is not SkillKind.ACTIVE:
+            continue
+        descriptor = _primary_damage_descriptor(skill)
+        if descriptor is not None:
+            payload.append(descriptor.as_payload())
+    return payload
 
 
 def _estimation_rules_payload() -> dict[str, Any]:
@@ -598,16 +740,19 @@ def _tuning_fingerprint(
     value, a tier default, a behaviour leaf or a referenced variant's binding
     always changes it. It is the complete set of decision-relevant rulebook
     inputs this process consumes today (design section 5): the archetype
-    decision leaves, the tier defaults, the referenced variant bindings, and --
-    since the effect-estimation slice landed -- the shared combat rulebook
-    leaves every estimate averages over, plus the observed-coordination decay
-    and window constants the focus and threat projections are defined by.
+    decision leaves (including each authored reflex temperature), the tier
+    defaults, the referenced variant bindings, the primary damage occurrence of
+    every registered damage skill a reflex decision may consume, and -- since
+    the effect-estimation slice landed -- the shared combat rulebook leaves
+    every estimate averages over, plus the observed-coordination decay and
+    window constants the focus and threat projections are defined by.
     """
     payload = {
         "algorithm_version": AI_ALGORITHM_VERSION,
         "candidate_budget": candidate_budget,
         "estimation_rules": _estimation_rules_payload(),
         "coordination_rules": _coordination_rules_payload(),
+        "primary_damage": _primary_damage_payload(),
         "tier_default_archetype": dict(sorted(defaults.items())),
         "archetypes": {
             key: {
@@ -618,6 +763,7 @@ def _tuning_fingerprint(
                 ),
                 "flee_hp_fraction": profile.flee_hp_fraction,
                 "decision_mode": profile.decision_mode.value,
+                "reflex_temperature": profile.reflex_temperature,
                 "utility_weights": (
                     None
                     if profile.utility_weights is None
@@ -649,9 +795,10 @@ def _load_ai_tuning(
     """Validate the whole AI tuning rulebook and fingerprint its resolved form.
 
     References, primitive types, numeric bounds, the complete named weight
-    schema and utility activation coverage are all checked once at startup;
-    the published record is immutable. The registries are injectable so a
-    synthetic rulebook can be validated without naming shipped content.
+    schema, the conditional reflex temperature and deliberation activation
+    coverage are all checked once at startup; the published record is
+    immutable. The registries are injectable so a synthetic rulebook can be
+    validated without naming shipped content.
     """
     if not isinstance(rulebook, Mapping):
         raise _configuration_error("rulebook must be a mapping")
@@ -683,7 +830,7 @@ def _load_ai_tuning(
         )
         for key in sorted(set(intelligence) | set(modes))
     }
-    _validate_utility_coverage(
+    _validate_deliberation_coverage(
         resolved_profiles, defaults, variant_rows, intelligence, modes
     )
     return MonsterAITuning(
@@ -806,7 +953,7 @@ def resolve_monster_ai(
         else resolved.variant_intelligence.get(variant_key)
     )
     reason = None
-    if mode is DecisionMode.UTILITY:
+    if mode is DecisionMode.DELIBERATION:
         if variant_key is None:
             reason = InvalidDecisionReason.INVALID_IDENTITY
         elif intelligence is None:
@@ -888,14 +1035,14 @@ def support_kit_mode_violations(
 ) -> tuple[tuple[str, str], ...]:
     """Report owned support actives an effective mode can never select.
 
-    The permanent legacy decision body proposes only affordable actives that
+    The permanent reflex decision body proposes only affordable actives that
     carry a ``damage:`` effect, so a variant whose effective decision mode is
-    not ``utility`` can never select an owned active without one. This reads
-    the same damage predicate the legacy body applies and returns every
+    not ``deliberation`` can never select an owned active without one. This
+    reads the same damage predicate the reflex body applies and returns every
     ``(variant_key, skill_key)`` pair in sorted order.
 
     It is a production integrity check over a resolved tuning, never a loader
-    rejection: an edited legacy rollback tuning must still load, and its
+    rejection: an edited reflex rollback tuning must still load, and its
     support-kit variants simply keep their innate attack while rolled back.
     """
     variant_rows = MONSTER_VARIANT_REGISTRY if variants is None else variants
@@ -914,7 +1061,7 @@ def support_kit_mode_violations(
             # A missing archetype is a startup error owned by the loader.
             continue
         mode = tuning.variant_decision_mode.get(key, profile.decision_mode)
-        if mode is DecisionMode.UTILITY:
+        if mode is DecisionMode.DELIBERATION:
             continue
         for skill_key in variant.active_skill_keys:
             skill = skill_rows.get(skill_key)
@@ -925,15 +1072,6 @@ def support_kit_mode_violations(
             ):
                 violations.append((key, skill_key))
     return tuple(sorted(violations))
-
-
-def _damage_school(skill: SkillDef) -> str:
-    """Return the physical or magic school from a damage effect."""
-    effect = next(
-        effect for effect in skill.effects if effect.startswith("damage:")
-    )
-    school = combat._parse_damage_effect(effect).school
-    return school
 
 
 def _living_enemies(
@@ -999,36 +1137,92 @@ def _choose_target(
     return tied[dice.roll_d100() % len(tied)]
 
 
+def _reflex_estimates(
+    entity: Any,
+    candidates: list[SkillDef],
+    *,
+    area_recipients: int,
+) -> list[float]:
+    """Return each candidate's exact own-output estimate ``E = A * c * R``.
+
+    ``A`` is the actor's own adjusted attacking stat for the primary damage
+    occurrence's school, read once per school per decision and including its
+    own buffs and modifier bundle. ``c`` is that occurrence's authored
+    coefficient and ``R`` the number of living hostile recipients for an AREA
+    kit (one for SINGLE). Deliberately absent: every defender term, hit chance,
+    damage floor, critical ladder, resistance, extra damage occurrence and
+    on-hit rider. Those stay real settlement concerns; this is the simple
+    own-output heuristic the reflex mode is defined by.
+    """
+    attacks: dict[str, float] = {}
+    estimates: list[float] = []
+    for skill in candidates:
+        descriptor = _primary_damage_descriptor(skill)
+        if descriptor is None:
+            raise ValueError(
+                f"a reflex candidate must declare a damage occurrence: "
+                f"{skill.key!r}"
+            )
+        attack = attacks.get(descriptor.school)
+        if attack is None:
+            attack_key = (
+                "atk_phys" if descriptor.school == "physical" else "magic_power"
+            )
+            attack = combat._adjusted_attack(entity, attack_key)
+            attacks[descriptor.school] = attack
+        recipients = area_recipients if skill.target_spec is TargetSpec.AREA else 1
+        estimates.append(attack * descriptor.coefficient * recipients)
+    return estimates
+
+
 def _choose_skill(
     entity: Any,
     candidates: list[SkillDef],
     strategy: str,
-    target: Any | None,
+    *,
+    area_recipients: int,
+    temperature: float | None = None,
+    seed: int | None = None,
+    rng: "Random | None" = None,
 ) -> SkillDef:
-    """Choose an eligible skill without consuming resolution dice."""
+    """Choose one usable authored skill without consuming resolution dice.
+
+    ``first_owned`` takes the first entry of the owned-order candidate list and
+    evaluates nothing. ``highest_expected_damage`` always returns a lone usable
+    authored kit without sampling, and otherwise samples the exact estimates by
+    stable softmax at the profile's authored temperature. The generator is the
+    injectable ``rng`` seam when one is supplied and a private ``Random(seed)``
+    otherwise, so combat hit, damage and initiative dice are never perturbed.
+    """
     if strategy == "first_owned":
         return candidates[0]
     if strategy != "highest_expected_damage":
         raise ValueError(f"unknown skill_choice: {strategy!r}")
-    defender_defense = (
-        combat._adjusted_defense(target) if target is not None else 0.0
+    if len(candidates) == 1:
+        return candidates[0]
+    if temperature is None:
+        raise ValueError(
+            "highest_expected_damage needs its authored reflex temperature"
+        )
+    from world.rules.monster_ai.selection import (
+        sample_index,
+        softmax_probabilities,
     )
 
-    def expected_damage(skill: SkillDef) -> float:
-        attack_key = (
-            "atk_phys"
-            if _damage_school(skill) == "physical"
-            else "magic_power"
+    estimates = _reflex_estimates(
+        entity, candidates, area_recipients=area_recipients
+    )
+    probabilities = softmax_probabilities(estimates, temperature=temperature)
+    if rng is not None:
+        generator = rng
+    elif seed is not None:
+        generator = Random(seed)
+    else:
+        raise ValueError(
+            "highest_expected_damage needs a selection seed or an injected "
+            "generator"
         )
-        return combat._adjusted_attack(entity, attack_key) - defender_defense
-
-    best = max(expected_damage(skill) for skill in candidates)
-    tied = [
-        skill for skill in candidates if expected_damage(skill) == best
-    ]
-    if len(tied) == 1:
-        return tied[0]
-    return tied[dice.roll_d100() % len(tied)]
+    return candidates[sample_index(probabilities, rng=generator)]
 
 
 def monster_behaviour_policy(
@@ -1039,6 +1233,7 @@ def monster_behaviour_policy(
     scale: float = 1.0,
     decision: Any = None,
     trace: "list[Any] | None" = None,
+    rng: Random | None = None,
 ) -> ActionRequest | None:
     """Return one resolver-ready monster action for the current turn.
 
@@ -1057,6 +1252,9 @@ def monster_behaviour_policy(
       one this session actually recorded.
     * ``trace`` -- an opt-in sink that receives one
       :class:`~world.rules.monster_ai.trace.DecisionTrace` per decision.
+    * ``rng`` -- the injectable independent selection generator a focused
+      test supplies to a stochastic reflex decision. Production passes
+      nothing, and the decision seeds its own private generator instead.
 
     A non-monster delegates unchanged; a typed invalid runtime AI state is
     reported and resolved by the configured invalid-state behaviour; an
@@ -1081,61 +1279,34 @@ def monster_behaviour_policy(
     resolution = resolve_monster_ai(entity) if decision is None else decision
     if resolution is not None and resolution.invalid_reason is not None:
         return _degraded_action(entity, battlefield, settlement, resolution)
-    if resolution is not None and resolution.mode is DecisionMode.UTILITY:
-        return _utility_dispatch(entity, battlefield, settlement, scale, resolution, trace)
-    return _legacy_action(
+    if resolution is not None and resolution.mode is DecisionMode.DELIBERATION:
+        return _deliberation_dispatch(
+            entity, battlefield, settlement, scale, resolution, trace
+        )
+    return _reflex_action(
         entity,
         battlefield,
         settlement,
         resolve_behaviour_profile(entity),
+        resolution=resolution,
+        rng=rng,
     )
 
 
-def _legacy_action(
+def _single_target(
     entity: Any,
     battlefield: Battlefield,
-    context: Any,
+    enemies: list[Any],
+    single_skills: list[SkillDef],
     profile: BehaviourProfile,
-) -> ActionRequest | None:
-    """Return the permanent legacy decision, unchanged, in one context."""
+) -> tuple[Any | None, list[SkillDef]]:
+    """Resolve the SINGLE-target domain and its one chosen target.
 
-    enemies = _living_enemies(battlefield, entity)
-    if not enemies:
-        return None
-    if _should_flee(entity, profile):
-        return ActionRequest(
-            actor=entity,
-            skill_key=FLEE_SKILL_KEY,
-            targets=[entity],
-            context=context,
-        )
-    damage_skills = _owned_damage_skills(entity)
-    single_skills = [
-        skill
-        for skill in damage_skills
-        if skill.target_spec is TargetSpec.SINGLE
-    ]
-    area_skills = [
-        skill
-        for skill in damage_skills
-        if skill.target_spec is TargetSpec.AREA
-    ]
-    use_area = (
-        profile.prefer_area_when_multiple_enemies
-        and len(enemies) > 1
-        and bool(area_skills)
-    ) or (not single_skills and bool(area_skills))
-    if use_area:
-        skill = _choose_skill(
-            entity,
-            area_skills,
-            profile.skill_choice,
-            target=None,
-        )
-        return ActionRequest(entity, skill.key, "all-enemies", context)
-    if not single_skills:
-        return None
-
+    Returns the chosen target and the SINGLE skills that target actually
+    admits, or ``(None, [])`` when the domain is empty or nothing it admits is
+    usable. An empty SINGLE domain never discards a legal AREA option: the
+    caller keeps its area kits regardless.
+    """
     from world.rules.buffs import entity_active_buffs, has_positional_marker
     from world.rules.spell_conditions import is_strike_class
 
@@ -1144,7 +1315,7 @@ def _legacy_action(
     # candidate base narrows to the seal-bearers in canonical order (player
     # first, then ascending pk). With no seal anywhere the base stays exactly
     # the living enemies, so every no-seal decision is byte-identical. AREA
-    # paths already returned above; the positional-marker exclusion below
+    # kits are outside this domain; the positional-marker exclusion below
     # remains an orthogonal filter and is never substituted by the seal.
     sealed = [
         enemy for enemy in enemies if "lamb_seal" in entity_active_buffs(enemy)
@@ -1170,7 +1341,7 @@ def _legacy_action(
     if not has_magic_single:
         candidates = [enemy for enemy in base if not has_positional_marker(enemy)]
         if not candidates:
-            return None
+            return None, []
     else:
         candidates = base
     # An active Taunt winner (party-combat-taunt-constraints) is the enemy's
@@ -1196,18 +1367,156 @@ def _legacy_action(
     if has_positional_marker(target):
         eligible_skills = [skill for skill in single_skills if not is_strike_class(skill)]
         if not eligible_skills:
-            return None
+            return None, []
     else:
         eligible_skills = single_skills
-    skill = _choose_skill(entity, eligible_skills, profile.skill_choice, target)
-    return ActionRequest(entity, skill.key, [target], context)
+    return target, eligible_skills
+
+
+def _reflex_selection_seed(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    resolution: Any,
+) -> int:
+    """Return the independent selection seed of one real reflex decision.
+
+    A real decision seeds from its actual execution scope and the tuning
+    fingerprint this session recorded, exactly like the deliberation path, and
+    builds no snapshot: the scope branch of :func:`selection_seed_for` never
+    reads a snapshot fingerprint, so the reflex decision pays no snapshot cost
+    for a seed it does not use. A direct two-argument inspection has no scope
+    and seeds from its canonical identity plus the decision snapshot's own
+    read-only fingerprint, built exactly as the deliberation inspection builds
+    it.
+    """
+    from world.rules.monster_ai.selection import selection_seed_for
+
+    fingerprint = (
+        MONSTER_AI_TUNING.fingerprint
+        if resolution is None
+        else resolution.tuning_fingerprint
+    )
+    scope = current_decision_scope()
+    if scope is not None:
+        return selection_seed_for(
+            scope=scope,
+            actor_id=scope.actor_id,
+            configuration_fingerprint=fingerprint,
+            snapshot_fingerprint="",
+        )
+    from world.rules.monster_ai import (
+        DecisionReads,
+        DecisionScope,
+        build_decision_snapshot,
+    )
+
+    snapshot = build_decision_snapshot(
+        entity,
+        context,
+        scope=DecisionScope("", 0, 0),
+        participants=tuple(
+            member for member in battlefield.roster.values() if member is not entity
+        ),
+        context_mode="normal",
+        reads=DecisionReads(),
+    )
+    return selection_seed_for(
+        scope=None,
+        actor_id=stable_actor_id(entity),
+        configuration_fingerprint=fingerprint,
+        snapshot_fingerprint=snapshot.fingerprint,
+    )
+
+
+def _reflex_action(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    profile: BehaviourProfile,
+    *,
+    resolution: Any = None,
+    rng: Random | None = None,
+) -> ActionRequest | None:
+    """Return the permanent reflex decision in one settlement context.
+
+    The branch order is the retained one: no living enemy, then the inclusive
+    flee boundary, then the owned damage kit. What changed is skill selection:
+    affordable authored SINGLE and AREA kits compete in one strategy selection
+    through the exact own-output estimate, the area-preference flag has no
+    reflex effect, and the innate attack is only the fallback when no authored
+    option is usable. There are no resolution effects, payments or casts here.
+    """
+    enemies = _living_enemies(battlefield, entity)
+    if not enemies:
+        return None
+    if _should_flee(entity, profile):
+        return ActionRequest(
+            actor=entity,
+            skill_key=FLEE_SKILL_KEY,
+            targets=[entity],
+            context=context,
+        )
+    damage_skills = _owned_damage_skills(entity)
+    authored = [skill for skill in damage_skills if skill.key != INNATE_ATTACK_KEY]
+    innate = [skill for skill in damage_skills if skill.key == INNATE_ATTACK_KEY]
+    authored_single = [
+        skill for skill in authored if skill.target_spec is TargetSpec.SINGLE
+    ]
+    target: Any | None = None
+    eligible_keys: frozenset[str] = frozenset()
+    if authored_single or innate:
+        # Target-dependent SINGLE eligibility is decided before scoring, with
+        # the retained seal/positional/Taunt order and tie-break draw. An
+        # AREA-only kit never reaches this branch and so never spends a die on
+        # a target it will not use.
+        target, eligible = _single_target(
+            entity, battlefield, enemies, authored_single + innate, profile
+        )
+        eligible_keys = frozenset(skill.key for skill in eligible)
+    usable = [
+        skill
+        for skill in authored
+        if skill.target_spec is TargetSpec.AREA
+        or (skill.target_spec is TargetSpec.SINGLE and skill.key in eligible_keys)
+    ]
+    if usable:
+        sampling = (
+            len(usable) > 1 and profile.skill_choice == "highest_expected_damage"
+        )
+        skill = _choose_skill(
+            entity,
+            usable,
+            profile.skill_choice,
+            area_recipients=len(enemies),
+            temperature=profile.reflex_temperature,
+            seed=(
+                _reflex_selection_seed(entity, battlefield, context, resolution)
+                if sampling and rng is None
+                else None
+            ),
+            rng=rng,
+        )
+        if skill.target_spec is TargetSpec.AREA:
+            return ActionRequest(entity, skill.key, "all-enemies", context)
+        return ActionRequest(entity, skill.key, [target], context)
+    for skill in innate:
+        if skill.target_spec is TargetSpec.AREA:
+            return ActionRequest(entity, skill.key, "all-enemies", context)
+        if (
+            skill.target_spec is TargetSpec.SINGLE
+            and target is not None
+            and skill.key in eligible_keys
+        ):
+            return ActionRequest(entity, skill.key, [target], context)
+    return None
 
 
 class InvalidStateFallback(StrEnum):
     """What one typed invalid runtime AI state resolves to (attack design §8).
 
-    ``LEGACY`` is the product's configured behaviour: the decision falls back
-    to the legacy body, which resolves a repaired-but-unusable stored binding
+    ``REFLEX`` is the product's configured behaviour: the decision falls back
+    to the reflex body, which resolves a repaired-but-unusable stored binding
     through its tier default instead of failing on it. ``NONE`` is the
     diagnostic choice for a manual investigation: the decision proposes
     nothing rather than acting on a state it could not validate. Neither is
@@ -1216,7 +1525,7 @@ class InvalidStateFallback(StrEnum):
     programming error.
     """
 
-    LEGACY = "legacy"
+    REFLEX = "reflex"
     NONE = "none"
 
 
@@ -1229,16 +1538,16 @@ def invalid_state_fallback() -> InvalidStateFallback:
 
     Only the explicit ``"none"`` selects the diagnostic behaviour; anything
     else -- including a process whose Django settings are not configured, so
-    no deployment override exists -- keeps the product's legacy fallback.
+    no deployment override exists -- keeps the product's reflex fallback.
     """
     try:
         declared = getattr(settings, INVALID_STATE_FALLBACK_SETTING, None)
     except ImproperlyConfigured:
         # observability: ignore R2: unconfigured settings mean no deployment override exists, so the product default applies
-        return InvalidStateFallback.LEGACY
+        return InvalidStateFallback.REFLEX
     if declared == InvalidStateFallback.NONE.value:
         return InvalidStateFallback.NONE
-    return InvalidStateFallback.LEGACY
+    return InvalidStateFallback.REFLEX
 
 
 def _invalid_state_error(reason: InvalidDecisionReason) -> ValueError:
@@ -1281,11 +1590,12 @@ def _invalid_state_action(
     """Apply the configured behaviour of an already reported invalid state."""
     if fallback is InvalidStateFallback.NONE:
         return None
-    return _legacy_action(
+    return _reflex_action(
         entity,
         battlefield,
         context,
         _profile_for(resolution.archetype_key, lambda: entity.threat_tier),
+        resolution=resolution,
     )
 
 
@@ -1307,7 +1617,7 @@ def _degraded_action(
     )
 
 
-def _utility_dispatch(
+def _deliberation_dispatch(
     entity: Any,
     battlefield: Battlefield,
     context: Any,
@@ -1315,11 +1625,13 @@ def _utility_dispatch(
     resolution: Any,
     trace: "list[Any] | None",
 ) -> ActionRequest | None:
-    """Run one utility decision, reporting its typed invalid state as configured."""
+    """Run one deliberation decision, reporting its typed invalid state."""
     from world.rules.monster_ai.utility import MonsterAIStateError
 
     try:
-        return _utility_action(entity, battlefield, context, scale, resolution, trace)
+        return _deliberation_action(
+            entity, battlefield, context, scale, resolution, trace
+        )
     except MonsterAIStateError as error:
         fallback = invalid_state_fallback()
         log_warn(
@@ -1335,7 +1647,7 @@ def _utility_dispatch(
         )
 
 
-def _utility_action(
+def _deliberation_action(
     entity: Any,
     battlefield: Battlefield,
     context: Any,
@@ -1343,13 +1655,13 @@ def _utility_action(
     resolution: Any,
     trace: "list[Any] | None",
 ) -> ActionRequest | None:
-    """Return the utility decision's selected request, or its no-action boundary.
+    """Return the deliberation decision's request, or its no-action boundary.
 
     The whole decision reads through ONE decision-local read set: the snapshot,
     the candidate enumeration and the estimation all share it, so a plan's
     legality and its projection can never be derived from different reads. The
     candidates are the producer's bounded deduplicated set; an empty set is the
-    decision's own no-action boundary and never a fallback to the legacy body.
+    decision's own no-action boundary and never a fallback to the reflex body.
 
     The imports are deliberately local: the utility package's candidate
     producer reads this module's tuning, so the dependency may only be

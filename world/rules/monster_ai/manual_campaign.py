@@ -259,8 +259,8 @@ def _nonstrike_hostile_single_keys() -> tuple[str, ...]:
     return tuple(keys)
 
 
-#: The legacy decider's synthetic variant (never declared utility).
-LEGACY_VARIANT_KEY = "t_campaign_legacy"
+#: The reflex decider's synthetic variant (never declared deliberation).
+REFLEX_VARIANT_KEY = "t_campaign_reflex"
 #: The synthetic row registered under the production basic-attack key, so the
 #: non-deciding party members' own default-attack policy resolves.
 _BASIC_ATTACK_ROW = _skill(
@@ -439,7 +439,7 @@ def _situations() -> tuple[SituationSpec, ...]:
 def _authored_archetypes() -> tuple[str, ...]:
     """Return the six production behaviour archetype keys, sorted.
 
-    The campaign's six archetypes are the authored utility profiles, read from
+    The campaign's six archetypes are the authored behaviour profiles, read from
     the production rulebook rather than duplicated here.
     """
     archetypes = tuple(sorted(behaviour.MONSTER_BEHAVIOUR_YAML["archetypes"]))
@@ -588,12 +588,12 @@ class CampaignHarness:
                     active_skill_keys=_MONSTER_SKILL_KEYS,
                     passive_skill_keys=(),
                 )
-        # The performance scenario's legacy decider: the same generated variant
-        # shape, but never declared utility, so it resolves the archetype's
-        # authored legacy mode and produces the permanent legacy action.
-        variant_rows[LEGACY_VARIANT_KEY] = replace(
+        # The performance scenario's reflex decider: the same generated variant
+        # shape, but never declared deliberation, so it resolves the archetype's
+        # authored reflex mode and produces the permanent reflex action.
+        variant_rows[REFLEX_VARIANT_KEY] = replace(
             make_monster_variant(
-                LEGACY_VARIANT_KEY,
+                REFLEX_VARIANT_KEY,
                 species_key=SPECIES_KEY,
                 threat_tier=TIER_KEY,
                 behaviour_profile_key=self.archetypes[0],
@@ -621,7 +621,7 @@ class CampaignHarness:
             for archetype in self.archetypes
             for value in reports.INTELLIGENCE_VALUES
         }
-        modes = {key: "utility" for key in intelligence}
+        modes = {key: "deliberation" for key in intelligence}
         authored = behaviour.MONSTER_BEHAVIOUR_YAML["archetypes"]
         book = {
             "tier_default_archetype": {TIER_KEY: self.archetypes[0]},
@@ -769,7 +769,7 @@ class CampaignHarness:
         hp: int = 60,
         mp: int = 60,
     ) -> Any:
-        """Create one real synthetic utility monster in the arena."""
+        """Create one real synthetic deliberation monster in the arena."""
         archetype_key = self.archetypes[0] if archetype is None else archetype
         value = self.intelligences[0] if intelligence is None else intelligence
         return self._monster(
@@ -1665,7 +1665,7 @@ class CampaignHarness:
         # at each examined-proposal budget: the actor/participant data never
         # varies with the budget, only the enumeration work the decision is
         # allowed to do.
-        scaling_field = self._performance_field("utility", enemies=8)
+        scaling_field = self._performance_field("deliberation", enemies=8)
         scaling = [
             self._measure_scaling(budget, scaling_field)
             for budget in reports.PERFORMANCE_SCALING_BUDGETS
@@ -1691,8 +1691,8 @@ class CampaignHarness:
         scaling probe builds this field once and only varies the decision's
         examined-proposal budget against it.
         """
-        if mode == "legacy":
-            variant_key = LEGACY_VARIANT_KEY
+        if mode == "reflex":
+            variant_key = REFLEX_VARIANT_KEY
         else:
             variant_key = _variant_key(self.archetypes[0], reports.INTELLIGENCE_VALUES[1])
         decider = self._monster(
@@ -1776,7 +1776,7 @@ class CampaignHarness:
         different actor's or participant's data.
         """
         if field is None:
-            field = self._performance_field("utility", enemies=8)
+            field = self._performance_field("deliberation", enemies=8)
         decider, battlefield = field
         context = BattlefieldActionContext(
             battlefield,
