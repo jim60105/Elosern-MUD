@@ -62,6 +62,8 @@ None.
   category membership.
 - `webclient-gallery-ui`: the surface renders categories and subjects, no
   filter tabs.
+- `webclient-art-panel`: completion-push scenarios stop mentioning filter
+  counts (text only; qualification is unchanged here).
 
 ## Impact
 
