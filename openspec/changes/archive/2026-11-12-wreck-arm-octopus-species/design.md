@@ -72,9 +72,27 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         True,
         active_skill_keys=("wreck_arm_bind", "wreck_arm_sweep",),
         passive_skill_keys=(),
-        behaviour_profile_key="pack_hunter",
+        behaviour_profile_key="ambush_predator",
     ),
 ```
+
+**Deviation (applied during implementation).** `pack_hunter` was the first
+choice, but its `skill_choice: highest_expected_damage` cannot select this kit
+deterministically: `_choose_skill` compares only the actor's adjusted attack
+against the defender's defense and ignores the coefficient, so `wreck_arm_bind`
+and the innate `basic_attack` — both physical, both appended to the owned keys
+— tie and consume one tie-break die (`_legacy_action` → `_choose_skill`). That
+is exactly the dice-dependent kit selection the change must not ship (the
+shipped boar smoke has to pin that die for the same reason). `ambush_predator`
+preserves the design's targeting and flee semantics exactly — `lowest_hp`
+targeting and the same 0.20 flee threshold — and its `first_owned` choice makes
+`wreck_arm_bind` the deterministic single-target selection; it is also the
+archetype the shipped two-strike kit 湖丘巨龜 binds for the identical
+single-plus-area shape. The trade-off is that `prefer_area_when_multiple_enemies`
+is not carried, so the legacy body always opens on the single-target arm bind
+and never selects 群腕橫掃, exactly as the turtle's area slam behaves today; the
+area row stays declared and exercised by the composition contracts. Recorded
+here, in D8's decision-mode subsection and in the developer review.
 
 ### D3. Skill rows (append at the end of `ROWS` in `world/skills/registry/data_monster_abilities.py`)
 
@@ -229,7 +247,7 @@ Append `## 沉船巨蛸` to `docs/development/monster-content-expansion.md`, wit
 * Costs and coefficients repeat the boar's and the turtle's single-plus-area shape; the element is water, as for the crocodile's bite.
 * Grade B: a dangerous site boss, below the A-grade 蓄潮型.
 - `### Reuse of the two-strike (single + area damage) representative`: the signature, the unchanged representative `warm_den_boar`, and the existing module that exercises the group.
-- `### Decision mode`: legacy, the archetype named in D2, and the flee threshold that archetype carries.
+- `### Decision mode`: legacy, the archetype named in D2, and the flee threshold that archetype carries. State D2's deviation: the archetype is `ambush_predator` rather than `pack_hunter` because the deterministic `first_owned` choice keeps `wreck_arm_bind` ahead of the innate `basic_attack`, `lowest_hp` targeting and the 0.20 flee threshold are preserved, and the legacy body therefore does not select the area sweep.
 - `### Focused commands and results`: the Verification commands and their observed results.
 - `### Human review of the prose`: the prose was transcribed from this design and is pending human editorial review in the ledger.
 

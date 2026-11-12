@@ -1,0 +1,22 @@
+# Tasks
+
+Begin after `salt-snort-iguana-species` is merged. Follow design.md verbatim. Every zh-TW string is copied from design.md and never recomposed.
+
+## 0. Environment
+
+- [x] 0.1 Create the test environment file with `printf 'MUD_TEST_SETTINGS=1\n' > /tmp/mud-species.env`. Check: the file holds that single line.
+
+## 1. Executable content
+
+- [x] 1.1 Append the species and variant rows (design D1, D2). Check: `uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"` exits 0; `world.lore.tests.test_monster_species_content` and `world.lore.tests.test_monster_visuals` pass.
+- [x] 1.2 Append the skill rows and the docstring sentence (design D3), plus the rulebook and narration rows (design D4). Check: `AuthoredMonsterKitContractTests`, `world.skills.tests.test_narration_catalog`, `world.rules.tests.test_monster_composition_coverage` and `world.rules.tests.test_ember_bristle_boar_resource_skill` pass; the narration rows sit in data_water.py.
+- [x] 1.3 Run the activation tests and re-fingerprint only if one fails (design D5). Check: `ActivationRecordTests`, `ActivationBindingTests` and `RollbackTests` pass, and `activated` and `activation_bindings` are unchanged.
+
+## 2. Documentation
+
+- [x] 2.1 Add the overview row, the bestiary section and the ledger row (design D6). Check: `world.lore.tests.test_bestiary_documentation` passes, and the section names no skill key, buff id or resource field.
+- [x] 2.2 Add the developer review section (design D8) and regenerate `content/map-reference-context.json`. Check: `uv run --locked python -m tools.map_reference_context --check` exits 0.
+
+## 3. Handoff
+
+- [x] 3.1 Run every label in design.md Verification, `uv run --locked python -m tools.contract_gate --change wreck-arm-octopus-species` and `openspec validate wreck-arm-octopus-species --strict`. Check: all exit 0, and `.github/evennia-shards.json`, `tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are unchanged.

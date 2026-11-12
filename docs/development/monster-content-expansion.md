@@ -3086,3 +3086,116 @@ performance report were not rerun and remain historical harness evidence at
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 沉船巨蛸
+
+This section records the fifth delivered species of the southwest coast Wave 4.
+沉船巨蛸 (`wreck_arm_octopus`) is a high-tier sea-cave octopus whose ordinary
+default variant is 沉骸型 (`wreck_den_elder`, grade B); it owns the single arm
+bind 觸腕絞纏 (`wreck_arm_bind`) and the area arm sweep 群腕橫掃
+(`wreck_arm_sweep`).
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Reach-heavy sea-cave boss: agility above the high band's floor, defense in its
+  lower part, and hit points between the boar's and the turtle's.
+* The MP pool holds one bind plus two sweeps (12 + 16 + 16 = 44 of the authored
+  48); the SP pool holds three of the larger casts (three times eight of the
+  authored 30).
+* The two costs and coefficients repeat the boar's and the turtle's
+  single-plus-area shape, and the element is water, as for the crocodile's bite.
+* Grade B: a dangerous site boss, below the A-grade 蓄潮型.
+
+### Reuse of the two-strike (single + area damage) representative
+
+The kit declares the shipped two-strike composition signature
+`(("active", "damage", "enemies", None), ("active", "damage", "enemies", None))`.
+Its representative is unchanged: `warm_den_boar`, declared in
+`world.rules.tests.test_ember_bristle_boar_resource_skill`, whose production
+smoke exercises the representative and the derived group. The new variant key
+sorts after that representative (`"warm_den_boar" < "wreck_den_elder"`), so no
+smoke module, shard entry or seed entry is added;
+`world.rules.tests.test_monster_composition_coverage` derives the whole group
+from the shipped declarations and checks the representative wiring.
+
+### Decision mode
+
+The variant binds the legacy `ambush_predator` archetype: `lowest_hp` targeting,
+`first_owned` skill choice, with that archetype's authored flee threshold of
+0.20. No intelligence value, decision-mode override or `monster_behaviour.yaml`
+edit is authored.
+
+This is the design's one recorded deviation. D2's first choice was
+`pack_hunter`, but its `highest_expected_damage` choice cannot select this kit
+deterministically: `_choose_skill` compares only the actor's adjusted attack
+against the defender's defense and ignores the coefficient, so `wreck_arm_bind`
+and the innate `basic_attack` — both physical, both in the owned key list — tie
+and consume one tie-break die, which is exactly what the shipped boar smoke has
+to pin. `ambush_predator` preserves the design's targeting and flee semantics
+(`lowest_hp` and the same 0.20 threshold) and its `first_owned` choice makes the
+arm bind the deterministic single-target selection; it is also the archetype
+the shipped two-strike kit 湖丘巨龜 binds for the identical single-plus-area
+shape. The trade-off, stated rather than hidden: the archetype carries no area
+preference, so the legacy body always opens on the single-target arm bind and
+never selects 群腕橫掃, exactly as the turtle's area slam behaves today. The
+area row stays declared, contract-checked and reproduced by the composition
+group, and the public prose still describes what the kit does.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_ember_bristle_boar_resource_skill` | 1 test, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 120 tests, OK, run as two exhaustive disjoint focused method-label batches (60 + 60) because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK |
+
+The registry import check succeeds and the registry holds 38 species and 68
+variants. A throwaway focused probe, run twice consecutively and deleted
+afterwards (`world.rules.tests.test_wreck_arm_octopus_selection_probe`, 4
+tests, OK both times), constructed `wreck_den_elder` and asserted with
+`dice.roll_d100` patched to raise: a two-opponent field selects
+`wreck_arm_bind` against the lowest-hit-point enemy twice in a row, the area
+sweep is never selected, a drained MP and SP pool falls back to `basic_attack`
+without dice, and 20% of the authored maximum hit points is the flee boundary
+while 21% still attacks. The probe was not committed, because design D7
+authors no test file and a committed module would need a shard entry this
+change does not touch.
+
+The remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+wreck-arm-octopus-species` and `openspec validate wreck-arm-octopus-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+This link adds no timed effect, modifier, intelligence value or mode entry, so
+the startup tuning fingerprint did not move and stays `8b56d98c...`, with the
+rollback tuning unchanged at `4c696e11...`; `activated` and
+`activation_bindings` are unchanged and the activation and manual evidence
+files are untouched. The six archetype campaigns and the performance report
+remain historical harness evidence at `497df2c1...`, not evidence for this
+tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
