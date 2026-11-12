@@ -1166,6 +1166,23 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "mast_circler",
         True,
     ),
+    MonsterSpecies(
+        "breakwater_seal",
+        "臥堤海豹",
+        "臥堤海豹是體長超過一人的海豹類魔獸，成群棲息於東南海岸的防波堤、礁岩與河口沙洲。",
+        "灰色短毛上散布著深色斑點，身軀圓滾，頭部渾圓，嘴邊一圈硬鬚。"
+        "四肢化成鰭狀，後鰭向後並攏，上岸時以腹部貼地蠕行。",
+        "牠們漲潮時下海捕魚，退潮後成群爬上防波堤與礁岩曬太陽。"
+        "牠的腹毛帶著異常的滑油，在濕滑的石面上一挺身就能滑出好幾丈，比在沙地上爬行快得多。"
+        "東南海岸的漁船靠防波堤內側停泊，臥堤海豹群會占滿堤上的繫船石與曬網架，扯破攤開的漁網，搶食網中漁獲。"
+        "近身時，牠挺身沿著濕地滑向對手，以整個身軀壓撞過去，撞中時讓對手在濕滑的地面上失去重心，短時間內腳步遲緩。",
+        ("southeast_coast",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；腹毛滑油的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階群居海豹：腹毛滑油屬於身體能力，不帶元素、不讓地面結冰或持續濕滑；戰鬥呈現為滑行壓撞與命中後短暫敏捷下降。描寫維持海豹體態，不與任何獸人亞種相比。連結漁船停泊的防波堤與曬網架。",
+        "（作者私有：尚未證實的猜想）金穗港的老船夫說臥堤海豹全群提早下海的日子，午後必有大浪，這種說法尚未證實。",
+        "pier_basker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2076,6 +2093,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("wind_snatch_dive",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "pier_basker",
+        "breakwater_seal",
+        "曬堤型",
+        "普通版本，退潮後成群爬上防波堤與礁岩曬太陽。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=160, mp=0, sp=24, atk_phys=21, agility=12, defense=13, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("flipper_slide_slam",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "haulout_bull",
+        "breakwater_seal",
+        "霸灘型",
+        "占住整片沙洲、帶著一群母海豹的大型公海豹，會滑向任何踏上沙洲的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=215, mp=0, sp=36, atk_phys=26, agility=12, defense=15, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("flipper_slide_slam",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 

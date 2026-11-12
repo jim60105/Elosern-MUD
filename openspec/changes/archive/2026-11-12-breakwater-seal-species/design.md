@@ -70,7 +70,7 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         True,
         active_skill_keys=("flipper_slide_slam",),
         passive_skill_keys=(),
-        behaviour_profile_key="pack_hunter",
+        behaviour_profile_key="ambush_predator",
     ),
 ```
 
@@ -89,9 +89,17 @@ Distinct from the shipped archetypes (sparrow, crab, hare, goat, lynx, crocodile
         True,
         active_skill_keys=("flipper_slide_slam",),
         passive_skill_keys=(),
-        behaviour_profile_key="pack_hunter",
+        behaviour_profile_key="ambush_predator",
     ),
 ```
+
+Both variants bind `ambush_predator`, not the originally planned `pack_hunter`:
+the shipped `EnemyRiderGroupMemberTests` contract requires a legacy member's own
+decision to return its kit, while `pack_hunter`'s `highest_expected_damage`
+ranks an elementless physical kit level with the innate `basic_attack` and
+breaks the tie with a die, so the fallback was selected on some runs.
+`ambush_predator` keeps the same `lowest_hp` target strategy and the same 0.20
+flee threshold and selects the kit deterministically through `first_owned`.
 
 ### D3. Skill rows (append at the end of `ROWS` in `world/skills/registry/data_monster_abilities.py`)
 
@@ -234,7 +242,7 @@ Append `## 臥堤海豹` to `docs/development/monster-content-expansion.md`, wit
 
 - `### Role constraints and the chosen literals`. State the following relations, not a value table:
 * Heavy colony slider: hit points and defense in the mid band's middle, higher on the stronger 霸灘型, agility near the band's floor.
-* The kit spends no MP, so the MP pool is zero; SP holds four casts of the slam's SP cost.
+* The kit spends no MP, so the MP pool is zero; the ordinary variant's SP holds four casts of the slam's SP cost and the stronger variant's SP holds six.
 * The rider (−3 agility for 15 s) equals the goat's shipped agility rider.
 * The stronger 霸灘型 holds a sandbar at grade C.
 - `### Reuse of the enemy hit-rider representative`: the signature, the unchanged representative `cliff_stepper`, and the existing module that exercises the group.

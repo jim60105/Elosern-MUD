@@ -73,6 +73,9 @@ The flat-leap goby's tail flick is assembled the same way with elementless
 physical damage plus a hit-dependent accuracy debuff on the struck enemy.
 The mast-wind gull's snatch dive is assembled the same way with wind physical
 damage plus a self-mounted agility lift granted by every resolved attempt.
+The breakwater seal's flipper slide slam is assembled the same way with
+elementless physical damage plus a hit-dependent agility debuff on the struck
+enemy.
 """
 
 from world.skills.effects import (
@@ -1135,6 +1138,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
+        ),
+    ),
+    _skill(
+        "flipper_slide_slam",
+        "滑身壓撞",
+        "挺身沿著濕地滑向單一敵方目標，以整個身軀壓撞，造成物理傷害；命中後讓對手在濕滑的地面上失去重心，短暫降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 6},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "buff_apply:slick_topple"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("breakwater_seal",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
         ),
     ),
 )
