@@ -13,5 +13,15 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 3. Gates
 
-- [ ] 3.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`; both pass.
-- [ ] 3.2 Run `openspec validate gallery-kind-card-capabilities --strict`; it passes.
+- [x] 3.1 Run `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate`; both pass.
+- [x] 3.2 Run `openspec validate gallery-kind-card-capabilities --strict`; it passes.
+
+## Implementation notes
+
+- Tests for the ADDED requirements stay unannotated: the delta requirement IDs
+  exist only after archive sync, which adds the annotations. This supersedes
+  the "annotate with the ADDED IDs" wording in 2.1 and 2.2.
+- The record has no `as_dict`; the three fields were added to `with_values`,
+  the field-enumerating copy seam, instead (design D3).
+- The writer guards skip a kind declared without a gallery, so the scene
+  kind keeps its established no-gallery refusal text (design D4).
