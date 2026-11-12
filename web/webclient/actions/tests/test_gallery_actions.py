@@ -742,6 +742,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.character(NPC, "t_gallery_stranger")
         return ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_stranger")
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_a_strangers_gallery_cannot_be_edited(self):
         subject = self.stranger()
         first, second = self.card(1, subject=subject), self.card(2, subject=subject)
@@ -750,6 +753,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(before, self.art_state())
         self.assertEqual(api.cards_for(subject), [first, second])
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_every_mutating_adapter_refuses_a_subject_in_no_category(self):
         subject = self.stranger()
         card = self.card(subject=subject)
@@ -778,6 +784,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(queue.pending_gallery_jobs(subject), [])
         self.assertTrue((self.root / card["stored_identity"]).exists())
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_another_categorys_subject_is_admitted(self):
         self.assertEqual(self.category_dispatch("monster")["outcome"], "success")
         self.assertEqual(gallery_view_snapshot(self.transport, self.actor).category, "monster")
@@ -804,6 +813,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.refused("gallery.default.set", {"subject_key": other_subject.full(), "image_id": other_card["image_id"]})
         self.assertEqual(before, self.art_state())
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_an_unsighted_species_is_refused(self):
         payload = {"subject_key": self.monster_subject.full(), "fields": [], "custom_prompt": ""}
         self.refused("gallery.generate", payload)
@@ -818,6 +830,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
             self.assertEqual(self.dispatch("gallery.generate", payload)["outcome"], "success")
         self.assertEqual(len(queue.pending_gallery_jobs(self.monster_subject)), 1)
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_an_unresolvable_owner_admits_nothing(self):
         card = self.card()
         before = self.art_state()
@@ -1422,6 +1437,9 @@ class OfficialPreferenceActionTests(EvenniaTest):
                 )
         self.assertEqual(self._world(), before)
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-require-an-admitted-subject"
+    )
     def test_official_preference_writes_require_an_admitted_subject(self):
         # The stranger is born from the same preset, so the identity lies inside
         # its own content reference: only admission stands between the request
