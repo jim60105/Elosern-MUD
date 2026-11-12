@@ -141,8 +141,15 @@ The right page belongs to the selected image.
 - **Portrait:** the art fills the page height at 9:16; ribbon, subject name,
   image facts (label, default mark, relative and exact date, chips), binding
   conditions sit beside it.
-- **Landscape (scenes):** the art spans the page width at 16:9; the facts sit
-  under it.
+- **Landscape (scenes):** the art sits above at 16:9; under it the name and
+  the description take the left column and the fact cells the right one, and
+  the page reads without scrolling at 1451×790 and 1920×1080.
+- Facts follow the quest detail's condition row (`.quest-detail__cond`): a
+  two-column grid of cells, one fact per cell — a ruled label, one line, one
+  note. The cells are 圖片, 生成時間, 狀態 (characters only), 標記 (chips) and
+  綁定條件 (chips, spanning both columns). The bordered letter box is kept
+  for prose alone (a scene's description), as in the codex and the quest
+  client's letter.
 - The ribbon reads `<category>` or `<category>・<group>`.
 - The footer is a `DetailFooter` whose buttons depend on the selection:
 
