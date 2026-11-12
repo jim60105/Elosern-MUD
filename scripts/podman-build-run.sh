@@ -18,7 +18,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/.."
 
 echo "=== Building image ==="
-podman compose build
+# --jobs=0 lets Podman run every independent build stage in parallel.
+podman compose --podman-build-args='--jobs=0' build
 
 echo ""
 echo "=== Preparing first-run superuser (bootstrap) ==="

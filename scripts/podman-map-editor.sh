@@ -149,7 +149,9 @@ port_in_use() {
 
 build_image() {
     echo "=== Building image ($IMAGE) ==="
+    # --jobs 0 lets Podman run every independent build stage in parallel.
     podman build \
+        --jobs 0 \
         --ignorefile "$PROJECT_DIR/$IGNOREFILE" \
         -f "$PROJECT_DIR/$CONTAINERFILE" \
         -t "$IMAGE" \
