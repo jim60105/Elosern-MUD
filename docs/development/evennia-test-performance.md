@@ -667,3 +667,36 @@ named refusal。
 **驗收方式**：`--durations 0`（evennia）與 driver 的 method／boundary 欄位
 （browser）本來就會把每測試實測寫進 job log；重新打包仍以那一輪 CI 的 job 時長為
 唯一依據，預算維持每分片 ≤ 6 分鐘（硬限 20 分鐘的 job timeout）。
+
+**第二批：把「不是受測物」的初始族群移出固定成本。** 同一輪 CI 的
+`--durations 0` 顯示剩下來的長尾幾乎都是「單一個測試跑一次全量 provisioning」：
+
+| 分片 | 單一測試（run 43164896133 實測） |
+|---|---|
+| 51 `test_limbo_room` | `test_at_server_start_renames_legacy_room_and_bridges_it` 354 s |
+| 47 `test_bootstrap_sync` | `test_sync_wilderness_is_idempotent` 368 s、`test_sync_wilderness_provisions_one_gate_exit_per_authored_gate` 359 s |
+| 45 `test_bootstrap_grid`（分片 821 s） | 四個 `at_server_start` 測試 199–258 s |
+| 32 `test_exits`（分片 391 s） | `WildernessGatewayExitTests` 單一類別 335 s |
+
+四個修法都只改變「測試宣告了多大的世界」，沒有放寬任何斷言：
+
+1. **空 scope 是合法的已初始化世界**：`sync_test_wilderness` 與
+   `selected_startup_settlements` 接受顯式 `zone_keys`，`()` 表示「這份合約
+   不主張任何環境族群」。seed、時間線、activity 記錄與 `population_zone_scope`
+   仍會寫入，`require_initialized_population` 仍以記錄為準，因此「多一個 zone」
+   與「少一個 zone」仍是同一個 named refusal。
+2. **守門、啟動與 lore mirror 合約宣告空 scope**：這些合約的受測物是 gate
+   exit、房間數與 mirror，不是族群。本機實測 `test_limbo_room` 的啟動測試
+   354 → 53 秒、`test_bootstrap_sync` 的兩個全量 pass 368／359 → 44／44 秒、
+   `test_bootstrap_grid` 的兩個啟動測試 258／246 → 11／11 秒（整模組 26 個測試
+   175 秒，原本單一分片 821 秒）。
+3. **`test_exits` 拆成共用 fixture 加兩個類別**：同一類別的測試只能序列執行，
+   335 秒的類別是多核心也吃不到的牆。
+4. **`test_map_knowledge_integration` 的 fixture 只宣告自己那張地圖**：原本同步
+   所有帶城門的聚落（162 個 zone），但每個 seam 旅程只走其中一張地圖的兩個
+   gate；改成先解析 `live_map_key()` 再宣告它。
+
+`test_bootstrap_grid` 仍刻意保留一個真正的主張：
+`test_fresh_wilderness_provisioning_initializes_population_once` 走 production
+全量 roster 路徑（本機 46 秒、CI 199 秒），因為「一次寫入全量族群」正是它的
+受測物。

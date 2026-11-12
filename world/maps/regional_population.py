@@ -539,8 +539,6 @@ def write_population_zone_scope(
     """
     _require_wilderness(wilderness)
     scope = tuple(sorted(dict.fromkeys(zone_keys)))
-    if not scope:
-        raise ValueError("a population zone scope needs at least one zone")
     unknown = tuple(key for key in scope if key not in ECOLOGY_ZONE_REGISTRY)
     if unknown:
         raise UnknownEcologyZone(f"{UNKNOWN_ZONE}: no authored ecology zone {unknown[0]!r}")
@@ -572,10 +570,10 @@ def read_population_zone_scope(wilderness: Any) -> tuple[str, ...]:
 
 def _zone_scope_value(saved: object) -> tuple[str, ...]:
     """One saved zone scope, or the named refusal for a malformed record."""
-    if not isinstance(saved, (tuple, list)) or not saved:
+    if not isinstance(saved, (tuple, list)):
         raise MalformedPopulationState(
             f"{MALFORMED_STATE}: {POPULATION_ZONE_SCOPE_ATTRIBUTE!r} must be a "
-            "non-empty sequence of zone keys"
+            "sequence of zone keys"
         )
     scope: list[str] = []
     for key in saved:

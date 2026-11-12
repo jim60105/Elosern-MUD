@@ -46,26 +46,12 @@ class _MapKnowledgeFixture(EvenniaTest):
         self.room1.save()
         self.room2.save()
         create_object(Room, key="虛境", location=None)
-        sync_test_settlements(
-            tuple(
-                sorted(
-                    {row.gate.map_id for row in live_city_gate_registry().values()}
-                )
-            )
-        )
-        sync_test_wilderness(
-            tuple(
-                sorted(
-                    {
-                        gate.destination.map_id
-                        for entry in live_wilderness_entry_registry().values()
-                        for gate in entry.gates
-                    }
-                )
-            )
-        )
-        # Resolve the map vocabulary only after the grid bootstraps.
+        # Resolve the map vocabulary before provisioning: every journey here
+        # crosses the one map's own gates, so only that settlement and its
+        # wilderness ground carry an initial population.
         self.map = live_map_key()
+        sync_test_settlements((self.map,))
+        sync_test_wilderness((self.map,))
         self.gate_row = live_city_gate_registry()[self.map]
         # The city-gate row's own identity is the south gate room's
         # coordinate — read from the live registry, not a shipped constant.

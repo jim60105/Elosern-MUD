@@ -163,7 +163,8 @@ def zones_for_settlements(settlement_ids: Iterable[str]) -> tuple[str, ...]:
     The test-side companion of the settlement declaration: a journey bounded to
     these settlements can only walk their regions, so only those regions'
     authored zones need an initial population. Derived from the published
-    wilderness entries (their footprint and gate-approach cells), never from a
+    wilderness entries' gate-approach cells (a zone rectangle never covers a
+    settlement's own footprint, which birth geometry excludes), never from a
     settlement node coordinate -- a settlement graph numbers its own cells and
     those are not wilderness cells.
     """
@@ -214,8 +215,9 @@ def sync_test_wilderness(
 
     Gates are bounded by ``settlement_ids``. The initial monster population is
     bounded by ``zone_keys``, which defaults to every ecology zone of the
-    regions those settlements stand in; a declaration that reads other zones
-    names them explicitly, and the world records whichever scope it got.
+    regions those settlements stand in. An explicit ``zone_keys=()`` declares a
+    world with no ambient ecology zone at all -- the right scope for a journey
+    or contract about gates, rooms or startup that never reads the population.
     """
 
     from world.maps.bootstrap import sync_wilderness
@@ -224,28 +226,28 @@ def sync_test_wilderness(
         raise TypeError("settlement_ids must be an iterable of map ids, not a string")
     ids = tuple(settlement_ids)
     publish_shipped_map_world()
-    scope = (
-        zones_for_settlements(ids)
-        if zone_keys is None
-        else tuple(zone_keys)
-    )
-    # A region with no authored zone would leave the world's population scope
-    # empty, which the owner refuses: such a declaration keeps the complete
-    # roster instead of pretending a smaller world.
-    sync_wilderness(
-        settlement_ids=ids,
-        zone_keys=scope or tuple(sorted(_live_zone_registry())),
-    )
+    if zone_keys is None:
+        # A declaration whose regions carry no authored zone keeps the complete
+        # roster rather than silently pretending a smaller world.
+        scope = zones_for_settlements(ids) or tuple(sorted(_live_zone_registry()))
+    else:
+        scope = tuple(zone_keys)
+    sync_wilderness(settlement_ids=ids, zone_keys=scope)
 
 
 @contextmanager
-def selected_startup_settlements(settlement_ids: Iterable[str]) -> Iterator[None]:
+def selected_startup_settlements(
+    settlement_ids: Iterable[str], *, zone_keys: Iterable[str] | None = None
+) -> Iterator[None]:
     """Run real startup code with the two synchronizers bound to one declaration.
 
     The real ``bootstrap.sync_grid``/``sync_wilderness`` bindings are captured
     before replacement, so startup still executes the production planner,
     writer and rollback journal with the fixed selection. Only those two
-    bindings are patched; both are restored on every exit path.
+    bindings are patched; both are restored on every exit path. The initial
+    monster population follows the same rule as
+    :func:`sync_test_wilderness`: the declared settlements' regions by default,
+    an explicit declaration when given, and no ambient zone for ``()``.
     """
 
     from unittest.mock import patch
@@ -258,6 +260,10 @@ def selected_startup_settlements(settlement_ids: Iterable[str]) -> Iterator[None
     # Publish and validate/freeze the declaration before anything is patched.
     publish_shipped_map_world()
     bootstrap._selected_settlement_graphs(ids)
+    if zone_keys is None:
+        scope = zones_for_settlements(ids) or tuple(sorted(_live_zone_registry()))
+    else:
+        scope = tuple(zone_keys)
     real_sync_grid = bootstrap.sync_grid
     real_sync_wilderness = bootstrap.sync_wilderness
 
@@ -265,7 +271,7 @@ def selected_startup_settlements(settlement_ids: Iterable[str]) -> Iterator[None
         return real_sync_grid(*args, settlement_ids=ids, **kwargs)
 
     def startup_sync_wilderness(*args, **kwargs):
-        return real_sync_wilderness(*args, settlement_ids=ids, **kwargs)
+        return real_sync_wilderness(*args, settlement_ids=ids, zone_keys=scope, **kwargs)
 
     with ExitStack() as stack:
         stack.enter_context(patch.object(bootstrap, "sync_grid", startup_sync_grid))

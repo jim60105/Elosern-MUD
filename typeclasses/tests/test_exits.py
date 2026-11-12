@@ -102,7 +102,9 @@ def _gate_approach_metres(return_direction):
     return _polyline_metres([gate_world, approach_world])
 
 
-class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
+class _WildernessGatewayFixture(_ChargeAssertions, EvenniaTest):
+    """The shared gate-exit fixture: one declared settlement's two gates."""
+
     def setUp(self):
         super().setUp()
         self.room1.key = "Room1"
@@ -125,6 +127,10 @@ class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
 
     def _tick(self):
         return get_world_clock().tick
+
+
+class WildernessGatewayExitTests(_WildernessGatewayFixture):
+    """Gate landing, refusal and clock charging at the gate exits."""
 
     @covers_requirement("wilderness-gateway::wildernessgateexit-moves-a-traversing-object-from-a-grid-room-into-the-wilderness")
     @covers_requirement("movement-settlement-atomicity::movement-settles-relocation-clock-cost-map-knowledge-and-companion-following-as-one-coherent-transaction")
@@ -231,6 +237,10 @@ class WildernessGatewayExitTests(_ChargeAssertions, EvenniaTest):
             expected += WILDERNESS_STEP_SECONDS
             self._exit("east").at_traverse(self.char1, self.char1.location)
             self.assertEqual(self._tick(), expected)
+
+
+class WildernessGatewayRoutingTests(_WildernessGatewayFixture):
+    """Return routing, long round trips and vetoed traversals at the gates."""
 
     def test_eight_leg_round_trip_advances_clock_by_each_resolved_edge(self):
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript

@@ -449,8 +449,9 @@ class WildernessGateProvisioningTests(_WildernessBootstrapCase):
         from world.maps.map_data import current
 
         create_object(Room, key=LIMBO_KEY, location=None)
+        # Gate provisioning is this contract; the ambient population is not.
         sync_test_settlements(WILDERNESS_GATE_MAP_IDS)
-        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS, zone_keys=())
 
         script, gates = self._gate_exits()
         self.assertIsNotNone(script)
@@ -523,9 +524,11 @@ class WildernessResyncTests(_WildernessBootstrapCase):
         from world.maps.map_data import current
 
         create_object(Room, key=LIMBO_KEY, location=None)
+        # A resync's idempotency is about gates and exits; the ambient
+        # population is not part of this declaration.
         sync_test_settlements(WILDERNESS_GATE_MAP_IDS)
-        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
-        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS)
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS, zone_keys=())
+        sync_test_wilderness(WILDERNESS_GATE_MAP_IDS, zone_keys=())
 
         script, gates = self._gate_exits()
         from evennia.contrib.grid.wilderness.wilderness import WildernessScript

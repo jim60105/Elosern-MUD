@@ -173,6 +173,8 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
         # Full startup also synchronizes service hosts in every settlement, so
         # the declaration must cover every spawned host room, not only the
         # bridge's own gate settlement.
+        # The ambient monster population is not part of this declaration: the
+        # contract under test is the legacy room's rename and its bridge.
         with selected_startup_settlements(
             tuple(
                 sorted(
@@ -182,7 +184,8 @@ class LimboRoomTests(BattlefieldIsolation, RegistryIsolationMixin, EvenniaTest):
                         for gate in entry.gates
                     }
                 )
-            )
+            ),
+            zone_keys=(),
         ):
             at_server_start()
 

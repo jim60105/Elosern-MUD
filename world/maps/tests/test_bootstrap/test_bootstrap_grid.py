@@ -175,7 +175,12 @@ class GridBootstrapStartupTests(_GridBootstrapCase):
         )
 
     def test_at_server_start_without_limbo_syncs_lore_and_grid(self):
-        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+        with selected_startup_settlements(
+            CAPITAL_VILLAGE_MAP_IDS,
+            # These contracts cover the grid, the bridges and the lore mirror;
+            # the ambient monster population is not part of them.
+            zone_keys=(),
+        ):
             at_server_start()
 
         self.assertEqual(
@@ -191,7 +196,12 @@ class GridBootstrapStartupTests(_GridBootstrapCase):
 
     def test_at_server_start_with_limbo_creates_bridging_exits(self):
         create_object(Room, key=LIMBO_KEY, location=None)
-        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+        with selected_startup_settlements(
+            CAPITAL_VILLAGE_MAP_IDS,
+            # These contracts cover the grid, the bridges and the lore mirror;
+            # the ambient monster population is not part of them.
+            zone_keys=(),
+        ):
             at_server_start()
 
         self.assertEqual(
@@ -502,7 +512,12 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         )
 
     def test_at_server_start_provisions_wilderness_too(self):
-        with selected_startup_settlements(CAPITAL_VILLAGE_MAP_IDS):
+        with selected_startup_settlements(
+            CAPITAL_VILLAGE_MAP_IDS,
+            # The wilderness map and its gate exits are this contract; the
+            # ambient monster population is covered by its own owner tests.
+            zone_keys=(),
+        ):
             at_server_start()
 
         self.assertEqual(
