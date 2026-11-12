@@ -130,11 +130,16 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts"
     )
     def test_panel_renders_committed_facts(self):
-        # 'filters committed rows without replacing counts or order, and keeps
-        # failure text intact' pins verbatim tab counts, payload row order,
-        # and the committed failure line with no image element; 'waits for
-        # subject publication rather than optimistically switching cards'
-        # pins the one select dispatch and publication-driven re-render.
+        # 'renders committed rows in payload order with no filter tabs, and
+        # keeps failure text intact' pins payload row order, the absent filter
+        # tabs and the committed failure line with no image element; the
+        # 'gallery categories and subjects' cases pin one control per
+        # committed category, the single category dispatch that waits for the
+        # committed panel, the focusable disabled category announcing its
+        # committed reason, and the empty category; 'waits for subject
+        # publication rather than optimistically switching cards' pins the one
+        # select dispatch and publication-driven re-render. The annotation
+        # names the requirement this change removes; archive sync retires it.
         _assert_vitest_passes(
             _run_vitest_once(GALLERY_COMPONENTS), "gallery panel facts"
         )
@@ -158,8 +163,8 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     )
     def test_official_rows_are_selectable_read_only(self):
         # 'renders the committed rows beside the cards and never counts them
-        # as cards' pins the separate committed list with the card grid and
-        # filter counts untouched; 'selects an official row and renders only
+        # as cards' pins the separate committed list with the card grid
+        # untouched; 'selects an official row and renders only
         # its read-only affordances' pins the preview plus 清除選取/清除個人調整
         # with no 刪除/replace/regenerate affordance; 'dispatches the selection
         # with only the subject key and the committed identity', 'clears the
@@ -170,13 +175,12 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         # edited component; 'never dispatches an untouched official geometry
         # save' pins that a save without an edit crosses no wire;
         # 'suppresses the paragraph when committed official rows replace every
-        # card' and 'suppresses the paragraph on every card filter with no
-        # visible rows while official rows exist' pin that committed official
-        # rows alone drop the empty-card guidance on every tab, while 'keeps
+        # card' and 'suppresses the paragraph while one card and official rows
+        # exist' pin that committed official rows alone drop the empty-card
+        # guidance, while 'keeps
         # the unchanged paragraph inside the cards area without official rows',
         # 'keeps the paragraph for a subject with no cards and no official
-        # rows' and 'keeps the paragraph for an empty filtered subset without
-        # official rows' pin its unchanged text, class and cards-area location
+        # rows' pin its unchanged text, class and cards-area location
         # when the committed official list is empty, and 'follows a committed
         # official-entry replacement in both directions without a dispatch'
         # pins the reactive, dispatch-free toggle.

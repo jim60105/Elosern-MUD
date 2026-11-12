@@ -102,8 +102,8 @@ class PresentationContext:
         gallery_view: The copied version-4 gallery view of this session (a
             ``gallery_selection.GalleryViewSelection``, or ``None``): one
             category and one subject per category, bound to the owning
-            character so it survives possession. Only the version-4 gallery
-            builder reads it; it never authorizes anything.
+            character so it survives possession. Only the registered gallery
+            presenter reads it; it never authorizes anything.
         travel_events: The immutable travel notices
             (``world.rules.travel_events.TravelEvent``) of the causal group
             being published, or of the latest published batch on a replay.
@@ -115,6 +115,8 @@ class PresentationContext:
     protocol_version: int
     session_tag: str | None = field(default=None)
     proposal: ProposalSnapshot | None = field(default=None)
+    # Dead version-3 rail selection, read only by the unregistered
+    # ``gallery_presenter_v3``; ``gallery-v3-removal`` drops it.
     gallery_subject: str | None = field(default=None)
     combat_round: Any = field(default=None)
     skill_use: tuple[int, str, float] | None = field(default=None)

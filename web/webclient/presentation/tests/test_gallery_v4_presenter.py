@@ -2,8 +2,8 @@
 
 Characters and companions are created in each test; monster species, variants
 and tiers come from the synthetic kit plus file-local factory rows. Every
-projection goes through ``build_gallery_v4``, which returns only payloads that
-passed ``validate_gallery_v4``; the tests re-validate each one explicitly.
+projection goes through ``gallery_presenter``, which returns only payloads that
+passed ``validate_gallery``; the tests re-validate each one explicitly.
 """
 
 from pathlib import Path
@@ -26,7 +26,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
 from web.webclient.presentation import gallery as gallery_module
 from web.webclient.presentation.coordinator import attach_coordinator
-from web.webclient.presentation.gallery import build_gallery_v4, validate_gallery_v4
+from web.webclient.presentation.gallery import gallery_presenter, validate_gallery
 from web.webclient.presentation.gallery_selection import (
     GalleryViewSelection,
     gallery_view_snapshot,
@@ -158,8 +158,8 @@ class GalleryV4PresenterTests(EvenniaTest):
         return identity
 
     def _build(self, session, actor=None):
-        panel = build_gallery_v4(build_presentation_context(session, actor or self.actor))
-        validate_gallery_v4(panel)
+        panel = gallery_presenter(build_presentation_context(session, actor or self.actor))
+        validate_gallery(panel)
         return panel
 
     # -- the projection -----------------------------------------------------

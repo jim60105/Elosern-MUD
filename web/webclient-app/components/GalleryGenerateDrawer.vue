@@ -15,7 +15,11 @@ const emit = defineEmits(["close", "submit", "character", "log"]);
 const fields = ref([]);
 const prompt = ref("");
 const count = computed(() => [...prompt.value].length);
-const puppet = computed(() => props.model.subjects?.find((row) => row.subject_key === props.model.selected)?.is_puppet);
+// The character-data link belongs only to the live character: the committed
+// subject tile of the selection marks it `is_current`.
+const puppet = computed(() => props.model.groups
+  ?.flatMap((group) => group.subjects)
+  .find((row) => row.subject_key === props.model.selected)?.is_current === true);
 function submit() {
   if (!props.disabled) emit("submit", {
     fields: props.model.capabilities?.supports_field_selection ? [...fields.value] : [],

@@ -12,12 +12,13 @@ from unittest.mock import patch
 import uuid
 
 from django.test import override_settings
-from evennia.server.signals import SIGNAL_OBJECT_POST_UNPUPPET
+from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from PIL import Image
 
 from tools.spec_traceability import covers_requirement
+from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from web.webclient.actions import gallery_actions as actions
@@ -26,7 +27,6 @@ from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation import gallery_selection
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.gallery_selection import (
-    gallery_selection_snapshot,
     gallery_view_snapshot,
 )
 from web.webclient.presentation.ingress import build_presentation_context
@@ -40,6 +40,7 @@ from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.clock import get_world_clock
+from world.tests.synthetic_data import make_monster_species, make_monster_tier, make_monster_variant
 
 ROOT = Path(__file__).resolve().parents[4]
 SUBJECT = "portrait:character:t_gallery_actor"
@@ -245,6 +246,8 @@ for (const x of [NaN, Infinity, -Infinity]) assert.throws(() => p.validateGaller
 """], cwd=ROOT, check=True)
 
 class GalleryActionIntegrationTests(EvenniaTest):
+    account_typeclass = Account
+
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
@@ -255,6 +258,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.addCleanup(settings.disable)
         get_world_clock()
         self.actor = self.character(PlayerCharacter, "t_gallery_actor")
+        # The registered gallery opens on "mine": the owning account's characters.
+        self.actor.account = self.account
+        self.account.characters.add(self.actor)
         self.companion = self.character(NPC, "t_gallery_companion")
         self.companion.db.party_member = self.actor.pk
         self.actor.db.party = [self.companion.pk]
@@ -270,10 +276,25 @@ class GalleryActionIntegrationTests(EvenniaTest):
         }
         for target in (
             "web.webclient.presentation.gallery.get_monster_visual_registry",
+            "web.webclient.presentation.gallery_categories.get_monster_visual_registry",
             "world.lore.monster_visuals.get_monster_visual_registry",
             "world.art.subjects.get_monster_visual_registry",
         ):
             patcher = patch(target, return_value=visual_registry)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        # The monster category groups sighted species by threat tier: give the
+        # synthetic species one synthetic tier.
+        species = make_monster_species("t_beast", display_name_zh="測試魔物", default_variant_key="t_beast_v")
+        variant = make_monster_variant(
+            "t_beast_v", species_key="t_beast", threat_tier="t_low", ordinary_variant=True, danger_grade=None,
+        )
+        for name, rows in (
+            ("MONSTER_SPECIES_REGISTRY", {"t_beast": species}),
+            ("MONSTER_VARIANT_REGISTRY", {"t_beast_v": variant}),
+            ("MONSTER_TIER_REGISTRY", {"t_low": make_monster_tier("t_low", display_name_zh="低測級")}),
+        ):
+            patcher = patch(f"web.webclient.presentation.gallery_categories.{name}", rows)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.registry = build_production_registry()
@@ -403,7 +424,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer",
         "webclient-gallery-management-actions::subject-selection-writes-only-session-presentation-state",
     )
-    def test_selection_publishes_once_without_art_mutation_and_retires_on_unpuppet(self):
+    def test_selection_publishes_once_without_art_mutation_and_retires_on_owner_change(self):
         self.card()
         self.generate(self.companion_subject)
         def art_state():
@@ -413,20 +434,27 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 for model in (api.GalleryRecord, ArtAssetRecord)
             ]
         before = art_state()
+        self.assertEqual(self.dispatch("gallery.category.select", {"category": "party"})["outcome"], "success")
         with patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
             result = self.dispatch("gallery.subject.select", {"subject_key": self.companion_subject.full()})
         self.assertEqual(result["outcome"], "success")
-        self.assertEqual(self.panel()["selected"], self.companion_subject.full())
+        panel = self.panel()
+        self.assertEqual((panel["category"], panel["selected"]), ("party", self.companion_subject.full()))
         self.assertEqual(before, art_state())
         self.assertIsNone(api.record_for(self.companion_subject))
         self.assertEqual(info.call_count, 1)
         self.assertEqual(info.call_args.args, ("gallery_action",))
         warn.assert_not_called()
-        SIGNAL_OBJECT_POST_UNPUPPET.send(sender=self.actor, session=self.transport, account=self.account)
-        self.assertIsNone(gallery_selection_snapshot(self.transport, self.actor))
-        self.assertIsNone(self.transport.ndb.gallery_selection)
+        # Puppeting a character of another owner retires the selection.
+        stranger = create_object(PlayerCharacter, key="新角色")
+        self.transport.puppet = stranger
+        SIGNAL_OBJECT_POST_PUPPET.send(sender=stranger, session=self.transport)
+        self.transport.puppet = self.actor
+        self.assertIsNone(gallery_view_snapshot(self.transport, self.actor))
+        self.assertIsNone(self.transport.ndb.gallery_view)
 
     def test_unknown_selection_preserves_store_and_reports_unknown_subject(self):
+        self.dispatch("gallery.category.select", {"category": "party"})
         self.dispatch("gallery.subject.select", {"subject_key": self.companion_subject.full()})
         result = self.dispatch("gallery.subject.select", {"subject_key": "portrait:character:t_absent"})
         self.assertEqual(result["code"], "unknown_subject")
@@ -587,7 +615,16 @@ class GalleryActionIntegrationTests(EvenniaTest):
     @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
     def test_monster_capability_refusals_and_offline_replacement(self):
         old = self.card(subject=self.monster_subject)
-        self.dispatch("gallery.subject.select", {"subject_key": self.monster_subject.full()})
+        # The monster category lists only sighted species: report the
+        # synthetic species as sighted (the lore codex owns the real record).
+        sighted = patch(
+            "web.webclient.presentation.gallery_categories.list_discovered",
+            return_value=(("monster", self.monster_subject.key),),
+        )
+        sighted.start()
+        self.addCleanup(sighted.stop)
+        self.assertEqual(self.dispatch("gallery.category.select", {"category": "monster"})["outcome"], "success")
+        self.assertEqual(self.dispatch("gallery.subject.select", {"subject_key": self.monster_subject.full()})["outcome"], "success")
         self.assertEqual(self.generate(self.monster_subject, fields=["appearance"])["code"], "field_selection_unsupported")
         self.assertEqual(self.generate(self.monster_subject, custom_prompt="光影")["code"], "free_text_unsupported")
         for image in (old["image_id"], IMAGE):
@@ -602,7 +639,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         panel = self.panel()
         self.assertEqual([(row["image_id"], row["status"]) for row in panel["cards"]], [(new["image_id"], "card")])
         self.assertFalse(panel["capabilities"]["supports_bindings"])
-        self.assertEqual(panel["filters"]["pending"], 0)
+        self.assertFalse(any(row["status"] == "pending" for row in panel["cards"]))
         pair = {"subject_key": self.monster_subject.full(), "image_id": new["image_id"]}
         self.assertEqual(self.dispatch("gallery.default.set", pair)["outcome"], "success")
         self.assertEqual(api.record_for(self.monster_subject).db.default_image_id, new["image_id"])
@@ -743,7 +780,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         for name, action, payload, accepted in wire_cases():
             if accepted or "\\ud800" in repr(payload):
                 continue  # lone surrogate is an envelope rejection, tested by wire parity
-            with self.subTest(case=name), patch.object(actions, "_mutate") as mutate, patch.object(actions, "select_gallery_subject") as select:
+            with self.subTest(case=name), patch.object(actions, "_mutate") as mutate, patch.object(actions, "select_gallery_subject_v4") as select:
                 result = self.dispatch(action, payload)
                 self.assertEqual(result["code"], "malformed_payload")
                 mutate.assert_not_called()
@@ -854,6 +891,8 @@ class OfficialPreferenceActionTests(EvenniaTest):
     exercised end to end.
     """
 
+    account_typeclass = Account
+
     def setUp(self):
         super().setUp()
         official_refs._reported_unresolved.clear()
@@ -886,6 +925,9 @@ class OfficialPreferenceActionTests(EvenniaTest):
             self.addCleanup(patcher.stop)
         get_world_clock()
         self.actor = self._character("t_gallery_actor", _PRESET_KEY)
+        # The registered gallery opens on "mine": the owning account's characters.
+        self.actor.account = self.account
+        self.account.characters.add(self.actor)
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
         self.registry = build_production_registry()
         self.action_registry = build_production_action_registry()

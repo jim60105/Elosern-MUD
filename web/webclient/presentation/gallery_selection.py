@@ -52,7 +52,10 @@ def gallery_selection_snapshot(session, actor) -> str | None:
 
 
 def select_gallery_subject(session, actor, subject_key) -> dict:
-    """Validate a rail selection and return action result data without publishing.
+    """Dead version-3 rail selection (deleted by ``gallery-v3-removal``).
+
+    ``gallery.subject.select`` calls ``select_gallery_subject_v4``; nothing
+    reaches this function any more.
 
     The companion action adapter owns dispatch and publication. Invalid input
     never alters an existing selection or any gallery record.

@@ -14,10 +14,11 @@ from unittest.mock import patch
 import uuid
 
 from django.test import override_settings
-from evennia.server.signals import SIGNAL_OBJECT_POST_UNPUPPET
+from evennia.server.signals import SIGNAL_OBJECT_POST_PUPPET
 from evennia.utils.create import create_object, create_script
 from evennia.utils.test_resources import EvenniaTest
 
+from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.art import gallery as api
@@ -35,12 +36,15 @@ from web.webclient.presentation.gallery import (
     GALLERY_MAX_PANEL_SUBJECTS,
     SLOT_LABELS,
     gallery_presenter,
+    gallery_presenter_v3,
     gallery_subjects,
     validate_gallery,
-    validate_gallery_v4,
+    validate_gallery_v3,
 )
-from web.webclient.presentation.gallery_selection import gallery_selection_snapshot, select_gallery_subject
-from web.webclient.presentation.ingress import build_presentation_context, reset_client_sequence, _coordinator_for
+from web.webclient.presentation.gallery_selection import (
+    gallery_view_snapshot, select_gallery_category, select_gallery_subject_v4,
+)
+from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size,
 )
@@ -231,6 +235,10 @@ def payload():
 
 
 class GalleryWireTests(unittest.TestCase):
+    """Parity of the dead version-3 validator pair (``validate_gallery_v3`` and
+    its JS mirror ``validateGalleryPanelV3``), kept until ``gallery-v3-removal``.
+    """
+
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-payload-is-exactly-version-mirrored-across-server-and-client"
     )
@@ -658,10 +666,10 @@ class GalleryWireTests(unittest.TestCase):
         add("envelope byte overflow", over_bytes)
         script = """
 const fs = require('node:fs');
-const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+const protocol = require('./web/static/webclient/js/elosern/protocol/panels/gallery.js');
 const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
 const results = cases.map(([name, value]) => {
-  try { return [name, true, protocol.validateGalleryPanel(value)]; }
+  try { return [name, true, protocol.validateGalleryPanelV3(value)]; }
   catch (_) { return [name, false, null]; }
 });
 process.stdout.write(JSON.stringify(results));
@@ -671,14 +679,14 @@ process.stdout.write(JSON.stringify(results));
         for (name, value, expected), (_, js_accepts, echoed) in zip(cases, js_results, strict=True):
             with self.subTest(case=name):
                 try:
-                    validate_gallery(value)
+                    validate_gallery_v3(value)
                     python_accepts = True
                 except ProtocolValidationError:
                     python_accepts = False
                 self.assertEqual(python_accepts, expected)
                 self.assertEqual(js_accepts, expected)
                 if js_accepts:
-                    self.assertEqual(validate_gallery(echoed), value)
+                    self.assertEqual(validate_gallery_v3(echoed), value)
 
 
 _V4_CAPABILITIES = {
@@ -758,6 +766,31 @@ def v4_case(modify):
     return value
 
 
+class GalleryCutoverTests(unittest.TestCase):
+    """The registered gallery is version 4 on both sides of the wire."""
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_registry_and_both_validators_speak_version_4(self):
+        from web.webclient.presentation import gallery as gallery_module
+        from web.webclient.presentation import gallery_categories
+
+        self.assertEqual(gallery_module.GALLERY_CATEGORY_KEYS, gallery_categories.CATEGORY_KEYS)
+        spec = build_production_registry().spec("gallery")
+        self.assertEqual(spec.schema_version, 4)
+        self.assertIs(spec.presenter, gallery_presenter)
+        script = """
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+process.stdout.write(JSON.stringify([protocol.PANEL_ALLOWLIST.gallery, protocol.GALLERY_CATEGORY_KEYS]));
+"""
+        output = subprocess.run(["node", "-e", script], text=True, capture_output=True, cwd=ROOT, check=True)
+        self.assertEqual(json.loads(output.stdout), [4, list(gallery_categories.CATEGORY_KEYS)])
+        # The version-3 rail shape is refused by the registered validator.
+        with self.assertRaises(ProtocolValidationError):
+            validate_gallery(payload())
+
+
 class GalleryV4ParityTests(unittest.TestCase):
     """Dual-direction parity of the version-4 validators (Python and the JS mirror)."""
 
@@ -772,7 +805,7 @@ const fs = require('node:fs');
 const protocol = require('./web/static/webclient/js/elosern/protocol.js');
 const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
 const results = cases.map(([name, value]) => {
-  try { return [name, true, protocol.validateGalleryPanelV4(value)]; }
+  try { return [name, true, protocol.validateGalleryPanel(value)]; }
   catch (_) { return [name, false, null]; }
 });
 process.stdout.write(JSON.stringify(results));
@@ -783,14 +816,14 @@ process.stdout.write(JSON.stringify(results));
         for (name, value, expected), (_, js_accepts, echoed) in zip(json.loads(text), js_results, strict=True):
             with self.subTest(case=name):
                 try:
-                    validate_gallery_v4(value)
+                    validate_gallery(value)
                     python_accepts = True
                 except ProtocolValidationError:
                     python_accepts = False
                 self.assertEqual(python_accepts, expected)
                 self.assertEqual(js_accepts, expected)
                 if js_accepts:
-                    self.assertEqual(validate_gallery_v4(echoed), value)
+                    self.assertEqual(validate_gallery(echoed), value)
 
     @covers_requirement(
         "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
@@ -1081,6 +1114,8 @@ process.stdout.write(JSON.stringify(results));
 
 
 class GalleryPresenterTests(EvenniaTest):
+    account_typeclass = Account
+
     def setUp(self):
         super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
@@ -1090,6 +1125,10 @@ class GalleryPresenterTests(EvenniaTest):
         settings.enable()
         self.addCleanup(settings.disable)
         self.actor = create_object(PlayerCharacter, key="測試主角", location=self.room1)
+        # The registered gallery opens on the "mine" category, which lists the
+        # owning account's characters.
+        self.actor.account = self.account
+        self.account.characters.add(self.actor)
         self.actor.db.portrait_policy = {"mode": "named", "stable_key": "t_gallery_actor"}
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
         self.context = PresentationContext(self.actor, 1)
@@ -1129,8 +1168,9 @@ class GalleryPresenterTests(EvenniaTest):
     def test_empty_available_and_mode_gate(self):
         before = api.GalleryRecord.objects.count()
         value = gallery_presenter(self.context)
+        self.assertEqual(value["schema_version"], 4)
+        self.assertEqual(value["category"], "mine")
         self.assertEqual(value["cards"], [])
-        self.assertEqual(value["filters"], dict.fromkeys(("all", "defaults", "bound", "pending", "failed"), 0))
         self.assertEqual(value["selected"], self.subject.full())
         self.assertEqual(api.GalleryRecord.objects.count(), before)
         self.actor.creation_pending = True
@@ -1143,6 +1183,8 @@ class GalleryPresenterTests(EvenniaTest):
         "artwork-descriptor::descriptors-reveal-only-authorized-exact-subjects"
     )
     def test_rail_prioritizes_companions_reserves_monsters_and_skips_corruption(self):
+        # The dead version-3 rail (deleted by gallery-v3-removal); its removed
+        # requirement annotation stays until archive sync retires it.
         other = create_object(NPC, key="其他角色")
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_other"}
         companion = create_object(NPC, key="同行角色")
@@ -1175,7 +1217,7 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual([row["image_id"] for row in value["binding_warnings"]], [image_id(2), image_id(1)])
         self.assertEqual(value["binding_warnings"][-1]["conditions"], ["主手：測試長劍", "防具：測試外套"])
         self.assertEqual(value["equipment_summary"]["accessories"]["value"], ["t_ring_a", "t_ring_b"])
-        self.assertEqual(value["filters"], {"all": 3, "defaults": 1, "bound": 3, "pending": 0, "failed": 0})
+        self.assertNotIn("filters", value)
 
     @covers_requirement(
         "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media"
@@ -1232,7 +1274,7 @@ class GalleryPresenterTests(EvenniaTest):
         value = gallery_presenter(self.context)
         self.assertEqual([row["image_id"] for row in value["binding_warnings"]], [image_id(number) for number in range(7, 2, -1)])
         self.assertEqual(value["binding_warnings"][0]["conditions"], ["飾品：t_ring_a、t_ring_b（任一）"])
-        self.assertEqual(value["filters"]["bound"], 8)
+        self.assertEqual(sum(row["binding_present"] for row in value["cards"]), 8)
 
     def job(self, number):
         with patch("world.art.queue._prompt_digest_or_empty", return_value=""), patch("world.art.queue.time.time", return_value=300 + number):
@@ -1248,7 +1290,7 @@ class GalleryPresenterTests(EvenniaTest):
         self.card(10, timestamp=400)
         value = gallery_presenter(self.context)
         self.assertEqual(sum(row["image_id"] == image_id(10) for row in value["cards"]), 1)
-        self.assertEqual(value["filters"]["pending"], 7)
+        self.assertEqual(sum(row["status"] == "pending" for row in value["cards"]), 7)
         job = ArtAssetRecord.objects.get(db_key=f"art:{self.subject.full()}:gen:{image_id(9)}")
         job.db.status = "in_progress"
         job.db.generation_token = "t_token"
@@ -1289,7 +1331,6 @@ class GalleryPresenterTests(EvenniaTest):
             {row["image_id"] for row in value["cards"]},
             {image_id(1), image_id(2)},
         )
-        self.assertEqual(value["filters"]["all"], 2)
         self.assertTrue(all(row["status"] == "card" for row in value["cards"]))
         reasons = {}
         for row in value["cards"]:
@@ -1311,50 +1352,59 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(reasons[image_id(1)], descriptors.REASON_GENERATED_OUTPUT_MISSING)
         self.assertEqual(reasons[image_id(2)], descriptors.REASON_SOURCE_REJECTED)
 
-    @covers_requirement(
-        "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
-    )
-    def test_selection_is_transport_owned_and_retired_by_real_unpuppet_signal(self):
-        a, b = self.make_session(), self.make_session()
-        selected = "portrait:monster:t_beast"
-        with patch("web.webclient.presentation.gallery_selection.log_info") as event:
-            res = select_gallery_subject(a, self.actor, selected)
-            self.assertEqual(res["outcome"], "success")
-            self.assertNotIn("affected_panels", res)
-            select_gallery_subject(a, self.actor, selected)
-            event.assert_called_once_with("gallery_panel_selected", context={"subject": selected, "kind": "portrait:monster"})
-        self.assertIsNone(gallery_selection_snapshot(b, self.actor))
-        self.assertEqual(select_gallery_subject(a, self.actor, "scene:t_scene")["code"], "unknown_subject")
-        self.assertEqual(gallery_selection_snapshot(a, self.actor), selected)
-        value = gallery_presenter(build_presentation_context(a, self.actor))
-        self.assertEqual(value["selected"], selected)
-        self.assertIsNone(value["equipment_summary"])
-        self.assertFalse(value["capabilities"]["supports_bindings"])
-        SIGNAL_OBJECT_POST_UNPUPPET.send(sender=self.actor, session=a, account=self.account)
-        self.assertIsNone(a.ndb.gallery_selection)
-        self.assertIsNone(gallery_selection_snapshot(a, self.actor))
-        select_gallery_subject(a, self.actor, selected)
-        reset_client_sequence(a)
-        self.assertIsNone(gallery_selection_snapshot(a, self.actor))
-        select_gallery_subject(a, self.actor, selected)
-        a.ndb.elosern_actor_id = str(self.actor.pk)
-        other = create_object(PlayerCharacter, key="新角色")
-        a.puppet = other
-        _coordinator_for(a, other)
-        self.assertIsNone(a.ndb.gallery_selection)
+    def companion(self, key, stable_key):
+        companion = create_object(NPC, key=key, location=self.room1)
+        companion.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        companion.db.party_member = self.actor.pk
+        self.actor.db.party = [*(self.actor.db.party or []), companion.pk]
+        meta = dict(self.actor.db.party_meta or {})
+        meta[str(companion.pk)] = {"general": True, "reasons": []}
+        self.actor.db.party_meta = meta
+        return companion
 
     @covers_requirement(
         "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
     )
-    def test_deleted_selected_character_falls_back_without_writing(self):
-        other = create_object(NPC, key="待刪角色")
-        other.db.portrait_policy = {"mode": "named", "stable_key": "t_deleted"}
+    def test_selection_is_transport_owned_and_retired_by_another_owners_puppet(self):
+        self.companion("同行角色", "t_companion")
+        a, b = self.make_session(), self.make_session()
+        selected = "portrait:character:t_companion"
+        self.assertEqual(select_gallery_category(a, self.actor, "party")["outcome"], "success")
+        with patch("web.webclient.presentation.gallery_selection.log_info") as event:
+            res = select_gallery_subject_v4(a, self.actor, selected)
+            self.assertEqual(res["outcome"], "success")
+            self.assertNotIn("affected_panels", res)
+            select_gallery_subject_v4(a, self.actor, selected)
+            event.assert_not_called()
+        self.assertIsNone(gallery_view_snapshot(b, self.actor))
+        self.assertEqual(select_gallery_subject_v4(a, self.actor, "scene:t_scene")["code"], "unknown_subject")
+        self.assertEqual(gallery_view_snapshot(a, self.actor).subjects, (("party", selected),))
+        value = gallery_presenter(build_presentation_context(a, self.actor))
+        self.assertEqual((value["category"], value["selected"]), ("party", selected))
+        self.assertTrue(value["capabilities"]["supports_bindings"])
+        # The other session still opens on the live character in "mine".
+        other_value = gallery_presenter(build_presentation_context(b, self.actor))
+        self.assertEqual((other_value["category"], other_value["selected"]), ("mine", self.subject.full()))
+        # Puppeting a character of another owner retires the view.
+        stranger = create_object(PlayerCharacter, key="新角色")
+        a.puppet = stranger
+        SIGNAL_OBJECT_POST_PUPPET.send(sender=stranger, session=a)
+        self.assertIsNone(a.ndb.gallery_view)
+
+    @covers_requirement(
+        "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
+    )
+    def test_deleted_selected_companion_falls_back_without_writing(self):
+        self.companion("同行角色", "t_companion")
+        other = self.companion("待刪角色", "t_deleted")
         session = self.make_session()
-        select_gallery_subject(session, self.actor, "portrait:character:t_deleted")
+        select_gallery_category(session, self.actor, "party")
+        select_gallery_subject_v4(session, self.actor, "portrait:character:t_deleted")
         frozen = build_presentation_context(session, self.actor)
         other.delete()
-        self.assertEqual(gallery_presenter(frozen)["selected"], self.subject.full())
-        self.assertEqual(session.ndb.gallery_selection.subject_key, "portrait:character:t_deleted")
+        value = gallery_presenter(frozen)
+        self.assertEqual((value["category"], value["selected"]), ("party", "portrait:character:t_companion"))
+        self.assertEqual(session.ndb.gallery_view.subjects, (("party", "portrait:character:t_deleted"),))
 
 
 _PRESET_KEY = "t_gallery_preset"
@@ -1370,6 +1420,8 @@ def _png(width=4, height=4) -> bytes:
 
 
 class OfficialEntryProjectionTests(EvenniaTest):
+    account_typeclass = Account
+
     """The official-entry read model of the gallery panel (task 3.1).
 
     The puppet carries a synthetic preset provenance, so its content
@@ -1415,6 +1467,10 @@ class OfficialEntryProjectionTests(EvenniaTest):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.actor = create_object(PlayerCharacter, key="測試主角", location=self.room1)
+        # The registered gallery opens on the "mine" category, which lists the
+        # owning account's characters.
+        self.actor.account = self.account
+        self.account.characters.add(self.actor)
         self.actor.db.portrait_policy = {"mode": "named", "stable_key": "t_gallery_actor"}
         self.actor.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, _PRESET_KEY)
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
@@ -1525,13 +1581,8 @@ class OfficialEntryProjectionTests(EvenniaTest):
                 [entry["source_id"] for entry in artwork["retention_sources"]],
                 [descriptors.gallery_official_source_id(row["identity"])],
             )
-        # Official rows are never cards, and the filter tabs keep counting only
-        # the card rows.
+        # Official rows are never cards: the card list holds only the runtime row.
         self.assertEqual([row["image_id"] for row in value["cards"]], [card["image_id"]])
-        self.assertEqual(
-            list(value["filters"]), ["all", "defaults", "bound", "pending", "failed"]
-        )
-        self.assertEqual(value["filters"]["all"], 1)
         # Selecting the official image cleared the runtime default; the card
         # itself is untouched.
         self.assertIsNone(api.record_for(self.subject).db.default_image_id)
@@ -1557,6 +1608,8 @@ class OfficialEntryProjectionTests(EvenniaTest):
         # is what declares one) presents an empty list too.
         other = create_object(PlayerCharacter, key="無來源角色", location=self.room1)
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_no_reference"}
+        other.account = self.account
+        self.account.characters.add(other)
         context = PresentationContext(other, 1)
         self.assertEqual(gallery_presenter(context)["official_entries"], [])
 

@@ -5,7 +5,7 @@ import AppClient from "../AppClient.vue";
 import GalleryGenerateDrawer from "../components/GalleryGenerateDrawer.vue";
 import GalleryStageTransformModal from "../components/GalleryStageTransformModal.vue";
 import { useElosernStore } from "../stores/elosern.js";
-import { GALLERY_SAMPLE } from "../stories/gallery-fixtures.js";
+import { GALLERY_V4_MINE as GALLERY_SAMPLE } from "../stories/gallery-fixtures-v4.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 describe("gallery application integration", () => {
@@ -54,7 +54,7 @@ describe("gallery application integration", () => {
 
     opener.element.focus();
     await opener.trigger("click");
-    await snapshot({ schema_version: 3, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
+    await snapshot({ schema_version: 4, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="gallery-panel"]').text()).toContain("圖庫資料暫時無法使用。");
   }, 20000);
@@ -101,7 +101,7 @@ describe("gallery application integration", () => {
     await open();
     const panel = () => wrapper.get('[data-testid="gallery-panel"]');
     // A pending row can never open the editor or target a mutation.
-    await panel().get(`[data-image-id="${GALLERY_SAMPLE.cards[6].image_id}"]`).trigger("click");
+    await panel().get(`[data-image-id="${GALLERY_SAMPLE.cards.find((row) => row.status === "pending").image_id}"]`).trigger("click");
     expect(button(wrapper.get('[data-testid="gallery-detail"]'), "比例調整")).toBeUndefined();
     expect(wrapper.findComponent(GalleryStageTransformModal).exists()).toBe(false);
     expect(sender.sent.actions).toEqual([]);

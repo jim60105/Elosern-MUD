@@ -1,5 +1,5 @@
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
-import { galleryStoryModel } from "../gallery-fixtures.js";
+import { galleryStoryModel } from "../gallery-fixtures-v4.js";
 // The modal reads its exact original (and that original's committed rectangle)
 // out of the row's own canonical descriptor, so the story model substitutes the
 // descriptor's own resource URLs with committed fallback artwork the offline

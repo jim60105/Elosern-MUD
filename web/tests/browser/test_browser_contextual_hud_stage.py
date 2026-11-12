@@ -104,24 +104,47 @@ def _wait_appended_page_measured(page, scale, timeout=30000) -> None:
 
 
 _GALLERY_PANEL = {
-    "schema_version": 3,
+    "schema_version": 4,
     "available": True,
     "kind": "gallery",
-    "subjects": [
+    "categories": [
+        {"key": "mine", "count": 1, "enabled": True, "reason": None},
+        {"key": "party", "count": 0, "enabled": True, "reason": None},
+        {"key": "people", "count": 0, "enabled": False, "reason": "尚未開放"},
+        {"key": "monster", "count": 0, "enabled": True, "reason": None},
+        {"key": "scene", "count": 0, "enabled": False, "reason": "尚未開放"},
+    ],
+    "category": "mine",
+    "groups": [
         {
-            "subject_key": "portrait:character:7001",
-            "kind": "portrait:character",
-            "display_name": "夜行者",
-            "is_puppet": True,
+            "key": "mine",
+            "label": None,
+            "seen": None,
+            "total": None,
+            "expanded": True,
+            "count": 1,
+            "subjects": [
+                {
+                    "subject_key": "portrait:character:7001",
+                    "kind": "portrait:character",
+                    "display_name": "夜行者",
+                    "is_current": True,
+                    "card_count": 0,
+                    "artwork": None,
+                }
+            ],
         }
     ],
     "selected": "portrait:character:7001",
-    "filters": {"all": 0, "defaults": 0, "bound": 0, "pending": 0, "failed": 0},
+    "description": None,
     "capabilities": {
         "supports_bindings": True,
         "supports_field_selection": True,
         "supports_free_text": True,
         "supports_personal_official_preferences": True,
+        "supports_face_rect": True,
+        "supports_stage": True,
+        "supports_card_delete": True,
         "max_cards": None,
     },
     "cards": [],

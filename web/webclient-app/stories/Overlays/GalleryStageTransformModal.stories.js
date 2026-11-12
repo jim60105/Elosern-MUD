@@ -1,5 +1,5 @@
 import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
-import { galleryStoryModel } from "../gallery-fixtures.js";
+import { galleryStoryModel } from "../gallery-fixtures-v4.js";
 // The modal edits one exact original's committed placement, so the story
 // fixture carries the placement inside that row's canonical descriptor (the v3
 // wire shape) rather than as a top-level card field.

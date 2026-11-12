@@ -551,7 +551,7 @@ var TRAVEL_LOG_MAX_PROSE = 2048;
 var TRAVEL_LOG_MAX_NODE_ID = 128;
 
 var PANEL_ALLOWLIST = {
-  gallery: 3,
+  gallery: 4,
   art: ART_SCHEMA_VERSION,
   status: 6,
   context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,

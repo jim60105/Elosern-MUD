@@ -19,7 +19,7 @@ const FIXTURES = pathToFileURL(
   path.join(__dirname, "../../../../webclient-app/stories/gallery-fixtures-v4.js"),
 ).href;
 
-test("every exported v4 gallery fixture passes validateGalleryPanelV4", async () => {
+test("every exported v4 gallery fixture passes validateGalleryPanel", async () => {
   const module = await import(FIXTURES);
   const panels = Object.entries(module).filter(
     ([, value]) => value !== null && typeof value === "object" && value.kind === "gallery",
@@ -27,7 +27,7 @@ test("every exported v4 gallery fixture passes validateGalleryPanelV4", async ()
   // Guard against a vacuous pass: the fixture module exports several panels.
   assert.ok(panels.length >= 5, `expected at least five panels, found ${panels.length}`);
   for (const [name, panel] of panels) {
-    assert.equal(panel.schema_version, Protocol.GALLERY_V4_SCHEMA_VERSION, name);
-    assert.doesNotThrow(() => Protocol.validateGalleryPanelV4(panel), name);
+    assert.equal(panel.schema_version, Protocol.GALLERY_SCHEMA_VERSION, name);
+    assert.doesNotThrow(() => Protocol.validateGalleryPanel(panel), name);
   }
 });

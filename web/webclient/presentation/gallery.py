@@ -1,7 +1,10 @@
-"""Gallery projections and exact wire schemas (versions three and four).
+"""Gallery projections and exact wire schemas.
 
-No mutation or service probe. The version-four builder and validator are
-exported but not yet registered.
+No mutation or service probe. The registered panel is version 4
+(``gallery_presenter`` / ``validate_gallery``). The version-3 rail presenter
+and validator stay below, renamed ``gallery_presenter_v3`` /
+``validate_gallery_v3``, unregistered and unreachable until
+``gallery-v3-removal`` deletes them.
 """
 
 import hashlib
@@ -46,7 +49,9 @@ from .protocol import (
 from .publication_parts import PUBLICATION_MAX_BYTES
 from .registry import PanelUnavailableError
 
-GALLERY_SCHEMA_VERSION = 3
+GALLERY_SCHEMA_VERSION = 4
+# The dead version-3 validator's own discriminator (gallery-v3-removal).
+_V3_SCHEMA_VERSION = 3
 GALLERY_MAX_SUBJECTS = 24
 GALLERY_MAX_LABEL = 128
 GALLERY_MAX_NAME = 64
@@ -89,8 +94,7 @@ PANEL_FIELDS = {
 
 # Version 4 (change gallery-v4-validators): one category at a time. Declared
 # here rather than imported from gallery_categories so this contract stays
-# independent of the category sources; the cutover asserts the two agree.
-GALLERY_V4_SCHEMA_VERSION = 4
+# independent of the category sources; a test asserts the two agree.
 GALLERY_CATEGORY_KEYS = ("mine", "party", "people", "monster", "scene")
 GALLERY_MAX_PANEL_SUBJECTS = 256
 GALLERY_MAX_GROUPS = 64
@@ -457,10 +461,10 @@ def _validate_card_facts(payload, capability, selected):
     return counts
 
 
-def validate_gallery(payload):
-    """Validate exactly the available form; unavailable forms belong to the registry."""
+def validate_gallery_v3(payload):
+    """Dead version-3 validator: unregistered, deleted by ``gallery-v3-removal``."""
     _exact(payload, PANEL_FIELDS, "gallery")
-    if _integer(payload["schema_version"], "schema_version") != GALLERY_SCHEMA_VERSION or payload["available"] is not True or payload["kind"] != "gallery":
+    if _integer(payload["schema_version"], "schema_version") != _V3_SCHEMA_VERSION or payload["available"] is not True or payload["kind"] != "gallery":
         raise ProtocolValidationError("invalid gallery discriminator")
     subjects = payload["subjects"]
     if not isinstance(subjects, list) or not 1 <= len(subjects) <= GALLERY_MAX_SUBJECTS:
@@ -570,14 +574,14 @@ def _validate_v4_groups(groups):
     return listed, total_count
 
 
-def validate_gallery_v4(payload):
+def validate_gallery(payload):
     """Validate exactly the version-4 available form (one category at a time).
 
-    Not yet the registered gallery version: ``gallery-v4-cutover`` registers it.
+    Unavailable forms belong to the registry.
     """
     _exact(payload, V4_PANEL_FIELDS, "gallery")
     if (
-        _integer(payload["schema_version"], "schema_version") != GALLERY_V4_SCHEMA_VERSION
+        _integer(payload["schema_version"], "schema_version") != GALLERY_SCHEMA_VERSION
         or payload["available"] is not True or payload["kind"] != "gallery"
     ):
         raise ProtocolValidationError("invalid gallery discriminator")
@@ -1037,8 +1041,8 @@ def _selected_subject_fields(subject, entity) -> dict:
     }
 
 
-def gallery_presenter(context: PresentationContext):
-    """Project one selected gallery. Reads never create or consolidate records."""
+def gallery_presenter_v3(context: PresentationContext):
+    """Dead version-3 rail presenter: unregistered, deleted by ``gallery-v3-removal``."""
     from .coordinator import PresentationCoordinator
 
     if PresentationCoordinator.mode_for(context) != "exploration":
@@ -1046,8 +1050,8 @@ def gallery_presenter(context: PresentationContext):
     rail = gallery_subjects(context.actor)
     selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
     subject, entity = selected[1:]
-    return validate_gallery({
-        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
+    return validate_gallery_v3({
+        "schema_version": _V3_SCHEMA_VERSION, "available": True, "kind": "gallery",
         "subjects": [entry[0] for entry in rail], "selected": subject.full(),
         **_selected_subject_fields(subject, entity),
     })
@@ -1109,10 +1113,10 @@ def _subject_row(ref):
     }
 
 
-def build_gallery_v4(context: PresentationContext):
-    """Project the version-4 gallery: one category, its groups, the selected subject.
+def gallery_presenter(context: PresentationContext):
+    """Project the registered gallery: one category, its groups, the selected subject.
 
-    Reads only. Not yet registered: ``gallery-v4-cutover`` registers it.
+    Reads never create or consolidate records.
     """
     from .coordinator import PresentationCoordinator
 
@@ -1161,8 +1165,8 @@ def build_gallery_v4(context: PresentationContext):
             "supports_card_delete": capability.supports_card_delete,
         }
         fields["selected"] = subject.full()
-    return validate_gallery_v4({
-        "schema_version": GALLERY_V4_SCHEMA_VERSION, "available": True, "kind": "gallery",
+    return validate_gallery({
+        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
         "categories": category_rows, "category": category, "groups": group_rows,
         "description": None, **fields,
     })

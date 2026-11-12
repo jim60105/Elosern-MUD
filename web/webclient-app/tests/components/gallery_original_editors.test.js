@@ -14,7 +14,7 @@ import { useImageAttempts } from "../../composables/useImageAttempts.js";
 import { useArtwork } from "../../composables/useArtwork.js";
 import { useOriginalEligibility } from "../../composables/useOriginalEligibility.js";
 import { canonicalOrder } from "../../lib/image-attempts.js";
-import { GALLERY_SAMPLE } from "../../stories/gallery-fixtures.js";
+import { GALLERY_V4_MINE as GALLERY_SAMPLE } from "../../stories/gallery-fixtures-v4.js";
 
 const wrappers = [];
 function mountSurface(component, props) {

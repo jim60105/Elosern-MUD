@@ -243,8 +243,8 @@ def build_presentation_context(
     ``party_view_selection_snapshot``: it survives possession, and a reconnect
     starts without one.
 
-    ``gallery_view`` is the version-4 gallery view copied through
-    ``gallery_view_snapshot``; like ``party_view`` it is bound to the owning
+    ``gallery_view`` is the gallery view read by the registered (version-4)
+    gallery presenter, copied through ``gallery_view_snapshot``; like ``party_view`` it is bound to the owning
     character and survives possession.
     """
     from web.webclient.presentation.gallery_selection import (

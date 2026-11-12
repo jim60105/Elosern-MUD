@@ -1,8 +1,8 @@
 // Synthetic, protocol-valid gallery panels at schema version 4 (change
 // gallery-v4-validators): one category at a time. No production character,
-// item or monster data. Every exported panel passes validateGalleryPanelV4
-// (web/static/webclient/js/tests/gallery_fixtures_v4.test.js). The v3
-// gallery-fixtures.js stays until gallery-v4-cutover.
+// item or monster data. Every exported panel passes validateGalleryPanel
+// (web/static/webclient/js/tests/gallery_fixtures_v4.test.js); since
+// gallery-v4-cutover these are the only gallery fixtures stories and tests use.
 
 export const GALLERY_V4_IDS = Array.from(
   { length: 12 },
@@ -218,6 +218,20 @@ export const GALLERY_V4_MINE = {
   error_state: { code: "sd_connection_error", at: 1700000100 },
 };
 
+// Mine with the selected live character holding no card, official entry,
+// warning or recorded error yet: the empty-card guidance frame.
+export const GALLERY_V4_MINE_BLANK = {
+  ...GALLERY_V4_MINE,
+  groups: [group("mine", [
+    tile(LIVE, "夜行者", { card_count: 0, is_current: true }),
+    tile(TWIN, "晨星", { card_count: 0 }),
+  ])],
+  cards: [],
+  official_entries: [],
+  binding_warnings: [],
+  error_state: null,
+};
+
 // Party: two companions in one unlabelled group, the first selected.
 export const GALLERY_V4_PARTY = {
   ...HEADER,
@@ -309,3 +323,37 @@ export const GALLERY_V4_PEOPLE_COLLAPSED = {
   ],
   ...NO_SELECTION,
 };
+
+// Story-only media remapping: the offline static server has no /art/gallery,
+// /art/official or /art/defaults route, so the committed fallback artwork is
+// substituted into the descriptors' own resources (their candidate, and the
+// silhouette terminal that rides with it) for the cards, the official entries
+// and the subject tiles. This is a display substitution for the showcase
+// build, never a wire shape: the exported fixtures above stay protocol-valid.
+export function galleryStoryModel(model = GALLERY_V4_MINE) {
+  const result = structuredClone(model);
+  if (result.available !== true) return result;
+  const images = ["woman", "elder", "man", "woman", "elder", "man"];
+  // On 864x1536 fallback aspect: h=0.16 => w=0.16*1536/864 ≈ 0.2847
+  const fallbackRect = { x: 0.3576, y: 0.02, w: 0.2847, h: 0.16 };
+  const substitute = (artwork, image) => {
+    // A monster subject shows the committed monster silhouette, never a person.
+    const key = artwork?.generation_subject?.startsWith("portrait:monster:") ? "monster_anon" : image;
+    const candidate = artwork?.attempts?.find((entry) => entry.type === "image");
+    if (candidate) {
+      candidate.resource.url = `/art/defaults/${key}.webp`;
+      candidate.resource.geometry.face_rect = { ...fallbackRect };
+    }
+    const terminal = artwork?.terminal;
+    if (terminal) {
+      terminal.resource.resource_id = `defaults/${key}.webp`;
+      terminal.resource.url = `/art/defaults/${key}.webp`;
+      terminal.source_id = `gallery.alpha:${key}`;
+      terminal.resource.geometry.face_rect = { ...fallbackRect };
+    }
+  };
+  result.cards.forEach((row, index) => substitute(row.artwork, images[index % images.length]));
+  result.official_entries.forEach((row, index) => substitute(row.artwork, images[(index + 3) % images.length]));
+  result.groups.forEach((row) => row.subjects.forEach((tile, index) => substitute(tile.artwork, images[(index + 1) % images.length])));
+  return result;
+}
