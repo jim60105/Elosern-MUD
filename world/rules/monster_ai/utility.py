@@ -88,7 +88,7 @@ from world.skills.registry import TargetSpec
 class MonsterAIStateError(ValueError):
     """A typed runtime AI state one decision cannot be selected from.
 
-    Raised for a genuinely unusable decision state -- a utility archetype
+    Raised for a genuinely unusable decision state -- a deliberation archetype
     without weights or a resolved intelligence, a numerically corrupt
     projection, a non-finite score, a non-positive or non-finite temperature.
     The decision boundary reports exactly this type through the configured
@@ -245,7 +245,7 @@ def score_candidates(
     weights = getattr(profile, "utility_weights", None)
     if weights is None:
         raise MonsterAIStateError(
-            "the utility archetype authors no weights"
+            "the deliberation archetype authors no weights"
         )
     if len(estimates.estimates) != len(candidates.candidates):
         raise ValueError("every candidate must have exactly one estimate")
@@ -379,7 +379,7 @@ def _threat_weighted_ranks(
     threat its own settled outcomes published against this side. A decision
     whose opponents published no positive threat at all keeps the static rank
     alone, so an empty history never moves a preference, and no other strategy
-    reaches here at all -- ``lowest_hp`` keeps its legacy metric ordering.
+    reaches here at all -- ``lowest_hp`` keeps its reflex metric ordering.
     """
     allies = group_members(KIND_FRIENDLY, snapshot, pool)
     threat = observed_threat(
@@ -575,7 +575,8 @@ def _unit_intelligence(intelligence: Any) -> float:
         or not 0 <= intelligence <= 100
     ):
         raise MonsterAIStateError(
-            f"a utility decision needs a resolved 0..100 intelligence, got {intelligence!r}"
+            f"a deliberation decision needs a resolved 0..100 intelligence, "
+            f"got {intelligence!r}"
         )
     return intelligence / 100.0
 

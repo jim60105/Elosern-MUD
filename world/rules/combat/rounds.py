@@ -109,7 +109,7 @@ def default_attack_policy(
     # displaced target) grants no exception and changes nothing. This
     # delegated policy is the non-``Monster`` enemy path; Monsters route
     # through ``monster_behaviour_policy``, which applies the same constraint
-    # in its legacy and utility bodies.
+    # in its reflex and deliberation bodies.
     winner = battlefield.taunt_winner(actor_id)
     if winner is not None and any(candidate is winner for candidate in candidates):
         candidates = [winner]

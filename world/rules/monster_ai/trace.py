@@ -1,7 +1,7 @@
-"""Opt-in trace of one monster utility decision.
+"""Opt-in trace of one monster deliberation decision.
 
 A decision normally reports nothing but its selected request: the resolver owns
-settlement, and the only facade line a utility decision can produce is the
+settlement, and the only facade line a deliberation decision can produce is the
 typed invalid-state warning, whose context stays a bounded summary of
 identifiers. Detailed debugging and manual reports are a separate, opt-in
 result: the caller passes a sink and receives one :class:`DecisionTrace` per

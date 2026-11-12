@@ -1,148 +1,78 @@
-# Focused slice verification: monster-ai-staged-activation
-#
-# Environment: a temporary file containing MUD_TEST_SETTINGS=1, passed as the
-# single-token --env-file=<path> argument and removed after the runs. Every
-# command ran from the worktree root (.worktrees/monster-ai-staged-activation)
-# with uv --locked / CPython 3.13 and the retained test database (--keepdb).
-# Full console output follows each command, including the runner's own banner
-# lines. The labels were split into batches only because the local test guard
-# caps one invocation at 100 discovered tests.
+Focused test output captured from the actual commands for
+monster-decision-modes-rename-and-reflex-area-estimate
+(branch feat/monster-decision-modes-rename-and-reflex-area-estimate).
+Host: Jim-Fedora. Environment file: /tmp/mud-monster-reflex-test.env
+containing exactly MUD_TEST_SETTINGS=1 (removed after verification).
 
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_behaviour_profile world.rules.tests.test_monster_ai_tuning world.rules.tests.test_monster_behaviour_policy world.rules.tests.test_monster_behaviour_integration world.rules.tests.test_monster_behaviour_golden world.rules.tests.test_monster_behaviour_determinism
+## D. Current evidence and production smoke (the authoritative activation run)
 
-    Using settings file 'test_settings.py' (server.conf.test_settings).
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_activation
+
+Using settings file 'test_settings.py' (server.conf.test_settings).
 
     TESTING: Using specified settings file 'server.conf.test_settings'.
 
     OBS: Evennia's full test suite may not pass if the settings are very
     different from the default (use 'evennia test evennia' to run core tests)
 
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 50 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    ..................................................
-    ----------------------------------------------------------------------
-    Ran 50 tests in 3.319s
+secret_settings.py file not found or failed to import.
+Gametime offset could not load - db not set up.
+Found 12 test(s).
+Using existing test database for alias 'default'...
+System check identified no issues (0 silenced).
+............
+----------------------------------------------------------------------
+Ran 12 tests in 2.201s
 
-    OK
-    Preserving test database for alias 'default'...
+OK
+Preserving test database for alias 'default'...
 
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_activation world.rules.tests.test_monster_behaviour_selection world.rules.tests.test_monster_composition_coverage world.rules.tests.test_crocodile_resource_skill world.rules.tests.test_sway_whistle_sparrow_resource_skill world.rules.tests.test_tide_lamp_crab_resource_skill world.rules.tests.test_monster_individual world.rules.tests.test_monster_scale
+## A. Core selection/configuration regressions
 
-    Using settings file 'test_settings.py' (server.conf.test_settings).
+The same labels ran as two batches (69 and 77 discovered tests); every label
+from the task's command is covered.
 
-    TESTING: Using specified settings file 'server.conf.test_settings'.
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_behaviour_profile world.rules.tests.test_monster_ai_tuning world.rules.tests.test_monster_behaviour_selection world.rules.tests.test_monster_behaviour_policy
+Found 69 test(s).
+Ran 69 tests in 2.988s
+OK
 
-    OBS: Evennia's full test suite may not pass if the settings are very
-    different from the default (use 'evennia test evennia' to run core tests)
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_selection world.rules.tests.test_overwhelm_threshold
+Found 77 test(s).
+Ran 77 tests in 6.748s
+OK
 
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 44 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    ............................................
-    ----------------------------------------------------------------------
-    Ran 44 tests in 5.701s
+## B. Adapter, rider and retained decision boundaries
 
-    OK
-    Preserving test database for alias 'default'...
+The literal single command discovers 111 tests, so the same labels ran as
+three batches.
 
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_memory world.rules.tests.test_monster_ai_coordination
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_behaviour_integration world.rules.tests.test_monster_behaviour_determinism world.rules.tests.test_monster_behaviour_golden world.rules.tests.test_monster_ai_flee_scope
+Found 19 test(s).
+Ran 19 tests in 4.241s
+OK
 
-    Using settings file 'test_settings.py' (server.conf.test_settings).
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_estimation world.rules.tests.test_monster_ai_support
+Found 68 test(s).
+Ran 68 tests in 8.182s
+OK
 
-    TESTING: Using specified settings file 'server.conf.test_settings'.
+$ uv run --locked --env-file=/tmp/mud-monster-reflex-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_coordination world.rules.tests.test_monster_ai_manual_reports
+Found 43 test(s).
+Ran 43 tests in 17.368s
+OK
 
-    OBS: Evennia's full test suite may not pass if the settings are very
-    different from the default (use 'evennia test evennia' to run core tests)
+## Final focused reruns after the review-driven edits
 
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 45 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    .............................................
-    ----------------------------------------------------------------------
-    Ran 45 tests in 5.601s
+$ ... evennia test ... world.rules.tests.test_monster_behaviour_policy
+Found 11 test(s).
+Ran 11 tests in 2.553s
+OK
 
-    OK
-    Preserving test database for alias 'default'...
+$ ... evennia test ... world.rules.tests.test_monster_behaviour_golden
+Found 3 test(s).
+Ran 3 tests in 2.549s
+OK
 
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_selection world.rules.tests.test_monster_ai_support
-
-    Using settings file 'test_settings.py' (server.conf.test_settings).
-
-    TESTING: Using specified settings file 'server.conf.test_settings'.
-
-    OBS: Evennia's full test suite may not pass if the settings are very
-    different from the default (use 'evennia test evennia' to run core tests)
-
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 85 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    .....................................................................................
-    ----------------------------------------------------------------------
-    Ran 85 tests in 8.767s
-
-    OK
-    Preserving test database for alias 'default'...
-
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_snapshots world.rules.tests.test_monster_ai_manual_reports world.rules.tests.test_human_combat_calibration
-
-    Using settings file 'test_settings.py' (server.conf.test_settings).
-
-    TESTING: Using specified settings file 'server.conf.test_settings'.
-
-    OBS: Evennia's full test suite may not pass if the settings are very
-    different from the default (use 'evennia test evennia' to run core tests)
-
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 54 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    ......................................................
-    ----------------------------------------------------------------------
-    Ran 54 tests in 21.887s
-
-    OK
-    Preserving test database for alias 'default'...
-
-# The activation module on its own, which is the label this slice owns: 11
-# tests, including the real settled encounter through the production session
-# adapter and the three rollback cases.
-$ uv run --locked --env-file=/tmp/mud-test-env evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_activation
-
-    Using settings file 'test_settings.py' (server.conf.test_settings).
-
-    TESTING: Using specified settings file 'server.conf.test_settings'.
-
-    OBS: Evennia's full test suite may not pass if the settings are very
-    different from the default (use 'evennia test evennia' to run core tests)
-
-    secret_settings.py file not found or failed to import.
-    Gametime offset could not load - db not set up.
-    Found 11 test(s).
-    Using existing test database for alias 'default'...
-    System check identified no issues (0 silenced).
-    ...........
-    ----------------------------------------------------------------------
-    Ran 11 tests in 1.175s
-
-    OK
-    Preserving test database for alias 'default'...
-
-# Not run here, and deliberately out of this slice: the full non-browser suite,
-# any CI shard command, every browser suite, and the automatic manual campaign.
-# One unrelated label is red in the branch's base commit as well:
-# world.rules.tests.test_monster_flee_decision
-#   .MonsterFleePolicyTests
-#   .test_source_preserves_deterministic_single_writer_boundary
-# Its forbidden-literal list still bans "0.25" in world/rules/monster_behaviour.py
-# while that file carries THREAT_DECAY_STEPS = (1.0, 0.5, 0.25) from the
-# observed-coordination slice; see the release record's README.
+Command D was rerun after activation.json was rebuilt at algorithm version 6
+and is green; the earlier red run is not carried forward as evidence.

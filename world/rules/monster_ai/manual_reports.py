@@ -94,10 +94,10 @@ PERFORMANCE_CANDIDATE_BUDGET = 256
 #: Five warm-ups then 50 measured decisions, with one separate cold call.
 PERFORMANCE_WARMUPS = 5
 PERFORMANCE_MEASUREMENTS = 50
-#: The initial warm utility p95 budget, in milliseconds.
+#: The initial warm deliberation p95 budget, in milliseconds.
 PERFORMANCE_P95_BUDGET_MS = 50.0
 #: The two modes the performance operation measures.
-PERFORMANCE_MODES: tuple[str, ...] = ("legacy", "utility")
+PERFORMANCE_MODES: tuple[str, ...] = ("reflex", "deliberation")
 #: The examined-proposal budgets the scaling probe compares on ONE fixed
 #: battlefield: the enumeration work the decision is allowed varies while the
 #: actor/participant data, the roster and the state do not.

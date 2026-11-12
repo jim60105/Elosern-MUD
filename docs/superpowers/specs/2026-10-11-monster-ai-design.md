@@ -12,7 +12,7 @@ The canonical Chinese term for `intelligence` is **智慧**. Intelligence is an 
 
 Intelligence changes tactical evaluation and selection stability. It never changes literal base stats, available resources, skill ownership, proficiency, initiative formulas, or effect formulas. Greater intelligence need not produce a greater encounter win rate when the monster lacks the abilities or strength to exploit better decisions.
 
-Existing `legacy` behavior is an explicitly retained decision mode and rollback control, not a compatibility shim. Its target selection, skill order, flee priority, and dice sequence remain unchanged. Non-monster combatants retain the existing delegated policy.
+The permanent `reflex` mode (本能模式) is an explicitly retained decision mode and rollback control, not a compatibility shim. Its target selection, owned skill order, flee priority and target tie-break dice remain unchanged. Its skill comparison is the exact own-output estimate `E(s) = A(s) * c(s) * R(s)` — the actor's own adjusted attacking stat times the primary damage occurrence's authored coefficient times the living hostile recipient count — and `highest_expected_damage` samples those estimates at the archetype-authored `reflex_temperature`. That supersedes the earlier "unchanged skill dice" promise for the skill comparison only. Non-monster combatants retain the existing delegated policy.
 
 ## 2. Evidence and corrections to the handoff
 
@@ -50,9 +50,9 @@ The accepted OpenSpec proposal decomposition of this roadmap, its dependency and
 
 ## 5. Configuration ownership
 
-`world/rules/rulebook/monster_behaviour.yaml` remains the AI tuning source. Existing archetypes own decision mode, preferences, flee thresholds, and utility weights. A `variant_intelligence` mapping owns the explicit intelligence value for each tuned registered variant. An optional `variant_decision_mode` mapping selects `legacy` or `utility` for individual registered variants; otherwise the resolved archetype's decision mode applies. Missing archetype mode means `legacy`.
+`world/rules/rulebook/monster_behaviour.yaml` remains the AI tuning source. Existing archetypes own decision mode, preferences, flee thresholds, utility weights and — for a `highest_expected_damage` skill choice — the sampling temperature `reflex_temperature`, which is expressed in raw `E` units and is initial tuning rather than a correctness constant. A `variant_intelligence` mapping owns the explicit intelligence value for each tuned registered variant. An optional `variant_decision_mode` mapping selects `reflex` or `deliberation` for individual registered variants; otherwise the resolved archetype's decision mode applies. Missing archetype mode means `reflex`. Neither value has an alias: `legacy` and `utility` are rejected like any other unrecognized mode.
 
-There is no archetype intelligence default, tier-derived intelligence, species-level inheritance, copied persistent intelligence trait, or individual GM override in this scope. Legacy variants need not acquire intelligence tuning to continue working. A variant selected for utility must have a validated value. Tier-only or unregistered monsters remain eligible for legacy but cannot silently acquire utility intelligence.
+There is no archetype intelligence default, tier-derived intelligence, species-level inheritance, copied persistent intelligence trait, or individual GM override in this scope. Reflex variants need not acquire intelligence tuning to continue working. A variant selected for deliberation must have a validated value. Tier-only or unregistered monsters remain eligible for reflex but cannot silently acquire deliberation intelligence.
 
 Runtime behavior resolution honors the actual stored `behaviour_tree` binding. Resolving intelligence must validate the registered species/variant pair; reading a variant string alone is insufficient. A session records the resolved profile, variant intelligence, and configuration fingerprint in process. Configuration is loaded and validated at startup, with no new hot-reload mechanism.
 
@@ -82,7 +82,7 @@ No combat stat rebalance, new abilities, patrol state machine, durable tactical 
 
 ## 9. Specification and delivery obligations
 
-Implementation must amend current OpenSpec requirements so legacy-specific target/skill/dice contracts remain scoped to legacy, while utility receives its own legal, offline, variant-intelligence and replay contracts. Amend the old prohibition on round/overwhelm integration changes for the new ephemeral execution/observation seams. Source-layout and wording-only assertions do not establish behavior and must be replaced by substantive coverage when affected.
+Implementation must amend current OpenSpec requirements so reflex-specific target/skill/flee and target-tie contracts remain scoped to reflex, while deliberation receives its own legal, offline, variant-intelligence and replay contracts. Amend the old prohibition on round/overwhelm integration changes for the new ephemeral execution/observation seams. Source-layout and wording-only assertions do not establish behavior and must be replaced by substantive coverage when affected.
 
 Update AI tuning/authoring documentation and changelog with each permanent feature. Register added test modules in the existing shard manifest. Player command documentation is intentionally unchanged unless an implementation proposal adds a command, which this design does not request.
 
@@ -132,7 +132,7 @@ All changes can share .github/evennia-shards.json and release documentation; the
 
 ### Deliberately unchanged contracts
 
-Monster flee thresholds, FLEE_SKILL_KEY and flee priority remain outside scoring. Non-monster delegated policy remains unchanged. Current effect definitions, base stats, initiative, resolver authority, true-trait arithmetic and transaction journals remain the existing product contracts. AI proposals amend legacy-specific main requirements through change-local deltas only. No durable memory, individual GM override, intelligence inheritance or entity trait copy is added.
+Monster flee thresholds, FLEE_SKILL_KEY and flee priority remain outside scoring. Non-monster delegated policy remains unchanged. Current effect definitions, base stats, initiative, resolver authority, true-trait arithmetic and transaction journals remain the existing product contracts. AI proposals amend reflex-specific main requirements through change-local deltas only. No durable memory, individual GM override, intelligence inheritance or entity trait copy is added.
 
 ### Startup-only mode transition
 
@@ -142,4 +142,4 @@ Every migration-plan reference to a new session means a session using configurat
 
 The single blocking rubber-duck review covered all ten complete artifact sets and approved designs. It identified two blocking planning defects. Staged activation now requires restart to load an edited rollback mode and tests that a new session cannot reload disk edits. Observation lifecycle now checkpoints all publication controls, including terminal tokens and pending tuning cleanup, and tests a caught terminal savepoint failure followed by successful outer commit.
 
-The review also identified an undefined threat-participation mapping. Coordination now uses the existing highest_effective_power strategy for utility threat participation, averages static-power and observed-threat ranks and verifies a paired nonparticipating lowest_hp profile. No new configuration field is added. These corrections preserve full approved scope; they do not constitute implementation evidence or a second independent review.
+The review also identified an undefined threat-participation mapping. Coordination now uses the existing highest_effective_power strategy for deliberation threat participation, averages static-power and observed-threat ranks and verifies a paired nonparticipating lowest_hp profile. No new configuration field is added. These corrections preserve full approved scope; they do not constitute implementation evidence or a second independent review.

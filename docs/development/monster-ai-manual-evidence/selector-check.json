@@ -1,6 +1,6 @@
 {
-  "algorithm_version": 5,
-  "baseline_commit": "b456b01aec47e6f19567d4f3e9f1d17e98ac136c",
+  "algorithm_version": 6,
+  "baseline_commit": "113014bf9dae5d5b2e354f4c4afdbe61006454e2",
   "candidates": {
     "canonical_order": [
       "highest",
@@ -10,14 +10,14 @@
     "lowest": "lowest",
     "utility_gap": 0.5
   },
-  "configuration_fingerprint": "bd82767e08a1857878c6f2802a81a5cd9ff5b88f42b90a2dca76a2cbdbb66ed5",
+  "configuration_fingerprint": "5b46ee570d95fc99507b303509e634f9387830a4a7fa87249d23a1d05bb9fba3",
   "counts": {
     "high": 118,
     "low": 74,
     "total": 128
   },
-  "evennia_version": "6.1.0 (rev b456b01a)",
-  "generated_at": "2026-11-12T04:03:57.833063+00:00",
+  "evennia_version": "6.1.0 (rev 113014bf)",
+  "generated_at": "2026-11-12T07:51:08.006877+00:00",
   "host": {
     "clock": "monotonic",
     "node": "Jim-Fedora",

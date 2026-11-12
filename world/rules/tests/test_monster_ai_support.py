@@ -478,8 +478,9 @@ def _profile(**over) -> BehaviourProfile:
         "skill_choice": "first_owned",
         "prefer_area_when_multiple_enemies": False,
         "flee_hp_fraction": None,
-        "decision_mode": DecisionMode.UTILITY,
+        "decision_mode": DecisionMode.DELIBERATION,
         "utility_weights": UtilityWeights(**WEIGHTS),
+        "reflex_temperature": None,
     }
     fields.update(over)
     return BehaviourProfile(**fields)
@@ -495,7 +496,7 @@ def _rulebook(*, intelligence=None, weights=None):
                 "skill_choice": "first_owned",
                 "prefer_area_when_multiple_enemies": False,
                 "flee_hp_fraction": None,
-                "decision_mode": "utility",
+                "decision_mode": "deliberation",
                 "utility_weights": (
                     dict(WEIGHTS) if weights is None else dict(weights)
                 ),
@@ -504,7 +505,7 @@ def _rulebook(*, intelligence=None, weights=None):
         "variant_intelligence": (
             {VARIANT: 50} if intelligence is None else intelligence
         ),
-        "variant_decision_mode": {VARIANT: "utility"},
+        "variant_decision_mode": {VARIANT: "deliberation"},
         "candidate_budget": 64,
     }
 

@@ -325,7 +325,7 @@ class EnemyRiderGroupMemberTests(EvenniaTestCase):
                     dict(evaluate_combat_modifiers(ally)),
                 )
 
-                # Candidacy: a legacy member's own decision returns its kit
+                # Candidacy: a reflex member's own decision returns its kit
                 # against the lone enemy; a utility member offers the same kit
                 # as a scored plan aimed at it, whatever else it may choose.
                 trace = []
@@ -333,7 +333,7 @@ class EnemyRiderGroupMemberTests(EvenniaTestCase):
                     member, field, context=context, trace=trace
                 )
                 self.assertIsNotNone(request)
-                if resolve_monster_ai(member).mode is DecisionMode.LEGACY:
+                if resolve_monster_ai(member).mode is DecisionMode.REFLEX:
                     self.assertEqual(request.skill_key, skill_key)
                     self.assertEqual(request.targets, [opponent])
                 else:

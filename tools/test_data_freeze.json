@@ -1,845 +1,845 @@
 {
- "contract": [
-  {
-   "path": "tests/test_command_docs.py",
-   "reason": "player command docs parity contract"
-  },
-  {
-   "path": "tests/test_preset_authoring_docs_contract.py",
-   "reason": "authoring docs contract"
-  },
-  {
-   "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
-   "reason": "every registered lore entry is representable by the codex panel"
-  },
-  {
-   "path": "web/webclient/presentation/tests/test_world_map_measurement.py",
-   "reason": "the shipped continental geography fits the measured world-map bound."
-  },
-  {
-   "path": "world/ai/tests/test_director_template_cards.py",
-   "reason": "offline quest template occupant card contract"
-  },
-  {
-   "path": "world/ai/tests/test_dream_frame_contract.py",
-   "reason": "approved dream frame divine-identity refusal contract"
-  },
-  {
-   "path": "world/art/tests/test_bundled_interior_art.py",
-   "reason": "bundled scene distribution and decode contract"
-  },
-  {
-   "path": "world/art/tests/test_bundled_outdoor_art.py",
-   "reason": "bundled scene distribution and decode contract"
-  },
-  {
-   "path": "world/art/tests/test_bundled_sacred_art.py",
-   "reason": "bundled scene distribution and decode contract"
-  },
-  {
-   "path": "world/art/tests/test_bundled_scenes.py",
-   "reason": "bundled scene-art registry, collection and media identity contract"
-  },
-  {
-   "path": "world/art/tests/test_bundled_terminal_art.py",
-   "reason": "bundled scene distribution and decode contract"
-  },
-  {
-   "path": "world/imports/tests/test_social_identity_imports.py",
-   "reason": "import schema, validation, loader, and profile social identity producers."
-  },
-  {
-   "path": "world/imports/tests/test_yohanna_demo.py",
-   "reason": "authored Yohanna import card and real protection setup contract"
-  },
-  {
-   "path": "world/lore/tests/test_anchor_placement.py",
-   "reason": "anchor placement data contract"
-  },
-  {
-   "path": "world/lore/tests/test_anchors.py",
-   "reason": "anchor data contract"
-  },
-  {
-   "path": "world/lore/tests/test_assortments.py",
-   "reason": "assortment registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_bestiary_documentation.py",
-   "reason": "keyed bestiary documentation relationship contract"
-  },
-  {
-   "path": "world/lore/tests/test_church.py",
-   "reason": "frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract"
-  },
-  {
-   "path": "world/lore/tests/test_dialogue_assembly.py",
-   "reason": "Altoria dialogue terrace split preserves tables and terrace alignment"
-  },
-  {
-   "path": "world/lore/tests/test_economy.py",
-   "reason": "price-table data contract"
-  },
-  {
-   "path": "world/lore/tests/test_elements.py",
-   "reason": "element data contract"
-  },
-  {
-   "path": "world/lore/tests/test_guild.py",
-   "reason": "guild registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_items.py",
-   "reason": "item registry registration/metadata/reference contract"
-  },
-  {
-   "path": "world/lore/tests/test_magic.py",
-   "reason": "magic tier data contract"
-  },
-  {
-   "path": "world/lore/tests/test_map_district_content.py",
-   "reason": "shipped map-district landmarks against the authored continent"
-  },
-  {
-   "path": "world/lore/tests/test_monster_activity.py",
-   "reason": "published field-activity declarations stay immutable and every shipped composition/site binding resolves"
-  },
-  {
-   "path": "world/lore/tests/test_monster_species_content.py",
-   "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
-  },
-  {
-   "path": "world/lore/tests/test_monsters.py",
-   "reason": "monster tier data contract"
-  },
-  {
-   "path": "world/lore/tests/test_names.py",
-   "reason": "name-pack corpus contract"
-  },
-  {
-   "path": "world/lore/tests/test_nations.py",
-   "reason": "nation data contract"
-  },
-  {
-   "path": "world/lore/tests/test_npc_editorial_review.py",
-   "reason": "registry-indexed NPC characterization editorial review contract"
-  },
-  {
-   "path": "world/lore/tests/test_npc_profile_inventory.py",
-   "reason": "shipped NPC source inventory equality contract"
-  },
-  {
-   "path": "world/lore/tests/test_npc_profile_slice_content.py",
-   "reason": "registry-derived NPC host characterization and authored dialogue coverage contract"
-  },
-  {
-   "path": "world/lore/tests/test_npc_tiers.py",
-   "reason": "npc tier data contract"
-  },
-  {
-   "path": "world/lore/tests/test_player_presets.py",
-   "reason": "lore registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_races.py",
-   "reason": "race/subrace data contract"
-  },
-  {
-   "path": "world/lore/tests/test_registry_index_contract.py",
-   "reason": "authored registry index coverage and shipped reference integrity contract"
-  },
-  {
-   "path": "world/lore/tests/test_room_prose_language.py",
-   "reason": "authored room prose language contract"
-  },
-  {
-   "path": "world/lore/tests/test_saintess_vessel_grant.py",
-   "reason": "saintess vessel registry and enrollment grant contract"
-  },
-  {
-   "path": "world/lore/tests/test_scene_archetypes.py",
-   "reason": "scene archetype data contract"
-  },
-  {
-   "path": "world/lore/tests/test_settlements.py",
-   "reason": "settlement and place registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_sex.py",
-   "reason": "lore registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_sexual_vocab.py",
-   "reason": "sexual vocabulary contract"
-  },
-  {
-   "path": "world/lore/tests/test_shops.py",
-   "reason": "shop registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_starting_kits.py",
-   "reason": "starting-kit data contract"
-  },
-  {
-   "path": "world/lore/tests/test_sync.py",
-   "reason": "lore cross-registry sync contract"
-  },
-  {
-   "path": "world/lore/tests/test_titles_registry.py",
-   "reason": "fixed-title registry content contract"
-  },
-  {
-   "path": "world/lore/tests/test_wilderness_entry.py",
-   "reason": "wilderness entry data contract"
-  },
-  {
-   "path": "world/lore/tests/test_wilderness_regions.py",
-   "reason": "wilderness region data contract"
-  },
-  {
-   "path": "world/maps/tests/test_altoria_capital.py",
-   "reason": "capital settlement document contract"
-  },
-  {
-   "path": "world/maps/tests/test_bootstrap/test_bootstrap_grid.py",
-   "reason": "map bootstrap/gate data contract"
-  },
-  {
-   "path": "world/maps/tests/test_bootstrap/test_bootstrap_selection.py",
-   "reason": "map bootstrap/gate data contract"
-  },
-  {
-   "path": "world/maps/tests/test_city_movement_cost.py",
-   "reason": "city movement cost data contract"
-  },
-  {
-   "path": "world/maps/tests/test_city_walkthrough.py",
-   "reason": "capital map walkability contract"
-  },
-  {
-   "path": "world/maps/tests/test_content_expansion_sites.py",
-   "reason": "content-expansion manual sites production smoke over the generic site, grouping, engagement and one-shot contracts"
-  },
-  {
-   "path": "world/maps/tests/test_geography_source.py",
-   "reason": "geography publication, composition and snapshot-isolation mechanism contract"
-  },
-  {
-   "path": "world/maps/tests/test_map_district_partition.py",
-   "reason": "the committed district partition recomputes exactly from shipped geography"
-  },
-  {
-   "path": "world/maps/tests/test_village_ciaran.py",
-   "reason": "village ciaran settlement document contract"
-  },
-  {
-   "path": "world/maps/tests/test_wilderness_geography_contract.py",
-   "reason": "authored continental terrain, waterway and anchor-region data contract"
-  },
-  {
-   "path": "world/quests/tests/test_compile_blueprint.py",
-   "reason": "quest compile data-contract surface"
-  },
-  {
-   "path": "world/quests/tests/test_compile_offline.py",
-   "reason": "quest compile data-contract surface"
-  },
-  {
-   "path": "world/quests/tests/test_compile_registration.py",
-   "reason": "quest compile data-contract surface"
-  },
-  {
-   "path": "world/quests/tests/test_definitions.py",
-   "reason": "quest definition catalog contract"
-  },
-  {
-   "path": "world/quests/tests/test_hunt_catalog_content.py",
-   "reason": "published hunt and site clear-out content contract"
-  },
-  {
-   "path": "world/quests/tests/test_scenario_mapping.py",
-   "reason": "scenario mapping data-contract surface"
-  },
-  {
-   "path": "world/rules/tests/test_affinity_config.py",
-   "reason": "affinity config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_authored_dialogue_runtime.py",
-   "reason": "authored dialogue runtime selection and transactional session delivery"
-  },
-  {
-   "path": "world/rules/tests/test_buffs.py",
-   "reason": "buff rulebook content contract"
-  },
-  {
-   "path": "world/rules/tests/test_church_accrual.py",
-   "reason": "church accrual tune finals and the offering baseline"
-  },
-  {
-   "path": "world/rules/tests/test_church_enrollment.py",
-   "reason": "church enrollment office and vestment handover contract"
-  },
-  {
-   "path": "world/rules/tests/test_church_hosts.py",
-   "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
-  },
-  {
-   "path": "world/rules/tests/test_church_rulebook.py",
-   "reason": "church rulebook cast-rail contract names its shipped rite rows"
-  },
-  {
-   "path": "world/rules/tests/test_clock.py",
-   "reason": "clock rulebook contract"
-  },
-  {
-   "path": "world/rules/tests/test_crocodile_resource_skill.py",
-   "reason": "crocodile representative-composition production smoke over the generic transfer/policy contracts"
-  },
-  {
-   "path": "world/rules/tests/test_dialogue_references.py",
-   "reason": "static permitted-reference catalog mirrors canonical registries"
-  },
-  {
-   "path": "world/rules/tests/test_dialogue_sources.py",
-   "reason": "shipped dialogue source inventory and profile service distinction"
-  },
-  {
-   "path": "world/rules/tests/test_equipment_effect_rulebook.py",
-   "reason": "equipment effect rulebook and item-lore liturgical-role contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/_support.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_assortment_shop_rules.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_catalog_loading.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_commerce_rulebook_slices.py",
-   "reason": "commerce rulebook slice loading contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_item_offer_definitions.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_merit_exam_rulebook.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_price_scaling.py",
-   "reason": "guild/shop config validation contract"
-  },
-  {
-   "path": "world/rules/tests/test_guild_config/test_service_host_roster.py",
-   "reason": "place-derived service host roster and current place-declaration contract"
-  },
-  {
-   "path": "world/rules/tests/test_human_combat_calibration.py",
-   "reason": "human combat calibration evidence exercises shipped gear, skill, and monster rows through the real resolver"
-  },
-  {
-   "path": "world/rules/tests/test_monster_ai_activation.py",
-   "reason": "staged activation of the named production variant set: real registry binding, one settled production encounter, the release record and the legacy rollback restart seam"
-  },
-  {
-   "path": "world/rules/tests/test_monster_behaviour_profile.py",
-   "reason": "monster behaviour rulebook contract"
-  },
-  {
-   "path": "world/rules/tests/test_monster_composition_coverage.py",
-   "reason": "authored-kit composition grouping and representative wiring contract"
-  },
-  {
-   "path": "world/rules/tests/test_mudfilm_slime_resource_skill.py",
-   "reason": "slime representative-composition production smoke over the generic self-support/lifetime contracts"
-  },
-  {
-   "path": "world/rules/tests/test_npc_roster_validation.py",
-   "reason": "registry-derived NPC roster completeness and fault-diagnostic contract"
-  },
-  {
-   "path": "world/rules/tests/test_npc_schedules.py",
-   "reason": "npc schedule rulebook contract"
-  },
-  {
-   "path": "world/rules/tests/test_reservoir_warden_resource_skill.py",
-   "reason": "crocodile drain-and-guard representative-composition production smoke over the generic transfer/self-support/lifetime contracts"
-  },
-  {
-   "path": "world/rules/tests/test_rulebook_schema.py",
-   "reason": "rulebook schema contract"
-  },
-  {
-   "path": "world/rules/tests/test_saintess_vessel_trickle.py",
-   "reason": "saintess vessel trickle and enrollment integration smoke contract"
-  },
-  {
-   "path": "world/rules/tests/test_shipped_item_use_regression.py",
-   "reason": "shipped usable-item regression contract"
-  },
-  {
-   "path": "world/rules/tests/test_sight.py",
-   "reason": "the sight rulebook's schema keys and loader rejection boundaries are the contract under test; every assertion injects a synthetic policy and never pins shipped values or wording"
-  },
-  {
-   "path": "world/rules/tests/test_social_identity.py",
-   "reason": "social identity canonical tag model and reader/writer APIs."
-  },
-  {
-   "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
-   "reason": "sparrow representative-composition production smoke over the generic rider/lifetime contracts"
-  },
-  {
-   "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
-   "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
-  },
-  {
-   "path": "world/rules/tests/test_ember_bristle_boar_resource_skill.py",
-   "reason": "boar two-strike representative-composition production smoke over the generic area/single damage and payment contracts"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_acceptance.py",
-   "reason": "sexual act acceptance catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_combat_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_divine_core_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_divine_mutators_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_interspecies_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_partner_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_registry_structure/_support.py",
-   "reason": "sexual act registry structure contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_registry_structure/test_divine_structure.py",
-   "reason": "sexual act registry structure contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_registry_structure/test_registry_assembly.py",
-   "reason": "sexual act registry structure contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_seed_acts.py",
-   "reason": "sexual act seed catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_shame_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/sexual_acts/tests/test_solo_catalog.py",
-   "reason": "sexual act catalog contract"
-  },
-  {
-   "path": "world/skills/tests/test_cost_tiers.py",
-   "reason": "MP cost-tier assignment contract"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/_support.py",
-   "reason": "skill registry content contract"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/test_category_classification.py",
-   "reason": "skill registry content contract"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/test_content_completion.py",
-   "reason": "skill registry content contract"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/test_narration_coverage.py",
-   "reason": "shipped narration coverage contract over the skill and act registries"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/test_out_of_combat_policy.py",
-   "reason": "skill registry content contract"
-  },
-  {
-   "path": "world/skills/tests/test_skill_registry/test_registry_contract.py",
-   "reason": "skill registry typed kit/reference contract"
-  },
-  {
-   "path": "world/skills/tests/test_spell_catalogs.py",
-   "reason": "closed spell-parser vocabulary plus generic lineage-graph and mastery-coverage relationships"
-  },
-  {
-   "path": "world/maps/tests/test_settlement_sources.py",
-   "reason": "settlement source discovery and composition contract"
-  },
-  {
-   "path": "world/maps/tests/test_settlement_reload.py",
-   "reason": "settlement reload convergence contract"
-  },
-  {
-   "path": "world/maps/tests/_bootstrap_fixtures.py",
-   "reason": "map bootstrap/gate data contract"
-  },
-  {
-   "path": "world/maps/tests/test_bootstrap_sync.py",
-   "reason": "map bootstrap/gate data contract"
-  }
- ],
- "debt": [
-  "web/webclient-app/tests/action/dock_items.test.js",
-  "web/webclient-app/tests/action/dock_menu.test.js",
-  "web/webclient-app/tests/action/dock_menu_panes.test.js",
-  "web/webclient-app/tests/components/dock_panes.test.js",
-  "web/webclient-app/tests/store/protocol_fixtures.js",
-  "web/webclient-app/tests/store/store_slices.test.js",
-  "web/webclient-app/tests/world/map_lattice_name_fit.test.js",
-  "web/webclient-app/tests/world/map_lattice_support.js",
-  "world/ai/tests/test_npc_dialogue_prompts.py",
-  "world/imports/tests/test_skill_registry_self_arming.py",
-  "world/rules/tests/test_item_effects_rulebook.py",
-  "world/rules/tests/test_traits.py"
- ],
- "seedDebtPaths": [
-  "commands/tests/test_art.py",
-  "commands/tests/test_background.py",
-  "commands/tests/test_character_creation.py",
-  "commands/tests/test_combat_actions.py",
-  "commands/tests/test_command_branch_behaviour.py",
-  "commands/tests/test_guild_economy_commands.py",
-  "commands/tests/test_inventory_breakdown.py",
-  "commands/tests/test_items.py",
-  "commands/tests/test_lineage_command.py",
-  "commands/tests/test_localized.py",
-  "commands/tests/test_lore_command.py",
-  "commands/tests/test_party_commands.py",
-  "commands/tests/test_persona_commands.py",
-  "commands/tests/test_talk_turnin_branch.py",
-  "commands/tests/test_talk_turnin_commands.py",
-  "commands/tests/test_title_command.py",
-  "server/conf/tests/test_ai_director_service.py",
-  "server/conf/tests/test_scene_flavor_service.py",
-  "server/conf/tests/test_ui_action_integration.py",
-  "tests/test_creation_parity_contract.py",
-  "tests/test_quality_gate_contract.py",
-  "typeclasses/tests/test_account_capacity.py",
-  "typeclasses/tests/test_account_login.py",
-  "typeclasses/tests/test_appearance.py",
-  "typeclasses/tests/test_art_room_entry.py",
-  "typeclasses/tests/test_components.py",
-  "typeclasses/tests/test_entities.py",
-  "typeclasses/tests/test_exit_movement_cost.py",
-  "typeclasses/tests/test_exits.py",
-  "typeclasses/tests/test_npc_dialogue.py",
-  "typeclasses/tests/test_npcs.py",
-  "typeclasses/tests/test_rooms.py",
-  "web/static/webclient/js/tests/art_panel.test.js",
-  "web/static/webclient/js/tests/character_menu.test.js",
-  "web/static/webclient/js/tests/combat_menu.test.js",
-  "web/static/webclient/js/tests/command_echo.test.js",
-  "web/static/webclient/js/tests/creation_menu.test.js",
-  "web/static/webclient/js/tests/exploration_menu.test.js",
-  "web/static/webclient/js/tests/hud_dock_menus.test.js",
-  "web/static/webclient/js/tests/protocol.test.js",
-  "web/static/webclient/js/tests/protocol_art.test.js",
-  "web/static/webclient/js/tests/protocol_character.test.js",
-  "web/static/webclient/js/tests/protocol_character_skills.test.js",
-  "web/static/webclient/js/tests/protocol_context_actions_a.test.js",
-  "web/static/webclient/js/tests/protocol_context_actions_b.test.js",
-  "web/static/webclient/js/tests/protocol_core.test.js",
-  "web/static/webclient/js/tests/protocol_creation.test.js",
-  "web/static/webclient/js/tests/protocol_detachment.test.js",
-  "web/static/webclient/js/tests/protocol_dialogue.test.js",
-  "web/static/webclient/js/tests/protocol_exploration_a.test.js",
-  "web/static/webclient/js/tests/protocol_exploration_b.test.js",
-  "web/static/webclient/js/tests/protocol_fixtures.js",
-  "web/static/webclient/js/tests/protocol_lineage.test.js",
-  "web/static/webclient/js/tests/protocol_local_map.test.js",
-  "web/static/webclient/js/tests/protocol_lore_codex.test.js",
-  "web/static/webclient/js/tests/protocol_party.test.js",
-  "web/static/webclient/js/tests/protocol_roster.test.js",
-  "web/static/webclient/js/tests/protocol_services_a.test.js",
-  "web/static/webclient/js/tests/protocol_services_b.test.js",
-  "web/static/webclient/js/tests/protocol_support.js",
-  "web/static/webclient/js/tests/protocol_title_ballot.test.js",
-  "web/static/webclient/js/tests/protocol_title_codex.test.js",
-  "web/static/webclient/js/tests/protocol_transport.test.js",
-  "web/tests/browser/browser_helpers.py",
-  "web/tests/browser/browser_settings.py",
-  "web/tests/browser/seed.py",
-  "web/tests/browser/seed/minimap_fixture.py",
-  "web/tests/browser/seed/services_fixture.py",
-  "web/tests/browser/seed/services_synth.py",
-  "web/tests/browser/test_browser_art.py",
-  "web/tests/browser/test_browser_combat.py",
-  "web/tests/browser/test_browser_combat_rejection.py",
-  "web/tests/browser/test_browser_contextual_hud.py",
-  "web/tests/browser/test_browser_creation.py",
-  "web/tests/browser/test_browser_exploration.py",
-  "web/tests/browser/test_browser_input_narrative.py",
-  "web/tests/browser/test_browser_inventory_actions.py",
-  "web/tests/browser/test_browser_inventory_grid.py",
-  "web/tests/browser/test_browser_lineage.py",
-  "web/tests/browser/test_browser_local_map.py",
-  "web/tests/browser/test_browser_pointer.py",
-  "web/tests/browser/test_browser_services.py",
-  "web/tests/browser/test_browser_shell.py",
-  "web/tests/browser/test_browser_title_codex.py",
-  "web/tests/browser/test_vue_foundation.py",
-  "web/webclient-app/tests/action/dock_items.test.js",
-  "web/webclient-app/tests/action/dock_menu.test.js",
-  "web/webclient-app/tests/action/dock_menu_panes.test.js",
-  "web/webclient-app/tests/components/dock_panes.test.js",
-  "web/webclient-app/tests/data/breakdown_rendering.test.js",
-  "web/webclient-app/tests/frame-resolvers.test.js",
-  "web/webclient-app/tests/overlays/creation_overlay.test.js",
-  "web/webclient-app/tests/preserved_contract.test.js",
-  "web/webclient-app/tests/store/command_echo_surfaces.test.js",
-  "web/webclient-app/tests/store/declarative_surfaces.test.js",
-  "web/webclient-app/tests/store/protocol_fixtures.js",
-  "web/webclient-app/tests/store/store_dispatch_focus.test.js",
-  "web/webclient-app/tests/store/store_slices.test.js",
-  "web/webclient-app/tests/world/item_icons.test.js",
-  "web/webclient-app/tests/world/map_lattice.test.js",
-  "web/webclient-app/tests/world/map_lattice_edge_names.test.js",
-  "web/webclient-app/tests/world/map_lattice_fidelity.test.js",
-  "web/webclient-app/tests/world/map_lattice_island_chrome.test.js",
-  "web/webclient-app/tests/world/map_lattice_legend_labels.test.js",
-  "web/webclient-app/tests/world/map_lattice_name_fit.test.js",
-  "web/webclient-app/tests/world/map_lattice_renderer.test.js",
-  "web/webclient-app/tests/world/map_lattice_support.js",
-  "web/webclient/actions/tests/test_character_actions.py",
-  "web/webclient/actions/tests/test_combat_actions.py",
-  "web/webclient/actions/tests/test_combat_dispatcher.py",
-  "web/webclient/actions/tests/test_creation_actions.py",
-  "web/webclient/actions/tests/test_exploration_actions.py",
-  "web/webclient/actions/tests/test_inventory_actions.py",
-  "web/webclient/actions/tests/test_node_ids.py",
-  "web/webclient/actions/tests/test_service_actions.py",
-  "web/webclient/actions/tests/test_service_validators.py",
-  "web/webclient/actions/tests/test_title_actions.py",
-  "web/webclient/presentation/tests/test_affordances.py",
-  "web/webclient/presentation/tests/test_art_panel.py",
-  "web/webclient/presentation/tests/test_art_push.py",
-  "web/webclient/presentation/tests/test_character_panel.py",
-  "web/webclient/presentation/tests/test_combat_panel.py",
-  "web/webclient/presentation/tests/test_creation_panel.py",
-  "web/webclient/presentation/tests/test_dialogue_panel.py",
-  "web/webclient/presentation/tests/test_exploration_panel.py",
-  "web/webclient/presentation/tests/test_lineage_panel.py",
-  "web/webclient/presentation/tests/test_local_map.py",
-  "web/webclient/presentation/tests/test_lore_codex_panel.py",
-  "web/webclient/presentation/tests/test_objectives_panel.py",
-  "web/webclient/presentation/tests/test_party_panel.py",
-  "web/webclient/presentation/tests/test_possession_presentation.py",
-  "web/webclient/presentation/tests/test_presentation_context.py",
-  "web/webclient/presentation/tests/test_quest_log_panel.py",
-  "web/webclient/presentation/tests/test_services_panel.py",
-  "web/webclient/presentation/tests/test_title_codex_panel.py",
-  "web/webclient/tests/test_art_media.py",
-  "web/webclient/tests/test_webclient_contract.py",
-  "world/ai/tests/_director_helpers.py",
-  "world/ai/tests/test_character_creation.py",
-  "world/ai/tests/test_narrator.py",
-  "world/ai/tests/test_npc_dialogue_prompts.py",
-  "world/ai/tests/test_npc_dialogue_retry.py",
-  "world/ai/tests/test_scenario_director_prompts.py",
-  "world/ai/tests/test_scenario_director_proposals.py",
-  "world/ai/tests/test_scenario_director_registration.py",
-  "world/ai/tests/test_scenario_director_validation.py",
-  "world/ai/tests/test_title_nomination.py",
-  "world/art/tests/test_art_observability.py",
-  "world/art/tests/test_connectivity.py",
-  "world/art/tests/test_gallery.py",
-  "world/art/tests/test_gallery_fallback.py",
-  "world/art/tests/test_gallery_match.py",
-  "world/art/tests/test_gallery_prompt.py",
-  "world/art/tests/test_gallery_seed.py",
-  "world/art/tests/test_presenter.py",
-  "world/art/tests/test_queue.py",
-  "world/art/tests/test_scheduler.py",
-  "world/art/tests/test_sd_worker.py",
-  "world/art/tests/test_service.py",
-  "world/art/tests/test_subjects.py",
-  "world/art/tests/test_worker.py",
-  "world/imports/tests/test_degraded_banner.py",
-  "world/imports/tests/test_loader_trait_values.py",
-  "world/imports/tests/test_schema.py",
-  "world/imports/tests/test_skill_registry_self_arming.py",
-  "world/imports/tests/test_validation_semantics.py",
-  "world/maps/tests/test_city_wilderness_roundtrip.py",
-  "world/maps/tests/test_instance_reclamation.py",
-  "world/maps/tests/test_instance_spawn.py",
-  "world/maps/tests/test_limbo_room.py",
-  "world/maps/tests/test_movement_roundtrip.py",
-  "world/maps/tests/test_service_interiors.py",
-  "world/maps/tests/test_wilderness_clock.py",
-  "world/maps/tests/test_wilderness_destination.py",
-  "world/maps/tests/test_wilderness_population.py",
-  "world/maps/tests/test_wilderness_provider.py",
-  "world/prompts/tests/test_degrade.py",
-  "world/prompts/tests/test_loader.py",
-  "world/prompts/tests/test_verbatim_shipment.py",
-  "world/quests/tests/_compile_helpers.py",
-  "world/quests/tests/_fixtures.py",
-  "world/quests/tests/test_acquire.py",
-  "world/quests/tests/test_action_events.py",
-  "world/quests/tests/test_binding.py",
-  "world/quests/tests/test_characterization.py",
-  "world/quests/tests/test_deliver.py",
-  "world/quests/tests/test_describe.py",
-  "world/quests/tests/test_generated_quest_store.py",
-  "world/quests/tests/test_integration.py",
-  "world/quests/tests/test_pipeline_scenarios.py",
-  "world/quests/tests/test_planner.py",
-  "world/quests/tests/test_room_observation.py",
-  "world/quests/tests/test_runtime.py",
-  "world/quests/tests/test_scene_builder.py",
-  "world/quests/tests/test_scene_builder_flavor.py",
-  "world/quests/tests/test_scene_builder_offline.py",
-  "world/quests/tests/test_settlement.py",
-  "world/rules/tests/_combat_session_helpers.py",
-  "world/rules/tests/test_action_pipeline_rejections.py",
-  "world/rules/tests/test_action_preview.py",
-  "world/rules/tests/test_affinity.py",
-  "world/rules/tests/test_art_view.py",
-  "world/rules/tests/test_buffs.py",
-  "world/rules/tests/test_cap_break_turnin.py",
-  "world/rules/tests/test_cast_settlement.py",
-  "world/rules/tests/test_cast_settlement_sexual_coercion.py",
-  "world/rules/tests/test_character_creation.py",
-  "world/rules/tests/test_climax_settlement.py",
-  "world/rules/tests/test_cmd_cast.py",
-  "world/rules/tests/test_combat_initiation.py",
-  "world/rules/tests/test_combat_modifiers.py",
-  "world/rules/tests/test_combat_modifiers_matched.py",
-  "world/rules/tests/test_combat_party.py",
-  "world/rules/tests/test_combat_result.py",
-  "world/rules/tests/test_combat_session_flow.py",
-  "world/rules/tests/test_combat_session_recovery.py",
-  "world/rules/tests/test_combat_session_sexual_coercion.py",
-  "world/rules/tests/test_combat_session_targeting.py",
-  "world/rules/tests/test_combat_view.py",
-  "world/rules/tests/test_conferral_action.py",
-  "world/rules/tests/test_creation_messages.py",
-  "world/rules/tests/test_creation_wizard.py",
-  "world/rules/tests/test_damage_effect_handler.py",
-  "world/rules/tests/test_defeat_aftermath_core.py",
-  "world/rules/tests/test_defeat_aftermath_digest.py",
-  "world/rules/tests/test_defeat_aftermath_violation.py",
-  "world/rules/tests/test_dialogue.py",
-  "world/rules/tests/test_dialogue_session.py",
-  "world/rules/tests/test_disengage.py",
-  "world/rules/tests/test_disengage_integration.py",
-  "world/rules/tests/test_divine_mystery_gate.py",
-  "world/rules/tests/test_effect_handlers.py",
-  "world/rules/tests/test_effective_power.py",
-  "world/rules/tests/test_equipment_attached_buffs.py",
-  "world/rules/tests/test_equipment_combat_wiring.py",
-  "world/rules/tests/test_equipment_gauge_sync.py",
-  "world/rules/tests/test_equipment_immunity.py",
-  "world/rules/tests/test_equipment_prose.py",
-  "world/rules/tests/test_equipment_sexual_effects.py",
-  "world/rules/tests/test_equipment_toggle.py",
-  "world/rules/tests/test_equipment_worn_grace_rules.py",
-  "world/rules/tests/test_event_log.py",
-  "world/rules/tests/test_freeform_casting.py",
-  "world/rules/tests/test_friendly_fire.py",
-  "world/rules/tests/test_golden_combat.py",
-  "world/rules/tests/test_guild_dialogue_turnin.py",
-  "world/rules/tests/test_guild_economy_sync.py",
-  "world/rules/tests/test_guild_exams.py",
-  "world/rules/tests/test_guild_registration.py",
-  "world/rules/tests/test_guild_rewards.py",
-  "world/rules/tests/test_heal_effect_handler.py",
-  "world/rules/tests/test_holy_water_cleanse.py",
-  "world/rules/tests/test_initiative_and_turn_loop.py",
-  "world/rules/tests/test_inventory_helpers.py",
-  "world/rules/tests/test_item_combat_turn.py",
-  "world/rules/tests/test_item_effects_rulebook.py",
-  "world/rules/tests/test_item_use.py",
-  "world/rules/tests/test_lineage_query.py",
-  "world/rules/tests/test_lore_deterministic_reveals.py",
-  "world/rules/tests/test_lore_knowledge.py",
-  "world/rules/tests/test_map_knowledge.py",
-  "world/rules/tests/test_map_knowledge_integration.py",
-  "world/rules/tests/test_monster_behaviour_determinism.py",
-  "world/rules/tests/test_monster_behaviour_golden.py",
-  "world/rules/tests/test_monster_behaviour_integration.py",
-  "world/rules/tests/test_monster_behaviour_policy.py",
-  "world/rules/tests/test_monster_behaviour_selection.py",
-  "world/rules/tests/test_monster_flee_decision.py",
-  "world/rules/tests/test_monster_scale.py",
-  "world/rules/tests/test_monster_sexual_baseline.py",
-  "world/rules/tests/test_movement.py",
-  "world/rules/tests/test_movement_settlement.py",
-  "world/rules/tests/test_namegen.py",
-  "world/rules/tests/test_npc_identity.py",
-  "world/rules/tests/test_npc_intents.py",
-  "world/rules/tests/test_npc_schedule_runtime.py",
-  "world/rules/tests/test_ordered_level_trait.py",
-  "world/rules/tests/test_overwhelm_compression.py",
-  "world/rules/tests/test_overwhelm_resolution.py",
-  "world/rules/tests/test_overwhelm_threshold.py",
-  "world/rules/tests/test_party.py",
-  "world/rules/tests/test_party_offline_loop.py",
-  "world/rules/tests/test_persona.py",
-  "world/rules/tests/test_persona_edit.py",
-  "world/rules/tests/test_phase4_integration.py",
-  "world/rules/tests/test_progression.py",
-  "world/rules/tests/test_quest_delivery.py",
-  "world/rules/tests/test_quest_issuance.py",
-  "world/rules/tests/test_quest_issuer_component.py",
-  "world/rules/tests/test_race_scale.py",
-  "world/rules/tests/test_rules_observability.py",
-  "world/rules/tests/test_service_binding_persistence.py",
-  "world/rules/tests/test_service_messages.py",
-  "world/rules/tests/test_service_view.py",
-  "world/rules/tests/test_service_view_side_effects.py",
-  "world/rules/tests/test_sexual_act_effects.py",
-  "world/rules/tests/test_sexual_decay_and_reset.py",
-  "world/rules/tests/test_sexual_event_self_arming.py",
-  "world/rules/tests/test_sexual_resist.py",
-  "world/rules/tests/test_sexual_resist_cast_wiring.py",
-  "world/rules/tests/test_sexual_state.py",
-  "world/rules/tests/test_sexual_transitions.py",
-  "world/rules/tests/test_sexual_unlock.py",
-  "world/rules/tests/test_shop_clock_sources.py",
-  "world/rules/tests/test_shop_economy.py",
-  "world/rules/tests/test_skill_lineage.py",
-  "world/rules/tests/test_skip_commands.py",
-  "world/rules/tests/test_starting_companions.py",
-  "world/rules/tests/test_stat_breakdown.py",
-  "world/rules/tests/test_status_query.py",
-  "world/rules/tests/test_status_text.py",
-  "world/rules/tests/test_subrace_order.py",
-  "world/rules/tests/test_targeting.py",
-  "world/rules/tests/test_tier_construction.py",
-  "world/rules/tests/test_time_skip.py",
-  "world/rules/tests/test_title_view.py",
-  "world/rules/tests/test_titles.py",
-  "world/rules/tests/test_traits.py",
-  "world/skills/tests/test_conferral.py",
-  "world/skills/tests/test_disguise_effect.py",
-  "world/skills/tests/test_effects.py",
-  "world/skills/tests/test_equipment.py",
-  "world/skills/tests/test_handler.py",
-  "world/skills/tests/test_inventory.py",
-  "world/skills/tests/test_skill_casts.py"
- ]
+  "contract": [
+    {
+      "path": "tests/test_command_docs.py",
+      "reason": "player command docs parity contract"
+    },
+    {
+      "path": "tests/test_preset_authoring_docs_contract.py",
+      "reason": "authoring docs contract"
+    },
+    {
+      "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
+      "reason": "every registered lore entry is representable by the codex panel"
+    },
+    {
+      "path": "web/webclient/presentation/tests/test_world_map_measurement.py",
+      "reason": "the shipped continental geography fits the measured world-map bound."
+    },
+    {
+      "path": "world/ai/tests/test_director_template_cards.py",
+      "reason": "offline quest template occupant card contract"
+    },
+    {
+      "path": "world/ai/tests/test_dream_frame_contract.py",
+      "reason": "approved dream frame divine-identity refusal contract"
+    },
+    {
+      "path": "world/art/tests/test_bundled_interior_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
+      "path": "world/art/tests/test_bundled_outdoor_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
+      "path": "world/art/tests/test_bundled_sacred_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
+      "path": "world/art/tests/test_bundled_scenes.py",
+      "reason": "bundled scene-art registry, collection and media identity contract"
+    },
+    {
+      "path": "world/art/tests/test_bundled_terminal_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
+      "path": "world/imports/tests/test_social_identity_imports.py",
+      "reason": "import schema, validation, loader, and profile social identity producers."
+    },
+    {
+      "path": "world/imports/tests/test_yohanna_demo.py",
+      "reason": "authored Yohanna import card and real protection setup contract"
+    },
+    {
+      "path": "world/lore/tests/test_anchor_placement.py",
+      "reason": "anchor placement data contract"
+    },
+    {
+      "path": "world/lore/tests/test_anchors.py",
+      "reason": "anchor data contract"
+    },
+    {
+      "path": "world/lore/tests/test_assortments.py",
+      "reason": "assortment registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_bestiary_documentation.py",
+      "reason": "keyed bestiary documentation relationship contract"
+    },
+    {
+      "path": "world/lore/tests/test_church.py",
+      "reason": "frozen church catalogues, the derived church-place venue set, and the church lore/status realignment contract"
+    },
+    {
+      "path": "world/lore/tests/test_dialogue_assembly.py",
+      "reason": "Altoria dialogue terrace split preserves tables and terrace alignment"
+    },
+    {
+      "path": "world/lore/tests/test_economy.py",
+      "reason": "price-table data contract"
+    },
+    {
+      "path": "world/lore/tests/test_elements.py",
+      "reason": "element data contract"
+    },
+    {
+      "path": "world/lore/tests/test_guild.py",
+      "reason": "guild registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_items.py",
+      "reason": "item registry registration/metadata/reference contract"
+    },
+    {
+      "path": "world/lore/tests/test_magic.py",
+      "reason": "magic tier data contract"
+    },
+    {
+      "path": "world/lore/tests/test_map_district_content.py",
+      "reason": "shipped map-district landmarks against the authored continent"
+    },
+    {
+      "path": "world/lore/tests/test_monster_activity.py",
+      "reason": "published field-activity declarations stay immutable and every shipped composition/site binding resolves"
+    },
+    {
+      "path": "world/lore/tests/test_monster_species_content.py",
+      "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
+    },
+    {
+      "path": "world/lore/tests/test_monsters.py",
+      "reason": "monster tier data contract"
+    },
+    {
+      "path": "world/lore/tests/test_names.py",
+      "reason": "name-pack corpus contract"
+    },
+    {
+      "path": "world/lore/tests/test_nations.py",
+      "reason": "nation data contract"
+    },
+    {
+      "path": "world/lore/tests/test_npc_editorial_review.py",
+      "reason": "registry-indexed NPC characterization editorial review contract"
+    },
+    {
+      "path": "world/lore/tests/test_npc_profile_inventory.py",
+      "reason": "shipped NPC source inventory equality contract"
+    },
+    {
+      "path": "world/lore/tests/test_npc_profile_slice_content.py",
+      "reason": "registry-derived NPC host characterization and authored dialogue coverage contract"
+    },
+    {
+      "path": "world/lore/tests/test_npc_tiers.py",
+      "reason": "npc tier data contract"
+    },
+    {
+      "path": "world/lore/tests/test_player_presets.py",
+      "reason": "lore registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_races.py",
+      "reason": "race/subrace data contract"
+    },
+    {
+      "path": "world/lore/tests/test_registry_index_contract.py",
+      "reason": "authored registry index coverage and shipped reference integrity contract"
+    },
+    {
+      "path": "world/lore/tests/test_room_prose_language.py",
+      "reason": "authored room prose language contract"
+    },
+    {
+      "path": "world/lore/tests/test_saintess_vessel_grant.py",
+      "reason": "saintess vessel registry and enrollment grant contract"
+    },
+    {
+      "path": "world/lore/tests/test_scene_archetypes.py",
+      "reason": "scene archetype data contract"
+    },
+    {
+      "path": "world/lore/tests/test_settlements.py",
+      "reason": "settlement and place registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_sex.py",
+      "reason": "lore registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_sexual_vocab.py",
+      "reason": "sexual vocabulary contract"
+    },
+    {
+      "path": "world/lore/tests/test_shops.py",
+      "reason": "shop registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_starting_kits.py",
+      "reason": "starting-kit data contract"
+    },
+    {
+      "path": "world/lore/tests/test_sync.py",
+      "reason": "lore cross-registry sync contract"
+    },
+    {
+      "path": "world/lore/tests/test_titles_registry.py",
+      "reason": "fixed-title registry content contract"
+    },
+    {
+      "path": "world/lore/tests/test_wilderness_entry.py",
+      "reason": "wilderness entry data contract"
+    },
+    {
+      "path": "world/lore/tests/test_wilderness_regions.py",
+      "reason": "wilderness region data contract"
+    },
+    {
+      "path": "world/maps/tests/test_altoria_capital.py",
+      "reason": "capital settlement document contract"
+    },
+    {
+      "path": "world/maps/tests/test_bootstrap/test_bootstrap_grid.py",
+      "reason": "map bootstrap/gate data contract"
+    },
+    {
+      "path": "world/maps/tests/test_bootstrap/test_bootstrap_selection.py",
+      "reason": "map bootstrap/gate data contract"
+    },
+    {
+      "path": "world/maps/tests/test_city_movement_cost.py",
+      "reason": "city movement cost data contract"
+    },
+    {
+      "path": "world/maps/tests/test_city_walkthrough.py",
+      "reason": "capital map walkability contract"
+    },
+    {
+      "path": "world/maps/tests/test_content_expansion_sites.py",
+      "reason": "content-expansion manual sites production smoke over the generic site, grouping, engagement and one-shot contracts"
+    },
+    {
+      "path": "world/maps/tests/test_geography_source.py",
+      "reason": "geography publication, composition and snapshot-isolation mechanism contract"
+    },
+    {
+      "path": "world/maps/tests/test_map_district_partition.py",
+      "reason": "the committed district partition recomputes exactly from shipped geography"
+    },
+    {
+      "path": "world/maps/tests/test_village_ciaran.py",
+      "reason": "village ciaran settlement document contract"
+    },
+    {
+      "path": "world/maps/tests/test_wilderness_geography_contract.py",
+      "reason": "authored continental terrain, waterway and anchor-region data contract"
+    },
+    {
+      "path": "world/quests/tests/test_compile_blueprint.py",
+      "reason": "quest compile data-contract surface"
+    },
+    {
+      "path": "world/quests/tests/test_compile_offline.py",
+      "reason": "quest compile data-contract surface"
+    },
+    {
+      "path": "world/quests/tests/test_compile_registration.py",
+      "reason": "quest compile data-contract surface"
+    },
+    {
+      "path": "world/quests/tests/test_definitions.py",
+      "reason": "quest definition catalog contract"
+    },
+    {
+      "path": "world/quests/tests/test_hunt_catalog_content.py",
+      "reason": "published hunt and site clear-out content contract"
+    },
+    {
+      "path": "world/quests/tests/test_scenario_mapping.py",
+      "reason": "scenario mapping data-contract surface"
+    },
+    {
+      "path": "world/rules/tests/test_affinity_config.py",
+      "reason": "affinity config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_authored_dialogue_runtime.py",
+      "reason": "authored dialogue runtime selection and transactional session delivery"
+    },
+    {
+      "path": "world/rules/tests/test_buffs.py",
+      "reason": "buff rulebook content contract"
+    },
+    {
+      "path": "world/rules/tests/test_church_accrual.py",
+      "reason": "church accrual tune finals and the offering baseline"
+    },
+    {
+      "path": "world/rules/tests/test_church_enrollment.py",
+      "reason": "church enrollment office and vestment handover contract"
+    },
+    {
+      "path": "world/rules/tests/test_church_hosts.py",
+      "reason": "the clergy host, ChurchHost service attachment, and spawn-data arousal"
+    },
+    {
+      "path": "world/rules/tests/test_church_rulebook.py",
+      "reason": "church rulebook cast-rail contract names its shipped rite rows"
+    },
+    {
+      "path": "world/rules/tests/test_clock.py",
+      "reason": "clock rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_crocodile_resource_skill.py",
+      "reason": "crocodile representative-composition production smoke over the generic transfer/policy contracts"
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_references.py",
+      "reason": "static permitted-reference catalog mirrors canonical registries"
+    },
+    {
+      "path": "world/rules/tests/test_dialogue_sources.py",
+      "reason": "shipped dialogue source inventory and profile service distinction"
+    },
+    {
+      "path": "world/rules/tests/test_equipment_effect_rulebook.py",
+      "reason": "equipment effect rulebook and item-lore liturgical-role contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/_support.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_assortment_shop_rules.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_catalog_loading.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_commerce_rulebook_slices.py",
+      "reason": "commerce rulebook slice loading contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_item_offer_definitions.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_merit_exam_rulebook.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_price_scaling.py",
+      "reason": "guild/shop config validation contract"
+    },
+    {
+      "path": "world/rules/tests/test_guild_config/test_service_host_roster.py",
+      "reason": "place-derived service host roster and current place-declaration contract"
+    },
+    {
+      "path": "world/rules/tests/test_human_combat_calibration.py",
+      "reason": "human combat calibration evidence exercises shipped gear, skill, and monster rows through the real resolver"
+    },
+    {
+      "path": "world/rules/tests/test_monster_ai_activation.py",
+      "reason": "staged activation of the named production variant set: real registry binding, one settled production encounter, the release record and the reflex rollback restart seam"
+    },
+    {
+      "path": "world/rules/tests/test_monster_behaviour_profile.py",
+      "reason": "monster behaviour rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_monster_composition_coverage.py",
+      "reason": "authored-kit composition grouping and representative wiring contract"
+    },
+    {
+      "path": "world/rules/tests/test_mudfilm_slime_resource_skill.py",
+      "reason": "slime representative-composition production smoke over the generic self-support/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_npc_roster_validation.py",
+      "reason": "registry-derived NPC roster completeness and fault-diagnostic contract"
+    },
+    {
+      "path": "world/rules/tests/test_npc_schedules.py",
+      "reason": "npc schedule rulebook contract"
+    },
+    {
+      "path": "world/rules/tests/test_reservoir_warden_resource_skill.py",
+      "reason": "crocodile drain-and-guard representative-composition production smoke over the generic transfer/self-support/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_rulebook_schema.py",
+      "reason": "rulebook schema contract"
+    },
+    {
+      "path": "world/rules/tests/test_saintess_vessel_trickle.py",
+      "reason": "saintess vessel trickle and enrollment integration smoke contract"
+    },
+    {
+      "path": "world/rules/tests/test_shipped_item_use_regression.py",
+      "reason": "shipped usable-item regression contract"
+    },
+    {
+      "path": "world/rules/tests/test_sight.py",
+      "reason": "the sight rulebook's schema keys and loader rejection boundaries are the contract under test; every assertion injects a synthetic policy and never pins shipped values or wording"
+    },
+    {
+      "path": "world/rules/tests/test_social_identity.py",
+      "reason": "social identity canonical tag model and reader/writer APIs."
+    },
+    {
+      "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
+      "reason": "sparrow representative-composition production smoke over the generic rider/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
+      "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_ember_bristle_boar_resource_skill.py",
+      "reason": "boar two-strike representative-composition production smoke over the generic area/single damage and payment contracts"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_acceptance.py",
+      "reason": "sexual act acceptance catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_combat_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_divine_core_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_divine_mutators_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_interspecies_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_partner_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/_support.py",
+      "reason": "sexual act registry structure contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/test_divine_structure.py",
+      "reason": "sexual act registry structure contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_registry_structure/test_registry_assembly.py",
+      "reason": "sexual act registry structure contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_seed_acts.py",
+      "reason": "sexual act seed catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_shame_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/sexual_acts/tests/test_solo_catalog.py",
+      "reason": "sexual act catalog contract"
+    },
+    {
+      "path": "world/skills/tests/test_cost_tiers.py",
+      "reason": "MP cost-tier assignment contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/_support.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_category_classification.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_content_completion.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_narration_coverage.py",
+      "reason": "shipped narration coverage contract over the skill and act registries"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_out_of_combat_policy.py",
+      "reason": "skill registry content contract"
+    },
+    {
+      "path": "world/skills/tests/test_skill_registry/test_registry_contract.py",
+      "reason": "skill registry typed kit/reference contract"
+    },
+    {
+      "path": "world/skills/tests/test_spell_catalogs.py",
+      "reason": "closed spell-parser vocabulary plus generic lineage-graph and mastery-coverage relationships"
+    },
+    {
+      "path": "world/maps/tests/test_settlement_sources.py",
+      "reason": "settlement source discovery and composition contract"
+    },
+    {
+      "path": "world/maps/tests/test_settlement_reload.py",
+      "reason": "settlement reload convergence contract"
+    },
+    {
+      "path": "world/maps/tests/_bootstrap_fixtures.py",
+      "reason": "map bootstrap/gate data contract"
+    },
+    {
+      "path": "world/maps/tests/test_bootstrap_sync.py",
+      "reason": "map bootstrap/gate data contract"
+    }
+  ],
+  "debt": [
+    "web/webclient-app/tests/action/dock_items.test.js",
+    "web/webclient-app/tests/action/dock_menu.test.js",
+    "web/webclient-app/tests/action/dock_menu_panes.test.js",
+    "web/webclient-app/tests/components/dock_panes.test.js",
+    "web/webclient-app/tests/store/protocol_fixtures.js",
+    "web/webclient-app/tests/store/store_slices.test.js",
+    "web/webclient-app/tests/world/map_lattice_name_fit.test.js",
+    "web/webclient-app/tests/world/map_lattice_support.js",
+    "world/ai/tests/test_npc_dialogue_prompts.py",
+    "world/imports/tests/test_skill_registry_self_arming.py",
+    "world/rules/tests/test_item_effects_rulebook.py",
+    "world/rules/tests/test_traits.py"
+  ],
+  "seedDebtPaths": [
+    "commands/tests/test_art.py",
+    "commands/tests/test_background.py",
+    "commands/tests/test_character_creation.py",
+    "commands/tests/test_combat_actions.py",
+    "commands/tests/test_command_branch_behaviour.py",
+    "commands/tests/test_guild_economy_commands.py",
+    "commands/tests/test_inventory_breakdown.py",
+    "commands/tests/test_items.py",
+    "commands/tests/test_lineage_command.py",
+    "commands/tests/test_localized.py",
+    "commands/tests/test_lore_command.py",
+    "commands/tests/test_party_commands.py",
+    "commands/tests/test_persona_commands.py",
+    "commands/tests/test_talk_turnin_branch.py",
+    "commands/tests/test_talk_turnin_commands.py",
+    "commands/tests/test_title_command.py",
+    "server/conf/tests/test_ai_director_service.py",
+    "server/conf/tests/test_scene_flavor_service.py",
+    "server/conf/tests/test_ui_action_integration.py",
+    "tests/test_creation_parity_contract.py",
+    "tests/test_quality_gate_contract.py",
+    "typeclasses/tests/test_account_capacity.py",
+    "typeclasses/tests/test_account_login.py",
+    "typeclasses/tests/test_appearance.py",
+    "typeclasses/tests/test_art_room_entry.py",
+    "typeclasses/tests/test_components.py",
+    "typeclasses/tests/test_entities.py",
+    "typeclasses/tests/test_exit_movement_cost.py",
+    "typeclasses/tests/test_exits.py",
+    "typeclasses/tests/test_npc_dialogue.py",
+    "typeclasses/tests/test_npcs.py",
+    "typeclasses/tests/test_rooms.py",
+    "web/static/webclient/js/tests/art_panel.test.js",
+    "web/static/webclient/js/tests/character_menu.test.js",
+    "web/static/webclient/js/tests/combat_menu.test.js",
+    "web/static/webclient/js/tests/command_echo.test.js",
+    "web/static/webclient/js/tests/creation_menu.test.js",
+    "web/static/webclient/js/tests/exploration_menu.test.js",
+    "web/static/webclient/js/tests/hud_dock_menus.test.js",
+    "web/static/webclient/js/tests/protocol.test.js",
+    "web/static/webclient/js/tests/protocol_art.test.js",
+    "web/static/webclient/js/tests/protocol_character.test.js",
+    "web/static/webclient/js/tests/protocol_character_skills.test.js",
+    "web/static/webclient/js/tests/protocol_context_actions_a.test.js",
+    "web/static/webclient/js/tests/protocol_context_actions_b.test.js",
+    "web/static/webclient/js/tests/protocol_core.test.js",
+    "web/static/webclient/js/tests/protocol_creation.test.js",
+    "web/static/webclient/js/tests/protocol_detachment.test.js",
+    "web/static/webclient/js/tests/protocol_dialogue.test.js",
+    "web/static/webclient/js/tests/protocol_exploration_a.test.js",
+    "web/static/webclient/js/tests/protocol_exploration_b.test.js",
+    "web/static/webclient/js/tests/protocol_fixtures.js",
+    "web/static/webclient/js/tests/protocol_lineage.test.js",
+    "web/static/webclient/js/tests/protocol_local_map.test.js",
+    "web/static/webclient/js/tests/protocol_lore_codex.test.js",
+    "web/static/webclient/js/tests/protocol_party.test.js",
+    "web/static/webclient/js/tests/protocol_roster.test.js",
+    "web/static/webclient/js/tests/protocol_services_a.test.js",
+    "web/static/webclient/js/tests/protocol_services_b.test.js",
+    "web/static/webclient/js/tests/protocol_support.js",
+    "web/static/webclient/js/tests/protocol_title_ballot.test.js",
+    "web/static/webclient/js/tests/protocol_title_codex.test.js",
+    "web/static/webclient/js/tests/protocol_transport.test.js",
+    "web/tests/browser/browser_helpers.py",
+    "web/tests/browser/browser_settings.py",
+    "web/tests/browser/seed.py",
+    "web/tests/browser/seed/minimap_fixture.py",
+    "web/tests/browser/seed/services_fixture.py",
+    "web/tests/browser/seed/services_synth.py",
+    "web/tests/browser/test_browser_art.py",
+    "web/tests/browser/test_browser_combat.py",
+    "web/tests/browser/test_browser_combat_rejection.py",
+    "web/tests/browser/test_browser_contextual_hud.py",
+    "web/tests/browser/test_browser_creation.py",
+    "web/tests/browser/test_browser_exploration.py",
+    "web/tests/browser/test_browser_input_narrative.py",
+    "web/tests/browser/test_browser_inventory_actions.py",
+    "web/tests/browser/test_browser_inventory_grid.py",
+    "web/tests/browser/test_browser_lineage.py",
+    "web/tests/browser/test_browser_local_map.py",
+    "web/tests/browser/test_browser_pointer.py",
+    "web/tests/browser/test_browser_services.py",
+    "web/tests/browser/test_browser_shell.py",
+    "web/tests/browser/test_browser_title_codex.py",
+    "web/tests/browser/test_vue_foundation.py",
+    "web/webclient-app/tests/action/dock_items.test.js",
+    "web/webclient-app/tests/action/dock_menu.test.js",
+    "web/webclient-app/tests/action/dock_menu_panes.test.js",
+    "web/webclient-app/tests/components/dock_panes.test.js",
+    "web/webclient-app/tests/data/breakdown_rendering.test.js",
+    "web/webclient-app/tests/frame-resolvers.test.js",
+    "web/webclient-app/tests/overlays/creation_overlay.test.js",
+    "web/webclient-app/tests/preserved_contract.test.js",
+    "web/webclient-app/tests/store/command_echo_surfaces.test.js",
+    "web/webclient-app/tests/store/declarative_surfaces.test.js",
+    "web/webclient-app/tests/store/protocol_fixtures.js",
+    "web/webclient-app/tests/store/store_dispatch_focus.test.js",
+    "web/webclient-app/tests/store/store_slices.test.js",
+    "web/webclient-app/tests/world/item_icons.test.js",
+    "web/webclient-app/tests/world/map_lattice.test.js",
+    "web/webclient-app/tests/world/map_lattice_edge_names.test.js",
+    "web/webclient-app/tests/world/map_lattice_fidelity.test.js",
+    "web/webclient-app/tests/world/map_lattice_island_chrome.test.js",
+    "web/webclient-app/tests/world/map_lattice_legend_labels.test.js",
+    "web/webclient-app/tests/world/map_lattice_name_fit.test.js",
+    "web/webclient-app/tests/world/map_lattice_renderer.test.js",
+    "web/webclient-app/tests/world/map_lattice_support.js",
+    "web/webclient/actions/tests/test_character_actions.py",
+    "web/webclient/actions/tests/test_combat_actions.py",
+    "web/webclient/actions/tests/test_combat_dispatcher.py",
+    "web/webclient/actions/tests/test_creation_actions.py",
+    "web/webclient/actions/tests/test_exploration_actions.py",
+    "web/webclient/actions/tests/test_inventory_actions.py",
+    "web/webclient/actions/tests/test_node_ids.py",
+    "web/webclient/actions/tests/test_service_actions.py",
+    "web/webclient/actions/tests/test_service_validators.py",
+    "web/webclient/actions/tests/test_title_actions.py",
+    "web/webclient/presentation/tests/test_affordances.py",
+    "web/webclient/presentation/tests/test_art_panel.py",
+    "web/webclient/presentation/tests/test_art_push.py",
+    "web/webclient/presentation/tests/test_character_panel.py",
+    "web/webclient/presentation/tests/test_combat_panel.py",
+    "web/webclient/presentation/tests/test_creation_panel.py",
+    "web/webclient/presentation/tests/test_dialogue_panel.py",
+    "web/webclient/presentation/tests/test_exploration_panel.py",
+    "web/webclient/presentation/tests/test_lineage_panel.py",
+    "web/webclient/presentation/tests/test_local_map.py",
+    "web/webclient/presentation/tests/test_lore_codex_panel.py",
+    "web/webclient/presentation/tests/test_objectives_panel.py",
+    "web/webclient/presentation/tests/test_party_panel.py",
+    "web/webclient/presentation/tests/test_possession_presentation.py",
+    "web/webclient/presentation/tests/test_presentation_context.py",
+    "web/webclient/presentation/tests/test_quest_log_panel.py",
+    "web/webclient/presentation/tests/test_services_panel.py",
+    "web/webclient/presentation/tests/test_title_codex_panel.py",
+    "web/webclient/tests/test_art_media.py",
+    "web/webclient/tests/test_webclient_contract.py",
+    "world/ai/tests/_director_helpers.py",
+    "world/ai/tests/test_character_creation.py",
+    "world/ai/tests/test_narrator.py",
+    "world/ai/tests/test_npc_dialogue_prompts.py",
+    "world/ai/tests/test_npc_dialogue_retry.py",
+    "world/ai/tests/test_scenario_director_prompts.py",
+    "world/ai/tests/test_scenario_director_proposals.py",
+    "world/ai/tests/test_scenario_director_registration.py",
+    "world/ai/tests/test_scenario_director_validation.py",
+    "world/ai/tests/test_title_nomination.py",
+    "world/art/tests/test_art_observability.py",
+    "world/art/tests/test_connectivity.py",
+    "world/art/tests/test_gallery.py",
+    "world/art/tests/test_gallery_fallback.py",
+    "world/art/tests/test_gallery_match.py",
+    "world/art/tests/test_gallery_prompt.py",
+    "world/art/tests/test_gallery_seed.py",
+    "world/art/tests/test_presenter.py",
+    "world/art/tests/test_queue.py",
+    "world/art/tests/test_scheduler.py",
+    "world/art/tests/test_sd_worker.py",
+    "world/art/tests/test_service.py",
+    "world/art/tests/test_subjects.py",
+    "world/art/tests/test_worker.py",
+    "world/imports/tests/test_degraded_banner.py",
+    "world/imports/tests/test_loader_trait_values.py",
+    "world/imports/tests/test_schema.py",
+    "world/imports/tests/test_skill_registry_self_arming.py",
+    "world/imports/tests/test_validation_semantics.py",
+    "world/maps/tests/test_city_wilderness_roundtrip.py",
+    "world/maps/tests/test_instance_reclamation.py",
+    "world/maps/tests/test_instance_spawn.py",
+    "world/maps/tests/test_limbo_room.py",
+    "world/maps/tests/test_movement_roundtrip.py",
+    "world/maps/tests/test_service_interiors.py",
+    "world/maps/tests/test_wilderness_clock.py",
+    "world/maps/tests/test_wilderness_destination.py",
+    "world/maps/tests/test_wilderness_population.py",
+    "world/maps/tests/test_wilderness_provider.py",
+    "world/prompts/tests/test_degrade.py",
+    "world/prompts/tests/test_loader.py",
+    "world/prompts/tests/test_verbatim_shipment.py",
+    "world/quests/tests/_compile_helpers.py",
+    "world/quests/tests/_fixtures.py",
+    "world/quests/tests/test_acquire.py",
+    "world/quests/tests/test_action_events.py",
+    "world/quests/tests/test_binding.py",
+    "world/quests/tests/test_characterization.py",
+    "world/quests/tests/test_deliver.py",
+    "world/quests/tests/test_describe.py",
+    "world/quests/tests/test_generated_quest_store.py",
+    "world/quests/tests/test_integration.py",
+    "world/quests/tests/test_pipeline_scenarios.py",
+    "world/quests/tests/test_planner.py",
+    "world/quests/tests/test_room_observation.py",
+    "world/quests/tests/test_runtime.py",
+    "world/quests/tests/test_scene_builder.py",
+    "world/quests/tests/test_scene_builder_flavor.py",
+    "world/quests/tests/test_scene_builder_offline.py",
+    "world/quests/tests/test_settlement.py",
+    "world/rules/tests/_combat_session_helpers.py",
+    "world/rules/tests/test_action_pipeline_rejections.py",
+    "world/rules/tests/test_action_preview.py",
+    "world/rules/tests/test_affinity.py",
+    "world/rules/tests/test_art_view.py",
+    "world/rules/tests/test_buffs.py",
+    "world/rules/tests/test_cap_break_turnin.py",
+    "world/rules/tests/test_cast_settlement.py",
+    "world/rules/tests/test_cast_settlement_sexual_coercion.py",
+    "world/rules/tests/test_character_creation.py",
+    "world/rules/tests/test_climax_settlement.py",
+    "world/rules/tests/test_cmd_cast.py",
+    "world/rules/tests/test_combat_initiation.py",
+    "world/rules/tests/test_combat_modifiers.py",
+    "world/rules/tests/test_combat_modifiers_matched.py",
+    "world/rules/tests/test_combat_party.py",
+    "world/rules/tests/test_combat_result.py",
+    "world/rules/tests/test_combat_session_flow.py",
+    "world/rules/tests/test_combat_session_recovery.py",
+    "world/rules/tests/test_combat_session_sexual_coercion.py",
+    "world/rules/tests/test_combat_session_targeting.py",
+    "world/rules/tests/test_combat_view.py",
+    "world/rules/tests/test_conferral_action.py",
+    "world/rules/tests/test_creation_messages.py",
+    "world/rules/tests/test_creation_wizard.py",
+    "world/rules/tests/test_damage_effect_handler.py",
+    "world/rules/tests/test_defeat_aftermath_core.py",
+    "world/rules/tests/test_defeat_aftermath_digest.py",
+    "world/rules/tests/test_defeat_aftermath_violation.py",
+    "world/rules/tests/test_dialogue.py",
+    "world/rules/tests/test_dialogue_session.py",
+    "world/rules/tests/test_disengage.py",
+    "world/rules/tests/test_disengage_integration.py",
+    "world/rules/tests/test_divine_mystery_gate.py",
+    "world/rules/tests/test_effect_handlers.py",
+    "world/rules/tests/test_effective_power.py",
+    "world/rules/tests/test_equipment_attached_buffs.py",
+    "world/rules/tests/test_equipment_combat_wiring.py",
+    "world/rules/tests/test_equipment_gauge_sync.py",
+    "world/rules/tests/test_equipment_immunity.py",
+    "world/rules/tests/test_equipment_prose.py",
+    "world/rules/tests/test_equipment_sexual_effects.py",
+    "world/rules/tests/test_equipment_toggle.py",
+    "world/rules/tests/test_equipment_worn_grace_rules.py",
+    "world/rules/tests/test_event_log.py",
+    "world/rules/tests/test_freeform_casting.py",
+    "world/rules/tests/test_friendly_fire.py",
+    "world/rules/tests/test_golden_combat.py",
+    "world/rules/tests/test_guild_dialogue_turnin.py",
+    "world/rules/tests/test_guild_economy_sync.py",
+    "world/rules/tests/test_guild_exams.py",
+    "world/rules/tests/test_guild_registration.py",
+    "world/rules/tests/test_guild_rewards.py",
+    "world/rules/tests/test_heal_effect_handler.py",
+    "world/rules/tests/test_holy_water_cleanse.py",
+    "world/rules/tests/test_initiative_and_turn_loop.py",
+    "world/rules/tests/test_inventory_helpers.py",
+    "world/rules/tests/test_item_combat_turn.py",
+    "world/rules/tests/test_item_effects_rulebook.py",
+    "world/rules/tests/test_item_use.py",
+    "world/rules/tests/test_lineage_query.py",
+    "world/rules/tests/test_lore_deterministic_reveals.py",
+    "world/rules/tests/test_lore_knowledge.py",
+    "world/rules/tests/test_map_knowledge.py",
+    "world/rules/tests/test_map_knowledge_integration.py",
+    "world/rules/tests/test_monster_behaviour_determinism.py",
+    "world/rules/tests/test_monster_behaviour_golden.py",
+    "world/rules/tests/test_monster_behaviour_integration.py",
+    "world/rules/tests/test_monster_behaviour_policy.py",
+    "world/rules/tests/test_monster_behaviour_selection.py",
+    "world/rules/tests/test_monster_flee_decision.py",
+    "world/rules/tests/test_monster_scale.py",
+    "world/rules/tests/test_monster_sexual_baseline.py",
+    "world/rules/tests/test_movement.py",
+    "world/rules/tests/test_movement_settlement.py",
+    "world/rules/tests/test_namegen.py",
+    "world/rules/tests/test_npc_identity.py",
+    "world/rules/tests/test_npc_intents.py",
+    "world/rules/tests/test_npc_schedule_runtime.py",
+    "world/rules/tests/test_ordered_level_trait.py",
+    "world/rules/tests/test_overwhelm_compression.py",
+    "world/rules/tests/test_overwhelm_resolution.py",
+    "world/rules/tests/test_overwhelm_threshold.py",
+    "world/rules/tests/test_party.py",
+    "world/rules/tests/test_party_offline_loop.py",
+    "world/rules/tests/test_persona.py",
+    "world/rules/tests/test_persona_edit.py",
+    "world/rules/tests/test_phase4_integration.py",
+    "world/rules/tests/test_progression.py",
+    "world/rules/tests/test_quest_delivery.py",
+    "world/rules/tests/test_quest_issuance.py",
+    "world/rules/tests/test_quest_issuer_component.py",
+    "world/rules/tests/test_race_scale.py",
+    "world/rules/tests/test_rules_observability.py",
+    "world/rules/tests/test_service_binding_persistence.py",
+    "world/rules/tests/test_service_messages.py",
+    "world/rules/tests/test_service_view.py",
+    "world/rules/tests/test_service_view_side_effects.py",
+    "world/rules/tests/test_sexual_act_effects.py",
+    "world/rules/tests/test_sexual_decay_and_reset.py",
+    "world/rules/tests/test_sexual_event_self_arming.py",
+    "world/rules/tests/test_sexual_resist.py",
+    "world/rules/tests/test_sexual_resist_cast_wiring.py",
+    "world/rules/tests/test_sexual_state.py",
+    "world/rules/tests/test_sexual_transitions.py",
+    "world/rules/tests/test_sexual_unlock.py",
+    "world/rules/tests/test_shop_clock_sources.py",
+    "world/rules/tests/test_shop_economy.py",
+    "world/rules/tests/test_skill_lineage.py",
+    "world/rules/tests/test_skip_commands.py",
+    "world/rules/tests/test_starting_companions.py",
+    "world/rules/tests/test_stat_breakdown.py",
+    "world/rules/tests/test_status_query.py",
+    "world/rules/tests/test_status_text.py",
+    "world/rules/tests/test_subrace_order.py",
+    "world/rules/tests/test_targeting.py",
+    "world/rules/tests/test_tier_construction.py",
+    "world/rules/tests/test_time_skip.py",
+    "world/rules/tests/test_title_view.py",
+    "world/rules/tests/test_titles.py",
+    "world/rules/tests/test_traits.py",
+    "world/skills/tests/test_conferral.py",
+    "world/skills/tests/test_disguise_effect.py",
+    "world/skills/tests/test_effects.py",
+    "world/skills/tests/test_equipment.py",
+    "world/skills/tests/test_handler.py",
+    "world/skills/tests/test_inventory.py",
+    "world/skills/tests/test_skill_casts.py"
+  ]
 }

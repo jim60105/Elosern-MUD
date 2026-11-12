@@ -58,7 +58,9 @@
 
 唯一來源是 `world/rules/rulebook/monster_behaviour.yaml`。變體用 `behaviour_profile_key` 指向 `archetypes` 之一，該原型提供 `target_strategy`、`flee_hp_fraction` 與 `decision_mode`。
 
-只有當變體的有效決策模式是 `utility` 時，才需要在 `variant_intelligence` 宣告智慧值，並在 `variant_decision_mode` 宣告 `utility`。沒有覆寫的變體沿用原型的模式。
+兩個永久模式是 `reflex`（本能模式）與 `deliberation`（權衡模式）；舊名稱 `legacy`、`utility` 不被接受，也沒有別名。只有當變體的有效決策模式是 `deliberation` 時，才需要在 `variant_intelligence` 宣告智慧值，並在 `variant_decision_mode` 宣告 `deliberation`。沒有覆寫的變體沿用原型的模式（原型未宣告時即為 `reflex`）。
+
+`skill_choice: highest_expected_damage` 的原型必須另外宣告 `reflex_temperature`：一個有限正數，單位是原始輸出估算 `E = A × c × R`，初始調校值為 `10.0`，不是固定正確常數，也不是百分比。`first_owned` 的原型可以省略它。這個值只影響本能模式的抽樣，權衡模式永遠用自己的智慧溫度。
 
 任何新增的 buff、modifier 或模式覆寫都會改變調校指紋。`docs/development/monster-ai-activation-evidence/activation.json` 記錄的是舊指紋，測試會比對，因此要一併重生。
 
@@ -84,7 +86,7 @@
 | 新物種，還是既有物種的新變體 | 新物種要多一筆 `MonsterSpecies`；新變體要多一筆 `MonsterVariant`，並把 `species_key` 指向父物種 |
 | 新技能簽章，還是沿用既有群組 | 影響代表煙霧模組。代表者的推導規則是同簽章群組內排序最小的鍵 |
 | 屬於哪個階級與 grade | profile 值必須在該階級帶內，grade 必須在該階級段位範圍內 |
-| 決策模式走 `legacy` 還是 `utility` | 帶支援型主動技能的變體必須綁 `utility`，legacy 決策不會提出支援技能 |
+| 決策模式走 `reflex` 還是 `deliberation` | 帶支援型主動技能的變體必須綁 `deliberation`，本能決策不會提出支援技能 |
 | 放置方式是區域池、手動據點，還是一次性 boss 據點 | 三者的宣告檔案與生命週期不同 |
 
 技能的「簽章」由變體的主動與被動技能列的宣告順序導出，每一項記為 `(slot, effect family, audience, hit-dependency index)`。兩隻變體只要這個序列相同，就歸入同一個群組。
@@ -153,7 +155,7 @@ _skill(
 
 ### Step 4，綁定 AI 並重生指紋
 
-在 `monster_behaviour.yaml` 補 `variant_intelligence` 與 `variant_decision_mode`（僅 utility 需要），確認 `behaviour_profile_key` 指向存在的原型。接著重生指紋相關證據。
+在 `monster_behaviour.yaml` 補 `variant_intelligence` 與 `variant_decision_mode`（僅 `deliberation` 需要），確認 `behaviour_profile_key` 指向存在的原型；若該原型是 `highest_expected_damage`，確認它宣告了 `reflex_temperature`。接著重生指紋相關證據。
 
 ```sh
 uv run --locked python tools/monster_ai_manual_reports.py selector

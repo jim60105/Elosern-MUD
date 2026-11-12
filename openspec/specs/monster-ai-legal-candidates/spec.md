@@ -43,7 +43,7 @@ The initial candidate budget SHALL be 256 and configurable in integer 1..4096. I
 
 #### Scenario: Target order and no action
 - **WHEN** targets tie under the profile order or all legal plans are excluded
-- **THEN** stable IDs order ties; an empty legal set returns None without forced attack or legacy fallback
+- **THEN** stable IDs order ties; an empty legal set returns None without forced attack or reflex fallback
 
 ### Requirement: Taunt constrains legal single-hostile target generation before estimation
 For an active Taunt winner legal for an enemy single-target hostile action, candidate generation, estimation and final execution SHALL constrain that action to the winner. Hostility SHALL use the authoritative typed-effect classification. Existing range, recipient, seal and displacement restrictions SHALL remain authoritative. Effects SHALL NOT be silently redirected after selection.

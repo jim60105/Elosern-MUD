@@ -13,9 +13,11 @@ from world.rules.monster_behaviour import (
     _choose_target,
     _living_enemies,
     _owned_damage_skills,
+    _reflex_estimates,
 )
 from world.rules.rulebook.schema import Rule
-from world.skills.registry import SkillKind
+from world.skills.effects import EffectPolicy
+from world.skills.registry import SkillKind, TargetSpec
 
 from ._combat_session_helpers import (
     SYNTH_GLOW_ELEMENT,
@@ -40,6 +42,13 @@ _T_SPELL = synth_damage_skill(
     effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic"],
     cost={"mp": 12},
 )
+_T_AREA = synth_damage_skill(
+    "t_rain_sweep",
+    "瀧灑橫掃",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic"],
+    cost={"mp": 12},
+    target_spec=TargetSpec.AREA,
+)
 # One flat atk_phys bonus rule keyed to the synthetic passive, mirroring the
 # rule-table shape any shipped ownership bonus uses (see test_stat_breakdown).
 _T_BONUS_PASSIVE = synth_damage_skill(
@@ -53,9 +62,26 @@ _T_BONUS_RULE = Rule(
 _SCOPE_EXTRA = {
     "skills": {
         row.key: row
-        for row in (_T_PASSIVE, _T_FLIGHT, _T_CLAW, _T_SPELL, _T_BONUS_PASSIVE)
+        for row in (
+            _T_PASSIVE,
+            _T_FLIGHT,
+            _T_CLAW,
+            _T_SPELL,
+            _T_AREA,
+            _T_BONUS_PASSIVE,
+        )
     }
 }
+
+
+class _FixedDraw:
+    """The injectable selection generator: one exact uniform draw."""
+
+    def __init__(self, draw: float):
+        self.draw = draw
+
+    def random(self) -> float:
+        return self.draw
 
 
 class MonsterBehaviourSelectionTests(unittest.TestCase):
@@ -139,74 +165,207 @@ class MonsterBehaviourSelectionTests(unittest.TestCase):
     @covers_requirement(
         "monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll",
     )
-    def test_skill_strategies_and_expected_damage(self):
+    def test_exact_estimate_is_attack_times_coefficient_times_recipients(self):
         entity = FakeEntity(
-            "actor", combat_identity='actor',
-            atk_phys=30,
-            magic_power=50,
+            "actor", combat_identity='actor', atk_phys=10, magic_power=10
         )
-        target = FakeEntity("target", combat_identity='target', defense=12)
-        physical = _T_CLAW
-        magic = _T_SPELL
-        self.assertIs(
-            _choose_skill(
-                entity,
-                [physical, magic],
-                "first_owned",
-                target,
+        stronger = replace(
+            _T_CLAW, effect_policies=(EffectPolicy(coefficient=1.5),)
+        )
+        sweep = replace(
+            _T_AREA, effect_policies=(EffectPolicy(coefficient=1.0),)
+        )
+        # 10 * 1.5 * 1 and 10 * 1.5 * 1: a SINGLE kit always counts one
+        # recipient, however many enemies stand in the field.
+        self.assertEqual(
+            _reflex_estimates(entity, [stronger], area_recipients=1), [15.0]
+        )
+        self.assertEqual(
+            _reflex_estimates(entity, [stronger], area_recipients=2), [15.0]
+        )
+        # 10 * 1.0 * 1 and 10 * 1.0 * 2: an AREA kit counts its recipients.
+        self.assertEqual(
+            _reflex_estimates(entity, [sweep], area_recipients=1), [10.0]
+        )
+        self.assertEqual(
+            _reflex_estimates(entity, [sweep], area_recipients=2), [20.0]
+        )
+
+    @covers_requirement(
+        "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected"
+    )
+    def test_the_first_damage_occurrence_supplies_the_coefficient(self):
+        entity = FakeEntity("actor", combat_identity='actor', atk_phys=10)
+        probe = synth_damage_skill(
+            "t_ordinal_probe",
+            "合成序位探針",
+            effects=["self_heal", f"damage:{SYNTH_GLOW_ELEMENT}:physical"],
+        )
+        probe = replace(
+            probe,
+            effect_policies=(
+                EffectPolicy(coefficient=2.0),
+                EffectPolicy(coefficient=1.5),
             ),
-            physical,
         )
-        self.assertIs(
-            _choose_skill(
-                entity,
-                [physical, magic],
-                "highest_expected_damage",
-                target,
-            ),
-            magic,
+        # 10 * 1.5 * 1: the damage occurrence's own 1.5 is read, never the
+        # preceding non-damage occurrence's 2.0 (which would give 20).
+        self.assertEqual(
+            _reflex_estimates(entity, [probe], area_recipients=1), [15.0]
         )
-        with patch(
-            "world.rules.monster_behaviour.dice.roll_d100",
-            return_value=0,
-        ) as roller:
-            entity.skills.values["magic_power"] = 30
-            self.assertIs(
-                _choose_skill(
-                    entity,
-                    [physical, magic],
-                    "highest_expected_damage",
-                    None,
-                ),
-                physical,
-            )
-        roller.assert_called_once_with()
 
     @covers_requirement(
         "combat-modifier-table::damage-estimation-surfaces-mirror-the-live-adjusted-damage-math"
     )
-    def test_physical_candidate_ranks_with_its_atk_phys_bonus(self):
-        entity = FakeEntity("actor", combat_identity='actor', atk_phys=30, magic_power=30)
+    def test_each_school_reads_its_own_adjusted_attack(self):
+        entity = FakeEntity(
+            "actor", combat_identity='actor', atk_phys=30, magic_power=30
+        )
         entity.skills._owned = [_T_BONUS_PASSIVE.key]
-        target = FakeEntity("target", combat_identity='target', defense=12)
-        physical = _T_CLAW
-        magic = _T_SPELL
+        with patch.object(
+            combat_modifiers,
+            "_RULES",
+            list(combat_modifiers._RULES) + [_T_BONUS_RULE],
+        ):
+            # The owned 5-point atk_phys bundle enters the physical estimate...
+            self.assertEqual(
+                _reflex_estimates(entity, [_T_CLAW], area_recipients=1), [35.0]
+            )
+            # ...and never the magic one, which keeps its own adjusted value.
+            self.assertEqual(
+                _reflex_estimates(entity, [_T_SPELL], area_recipients=1), [30.0]
+            )
+
+    @covers_requirement(
+        "monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll",
+    )
+    def test_a_larger_exact_estimate_is_more_probable_without_being_certain(self):
+        entity = FakeEntity("actor", combat_identity='actor', atk_phys=10)
+        weak = replace(
+            _T_CLAW, effect_policies=(EffectPolicy(coefficient=1.0),)
+        )
+        strong = replace(
+            _T_CLAW,
+            key="t_strong_probe",
+            effect_policies=(EffectPolicy(coefficient=2.0),),
+        )
+
+        def pick(draw: float) -> str:
+            return _choose_skill(
+                entity,
+                [weak, strong],
+                "highest_expected_damage",
+                area_recipients=1,
+                temperature=10.0,
+                rng=_FixedDraw(draw),
+            ).key
+
+        # E is 10 and 20 at temperature 10, so the weak interval is
+        # [0, 0.2689) and the strong one the rest of [0, 1).
+        self.assertEqual(pick(0.2), weak.key)
+        self.assertEqual(pick(0.5), strong.key)
+        # No quantisation merges the two scores, and nothing guarantees the
+        # maximum: a draw inside the strong interval is required for it.
+        self.assertEqual(pick(0.1), weak.key)
+        self.assertEqual(pick(0.99), strong.key)
+
+    @covers_requirement(
+        "monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll",
+    )
+    def test_equal_estimates_share_one_interval_apart(self):
+        entity = FakeEntity("actor", combat_identity='actor', atk_phys=10)
+        first = replace(
+            _T_CLAW, effect_policies=(EffectPolicy(coefficient=1.0),)
+        )
+        second = replace(
+            _T_CLAW,
+            key="t_tied_probe",
+            effect_policies=(EffectPolicy(coefficient=1.0),),
+        )
+
+        def pick(draw: float) -> str:
+            return _choose_skill(
+                entity,
+                [first, second],
+                "highest_expected_damage",
+                area_recipients=1,
+                temperature=10.0,
+                rng=_FixedDraw(draw),
+            ).key
+
+        # Equal exact E is a uniform [0, 0.5) / [0.5, 1) split in owned order:
+        # equal probabilities, no base-rate bonus for either position.
+        self.assertEqual(pick(0.25), first.key)
+        self.assertEqual(pick(0.75), second.key)
+
+    @covers_requirement(
+        "monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll",
+    )
+    def test_fixed_seed_distribution_favours_the_stronger_estimate(self):
+        entity = FakeEntity("actor", combat_identity='actor', atk_phys=10)
+        weak = replace(
+            _T_CLAW, effect_policies=(EffectPolicy(coefficient=1.0),)
+        )
+        strong = replace(
+            _T_CLAW,
+            key="t_strong_probe",
+            effect_policies=(EffectPolicy(coefficient=2.0),),
+        )
+
+        def sweep() -> list[str]:
+            return [
+                _choose_skill(
+                    entity,
+                    [weak, strong],
+                    "highest_expected_damage",
+                    area_recipients=1,
+                    temperature=10.0,
+                    seed=seed,
+                ).key
+                for seed in range(200)
+            ]
+
+        chosen = sweep()
+        # E = (10, 20) at temperature 10: the stronger kit must win more than
+        # half of the enumerated 0..199 seeds and can never win all of them.
+        self.assertGreater(chosen.count(strong.key), 100)
+        self.assertLess(chosen.count(strong.key), 200)
+        # The finite seed set replays exactly.
+        self.assertEqual(sweep(), chosen)
+
+    @covers_requirement(
+        "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected"
+    )
+    def test_first_owned_and_a_singleton_kit_evaluate_and_draw_nothing(self):
+        entity = FakeEntity(
+            "actor", combat_identity='actor', atk_phys=10, magic_power=10
+        )
         with (
-            patch.object(
-                combat_modifiers, "_RULES", list(combat_modifiers._RULES) + [_T_BONUS_RULE]
+            patch(
+                "world.rules.monster_behaviour._reflex_estimates",
+                side_effect=AssertionError("a deterministic choice evaluated"),
             ),
             patch(
-                "world.rules.monster_behaviour.dice.roll_d100",
-                return_value=0,
+                "world.rules.monster_behaviour.dice.roll_d100"
             ) as roller,
         ):
             self.assertIs(
                 _choose_skill(
                     entity,
-                    [physical, magic],
-                    "highest_expected_damage",
-                    target,
+                    [_T_CLAW, _T_SPELL],
+                    "first_owned",
+                    area_recipients=2,
                 ),
-                physical,
+                _T_CLAW,
+            )
+            self.assertIs(
+                _choose_skill(
+                    entity,
+                    [_T_SPELL],
+                    "highest_expected_damage",
+                    area_recipients=2,
+                    temperature=10.0,
+                ),
+                _T_SPELL,
             )
         roller.assert_not_called()

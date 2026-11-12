@@ -1,6 +1,6 @@
 # Monster AI staged activation evidence (monster-ai-staged-activation)
 
-Release record for the first production utility activation. It is manual release
+Release record for the production deliberation activation. It is manual release
 evidence, not a test input beyond the machine-readable companion
 (`activation.json`), which
 `world.rules.tests.test_monster_ai_activation` reads to establish that this
@@ -8,8 +8,8 @@ record still describes the tuning the process loads.
 
 ## What is activated
 
-Six registered variants are switched from the permanent legacy decision to the
-utility decision by `variant_decision_mode` in
+Six registered variants are switched from the permanent reflex decision to the
+deliberation decision by `variant_decision_mode` in
 `world/rules/rulebook/monster_behaviour.yaml`, each with its own explicitly
 authored intelligence:
 
@@ -26,16 +26,16 @@ The values are read from each row's authored bestiary lore, never from its
 threat tier, ordinary/stronger rank, combat numbers or archetype: the low-tier
 reef warden deliberately outranks the mid-tier trail hunter. Every other
 registered variant authors neither an intelligence nor a mode override and keeps
-its archetype's legacy mode; nothing supplies intelligence or a mode by tier,
+its archetype's reflex mode; nothing supplies intelligence or a mode by tier,
 species, rank, stat or archetype.
 
-Tuning fingerprint of the activated configuration (algorithm version 5):
-`bd82767e08a1857878c6f2802a81a5cd9ff5b88f42b90a2dca76a2cbdbb66ed5`.
+Tuning fingerprint of the activated configuration (algorithm version 6):
+`5b46ee570d95fc99507b303509e634f9387830a4a7fa87249d23a1d05bb9fba3`.
 
 `reservoir-warden-variant` adds the high-tier 蓄潮型 `reservoir_warden` to the
 named set with its own authored intelligence of 62. Its new buff definition and
 modifier rule also move the startup fingerprint because every estimate averages
-over them. `膠掌小鬼` stays legacy, so it keeps its archetype's flee threshold
+over them. `膠掌小鬼` stays reflex, so it keeps its archetype's flee threshold
 and never enters this table.
 
 ## Evidence linkage
@@ -44,13 +44,13 @@ Every acceptance clause of the change, and where it is established:
 
 | acceptance clause | evidence |
 | --- | --- |
-| Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate` passes observability, test-data, shard manifests and the ownership contracts; its traceability gate reports the change's own four new capability IDs as `unknown-requirement-id`, which is the documented pre-sync state of an active change (its requirements enter the index only when the archive workflow syncs the delta; see `scripts/openspec-gates.sh`). Verified green against the equivalent delta-applied tree: 2189 requirements, 0 uncovered, 0 errors. The post-sync check is the authoritative one and belongs to the archive workflow. |
-| The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `497df2c1a7427a646c531d98a89daf2273dad1abf2767b70fd25d1a4300a0e0f` |
-| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `bd82767e...` |
-| Complete-policy performance | `performance.json`: warm utility p95 16.84 ms and p50 16.36 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
-| A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves legacy |
+| Attack/tactics regressions, real production smoke and the repository contract gate | `gates.txt` and `focused-tests.txt` beside this record. `uv run --locked python -m tools.contract_gate --change monster-decision-modes-rename-and-reflex-area-estimate` passes reference-context, traceability, observability, test-data, shard manifests and the ownership contracts: 2726 requirements, 0 uncovered, 0 errors, and zero observability or test-data violations. This change adds no new capability or requirement heading, so the pre-sync gate is already authoritative for it; the archive workflow's post-sync run remains the final check. |
+| The approved manual campaign was executed with raw reports | `docs/development/monster-ai-manual-evidence/` (144 encounters, two documented seeds, intelligence 10/90; selector and performance operations), fingerprint `6c8e5bdab452aa2b15963a91978e145bec3c6642b49e2b3da46f2b8f3c58f921` |
+| Selector threshold | `selector-check.json`: paired difference 0.344 against the required 0.15, `margin_met` true; the report was regenerated under the activated fingerprint `5b46ee57...` |
+| Complete-policy performance | `performance.json`: warm deliberation p95 17.18 ms and p50 16.86 ms against the 50 ms budget, `budget_met` true, `dice_isolated` true |
+| A small explicit named registered set with independently authored intelligence | `activation.json` `activated` + the table above; `ActivationBindingTests` resolves each name through the real species/variant registry and proves every other registered variant still resolves reflex |
 | A real affected encounter | `RealEncounterTests`: one real `Monster` row of an activated variant decides inside a real round scope **through the production session adapter** (`_enemy_policy`), its selected candidate is the request that settlement receives, the round writes a damage entry and the defender's committed hit points fall, and the monster's own statistics, resources, kit and proficiency are unchanged |
-| Rollback without migration or restore | `legacy_rollback` below, with `RollbackTests` |
+| Rollback without migration or restore | `reflex_rollback` below, with `RollbackTests` |
 | Release evidence is reproducible and scoped | `ActivationRecordTests` re-derives the record's name set, fingerprints and evidence files from this tuning; the new test module has one shard owner and the manual operations stayed manual tools |
 
 ## Exact operations
@@ -110,19 +110,21 @@ uv run --locked python -m tools.contract_gate
 uv run --locked python -m tools.test_data_lint check
 ```
 
-The one manual operation this slice reran, because its report records the
-process's *startup* fingerprint and the activation moved it:
+`monster-decision-modes-rename-and-reflex-area-estimate` reran **all eight**
+manual operations, because the mode rename and the new reflex estimate change
+what an identical tuning decides, so neither the startup-fingerprint selector
+report nor the campaign/performance harness reports could stand:
 
 ```sh
 uv run --locked python tools/monster_ai_manual_reports.py selector
+uv run --locked python tools/monster_ai_manual_reports.py archetype --archetype <name>
+uv run --locked python tools/monster_ai_manual_reports.py performance
 ```
 
-Its outputs replace `docs/development/monster-ai-manual-evidence/selector-check.json`
-and `.md`; the six archetype campaigns and the performance report were *not*
-rerun, because their harness builds the campaign's own synthetic variant pairs
-and copies only the archetypes from the shipped rulebook, so the shipped
-variant maps do not enter their tuning or their recorded fingerprint
-(`497df2c1...`, unchanged).
+Their outputs replace the whole of `docs/development/monster-ai-manual-evidence/`:
+the selector pair now records the startup fingerprint `5b46ee57...` and the six
+campaigns plus the performance report record the version 6 harness fingerprint
+`6c8e5bdab452...`. Every earlier value is superseded history.
 
 ## Seeds
 
@@ -131,8 +133,8 @@ variant maps do not enter their tuning or their recorded fingerprint
   `95`. The decision's own selector seed is derived by the production function
   from that scope and the tuning fingerprint, so it is recorded by the trace the
   test asserts on, not invented here.
-* Legacy smoke: the same field, with the selection roller patched to raise, so
-  the legacy body must return its deterministic target and skill without
+* Reflex smoke: the same field, with the selection roller patched to raise, so
+  the reflex body must return its deterministic target and skill without
   spending a selection die; the flee case is exercised at the archetype's own
   authored fraction.
 * Manual selector check: the documented 128 injected seeds, intelligence 10/90.
@@ -146,17 +148,18 @@ The activation is a rulebook mode map, so rollback is an edit plus a restart:
 2. Restart the process. Startup validation is the only path that loads a
    changed on-disk mode; there is no hot reload, and a new *session* in the
    running process keeps the tuning the process already recorded.
-3. Continue playing: the selected variants take the permanent legacy decision
-   again -- legacy target strategy, legacy skill choice, legacy flee priority
-   and the legacy dice usage -- with no data migration and no database restore.
+3. Continue playing: the selected variants take the permanent reflex decision
+   again -- reflex target strategy, reflex skill choice, reflex flee priority,
+   the exact `E = A * c * R` estimate and its target tie-break dice -- with no
+   data migration and no database restore.
    Restarting also clears the in-process tactical history (recorded session
    tuning and the observation memory).
 
 Rollback fingerprint of the edited configuration:
-`56152d3af04d774a666f1d0b16bd64b000a3e98e22a4f0b8f4c48c58a45a7bbf`. Recorded
-acceptance claims made under `bd82767e...` do not describe it, which is exactly
+`6703850479fbbf10e9ad925032947f124520f45972a9779ad67d1ee843450d87`. Recorded
+acceptance claims made under `5b46ee57...` do not describe it, which is exactly
 what the fingerprinted record and the focused tests enforce. The earlier
-activation fingerprints `8b56d98c...`, `877fdd6d...`, `70e5f38d...`, `383b1eff...`, `ef4b4b14...`, `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`, `f8858072...`, `3030d4a3...`, `fc1dd263...`, `7c1cafd7...` and their predecessors, together with the earlier rollback fingerprints `4c696e11...`, `6639e736...` and their predecessors, describe tunings
+activation fingerprints `bd82767e...`, `8b56d98c...`, `877fdd6d...`, `70e5f38d...`, `383b1eff...`, `ef4b4b14...`, `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`, `f8858072...`, `3030d4a3...`, `fc1dd263...`, `7c1cafd7...` and their predecessors, together with the earlier rollback fingerprints `56152d3a...`, `4c696e11...`, `6639e736...` and their predecessors, describe tunings
 production no longer loads and are superseded, not evidence for the changed
 tuning.
 
@@ -185,15 +188,15 @@ To activate more variants, or to retune one of these:
   boundaries, verified preconditions, decision shares, replay inputs and a
   timing envelope.
 * Six activated variants are a small named set, not a policy for the whole
-  bestiary; the remaining registered variants stay legacy until their own
+  bestiary; the remaining registered variants stay reflex until their own
   evidence exists.
-* The utility decision samples with a temperature derived from intelligence, so
+* The deliberation decision samples with a temperature derived from intelligence, so
   a single encounter is one draw, not a deterministic script; the recorded
   decision scope, tuning fingerprint and trace are what make a decision
   reproducible, not the encounter.
-* An activated variant no longer takes the legacy flee action: the utility
+* An activated variant no longer takes the reflex flee action: the deliberation
   decision proposes owned, modelable actions only, and the flee thresholds,
-  `FLEE_SKILL_KEY` and the flee priority stay with the permanent legacy mode.
+  `FLEE_SKILL_KEY` and the flee priority stay with the permanent reflex mode.
   The original three activated variants are low- and mid-tier monsters whose
   own lore keeps them in the fight (a flock leader coordinating, a reef warden
   holding its narrow mouth, a trail hunter probing the edge); the slime's and
@@ -201,6 +204,6 @@ To activate more variants, or to retune one of these:
   defended-area field aggression, the known deviation recorded in design
   §12.4 and `docs/development/monster-content-expansion.md`. The high-tier
   crocodile boss follows the same trade-off: its escapes in play come from the
-  opposing party's paid retreat, and rollback restores the legacy flee priority
+  opposing party's paid retreat, and rollback restores the reflex flee priority
   for all six immediately.
 * Reaching production does not add a player command or a browser action.

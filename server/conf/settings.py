@@ -378,7 +378,7 @@ DEFEAT_ADULT_SCENES = _env_typed(
 ######################################################################
 
 # What one typed invalid runtime monster-AI state resolves to. The product's
-# behaviour is "legacy": the decision falls back to the legacy body, which
+# behaviour is "reflex": the decision falls back to the reflex body, which
 # resolves a repaired-but-unusable stored binding through its tier default
 # instead of failing on it. "none" is the diagnostic setting a manual
 # investigation selects: the decision proposes nothing rather than acting on a
@@ -389,7 +389,7 @@ DEFEAT_ADULT_SCENES = _env_typed(
 # resolves an invalid decision (settings-environment-overrides).
 # Consumed through world.rules.monster_behaviour.invalid_state_fallback(),
 # which reads it at call time so a session can be switched without a restart.
-MONSTER_AI_INVALID_STATE_FALLBACK = "legacy"
+MONSTER_AI_INVALID_STATE_FALLBACK = "reflex"
 
 ######################################################################
 # Deterministic art-assets backend (art-assets)

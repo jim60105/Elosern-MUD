@@ -9,10 +9,10 @@ health effects with settlement's own arithmetic plus the bounded marginal value
 of the control it mounts, and the utility decision itself: the bounded score of
 every supported candidate and the stable, independently seeded softmax sampling
 that selects one, plus the observed focus and threat the eligible settled
-history contributes to that score. Every production variant is still authored
-``legacy``, so the legacy decision body in
-:mod:`world.rules.monster_behaviour` returns exactly what it returned before;
-activating a variant is the separate staged-activation change's decision.
+history contributes to that score. A variant whose effective mode stays
+``reflex`` keeps the reflex decision body in
+:mod:`world.rules.monster_behaviour`, and activating one is the separate
+staged-activation change's decision.
 
 - :mod:`world.rules.monster_ai.models` -- the immutable models and the
   read-only snapshot fingerprint.

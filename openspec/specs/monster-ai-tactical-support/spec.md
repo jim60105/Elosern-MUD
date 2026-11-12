@@ -14,7 +14,7 @@ Owned active healing, supported buffs and hostile control SHALL enter the same c
 
 #### Scenario: Unsupported benefit and harm
 - **WHEN** a support plan has unknown harmless benefit or unsupported harmful consequences
-- **THEN** unknown benefit is zero with diagnostics; harmful or unrepresentable plans are excluded without changing player or legacy resolution
+- **THEN** unknown benefit is zero with diagnostics; harmful or unrepresentable plans are excluded without changing player or reflex resolution
 
 ### Requirement: Healing projects payment and actual prerequisites
 Healing SHALL use shared magnitude, potency, proficiency, scale and conditional rules, capped by projected missing HP. Resource payment SHALL precede effect projection. Hit-dependent healing and drain recovery SHALL use modeled prerequisites and actual projected loss.

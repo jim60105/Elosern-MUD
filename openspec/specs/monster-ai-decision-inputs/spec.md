@@ -17,7 +17,7 @@ Snapshots SHALL contain stable identity, real execution scope, resolved context,
 - **THEN** snapshot, scoring inputs, seed inputs and traces remain unchanged
 
 ### Requirement: Utility legality shares all deterministic settlement gates
-Utility validation SHALL use the actual context, scale and submitted plan with shared ownership, active-kind, identity, lineage, proficiency, resource, capability, cast, interaction and target gates. Submission and initiative-time resolver revalidation SHALL remain authoritative.
+Deliberation validation SHALL use the actual context, scale and submitted plan with shared ownership, active-kind, identity, lineage, proficiency, resource, capability, cast, interaction and target gates. Submission and initiative-time resolver revalidation SHALL remain authoritative.
 
 #### Scenario: Complete cast rejection
 - **WHEN** a skill passes the old preview subset but fails a real cast or interaction prerequisite

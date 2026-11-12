@@ -29,71 +29,55 @@ Each entry in `world/rules/rulebook/monster_behaviour.yaml`'s `archetypes` mappi
 
 ### Requirement: Flee tuning follows existing tier defaults and instance overrides
 
-Legacy mode retains this existing contract; a utility decision SHALL NOT derive flee from it.
-The flee policy SHALL use `resolve_behaviour_profile(entity)` without a separate tier or monster-key mapping: a monster without a `behaviour_tree` override SHALL receive the threshold of its `threat_tier` default archetype, and a valid override SHALL receive the overridden archetype's.
-Only the configured typed-invalid-state fallback MAY still reach the legacy body for a utility-mode monster.
+Reflex flee SHALL use the actual resolved behavior profile, taking its tier default when no override exists and its valid instance override otherwise. No separate tier or monster-key flee mapping SHALL exist. Deliberation SHALL NOT derive voluntary flee from this tuning. Only configured typed-invalid-state reflex fallback MAY reach the reflex flee body for a deliberation-mode monster.
 
 #### Scenario: Tier default controls an unoverridden monster
-
-- **WHEN** in legacy mode, a monster has no `behaviour_tree` override
-- **THEN** its flee threshold equals the profile referenced by `tier_default_archetype[monster.threat_tier]`
+- **WHEN** a reflex monster has no behavior override
+- **THEN** its flee threshold equals its authored tier-default profile threshold
 
 #### Scenario: Instance override controls the flee decision
-
-- **WHEN** in legacy mode, two otherwise identical monsters share a threat tier but one has a valid `behaviour_tree` override with a different flee threshold
-- **THEN** each monster's flee decision uses its own resolved profile threshold
+- **WHEN** two otherwise identical reflex monsters share a tier but one has a valid behavior override with a different threshold
+- **THEN** each uses its own resolved threshold
 
 ### Requirement: The policy checks current-to-maximum true HP at an inclusive boundary
 
-For a living, non-fled monster with at least one living, non-fled enemy, `monster_behaviour_policy()` SHALL choose flee exactly when its resolved `flee_hp_fraction` is not `None`, its stored maximum HP is positive, and `stored_current_hp / stored_maximum_hp` is at most that fraction.
-It SHALL read true stored HP through the combat accessors, never `disguised_stats`, and advance no timer.
-Only the legacy body SHALL evaluate this predicate; the configured typed-invalid-state fallback MAY.
+For a living non-fled monster with a living non-fled enemy, reflex SHALL choose flee exactly when its resolved threshold is non-null, stored maximum HP is positive and stored current HP divided by stored maximum HP is at most the threshold. It SHALL read true stored HP without regeneration or disguised stats. Deliberation SHALL NOT evaluate this predicate except through configured typed-invalid-state reflex fallback.
 
 #### Scenario: Exact threshold chooses flee
-
-- **WHEN** in legacy mode, a monster's stored current HP divided by stored maximum HP exactly equals its non-null `flee_hp_fraction`
-- **THEN** `monster_behaviour_policy()` returns a request whose `skill_key` is `"flee"`
+- **WHEN** a reflex monster is at its non-null inclusive threshold
+- **THEN** the policy returns the canonical flee skill request
 
 #### Scenario: Above threshold preserves attack behavior
-
-- **WHEN** in legacy mode, the same monster's HP fraction is greater than its configured threshold and it has an affordable damage skill
-- **THEN** the policy returns the same attack request that 10b's target and skill policy would select
+- **WHEN** a reflex monster is above its threshold and has a usable damage skill
+- **THEN** the current reflex skill strategy selects the attack without changing the threshold contract
 
 #### Scenario: A non-positive maximum does not divide or choose flee
-
-- **WHEN** in legacy mode, a malformed test entity reports a maximum HP of zero or less
-- **THEN** the flee predicate is false and no division-by-zero exception escapes
+- **WHEN** stored maximum HP is non-positive
+- **THEN** the flee predicate is false without division or a flee request
 
 #### Scenario: Reading the predicate does not advance regeneration
-
-- **WHEN** in legacy mode, the HP gauge has stored current HP and a pending time-based regeneration timestamp
-- **THEN** evaluating the flee predicate leaves the complete HP gauge backing data unchanged
+- **WHEN** a valid gauge has a pending regeneration timestamp
+- **THEN** reading the flee predicate leaves its complete backing data and timestamp unchanged
 
 ### Requirement: Flee selection has priority over attack selection without consuming decision dice
 
-Legacy mode retains this existing contract; a utility decision SHALL NOT evaluate flee, so the order constrains the legacy body only.
-After preserving 10b's non-monster delegation and finding living enemies, the policy SHALL evaluate flee before enumerating attack skills, selecting targets, selecting area shape, or rolling a seeded tie-break.
-A monster meeting its threshold SHALL select flee even with no affordable damage skill; with no living, non-fled enemy it SHALL return `None`.
+After non-monster delegation and finding living enemies, reflex SHALL evaluate flee before enumerating attack skills, choosing targets or shapes, or sampling a skill. Meeting the threshold SHALL choose flee even without affordable damage skills. A flee decision SHALL consume neither combat dice nor independent skill-selection RNG. With no living non-fled enemy it SHALL return None. Deliberation SHALL NOT evaluate voluntary flee.
 
 #### Scenario: Threshold flee does not require a damage skill
-
-- **WHEN** in legacy mode, a monster meets its flee threshold but owns no damage skill or cannot afford any owned damage skill
-- **THEN** the policy still returns a `"flee"` request
+- **WHEN** a reflex monster meets its threshold with either no usable damage kit or multiple kits requiring stochastic skill selection
+- **THEN** it returns flee without calling either combat dice or the independent selection RNG
 
 #### Scenario: Threshold flee consumes no policy tie-break roll
-
-- **WHEN** in legacy mode, a threshold-triggered decision is made on a battlefield that would otherwise require a tied target or skill selection
-- **THEN** `dice.roll_d100()` is not called by `monster_behaviour_policy()`
+- **WHEN** a threshold-triggered reflex decision would otherwise require tied target or stochastic skill selection
+- **THEN** flee returns before any target tie roll or independent skill-selection draw
 
 #### Scenario: No enemy means no flee action
-
-- **WHEN** in legacy mode, every opposing combatant is dead or already in `Battlefield.fled`
-- **THEN** the policy returns `None`
+- **WHEN** every opponent is dead or fled
+- **THEN** the policy returns None
 
 #### Scenario: Non-monsters retain 10b delegation
-
-- **WHEN** in legacy mode, `monster_behaviour_policy()` receives an entity without `threat_tier`
-- **THEN** it delegates to `combat.default_attack_policy()` without evaluating a flee threshold
+- **WHEN** the entity has no monster threat tier
+- **THEN** it delegates to the existing default attack policy without evaluating flee
 
 ### Requirement: A flee decision is a complete ActionResolver request and never a state mutation
 
@@ -139,43 +123,36 @@ When the request returned by the policy is used as the action provider output fo
 
 ### Requirement: Monster flee decisions remain deterministic, offline, and YAML-tuned
 
-The flee policy SHALL make no LLM, network, or Python-random call. All archetype threshold values SHALL reside in `monster_behaviour.yaml`, and fixed entity state plus fixed resolver dice SHALL produce the same request and resolution outcome across repeated runs.
+The flee predicate SHALL use no LLM, network or random draw. Archetype thresholds SHALL remain rulebook-authored. Fixed profile and stored HP state SHALL reproduce the flee-versus-attack decision; fixed resolver dice SHALL reproduce a chosen flee's resolution. Attack skill sampling after a false flee predicate SHALL follow the current reflex contract and SHALL NOT redefine the deterministic flee boundary.
 
 #### Scenario: Fixed state reproduces the same decision
-
-- **WHEN** two equivalent battlefields use identical monster profiles, HP state, and fixed resolver dice
-- **THEN** both runs produce identical flee-versus-attack decisions and identical resolution outcomes
+- **WHEN** equivalent battlefields use identical profiles and stored HP with different injected skill-selection RNG states
+- **THEN** both make the same flee-versus-attack decision; a chosen flee consumes no selection draw
 
 #### Scenario: Deterministic core has no generative dependency
-
-- **WHEN** the changed monster behaviour source is inspected
-- **THEN** it imports no `world.ai` module, performs no network call, and contains no balance threshold literal for a shipped archetype
+- **WHEN** external model and network access are unavailable and the flee predicate is evaluated
+- **THEN** its decision succeeds without persistent state changes and reads the authored threshold
 
 ### Requirement: Utility mode never voluntarily flees
 
-A monster whose effective decision mode is `utility` SHALL NOT voluntarily flee at any HP fraction, including at or below its resolved `flee_hp_fraction`. Its utility decision SHALL keep the canonical `FLEE_SKILL_KEY` out of its enumerated candidate set, its score terms and any returned `ActionRequest`, proposing its own scored selection when one exists and its own no-action boundary when none does. The configured typed-invalid-state fallback SHALL keep its existing contract.
+A deliberation monster SHALL NOT voluntarily flee at any HP fraction. Its deliberation candidates, scores and returned requests SHALL exclude the canonical flee skill, selecting its scored action when available and returning None when no scored action exists. Configured typed-invalid-state reflex fallback SHALL retain its inclusive flee contract and diagnostic identity.
 
 #### Scenario: The same authored boundary decides differently by effective mode
-
-- **WHEN** two otherwise identical registered monsters resolve to one archetype whose `flee_hp_fraction` is not `null`, each stands at exactly that inclusive boundary with one living enemy and at least one legal damage candidate, and one resolves to `legacy` while the other resolves to `utility`
-- **THEN** the legacy monster returns a request whose `skill_key` is the flee key, while the utility monster returns its own scored request whose `skill_key` is a legal damage candidate and never the flee key
+- **WHEN** otherwise identical synthetic registered monsters meet a non-null threshold with a living enemy and legal damage action, one in reflex and one in deliberation
+- **THEN** reflex returns flee and deliberation returns its scored damage action, never flee
 
 #### Scenario: Below the boundary the utility decision still scores
-
-- **WHEN** the utility monster's stored HP fraction falls below the same authored threshold and a legal scored candidate exists
-- **THEN** it still returns a scored utility request rather than the flee request, and replaying the identical state, configuration and selection inputs returns that same request
+- **WHEN** deliberation is below its profile threshold with a legal scored candidate
+- **THEN** it returns its scored request; identical state, configuration and selection inputs replay that request
 
 #### Scenario: An empty utility candidate set stays no action
-
-- **WHEN** a living utility monster at or below the same authored threshold owns no legal scored candidate
-- **THEN** the policy returns no action rather than the legacy flee request
+- **WHEN** a living deliberation monster at or below the threshold has no legal scored candidate
+- **THEN** it returns None without reflex flee fallback
 
 #### Scenario: The owned flee key is no enumerated candidate
-
-- **WHEN** a utility monster innately owns the canonical flee key and its utility decision reports its enumeration across the HP range up to its maximum
-- **THEN** no enumerated candidate, rejected proposal, exclusion, unusable skill, score term or returned request is the flee key
+- **WHEN** deliberation owns innate flee and reports its enumeration at different HP fractions
+- **THEN** no candidate, rejected proposal, exclusion, unusable skill, score term or returned request names flee
 
 #### Scenario: The typed-invalid-state fallback keeps the legacy body
-
-- **WHEN** a utility-mode monster at or below the boundary raises the typed utility state error while the configured fallback is the legacy fallback
-- **THEN** the returned action is that fallback's legacy decision, including its inclusive flee request, and the reported diagnostic names that fallback
+- **WHEN** deliberation raises its typed invalid-state error at or below the threshold with configured reflex fallback
+- **THEN** the fallback returns its inclusive reflex flee request and the diagnostic identifies reflex

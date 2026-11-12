@@ -62,6 +62,7 @@ from world.rules.combat_session import (
 )
 from world.rules.combat_session.policies import _enemy_policy, _overwhelm_provider
 from world.rules.combat_session.records import CombatSessionRecord
+from world.rules.combat.decision_scope import ExecutionScope
 from world.rules.overwhelm import resolve_overwhelm
 from world.rules.monster_ai import (
     CandidateIdentity,
@@ -216,14 +217,15 @@ BLOCKER = next(iter(BLOCKING_BUFF_KEYS))
 
 def _archetype(
     *,
-    mode="utility",
+    mode="deliberation",
     target_strategy="lowest_hp",
     skill_choice="first_owned",
     prefer_area=False,
     weights=None,
+    temperature=10.0,
 ):
     """One synthetic archetype entry carrying the complete authoring contract."""
-    return {
+    fields = {
         "target_strategy": target_strategy,
         "skill_choice": skill_choice,
         "prefer_area_when_multiple_enemies": prefer_area,
@@ -231,10 +233,13 @@ def _archetype(
         "decision_mode": mode,
         "utility_weights": dict(WEIGHTS) if weights is None else weights,
     }
+    if skill_choice == "highest_expected_damage":
+        fields["reflex_temperature"] = temperature
+    return fields
 
 
 def _rulebook(*, intelligence=None, modes=None, archetypes=None, patrol=None):
-    """One complete synthetic rulebook whose variant is a utility monster."""
+    """One complete synthetic rulebook whose variant is a deliberation monster."""
     return {
         "tier_default_archetype": {TIER: ARCHETYPE},
         "archetypes": (
@@ -252,7 +257,9 @@ def _rulebook(*, intelligence=None, modes=None, archetypes=None, patrol=None):
         "variant_intelligence": (
             {VARIANT: 50} if intelligence is None else intelligence
         ),
-        "variant_decision_mode": {VARIANT: "utility"} if modes is None else modes,
+        "variant_decision_mode": (
+            {VARIANT: "deliberation"} if modes is None else modes
+        ),
         "candidate_budget": 64,
     }
 
@@ -278,7 +285,7 @@ def _scope(test, *extra_logicals):
 
 
 class SyntheticTuningMixin:
-    """Install one synthetic utility tuning in place of the shipped one."""
+    """Install one synthetic deliberation tuning in place of the shipped one."""
 
     def open_tuning(self, **kwargs):
         """Load and patch one synthetic rulebook, its profiles and its tuning."""
@@ -1497,8 +1504,8 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         )
 
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
-    def test_the_default_configured_behaviour_is_the_legacy_fallback(self):
-        self.assertIs(invalid_state_fallback(), InvalidStateFallback.LEGACY)
+    def test_the_default_configured_behaviour_is_the_reflex_fallback(self):
+        self.assertIs(invalid_state_fallback(), InvalidStateFallback.REFLEX)
         self.assertIs(
             InvalidStateFallback.NONE.value, "none"
         )
@@ -1516,7 +1523,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(event, "monster_ai_invalid_state")
         self.assertEqual(context["reason"], "invalid_binding")
         self.assertEqual(context["char"], str(monster.pk))
-        self.assertEqual(context["action"], "legacy")
+        self.assertEqual(context["action"], "reflex")
         self.assertIsInstance(warning.call_args.kwargs["exc"], ValueError)
         # The stored binding is never rewritten by the fallback.
         self.assertEqual(monster.db.behaviour_tree, 7)
@@ -1534,7 +1541,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(warning.call_args.kwargs["context"]["action"], "none")
 
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
-    def test_utility_without_an_identity_warns_and_falls_back(self):
+    def test_deliberation_without_an_identity_warns_and_falls_back(self):
         monster = self._monster_row("t_sel_tier_only", species=None)
         with patch("world.rules.monster_behaviour.log_warn") as warning:
             request = monster_behaviour_policy(monster, self._field(monster))
@@ -1544,13 +1551,13 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         )
 
     @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
-    def test_utility_without_intelligence_warns_and_falls_back(self):
+    def test_deliberation_without_intelligence_warns_and_falls_back(self):
         monster = self._monster_row("t_sel_unvalued")
         monster.db.behaviour_tree = OTHER_ARCHETYPE
         book = _rulebook(
             archetypes={
-                ARCHETYPE: _archetype(mode="legacy"),
-                OTHER_ARCHETYPE: _archetype(mode="utility"),
+                ARCHETYPE: _archetype(mode="reflex"),
+                OTHER_ARCHETYPE: _archetype(mode="deliberation"),
             },
             modes={},
             intelligence={},
@@ -1681,14 +1688,14 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertIsNone(trace[0].selected)
 
 
-class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
-    """The legacy body, its dice and the resolver's authority are unchanged."""
+class ReflexRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
+    """The reflex body, its dice and the resolver's authority are unchanged."""
 
     def setUp(self):
         _scope(self)
         super().setUp()
-        self.open_tuning(modes={VARIANT: "legacy"})
-        self.room = create_object(Room, key="legacy arena")
+        self.open_tuning(modes={VARIANT: "reflex"})
+        self.room = create_object(Room, key="reflex arena")
         self.opponent = _player("t_sel_legacy_foe")
         self.opponent.location = self.room
         self.opponent.traits.hp.base = 300
@@ -1715,7 +1722,7 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
         )
 
     @covers_requirement("monster-action-policy::no-llm-or-generative-layer-involvement-anywhere-in-monster-decision-making")
-    def test_a_legacy_variant_keeps_the_legacy_body_and_one_dice_draw(self):
+    def test_a_reflex_variant_keeps_the_reflex_body_and_one_dice_draw(self):
         tie = _player("t_sel_legacy_tie")
         tie.location = self.room
         tie.traits.hp.base = 300
@@ -1745,18 +1752,18 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
             patch("socket.create_connection", side_effect=AssertionError("no network")),
         ):
             self.open_tuning()
-            utility = monster_behaviour_policy(self.monster, field)
-            self.assertIsNotNone(utility)
+            deliberation = monster_behaviour_policy(self.monster, field)
+            self.assertIsNotNone(deliberation)
         with (
             patch("socket.socket.connect", side_effect=AssertionError("no network")),
             patch("socket.create_connection", side_effect=AssertionError("no network")),
         ):
-            self.open_tuning(modes={VARIANT: "legacy"})
-            legacy = monster_behaviour_policy(self.monster, field)
-        self.assertIsNotNone(legacy)
+            self.open_tuning(modes={VARIANT: "reflex"})
+            reflex = monster_behaviour_policy(self.monster, field)
+        self.assertIsNotNone(reflex)
 
     @covers_requirement("monster-action-policy::target-selection-differs-by-archetype-and-is-deterministic-under-a-fixed-seed")
-    def test_the_legacy_body_still_consumes_no_selection_rng(self):
+    def test_the_reflex_body_still_consumes_no_selection_rng(self):
         random.seed(4242)
         before = random.getstate()
         monster_behaviour_policy(self.monster, self._field())
@@ -1809,3 +1816,122 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
         before = _stored_attributes(self.monster)
         monster_behaviour_policy(self.monster, field)
         self.assertEqual(_stored_attributes(self.monster), before)
+
+
+class ReflexSelectionScopeTests(SyntheticTuningMixin, EvenniaTestCase):
+    """A stochastic reflex decision seeds from its own scope, like deliberation.
+
+    The reflex body samples its exact own-output estimates with an independent
+    generator, so the same state, owned order, tuning and scope must replay one
+    choice while another real slot may legitimately choose differently -- and
+    neither consumes the combat hit, damage or initiative dice.
+    """
+
+    def setUp(self):
+        _scope(self)
+        _suppress_innate_skills(self)
+        super().setUp()
+        self.open_tuning(
+            patrol={
+                "mode": "reflex",
+                "skill_choice": "highest_expected_damage",
+                "temperature": 10.0,
+            },
+            modes={},
+            intelligence={},
+        )
+        self.room = create_object(Room, key="reflex scope arena")
+        self.opponent = _player("t_sel_reflex_foe")
+        self.opponent.location = self.room
+        self.opponent.traits.hp.base = 300
+        self.opponent.traits.hp.current = 300
+        self.monster = construct_species_individual(
+            SPECIES, VARIANT, individual_name="t_sel_reflex_scope"
+        )
+        self.monster.location = self.room
+        self.monster.traits.hp.base = 300
+        self.monster.traits.hp.current = 300
+        self.monster.traits.mp.base = 100
+        self.monster.traits.mp.current = 100
+        self.monster.db.skills = {
+            "active": [STRIKE.key, AREA.key],
+            "passive": [],
+        }
+
+    def _field(self):
+        return Battlefield(
+            {
+                'foes': frozenset({stable_actor_id(self.monster)}),
+                'party': frozenset({stable_actor_id(self.opponent)}),
+            },
+            {
+                stable_actor_id(self.monster): self.monster,
+                stable_actor_id(self.opponent): self.opponent,
+            },
+        )
+
+    @covers_requirement("monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll")
+    def test_the_same_scope_replays_without_touching_combat_dice(self):
+        field = self._field()
+        scope = ExecutionScope(
+            session_id="t:reflex:1",
+            round_index=1,
+            slot_index=0,
+            actor_id=stable_actor_id(self.monster),
+        )
+        with patch(
+            "world.rules.monster_behaviour.dice.roll_d100",
+            side_effect=AssertionError("reflex sampling consumed combat dice"),
+        ):
+            with decision_scope(scope):
+                first = monster_behaviour_policy(self.monster, field)
+                replay = monster_behaviour_policy(self.monster, field)
+        self.assertEqual(first.skill_key, replay.skill_key)
+        self.assertEqual(first.targets, replay.targets)
+
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
+    def test_distinct_slots_seed_their_own_selection_from_the_real_scope(self):
+        field = self._field()
+        base = ExecutionScope(
+            session_id="t:reflex:2",
+            round_index=1,
+            slot_index=0,
+            actor_id=stable_actor_id(self.monster),
+        )
+        recorded = []
+        with patch(
+            "world.rules.monster_ai.selection.selection_seed_for",
+            wraps=selection_seed_for,
+        ) as seeded:
+            for slot in (0, 1):
+                scope = replace(base, round_index=1 + slot, slot_index=slot)
+                with decision_scope(scope):
+                    first = monster_behaviour_policy(self.monster, field)
+                    replay = monster_behaviour_policy(self.monster, field)
+                recorded.append(seeded.call_args.kwargs["scope"])
+                # Each real slot reproduces its own choice.
+                self.assertEqual(first.skill_key, replay.skill_key)
+        self.assertNotEqual(recorded[0], recorded[1])
+        self.assertEqual(
+            [scope.slot_index for scope in recorded], [0, 1]
+        )
+        self.assertEqual(
+            seeded.call_args.kwargs["configuration_fingerprint"],
+            self.tuning.fingerprint,
+        )
+
+    @covers_requirement("monster-action-policy::highest-expected-damage-comparison-uses-effective-value-and-one-tie-breaking-roll")
+    def test_a_direct_inspection_replays_its_canonical_identity(self):
+        field = self._field()
+        with patch(
+            "world.rules.monster_ai.selection.selection_seed_for",
+            wraps=selection_seed_for,
+        ) as seeded:
+            first = monster_behaviour_policy(self.monster, field)
+            replay = monster_behaviour_policy(self.monster, field)
+        self.assertEqual(first.skill_key, replay.skill_key)
+        kwargs = seeded.call_args.kwargs
+        # An inspection has no execution scope: its seed carries the canonical
+        # identity and the snapshot's own read-only fingerprint instead.
+        self.assertIsNone(kwargs["scope"])
+        self.assertTrue(kwargs["snapshot_fingerprint"])

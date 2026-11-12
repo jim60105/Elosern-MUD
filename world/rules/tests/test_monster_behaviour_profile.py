@@ -23,7 +23,7 @@ _MANDATORY_FIELDS = {
     "prefer_area_when_multiple_enemies",
     "flee_hp_fraction",
 }
-_OPTIONAL_FIELDS = {"decision_mode", "utility_weights"}
+_OPTIONAL_FIELDS = {"decision_mode", "utility_weights", "reflex_temperature"}
 _SIX_ARCHETYPES = {
     "instinctive",
     "pack_hunter",
@@ -72,16 +72,24 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                     self.assertIsInstance(weight, Real)
                     self.assertNotIsInstance(weight, bool)
                     self.assertGreaterEqual(weight, 0)
-            self.assertIn(values["decision_mode"], {"legacy", "utility"})
+            self.assertIn(values["decision_mode"], {"reflex", "deliberation"})
+            # A highest_expected_damage profile must author the temperature it
+            # samples by; a first_owned profile may omit it entirely.
+            if values["skill_choice"] == "highest_expected_damage":
+                self.assertGreater(values["reflex_temperature"], 0)
+                self.assertIsInstance(values["reflex_temperature"], Real)
+                self.assertNotIsInstance(values["reflex_temperature"], bool)
+            else:
+                self.assertNotIn("reflex_temperature", values)
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
-    def test_all_six_archetypes_stay_available_with_their_own_legacy_modes(self):
+    def test_all_six_archetypes_stay_available_with_their_own_reflex_modes(self):
         self.assertEqual(set(MONSTER_AI_TUNING.behaviour_profiles), _SIX_ARCHETYPES)
         self.assertEqual(set(BEHAVIOUR_PROFILES), _SIX_ARCHETYPES)
         for key, profile in BEHAVIOUR_PROFILES.items():
             with self.subTest(archetype=key):
                 authored = MONSTER_BEHAVIOUR_YAML["archetypes"][key]
-                self.assertIs(profile.decision_mode, DecisionMode.LEGACY)
+                self.assertIs(profile.decision_mode, DecisionMode.REFLEX)
                 self.assertEqual(profile.target_strategy, authored["target_strategy"])
                 self.assertEqual(profile.skill_choice, authored["skill_choice"])
                 self.assertEqual(
@@ -91,11 +99,18 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                 self.assertEqual(
                     profile.flee_hp_fraction, authored["flee_hp_fraction"]
                 )
-        # Every archetype keeps its own legacy mode, so the ONLY way a
-        # production variant leaves the legacy decision is its own registered
+                if profile.skill_choice == "highest_expected_damage":
+                    # The evaluating profiles sample exact own-output estimates
+                    # by their own authored raw-E-unit temperature.
+                    self.assertGreater(profile.reflex_temperature, 0)
+                    self.assertIsInstance(profile.reflex_temperature, float)
+                else:
+                    self.assertIsNone(profile.reflex_temperature)
+        # Every archetype keeps its own reflex mode, so the ONLY way a
+        # production variant leaves the reflex decision is its own registered
         # override: each mapped key is a registered variant with a recorded
         # binding and an explicit intelligence. Which variants those are, and
-        # that every other registered variant still resolves legacy, is
+        # that every other registered variant still resolves reflex, is
         # established behaviourally by
         # ``world.rules.tests.test_monster_ai_activation``.
         for key, mode in MONSTER_AI_TUNING.variant_decision_mode.items():
