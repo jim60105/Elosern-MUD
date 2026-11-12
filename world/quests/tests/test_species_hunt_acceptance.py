@@ -139,15 +139,17 @@ class HuntAcceptanceTests(
         from world.quests.catalog import register_catalog
 
         register_catalog()
+        # The region probes need ground with no authored source. The shipped
+        # site roster now covers every live region, so the probe reads the
+        # world under the kit's own site catalog instead: its sites live in
+        # its synthetic regions, which leaves every live region source-free
+        # without naming an authored region, site or coordinate here.
+        self.enterContext(synthetic_registries("monster_sites"))
         self.probe, self.region = _probe_cell()
         # A live region with no authored source under this scope: the only
-        # ecology zone is the synthetic one in ``self.region`` and the shipped
-        # sites live in other regions.
-        site_regions = _live_site_regions()
+        # ecology zone is the synthetic one in ``self.region``.
         self.bare_region = next(
-            key
-            for key in _live_region_keys()
-            if key != self.region and key not in site_regions
+            key for key in _live_region_keys() if key != self.region
         )
         self.zone = EcologyZone(
             "t_probe_habitat",
