@@ -103,6 +103,13 @@ POPULATION_SEED_ATTRIBUTE = "regional_population_seed"
 #: The wilderness Attribute holding the chronological presence evidence.
 POPULATION_TIMELINE_ATTRIBUTE = "population_timeline"
 
+#: The wilderness Attribute recording exactly which authored zones this world
+#: provisioned. A world remembers its own scope, so a later boot validates the
+#: zones it actually has instead of demanding every authored zone: production
+#: records the complete registry, while a bounded world (a test declaration)
+#: records its own subset and still refuses a missing or unknown record.
+POPULATION_ZONE_SCOPE_ATTRIBUTE = "population_zone_scope"
+
 #: The individual Attribute carrying ordinary home ownership.
 HOME_ZONE_ATTRIBUTE = "home_ecology_zone"
 
@@ -521,6 +528,65 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
     return int(seed)
 
 
+def write_population_zone_scope(
+    wilderness: Any, zone_keys: Iterable[str]
+) -> tuple[str, ...]:
+    """Record the exact authored zones this world provisioned, once.
+
+    A world that already carries a scope keeps it: the record is the answer a
+    later boot validates against, and replacing it would let a smaller subset
+    silently pass for a world that has more.
+    """
+    _require_wilderness(wilderness)
+    scope = tuple(sorted(dict.fromkeys(zone_keys)))
+    if not scope:
+        raise ValueError("a population zone scope needs at least one zone")
+    unknown = tuple(key for key in scope if key not in ECOLOGY_ZONE_REGISTRY)
+    if unknown:
+        raise UnknownEcologyZone(f"{UNKNOWN_ZONE}: no authored ecology zone {unknown[0]!r}")
+    saved = wilderness.attributes.get(POPULATION_ZONE_SCOPE_ATTRIBUTE)
+    if saved is not None:
+        recorded = _zone_scope_value(saved)
+        if recorded != scope:
+            raise MalformedPopulationState(
+                f"{MALFORMED_STATE}: saved population zone scope {recorded!r} "
+                f"does not match {scope!r}"
+            )
+        return recorded
+    wilderness.attributes.add(POPULATION_ZONE_SCOPE_ATTRIBUTE, scope)
+    return scope
+
+
+def read_population_zone_scope(wilderness: Any) -> tuple[str, ...]:
+    """The authored zones this world provisioned.
+
+    A world provisioned before the scope was recorded carries every authored
+    zone, which is exactly what the complete registry describes.
+    """
+    _require_wilderness(wilderness)
+    saved = wilderness.attributes.get(POPULATION_ZONE_SCOPE_ATTRIBUTE)
+    if saved is None:
+        return tuple(sorted(ECOLOGY_ZONE_REGISTRY))
+    return _zone_scope_value(saved)
+
+
+def _zone_scope_value(saved: object) -> tuple[str, ...]:
+    """One saved zone scope, or the named refusal for a malformed record."""
+    if not isinstance(saved, (tuple, list)) or not saved:
+        raise MalformedPopulationState(
+            f"{MALFORMED_STATE}: {POPULATION_ZONE_SCOPE_ATTRIBUTE!r} must be a "
+            "non-empty sequence of zone keys"
+        )
+    scope: list[str] = []
+    for key in saved:
+        if not isinstance(key, str) or not key:
+            raise MalformedPopulationState(
+                f"{MALFORMED_STATE}: population zone scope entry {key!r} is not a zone key"
+            )
+        scope.append(key)
+    return tuple(sorted(dict.fromkeys(scope)))
+
+
 def _zone_state_from_record(
     zone_key: str, record: Mapping[str, object] | None, world_seed: int
 ) -> ZonePopulationState | None:
@@ -907,10 +973,12 @@ def population_provisioned(wilderness: Any) -> bool:
 def require_initialized_population(wilderness: Any) -> None:
     """Refuse a preexisting world that lacks the complete runtime state.
 
-    Fresh provisioning initializes the shared seed and every authored zone.
-    A world that already exists must carry exactly that state; missing,
-    malformed or extra zone records are the named operator refusal, with no
-    automatic filling, conversion or reset from old coordinate slots.
+    Fresh provisioning initializes the shared seed and the zones it records as
+    its scope (the complete authored registry unless a bounded declaration
+    provisioned the world). A world that already exists must carry exactly
+    that state; missing, malformed or extra zone records are the named
+    operator refusal, with no automatic filling, conversion or reset from old
+    coordinate slots.
     """
     _require_wilderness(wilderness)
     if not population_provisioned(wilderness):
@@ -948,8 +1016,14 @@ def require_initialized_population(wilderness: Any) -> None:
         raise PopulationStateUninitialized(
             f"{STATE_UNINITIALIZED}: {error}"
         ) from error
-    missing = sorted(set(ECOLOGY_ZONE_REGISTRY) - set(states))
-    extra = sorted(set(states) - set(ECOLOGY_ZONE_REGISTRY))
+    try:
+        scope = read_population_zone_scope(wilderness)
+    except MalformedPopulationState as error:
+        raise PopulationStateUninitialized(
+            f"{STATE_UNINITIALIZED}: {error}"
+        ) from error
+    missing = sorted(set(scope) - set(states))
+    extra = sorted(set(states) - set(scope))
     if missing or extra:
         raise PopulationStateUninitialized(
             f"{STATE_UNINITIALIZED}: missing zones {missing!r}, "
@@ -2494,6 +2568,9 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
                 (POPULATION_TIMELINE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
                     wilderness, POPULATION_TIMELINE_ATTRIBUTE
                 ),
+                (POPULATION_ZONE_SCOPE_ATTRIBUTE, None): _db_safe_attribute_snapshot(
+                    wilderness, POPULATION_ZONE_SCOPE_ATTRIBUTE
+                ),
                 # The map-owned activity record is written by the same
                 # construction/registration operations; a caller-owned rollback
                 # must restore it with the population surfaces it belongs to.
@@ -2599,6 +2676,7 @@ __all__ = [
     "MalformedPopulationState",
     "POPULATION_SEED_ATTRIBUTE",
     "POPULATION_TIMELINE_ATTRIBUTE",
+    "POPULATION_ZONE_SCOPE_ATTRIBUTE",
     "PopulationCounts",
     "PopulationPlacement",
     "PopulationPlanStale",
@@ -2644,6 +2722,7 @@ __all__ = [
     "protected_cells",
     "read_population_seed",
     "read_population_timeline",
+    "read_population_zone_scope",
     "record_population_protection",
     "record_population_transition",
     "register_explicit_group",
@@ -2656,6 +2735,7 @@ __all__ = [
     "snapshot_population_surfaces",
     "snapshot_regional_population_surfaces",
     "wilderness_registration_target",
+    "write_population_zone_scope",
     "zone_birth_cells",
     "zone_counts_from_presence",
     "zone_lower_bound",

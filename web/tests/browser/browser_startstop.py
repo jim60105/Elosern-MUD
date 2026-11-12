@@ -177,6 +177,21 @@ def _production(name):
     return hook
 
 
+def _journey_zone_scope(settlements):
+    """Every ecology zone of the regions the declared settlements stand in.
+
+    Resolved here rather than in the declaration because the derivation reads
+    the published world, which this boot publishes before any synchronizer
+    runs.
+    """
+
+    from world.maps import runtime
+    from world.tests.geography_fixture import zones_for_settlements
+
+    runtime.ensure_published()
+    return zones_for_settlements(settlements)
+
+
 def apply_settlement_scope():
     """Bind the two synchronizers to this runtime's declared settlements.
 
@@ -185,6 +200,11 @@ def apply_settlement_scope():
     materialization alone cost ~57 s of every process list (the first boot plus
     its initial-setup restart), which starved the sibling process on the same
     runner and pushed journeys past their own waits.
+
+    The same declaration bounds the initial monster population: the journey's
+    wilderness is the regions its settlements stand in, so only those regions'
+    ecology zones are initialized. A journey that could read another region's
+    zones would have to declare it, exactly like its settlements.
 
     Only the synchronizer *bindings* are replaced: publication,
     static-reference validation, the planner, the writer, the transaction and
@@ -207,7 +227,9 @@ def apply_settlement_scope():
         return real_sync_grid(*args, **kwargs)
 
     def scoped_sync_wilderness(*args, **kwargs):
-        kwargs.setdefault("settlement_ids", journey_settlement_scope())
+        settlements = kwargs.setdefault("settlement_ids", journey_settlement_scope())
+        if kwargs.get("zone_keys") is None:
+            kwargs["zone_keys"] = _journey_zone_scope(settlements)
         return real_sync_wilderness(*args, **kwargs)
 
     bootstrap.sync_grid = scoped_sync_grid

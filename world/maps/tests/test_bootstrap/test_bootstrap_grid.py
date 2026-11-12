@@ -315,8 +315,11 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
             initialized_zone_keys,
             read_population_seed,
         )
+        from world.maps.bootstrap import sync_wilderness
 
-        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        # "Every authored zone" is the production entry point's claim; a test
+        # declaration bounds its world and is covered separately.
+        sync_wilderness(settlement_ids=CAPITAL_VILLAGE_MAP_IDS)
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         # A genuinely new script is seeded and every authored zone is
         # initialized before any reader or boundary can observe it.
@@ -332,7 +335,7 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         self.assertTrue(living)
 
         # A rerun never reseeds, rerolls, refills or replaces a living ID.
-        sync_test_wilderness(CAPITAL_VILLAGE_MAP_IDS)
+        sync_wilderness(settlement_ids=CAPITAL_VILLAGE_MAP_IDS)
         self.assertEqual(read_population_seed(script), INITIAL_POPULATION_SEED)
         self.assertEqual(
             {
@@ -342,6 +345,37 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
             },
             living,
         )
+
+    def test_a_bounded_declaration_records_and_verifies_its_own_zone_scope(self):
+        from evennia.contrib.grid.wilderness.wilderness import WildernessScript
+
+        from world.lore.monster_placement import ECOLOGY_ZONE_REGISTRY
+        from world.maps.bootstrap import sync_wilderness
+        from world.maps.regional_population import (
+            POPULATION_ZONE_SCOPE_ATTRIBUTE,
+            PopulationStateUninitialized,
+            initialized_zone_keys,
+            read_population_zone_scope,
+            require_initialized_population,
+        )
+
+        scope = (sorted(ECOLOGY_ZONE_REGISTRY)[0],)
+        sync_wilderness(settlement_ids=CAPITAL_VILLAGE_MAP_IDS, zone_keys=scope)
+        script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
+        self.assertEqual(read_population_zone_scope(script), scope)
+        self.assertEqual(initialized_zone_keys(script), scope)
+        self.assertEqual(
+            tuple(script.attributes.get(POPULATION_ZONE_SCOPE_ATTRIBUTE)), scope
+        )
+        # A later boot verifies the scope this world recorded, so the bounded
+        # world is complete and any record outside it is the named refusal.
+        require_initialized_population(script)
+        outside = sorted(set(ECOLOGY_ZONE_REGISTRY) - set(scope))[0]
+        states = dict(script.db.regional_population)
+        states[outside] = dict(states[scope[0]])
+        script.db.regional_population = states
+        with self.assertRaises(PopulationStateUninitialized):
+            require_initialized_population(script)
 
     @covers_requirement(
         "wilderness-monster-population::runtime-population-uses-authored-regions-without-implicit-fallback"

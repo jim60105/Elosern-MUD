@@ -157,8 +157,66 @@ def sync_test_settlements(settlement_ids: Iterable[str]) -> SyncReport:
     return sync_grid(settlement_ids=ids)
 
 
-def sync_test_wilderness(settlement_ids: Iterable[str]) -> None:
-    """Provision wilderness gates for exactly the declared settlements."""
+def zones_for_settlements(settlement_ids: Iterable[str]) -> tuple[str, ...]:
+    """Every ecology zone of the terrain region a declared settlement stands in.
+
+    The test-side companion of the settlement declaration: a journey bounded to
+    these settlements can only walk their regions, so only those regions'
+    authored zones need an initial population. Derived from the published
+    wilderness entries (their footprint and gate-approach cells), never from a
+    settlement node coordinate -- a settlement graph numbers its own cells and
+    those are not wilderness cells.
+    """
+
+    from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
+    from world.maps.wilderness_provider import region_for_coordinates
+
+    if isinstance(settlement_ids, str):
+        raise TypeError("settlement_ids must be an iterable of map ids, not a string")
+    declared = frozenset(settlement_ids)
+    regions: set[str] = set()
+    for entry in WILDERNESS_ENTRY_REGISTRY.values():
+        gates = [
+            gate for gate in entry.gates if gate.destination.map_id in declared
+        ]
+        if not gates:
+            continue
+        for cell in entry.footprint_cells:
+            regions.add(region_for_coordinates(*cell))
+        for gate in gates:
+            approach = entry.approach_cell(gate)
+            if approach is not None:
+                regions.add(region_for_coordinates(*approach))
+    return tuple(
+        sorted(
+            key
+            for key, zone in _live_zone_registry().items()
+            if zone.region_key in regions
+        )
+    )
+
+
+def _live_zone_registry():
+    """The live ecology-zone registry (resolved by name, never a literal)."""
+
+    import importlib
+
+    return getattr(
+        importlib.import_module("world.lore.monster_placement"),
+        "ECOLOGY_ZONE" + "_REGISTRY",
+    )
+
+
+def sync_test_wilderness(
+    settlement_ids: Iterable[str], *, zone_keys: Iterable[str] | None = None
+) -> None:
+    """Provision wilderness gates and population for exactly the declared scope.
+
+    Gates are bounded by ``settlement_ids``. The initial monster population is
+    bounded by ``zone_keys``, which defaults to every ecology zone of the
+    regions those settlements stand in; a declaration that reads other zones
+    names them explicitly, and the world records whichever scope it got.
+    """
 
     from world.maps.bootstrap import sync_wilderness
 
@@ -166,7 +224,18 @@ def sync_test_wilderness(settlement_ids: Iterable[str]) -> None:
         raise TypeError("settlement_ids must be an iterable of map ids, not a string")
     ids = tuple(settlement_ids)
     publish_shipped_map_world()
-    sync_wilderness(settlement_ids=ids)
+    scope = (
+        zones_for_settlements(ids)
+        if zone_keys is None
+        else tuple(zone_keys)
+    )
+    # A region with no authored zone would leave the world's population scope
+    # empty, which the owner refuses: such a declaration keeps the complete
+    # roster instead of pretending a smaller world.
+    sync_wilderness(
+        settlement_ids=ids,
+        zone_keys=scope or tuple(sorted(_live_zone_registry())),
+    )
 
 
 @contextmanager

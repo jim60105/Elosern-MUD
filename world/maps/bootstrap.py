@@ -1407,7 +1407,11 @@ def _prune_exits_into(limbo) -> None:
 GATE_EXIT_KEY = "荒野"
 
 
-def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
+def sync_wilderness(
+    *,
+    settlement_ids: Iterable[str] | None = None,
+    zone_keys: Iterable[str] | None = None,
+) -> None:
     """Provision the wilderness map and one grid-side gate per selected gate.
 
     ``create_wilderness()`` is itself a no-op if a ``WildernessScript`` keyed
@@ -1434,9 +1438,10 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
     approach cells. Grid-side gate-exit provisioning is independent of that
     refresh pass.
 
-    The first call on a genuinely new script also initializes the shared
-    population seed and every authored zone once; later calls only verify the
-    complete runtime state and never refill, reroll or reseed it.
+    ``zone_keys`` bounds the population a genuinely new script initializes and
+    is recorded on the world as its scope; an omitted declaration initializes
+    every authored zone. A preexisting script is never refilled, rerolled or
+    reseeded: it verifies the runtime state it recorded instead.
     """
 
     from world.maps import runtime
@@ -1452,7 +1457,7 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
     if not graphs:
         return
 
-    _provision_wilderness_script()
+    _provision_wilderness_script(zone_keys)
 
     script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
     for coordinates, room in list(script.db.rooms.items()):
@@ -1465,15 +1470,17 @@ def sync_wilderness(*, settlement_ids: Iterable[str] | None = None) -> None:
             _provision_gate_exit(entry.anchor_key, gate)
 
 
-def _provision_wilderness_script() -> None:
+def _provision_wilderness_script(zone_keys: Iterable[str] | None = None) -> None:
     """Provision the wilderness script and initialize its population once.
 
-    A genuinely new script receives the explicit configured initial seed and
-    every authored zone's constrained actual population in one compensated
-    transaction after the map world is published, before any manual-site or
-    boundary source can read it. A failure in a later zone restores the
-    earlier created individuals and every owner/cache surface, so a partial
-    world is never left behind.
+    A genuinely new script receives the explicit configured initial seed, the
+    zone scope it records, and each of those zones' constrained actual
+    population in one compensated transaction after the map world is
+    published, before any manual-site or boundary source can read it. The
+    scope is the complete authored registry unless a bounded declaration
+    names its own zones. A failure in a later zone restores the earlier
+    created individuals and every owner/cache surface, so a partial world is
+    never left behind.
 
     A preexisting script is never re-seeded, converted or reset: it must
     already carry the complete runtime population state, and missing or
@@ -1492,6 +1499,7 @@ def _provision_wilderness_script() -> None:
         require_initialized_population,
         restore_population_surfaces,
         snapshot_population_surfaces,
+        write_population_zone_scope,
     )
 
     if WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists():
@@ -1499,6 +1507,11 @@ def _provision_wilderness_script() -> None:
         require_initialized_population(script)
         return
 
+    scope = (
+        tuple(sorted(ECOLOGY_ZONE_REGISTRY))
+        if zone_keys is None
+        else tuple(sorted(dict.fromkeys(zone_keys)))
+    )
     surfaces: dict = {}
     try:
         with transaction.atomic():
@@ -1507,6 +1520,7 @@ def _provision_wilderness_script() -> None:
             )
             script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
             surfaces = snapshot_population_surfaces(script)
+            write_population_zone_scope(script, scope)
             tick = current_population_tick()
             initialize_population_seed(
                 script,
@@ -1515,7 +1529,7 @@ def _provision_wilderness_script() -> None:
             )
             initialize_zones(
                 script,
-                sorted(ECOLOGY_ZONE_REGISTRY),
+                scope,
                 seed=INITIAL_POPULATION_SEED,
                 tick=tick,
             )
