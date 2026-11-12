@@ -1180,6 +1180,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 (owner.REGIONAL_POPULATION_ATTRIBUTE, None),
                 (owner.POPULATION_SEED_ATTRIBUTE, None),
                 (owner.POPULATION_TIMELINE_ATTRIBUTE, None),
+                # The provisioned zone scope is owner state too: a rollback
+                # must restore it with the records it describes.
+                (owner.POPULATION_ZONE_SCOPE_ATTRIBUTE, None),
                 ("itemcoordinates", None),
                 # The same construction/registration operations own the
                 # map-owned activity record, so a caller rollback covers it.
