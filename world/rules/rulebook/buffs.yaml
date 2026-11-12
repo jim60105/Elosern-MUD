@@ -651,6 +651,12 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（西南海岸第四波）：碎殼蝦錘肢彈擊：命中後震裂護具表面的 mount，defense −2 資料在 combat_modifiers.yaml 的 guard_crack_defense 列（jaw_wrench_defense 的 defense 先例）。
+- key: guard_crack
+  duration: 15
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，
