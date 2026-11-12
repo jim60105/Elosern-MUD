@@ -33,11 +33,13 @@ scene backgrounds at all.
 - No redesign of the four editors (generate drawer, binding drawer, face-rect
   modal, stage-transform modal); they are reopened from the new action footer.
 
-## Delivery in three specifications
+## Delivery
 
-The work is three independent pieces, shipped in this order. Each gets its own
+The work is four independent pieces, shipped in this order. Each gets its own
 OpenSpec change.
 
+0. **Remove the baseline art-only visual species** (see "Prerequisite").
+   Small, and it removes a special case from everything after it.
 1. **Gallery window and category-scoped panel** (this document, in full).
    Ships 我的角色, 隊友 and 魔物. 人物 and 背景 are present on the rail but
    disabled with a reason. Resolves the handoff.
@@ -50,6 +52,35 @@ The window, the wall, the page and the panel shape are designed for all five
 categories now, so specifications 2 and 3 add data and enable a tab without
 reshaping the wire or the layout.
 
+## Prerequisite: remove the baseline art-only visual species
+
+The visual registry merges 40 combat species with twelve authored "baseline"
+rows (`slime`, `goblin`, `giant_rat`, `wolf_beast`, `ogre`, `earth_dragon`,
+`two_headed_dragon`, `magical_creature`, `troll`, `ancient_dragon`,
+`demon_god`, `calamity_beast`). They were meant for tier-built monsters that
+have no combat species, reached through `Monster.art_species_key`. No
+non-test code writes that attribute, so no monster in the game uses them; the
+startup sync still generates and stores art for all twelve, and several take
+rows on today's rail.
+
+The change removes:
+
+- `BASELINE_VISUAL_ROWS` and `MonsterVisualDeclaration.is_baseline_art_only`
+  (`world/lore/monster_visuals.py`); the registry becomes the projection of
+  the combat species registry alone.
+- `Monster.art_species_key` (`typeclasses/monsters.py`) and the fallback that
+  reads it (`world/art/presenter.py`, `ART_SPECIES_PROVENANCE_ATTRIBUTE` in
+  `world/art/official_refs.py`).
+- The baseline requirements and scenarios of `monster-visual-identity` and the
+  tier-built scenario of `species-portrait-identity`.
+- Stored gallery records, queue records and image files of the twelve keys,
+  through the existing unregistered-key handling or an explicit cleanup step;
+  the change decides which and proves no orphan remains.
+
+Tests that borrow `BASELINE_VISUAL_ROWS[0]` as a sample key switch to a
+synthetic registry. The tier registry's example labels (史萊姆, 哥布林, …) are
+plain strings with no link to these rows and stay.
+
 ## Decisions
 
 ### D1. Five categories on a vertical rail
@@ -59,7 +90,7 @@ reshaping the wire or the layout.
 | `mine` | 我的角色 | Every character of the account that owns the rendered puppet (the `roster` panel's set), the live one first and marked 操作中 | `MAX_NR_CHARACTERS` (≤ 10) |
 | `party` | 隊友 | The live character's active party companions (`live_companions`), party order | party capacity |
 | `people` | 人物 | Specification 2 | — |
-| `monster` | 魔物 | Visual species the player has sighted, grouped by threat tier | visual registry size |
+| `monster` | 魔物 | Visual species the player has sighted, grouped by threat tier | visual registry size (authored) |
 | `scene` | 背景 | Specification 3 | — |
 
 The category set and order are closed and client-labelled. `mine` follows the
@@ -84,9 +115,8 @@ group, so the wall starts with tiles and never repeats the tab's name.
 - Every tier that has at least one registered species draws its heading with
   `seen / total`. Unseen species get no tile and no placeholder: the gallery
   manages images, the codex owns collection progress.
-- The twelve baseline art-only visual rows (`is_baseline_art_only`) are not
-  codex species, cannot be sighted, and therefore never appear. Their records
-  and seeded art are untouched.
+- After the prerequisite change every visual species is a codex species, so
+  the sighting gate needs no exception.
 
 ### D4. The wall with an inline image tray
 
@@ -144,7 +174,6 @@ confirmation step.
   groups: [{ key, label, seen, total,              // label/seen/total nullable
              subjects: [{ subject_key, kind, display_name,
                           is_current, card_count, artwork }] }],
-  truncated: false,
   selected: "<subject_key>" | null,
   cards, official_entries, equipment_summary,
   capabilities, binding_warnings, error_state      // of `selected`, as today
@@ -163,10 +192,16 @@ confirmation step.
   default image (or null), so the wall needs no per-subject request.
 - `selected` is null only for a category with no subject; then the card fields
   are empty and `capabilities` is null.
-- Every category list is bounded by one explicit per-category cap. A category
-  past the cap keeps its ordered prefix and sets `truncated: true`; the wall
-  then says the list is incomplete. `mine`, `party` and `monster` cannot reach
-  the cap with shipped content.
+- Each category is bounded by its own source: the account's character limit,
+  the party capacity, the authored registry. None grows without an author.
+  There is no truncation rule and no "incomplete list" state: a list that
+  silently drops subjects is the defect this design removes.
+- The validators keep one hard ceiling on subjects per panel, set far above
+  any authored content. It is a guard against a programming error, not a
+  content rule: a panel past it is not rendered in part — the gallery takes
+  the common unavailable form and the error is logged.
+- A category that can grow without an author (people) must page, delivering
+  complete content in parts. That is designed in specification 2.
 - Both validator mirrors (Python and JS) enforce the shape, fail closed.
 
 **Stored selection.** The session remembers one category and one subject per
@@ -233,8 +268,8 @@ component as is: tiles are not square and a tray interrupts the grid.
 ## Testing
 
 - Presenter tests use synthetic registries, parties and rosters. They assert
-  the rules (ordering, grouping, sighting gate, fallbacks, cap and
-  `truncated`), never shipped counts.
+  the rules (ordering, grouping, sighting gate, fallbacks, the ceiling's
+  unavailable form), never shipped counts.
 - The registry patch in `test_art_push.py` is removed; its character
   assertions hold against the shipped registry because characters no longer
   share a budget with species.
@@ -259,7 +294,7 @@ keeps one group; the place is rewritten only when it changes. 人物 groups by
 that place, most recently visited first, and orders each group by most recent
 meeting. Open for that specification: whether other players' characters appear
 here, what happens to a met person whose NPC was reclaimed with its scene, and
-paging for a category that can exceed the cap.
+paging, since this is the one category that grows without an author.
 
 **3. Scenes.** The scene kind's capability record changes from gallery-less to
 gallery-bearing with one card, no bindings, no face rect and no stage
