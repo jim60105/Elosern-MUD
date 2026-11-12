@@ -645,6 +645,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（西南海岸第四波）：硬腕海星硬腕撲壓：每次已結算且具合法目標的施放都讓體壁硬化，防禦 +2 資料在 combat_modifiers.yaml 的 body_wall_set_defense 列（lamp_carapace_guard_defense 的 defense 先例）。
+- key: body_wall_set
+  duration: 20
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
 # 生理性疲勞投影（project-physiological-fatigue）：精神儲備與睡眠姿勢是唯一的
 # 權威狀態，這四列只是它的排他投影。`protection: physiological` 讓所有一般
 # 移除選擇器（明確鍵、negative、all）與淨化都無法抹除它們；沒有 duration，

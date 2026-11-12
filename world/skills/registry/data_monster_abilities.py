@@ -78,6 +78,9 @@ elementless physical damage plus a hit-dependent agility debuff on the struck
 enemy.
 The salt-column ant's jaw haul is assembled the same way with elementless
 physical damage plus a hit-dependent agility debuff on the struck enemy.
+The stiff-arm starfish's arm press is assembled the same way with elementless
+physical damage plus a self-mounted defense lift granted by every resolved
+attempt.
 """
 
 from world.skills.effects import (
@@ -1186,6 +1189,29 @@ ROWS: tuple[SkillDef, ...] = (
         effect_policies=(
             EffectPolicy(coefficient=0.9, audience=EffectAudience.ENEMIES),
             EffectPolicy(coefficient=1.0, audience=EffectAudience.ENEMIES, requires_hit_from=0),
+        ),
+    ),
+    _skill(
+        "stiff_arm_press",
+        "硬腕撲壓",
+        "撐起腕足撲壓單一敵方目標，造成物理傷害；撲壓時全身體壁硬化，短暫提高自身防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "self_buff_apply:body_wall_set"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("stiff_arm_starfish",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )
