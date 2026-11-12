@@ -409,8 +409,6 @@ class MonsterFleePolicyTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for forbidden in (
             "world.ai",
-            "import random",
-            "from random",
             "requests.",
             "httpx.",
             "urllib.",
@@ -418,6 +416,17 @@ class MonsterFleePolicyTests(unittest.TestCase):
             ".fled.add(",
         ):
             self.assertNotIn(forbidden, source)
+        # The only randomness this boundary may use is the explicitly seeded
+        # ``Random(seed)`` instance the selection seam builds; an unseeded
+        # constructor or any module-level RNG API, aliased or not, is a
+        # determinism defect.
+        for pattern in (
+            r"import\s+random\b",
+            r"from\s+random\s+import\s+(?!Random\b)",
+            r"(?<![\w.])random\.",
+            r"Random\(\s*\)",
+        ):
+            self.assertNotRegex(source, pattern)
 
     def test_fresh_import_loads_flee_registration(self):
         script = "\n".join(
