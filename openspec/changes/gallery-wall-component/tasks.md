@@ -1,0 +1,17 @@
+# Tasks
+
+Run pnpm commands in `web/webclient-app`.
+
+## 1. Model and component
+
+- [ ] 1.1 Add the D2 helpers to `components/gallery-window-model.js` with unit tests in `tests/components/gallery_wall.test.js`. Verify `pnpm test -- gallery_wall` passes.
+- [ ] 1.2 Create `components/GalleryWall.vue` per design D1, D3, D4; extend the same test file with one test per ADDED scenario of `specs/webclient-gallery-wall/spec.md` and the style lint. Verify `pnpm test -- gallery_wall` passes.
+
+## 2. Stories
+
+- [ ] 2.1 Add v4 fixtures to `stories/gallery-fixtures.js`, `stories/Data/GalleryWall.stories.js` and the `Data/GalleryWall` manifest entry (design D5), plus the Node fixture-validity test. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
+
+## 3. Gates
+
+- [ ] 3.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-wall-component`; both pass.
+- [ ] 3.2 Run `openspec validate gallery-wall-component --strict`; it passes.
