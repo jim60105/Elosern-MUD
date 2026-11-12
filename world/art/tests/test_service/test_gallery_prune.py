@@ -40,6 +40,7 @@ from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
     SYNTH_MONSTER_TIERS,
+    make_monster_species,
     synthetic_registries,
 )
 
@@ -93,7 +94,10 @@ class GalleryPruneTests(EvenniaTestCase):
         self.assertTrue(outside_gallery.exists())
         self.assertEqual(result["files"], 1)
         # Idempotent: a second pass deletes nothing.
-        self.assertEqual(prune_gallery_orphans(), {"files": 0, "records": 0})
+        self.assertEqual(
+            prune_gallery_orphans(),
+            {"files": 0, "records": 0, "records_unregistered": 0},
+        )
 
     @covers_requirement(
         "art-gallery-generation::interrupted-gallery-generations-are-reclaimed-at-startup"
@@ -192,3 +196,150 @@ class GalleryPruneTests(EvenniaTestCase):
             self.subject, "d", image_id=image_id,
             binding=None, face_rect=None, requested_fields=[],
         )
+
+
+_GONE = "t_prune_gone"
+_KEPT = "t_prune_kept"
+_GONE_CARD = "cccc0000-0000-4000-8000-000000000001"
+_GONE_JOB = "cccc0000-0000-4000-8000-000000000002"
+_KEPT_CARD = "cccc0000-0000-4000-8000-000000000003"
+
+
+def _species_scope(*keys):
+    """A monster-species scope registering exactly the kit species plus ``keys``."""
+    return synthetic_registries(
+        "monster_species",
+        extra={"monster_species": {key: make_monster_species(key) for key in keys}},
+    )
+
+
+class UnregisteredMonsterPruneTests(EvenniaTestCase):
+    """The startup prune reclaims stored art of monster keys no registry holds."""
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.gone = ArtSubject(ArtSubjectKind.MONSTER, _GONE)
+        self.kept = ArtSubject(ArtSubjectKind.MONSTER, _KEPT)
+        # Seeded while both keys are registered: the stored state of a species
+        # that a later registry edit removes.
+        with _species_scope(_GONE, _KEPT):
+            from world.art.queue import enqueue_gallery_job
+
+            self.gone_card = self._card(self.gone, _GONE_CARD)
+            self.kept_card = self._card(self.kept, _KEPT_CARD)
+            self.gone_job = enqueue_gallery_job(
+                self.gone, "d", image_id=_GONE_JOB,
+                binding=None, face_rect=None, requested_fields=[],
+            )
+            self.gone_classic = ensure(self.gone, "d")
+            self.gone_output = self._write(f"portrait/monster/{_GONE}.png")
+            self.gone_prior = self._write(f"portrait/monster/{_GONE}-prior.png")
+            self.gone_classic.db.status = ArtAssetStatus.DONE
+            self.gone_classic.db.output_identity = f"portrait/monster/{_GONE}.png"
+            self.gone_classic.db.prior_output_identity = f"portrait/monster/{_GONE}-prior.png"
+        self.gone_files = (self.gone_card, self.gone_output, self.gone_prior)
+
+    def _write(self, identity: str) -> Path:
+        path = self.root / identity
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"img")
+        return path
+
+    def _card(self, subject, image_id) -> Path:
+        identity = f"gallery/monster/{subject.key}/{image_id}.png"
+        path = self._write(identity)
+        gallery_api.append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 1000, "height": 1000},
+        )
+        return path
+
+    def _records_naming(self, key):
+        return sorted(
+            [
+                *(
+                    record.db_key
+                    for record in ArtAssetRecord.objects.all()
+                    if record.db.subject_key == key
+                ),
+                *(
+                    record.db_key
+                    for record in gallery_api.GalleryRecord.objects.all()
+                    if record.db.subject_key == key
+                ),
+            ]
+        )
+
+    def test_an_unregistered_species_leaves_nothing_behind(self):
+        self.assertEqual(len(self._records_naming(_GONE)), 3)
+        with _species_scope(_KEPT):
+            result = prune_gallery_orphans()
+        self.assertEqual(self._records_naming(_GONE), [])
+        for path in self.gone_files:
+            with self.subTest(path=path.name):
+                self.assertFalse(path.exists())
+        self.assertEqual(result["records_unregistered"], 2)
+        self.assertEqual(result["records"], 1)
+        self.assertEqual(result["files"], 3)
+
+    def test_a_registered_species_is_untouched(self):
+        before = gallery_api.record_for(self.kept)
+        cards_before = list(before.db.cards)
+        default_before = before.db.default_image_id
+        with _species_scope(_KEPT):
+            prune_gallery_orphans()
+        after = gallery_api.record_for(self.kept)
+        self.assertIsNotNone(after)
+        self.assertEqual(after.pk, before.pk)
+        self.assertEqual(list(after.db.cards), cards_before)
+        self.assertEqual(after.db.default_image_id, default_before)
+        self.assertTrue(self.kept_card.is_file())
+
+    def test_the_prune_stays_idempotent(self):
+        with _species_scope(_KEPT):
+            prune_gallery_orphans()
+            self.assertEqual(
+                prune_gallery_orphans(),
+                {"files": 0, "records": 0, "records_unregistered": 0},
+            )
+        self.assertTrue(self.kept_card.is_file())
+
+    def test_an_empty_or_failing_registry_deletes_nothing(self):
+        cases = (
+            ("empty", {"return_value": {}}),
+            ("failing", {"side_effect": RuntimeError("registry down")}),
+        )
+        for label, behaviour in cases:
+            with self.subTest(registry=label):
+                with patch("world.art.service.get_monster_visual_registry", **behaviour):
+                    result = prune_gallery_orphans()
+                self.assertEqual(result["records_unregistered"], 0)
+                self.assertEqual(len(self._records_naming(_GONE)), 3)
+                for path in self.gone_files:
+                    self.assertTrue(path.exists())
+
+    def test_an_unreadable_reference_set_keeps_classic_records_and_files(self):
+        with _species_scope(_KEPT), patch(
+            "world.art.gallery.referenced_stored_identities",
+            side_effect=RuntimeError("db down"),
+        ):
+            prune_gallery_orphans()
+        # The gallery record and the job record are still reclaimed; the
+        # classic record waits for a pass that can prove its files unreferenced.
+        self.assertEqual(self._records_naming(_GONE), [self.gone_classic.db_key])
+        self.assertTrue(self.gone_output.exists())
+        self.assertTrue(self.gone_prior.exists())

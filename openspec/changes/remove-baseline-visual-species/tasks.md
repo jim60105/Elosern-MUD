@@ -15,8 +15,8 @@ command prefix below: `uv run --locked --env-file=/tmp/mud-test.env evennia test
 
 ## 3. Startup prune
 
-- [ ] 3.1 Add `delete_unregistered_monster_records()` to `world/art/gallery.py` (sole writer, under `gallery_lock`, returns count) and call it first in `world/art/service.py::prune_gallery_orphans`; extend `_gallery_job_is_unclaimable` for unregistered monster keys; add the classic-record phase that deletes unregistered monster classic records and unlinks their confined `output_identity`/`prior_output_identity` files (design D3). Verify the function exists and the order matches design D3 by reading the diff.
-- [ ] 3.2 Add prune tests in the existing prune test module (find it with `rg -ln "prune_gallery_orphans" world/art/tests`) covering the three ADDED scenarios with a synthetic registry, annotated with the requirement ID from `uv run --locked python -m tools.spec_traceability list`. Verify the module passes with `<prefix> <module label>`.
+- [x] 3.1 Add `delete_unregistered_monster_records()` to `world/art/gallery.py` (sole writer, under `gallery_lock`, returns count) and call it first in `world/art/service.py::prune_gallery_orphans`; extend `_gallery_job_is_unclaimable` for unregistered monster keys; add the classic-record phase that deletes unregistered monster classic records and unlinks their confined `output_identity`/`prior_output_identity` files (design D3). Verify the function exists and the order matches design D3 by reading the diff.
+- [x] 3.2 Add prune tests in the existing prune test module (find it with `rg -ln "prune_gallery_orphans" world/art/tests`) covering the three ADDED scenarios with a synthetic registry, annotated with the requirement ID from `uv run --locked python -m tools.spec_traceability list`. Verify the module passes with `<prefix> <module label>`.
 
 ## 4. Gates
 
