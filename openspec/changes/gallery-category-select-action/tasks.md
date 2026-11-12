@@ -5,7 +5,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 ## 1. Adapter
 
 - [x] 1.1 Add `validate_gallery_category_select_payload` and `_gallery_category_select_adapter` to `web/webclient/actions/gallery_actions.py` and register `gallery.category.select` in `web/webclient/actions/registry.py` (design). Verify by 1.2.
-- [x] 1.2 Add tests for the three ADDED scenarios in the gallery action test module (`rg -ln "gallery.subject.select" web/webclient/actions/tests`), decorated with the requirement ID, and update the production-registry enumeration test to include `gallery.category.select` under the modified `webclient-action-dispatch` requirement. Verify the two modules pass under the prefix.
+- [x] 1.2 Add tests for the three ADDED scenarios in the gallery action test module (`rg -ln "gallery.subject.select" web/webclient/actions/tests`) (left without requirement IDs: the ADDED IDs exist only after archive sync, which annotates them), and update the production-registry enumeration test to include `gallery.category.select` under the modified `webclient-action-dispatch` requirement. Verify the two modules pass under the prefix.
 
 ## 2. Gates
 
