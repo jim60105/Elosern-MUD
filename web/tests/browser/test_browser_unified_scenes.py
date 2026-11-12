@@ -77,6 +77,29 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
     # --- helpers ---------------------------------------------------------
 
     def _art(self, page) -> dict:
+        """The committed art scene, gated on the panel having resolved one.
+
+        The art panel is pushed before its scene resolves: a page gated only on
+        ``domcontentloaded`` can read the panel while it is still the provisional
+        unavailable surface, which carries no ``scene`` key at all. Poll for the
+        resolved panel instead of racing the snapshot.
+        """
+        try:
+            wait_for_store_state(
+                page,
+                lambda state: bool(
+                    ((state.get("panels") or {}).get("art") or {}).get("scene")
+                ),
+                timeout=30000,
+            )
+        except AssertionError:
+            state = store_state(page)
+            panel = (state.get("panels") or {}).get("art") or {}
+            raise AssertionError(
+                "the art panel never resolved a scene: "
+                f"available={panel.get('available')} reason={panel.get('reason')} "
+                f"mode={state.get('mode')!r}"
+            )
         return store_state(page)["panels"]["art"]["scene"]["artwork"]
 
     def _displayed(self, page) -> str | None:
