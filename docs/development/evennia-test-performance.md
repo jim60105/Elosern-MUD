@@ -700,3 +700,23 @@ named refusal。
 `test_fresh_wilderness_provisioning_initializes_population_once` 走 production
 全量 roster 路徑（本機 46 秒、CI 199 秒），因為「一次寫入全量族群」正是它的
 受測物。
+
+**CI 複驗（run 43168938911，commit `9f4ec510`）：**
+
+| 分片 | 修法前 | 修法後 |
+|---|---:|---:|
+| 51 `maps-33 test_limbo_room` | 454 s | 242 s |
+| 47 `maps-29 test_bootstrap_sync` | 471 s | 278 s |
+| 15 `rules-11 …test_map_knowledge_integration.test_recording` | 逾 14 分鐘未完成 | 280 s |
+| 45 `maps-28-1 test_bootstrap_grid` | 821 s | 588 s |
+| 56 `maps-34-5 regional_population + bootstrap_selection` | 395 s | 395 s |
+| 最慢 browser 分片 | 389 s | 423 s（300–430 s 區間） |
+
+複驗揭露了真正的分配單位：Django 的平行 runner 以 `TestCase` 類別分派工作，
+不是以 method 分派，所以「一個分片一個類別」等於只有一個 worker 在跑。這一輪
+因此把五個單類別長尾各自切開：`WildernessGatewayExitTests`（335 s／14 個
+測試）、`WildernessWindowTests`（333 s／9）、`LocalMapWildernessGatewayTests`
+（330 s／12）、`WildernessBootstrapTests`（521 s／19，依「物化／初始族群／
+gate 修復」切三）與 `SelectedSettlementSyncTests`（328 s／11，依「選取規則／
+預設選取結果」切二）。共用 fixture 以 mixin 形式提供，避免基底類別自己也被
+收集成一個測試類別。

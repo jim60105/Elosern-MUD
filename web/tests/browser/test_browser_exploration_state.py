@@ -36,6 +36,12 @@ def _press(page, key, wait_ms=80):
     page.wait_for_timeout(wait_ms)
 
 
+#: Budget for one move round trip. The server commits a move behind a clock
+#: advance and its population settle, so on a loaded CI runner the answer can
+#: take tens of seconds; the move journeys use the same budget.
+MOVE_SETTLE_TIMEOUT = 60000
+
+
 # The methods that need the synthetic companion lineup (a committed four-slot
 # party of present LLMNPCs). The companion-focus journey additionally opts into
 # the portrait branch's admitted media, so the reused figure is asserted against
@@ -597,6 +603,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             "local_map",
             lambda p: p.get("available") is True and p["current_node"] != fixture_home_node_id(),
+            timeout=MOVE_SETTLE_TIMEOUT,
         )
         self.assertEqual(
             sent_action_count(page, "explore.move"),

@@ -309,6 +309,9 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         self.assertEqual(len(scripts), 1)
         self.assertEqual(WildernessGateExit.objects.all().count(), 0)
 
+class WildernessPopulationProvisioningTests(_WildernessBootstrapCase):
+    """Fresh provisioning writes the population once and records its scope."""
+
     @covers_requirement(
         "regional-population::shared-population-seed-and-explicit-registrations-are-owner-supplied"
     )
@@ -492,6 +495,9 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         self.assertNotEqual(committed_zones[0], committed_zones[1])
         self.assertFalse(WildernessScript.objects.filter(db_key=WILDERNESS_NAME).exists())
         self.assertEqual(Monster.objects.count(), 0)
+
+class WildernessGateHealingTests(_WildernessBootstrapCase):
+    """Wilderness and gate rows are provisioned, healed or left alone."""
 
     def test_sync_grid_body_is_unmodified(self):
         source = inspect.getsource(sync_grid)

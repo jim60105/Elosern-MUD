@@ -318,6 +318,11 @@ class MetricCutoverTests(EvenniaTest):
 
         return XYZExit.objects.all_family().count()
 
+    def _object(self, pk):
+        from evennia.objects.models import ObjectDB
+
+        return ObjectDB.objects.get(pk=pk)
+
     def _seed_precutover_rooms(self):
         from world.maps.bootstrap import NODE_IDENTITY_TAG_CATEGORY
 
@@ -340,11 +345,6 @@ class MetricCutoverTests(EvenniaTest):
                 room.save()
                 ids[map_id][node_id] = room.id
         return ids
-
-    def _object(self, pk):
-        from evennia.objects.models import ObjectDB
-
-        return ObjectDB.objects.get(pk=pk)
 
     @covers_requirement(
         "map-knowledge::coordinate-cutover-preserves-observations-without-re-observation"
@@ -665,8 +665,8 @@ def _synthetic_registry(*graphs):
     return {graph.map_id: graph for graph in graphs}
 
 
-class SelectedSettlementSyncTests(EvenniaTest):
-    """Explicit settlement selection through the real planner and writer."""
+class _SelectionFixture:
+    """Synthetic settlement graphs and grid lookups shared by both journeys."""
 
     def _rooms(self, map_id):
         return list(GridRoom.objects.filter_xyz(xyz=("*", "*", map_id)))
@@ -679,6 +679,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
 
     def _beta(self, start=(1, 1), north=(1, 2)):
         return _synthetic_graph_for(BETA, start, north)
+
+class SelectedSettlementSyncTests(_SelectionFixture, EvenniaTest):
+    """Explicit settlement selection through the real planner and writer."""
 
     @covers_requirement(
         "grid-room-sync::explicit-settlement-selection-bounds-test-synchronization"
@@ -1018,6 +1021,9 @@ class SelectedSettlementSyncTests(EvenniaTest):
         ]
         self.assertEqual(len(prunes), 1)
         self.assertEqual(prunes[0].kwargs["context"]["source_room_key"], village_art_room.key)
+
+class DefaultSelectionOutcomeTests(_SelectionFixture, EvenniaTest):
+    """The default selection, its wilderness identity and its adapter."""
 
     @covers_requirement(
         "grid-room-sync::sync-grid-is-distinct-from-sync-all-and-instantiates-real-rooms-and-exits"
