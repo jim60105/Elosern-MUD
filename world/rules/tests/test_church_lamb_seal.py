@@ -29,6 +29,7 @@ from world.rules.sexual_state import _apply_climax_phase_set
 
 from ._combat_session_helpers import open_synthetic_scope
 from .test_monster_behaviour_policy import (
+    _FixedDraw,
     _T_AREA,
     _T_CLAW,
     _T_SPELL,
@@ -142,8 +143,12 @@ class MonsterSealNarrowTests(EvenniaTestCase):
         _seal(sealed_a)
         sealed_b = _party_member("sealed b", hp=90)
         _seal(sealed_b)
+        # pack_hunter evaluates both owned kits: with two hostile recipients
+        # the area estimate is twice the single one, so the pinned draw lands
+        # in the area interval. The injected generator keeps the decision
+        # deterministic and proves the seals did not narrow it.
         request = monster_behaviour_policy(
-            monster, _field(monster, [sealed_a, sealed_b])
+            monster, _field(monster, [sealed_a, sealed_b]), rng=_FixedDraw(0.5)
         )
         self.assertEqual(request.skill_key, _T_AREA.key)
         self.assertEqual(request.targets, "all-enemies")
