@@ -48,6 +48,10 @@ var GALLERY_MAX_OFFICIAL_ENTRIES = 32;
 var GALLERY_MAX_OFFICIAL_IDENTITY = 192;
 var GALLERY_OFFICIAL_URL_PREFIX = "/art/official/";
 var GALLERY_OFFICIAL_ROW_FIELDS = ["identity", "artwork", "is_current", "is_catalog_default"];
+var GALLERY_CAPABILITY_FIELDS = [
+  "supports_bindings", "supports_field_selection", "supports_free_text",
+  "supports_personal_official_preferences", "max_cards"
+];
 var GALLERY_CARD_FIELDS = [
   "image_id", "status", "label", "artwork", "is_default", "chips",
   "requested_fields", "binding_present", "created_at"
@@ -60,6 +64,31 @@ var GALLERY_DEFAULTS_URL_PREFIX = "/art/defaults/";
 var GALLERY_DEFAULTS_IDENTITY_PREFIX = "defaults/";
 var GALLERY_FALLBACK_EXTENSION = ".webp";
 var GALLERY_FALLBACK_KEYS = ["man", "woman", "boy", "girl", "elder", "monster_anon"];
+
+// Version 4 (change gallery-v4-validators), mirrored name for name from
+// web/webclient/presentation/gallery.py: one category at a time. Exported but
+// not registered — PANEL_ALLOWLIST keeps gallery at version 3 until the
+// cutover.
+var GALLERY_V4_SCHEMA_VERSION = 4;
+var GALLERY_CATEGORY_KEYS = Object.freeze(["mine", "party", "people", "monster", "scene"]);
+var GALLERY_MAX_PANEL_SUBJECTS = 256;
+var GALLERY_MAX_GROUPS = 64;
+var GALLERY_MAX_REASON = 64;
+var GALLERY_MAX_DESCRIPTION = 512;
+var GALLERY_GROUP_KEY = /^[a-z0-9_:.-]{1,96}$/;
+var V4_PANEL_FIELDS = Object.freeze([
+  "schema_version", "available", "kind", "categories", "category", "groups",
+  "selected", "description", "cards", "official_entries", "equipment_summary",
+  "capabilities", "binding_warnings", "error_state"
+]);
+var V4_CATEGORY_FIELDS = Object.freeze(["key", "count", "enabled", "reason"]);
+var V4_GROUP_FIELDS = Object.freeze(["key", "label", "seen", "total", "expanded", "count", "subjects"]);
+var V4_SUBJECT_FIELDS = Object.freeze(["subject_key", "kind", "display_name", "is_current", "card_count", "artwork"]);
+var V4_CAPABILITY_FIELDS = Object.freeze([
+  "supports_bindings", "supports_field_selection", "supports_free_text",
+  "supports_personal_official_preferences", "supports_face_rect", "supports_stage",
+  "supports_card_delete", "max_cards"
+]);
 
 function galleryText(value, maximum, name) {
   requireString(value, name, maximum);
@@ -303,6 +332,22 @@ function galleryCardReference(value) {
 
 
 function validateGalleryActionPayload(actionId, payload) {
+  // Version-4 navigation: the category and the group are the only keys, and
+  // neither names a subject. Server registration lands with the cutover.
+  if (actionId === "gallery.category.select") {
+    requireExactFields(payload, actionId, ["category"], []);
+    if (typeof payload.category !== "string" || GALLERY_CATEGORY_KEYS.indexOf(payload.category) === -1) {
+      throw new Error("unknown gallery category");
+    }
+    return Object.assign({}, payload);
+  }
+  if (actionId === "gallery.group.select") {
+    requireExactFields(payload, actionId, ["group"], []);
+    if (typeof payload.group !== "string" || !GALLERY_GROUP_KEY.test(payload.group)) {
+      throw new Error("invalid gallery group");
+    }
+    return Object.assign({}, payload);
+  }
   // The one action whose exact key set is a union: {subject_key, identity} plus
   // at least one geometry component, because the component the client omits
   // keeps whatever the record already stores for that identity.
@@ -431,13 +476,32 @@ function validateGalleryPanel(payload) {
   var selected = gallerySubject(payload.selected);
   if (!subjects.has(payload.selected)) throw new Error("selected is not in rail");
   var capability = payload.capabilities;
-  requireExactFields(capability, "capabilities", [
-    "supports_bindings", "supports_field_selection", "supports_free_text", "supports_personal_official_preferences", "max_cards"
-  ], []);
-  ["supports_bindings", "supports_field_selection", "supports_free_text", "supports_personal_official_preferences"].forEach(function (field) {
+  validateGalleryCapabilities(capability, GALLERY_CAPABILITY_FIELDS);
+  var counts = validateGalleryCardFacts(payload, capability, selected);
+  requireExactFields(payload.filters, "filters", ["all", "defaults", "bound", "pending", "failed"], []);
+  Object.keys(counts).forEach(function (key) {
+    requireInt(payload.filters[key], key, 0, MAX_SAFE_INTEGER);
+    if (payload.filters[key] !== counts[key]) throw new Error("filter counts differ from rows");
+  });
+  checkGlobalSafety(payload);
+  if (jsonByteSize(payload) > MAX_CANONICAL_JSON_BYTES) throw new Error("gallery exceeds envelope size");
+  return payload;
+}
+
+// One selected subject's capability record: boolean flags, then the card cap.
+function validateGalleryCapabilities(capability, fields) {
+  requireExactFields(capability, "capabilities", fields, []);
+  fields.slice(0, -1).forEach(function (field) {
     requireBool(capability[field], field);
   });
   if (capability.max_cards !== null && capability.max_cards !== 1) throw new Error("invalid card cap");
+}
+
+// The selected subject's card fields, shared by every panel version:
+// equipment, official entries, card rows, the default/pending/failed limits,
+// the error state and the binding warnings. Returns the per-status row
+// counts, which the version-3 panel also publishes as `filters`.
+function validateGalleryCardFacts(payload, capability, selected) {
   if (capability.supports_bindings) validateGalleryEquipment(payload.equipment_summary);
   else if (payload.equipment_summary !== null) throw new Error("unsupported equipment summary");
   validateGalleryOfficialEntries(payload.official_entries);
@@ -486,11 +550,6 @@ function validateGalleryPanel(payload) {
       throw new Error("incoherent chips");
     }
   });
-  requireExactFields(payload.filters, "filters", ["all", "defaults", "bound", "pending", "failed"], []);
-  Object.keys(counts).forEach(function (key) {
-    requireInt(payload.filters[key], key, 0, MAX_SAFE_INTEGER);
-    if (payload.filters[key] !== counts[key]) throw new Error("filter counts differ from rows");
-  });
   if (counts.defaults > 1 || counts.pending > 8 || counts.failed > 1) throw new Error("too many default/pending/failed rows");
   var error = payload.error_state;
   if (error !== null) {
@@ -520,13 +579,129 @@ function validateGalleryPanel(payload) {
   if (new Set(warningIds).size !== warningIds.length || JSON.stringify(warningIds) !== JSON.stringify(orderedWarnings)) {
     throw new Error("warnings must be unique and newest first");
   }
+  return counts;
+}
+
+// One version-4 bounded non-negative integer (an integral float such as 7.0
+// is the same JSON number on both sides).
+function v4Count(value, maximum, name) {
+  return requireInt(value, name, 0, maximum);
+}
+
+// The five categories in their closed order; returns them by key.
+function validateGalleryV4Categories(categories) {
+  if (!Array.isArray(categories) || categories.length !== GALLERY_CATEGORY_KEYS.length) {
+    throw new Error("invalid gallery categories");
+  }
+  var byKey = Object.create(null);
+  GALLERY_CATEGORY_KEYS.forEach(function (key, index) {
+    var row = categories[index];
+    requireExactFields(row, "gallery category", V4_CATEGORY_FIELDS, []);
+    if (row.key !== key) throw new Error("categories must list the closed keys in order");
+    v4Count(row.count, GALLERY_MAX_PANEL_SUBJECTS, "category count");
+    requireBool(row.enabled, "category enabled");
+    if (row.enabled) {
+      if (row.reason !== null) throw new Error("an enabled category carries no reason");
+    } else {
+      galleryText(row.reason, GALLERY_MAX_REASON, "category reason");
+    }
+    byKey[key] = row;
+  });
+  return byKey;
+}
+
+// The selected category's groups; returns the listed subject keys and the
+// summed group counts.
+function validateGalleryV4Groups(groups) {
+  if (!Array.isArray(groups) || groups.length > GALLERY_MAX_GROUPS) throw new Error("invalid gallery groups");
+  var groupKeys = new Set(), listed = new Set();
+  var totalCount = 0, currents = 0;
+  groups.forEach(function (group) {
+    requireExactFields(group, "gallery group", V4_GROUP_FIELDS, []);
+    if (typeof group.key !== "string" || !GALLERY_GROUP_KEY.test(group.key) || groupKeys.has(group.key)) {
+      throw new Error("invalid or duplicate group key");
+    }
+    groupKeys.add(group.key);
+    if (group.label !== null) galleryText(group.label, GALLERY_MAX_NAME, "group label");
+    if ((group.seen === null) !== (group.total === null)) throw new Error("group seen and total are paired");
+    if (group.seen !== null) {
+      v4Count(group.total, GALLERY_MAX_PANEL_SUBJECTS, "group total");
+      if (v4Count(group.seen, GALLERY_MAX_PANEL_SUBJECTS, "group seen") > group.total) {
+        throw new Error("group seen exceeds total");
+      }
+    }
+    requireBool(group.expanded, "group expanded");
+    var count = v4Count(group.count, GALLERY_MAX_PANEL_SUBJECTS, "group count");
+    totalCount += count;
+    var subjects = group.subjects;
+    if (!Array.isArray(subjects) || subjects.length !== (group.expanded ? count : 0)) {
+      throw new Error("an expanded group lists count subjects; a collapsed one none");
+    }
+    // The hard ceiling: a guard against a programming error, never a
+    // truncation rule (implied by the count bounds today, kept explicit).
+    if (listed.size + subjects.length > GALLERY_MAX_PANEL_SUBJECTS) {
+      throw new Error("gallery lists too many subjects");
+    }
+    subjects.forEach(function (row) {
+      requireExactFields(row, "gallery subject", V4_SUBJECT_FIELDS, []);
+      var subject = gallerySubject(row.subject_key);
+      if (row.kind !== subject.kind || listed.has(row.subject_key)) {
+        throw new Error("incoherent or duplicate subject");
+      }
+      listed.add(row.subject_key);
+      galleryText(row.display_name, GALLERY_MAX_NAME, "subject display name");
+      requireBool(row.is_current, "is_current");
+      if (row.is_current === true) currents++;
+      v4Count(row.card_count, MAX_LIST_ITEMS, "card_count");
+      if (row.artwork !== null) artwork.validateArtwork(row.artwork);
+    });
+  });
+  if (currents > 1) throw new Error("at most one current subject");
+  return { listed: listed, totalCount: totalCount };
+}
+
+// Exact version-4 available form, mirror of gallery.py::validate_gallery_v4.
+function validateGalleryPanelV4(payload) {
+  requireExactFields(payload, "gallery", V4_PANEL_FIELDS, []);
+  if (payload.schema_version !== GALLERY_V4_SCHEMA_VERSION || payload.available !== true || payload.kind !== "gallery") {
+    throw new Error("invalid gallery discriminator");
+  }
+  var categories = validateGalleryV4Categories(payload.categories);
+  var category = payload.category;
+  if (typeof category !== "string" || GALLERY_CATEGORY_KEYS.indexOf(category) === -1 || !categories[category].enabled) {
+    throw new Error("category must name an enabled category");
+  }
+  var groups = validateGalleryV4Groups(payload.groups);
+  if (groups.totalCount !== categories[category].count) {
+    throw new Error("group counts differ from the category count");
+  }
+  if (groups.listed.size === 0) {
+    if (payload.selected !== null || payload.description !== null ||
+        !isEmptyList(payload.cards) || !isEmptyList(payload.official_entries) ||
+        !isEmptyList(payload.binding_warnings) || payload.equipment_summary !== null ||
+        payload.capabilities !== null || payload.error_state !== null) {
+      throw new Error("a panel without a listed subject carries no card facts");
+    }
+  } else {
+    var selected = gallerySubject(payload.selected);
+    if (!groups.listed.has(payload.selected)) throw new Error("selected is not a listed subject");
+    if (payload.description !== null) galleryText(payload.description, GALLERY_MAX_DESCRIPTION, "description");
+    validateGalleryCapabilities(payload.capabilities, V4_CAPABILITY_FIELDS);
+    validateGalleryCardFacts(payload, payload.capabilities, selected);
+  }
+  // No panel-local byte limit (design D1a): structure bounds the panel, and
+  // the only byte ceiling is the publication logical one.
   checkGlobalSafety(payload);
-  if (jsonByteSize(payload) > MAX_CANONICAL_JSON_BYTES) throw new Error("gallery exceeds envelope size");
   return payload;
+}
+
+function isEmptyList(value) {
+  return Array.isArray(value) && value.length === 0;
 }
 
 module.exports = {
   validateGalleryPanel: validateGalleryPanel,
+  validateGalleryPanelV4: validateGalleryPanelV4,
   validateGalleryActionPayload: validateGalleryActionPayload,
   GALLERY_SCHEMA_VERSION: GALLERY_SCHEMA_VERSION,
   GALLERY_MAX_SUBJECTS: GALLERY_MAX_SUBJECTS,
@@ -543,4 +718,15 @@ module.exports = {
   GALLERY_CARD_FIELDS: GALLERY_CARD_FIELDS,
   GALLERY_RANK_ORIGINAL: GALLERY_RANK_ORIGINAL,
   GALLERY_RANK_ALPHA: GALLERY_RANK_ALPHA,
+  GALLERY_V4_SCHEMA_VERSION: GALLERY_V4_SCHEMA_VERSION,
+  GALLERY_CATEGORY_KEYS: GALLERY_CATEGORY_KEYS,
+  GALLERY_MAX_PANEL_SUBJECTS: GALLERY_MAX_PANEL_SUBJECTS,
+  GALLERY_MAX_GROUPS: GALLERY_MAX_GROUPS,
+  GALLERY_MAX_REASON: GALLERY_MAX_REASON,
+  GALLERY_MAX_DESCRIPTION: GALLERY_MAX_DESCRIPTION,
+  V4_PANEL_FIELDS: V4_PANEL_FIELDS,
+  V4_CATEGORY_FIELDS: V4_CATEGORY_FIELDS,
+  V4_GROUP_FIELDS: V4_GROUP_FIELDS,
+  V4_SUBJECT_FIELDS: V4_SUBJECT_FIELDS,
+  V4_CAPABILITY_FIELDS: V4_CAPABILITY_FIELDS,
 };

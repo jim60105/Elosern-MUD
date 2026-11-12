@@ -32,14 +32,18 @@ from web.webclient.presentation.gallery import (
     GALLERY_MAX_OFFICIAL_ENTRIES,
     GALLERY_MAX_OFFICIAL_IDENTITY,
     GALLERY_MAX_OFFICIAL_URL,
+    GALLERY_MAX_PANEL_SUBJECTS,
     SLOT_LABELS,
     gallery_presenter,
     gallery_subjects,
     validate_gallery,
+    validate_gallery_v4,
 )
 from web.webclient.presentation.gallery_selection import gallery_selection_snapshot, select_gallery_subject
 from web.webclient.presentation.ingress import build_presentation_context, reset_client_sequence, _coordinator_for
-from web.webclient.presentation.protocol import ProtocolValidationError
+from web.webclient.presentation.protocol import (
+    MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size,
+)
 from web.webclient.presentation.registry import build_production_registry
 from world.art.queue import enqueue_gallery_job, pending_gallery_jobs, settle_gallery_failed
 from world.art.store import ArtAssetRecord
@@ -675,6 +679,365 @@ process.stdout.write(JSON.stringify(results));
                 self.assertEqual(js_accepts, expected)
                 if js_accepts:
                     self.assertEqual(validate_gallery(echoed), value)
+
+
+_V4_CAPABILITIES = {
+    "supports_bindings": True, "supports_field_selection": True, "supports_free_text": True,
+    "supports_personal_official_preferences": True, "supports_face_rect": True,
+    "supports_stage": True, "supports_card_delete": True, "max_cards": None,
+}
+
+
+def v4_subject(number, *, current=False, artwork=True, kind="character"):
+    """One synthetic version-4 subject tile."""
+    key = _SUBJECT_KEY if number == 0 else f"portrait:{kind}:t_{number}"
+    return {
+        "subject_key": key, "kind": f"portrait:{kind}", "display_name": "測試角色",
+        "is_current": current, "card_count": 1,
+        "artwork": card_descriptor(number + 1, subject_key=key) if artwork else None,
+    }
+
+
+def v4_group(key, subjects, *, label=None, seen=None, total=None, expanded=True, count=None):
+    """One synthetic version-4 group; ``count`` defaults to the listed subjects."""
+    return {
+        "key": key, "label": label, "seen": seen, "total": total, "expanded": expanded,
+        "count": len(subjects) if count is None else count, "subjects": subjects,
+    }
+
+
+def payload_v4():
+    """File-local synthetic version-4 fixture: mine, one selected subject, one card."""
+    v3 = payload()
+    return {
+        "schema_version": 4, "available": True, "kind": "gallery",
+        "categories": [
+            {"key": "mine", "count": 1, "enabled": True, "reason": None},
+            {"key": "party", "count": 0, "enabled": True, "reason": None},
+            {"key": "people", "count": 0, "enabled": False, "reason": "測試停用"},
+            {"key": "monster", "count": 0, "enabled": True, "reason": None},
+            {"key": "scene", "count": 0, "enabled": False, "reason": "測試停用"},
+        ],
+        "category": "mine",
+        "groups": [v4_group("mine", [v4_subject(0, current=True)])],
+        "selected": _SUBJECT_KEY, "description": None,
+        "cards": v3["cards"], "official_entries": [],
+        "equipment_summary": v3["equipment_summary"],
+        "capabilities": dict(_V4_CAPABILITIES),
+        "binding_warnings": [], "error_state": None,
+    }
+
+
+def v4_empty(p, category="party"):
+    """Select an enabled category with no subject: every card fact is empty."""
+    p["category"] = category
+    p["categories"][0]["count"] = 0
+    p["groups"] = []
+    p.update(
+        selected=None, description=None, cards=[], official_entries=[], binding_warnings=[],
+        equipment_summary=None, capabilities=None, error_state=None,
+    )
+
+
+def v4_collapsed(p, count=7):
+    """Add a labelled collapsed group carrying only its count."""
+    p["groups"].append(v4_group("place:t_hall", [], label="測試大廳", expanded=False, count=count))
+    p["categories"][0]["count"] += count
+
+
+def v4_subjects(p, count, *, artwork=False):
+    """Replace the one group with ``count`` subjects, the first selected."""
+    subjects = [v4_subject(i, current=i == 0, artwork=artwork) for i in range(count)]
+    p["groups"] = [v4_group("mine", subjects)]
+    p["categories"][0]["count"] = count
+
+
+def v4_case(modify):
+    value = payload_v4()
+    modify(value)
+    return value
+
+
+class GalleryV4ParityTests(unittest.TestCase):
+    """Dual-direction parity of the version-4 validators (Python and the JS mirror)."""
+
+    def assert_parity(self, cases):
+        """Every (name, payload, expected) case gets the same verdict on both sides.
+
+        Cases travel as JSON text to both sides, so an integral float such as
+        ``7.0`` reaches Python exactly as the wire would deliver it.
+        """
+        script = """
+const fs = require('node:fs');
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
+const results = cases.map(([name, value]) => {
+  try { return [name, true, protocol.validateGalleryPanelV4(value)]; }
+  catch (_) { return [name, false, null]; }
+});
+process.stdout.write(JSON.stringify(results));
+"""
+        text = json.dumps(cases)
+        output = subprocess.run(["node", "-e", script], input=text, text=True, capture_output=True, cwd=ROOT, check=True)
+        js_results = json.loads(output.stdout)
+        for (name, value, expected), (_, js_accepts, echoed) in zip(json.loads(text), js_results, strict=True):
+            with self.subTest(case=name):
+                try:
+                    validate_gallery_v4(value)
+                    python_accepts = True
+                except ProtocolValidationError:
+                    python_accepts = False
+                self.assertEqual(python_accepts, expected)
+                self.assertEqual(js_accepts, expected)
+                if js_accepts:
+                    self.assertEqual(validate_gallery_v4(echoed), value)
+
+    def test_disabled_category_is_rejected(self):
+        self.assert_parity([
+            ("valid", payload_v4(), True),
+            ("disabled category", v4_case(lambda p: p.update(category="people")), False),
+            ("disabled scene", v4_case(lambda p: p.update(category="scene")), False),
+        ])
+
+    def test_reordered_or_partial_category_list_is_rejected(self):
+        def swap(p):
+            p["categories"][1], p["categories"][3] = p["categories"][3], p["categories"][1]
+
+        def repeat(p):
+            p["categories"][4] = dict(p["categories"][3])
+        self.assert_parity([
+            ("omitted key", v4_case(lambda p: p["categories"].pop()), False),
+            ("repeated key", v4_case(repeat), False),
+            ("reordered keys", v4_case(swap), False),
+            ("extra category", v4_case(lambda p: p["categories"].append(dict(p["categories"][1]))), False),
+        ])
+
+    def test_reason_accompanies_only_disabled_categories(self):
+        self.assert_parity([
+            ("enabled with reason", v4_case(lambda p: p["categories"][1].update(reason="原因")), False),
+            ("disabled without reason", v4_case(lambda p: p["categories"][2].update(reason=None)), False),
+            ("disabled empty reason", v4_case(lambda p: p["categories"][2].update(reason="")), False),
+            ("reason at cap", v4_case(lambda p: p["categories"][2].update(reason="由" * 64)), True),
+            ("reason over cap", v4_case(lambda p: p["categories"][2].update(reason="由" * 65)), False),
+        ])
+
+    def test_collapsed_group_with_subjects_is_rejected(self):
+        self.assert_parity([
+            ("collapsed with subjects", v4_case(lambda p: p["groups"][0].update(expanded=False)), False),
+        ])
+
+    def test_group_counts_sum_to_the_category_count(self):
+        def collapsed_not_summed(p):
+            v4_collapsed(p)
+            p["categories"][0]["count"] = 1
+        self.assert_parity([
+            ("category count high", v4_case(lambda p: p["categories"][0].update(count=2)), False),
+            ("category count low", v4_case(lambda p: p["categories"][0].update(count=0)), False),
+            ("collapsed count not summed", v4_case(collapsed_not_summed), False),
+        ])
+
+    def test_collapsed_group_is_accepted(self):
+        def collapsed_only(p):
+            v4_empty(p, "mine")
+            v4_collapsed(p)
+
+        def integral_float(p):
+            v4_collapsed(p)
+            p["groups"][1]["count"] = 7.0
+        self.assert_parity([
+            ("collapsed beside expanded", v4_case(v4_collapsed), True),
+            ("collapsed only, nothing selected", v4_case(collapsed_only), True),
+            ("integral float count", v4_case(integral_float), True),
+        ])
+
+    def test_seen_and_total_are_paired_and_bounded(self):
+        def tier(**changes):
+            return v4_case(lambda p: p["groups"][0].update(changes))
+        self.assert_parity([
+            ("seen and total", tier(seen=1, total=3), True),
+            ("seen equals total", tier(seen=3, total=3), True),
+            ("seen without total", tier(seen=1), False),
+            ("total without seen", tier(total=3), False),
+            ("seen over total", tier(seen=4, total=3), False),
+            ("negative seen", tier(seen=-1, total=3), False),
+            ("total over ceiling", tier(seen=1, total=257), False),
+            ("boolean seen", tier(seen=True, total=3), False),
+            ("fractional total", tier(seen=1, total=2.5), False),
+        ])
+
+    def test_empty_category_carries_no_card_facts(self):
+        cases = [("empty category", v4_case(v4_empty), True)]
+        for field, value in (
+            ("capabilities", dict(_V4_CAPABILITIES)),
+            ("selected", _SUBJECT_KEY),
+            ("description", "測試描述"),
+            ("cards", payload()["cards"]),
+            ("official_entries", [official_row()]),
+            ("binding_warnings", [{"image_id": image_id(1), "label": "測試肖像", "conditions": ["防具：未裝備"]}]),
+            ("equipment_summary", payload()["equipment_summary"]),
+            ("error_state", {"code": "sd_connection_error", "at": 1}),
+        ):
+            def modify(p, field=field, value=value):
+                v4_empty(p)
+                p[field] = value
+            cases.append((f"empty with {field}", v4_case(modify), False))
+        self.assert_parity(cases)
+
+    def test_selection_outside_listed_subjects_is_rejected(self):
+        def collapsed_selection(p):
+            v4_empty(p, "mine")
+            v4_collapsed(p)
+            p["selected"] = _SUBJECT_KEY
+        self.assert_parity([
+            ("selection only a collapsed group holds", v4_case(collapsed_selection), False),
+            ("selection not listed", v4_case(lambda p: p.update(selected="portrait:character:absent")), False),
+            ("null selection with a listed subject", v4_case(lambda p: p.update(selected=None)), False),
+        ])
+
+    def test_capabilities_carry_the_declared_card_operations(self):
+        cases = []
+        for field in ("supports_face_rect", "supports_stage", "supports_card_delete"):
+            cases.append((f"missing {field}", v4_case(lambda p, f=field: p["capabilities"].pop(f)), False))
+            cases.append((f"non-boolean {field}", v4_case(lambda p, f=field: p["capabilities"].update({f: 1})), False))
+        cases.append(("v3 capability record", v4_case(lambda p: p.update(capabilities=payload()["capabilities"])), False))
+        cases.append(("null capabilities with a selection", v4_case(lambda p: p.update(capabilities=None)), False))
+        self.assert_parity(cases)
+
+    def test_one_subject_over_the_ceiling_fails_closed(self):
+        def over_split(p):
+            # Two groups whose counts are each in range, still one past the ceiling.
+            v4_subjects(p, GALLERY_MAX_PANEL_SUBJECTS + 1)
+            subjects = p["groups"][0]["subjects"]
+            p["groups"] = [v4_group("a", subjects[:200]), v4_group("b", subjects[200:])]
+        self.assert_parity([
+            ("256 subjects", v4_case(lambda p: v4_subjects(p, GALLERY_MAX_PANEL_SUBJECTS)), True),
+            ("257 subjects", v4_case(lambda p: v4_subjects(p, GALLERY_MAX_PANEL_SUBJECTS + 1)), False),
+            ("257 subjects in two groups", v4_case(over_split), False),
+        ])
+
+    def test_panel_larger_than_one_frame_is_valid(self):
+        value = v4_case(lambda p: v4_subjects(p, GALLERY_MAX_PANEL_SUBJECTS, artwork=True))
+        self.assertGreater(json_byte_size(value), MAX_CANONICAL_JSON_BYTES)
+        self.assert_parity([("larger than one frame", value, True)])
+
+    def test_parity_cases_cover_every_rule(self):
+        cases = [("valid", payload_v4(), True)]
+
+        def add(name, modify, accepted=False):
+            cases.append((name, v4_case(modify), accepted))
+
+        def group(**changes):
+            return lambda p: p["groups"][0].update(changes)
+
+        def subject(**changes):
+            return lambda p: p["groups"][0]["subjects"][0].update(changes)
+
+        def second_group(p, key="tier:b", subjects=None):
+            subjects = [v4_subject(1)] if subjects is None else subjects
+            p["groups"].append(v4_group(key, subjects))
+            p["categories"][0]["count"] += len(subjects)
+
+        def extra_groups(count):
+            return lambda p: p["groups"].extend(v4_group(f"g{i}", [], count=0) for i in range(count))
+
+        def no_bindings(p):
+            p["capabilities"]["supports_bindings"] = False
+            p["equipment_summary"] = None
+
+        def failed(p):
+            row = {
+                "image_id": image_id(2), "status": "failed", "label": "暫時無法生成",
+                "artwork": card_descriptor(2, generation="failed", terminal=False),
+                "is_default": False, "chips": [], "requested_fields": [],
+                "binding_present": False, "created_at": 50,
+            }
+            row["artwork"].update(attempts=[], retention_sources=[])
+            p["cards"].append(row)
+            p["error_state"] = {"code": "sd_connection_error", "at": 50}
+
+        def two_defaults(p):
+            p["cards"].append(dict(p["cards"][0], image_id=image_id(3), artwork=card_descriptor(3), created_at=50))
+
+        warning = {"image_id": image_id(1), "label": "測試肖像", "conditions": ["防具：未裝備"]}
+        # Discriminators and exact keys.
+        add("schema 3", lambda p: p.update(schema_version=3))
+        add("schema boolean", lambda p: p.update(schema_version=True))
+        add("integral float schema", lambda p: p.update(schema_version=4.0), True)
+        add("unavailable", lambda p: p.update(available=False))
+        add("wrong kind", lambda p: p.update(kind="art"))
+        add("unknown top key", lambda p: p.update(extra=1))
+        add("missing description", lambda p: p.pop("description"))
+        add("v3 filters key", lambda p: p.update(filters={"all": 1}))
+        add("v3 subjects key", lambda p: p.update(subjects=[]))
+        add("prototype key", lambda p: p.update({"__proto__": 1}))
+        # Categories.
+        add("categories not a list", lambda p: p.update(categories={}))
+        add("category extra key", lambda p: p["categories"][0].update(extra=1))
+        add("category count negative", lambda p: p["categories"][1].update(count=-1))
+        add("category count over ceiling", lambda p: p["categories"][1].update(count=257))
+        add("category count boolean", lambda p: p["categories"][1].update(count=True))
+        add("category enabled non-boolean", lambda p: p["categories"][1].update(enabled=1))
+        add("unknown category", lambda p: p.update(category="pets"))
+        add("category not a string", lambda p: p.update(category=["mine"]))
+        add("category null", lambda p: p.update(category=None))
+        # Groups.
+        add("groups not a list", lambda p: p.update(groups={}))
+        add("groups at cap", extra_groups(63), True)
+        add("groups over cap", extra_groups(64))
+        add("group extra key", group(extra=1))
+        add("group missing key", lambda p: p["groups"][0].pop("label"))
+        add("group key grammar", group(key="Mine"))
+        add("group key empty", group(key=""))
+        add("group key trailing newline", group(key="mine\n"))
+        add("group key at cap", group(key="k" * 96), True)
+        add("group key over cap", group(key="k" * 97))
+        add("group key punctuation", group(key="place:t_hall.north-1"), True)
+        add("duplicate group key", lambda p: second_group(p, key="mine"))
+        add("label at cap", group(label="名" * 64), True)
+        add("label over cap", group(label="名" * 65))
+        add("label empty", group(label=""))
+        add("expanded non-boolean", group(expanded=1))
+        add("count negative", group(count=-1))
+        add("count over ceiling", group(count=257))
+        add("expanded count mismatch", group(count=2))
+        add("subjects not a list", group(subjects={}))
+        # Subjects.
+        add("subject extra key", subject(extra=1))
+        add("subject unknown key", subject(subject_key="portrait:character:a/b"))
+        add("subject non-string key", subject(subject_key=7))
+        add("scene subject", subject(subject_key="scene:t_scene", kind="scene"))
+        add("kind mismatch", subject(kind="portrait:monster"))
+        add("monster subject", lambda p: second_group(p, subjects=[v4_subject(1, kind="monster")]), True)
+        add("duplicate subject across groups", lambda p: second_group(p, subjects=[v4_subject(0)]))
+        add("display name at cap", subject(display_name="名" * 64), True)
+        add("display name over cap", subject(display_name="名" * 65))
+        add("display name surrogate", subject(display_name="\ud800"))
+        add("is_current non-boolean", subject(is_current=1))
+        add("no current subject", subject(is_current=False), True)
+        add("two current subjects", lambda p: second_group(p, subjects=[v4_subject(1, current=True)]))
+        add("card_count at cap", subject(card_count=320), True)
+        add("card_count over cap", subject(card_count=321))
+        add("card_count boolean", subject(card_count=False))
+        add("artwork null", subject(artwork=None), True)
+        add("artwork invalid", lambda p: p["groups"][0]["subjects"][0]["artwork"].update(extra=1))
+        # Selection-scoped card facts (the version-3 rules, without filters).
+        add("description", lambda p: p.update(description="測試描述"), True)
+        add("description at cap", lambda p: p.update(description="景" * 512), True)
+        add("description over cap", lambda p: p.update(description="景" * 513))
+        add("description empty", lambda p: p.update(description=""))
+        add("max_cards one", lambda p: p["capabilities"].update(max_cards=1), True)
+        add("max_cards two", lambda p: p["capabilities"].update(max_cards=2))
+        add("unsupported equipment", lambda p: p["capabilities"].update(supports_bindings=False))
+        add("no bindings, no equipment", no_bindings, True)
+        add("card row unknown key", lambda p: p["cards"][0].update(extra=1))
+        add("card foreign url", lambda p: candidate(p).update(url=f"/art/gallery/character/other/{image_id(1)}.png"))
+        add("official entries", lambda p: p.update(official_entries=[official_row()]), True)
+        add("official duplicate", lambda p: p.update(official_entries=[official_row(), official_row()]))
+        add("error without failed row", lambda p: p.update(error_state={"code": "sd_connection_error", "at": 1}))
+        add("warning without bound card", lambda p: p.update(binding_warnings=[dict(warning)]))
+        add("failed row with error state", failed, True)
+        add("two default rows", two_defaults)
+        self.assert_parity(cases)
 
 
 class GalleryPresenterTests(EvenniaTest):
