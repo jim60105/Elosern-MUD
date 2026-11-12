@@ -3301,3 +3301,95 @@ historical harness evidence at `497df2c1...`, not evidence for this tuning.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 陷坑蟻獅
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Pit ambusher: the ordinary 伏坑型 holds attack in the mid band's upper half,
+  defense in its middle, hit points in its lower half, and agility near its
+  floor. The stronger 大坑型 keeps the same attack and agility relations and
+  lifts its hit points above the band's midpoint with defense toward the top.
+* The kit spends no MP, so the MP pool is zero; the SP pool holds four casts
+  of the bite's six-point cost on 伏坑型 and six casts on 大坑型.
+* The rider (−3 agility for 15 s) equals the goat's shipped
+  `rock_echo_stagger_agility_flat` contribution and lifetime.
+* The stronger 大坑型 holds the widest spoil-heap pit at grade C: a local,
+  avoidable threat, not a site boss.
+
+### Reuse of the enemy hit-rider representative
+
+The kit declares the shipped enemy hit-rider composition signature
+`(("active", "damage", "enemies", None), ("active", "buff_apply", "enemies", 0))`.
+Its representative is unchanged: `cliff_stepper`, declared in
+`world.rules.tests.test_sway_whistle_sparrow_resource_skill`, whose production
+smoke exercises the representative itself. Both new variant keys sort after
+that representative (`"cliff_stepper" < "quarry_pit_lurker" <
+"spoil_heap_elder"`), so no smoke module, shard entry or seed entry is added.
+The existing `EnemyRiderGroupMemberTests` in that module derives the whole group
+from the shipped declarations and exercises both new variants on their own
+rider axis through a landed hit, a miss and a committed reload; it also asserts
+that each member's legacy decision returns its damage kit against a lone enemy.
+
+### Decision mode
+
+Both variants bind the legacy `ambush_predator` archetype: `lowest_hp` targeting,
+`first_owned` skill choice, with that archetype's authored flee threshold of
+0.20. No intelligence value, decision-mode override or `monster_behaviour.yaml`
+edit is authored, so the startup tuning moves only through this change's new
+buff definition and modifier rule.
+
+The derived group-member check constructs both variants through the production
+construction entry point and asks the shipped behaviour policy for their action
+against one living enemy; each variant returns `sand_toss_pincer` targeted at
+that enemy. `first_owned` takes the sole owned damage skill and a lone enemy
+leaves no target tie to break, so this path spends no selection die. The check
+was run twice consecutively and passed both times (2 tests each, OK).
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK |
+| `world.rules.tests.test_sway_whistle_sparrow_resource_skill` | 2 tests, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 122 tests, OK, run as two exhaustive disjoint focused method-label batches (61 + 61) collected once from the class and split because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK after re-fingerprinting; before it, 1 of 4 failed on the recorded fingerprint comparison |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, 2 of 3 failed on the recorded fingerprint comparison |
+
+The registry import check succeeds and the registry holds 40 species and 72
+variants. The remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+pit-sand-antlion-species` and `openspec validate pit-sand-antlion-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+This link adds one timed effect and one modifier, so the startup tuning
+fingerprint moved from `7c1cafd7...` to `bd82767e...`; the selector report was
+regenerated under the new tuning at its own baseline commit `b456b01a...`, the
+activation record and its rollback fingerprint (`6639e736...` to `56152d3a...`)
+were updated, and `activated` and `activation_bindings` are unchanged. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.
