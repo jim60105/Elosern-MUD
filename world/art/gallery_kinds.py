@@ -15,6 +15,13 @@ canonical-age precondition, whether the kind supports a prompt field
 selection, and whether it supports free-form prompt text. The character kind
 declares all three; the monster kind declares none.
 
+``gallery-kind-card-capabilities`` adds the three per-card operation facts the
+sole writer and the management adapters enforce: whether a card may carry a
+player-set face rectangle, whether it may carry a player-set stage transform,
+and whether a player may delete a card. The character kind declares all three;
+the monster kind declares the two geometry facts but not deletion (its single
+card is replaced by regeneration); a kind without a gallery declares none.
+
 This module lives HERE — with zero imports — exactly like
 ``world/art/fallback_keys.py`` and for the same reason: ``world/art/subjects.py``
 imports ``world/art/gallery_prompt.py`` at module level, so a capability table
@@ -53,6 +60,9 @@ class GalleryKindCapabilities:
         "requires_age_precondition",
         "supports_field_selection",
         "supports_free_text",
+        "supports_face_rect",
+        "supports_stage",
+        "supports_card_delete",
     )
 
     def __init__(
@@ -65,6 +75,9 @@ class GalleryKindCapabilities:
         requires_age_precondition: bool,
         supports_field_selection: bool,
         supports_free_text: bool,
+        supports_face_rect: bool,
+        supports_stage: bool,
+        supports_card_delete: bool,
     ) -> None:
         object.__setattr__(self, "kind_value", kind_value)
         object.__setattr__(self, "has_gallery", has_gallery)
@@ -74,6 +87,9 @@ class GalleryKindCapabilities:
         object.__setattr__(self, "requires_age_precondition", requires_age_precondition)
         object.__setattr__(self, "supports_field_selection", supports_field_selection)
         object.__setattr__(self, "supports_free_text", supports_free_text)
+        object.__setattr__(self, "supports_face_rect", supports_face_rect)
+        object.__setattr__(self, "supports_stage", supports_stage)
+        object.__setattr__(self, "supports_card_delete", supports_card_delete)
 
     def __setattr__(self, name: str, value: object) -> "None":
         raise TypeError(
@@ -94,7 +110,10 @@ class GalleryKindCapabilities:
             f"supports_bindings={self.supports_bindings!r}, "
             f"requires_age_precondition={self.requires_age_precondition!r}, "
             f"supports_field_selection={self.supports_field_selection!r}, "
-            f"supports_free_text={self.supports_free_text!r})"
+            f"supports_free_text={self.supports_free_text!r}, "
+            f"supports_face_rect={self.supports_face_rect!r}, "
+            f"supports_stage={self.supports_stage!r}, "
+            f"supports_card_delete={self.supports_card_delete!r})"
         )
 
     def with_values(self, **changes) -> "GalleryKindCapabilities":
@@ -112,6 +131,9 @@ class GalleryKindCapabilities:
             "requires_age_precondition": self.requires_age_precondition,
             "supports_field_selection": self.supports_field_selection,
             "supports_free_text": self.supports_free_text,
+            "supports_face_rect": self.supports_face_rect,
+            "supports_stage": self.supports_stage,
+            "supports_card_delete": self.supports_card_delete,
         }
         unknown = set(changes) - set(fields)
         if unknown:
@@ -194,6 +216,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         requires_age_precondition=True,
         supports_field_selection=True,
         supports_free_text=True,
+        supports_face_rect=True,
+        supports_stage=True,
+        supports_card_delete=True,
     ),
     _MONSTER_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_MONSTER_KIND_VALUE,
@@ -204,6 +229,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         requires_age_precondition=False,
         supports_field_selection=False,
         supports_free_text=False,
+        supports_face_rect=True,
+        supports_stage=True,
+        supports_card_delete=False,
     ),
     _SCENE_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_SCENE_KIND_VALUE,
@@ -214,6 +242,9 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
         requires_age_precondition=False,
         supports_field_selection=False,
         supports_free_text=False,
+        supports_face_rect=False,
+        supports_stage=False,
+        supports_card_delete=False,
     ),
 }
 
@@ -308,7 +339,8 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
     an undeclared kind, a stale entry naming no member, a declared maximum
     outside the admitted values, or a cross-field impossibility (a gallery
     without a directory, a no-gallery kind claiming a directory, a maximum, or
-    binding, age-precondition, field-selection, or free-text support, a record
+    binding, age-precondition, field-selection, free-text, face-rectangle,
+    stage, or card-deletion support, a record
     whose own kind_value disagrees with its key, or a flag that is not exactly
     a bool).
     """
@@ -340,6 +372,9 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
             "requires_age_precondition",
             "supports_field_selection",
             "supports_free_text",
+            "supports_face_rect",
+            "supports_stage",
+            "supports_card_delete",
         ):
             if not isinstance(getattr(record, flag), bool):
                 violations.append(
@@ -375,6 +410,9 @@ def validate_declaration_contract(kind_values: "tuple[str, ...]") -> list:
                 "requires_age_precondition",
                 "supports_field_selection",
                 "supports_free_text",
+                "supports_face_rect",
+                "supports_stage",
+                "supports_card_delete",
             ):
                 if getattr(record, flag):
                     violations.append(

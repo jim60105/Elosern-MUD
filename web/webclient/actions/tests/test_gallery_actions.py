@@ -562,9 +562,46 @@ class GalleryActionIntegrationTests(EvenniaTest):
         pair = {"subject_key": self.monster_subject.full(), "image_id": new["image_id"]}
         self.assertEqual(self.dispatch("gallery.default.set", pair)["outcome"], "success")
         self.assertEqual(api.record_for(self.monster_subject).db.default_image_id, new["image_id"])
-        self.assertEqual(self.dispatch("gallery.card.delete", pair)["outcome"], "success")
-        self.assertEqual(self.panel()["cards"], [])
-        self.assertIsNone(api.record_for(self.monster_subject).db.default_image_id)
+        # gallery-kind-card-capabilities: the monster kind declares no card
+        # deletion, so its one card is replaced by regeneration, never deleted.
+        deleted = self.dispatch("gallery.card.delete", pair)
+        self.assertEqual((deleted["outcome"], deleted["code"]), ("rejected", "delete_unsupported"))
+        # The declared gallery, art and roster refresh is the one publication.
+        self.panel()
+        self.assertEqual(api.cards_for(self.monster_subject), [new])
+        self.assertEqual(api.record_for(self.monster_subject).db.default_image_id, new["image_id"])
+        self.assertTrue((self.root / new["stored_identity"]).exists())
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::undeclared-card-operations-reject-with-stable-codes"
+    )
+    def test_undeclared_card_operations_reject_with_stable_codes(self):
+        from world.art import gallery_kinds
+
+        card = self.card()
+        pair = {"subject_key": SUBJECT, "image_id": card["image_id"]}
+        cases = (
+            ("supports_stage", "gallery.stage.update", dict(pair, stage={"scale": 0.6, "x": -0.2, "y": 0}), "stage_unsupported"),
+            ("supports_face_rect", "gallery.face_rect.update", dict(pair, face_rect={"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.3}), "face_rect_unsupported"),
+            ("supports_card_delete", "gallery.card.delete", pair, "delete_unsupported"),
+        )
+        for flag, action, payload, code in cases:
+            undeclared = gallery_kinds.capabilities_for(ArtSubjectKind.CHARACTER.value).with_values(**{flag: False})
+            with self.subTest(action=action), patch.dict(
+                gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+                {ArtSubjectKind.CHARACTER.value: undeclared},
+            ), patch.object(actions, "log_warn") as warn, patch.object(actions, "log_info") as info:
+                result = self.dispatch(action, payload)
+                self.assertEqual((result["outcome"], result["code"]), ("rejected", code))
+                self.assertEqual(result["message"], actions.REJECTION_MESSAGES[code])
+                # The declared three-panel refresh publishes at most once.
+                self.panel()
+                adapter = self.action_registry.spec(action).adapter
+                self.assertEqual(adapter(self.actor, payload, self.transport)["affected_panels"], ("gallery", "art", "roster"))
+                self.assertEqual(warn.call_count, 2)
+                info.assert_not_called()
+            self.assertEqual(api.cards_for(self.subject), [card])
+        self.assertTrue((self.root / card["stored_identity"]).exists())
 
     def test_missing_and_deleted_subjects_never_mutate_cards(self):
         card = self.card(subject=self.companion_subject)
@@ -926,6 +963,43 @@ class OfficialPreferenceActionTests(EvenniaTest):
         self.assertEqual(
             [row["image_id"] for row in api.cards_for(self.subject)],
             [card["image_id"]],
+        )
+
+    def test_an_undeclared_official_component_is_refused_and_never_carried(self):
+        from world.art import gallery_kinds
+
+        identity = self._index("a.png")
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+        stage = {"scale": 0.6, "x": 0.0, "y": -0.2}
+        api.set_official_geometry(self.subject, identity, face_rect=dict(rect), stage=dict(stage))
+        undeclared = gallery_kinds.capabilities_for(ArtSubjectKind.CHARACTER.value).with_values(
+            supports_face_rect=False
+        )
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.CHARACTER.value: undeclared},
+        ):
+            refused = self._dispatch(
+                "gallery.official.geometry.set",
+                {"subject_key": SUBJECT, "identity": identity, "face_rect": dict(rect)},
+            )
+            self.assertEqual((refused["outcome"], refused["code"]), ("rejected", "face_rect_unsupported"))
+            self.assertEqual(
+                api.official_preferences_for(self.subject).geometry,
+                {identity: {"face_rect": rect, "stage": stage}},
+            )
+            # A stage-only edit still succeeds: the stored rectangle the kind
+            # no longer declares is not re-sent to the writer.
+            moved = {"scale": 0.8, "x": 0.1, "y": 0.0}
+            self.assertEqual(
+                self._dispatch(
+                    "gallery.official.geometry.set",
+                    {"subject_key": SUBJECT, "identity": identity, "stage": dict(moved)},
+                )["outcome"],
+                "success",
+            )
+        self.assertEqual(
+            api.official_preferences_for(self.subject).geometry, {identity: {"stage": moved}}
         )
 
     @covers_requirement(

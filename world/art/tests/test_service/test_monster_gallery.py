@@ -166,6 +166,34 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         self.assertIsNone(gallery_api.record_for(self.subject))
 
     @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
+    def test_a_face_rect_is_accepted_only_where_the_kind_declares_it(self):
+        # gallery-kind-card-capabilities: the generation seam reads the
+        # face-rectangle declaration; a re-declared kind refuses the argument
+        # before any render or write, and the declared kind still accepts it.
+        from world.art import gallery_kinds
+
+        rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375}
+        undeclared = gallery_kinds.capabilities_for(self.subject.kind.value).with_values(
+            supports_face_rect=False
+        )
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {self.subject.kind.value: undeclared},
+        ):
+            with patch("world.art.sd_worker.render_prompt_pair") as render:
+                with self.assertRaises(gallery_api.GalleryRecordError) as caught:
+                    request_gallery_image(self.subject, face_rect=dict(rect))
+            render.assert_not_called()
+            # The shared default (no rectangle) stays legal for the kind.
+            request_gallery_image(self.subject)
+            self.assertEqual(len(self._gallery_jobs()), 1)
+        self.assertIn("declares no face rectangle support", str(caught.exception))
+        request_gallery_image(self.subject, face_rect=dict(rect))
+        self.assertEqual(len(self._gallery_jobs()), 2)
+
+    @covers_requirement(
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
     def test_an_unregistered_monster_key_is_rejected_before_any_write(self):

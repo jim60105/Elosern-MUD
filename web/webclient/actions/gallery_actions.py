@@ -47,6 +47,9 @@ REJECTION_MESSAGES = {
     "gallery_rejected": "無法更新這張肖像。",
     "entity_required": "此肖像為物種共用，不支援個人偏好設定。",
     "stage_rejected": "無法儲存比例調整。",
+    "face_rect_unsupported": "此類圖片不能調整臉框。",
+    "stage_unsupported": "此類圖片不能調整舞台位置。",
+    "delete_unsupported": "此類圖片不能刪除，請改用重新生成。",
 }
 _SUCCESS = {
     "gallery.generate": ("gallery_queued", "已加入肖像生成佇列。"),
@@ -254,6 +257,10 @@ def _error_code(error, *, resolved):
         return "binding_unsupported"
     if text == "this subject has no gallery record" or text.startswith(("no card with image_id ", "no valid card with image_id ")):
         return "unknown_card"
+    if "declares no face rectangle support" in text:
+        return "face_rect_unsupported"
+    if "declares no stage support" in text:
+        return "stage_unsupported"
     if text.startswith("stage"):
         return "stage_rejected"
     return "gallery_rejected"
@@ -296,6 +303,13 @@ def _mutate(action_id, payload):
         if action_id == "gallery.binding.save" and not capabilities_for(subject.kind.value).supports_bindings:
             log_warn("gallery_action", context=context)
             return _rejected("binding_unsupported")
+        if action_id == "gallery.card.delete" and not capabilities_for(subject.kind.value).supports_card_delete:
+            # Deletion is a declared kind fact enforced HERE, at the player
+            # action: the sole writer's remove_card stays unguarded for
+            # internal callers. A kind without it replaces its card by
+            # regeneration instead.
+            log_warn("gallery_action", context=context)
+            return _rejected("delete_unsupported")
         if image_id is not None and _UUID.fullmatch(image_id) is None:
             # An official identity can never name a card: the mounted artwork is
             # shared and read-only, so a DIRECT request is refused here — before
@@ -405,16 +419,20 @@ def _merge_official_geometry(subject, identity, image, payload):
     ``official-art-personalization``'s update tolerance).
     """
     stored = gallery_api.official_preferences_for(subject).geometry.get(identity, {})
+    capability = capabilities_for(subject.kind.value)
     merged = {}
+    # A stored component the kind no longer declares is not carried through:
+    # re-sending it would make the sole writer refuse an edit of the OTHER,
+    # still-declared component.
     if "face_rect" in payload:
         merged["face_rect"] = gallery_api.validate_face_rect(
             payload["face_rect"], image_size=image.image_size
         )
-    elif stored.get("face_rect") is not None:
+    elif stored.get("face_rect") is not None and capability.supports_face_rect:
         merged["face_rect"] = dict(stored["face_rect"])
     if "stage" in payload:
         merged["stage"] = gallery_api.validate_stage(payload["stage"])
-    elif stored.get("stage") is not None:
+    elif stored.get("stage") is not None and capability.supports_stage:
         merged["stage"] = dict(stored["stage"])
     if not merged:
         raise gallery_api.GalleryRecordError(

@@ -28,7 +28,10 @@ from world.art.gallery import (
     GalleryRecordError,
     append_card,
     cards_for,
+    clear_official_geometry,
+    official_preferences_for,
     record_for,
+    set_official_geometry,
     update_card_binding,
     update_card_face_rect,
     set_stage,
@@ -584,6 +587,134 @@ class CardBindingUpdateTests(EvenniaTestCase):
             updated = update_card_binding(carded, image_id, None)
         self.assertIsNone(updated["binding"])
         self.assertIsNone(cards_for(carded)[0]["binding"])
+
+
+_OFFICIAL = "preset/t_synth_preset/hero.png"
+_OFFICIAL_RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.375}
+_OFFICIAL_STAGE = {"scale": 1.4, "x": 0.1, "y": -0.2}
+
+
+@contextmanager
+def _declared(kind, **changes):
+    """Re-declare one kind through the declaration's test patch seam."""
+    record = gallery_kinds.GALLERY_KIND_CAPABILITIES[kind.value].with_values(**changes)
+    with patch.dict(gallery_kinds._CAPABILITIES_BY_KIND_VALUE, {kind.value: record}):
+        yield
+
+
+class CardGeometryCapabilityGateTests(EvenniaTestCase):
+    """The sole writer refuses geometry a kind does not declare.
+
+    ``gallery-kind-card-capabilities``: each guard reads the kind's
+    declaration, so re-declaring a kind through the patch seam changes what
+    the writer allows with no edit to ``world/art/gallery.py``.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name).resolve()
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.subject = _character("gate_hero")
+        self.image_id = _new_id()
+        append_card(self.subject, **_card_fields(self.subject, image_id=self.image_id))
+        set_official_geometry(
+            self.subject, _OFFICIAL, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
+        )
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        super().tearDown()
+
+    def _state(self):
+        return _raw_cards(self.subject), official_preferences_for(self.subject).geometry
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
+    def test_an_undeclared_stage_is_refused_with_no_write(self):
+        before = self._state()
+        with _declared(ArtSubjectKind.CHARACTER, supports_stage=False):
+            with patch("world.art.gallery.log_info") as info:
+                with self.assertRaises(GalleryRecordError) as refused:
+                    set_stage(self.subject, self.image_id, {"scale": 0.6, "x": 0.1, "y": 0})
+                with self.assertRaises(GalleryRecordError) as official:
+                    set_official_geometry(self.subject, _OFFICIAL, stage=dict(_OFFICIAL_STAGE))
+            # The face rectangle stays declared: its writers keep working.
+            update_card_face_rect(self.subject, self.image_id, {"x": 0, "y": 0, "w": 0.4, "h": 0.3})
+            set_official_geometry(self.subject, _OFFICIAL, face_rect=dict(_OFFICIAL_RECT))
+        for error in (refused.exception, official.exception):
+            self.assertIn(
+                f"subject kind {self.subject.kind.value!r} declares no stage support",
+                str(error),
+            )
+        self.assertEqual(info.call_args_list, [])
+        after_cards, after_geometry = self._state()
+        self.assertEqual(after_cards[0]["stage"], before[0][0]["stage"])
+        self.assertEqual(after_geometry, {_OFFICIAL: {"face_rect": _OFFICIAL_RECT}})
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
+    def test_an_undeclared_face_rect_is_refused_with_no_write(self):
+        before = self._state()
+        with _declared(ArtSubjectKind.CHARACTER, supports_face_rect=False):
+            with self.assertRaises(GalleryRecordError) as refused:
+                update_card_face_rect(
+                    self.subject, self.image_id, {"x": 0, "y": 0, "w": 0.4, "h": 0.3}
+                )
+            with self.assertRaises(GalleryRecordError) as official:
+                set_official_geometry(
+                    self.subject, _OFFICIAL, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
+                )
+            self.assertEqual(self._state(), before)
+            # The stage stays declared, and removing an override is never a
+            # face-rectangle write.
+            set_stage(self.subject, self.image_id, {"scale": 0.6, "x": 0.1, "y": 0})
+            self.assertTrue(clear_official_geometry(self.subject, _OFFICIAL))
+        for error in (refused.exception, official.exception):
+            self.assertIn("declares no face rectangle support", str(error))
+        self.assertEqual(_raw_cards(self.subject)[0]["face_rect"], before[0][0]["face_rect"])
+        self.assertEqual(official_preferences_for(self.subject).geometry, {})
+
+    def test_the_refusal_precedes_validation_and_record_reads(self):
+        # An invalid value and a missing record both still report the
+        # capability, so the guard runs before anything else.
+        fresh = _character("gate_fresh")
+        with _declared(ArtSubjectKind.CHARACTER, supports_stage=False, supports_face_rect=False):
+            with self.assertRaises(GalleryRecordError) as stage:
+                set_stage(fresh, _new_id(), {"scale": 99, "x": 0, "y": 0})
+            with self.assertRaises(GalleryRecordError) as rect:
+                update_card_face_rect(fresh, _new_id(), {"x": 0, "y": 0, "w": 0, "h": 0})
+        self.assertIn("declares no stage support", str(stage.exception))
+        self.assertIn("declares no face rectangle support", str(rect.exception))
+        self.assertIsNone(record_for(fresh))
+
+    def test_a_gallery_less_kind_keeps_its_established_refusal(self):
+        scene = ArtSubject(ArtSubjectKind.SCENE, "t_gate_scene")
+        for write in (
+            lambda: set_stage(scene, _new_id(), {"scale": 1, "x": 0, "y": 0}),
+            lambda: update_card_face_rect(scene, _new_id(), {"x": 0, "y": 0, "w": 0.4, "h": 0.3}),
+        ):
+            with self.assertRaises(GalleryRecordError) as refused:
+                write()
+            self.assertEqual(str(refused.exception), "this subject has no gallery record")
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
+    )
+    def test_declared_operations_keep_working(self):
+        stage = {"scale": 0.6, "x": 0.1, "y": 0}
+        rect = {"x": 0, "y": 0, "w": 0.4, "h": 0.3}
+        self.assertEqual(set_stage(self.subject, self.image_id, stage)["stage"], stage)
+        self.assertEqual(update_card_face_rect(self.subject, self.image_id, rect)["face_rect"], rect)
+        monster = _monster("gate_goblin")
+        monster_id = _new_id()
+        append_card(monster, **_card_fields(monster, image_id=monster_id))
+        self.assertEqual(set_stage(monster, monster_id, stage)["stage"], stage)
+        self.assertEqual(update_card_face_rect(monster, monster_id, rect)["face_rect"], rect)
 
 
 class SubjectKeyResolverTests(EvenniaTestCase):
