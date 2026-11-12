@@ -138,7 +138,6 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
 
     @covers_requirement(
         "art-gallery-resolution::gallery-urls-are-built-only-from-validated-card-identities",
-        "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts",
         "webclient-gallery-ui::gallery-previews-retain-exact-image-identity-and-reached-failures",
     )
     def test_original_404_falls_back_with_local_failure(self) -> None:
@@ -233,6 +232,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel",
         "webclient-gallery-ui::official-entries-render-as-selectable-read-only-rows-with-personal-geometry-affordances",
+        "webclient-gallery-ui::the-gallery-surface-renders-committed-categories-subjects-and-rows",
     )
     def test_official_and_synthetic_rows_carry_their_own_truth(self) -> None:
         page = self.logged_in_page()

@@ -1177,14 +1177,10 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(self.registry.render("gallery", self.context)["reason"]["code"], "gallery_unavailable")
 
     @covers_requirement(
-        "webclient-gallery-panel::the-subject-rail-names-every-gallery-bearing-subject-with-companion-first-ordering"
-    )
-    @covers_requirement(
         "artwork-descriptor::descriptors-reveal-only-authorized-exact-subjects"
     )
     def test_rail_prioritizes_companions_reserves_monsters_and_skips_corruption(self):
-        # The dead version-3 rail (deleted by gallery-v3-removal); its removed
-        # requirement annotation stays until archive sync retires it.
+        # The dead version-3 rail (deleted by gallery-v3-removal).
         other = create_object(NPC, key="其他角色")
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_other"}
         companion = create_object(NPC, key="同行角色")
@@ -1201,7 +1197,7 @@ class GalleryPresenterTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media",
-        "webclient-gallery-panel::filter-counts-and-the-equipment-summary-are-server-computed",
+        "webclient-gallery-panel::the-equipment-summary-and-capabilities-are-server-computed",
     )
     def test_card_chips_order_counts_and_overlap_are_server_facts(self):
         self.actor.db.equipment = {"weapon_main": "t_sword", "armor": "t_coat", "accessories": ["t_ring_b", "t_ring_a"]}

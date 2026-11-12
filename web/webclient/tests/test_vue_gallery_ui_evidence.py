@@ -127,7 +127,7 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     SHOWCASE_BUILD = "storybook"
 
     @covers_requirement(
-        "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts"
+        "webclient-gallery-ui::the-gallery-surface-renders-committed-categories-subjects-and-rows"
     )
     def test_panel_renders_committed_facts(self):
         # 'renders committed rows in payload order with no filter tabs, and
@@ -138,8 +138,7 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         # committed panel, the focusable disabled category announcing its
         # committed reason, and the empty category; 'waits for subject
         # publication rather than optimistically switching cards' pins the one
-        # select dispatch and publication-driven re-render. The annotation
-        # names the requirement this change removes; archive sync retires it.
+        # select dispatch and publication-driven re-render.
         _assert_vitest_passes(
             _run_vitest_once(GALLERY_COMPONENTS), "gallery panel facts"
         )

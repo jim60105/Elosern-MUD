@@ -11,69 +11,6 @@ documents the complete management journey.
 
 ## Requirements
 
-### Requirement: The gallery surface renders only committed panel facts
-
-The Vue application SHALL render the 角色肖像圖庫 management surface from the
-committed `gallery` panel only: its subject rail, filter-tab labels and counts,
-card order, chips, crown, pending spinner rows, failed rows, card labels,
-equipment summary, binding conditions, and overlap warnings SHALL come verbatim
-from the payload. The client SHALL NOT compose chips or labels, compute filter
-counts or overlap rules, read equipment state, or re-sort rows.
-
-#### Scenario: Tabs render the committed counts
-
-- **WHEN** the committed filters are all 8, defaults 1, bound 3, pending 1, failed 1
-- **THEN** the tab row shows 全部 (8) 預設 (1) 已綁定 (3) 生成中 (1) 失敗 (1) with no client arithmetic
-
-#### Scenario: A failed row renders the committed failure line
-
-- **WHEN** a row carries status `failed` with the committed zh-TW message
-- **THEN** the card shows that message verbatim and no image element, and the panel remains fully usable
-
-#### Scenario: Subject selection dispatches and waits for the panel
-
-- **WHEN** a rail row is activated
-- **THEN** exactly one `gallery.subject.select` dispatch carries that committed subject key, and the surface re-renders only when the new committed panel arrives
-
-#### Scenario: Same-label cards stay distinguishable
-- **WHEN** two cards share the label 「肖像」 and differ in `created_at`
-- **THEN** each shows its own relative date, its exact local instant is available on hover and to
-  assistive technology, its image's accessible name is 「肖像」 plus that instant, and no label is
-  parsed or rewritten
-
-#### Scenario: Impossible and future instants stay truthful
-- **WHEN** a row's `created_at` is in the future, or is finite but outside the calendar
-- **THEN** the future row reads a future-relative time, the impossible one reads 日期不詳, and both
-  keep their label and status
-
-#### Scenario: The date clock lives only while the gallery is open
-- **WHEN** the gallery stays open for a minute and then closes
-- **THEN** the relative dates refresh once and the minute clock is torn down with the surface
-
-#### Scenario: Crown and failure strings are committed verbatim
-- **WHEN** a row carries the default crown or the committed failure state
-- **THEN** the crown reads 「目前預設」 and the failed row reads 「暫時無法生成，稍後再試」, each exactly as payload text
-
-#### Scenario: Rows follow payload order and tabs only filter
-- **WHEN** the panel lists rows and the player switches filter tabs
-- **THEN** the list order is the payload order and each tab only FILTERS by the committed row status/`binding_present`/`is_default` facts
-
-#### Scenario: Static vocabulary stays client-owned and composition limited
-- **WHEN** the surface renders static chrome, filter labels, and the closed field/slot catalog
-- **THEN** those are client vocabulary, and the accessible name (the committed label followed by the exact local instant) is the only string the client composes around a label
-
-#### Scenario: Dates derive only from the structured created_at
-- **WHEN** a row's date is presented
-- **THEN** it is a localized relative time from `created_at` alone — 剛剛 within a minute either way, then minutes, hours, days, months or years, past or future — never parsed from a label, with the exact localized local date and time available to assistive technology and on hover
-
-#### Scenario: Unusable created_at values read 日期不詳
-- **WHEN** a row's `created_at` is non-numeric, non-finite, or out of the calendar
-- **THEN** the row reads 日期不詳 while keeping its label and status
-
-#### Scenario: Mutation gates follow panel availability
-- **WHEN** the committed panel is unavailable, and when it is available
-- **THEN** the surface locks its mutation controls while unavailable and mounts from the existing overlay host while available
-
 ### Requirement: The detail rail presents the selected card and gates destructive intent
 
 The 肖像詳情 rail SHALL show the selected card's committed preview, badges,
@@ -438,7 +375,7 @@ compose no official fact locally.
 #### Scenario: Official rows never reach the card grid
 
 - **WHEN** a payload carries three official rows and two card rows
-- **THEN** the card grid renders exactly the two card rows, the filter tabs keep the committed card counts, and the official rows render separately as read-only entries
+- **THEN** the card grid renders exactly the two card rows and the official rows render separately as read-only entries
 
 #### Scenario: Official row facts come verbatim from the payload
 
@@ -467,8 +404,8 @@ compose no official fact locally.
 
 #### Scenario: Official rows stay out of the card filter counts
 
-- **WHEN** the card filter tabs compute their counts
-- **THEN** official rows SHALL NOT be counted by the card filter tabs
+- **WHEN** the surface counts or lists card rows
+- **THEN** official rows SHALL NOT be counted or listed as card rows
 
 #### Scenario: Species previews preserve generation while declining personal writes
 - **WHEN** a registered visual-species gallery row carries supports_personal_official_preferences false
@@ -480,13 +417,12 @@ compose no official fact locally.
 - **AND** the decision uses only the committed official-entry list length, without a new payload field or client-composed official fact
 
 #### Scenario: Empty filters with official rows do not claim missing artwork
-- **WHEN** committed `official_entries` is non-empty and the player selects any card filter with zero matching visible card rows, including all, defaults, bound, pending or failed
-- **THEN** `gallery-panel__empty` is absent on that tab, the separate official rows remain visible, and committed card filter counts remain unchanged
+- **WHEN** committed `official_entries` is non-empty and the selected subject has zero card rows
+- **THEN** `gallery-panel__empty` is absent and the separate official rows remain visible
 
 #### Scenario: Empty-card guidance remains unchanged without official entries
-- **WHEN** the selected card filter has zero visible card rows and committed `official_entries` is an empty list
-- **THEN** the existing paragraph remains inside the cards area with class `gallery-panel__empty` and text `此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。`
-- **AND** this holds for an empty subject and a filter with no matches on a subject that has other card rows
+- **WHEN** the selected subject has zero card rows and committed `official_entries` is an empty list
+- **THEN** the existing paragraph remains inside the cards area with class `gallery-panel__empty`
 
 #### Scenario: Committed official-entry replacement updates guidance
 - **WHEN** zero visible card rows remain and a committed panel replacement changes `official_entries` from non-empty to empty or from empty to non-empty
@@ -502,3 +438,30 @@ Gallery card thumbnails, official rows, detail rails and binding/generation refe
 #### Scenario: All preview readers share the result
 - **WHEN** the same exact original appears in card, official-row, detail, binding or generation surfaces
 - **THEN** each uses the common lifecycle and shared message categories without a local failed-URL selector
+
+### Requirement: The gallery surface renders committed categories, subjects and rows
+The gallery surface SHALL render, from the committed `gallery` panel only, one control per committed category (disabled categories focusable and announcing their committed reason), the selected category's committed groups and subjects, and the selected subject's rows, chips, crown, pending and failed states verbatim. It SHALL render no filter tabs, compose no chips or labels and re-sort nothing.
+
+#### Scenario: A category press dispatches and waits for the panel
+- **WHEN** an enabled category control other than the committed `category` is activated
+- **THEN** exactly one `gallery.category.select` dispatch carries that key and the subjects shown change only when the new committed panel arrives
+
+#### Scenario: A disabled category announces its reason and sends nothing
+- **WHEN** a committed category with `enabled: false` is focused and activated
+- **THEN** its committed reason is exposed to assistive technology and no action is dispatched
+
+#### Scenario: Subject selection dispatches and waits for the panel
+- **WHEN** a listed subject is activated
+- **THEN** exactly one `gallery.subject.select` dispatch carries that committed subject key, and the surface re-renders only when the new committed panel arrives
+
+#### Scenario: A failed row renders the committed failure line
+- **WHEN** a row carries status `failed` with the committed zh-TW message
+- **THEN** the card shows that message verbatim and no image element, and the surface remains usable
+
+#### Scenario: Dates derive only from the structured created_at
+- **WHEN** a row's date is presented
+- **THEN** it is a localized relative time from `created_at` alone, with the exact local date and time available to assistive technology and on hover, and an unusable value reads 日期不詳
+
+#### Scenario: Mutation gates follow panel availability
+- **WHEN** the committed panel is unavailable
+- **THEN** the surface locks every mutation control

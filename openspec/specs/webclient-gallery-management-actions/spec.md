@@ -90,8 +90,8 @@ wrongly typed field before the adapter runs.
 #### Scenario: Selection validates rail membership through the service API
 
 - **WHEN** `gallery.subject.select` runs
-- **THEN** it uses `select_gallery_subject(session, actor, subject_key)` to validate current rail
-  membership and returns its result through the dispatcher
+- **THEN** it uses the version-4 selection store to validate membership of the selected
+  category and returns its result through the dispatcher
 
 #### Scenario: An official identity in a card field is refused by the adapter
 
@@ -107,18 +107,18 @@ Canonical requirement ID: `webclient-gallery-management-actions::subject-selecti
 
 `gallery.subject.select` SHALL accept exactly `subject_key`, SHALL write only
 the per-presentation-sequence selection store shipped by the gallery panel, and
-SHALL return stable code `unknown_subject` (zh-TW message) when the key names no
-current rail entry. It SHALL NOT create, mutate, or delete any gallery record,
+SHALL return stable code `unknown_subject` (zh-TW message) when the key is not
+listed in the selected category. It SHALL NOT create, mutate, or delete any gallery record,
 card, or job.
 
 #### Scenario: Selecting a rail subject re-renders the panel
 
-- **WHEN** a client selects a listed companion subject key
+- **WHEN** a client selects a companion subject key listed in the selected `party` category
 - **THEN** the result succeeds, one update contains `gallery`, `art`, and `roster`, gallery names the subject as `selected`, and the selection store is retired with the sequence at unpuppet
 
 #### Scenario: An unknown selection preserves state while refreshing presentation
 
-- **WHEN** a schema-valid selected key names no current rail entry
+- **WHEN** a schema-valid selected key is not listed in the selected category
 - **THEN** selection is rejected with `unknown_subject`, the prior selection and all gallery records remain unchanged, and one update re-renders gallery, art, and roster from the current state
 
 #### Scenario: Selection publishes its declared-panel update through the dispatcher
