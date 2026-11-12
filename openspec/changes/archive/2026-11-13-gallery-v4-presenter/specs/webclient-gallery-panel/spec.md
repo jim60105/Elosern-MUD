@@ -16,7 +16,7 @@ The version-4 gallery projection SHALL carry every category descriptor and only 
 - **THEN** both results are identical and no gallery record, card, job or preference changed
 
 ### Requirement: The version-4 selection is remembered per category with fallbacks
-The session SHALL remember one category and one subject per category for the owning character, retired with the presentation sequence. A remembered subject no longer listed SHALL fall back to the category default (the live character in `mine`, else the first listed subject, else null); a remembered category that is disabled SHALL fall back to `mine`. A fresh session SHALL open on `mine` with the live character selected.
+The session SHALL remember one category and one subject per category for the owning character, kept across possession and retired when the session puppets another owner or ends. A remembered subject no longer listed SHALL fall back to the category default (the live character in `mine`, else the first listed subject, else null); a remembered category that is disabled SHALL fall back to `mine`. A fresh session SHALL open on `mine` with the live character selected.
 
 #### Scenario: A fresh session opens on the live character
 - **WHEN** a session with no stored selection builds the projection

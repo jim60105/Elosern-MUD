@@ -46,7 +46,6 @@ calls it and keeps its exact output (its tests must stay green unchanged).
 @dataclass(frozen=True)
 class GalleryViewSelection:
     owner_id: int                 # gallery_owner(actor).pk
-    epoch: str                    # coordinator epoch
     category: str
     subjects: tuple[tuple[str, str], ...]   # (category, subject_key) pairs
 
@@ -55,10 +54,19 @@ def select_gallery_category(session, actor, category) -> dict
 def select_gallery_subject_v4(session, actor, subject_key) -> dict
 ```
 
-- Stored on `session.ndb.gallery_view`; `retire_gallery_selection` also clears
-  it (same unpuppet signal and sequence reset).
-- Snapshot is valid only when `session.puppet is actor`, `owner_id ==
-  gallery_owner(actor).pk` and `epoch == coordinator.epoch`.
+- Stored on `session.ndb.gallery_view`. It is bound to the owning character,
+  not to the presentation epoch: real possession unpuppets the owner and resets
+  the coordinator sequence (`reset_client_sequence` → `coordinator.reset()`),
+  yet the spec requires the selection to survive possession. So
+  `retire_gallery_selection` and `coordinator.reset()` deliberately leave
+  `gallery_view` alone, and a `SIGNAL_OBJECT_POST_PUPPET` receiver clears it
+  whenever the session puppets an object whose `gallery_owner` differs from
+  `owner_id` (or cannot be resolved). Possession (where `possessed_by` is set
+  before the puppet transfer) and handback keep the owner, so the view
+  survives; puppeting another character retires it; a new session starts
+  without one.
+- Snapshot is valid only when `session.puppet is actor`, a coordinator is
+  attached and `owner_id == gallery_owner(actor).pk`.
 - `select_gallery_category`: rejects `{"outcome":"rejected","code":
   "unknown_category","message":"找不到此圖庫分類"}` unless the key is an enabled
   category; on success keeps the subject map and sets `category`; logs
@@ -89,11 +97,13 @@ def select_gallery_subject_v4(session, actor, subject_key) -> dict
   filled in `ingress.py` via `gallery_view_snapshot`).
 - Subject row: `subject_key`, `kind`, `display_name`, `is_current`,
   `card_count = len(gallery_api.cards_for(subject))`, `artwork =
-  validate_artwork(describe_portrait(subject, ref.entity))`; any exception
-  there sets `artwork: None` and logs `gallery_tile_artwork_failed` (warn) —
-  one bad tile never degrades the panel.
+  validate_artwork(describe_portrait(subject, ref.entity))` when that
+  descriptor resolves an image attempt, else `None` (the spec's "null when none
+  resolves"); any exception there sets `artwork: None` and logs
+  `gallery_tile_artwork_failed` (warn) — one bad tile never degrades the panel.
 - Group row: `key`, `label`, `seen`, `total`, `expanded: True`, `count =
-  len(subjects)`.
+  len(subjects)`. The selected category's groups are read once; its category
+  row's `count` is taken from those same groups so the two cannot disagree.
 - Selected-subject fields from D1, or the empty set of D1 of
   `gallery-v4-validators` when nothing is selected; `description: None`.
 - Return `validate_gallery_v4(payload)`.

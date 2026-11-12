@@ -1,7 +1,7 @@
-"""Gallery projection (version three) and exact wire schemas (versions three and four).
+"""Gallery projections and exact wire schemas (versions three and four).
 
-No mutation or service probe. The version-four validator is exported but not
-yet registered.
+No mutation or service probe. The version-four builder and validator are
+exported but not yet registered.
 """
 
 import hashlib
@@ -21,7 +21,9 @@ from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_match import card_identity_resolution, fallback_for
 from world.art.gallery_prompt import GALLERY_PROMPT_FIELDS
-from world.art.presenter import GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, media_url_for
+from world.art.presenter import (
+    GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, describe_portrait, media_url_for,
+)
 from world.art.queue import MAX_PENDING_GALLERY_JOBS, pending_gallery_jobs
 from world.art.subjects import (
     ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
@@ -34,6 +36,9 @@ from world.rules.party import live_companions
 
 from . import artwork as artwork_wire
 from .context import PresentationContext
+from .gallery_categories import (
+    DISABLED_REASONS, GalleryCategoryError, category_groups, gallery_categories,
+)
 from .protocol import (
     MAX_CANONICAL_JSON_BYTES, MAX_LIST_ITEMS, MAX_SAFE_INTEGER,
     ProtocolValidationError, _require_exact_fields, check_json_safety, json_byte_size,
@@ -960,15 +965,14 @@ def _official_entries(subject, entity, generation, terminal) -> list[dict]:
     return entries
 
 
-def gallery_presenter(context: PresentationContext):
-    """Project one selected gallery. Reads never create or consolidate records."""
-    from .coordinator import PresentationCoordinator
+def _selected_subject_fields(subject, entity) -> dict:
+    """The selected subject's card facts, shared by every panel version.
 
-    if PresentationCoordinator.mode_for(context) != "exploration":
-        raise PanelUnavailableError
-    rail = gallery_subjects(context.actor)
-    selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
-    subject, entity = selected[1:]
+    Returns ``cards``, ``official_entries``, ``equipment_summary``,
+    ``capabilities`` (the version-three capability record), ``binding_warnings``,
+    ``error_state`` and ``filters`` (only version three publishes it). Reads
+    never create or consolidate records.
+    """
     capability = capabilities_for(subject.kind.value)
     # Observe jobs first: if one settles before the card read, dedupe favors the card.
     pending = pending_gallery_jobs(subject)
@@ -1024,12 +1028,141 @@ def gallery_presenter(context: PresentationContext):
             generation[0], descriptors.GENERATION_FAILED,
         ))
     rows.sort(key=lambda row: -row["created_at"])
-    return validate_gallery({
-        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
-        "subjects": [entry[0] for entry in rail], "selected": subject.full(),
+    return {
         "filters": _filters(rows), "cards": rows,
         "official_entries": _official_entries(subject, entity, generation, terminal),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
         "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,
+    }
+
+
+def gallery_presenter(context: PresentationContext):
+    """Project one selected gallery. Reads never create or consolidate records."""
+    from .coordinator import PresentationCoordinator
+
+    if PresentationCoordinator.mode_for(context) != "exploration":
+        raise PanelUnavailableError
+    rail = gallery_subjects(context.actor)
+    selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
+    subject, entity = selected[1:]
+    return validate_gallery({
+        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
+        "subjects": [entry[0] for entry in rail], "selected": subject.full(),
+        **_selected_subject_fields(subject, entity),
+    })
+
+
+def _resolve_category(view) -> str:
+    """The remembered category while it is enabled, else ``mine``."""
+    category = getattr(view, "category", None)
+    if category in GALLERY_CATEGORY_KEYS and category not in DISABLED_REASONS:
+        return category
+    return "mine"
+
+
+def _resolve_view(actor, view):
+    """``(category, selected ref or None, groups)`` with the stored-selection fallbacks.
+
+    The remembered subject of the resolved category while it is still listed,
+    else the category's current subject (the live character in ``mine``), else
+    its first listed subject, else nothing. May raise ``GalleryCategoryError``.
+    """
+    category = _resolve_category(view)
+    groups = category_groups(actor, category)
+    refs = [ref for group in groups for ref in group.subjects]
+    remembered = next(
+        (key for pair_category, key in getattr(view, "subjects", ()) if pair_category == category),
+        None,
+    )
+    selected = (
+        next((ref for ref in refs if ref.subject.full() == remembered), None)
+        or next((ref for ref in refs if ref.is_current), None)
+        or (refs[0] if refs else None)
+    )
+    return category, selected, groups
+
+
+def _tile_artwork(ref):
+    """One tile's resolved default artwork descriptor, or ``None``.
+
+    ``None`` when the subject resolves no image; a failure here is logged and
+    degrades only this tile, never the panel.
+    """
+    try:
+        descriptor = artwork_wire.validate_artwork(describe_portrait(ref.subject, ref.entity))
+    except Exception as exc:  # observability: ignore R2: logged below; one bad tile must not fail the panel
+        log_warn("gallery_tile_artwork_failed", context={"subject": ref.subject.full()}, exc=exc)
+        return None
+    if not any(attempt["type"] == "image" for attempt in descriptor["attempts"]):
+        return None
+    return descriptor
+
+
+def _subject_row(ref):
+    subject = ref.subject
+    return {
+        "subject_key": subject.full(), "kind": subject.kind.value,
+        "display_name": ref.display_name, "is_current": ref.is_current,
+        "card_count": len(gallery_api.cards_for(subject)),
+        "artwork": _tile_artwork(ref),
+    }
+
+
+def build_gallery_v4(context: PresentationContext):
+    """Project the version-4 gallery: one category, its groups, the selected subject.
+
+    Reads only. Not yet registered: ``gallery-v4-cutover`` registers it.
+    """
+    from .coordinator import PresentationCoordinator
+
+    if PresentationCoordinator.mode_for(context) != "exploration":
+        raise PanelUnavailableError
+    actor = context.actor
+    try:
+        categories = gallery_categories(actor)
+        category, selected, groups = _resolve_view(actor, context.gallery_view)
+    except GalleryCategoryError as exc:
+        log_warn("gallery_category_failed", context={"char": getattr(actor, "pk", None)}, exc=exc)
+        raise PanelUnavailableError from exc
+    group_rows = [
+        {
+            "key": group.key, "label": group.label, "seen": group.seen, "total": group.total,
+            "expanded": True, "count": len(group.subjects),
+            "subjects": [_subject_row(ref) for ref in group.subjects],
+        }
+        for group in groups
+    ]
+    # The selected category's count comes from the groups held here, so the
+    # two reads of one build can never disagree.
+    category_rows = [
+        {
+            "key": row.key,
+            "count": sum(len(group.subjects) for group in groups) if row.key == category else row.count,
+            "enabled": row.enabled, "reason": row.reason,
+        }
+        for row in categories
+    ]
+    if selected is None:
+        fields = {
+            "selected": None, "cards": [], "official_entries": [],
+            "equipment_summary": None, "capabilities": None,
+            "binding_warnings": [], "error_state": None,
+        }
+    else:
+        subject = selected.subject
+        fields = _selected_subject_fields(subject, selected.entity)
+        del fields["filters"]
+        capability = capabilities_for(subject.kind.value)
+        fields["capabilities"] = {
+            **fields["capabilities"],
+            "supports_face_rect": capability.supports_face_rect,
+            "supports_stage": capability.supports_stage,
+            "supports_card_delete": capability.supports_card_delete,
+        }
+        fields["selected"] = subject.full()
+    return validate_gallery_v4({
+        "schema_version": GALLERY_V4_SCHEMA_VERSION, "available": True, "kind": "gallery",
+        "categories": category_rows, "category": category, "groups": group_rows,
+        "description": None, **fields,
     })
