@@ -35,8 +35,9 @@ scene backgrounds at all.
 
 ## Delivery
 
-The work is four independent pieces, shipped in this order. Each gets its own
-OpenSpec change.
+The work is four stages, shipped in this order. Each stage is split into
+OpenSpec changes of at most one working day (8 hours) each; see "Proposals"
+and "Parallel implementation batches" below.
 
 0. **Remove the baseline art-only visual species** (see "Prerequisite").
    Small, and it removes a special case from everything after it.
@@ -49,6 +50,80 @@ OpenSpec change.
 The window, the wall, the page and the panel shape are designed for all five
 categories now, so specifications 2 and 3 add data and enable a tab without
 reshaping the wire or the layout.
+
+### Proposals
+
+24 changes under `openspec/changes/`. Estimates are the proposer's, each
+within the 8-hour cap. Every change leaves master green on its own: the v4
+server work and the new components land additive and unmounted, one cutover
+change switches the wire, and one mount change replaces the old surface.
+
+| # | Change | Stage | Est. | Scope | Depends on |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `remove-baseline-visual-species` | 0 | 7h | Remove the twelve baseline species, `Monster.art_species_key` and its readers; the startup prune reclaims stored art of unregistered monster keys | — |
+| 2 | `gallery-kind-card-capabilities` | 1 | 5h | Declare and enforce per-kind face-rect, stage-transform and card-delete facts | — |
+| 3 | `gallery-category-sources` | 1 | 6h | Read-only sources for `mine`, `party`, `monster` and the admission predicate | 1 |
+| 4 | `gallery-v4-validators` | 1 | 8h | Mirrored additive v4 validators, the subject ceiling, v4 client fixtures | 2 |
+| 5 | `gallery-v4-presenter` | 1 | 7h | Additive v4 builder and the per-category selection store | 3, 4 |
+| 6 | `gallery-category-select-action` | 1 | 3h | Register `gallery.category.select` | 5 |
+| 7 | `gallery-v4-cutover` | 1 | 8h | Switch registration, allowlist and fixtures to v4; minimal adaptation of the old panel; browser journey | 5, 6 |
+| 8 | `gallery-v3-removal` | 1 | 3h | Delete the dead v3 code | 7 |
+| 9 | `gallery-mutation-admission` | 1 | 4h | Mutating actions re-derive subject admission | 7 |
+| 10 | `gallery-tile-completion-refresh` | 1 | 3h | Art pushes refresh the wall's subject tiles | 7 |
+| 11 | `gallery-wall-component` | 1 | 7h | Wall, tray and the keyboard contract, unmounted | 4 |
+| 12 | `gallery-image-page` | 1 | 6h | Image page with the capability-driven footer, unmounted | 2, 4 |
+| 13 | `gallery-window-component` | 1 | 6h | Window composition, rail and editor lifecycle, unmounted | 11, 12 |
+| 14 | `gallery-window-mount` | 1 | 7h | Mount the window, rename the tool to 圖庫, delete the old panel | 7, 13 |
+| 15 | `met-person-record` | 2 | 5h | Per-character met-person record and its writer | — |
+| 16 | `met-person-write-points` | 2 | 5h | Writes from talk, look, service use and invite | 15 |
+| 17 | `gallery-people-category` | 2 | 6h | People source with exactly one place expanded | 8, 9, 14, 15, 16 |
+| 18 | `gallery-group-expansion` | 2 | 7h | `gallery.group.select` and clickable place headings | 17 |
+| 19 | `scene-kind-gallery` | 3 | 7h | The scene kind becomes gallery-bearing; the scene chain reads the gallery first | 2 |
+| 20 | `scene-asset-migration` | 3 | 8h | Startup conversion of classic scene assets; scene producers switch to the gallery | 19 |
+| 21 | `scene-classic-fallback-removal` | 3 | 7h | Remove the classic fallback from the scene chain; restage browser scene fixtures | 20 |
+| 22 | `entered-archetype-record` | 3 | 4h | Per-character record of entered archetypes at the room-entry seam | — |
+| 23 | `gallery-landscape-page` | 3 | 5h | Landscape page and scene labels | 12, 18 |
+| 24 | `gallery-scene-category` | 3 | 7.5h | Scene source, scene tile artwork and description, scene subject keys in both validators | 17, 21, 22, 23 |
+
+### Parallel implementation batches
+
+Changes in one batch have every dependency in an earlier batch and share no
+file or spec capability, so they can be implemented at the same time. Batches
+run in order.
+
+| Batch | Changes |
+| --- | --- |
+| 1 | `remove-baseline-visual-species`, `gallery-kind-card-capabilities`, `met-person-record`, `entered-archetype-record` |
+| 2 | `gallery-category-sources`, `gallery-v4-validators`, `met-person-write-points`, `scene-kind-gallery` |
+| 3 | `gallery-v4-presenter`, `scene-asset-migration` |
+| 4 | `gallery-category-select-action`, `gallery-wall-component`, `scene-classic-fallback-removal` |
+| 5 | `gallery-v4-cutover`, `gallery-image-page` |
+| 6 | `gallery-v3-removal`, `gallery-mutation-admission`, `gallery-tile-completion-refresh`, `gallery-window-component` |
+| 7 | `gallery-window-mount` |
+| 8 | `gallery-people-category` |
+| 9 | `gallery-group-expansion` |
+| 10 | `gallery-landscape-page` |
+| 11 | `gallery-scene-category` |
+
+Why some pairs without a dependency are still kept apart:
+
+- `gallery-wall-component`, `gallery-image-page` and
+  `gallery-window-component` each append to `component-manifest.json`, the
+  showcase evidence tests and the v4 fixtures; the first two also share
+  `gallery-window-model.js`.
+- `gallery-category-select-action`, `gallery-mutation-admission`,
+  `gallery-people-category` and `gallery-group-expansion` edit the gallery
+  action registry and its `webclient-action-dispatch` requirement.
+- `gallery-v4-cutover`, `gallery-v3-removal`, `gallery-people-category` and
+  `gallery-scene-category` edit the gallery presenter, the selection store
+  and the validators.
+- `gallery-v4-cutover` and `gallery-window-mount` both modify
+  `webclient-gallery-ui`.
+- `gallery-kind-card-capabilities` and `scene-kind-gallery` both edit
+  `gallery_kinds.py`; the three scene changes after it touch the art
+  presenter, the art service and the scene capabilities in sequence.
+- `gallery-group-expansion` and `gallery-landscape-page` both edit
+  `GalleryWall.vue`.
 
 ## Prerequisite: remove the baseline art-only visual species
 
