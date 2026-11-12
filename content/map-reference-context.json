@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "b143a568db810ad0145de1e34b2c688e3d745c5194863eb85840ca09eb3dd1eb",
+  "fingerprint": "c3006998928b492a8939a9b53f7281017e846fd8aaaf96eb263334eeeb38392f",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -1529,6 +1529,38 @@
       },
       {
         "capacity": 3,
+        "composition_key": "reef_warden_cove_group",
+        "coordinates": [
+          268,
+          490
+        ],
+        "individual_name_zh": null,
+        "key": "reef_warden_cove",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "tide_lamp_crab",
+            "species_name_zh": "潮燈蟹",
+            "variant_key": "reef_warden",
+            "variant_name_zh": "守礁型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "tide_lamp_crab",
+            "species_name_zh": "潮燈蟹",
+            "variant_key": "shore_walker",
+            "variant_name_zh": "灘行型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 3,
         "composition_key": "reef_warden_reef_group",
         "coordinates": [
           1822,
@@ -1641,6 +1673,94 @@
       },
       {
         "capacity": 3,
+        "composition_key": "salt_dike_holder_dike_group",
+        "coordinates": [
+          468,
+          98
+        ],
+        "individual_name_zh": null,
+        "key": "salt_dike_holder_dike",
+        "kind": "camp",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "salt_snort_iguana",
+            "species_name_zh": "噴鹽鬣蜥",
+            "variant_key": "salt_dike_holder",
+            "variant_name_zh": "冠刺型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "salt_snort_iguana",
+            "species_name_zh": "噴鹽鬣蜥",
+            "variant_key": "seacliff_basker",
+            "variant_name_zh": "曬崖型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "salt_mound_soldier_mound_group",
+        "coordinates": [
+          850,
+          320
+        ],
+        "individual_name_zh": null,
+        "key": "salt_mound_soldier_mound",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "salt_column_ant",
+            "species_name_zh": "負鹽蟻",
+            "variant_key": "salt_mound_soldier",
+            "variant_name_zh": "守丘型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "salt_column_ant",
+            "species_name_zh": "負鹽蟻",
+            "variant_key": "salt_hauler",
+            "variant_name_zh": "搬鹽型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 1,
+        "composition_key": "seawall_den_holder_den_member",
+        "coordinates": [
+          290,
+          408
+        ],
+        "individual_name_zh": null,
+        "key": "seawall_den_holder_den",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "shell_crack_shrimp",
+            "species_name_zh": "碎殼蝦",
+            "variant_key": "seawall_den_holder",
+            "variant_name_zh": "深穴型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 3,
         "composition_key": "spring_keeper_pool_group",
         "coordinates": [
           1420,
@@ -1705,6 +1825,30 @@
       },
       {
         "capacity": 1,
+        "composition_key": "sunken_anchor_boss",
+        "coordinates": [
+          814,
+          106
+        ],
+        "individual_name_zh": "沉錨",
+        "key": "sunken_anchor_boss_site",
+        "kind": "boss_site",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "wreck_arm_octopus",
+            "species_name_zh": "沉船巨蛸",
+            "variant_key": "wreck_den_elder",
+            "variant_name_zh": "沉骸型"
+          }
+        ],
+        "one_shot": true,
+        "recover_after_ticks": null,
+        "region_key": "southwest_coast"
+      },
+      {
+        "capacity": 1,
         "composition_key": "tide_mouth_boss",
         "coordinates": [
           2100,
@@ -1726,6 +1870,38 @@
         "one_shot": true,
         "recover_after_ticks": null,
         "region_key": "southeast_coast"
+      },
+      {
+        "capacity": 3,
+        "composition_key": "tide_pool_elder_pool_group",
+        "coordinates": [
+          532,
+          104
+        ],
+        "individual_name_zh": null,
+        "key": "tide_pool_elder_pool",
+        "kind": "nest",
+        "members": [
+          {
+            "maximum": 1,
+            "minimum": 1,
+            "species_key": "stiff_arm_starfish",
+            "species_name_zh": "硬腕海星",
+            "variant_key": "tide_pool_elder",
+            "variant_name_zh": "老礁型"
+          },
+          {
+            "maximum": 2,
+            "minimum": 2,
+            "species_key": "stiff_arm_starfish",
+            "species_name_zh": "硬腕海星",
+            "variant_key": "oyster_rack_creeper",
+            "variant_name_zh": "爬架型"
+          }
+        ],
+        "one_shot": false,
+        "recover_after_ticks": 86400,
+        "region_key": "southwest_coast"
       },
       {
         "capacity": 1,
@@ -3883,6 +4059,254 @@
           ]
         ],
         "region_key": "northwest_highland_forest",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_salt_ferry_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_salt_ferry_east_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_ferry_east_hinterland_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_ferry_east_hinterland_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            409,
+            428,
+            477,
+            496
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_salt_ferry_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_salt_ferry_west_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_ferry_west_hinterland_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_ferry_west_hinterland_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            388,
+            407,
+            477,
+            496
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_salt_road_east_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_salt_road_east_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_road_east_hinterland_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_road_east_hinterland_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1024,
+            1043,
+            337,
+            356
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "city_salt_road_west_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "city_salt_road_west_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_road_west_hinterland_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "city_salt_road_west_hinterland_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            997,
+            1016,
+            359,
+            378
+          ]
+        ],
+        "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -8983,6 +9407,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_fishers_cove_hinterland_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_fishers_cove_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9301,6 +9753,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_south_tide_hinterland_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_south_tide_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9605,6 +10085,34 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "port_white_sail_hinterland_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "port_white_sail_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -9619,6 +10127,186 @@
         "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "salt_road_southeast_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "salt_road_southeast_wild_reef_burrow_striker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "shell_crack_shrimp",
+                "species_name_zh": "碎殼蝦",
+                "variant_key": "reef_burrow_striker",
+                "variant_name_zh": "穴擊型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southeast_wild_seacliff_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "salt_snort_iguana",
+                "species_name_zh": "噴鹽鬣蜥",
+                "variant_key": "seacliff_basker",
+                "variant_name_zh": "曬崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southeast_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southeast_wild_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southeast_wild_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1110,
+            1139,
+            110,
+            139
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "salt_road_southwest_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "salt_road_southwest_wild_reef_burrow_striker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "shell_crack_shrimp",
+                "species_name_zh": "碎殼蝦",
+                "variant_key": "reef_burrow_striker",
+                "variant_name_zh": "穴擊型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southwest_wild_seacliff_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "salt_snort_iguana",
+                "species_name_zh": "噴鹽鬣蜥",
+                "variant_key": "seacliff_basker",
+                "variant_name_zh": "曬崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southwest_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southwest_wild_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "salt_road_southwest_wild_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            930,
+            959,
+            120,
+            149
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
         "wave_budget": 3
       },
       {
@@ -9913,6 +10601,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "south_tide_east_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "south_tide_east_wild_reef_burrow_striker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "shell_crack_shrimp",
+                "species_name_zh": "碎殼蝦",
+                "variant_key": "reef_burrow_striker",
+                "variant_name_zh": "穴擊型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_tide_east_wild_seacliff_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "salt_snort_iguana",
+                "species_name_zh": "噴鹽鬣蜥",
+                "variant_key": "seacliff_basker",
+                "variant_name_zh": "曬崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_tide_east_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_tide_east_wild_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "south_tide_east_wild_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            720,
+            749,
+            100,
+            129
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "southeast_road_01",
         "lower_density": 1,
         "pool": [
@@ -10113,6 +10891,96 @@
       },
       {
         "cell_capacity": 3,
+        "key": "southwest_east_cape_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_east_cape_wild_reef_burrow_striker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "shell_crack_shrimp",
+                "species_name_zh": "碎殼蝦",
+                "variant_key": "reef_burrow_striker",
+                "variant_name_zh": "穴擊型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_east_cape_wild_seacliff_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "salt_snort_iguana",
+                "species_name_zh": "噴鹽鬣蜥",
+                "variant_key": "seacliff_basker",
+                "variant_name_zh": "曬崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_east_cape_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_east_cape_wild_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_east_cape_wild_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1270,
+            1299,
+            90,
+            119
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
         "key": "southwest_road_01",
         "lower_density": 1,
         "pool": [
@@ -10154,6 +11022,20 @@
                 "species_name_zh": "潮燈蟹",
                 "variant_key": "shore_walker",
                 "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_01_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
               }
             ],
             "weight": 1
@@ -10219,6 +11101,20 @@
               }
             ],
             "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_02_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
           }
         ],
         "recovery_delay": 3600,
@@ -10228,6 +11124,316 @@
             397,
             211,
             230
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_03",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_03_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_03_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_03_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            1188,
+            1207,
+            416,
+            435
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_04",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_04_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_04_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_04_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            549,
+            568,
+            337,
+            356
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_05",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_05_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_05_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_05_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            850,
+            869,
+            287,
+            306
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_06",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_06_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_06_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_06_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            612,
+            631,
+            258,
+            277
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 3,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "southwest_road_07",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "southwest_road_07_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_07_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "southwest_road_07_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            498,
+            517,
+            235,
+            254
           ]
         ],
         "region_key": "southwest_coast",
@@ -11433,6 +12639,68 @@
           ]
         ],
         "region_key": "eastern_plains",
+        "replenishment_interval": 600,
+        "upper_density": 4,
+        "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "town_olive_ferry_hinterland",
+        "lower_density": 2,
+        "pool": [
+          {
+            "composition_key": "town_olive_ferry_hinterland_salt_hauler",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_olive_ferry_hinterland_salt_hauler_pair",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "town_olive_ferry_hinterland_salt_hauler_column",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 3,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            704,
+            723,
+            232,
+            251
+          ]
+        ],
+        "region_key": "southwest_coast",
         "replenishment_interval": 600,
         "upper_density": 4,
         "wave_budget": 3
@@ -13610,6 +14878,96 @@
         "replenishment_interval": 600,
         "upper_density": 3,
         "wave_budget": 3
+      },
+      {
+        "cell_capacity": 3,
+        "key": "white_sail_north_wild",
+        "lower_density": 1,
+        "pool": [
+          {
+            "composition_key": "white_sail_north_wild_reef_burrow_striker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "shell_crack_shrimp",
+                "species_name_zh": "碎殼蝦",
+                "variant_key": "reef_burrow_striker",
+                "variant_name_zh": "穴擊型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "white_sail_north_wild_seacliff_basker",
+            "members": [
+              {
+                "maximum": 2,
+                "minimum": 1,
+                "species_key": "salt_snort_iguana",
+                "species_name_zh": "噴鹽鬣蜥",
+                "variant_key": "seacliff_basker",
+                "variant_name_zh": "曬崖型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "white_sail_north_wild_shore_walker",
+            "members": [
+              {
+                "maximum": 1,
+                "minimum": 1,
+                "species_key": "tide_lamp_crab",
+                "species_name_zh": "潮燈蟹",
+                "variant_key": "shore_walker",
+                "variant_name_zh": "灘行型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "white_sail_north_wild_oyster_rack_creeper",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "stiff_arm_starfish",
+                "species_name_zh": "硬腕海星",
+                "variant_key": "oyster_rack_creeper",
+                "variant_name_zh": "爬架型"
+              }
+            ],
+            "weight": 1
+          },
+          {
+            "composition_key": "white_sail_north_wild_salt_hauler",
+            "members": [
+              {
+                "maximum": 3,
+                "minimum": 2,
+                "species_key": "salt_column_ant",
+                "species_name_zh": "負鹽蟻",
+                "variant_key": "salt_hauler",
+                "variant_name_zh": "搬鹽型"
+              }
+            ],
+            "weight": 1
+          }
+        ],
+        "recovery_delay": 3600,
+        "rectangles": [
+          [
+            280,
+            309,
+            440,
+            469
+          ]
+        ],
+        "region_key": "southwest_coast",
+        "replenishment_interval": 600,
+        "upper_density": 2,
+        "wave_budget": 3
       }
     ]
   },
@@ -13667,8 +15025,8 @@
     "world/lore/items/vocab.py": "0c13bb1dc25c8df3f641884e7be47045ccb0e3e3301da7133058e0ac7340860e",
     "world/lore/magic.py": "f1ae1ffe5f9c9ffba58ac9ea78f80618c80d1ef2d763c7e3b545e7bf8af27dc8",
     "world/lore/map_districts.py": "5a3e96fa284cf4ecaa3bb1590f4080405a13c98164b402c4a275336a88c71039",
-    "world/lore/monster_activity.py": "f466bd65e753a92506689c0b6bffa684e94270625f2fc52ec8980f2300239f34",
-    "world/lore/monster_placement.py": "b1cc3bce1c18cb7b40af0d764037d73d59e30d46a07a5c0e97c79c1b3487441b",
+    "world/lore/monster_activity.py": "43fed5f72929a064b7a8aa90124414e487cfe2a3cf916526fc11ac8239cf10f5",
+    "world/lore/monster_placement.py": "0258cf1a8875edb1a4f46c6e041183cd99337a8d0f8fc53c64a02cbaeb4d9809",
     "world/lore/monster_species.py": "a26bc1664c5e976320e3b44b2d35d313b10d2419a824239623536aa7ad8440d4",
     "world/lore/monster_visuals.py": "973f5ecbc54b805716f2b9706f27f51807ea5f58f99821618d5d2c37876ce4e6",
     "world/lore/monsters.py": "550abd3a3571da752b02bb75cf941dc2ab0fb89269ed32be8680cab5c9fc92bf",

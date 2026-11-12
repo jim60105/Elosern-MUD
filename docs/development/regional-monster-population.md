@@ -842,6 +842,66 @@ activity area and site ground keeps the authored edge distance from every other
 landed one, that each new deep-wild rectangle holds water-adjacent ground, and
 that the added compositions initialize within their zones' existing bounds.
 
+### Hinterland, corridors, deep wild and sites: south-west coast
+
+**Belts.** This change completes the south-west coast's monster placement. Wave 1
+gave each port a hinterland belt and deferred the hinterland of the inland ferry
+settlements because the region had no low-tier dry-ground species; the
+dry-ground ant now supplies that tier, so both ferry cities and the olive town
+receive the hinterland zones beside their own ground. The port hinterlands keep
+their rectangle, extent and configured behaviour exactly as they were; only the
+composition mix inside them changes. New trunk-road corridors follow the salt
+road and the routes between the ports and the inland towns, and deep-wild zones
+lie on the remote shore. The declarations remain the only authority for keys,
+rectangles, pools and bindings, so this section repeats no coordinate, density,
+configured timing or count.
+
+**Species fit.** The salt-column ant (負鹽蟻) is the new low animal of the dry
+ground: it forages the salt road, the olive groves and the storehouse ground
+around the ferry cities and the olive town, and it alone follows the added
+corridors, which hold no water of their own. The stiff-arm starfish (硬腕海星)
+and the ant are the new low company beside the ports, joining the crab (潮燈蟹)
+on ground the fishing families already work. The shell-crack shrimp (碎殼蝦) and
+the salt-snort iguana (噴鹽鬣蜥) are the mid-tier animals of the deep wild, with
+the crab, the starfish and the ant around them; every deep-wild zone touches
+water, so a shore pool never sits on dry ground. The shrimp and the iguana answer
+on contact while the low company stays passive, so an ordinary encounter still
+waits for engagement and keeps the light-adventure tone of
+`docs/lore/monster-creation-guidelines.md` §5.
+
+**Recorded deviations.** The remote corridors carry no mid-tier composition:
+both south-west mid-tier ordinary animals are shore animals and every corridor
+rectangle is dry ground. The corridor belt is also sparser than one corridor per
+forty to sixty kilometres of trunk road; the corridor rules and the programme's
+overall zone budget limit the belt, and a human reviewer may add corridors later
+without any test edit. Both deviations are recorded for human review.
+
+**Sites.** The stronger variants occupy recoverable places: the ant's
+salt-crusted nest mound, the starfish's deep pool, the shrimp's seawall den, the
+iguana's warm salt-pan dike and the crab's reef of 守礁型. Each re-forms after
+clearing and answers only when an intruder enters its defended extent. The
+one-shot octopus boss 沉錨 holds a wreck on the sea cliffs east of 南潮港,
+matching the species' wreck-and-sea-cave dossier. The shipped crocodile boss
+sites stay as they are. No stronger or high-tier variant joins an ordinary pool.
+
+**Verification.** Focused runs, each executed independently from the worktree
+root with the single-token environment file `/tmp/mud-belts.env`
+(`MUD_TEST_SETTINGS=1`):
+
+| Command | Result |
+| --- | --- |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_placement` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.lore.tests.test_monster_activity` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_population_geometry` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_content_expansion_sites` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population` | OK |
+| `uv run --locked --env-file=/tmp/mud-belts.env evennia test --settings test_settings.py --keepdb world.quests.tests.test_hunt_catalog_content` | OK |
+| `world.maps.tests.test_bootstrap.test_bootstrap_grid` | Not run locally: non-gating observation, and the local command-duration budget forbids the label; no before and after duration exists for this change. |
+| `uv run --locked python -m tools.map_reference_context --check` | exit 0, up to date |
+| `uv run --locked python -m tools.contract_gate --change southwest-coast-placement` | passed |
+| `openspec validate southwest-coast-placement --strict` | valid |
+
 ## Assertion roles and requirement mapping
 
 The delta requirements were synced into
