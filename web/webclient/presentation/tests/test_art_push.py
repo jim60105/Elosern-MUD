@@ -497,9 +497,23 @@ class ArtPushPresenterTests(EvenniaTestCase):
             image_size={"width": 1000, "height": 1000},
         )
 
+        # The rail spends its budget on the visual-species prefix first, so a
+        # shipped roster larger than the rail would push every character out
+        # and this character-gallery publication could never be observed. The
+        # rail's own truncation rule is a different contract; here the two
+        # species this module uses keep the character selectable without
+        # depending on how many species ship today.
+        visual_registry = {
+            key: get_monster_visual_registry()[key]
+            for key in (_MONSTER_KEY_A, _MONSTER_KEY_B)
+        }
         with (
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.art_push.log_info") as info_mock,
+            patch(
+                "web.webclient.presentation.gallery.get_monster_visual_registry",
+                return_value=visual_registry,
+            ),
         ):
             # Selected is also set to other_key so gallery matches, art catalog references it, and make account own other_char too so roster matches!
             account.characters.add(other_char)
