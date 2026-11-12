@@ -3199,3 +3199,105 @@ tuning.
 
 The prose was transcribed from this change's design and is pending human
 editorial review in the ledger.
+
+## 坑道灶馬
+
+This section records the first delivered species of the western hills Wave 4.
+坑道灶馬 (`shaft_leap_cricket`) is a low-tier cave cricket whose ordinary
+default variant is 躍窖型 (`cellar_leaper`, grade F); it owns the single hind
+kick 蓄腿蹬踢 (`coiled_hind_kick`), and 守坑型 (`old_shaft_leaper`, grade E) is
+the older individual that leads the swarm at an abandoned shaft mouth.
+
+### Role constraints and the chosen literals
+
+The design fixes roles, not numbers, so the review states the relation each
+chosen literal holds rather than repeating a value table. The complete literal
+profile and its authored grade live only in `world/lore/monster_species.py` and
+are band-checked at import.
+
+* Light cellar leaper: agility one below the low band's ceiling, defense one
+  above the band floor, and hit points in the band's lower part.
+* The kit spends no MP, so the MP pool is zero; the SP pool holds three casts
+  of the kick's cost on 躍窖型 and five casts on 守坑型.
+* The lift (+2 agility for 15 s) is below the rat's shipped self agility rise
+  (+3), so this species' own mount is the weaker of the two.
+* The stronger 守坑型 leads a swarm at an abandoned shaft mouth at grade E: a
+  local, avoidable threat, not a site boss.
+
+### Reuse of the self-guard strike representative
+
+The kit declares the shipped self-guard strike composition signature
+`(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self",
+None))`. Its representative is unchanged: `burrow_maker`, declared in
+`world.rules.tests.test_tide_lamp_crab_resource_skill`, whose production smoke
+exercises the representative itself. Both new variant keys sort after that
+representative (`"burrow_maker" < "cellar_leaper" < "old_shaft_leaper"`), so
+no smoke module, shard entry or seed entry is added;
+`world.rules.tests.test_monster_composition_coverage` derives the whole group
+from the shipped declarations, so it establishes these variants' membership and
+the representative wiring without executing every member.
+
+### Decision mode
+
+Both variants bind the legacy `instinctive` archetype: `lowest_hp` targeting,
+`first_owned` skill choice, with that archetype's authored flee threshold of
+0.35. No intelligence value, decision-mode override or `monster_behaviour.yaml`
+edit is authored, so the startup tuning moves only through this change's new
+buff definition and modifier rule.
+
+The kit's determinism was observed rather than assumed. A temporary probe,
+run twice consecutively and deleted afterwards
+(`world.rules.tests.test_shaft_leap_cricket_selection_probe`, 2 tests, OK both
+times), constructed both variants through the production construction entry
+point and decided through `combat_session.policies._enemy_policy` with
+`world.rules.monster_behaviour.dice.roll_d100` patched to raise: against one
+unique lowest-hit-point opponent each variant selected `coiled_hind_kick`
+twice in a row with no selection die, a drained SP pool fell back to
+`basic_attack` without dice, and the inclusive 35% flee edge was reproduced
+(the edge flees, one hit point above it selects the kit). The probe was not
+committed, because design D7 authors no test file and a committed module would
+need a shard entry this change does not touch. Equal-hit-point targets keep
+the ordinary target-selection tie-break, which is unrelated to skill choice.
+
+### Focused commands and results
+
+`/tmp/mud-species.env` contains `MUD_TEST_SETTINGS=1`. Every label was run from
+the worktree root with
+`uv run --locked --env-file=/tmp/mud-species.env evennia test --settings test_settings.py --keepdb <label>`:
+
+| label | result |
+| --- | --- |
+| `world.lore.tests.test_monster_species_content` | 17 tests, OK |
+| `world.lore.tests.test_monster_visuals` | 7 tests, OK |
+| `world.lore.tests.test_bestiary_documentation` | 13 tests, OK |
+| `world.rules.tests.test_monster_composition_coverage` | 4 tests, OK, run twice consecutively |
+| `world.rules.tests.test_tide_lamp_crab_resource_skill` | 1 test, OK, run twice consecutively |
+| `world.skills.tests.test_skill_registry.test_registry_contract.AuthoredMonsterKitContractTests` | 4 tests, OK |
+| `world.rules.tests.test_combat_modifiers.CombatModifierTests` | 121 tests, OK, run as two exhaustive disjoint focused method-label batches (61 + 60) collected once from the class and split because the local focus guard caps `evennia test` discovery at 100 |
+| `world.skills.tests.test_narration_catalog` | 42 tests, OK |
+| `world.skills.tests.test_skill_registry.test_out_of_combat_policy` | 6 tests, OK |
+| `world.rules.tests.test_monster_ai_activation.ActivationRecordTests` | 4 tests, OK after re-fingerprinting; before it, 1 of 4 failed on the recorded fingerprint comparison |
+| `.ActivationBindingTests` | 4 tests, OK |
+| `.RollbackTests` | 3 tests, OK after re-fingerprinting; before it, 2 of 3 failed on the recorded fingerprint comparison |
+
+The registry import check succeeds and the registry holds 39 species and 70
+variants. The remaining gates passed:
+`uv run --locked python -m tools.map_reference_context` followed by `--check`,
+`uv run --locked python -m tools.contract_gate --change
+shaft-leap-cricket-species` and `openspec validate shaft-leap-cricket-species
+--strict`. The committed manifest files `.github/evennia-shards.json`,
+`tools/test_data_lint_seed.json` and `tools/test_data_freeze.json` are
+unchanged.
+
+This link adds one timed effect and one modifier, so the startup tuning
+fingerprint moved from `8b56d98c...` to `7c1cafd7...`; the selector report was
+regenerated under the new tuning at its own baseline commit `18141b8a...`, the
+activation record and its rollback fingerprint (`4c696e11...` to `6639e736...`)
+were updated, and `activated` and `activation_bindings` are unchanged. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
+
+### Human review of the prose
+
+The prose was transcribed from this change's design and is pending human
+editorial review in the ledger.

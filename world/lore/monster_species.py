@@ -1274,6 +1274,23 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "wreck_den_elder",
         True,
     ),
+    MonsterSpecies(
+        "shaft_leap_cricket",
+        "坑道灶馬",
+        "坑道灶馬是約手掌長的穴居蟋蟀類魔獸，成群棲息於西部丘陵的礦坑坑道、作坊地窖與磨坊的倉房。",
+        "淺褐色的身體向上拱起，光滑的外殼帶著深色斑紋。"
+        "觸角比身體長上好幾倍，後腿粗壯修長，大腿鼓起，小腿上排著細刺。",
+        "牠們躲在陰暗潮濕的角落，夜裡成群爬出，啃食皮革、蠟燭的油脂、麵粉與穀屑，也會聚到礦工的燈旁。"
+        "牠的後腿帶著異常的彈力，一蹬就能在漆黑的坑道裡躍出十幾步遠，落地後立刻又縮起後腿準備下一跳。"
+        "西部丘陵的作坊與磨坊多半挖有地窖存放皮料與麵粉，坑道灶馬一旦在地窖裡繁衍開來，就會咬壞水車的皮帶與麵粉袋。"
+        "近身時，牠以後腿猛力蹬踢對手，蹬踢時後腿順勢縮起蓄力，短時間內身形更加靈活。",
+        ("western_hills_valleys",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；後腿異常彈力的成因不在設定中交代。",
+        "（作者私有：作者解釋）低階群居灶馬：後腿彈力屬於身體能力，不帶元素、不發出鳴聲干擾；戰鬥呈現為蹬踢與自身短暫敏捷提升。描寫維持昆蟲體態。連結礦坑坑道、作坊地窖與磨坊水車的皮帶。",
+        "（作者私有：尚未證實的猜想）灰岩城的礦工說坑道灶馬成群往坑口爬的日子，坑道深處就會滲水，這種說法尚未證實。",
+        "cellar_leaper",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2360,6 +2377,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("wreck_arm_bind", "wreck_arm_sweep",),
         passive_skill_keys=(),
         behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "cellar_leaper",
+        "shaft_leap_cricket",
+        "躍窖型",
+        "普通版本，成群躲在地窖與坑道的陰暗角落，夜裡出來覓食。",
+        "low",
+        True,
+        MonsterCombatProfile(
+            hp=30, mp=0, sp=9, atk_phys=5, agility=11, defense=3, magic_power=0
+        ),
+        "F",
+        True,
+        active_skill_keys=("coiled_hind_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "old_shaft_leaper",
+        "shaft_leap_cricket",
+        "守坑型",
+        "住在廢棄礦坑口、後腿最長的老個體，坑口一有燈光靠近，就帶著整群躍出。",
+        "low",
+        False,
+        MonsterCombatProfile(
+            hp=52, mp=0, sp=15, atk_phys=9, agility=12, defense=4, magic_power=0
+        ),
+        "E",
+        True,
+        active_skill_keys=("coiled_hind_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
 )
 

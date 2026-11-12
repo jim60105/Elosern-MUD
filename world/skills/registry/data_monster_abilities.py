@@ -91,6 +91,9 @@ The wreck-arm octopus's two water strikes are assembled the same way with
 physical-school damage that reads the actor's physical attack: one single-target
 arm bind and one area arm sweep, each paid in both MP and SP, and the area cast
 resolves every recipient's own hit and defense while the action pays once.
+The shaft-leap cricket's coiled hind kick is assembled the same way with
+elementless physical damage plus a self-mounted agility lift granted by every
+resolved attempt.
 """
 
 from world.skills.effects import (
@@ -1316,6 +1319,29 @@ ROWS: tuple[SkillDef, ...] = (
         prerequisites=(),
         effect_policies=(
             EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+        ),
+    ),
+    _skill(
+        "coiled_hind_kick",
+        "蓄腿蹬踢",
+        "以後腿猛力蹬踢單一敵方目標，造成物理傷害；蹬踢時後腿順勢縮起蓄力，短暫提高自身敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"sp": 3},
+        # A damage-carrying ability: its field use is opening a fight, so it
+        # stays selectable outside combat like the other monster strikes.
+        usable_out_of_combat=True,
+        effects=["damage:none:physical", "self_buff_apply:coiled_legs"],
+        category=SkillCategory.MARTIAL_ARTS,
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("shaft_leap_cricket",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(coefficient=0.8, audience=EffectAudience.ENEMIES),
+            EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF),
         ),
     ),
 )
