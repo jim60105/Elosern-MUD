@@ -115,9 +115,6 @@ class PresentationContext:
     protocol_version: int
     session_tag: str | None = field(default=None)
     proposal: ProposalSnapshot | None = field(default=None)
-    # Dead version-3 rail selection, read only by the unregistered
-    # ``gallery_presenter_v3``; ``gallery-v3-removal`` drops it.
-    gallery_subject: str | None = field(default=None)
     combat_round: Any = field(default=None)
     skill_use: tuple[int, str, float] | None = field(default=None)
     party_actor: int | None = field(default=None)

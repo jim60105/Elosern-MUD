@@ -247,10 +247,7 @@ def build_presentation_context(
     gallery presenter, copied through ``gallery_view_snapshot``; like ``party_view`` it is bound to the owning
     character and survives possession.
     """
-    from web.webclient.presentation.gallery_selection import (
-        gallery_selection_snapshot,
-        gallery_view_snapshot,
-    )
+    from web.webclient.presentation.gallery_selection import gallery_view_snapshot
     from web.webclient.presentation.party_actor_selection import (
         party_actor_selection_snapshot,
     )
@@ -264,7 +261,6 @@ def build_presentation_context(
         actor=actor,
         protocol_version=PROTOCOL_VERSION,
         proposal=proposal_snapshot(session, actor),
-        gallery_subject=gallery_selection_snapshot(session, actor),
         combat_round=combat_round,
         skill_use=skill_use_selection_snapshot(session, actor),
         party_actor=party_actor_selection_snapshot(session, actor),

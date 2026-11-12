@@ -275,7 +275,6 @@ class GalleryActionIntegrationTests(EvenniaTest):
             )
         }
         for target in (
-            "web.webclient.presentation.gallery.get_monster_visual_registry",
             "web.webclient.presentation.gallery_categories.get_monster_visual_registry",
             "world.lore.monster_visuals.get_monster_visual_registry",
             "world.art.subjects.get_monster_visual_registry",
@@ -695,9 +694,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
     def category_dispatch(self, category, payload=None):
         """Dispatch one category selection, spying on the publication request.
 
-        The registered version-3 panels do not read the version-4 view store,
-        so the transmitted delta may be empty; the publication request and its
-        declared panels are the observable "one update".
+        The transmitted delta may be empty when no visible panel changed; the
+        publication request and its declared panels are the observable "one
+        update".
         """
         with patch.object(
             self.coordinator, "enqueue_publication", wraps=self.coordinator.enqueue_publication
@@ -780,7 +779,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         for name, action, payload, accepted in wire_cases():
             if accepted or "\\ud800" in repr(payload):
                 continue  # lone surrogate is an envelope rejection, tested by wire parity
-            with self.subTest(case=name), patch.object(actions, "_mutate") as mutate, patch.object(actions, "select_gallery_subject_v4") as select:
+            with self.subTest(case=name), patch.object(actions, "_mutate") as mutate, patch.object(actions, "select_gallery_subject") as select:
                 result = self.dispatch(action, payload)
                 self.assertEqual(result["code"], "malformed_payload")
                 mutate.assert_not_called()

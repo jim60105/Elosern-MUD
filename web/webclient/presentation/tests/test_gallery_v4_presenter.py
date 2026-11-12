@@ -31,7 +31,7 @@ from web.webclient.presentation.gallery_selection import (
     GalleryViewSelection,
     gallery_view_snapshot,
     select_gallery_category,
-    select_gallery_subject_v4,
+    select_gallery_subject,
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
@@ -195,7 +195,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         identity = self._card("t_v4_companion_b")
         session = self._session()
         select_gallery_category(session, self.actor, "party")
-        select_gallery_subject_v4(session, self.actor, "portrait:character:t_v4_companion_a")
+        select_gallery_subject(session, self.actor, "portrait:character:t_v4_companion_a")
         panel = self._build(session)
         self.assertEqual(panel["selected"], "portrait:character:t_v4_companion_a")
         rows = {row["subject_key"]: row for row in panel["groups"][0]["subjects"]}
@@ -280,10 +280,10 @@ class GalleryV4PresenterTests(EvenniaTest):
         session = self._session()
         companion_b = "portrait:character:t_v4_companion_b"
         select_gallery_category(session, self.actor, "party")
-        self.assertEqual(select_gallery_subject_v4(session, self.actor, companion_b)["code"], "gallery_selected")
+        self.assertEqual(select_gallery_subject(session, self.actor, companion_b)["code"], "gallery_selected")
         select_gallery_category(session, self.actor, "monster")
         self.assertEqual(self._build(session)["selected"], f"portrait:monster:{T_A}")
-        select_gallery_subject_v4(session, self.actor, f"portrait:monster:{T_B}")
+        select_gallery_subject(session, self.actor, f"portrait:monster:{T_B}")
         self.assertEqual(self._build(session)["selected"], f"portrait:monster:{T_B}")
         select_gallery_category(session, self.actor, "party")
         panel = self._build(session)
@@ -299,7 +299,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         companion_b = self._companion("同行乙", "t_v4_companion_b")
         session = self._session()
         select_gallery_category(session, self.actor, "party")
-        select_gallery_subject_v4(session, self.actor, "portrait:character:t_v4_companion_b")
+        select_gallery_subject(session, self.actor, "portrait:character:t_v4_companion_b")
         stored = session.ndb.gallery_view
         self._leave_party(companion_b)
         panel = self._build(session)
@@ -348,7 +348,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         record_species_sighting(player, T_B)
         record_species_sighting(npc, T_B)
         select_gallery_category(self.session, player, "monster")
-        select_gallery_subject_v4(self.session, player, f"portrait:monster:{T_A}")
+        select_gallery_subject(self.session, player, f"portrait:monster:{T_A}")
         enter_possession(player, npc)
         self.assertIs(self.session.puppet, npc)
         self.assertIsNotNone(gallery_view_snapshot(self.session, npc))
@@ -405,7 +405,7 @@ class GalleryV4PresenterTests(EvenniaTest):
             self.assertIs(session.ndb.gallery_view, stored)
         # Listed in another enabled category, but not in the selected one.
         for subject_key in (f"portrait:monster:{T_A}", "portrait:character:t_v4_actor", 7):
-            result = select_gallery_subject_v4(session, self.actor, subject_key)
+            result = select_gallery_subject(session, self.actor, subject_key)
             self.assertEqual(
                 result,
                 {"outcome": "rejected", "code": "unknown_subject", "message": "找不到此圖庫對象"},

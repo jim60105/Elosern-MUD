@@ -36,13 +36,10 @@ from web.webclient.presentation.gallery import (
     GALLERY_MAX_PANEL_SUBJECTS,
     SLOT_LABELS,
     gallery_presenter,
-    gallery_presenter_v3,
-    gallery_subjects,
     validate_gallery,
-    validate_gallery_v3,
 )
 from web.webclient.presentation.gallery_selection import (
-    gallery_view_snapshot, select_gallery_category, select_gallery_subject_v4,
+    gallery_view_snapshot, select_gallery_category, select_gallery_subject,
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import (
@@ -210,52 +207,192 @@ def geometry(panel, index=0):
     return candidate(panel, index)["geometry"]
 
 
-def payload():
-    """File-local synthetic character wire fixture, independent of shipped content."""
+def card_rows():
+    """One synthetic default card row of the selected subject."""
+    return [{
+        "image_id": image_id(1), "status": "card", "label": "測試肖像",
+        "artwork": card_descriptor(1), "is_default": True,
+        "chips": ["預設臉框", "目前預設"], "requested_fields": ["appearance"],
+        "binding_present": False, "created_at": 100,
+    }]
+
+
+def equipment_summary():
+    """A synthetic equipment summary with every slot empty."""
+    return {
+        "weapon_main": {"value": None, "display_name": "未裝備"},
+        "weapon_off": {"value": None, "display_name": "未裝備"},
+        "armor": {"value": None, "display_name": "未裝備"},
+        "accessories": {"value": [], "display_names": [], "equipped_count": 0},
+    }
+
+
+def retired_rail_payload():
+    """The retired version-3 rail shape, kept only to prove the validators refuse it."""
     return {
         "schema_version": 3, "available": True, "kind": "gallery",
         "subjects": [{"subject_key": _SUBJECT_KEY, "kind": "portrait:character", "display_name": "測試角色", "is_puppet": True}],
         "selected": _SUBJECT_KEY,
         "filters": {"all": 1, "defaults": 1, "bound": 0, "pending": 0, "failed": 0},
-        "cards": [{
-            "image_id": image_id(1), "status": "card", "label": "測試肖像",
-            "artwork": card_descriptor(1), "is_default": True,
-            "chips": ["預設臉框", "目前預設"], "requested_fields": ["appearance"],
-            "binding_present": False, "created_at": 100,
-        }],
-        "equipment_summary": {
-            "weapon_main": {"value": None, "display_name": "未裝備"},
-            "weapon_off": {"value": None, "display_name": "未裝備"},
-            "armor": {"value": None, "display_name": "未裝備"},
-            "accessories": {"value": [], "display_names": [], "equipped_count": 0},
-        },
+        "cards": card_rows(),
+        "equipment_summary": equipment_summary(),
         "capabilities": {"supports_bindings": True, "supports_field_selection": True, "supports_free_text": True, "supports_personal_official_preferences": True, "max_cards": None},
         "binding_warnings": [], "error_state": None, "official_entries": [],
     }
 
 
-class GalleryWireTests(unittest.TestCase):
-    """Parity of the dead version-3 validator pair (``validate_gallery_v3`` and
-    its JS mirror ``validateGalleryPanelV3``), kept until ``gallery-v3-removal``.
-    """
+_V4_CAPABILITIES = {
+    "supports_bindings": True, "supports_field_selection": True, "supports_free_text": True,
+    "supports_personal_official_preferences": True, "supports_face_rect": True,
+    "supports_stage": True, "supports_card_delete": True, "max_cards": None,
+}
+
+
+def v4_subject(number, *, current=False, artwork=True, kind="character"):
+    """One synthetic version-4 subject tile."""
+    key = _SUBJECT_KEY if number == 0 else f"portrait:{kind}:t_{number}"
+    return {
+        "subject_key": key, "kind": f"portrait:{kind}", "display_name": "測試角色",
+        "is_current": current, "card_count": 1,
+        "artwork": card_descriptor(number + 1, subject_key=key) if artwork else None,
+    }
+
+
+def v4_group(key, subjects, *, label=None, seen=None, total=None, expanded=True, count=None):
+    """One synthetic version-4 group; ``count`` defaults to the listed subjects."""
+    return {
+        "key": key, "label": label, "seen": seen, "total": total, "expanded": expanded,
+        "count": len(subjects) if count is None else count, "subjects": subjects,
+    }
+
+
+def payload_v4():
+    """File-local synthetic version-4 fixture: mine, one selected subject, one card."""
+    return {
+        "schema_version": 4, "available": True, "kind": "gallery",
+        "categories": [
+            {"key": "mine", "count": 1, "enabled": True, "reason": None},
+            {"key": "party", "count": 0, "enabled": True, "reason": None},
+            {"key": "people", "count": 0, "enabled": False, "reason": "測試停用"},
+            {"key": "monster", "count": 0, "enabled": True, "reason": None},
+            {"key": "scene", "count": 0, "enabled": False, "reason": "測試停用"},
+        ],
+        "category": "mine",
+        "groups": [v4_group("mine", [v4_subject(0, current=True)])],
+        "selected": _SUBJECT_KEY, "description": None,
+        "cards": card_rows(), "official_entries": [],
+        "equipment_summary": equipment_summary(),
+        "capabilities": dict(_V4_CAPABILITIES),
+        "binding_warnings": [], "error_state": None,
+    }
+
+
+def v4_empty(p, category="party"):
+    """Select an enabled category with no subject: every card fact is empty."""
+    p["category"] = category
+    p["categories"][0]["count"] = 0
+    p["groups"] = []
+    p.update(
+        selected=None, description=None, cards=[], official_entries=[], binding_warnings=[],
+        equipment_summary=None, capabilities=None, error_state=None,
+    )
+
+
+def v4_collapsed(p, count=7):
+    """Add a labelled collapsed group carrying only its count."""
+    p["groups"].append(v4_group("place:t_hall", [], label="測試大廳", expanded=False, count=count))
+    p["categories"][0]["count"] += count
+
+
+def v4_subjects(p, count, *, artwork=False):
+    """Replace the one group with ``count`` subjects, the first selected."""
+    subjects = [v4_subject(i, current=i == 0, artwork=artwork) for i in range(count)]
+    p["groups"] = [v4_group("mine", subjects)]
+    p["categories"][0]["count"] = count
+
+
+def v4_case(modify):
+    value = payload_v4()
+    modify(value)
+    return value
+
+
+class GalleryCutoverTests(unittest.TestCase):
+    """The registered gallery is version 4 on both sides of the wire."""
+
+    @covers_requirement(
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_registry_and_both_validators_speak_version_4(self):
+        from web.webclient.presentation import gallery as gallery_module
+        from web.webclient.presentation import gallery_categories
+
+        self.assertEqual(gallery_module.GALLERY_CATEGORY_KEYS, gallery_categories.CATEGORY_KEYS)
+        spec = build_production_registry().spec("gallery")
+        self.assertEqual(spec.schema_version, 4)
+        self.assertIs(spec.presenter, gallery_presenter)
+        script = """
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+process.stdout.write(JSON.stringify([protocol.PANEL_ALLOWLIST.gallery, protocol.GALLERY_CATEGORY_KEYS]));
+"""
+        output = subprocess.run(["node", "-e", script], text=True, capture_output=True, cwd=ROOT, check=True)
+        self.assertEqual(json.loads(output.stdout), [4, list(gallery_categories.CATEGORY_KEYS)])
+        # The version-3 rail shape is refused by the registered validator.
+        with self.assertRaises(ProtocolValidationError):
+            validate_gallery(retired_rail_payload())
+
+
+class GalleryV4ParityTests(unittest.TestCase):
+    """Dual-direction parity of the version-4 validators (Python and the JS mirror)."""
+
+    def assert_parity(self, cases):
+        """Every (name, payload, expected) case gets the same verdict on both sides.
+
+        Cases travel as JSON text to both sides, so an integral float such as
+        ``7.0`` reaches Python exactly as the wire would deliver it.
+        """
+        script = """
+const fs = require('node:fs');
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
+const results = cases.map(([name, value]) => {
+  try { return [name, true, protocol.validateGalleryPanel(value)]; }
+  catch (_) { return [name, false, null]; }
+});
+process.stdout.write(JSON.stringify(results));
+"""
+        text = json.dumps(cases)
+        output = subprocess.run(["node", "-e", script], input=text, text=True, capture_output=True, cwd=ROOT, check=True)
+        js_results = json.loads(output.stdout)
+        for (name, value, expected), (_, js_accepts, echoed) in zip(json.loads(text), js_results, strict=True):
+            with self.subTest(case=name):
+                try:
+                    validate_gallery(value)
+                    python_accepts = True
+                except ProtocolValidationError:
+                    python_accepts = False
+                self.assertEqual(python_accepts, expected)
+                self.assertEqual(js_accepts, expected)
+                if js_accepts:
+                    self.assertEqual(validate_gallery(echoed), value)
 
     @covers_requirement(
         "webclient-gallery-panel::the-gallery-payload-is-exactly-version-mirrored-across-server-and-client"
     )
-    def test_bidirectional_boundary_parity(self):
-        cases = [("valid", payload(), True)]
+    def test_card_fact_boundaries_match_on_both_sides(self):
+        """The selected subject's card facts: rows, descriptors, official entries, bounds."""
+        cases = [("valid", payload_v4(), True)]
         def add(name, modify, accepted=False):
-            value = payload()
+            value = payload_v4()
             modify(value)
             cases.append((name, value, accepted))
         add("unknown top key", lambda p: p.update(extra=1))
         add("unknown nested key", lambda p: p["cards"][0].update(extra=1))
         add("wrong schema boolean", lambda p: p.update(schema_version=True))
-        add("integral numeric schema", lambda p: p.update(schema_version=3.0), True)
         add("unknown selection", lambda p: p.update(selected="portrait:character:absent"))
-        add("surrogate", lambda p: p["subjects"][0].update(display_name="\ud800"))
-        add("name at cap", lambda p: p["subjects"][0].update(display_name="𠮷" * 64), True)
-        add("name over cap", lambda p: p["subjects"][0].update(display_name="𠮷" * 65))
+        add("surrogate", lambda p: p["groups"][0]["subjects"][0].update(display_name="\ud800"))
+        add("name at cap", lambda p: p["groups"][0]["subjects"][0].update(display_name="𠮷" * 64), True)
+        add("name over cap", lambda p: p["groups"][0]["subjects"][0].update(display_name="𠮷" * 65))
         add("label at cap", lambda p: p["cards"][0].update(label="畫" * 128), True)
         add("label over cap", lambda p: p["cards"][0].update(label="畫" * 129))
         add("rect zero", lambda p: geometry(p)["face_rect"].update(w=0))
@@ -274,9 +411,6 @@ class GalleryWireTests(unittest.TestCase):
         add("fractional timestamp", lambda p: p["cards"][0].update(created_at=100.125), True)
         add("timestamp boolean", lambda p: p["cards"][0].update(created_at=True))
         add("unsafe timestamp", lambda p: p["cards"][0].update(created_at=2**53))
-        add("wrong count", lambda p: p["filters"].update(all=2))
-        add("boolean count", lambda p: p["filters"].update(all=True))
-        add("integral numeric count", lambda p: p["filters"].update(all=1.0), True)
         add("foreign URL", lambda p: candidate(p).update(url=f"/art/gallery/character/other/{image_id(1)}.png"))
         add("unsupported extension", lambda p: candidate(p).update(url=candidate(p)["url"] + ".svg"))
         add("jpg extension", lambda p: candidate(p).update(url=candidate(p)["url"][:-4] + ".jpg"), True)
@@ -337,10 +471,6 @@ class GalleryWireTests(unittest.TestCase):
             }]
             p["cards"][0]["artwork"]["attempts"] = []
             p["cards"][0]["artwork"]["retention_sources"] = []
-            p["filters"] = {
-                "all": 1, "defaults": 0, "bound": 0,
-                "pending": int(status == "pending"), "failed": int(status == "failed"),
-            }
             p["error_state"] = (
                 {"code": "sd_connection_error", "at": 200}
                 if status == "failed"
@@ -596,12 +726,8 @@ class GalleryWireTests(unittest.TestCase):
             lambda p: official_identity_case(p, GALLERY_MAX_OFFICIAL_IDENTITY + 1),
         )
         add("warning missing card", lambda p: p["binding_warnings"].append({"image_id": image_id(99), "label": "不存在", "conditions": ["防具：未裝備"]}))
-        def subjects(p, count):
-            p["subjects"].extend({"subject_key": f"portrait:character:t_{i}", "kind": "portrait:character", "display_name": "其他角色", "is_puppet": False} for i in range(count - 1))
-        add("rail at cap", lambda p: subjects(p, 24), True)
-        add("rail over cap", lambda p: subjects(p, 25))
         def subject_key(p, key):
-            p["selected"] = p["subjects"][0]["subject_key"] = f"portrait:character:{key}"
+            p["selected"] = p["groups"][0]["subjects"][0]["subject_key"] = f"portrait:character:{key}"
             candidate(p)["url"] = f"/art/gallery/character/{key}/{image_id(1)}.avif"
         add("URL 129", lambda p: subject_key(p, "a" * 64), True)
         add("key byte cap", lambda p: subject_key(p, "𠮷" * 50), True)
@@ -625,7 +751,6 @@ class GalleryWireTests(unittest.TestCase):
             }]
             p["cards"][0]["artwork"]["attempts"] = []
             p["cards"][0]["artwork"]["retention_sources"] = []
-            p["filters"] = {"all": 1, "defaults": 0, "bound": 0, "pending": 0, "failed": 1}
             p["error_state"] = {"code": "sd_connection_error", "at": 200}
         add("failed row", failed, True)
         def pending_rows(p, count):
@@ -635,7 +760,6 @@ class GalleryWireTests(unittest.TestCase):
             first.update(status="pending", label="肖像（生成中）")
             first["artwork"]["generation_state"] = "pending"
             p["cards"] = [dict(first, image_id=image_id(i + 1)) for i in range(count)]
-            p["filters"].update(all=count, pending=count, failed=0)
         add("pending at cap", lambda p: pending_rows(p, 8), True)
         add("pending over cap", lambda p: pending_rows(p, 9))
         def warning_rows(p, count, condition_length=12):
@@ -647,183 +771,12 @@ class GalleryWireTests(unittest.TestCase):
                 row["image_id"] = image_id(i + 1)
                 row["artwork"] = card_descriptor(i + 1)
                 p["cards"].append(row)
-            p["filters"].update(all=count, defaults=0, bound=count)
             p["binding_warnings"] = [{"image_id": row["image_id"], "label": row["label"], "conditions": ["條" * condition_length]} for row in p["cards"]]
         add("warnings at cap", lambda p: warning_rows(p, 5), True)
         add("warnings over cap", lambda p: warning_rows(p, 6))
         add("condition at cap", lambda p: warning_rows(p, 1, 512), True)
         add("condition over cap", lambda p: warning_rows(p, 1, 513))
-        def over_bytes(p):
-            first = p["cards"][0]
-            first.update(is_default=False, chips=["預設臉框"], label="𠮷" * 128)
-            p["cards"] = []
-            for i in range(110):
-                row = deepcopy(first)
-                row["image_id"] = image_id(i + 1)
-                row["artwork"] = card_descriptor(i + 1)
-                p["cards"].append(row)
-            p["filters"].update(all=110, defaults=0)
-        add("envelope byte overflow", over_bytes)
-        script = """
-const fs = require('node:fs');
-const protocol = require('./web/static/webclient/js/elosern/protocol/panels/gallery.js');
-const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
-const results = cases.map(([name, value]) => {
-  try { return [name, true, protocol.validateGalleryPanelV3(value)]; }
-  catch (_) { return [name, false, null]; }
-});
-process.stdout.write(JSON.stringify(results));
-"""
-        output = subprocess.run(["node", "-e", script], input=json.dumps(cases), text=True, capture_output=True, cwd=ROOT, check=True)
-        js_results = json.loads(output.stdout)
-        for (name, value, expected), (_, js_accepts, echoed) in zip(cases, js_results, strict=True):
-            with self.subTest(case=name):
-                try:
-                    validate_gallery_v3(value)
-                    python_accepts = True
-                except ProtocolValidationError:
-                    python_accepts = False
-                self.assertEqual(python_accepts, expected)
-                self.assertEqual(js_accepts, expected)
-                if js_accepts:
-                    self.assertEqual(validate_gallery_v3(echoed), value)
-
-
-_V4_CAPABILITIES = {
-    "supports_bindings": True, "supports_field_selection": True, "supports_free_text": True,
-    "supports_personal_official_preferences": True, "supports_face_rect": True,
-    "supports_stage": True, "supports_card_delete": True, "max_cards": None,
-}
-
-
-def v4_subject(number, *, current=False, artwork=True, kind="character"):
-    """One synthetic version-4 subject tile."""
-    key = _SUBJECT_KEY if number == 0 else f"portrait:{kind}:t_{number}"
-    return {
-        "subject_key": key, "kind": f"portrait:{kind}", "display_name": "測試角色",
-        "is_current": current, "card_count": 1,
-        "artwork": card_descriptor(number + 1, subject_key=key) if artwork else None,
-    }
-
-
-def v4_group(key, subjects, *, label=None, seen=None, total=None, expanded=True, count=None):
-    """One synthetic version-4 group; ``count`` defaults to the listed subjects."""
-    return {
-        "key": key, "label": label, "seen": seen, "total": total, "expanded": expanded,
-        "count": len(subjects) if count is None else count, "subjects": subjects,
-    }
-
-
-def payload_v4():
-    """File-local synthetic version-4 fixture: mine, one selected subject, one card."""
-    v3 = payload()
-    return {
-        "schema_version": 4, "available": True, "kind": "gallery",
-        "categories": [
-            {"key": "mine", "count": 1, "enabled": True, "reason": None},
-            {"key": "party", "count": 0, "enabled": True, "reason": None},
-            {"key": "people", "count": 0, "enabled": False, "reason": "測試停用"},
-            {"key": "monster", "count": 0, "enabled": True, "reason": None},
-            {"key": "scene", "count": 0, "enabled": False, "reason": "測試停用"},
-        ],
-        "category": "mine",
-        "groups": [v4_group("mine", [v4_subject(0, current=True)])],
-        "selected": _SUBJECT_KEY, "description": None,
-        "cards": v3["cards"], "official_entries": [],
-        "equipment_summary": v3["equipment_summary"],
-        "capabilities": dict(_V4_CAPABILITIES),
-        "binding_warnings": [], "error_state": None,
-    }
-
-
-def v4_empty(p, category="party"):
-    """Select an enabled category with no subject: every card fact is empty."""
-    p["category"] = category
-    p["categories"][0]["count"] = 0
-    p["groups"] = []
-    p.update(
-        selected=None, description=None, cards=[], official_entries=[], binding_warnings=[],
-        equipment_summary=None, capabilities=None, error_state=None,
-    )
-
-
-def v4_collapsed(p, count=7):
-    """Add a labelled collapsed group carrying only its count."""
-    p["groups"].append(v4_group("place:t_hall", [], label="測試大廳", expanded=False, count=count))
-    p["categories"][0]["count"] += count
-
-
-def v4_subjects(p, count, *, artwork=False):
-    """Replace the one group with ``count`` subjects, the first selected."""
-    subjects = [v4_subject(i, current=i == 0, artwork=artwork) for i in range(count)]
-    p["groups"] = [v4_group("mine", subjects)]
-    p["categories"][0]["count"] = count
-
-
-def v4_case(modify):
-    value = payload_v4()
-    modify(value)
-    return value
-
-
-class GalleryCutoverTests(unittest.TestCase):
-    """The registered gallery is version 4 on both sides of the wire."""
-
-    @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
-    )
-    def test_registry_and_both_validators_speak_version_4(self):
-        from web.webclient.presentation import gallery as gallery_module
-        from web.webclient.presentation import gallery_categories
-
-        self.assertEqual(gallery_module.GALLERY_CATEGORY_KEYS, gallery_categories.CATEGORY_KEYS)
-        spec = build_production_registry().spec("gallery")
-        self.assertEqual(spec.schema_version, 4)
-        self.assertIs(spec.presenter, gallery_presenter)
-        script = """
-const protocol = require('./web/static/webclient/js/elosern/protocol.js');
-process.stdout.write(JSON.stringify([protocol.PANEL_ALLOWLIST.gallery, protocol.GALLERY_CATEGORY_KEYS]));
-"""
-        output = subprocess.run(["node", "-e", script], text=True, capture_output=True, cwd=ROOT, check=True)
-        self.assertEqual(json.loads(output.stdout), [4, list(gallery_categories.CATEGORY_KEYS)])
-        # The version-3 rail shape is refused by the registered validator.
-        with self.assertRaises(ProtocolValidationError):
-            validate_gallery(payload())
-
-
-class GalleryV4ParityTests(unittest.TestCase):
-    """Dual-direction parity of the version-4 validators (Python and the JS mirror)."""
-
-    def assert_parity(self, cases):
-        """Every (name, payload, expected) case gets the same verdict on both sides.
-
-        Cases travel as JSON text to both sides, so an integral float such as
-        ``7.0`` reaches Python exactly as the wire would deliver it.
-        """
-        script = """
-const fs = require('node:fs');
-const protocol = require('./web/static/webclient/js/elosern/protocol.js');
-const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
-const results = cases.map(([name, value]) => {
-  try { return [name, true, protocol.validateGalleryPanel(value)]; }
-  catch (_) { return [name, false, null]; }
-});
-process.stdout.write(JSON.stringify(results));
-"""
-        text = json.dumps(cases)
-        output = subprocess.run(["node", "-e", script], input=text, text=True, capture_output=True, cwd=ROOT, check=True)
-        js_results = json.loads(output.stdout)
-        for (name, value, expected), (_, js_accepts, echoed) in zip(json.loads(text), js_results, strict=True):
-            with self.subTest(case=name):
-                try:
-                    validate_gallery(value)
-                    python_accepts = True
-                except ProtocolValidationError:
-                    python_accepts = False
-                self.assertEqual(python_accepts, expected)
-                self.assertEqual(js_accepts, expected)
-                if js_accepts:
-                    self.assertEqual(validate_gallery(echoed), value)
+        self.assert_parity(cases)
 
     @covers_requirement(
         "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
@@ -928,10 +881,10 @@ process.stdout.write(JSON.stringify(results));
             ("capabilities", dict(_V4_CAPABILITIES)),
             ("selected", _SUBJECT_KEY),
             ("description", "測試描述"),
-            ("cards", payload()["cards"]),
+            ("cards", card_rows()),
             ("official_entries", [official_row()]),
             ("binding_warnings", [{"image_id": image_id(1), "label": "測試肖像", "conditions": ["防具：未裝備"]}]),
-            ("equipment_summary", payload()["equipment_summary"]),
+            ("equipment_summary", equipment_summary()),
             ("error_state", {"code": "sd_connection_error", "at": 1}),
         ):
             def modify(p, field=field, value=value):
@@ -962,7 +915,7 @@ process.stdout.write(JSON.stringify(results));
         for field in ("supports_face_rect", "supports_stage", "supports_card_delete"):
             cases.append((f"missing {field}", v4_case(lambda p, f=field: p["capabilities"].pop(f)), False))
             cases.append((f"non-boolean {field}", v4_case(lambda p, f=field: p["capabilities"].update({f: 1})), False))
-        cases.append(("v3 capability record", v4_case(lambda p: p.update(capabilities=payload()["capabilities"])), False))
+        cases.append(("v3 capability record", v4_case(lambda p: p.update(capabilities=retired_rail_payload()["capabilities"])), False))
         cases.append(("null capabilities with a selection", v4_case(lambda p: p.update(capabilities=None)), False))
         self.assert_parity(cases)
 
@@ -1093,7 +1046,7 @@ process.stdout.write(JSON.stringify(results));
         add("card_count boolean", subject(card_count=False))
         add("artwork null", subject(artwork=None), True)
         add("artwork invalid", lambda p: p["groups"][0]["subjects"][0]["artwork"].update(extra=1))
-        # Selection-scoped card facts (the version-3 rules, without filters).
+        # Selection-scoped card facts.
         add("description", lambda p: p.update(description="測試描述"), True)
         add("description at cap", lambda p: p.update(description="景" * 512), True)
         add("description over cap", lambda p: p.update(description="景" * 513))
@@ -1135,7 +1088,6 @@ class GalleryPresenterTests(EvenniaTest):
         self.registry = build_production_registry()
         visual_registry = {"t_beast": SimpleNamespace(display_label="測試魔物")}
         for target in (
-            "web.webclient.presentation.gallery.get_monster_visual_registry",
             "world.lore.monster_visuals.get_monster_visual_registry",
             "world.art.subjects.get_monster_visual_registry",
         ):
@@ -1175,25 +1127,6 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(api.GalleryRecord.objects.count(), before)
         self.actor.creation_pending = True
         self.assertEqual(self.registry.render("gallery", self.context)["reason"]["code"], "gallery_unavailable")
-
-    @covers_requirement(
-        "artwork-descriptor::descriptors-reveal-only-authorized-exact-subjects"
-    )
-    def test_rail_prioritizes_companions_reserves_monsters_and_skips_corruption(self):
-        # The dead version-3 rail (deleted by gallery-v3-removal).
-        other = create_object(NPC, key="其他角色")
-        other.db.portrait_policy = {"mode": "named", "stable_key": "t_other"}
-        companion = create_object(NPC, key="同行角色")
-        companion.db.portrait_policy = {"mode": "named", "stable_key": "t_companion"}
-        companion.db.party_member = self.actor.pk
-        self.actor.db.party = [companion.pk]
-        self.actor.db.party_meta = {str(companion.pk): {"general": True, "reasons": []}}
-        corrupt = create_object(NPC, key="損壞資料")
-        corrupt.db.portrait_policy = {"mode": "named", "stable_key": "bad/key"}
-        rail = gallery_subjects(self.actor)
-        self.assertEqual([entry[0]["subject_key"] for entry in rail], [self.subject.full(), "portrait:character:t_companion", "portrait:character:t_other", "portrait:monster:t_beast"])
-        with patch("web.webclient.presentation.gallery.GALLERY_MAX_SUBJECTS", 3):
-            self.assertEqual([row[0]["subject_key"] for row in gallery_subjects(self.actor)], [self.subject.full(), "portrait:character:t_companion", "portrait:monster:t_beast"])
 
     @covers_requirement(
         "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media",
@@ -1367,13 +1300,13 @@ class GalleryPresenterTests(EvenniaTest):
         selected = "portrait:character:t_companion"
         self.assertEqual(select_gallery_category(a, self.actor, "party")["outcome"], "success")
         with patch("web.webclient.presentation.gallery_selection.log_info") as event:
-            res = select_gallery_subject_v4(a, self.actor, selected)
+            res = select_gallery_subject(a, self.actor, selected)
             self.assertEqual(res["outcome"], "success")
             self.assertNotIn("affected_panels", res)
-            select_gallery_subject_v4(a, self.actor, selected)
+            select_gallery_subject(a, self.actor, selected)
             event.assert_not_called()
         self.assertIsNone(gallery_view_snapshot(b, self.actor))
-        self.assertEqual(select_gallery_subject_v4(a, self.actor, "scene:t_scene")["code"], "unknown_subject")
+        self.assertEqual(select_gallery_subject(a, self.actor, "scene:t_scene")["code"], "unknown_subject")
         self.assertEqual(gallery_view_snapshot(a, self.actor).subjects, (("party", selected),))
         value = gallery_presenter(build_presentation_context(a, self.actor))
         self.assertEqual((value["category"], value["selected"]), ("party", selected))
@@ -1395,7 +1328,7 @@ class GalleryPresenterTests(EvenniaTest):
         other = self.companion("待刪角色", "t_deleted")
         session = self.make_session()
         select_gallery_category(session, self.actor, "party")
-        select_gallery_subject_v4(session, self.actor, "portrait:character:t_deleted")
+        select_gallery_subject(session, self.actor, "portrait:character:t_deleted")
         frozen = build_presentation_context(session, self.actor)
         other.delete()
         value = gallery_presenter(frozen)
@@ -1455,7 +1388,6 @@ class OfficialEntryProjectionTests(EvenniaTest):
             self.addCleanup(patcher.stop)
         visual_registry = {"t_beast": SimpleNamespace(display_label="測試魔物")}
         for target in (
-            "web.webclient.presentation.gallery.get_monster_visual_registry",
             "world.lore.monster_visuals.get_monster_visual_registry",
             "world.art.subjects.get_monster_visual_registry",
         ):
