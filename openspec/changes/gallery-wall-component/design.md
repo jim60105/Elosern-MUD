@@ -67,6 +67,11 @@ export function trayInsertIndex(ownerIndex, columns, groupLength)
 - Each group is a `<section role="group">` (heading `<h3>` only when `label`
   is non-null, plus `<span>seen / total</span>` when both present) with one
   CSS grid; portrait tiles `aspect-ratio: 9 / 16`, landscape `16 / 9`.
+- A group with `expanded: false` renders its heading with `count` and no
+  grid. Headings are plain `<h3>` here; `gallery-group-expansion` turns them
+  into buttons.
+- Each subject tile carries `data-testid="gallery-subject"` and
+  `data-subject-key="<subject_key>"` (the browser journey selects by them).
 - Columns are read with a `ResizeObserver` on the selected subject's group
   grid (`gridTemplateColumns` token count); the tray is rendered inside that
   grid after the tile at `trayInsertIndex(...)` with `grid-column: 1 / -1`.

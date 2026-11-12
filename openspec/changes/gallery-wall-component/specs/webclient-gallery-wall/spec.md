@@ -7,7 +7,7 @@ subject's images and a keyboard contract of two roving listboxes.
 ## ADDED Requirements
 
 ### Requirement: The wall renders committed groups as aspect-true subject tiles
-The wall SHALL render the committed groups in order, drawing a heading only for a group with a label (with `seen / total` when both are present), and one tile per committed subject showing its display name, its committed artwork, its image count when the count is above one, and a 操作中 marker on the subject marked current. Scene subjects SHALL use landscape tiles and every other kind portrait tiles.
+The wall SHALL render the committed groups in order, drawing a heading only for a group with a label (with `seen / total` when both are present, and the count of a collapsed group), and one tile per committed subject showing its display name, its committed artwork, its image count when the count is above one, and a 操作中 marker on the subject marked current. Scene subjects SHALL use landscape tiles and every other kind portrait tiles.
 
 #### Scenario: An unlabeled group starts with tiles
 - **WHEN** the committed groups hold one group with a null label and three subjects
@@ -16,6 +16,10 @@ The wall SHALL render the committed groups in order, drawing a heading only for 
 #### Scenario: A tier heading carries its counts
 - **WHEN** a group has label `t_low`, seen 1 and total 2
 - **THEN** its heading shows the label and `1 / 2`
+
+#### Scenario: A collapsed group shows only its heading and count
+- **WHEN** a group has `expanded: false`, label `t_place` and count 7
+- **THEN** the wall renders its heading with `t_place` and 7 and no tiles for it
 
 #### Scenario: The live character is marked by text
 - **WHEN** a subject has `is_current: true`
