@@ -3230,11 +3230,12 @@ The kit declares the shipped self-guard strike composition signature
 `(("active", "damage", "enemies", None), ("active", "self_buff_apply", "self",
 None))`. Its representative is unchanged: `burrow_maker`, declared in
 `world.rules.tests.test_tide_lamp_crab_resource_skill`, whose production smoke
-exercises the representative and the derived group. Both new variant keys sort
-after that representative (`"burrow_maker" < "cellar_leaper" <
-"old_shaft_leaper"`), so no smoke module, shard entry or seed entry is added;
+exercises the representative itself. Both new variant keys sort after that
+representative (`"burrow_maker" < "cellar_leaper" < "old_shaft_leaper"`), so
+no smoke module, shard entry or seed entry is added;
 `world.rules.tests.test_monster_composition_coverage` derives the whole group
-from the shipped declarations and checks the representative wiring.
+from the shipped declarations, so it establishes these variants' membership and
+the representative wiring without executing every member.
 
 ### Decision mode
 
