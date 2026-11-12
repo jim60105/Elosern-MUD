@@ -158,28 +158,45 @@ function press(key) {
               <h4 class="gpage__label">描述</h4>
               <p class="gpage__prose">{{ subject.sentence }}</p>
             </section>
-            <section class="gpage__cell">
-              <h4 class="gpage__label">圖片</h4>
-              <template v-if="image">
+            <!-- One fact per cell on the quest detail's two-column grid
+                 (`.quest-detail__cond`): a ruled label, one line, one note. -->
+            <div class="gpage__cond">
+              <section class="gpage__cell">
+                <h4 class="gpage__label">圖片</h4>
+                <template v-if="image">
+                  <p class="gpage__line">{{ image.label }}</p>
+                  <p v-if="image.official" class="gpage__text">唯讀，只能調整個人的臉框與舞台位置。</p>
+                  <p v-else-if="image.bundled" class="gpage__text">尚未生成專屬圖片。</p>
+                  <p v-else-if="subject.kind === 'scene'" class="gpage__text">只保留一張；刪除後回到官方內建圖。</p>
+                  <p v-else-if="subject.maxCards === 1" class="gpage__text">只保留一張，重新生成會替換原圖。</p>
+                </template>
+                <template v-else>
+                  <p class="gpage__line">尚無圖片</p>
+                  <p class="gpage__text">生成一張來記錄它的模樣。</p>
+                </template>
+              </section>
+              <section v-if="image && !image.official && !image.bundled" class="gpage__cell">
+                <h4 class="gpage__label">生成時間</h4>
+                <p class="gpage__line">{{ image.date }}</p>
+                <p v-if="image.exact" class="gpage__text">{{ image.exact }}</p>
+              </section>
+              <section v-if="image && !image.official && subject.kind === 'character'" class="gpage__cell">
+                <h4 class="gpage__label">狀態</h4>
                 <p class="gpage__line">
-                  {{ image.label }}
-                  <span v-if="image.isDefault" class="gpage__default">目前預設</span>
+                  <svg v-if="image.isDefault" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" /></svg>
+                  {{ image.status === "pending" ? "生成中" : image.status === "failed" ? "生成失敗" : image.isDefault ? "目前預設" : "備用圖片" }}
                 </p>
-                <p v-if="!image.official && image.date" class="gpage__text">
-                  {{ image.date }}<small v-if="image.exact">{{ image.exact }}</small>
-                </p>
-                <ul v-if="image.chips?.length" class="gpage__chips"><li v-for="chip in image.chips" :key="chip">{{ chip }}</li></ul>
-                <p v-if="image.official" class="gpage__text">官方圖片為唯讀，只能調整個人的臉框與舞台位置。</p>
-                <p v-else-if="image.bundled" class="gpage__text">尚未生成專屬圖片，目前使用官方內建圖。</p>
-                <p v-else-if="subject.kind === 'scene'" class="gpage__text">只保留一張圖，重新生成會替換原圖；刪除後回到官方內建圖。</p>
-                <p v-else-if="subject.maxCards === 1" class="gpage__text">只保留一張圖，重新生成會替換原圖。</p>
-              </template>
-              <p v-else class="gpage__text">這個對象還沒有圖片。生成一張來記錄它的模樣。</p>
-            </section>
-            <section v-if="image?.conditions?.length" class="gpage__cell">
-              <h4 class="gpage__label">綁定條件</h4>
-              <ul class="gpage__chips gpage__chips--wide"><li v-for="line in image.conditions" :key="line">{{ line }}</li></ul>
-            </section>
+                <p v-if="image.isDefault" class="gpage__text">沒有符合的綁定條件時顯示這張。</p>
+              </section>
+              <section v-if="image?.chips?.length" class="gpage__cell">
+                <h4 class="gpage__label">標記</h4>
+                <ul class="gpage__chips"><li v-for="chip in image.chips" :key="chip">{{ chip }}</li></ul>
+              </section>
+              <section v-if="image?.conditions?.length" class="gpage__cell gpage__cell--wide">
+                <h4 class="gpage__label">綁定條件</h4>
+                <ul class="gpage__chips gpage__chips--wide"><li v-for="line in image.conditions" :key="line">{{ line }}</li></ul>
+              </section>
+            </div>
             <p v-if="lastIntent" class="gpage__intent" role="status">送出 {{ lastIntent }}</p>
           </div>
         </div>
@@ -278,9 +295,9 @@ function press(key) {
   font-size: var(--text-sm);
 }
 
-/* Landscape: the art is 16:9 above the facts. It stops short of the full
-   page width so the facts stay visible without scrolling; the window keeps
-   one proportion across viewports through --ui-scale. */
+/* Landscape: the 16:9 art sits above; under it the name and the description
+   take the left column and the fact cells the right one, so the whole page
+   reads without scrolling. */
 .gwin--landscape .gpage__scroll {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -288,9 +305,46 @@ function press(key) {
 }
 
 .gwin--landscape .gpage__art {
-  width: 78%;
+  width: 60%;
   height: auto;
   aspect-ratio: 16 / 9;
+}
+
+.gwin--landscape .gpage__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-areas:
+    "head cond"
+    "letter cond"
+    "intent intent";
+  align-content: start;
+  gap: var(--sp-3) var(--sp-6);
+}
+
+.gwin--landscape .gpage__head {
+  grid-area: head;
+}
+
+.gwin--landscape .gpage__letter {
+  grid-area: letter;
+}
+
+.gwin--landscape .gpage__cond {
+  grid-area: cond;
+  grid-template-columns: 1fr;
+  gap: var(--sp-4);
+}
+
+.gwin--landscape .gpage__intent {
+  grid-area: intent;
+}
+
+.gpage__facts {
+  max-height: 100%;
+}
+
+.gwin--landscape .gpage__cond {
+  grid-template-columns: 1fr;
 }
 
 .gpage__facts {
@@ -344,8 +398,25 @@ function press(key) {
 
 /* Facts: an unboxed cell under a ruled label, as the quest detail's
    接取條件 and 期限. */
+.gpage__cond {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5) var(--sp-6);
+}
+
 .gpage__cell {
   min-width: 0;
+}
+
+.gpage__cell--wide {
+  grid-column: 1 / -1;
+}
+
+.gpage__line svg {
+  flex: none;
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--gold-500);
 }
 
 .gpage__label {
@@ -368,7 +439,7 @@ function press(key) {
 .gpage__line {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-2);
   margin: 0 0 var(--sp-1);
   color: var(--paper-50);
   font-size: var(--text-md);
@@ -381,26 +452,12 @@ function press(key) {
   line-height: 1.75;
 }
 
-.gpage__text small {
-  margin-left: var(--sp-3);
-  color: var(--paper-500);
-  font-size: var(--text-xs);
-}
-
-.gpage__default {
-  padding: 0 var(--sp-2);
-  color: var(--gold-300);
-  font: var(--text-xs) / 1.6 var(--f-display);
-  border: 1px solid var(--gold-500);
-  border-radius: var(--radius-sm);
-}
-
 /* Short enumerations: the quest reward cells. */
 .gpage__chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
-  margin: var(--sp-2) 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
