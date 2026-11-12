@@ -151,31 +151,34 @@ function press(key) {
             <header class="gpage__head">
               <span class="gpage__ribbon">{{ ribbon }}</span>
               <h3 class="gpage__title">{{ subject.name }}</h3>
-              <p v-if="subject.sentence" class="gpage__sentence">{{ subject.sentence }}</p>
             </header>
-            <template v-if="image && !image.official">
-              <section class="gpage__section">
-                <h4 class="gpage__label">圖片</h4>
-                <p class="gpage__text">{{ image.label }}<span v-if="image.isDefault" class="gpage__default">目前預設</span></p>
-                <p class="gpage__date">{{ image.date }}<small>{{ image.exact }}</small></p>
-                <p v-if="image.chips.length" class="gpage__chips"><span v-for="chip in image.chips" :key="chip">{{ chip }}</span></p>
-                <p v-if="image.bundled" class="gpage__note">尚未生成專屬圖片，目前使用官方內建圖。</p>
-                <p v-else-if="subject.kind === 'scene'" class="gpage__note">這個對象只保留一張圖，重新生成會替換原圖；刪除後回到官方內建圖。</p>
-                <p v-else-if="subject.maxCards === 1" class="gpage__note">這個對象只保留一張圖，重新生成會替換原圖。</p>
-              </section>
-              <section v-if="image.conditions.length" class="gpage__section">
-                <h4 class="gpage__label">綁定條件</h4>
-                <ul class="gpage__list"><li v-for="line in image.conditions" :key="line">{{ line }}</li></ul>
-              </section>
-            </template>
-            <section v-else-if="image" class="gpage__section">
-              <h4 class="gpage__label">圖片</h4>
-              <p class="gpage__text">{{ image.label }}</p>
-              <p class="gpage__note">官方圖片為唯讀，只能調整個人的臉框與舞台位置。</p>
+            <!-- Prose is a letter (the codex's 描述 box); facts are plain
+                 labelled cells, as in the quest detail. -->
+            <section v-if="subject.sentence" class="gpage__letter">
+              <h4 class="gpage__label">描述</h4>
+              <p class="gpage__prose">{{ subject.sentence }}</p>
             </section>
-            <section v-else class="gpage__section">
+            <section class="gpage__cell">
               <h4 class="gpage__label">圖片</h4>
-              <p class="gpage__text gpage__text--muted">這個對象還沒有圖片。生成一張來記錄它的模樣。</p>
+              <template v-if="image">
+                <p class="gpage__line">
+                  {{ image.label }}
+                  <span v-if="image.isDefault" class="gpage__default">目前預設</span>
+                </p>
+                <p v-if="!image.official && image.date" class="gpage__text">
+                  {{ image.date }}<small v-if="image.exact">{{ image.exact }}</small>
+                </p>
+                <ul v-if="image.chips?.length" class="gpage__chips"><li v-for="chip in image.chips" :key="chip">{{ chip }}</li></ul>
+                <p v-if="image.official" class="gpage__text">官方圖片為唯讀，只能調整個人的臉框與舞台位置。</p>
+                <p v-else-if="image.bundled" class="gpage__text">尚未生成專屬圖片，目前使用官方內建圖。</p>
+                <p v-else-if="subject.kind === 'scene'" class="gpage__text">只保留一張圖，重新生成會替換原圖；刪除後回到官方內建圖。</p>
+                <p v-else-if="subject.maxCards === 1" class="gpage__text">只保留一張圖，重新生成會替換原圖。</p>
+              </template>
+              <p v-else class="gpage__text">這個對象還沒有圖片。生成一張來記錄它的模樣。</p>
+            </section>
+            <section v-if="image?.conditions?.length" class="gpage__cell">
+              <h4 class="gpage__label">綁定條件</h4>
+              <ul class="gpage__chips gpage__chips--wide"><li v-for="line in image.conditions" :key="line">{{ line }}</li></ul>
             </section>
             <p v-if="lastIntent" class="gpage__intent" role="status">送出 {{ lastIntent }}</p>
           </div>
@@ -324,82 +327,96 @@ function press(key) {
   letter-spacing: 0.04em;
 }
 
-.gpage__sentence {
-  margin: var(--sp-2) 0 0;
-  color: var(--paper-300);
-  font: var(--text-md) / 1.8 var(--f-serif);
+/* Prose: the codex's and the quest client's letter box. */
+.gpage__letter {
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  background: linear-gradient(135deg, rgba(185, 154, 96, 0.09), rgba(185, 154, 96, 0.02) 60%);
+  border: 1px solid rgba(185, 154, 96, 0.28);
+  border-left: 3px solid var(--gold-500);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
-.gpage__section {
-  padding: var(--sp-3) var(--sp-4);
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(185, 154, 96, 0.22);
-  border-left: 3px solid var(--gold-500);
-  border-radius: var(--radius-sm);
+.gpage__prose {
+  margin: 0;
+  color: var(--paper-200);
+  font: var(--text-sm) / 1.9 var(--f-serif);
+}
+
+/* Facts: an unboxed cell under a ruled label, as the quest detail's
+   接取條件 and 期限. */
+.gpage__cell {
+  min-width: 0;
 }
 
 .gpage__label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   margin: 0 0 var(--sp-2);
-  color: var(--gold-400);
+  color: var(--gold-500);
   font: var(--text-xs) var(--f-display);
-  letter-spacing: 0.24em;
+  letter-spacing: 0.18em;
 }
 
-.gpage__text,
-.gpage__date,
-.gpage__list {
+.gpage__label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.28), transparent);
+}
+
+.gpage__line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-1);
+  color: var(--paper-50);
+  font-size: var(--text-md);
+}
+
+.gpage__text {
   margin: 0;
-  color: var(--paper-100);
-  font: var(--text-md) / 1.7 var(--f-serif);
-}
-
-.gpage__text--muted {
-  color: var(--paper-400);
-}
-
-.gpage__default {
-  margin-left: var(--sp-3);
-  padding: 0 var(--sp-2);
-  color: var(--gold-300);
-  font: var(--text-xs) var(--f-display);
-  border: 1px solid var(--gold-500);
-  border-radius: var(--radius-sm);
-}
-
-.gpage__date {
   color: var(--paper-300);
   font-size: var(--text-sm);
+  line-height: 1.75;
 }
 
-.gpage__date small {
+.gpage__text small {
   margin-left: var(--sp-3);
   color: var(--paper-500);
   font-size: var(--text-xs);
 }
 
-.gpage__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  margin: var(--sp-2) 0 0;
-}
-
-.gpage__chips span {
-  padding: 1px var(--sp-2);
-  color: var(--paper-200);
-  font-size: var(--text-xs);
-  border: 1px solid var(--ink-600);
+.gpage__default {
+  padding: 0 var(--sp-2);
+  color: var(--gold-300);
+  font: var(--text-xs) / 1.6 var(--f-display);
+  border: 1px solid var(--gold-500);
   border-radius: var(--radius-sm);
 }
 
-.gpage__list {
-  padding-left: var(--sp-5);
+/* Short enumerations: the quest reward cells. */
+.gpage__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+  padding: 0;
+  list-style: none;
 }
 
-.gpage__note {
-  margin: var(--sp-2) 0 0;
-  color: var(--paper-400);
+.gpage__chips li {
+  padding: var(--sp-1) var(--sp-3);
+  color: var(--paper-300);
   font-size: var(--text-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-sm);
+}
+
+.gpage__chips--wide li {
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--paper-100);
 }
 
 .gpage__intent {
