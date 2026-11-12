@@ -138,6 +138,12 @@ change adds one buff definition and one modifier rule and so moves the process's
 startup fingerprint; the recorded measurements are unchanged again. The six
 archetype campaigns and the performance report were not rerun and remain
 historical harness evidence at `497df2c1...`, not evidence for this tuning.
+They were regenerated once more for `pit-sand-antlion-species` (baseline commit
+`b456b01aec47e6f19567d4f3e9f1d17e98ac136c`), again because that content change
+adds one buff definition and one modifier rule and so moves the process's
+startup fingerprint; the recorded measurements are unchanged again. The six
+archetype campaigns and the performance report were not rerun and remain
+historical harness evidence at `497df2c1...`, not evidence for this tuning.
 
 ## Exact operations
 
@@ -258,12 +264,12 @@ never enter this fingerprint — but the shared combat-rulebook leaves every
 estimate averages over (the buff definitions and the modifier rules) do, so a
 rulebook change moves this value exactly as it moves the production tuning.
 Selector-check fingerprint:
-`7c1cafd74c86871c493ac3951a0468191378bcdc37d3c18c3bc5ba719e6eddb1` -- that
+`bd82767e08a1857878c6f2802a81a5cd9ff5b88f42b90a2dca76a2cbdbb66ed5` -- that
 operation records the process's startup fingerprint, which this value now is;
 the earlier values `8b56d98c...`, `877fdd6d...`, `70e5f38d...`, `383b1eff...`, `ef4b4b14...`, `5828d932...`, `75b74aa1...`, `b0dd9da6...`, `955832b5...`, `5f4a4506...`, `03ad9da4...`, `abb0989c...`, `3232b667...`, `d65909aa...`, `cd78725a...`,
 `f8858072...`, `3030d4a3...`, `fc1dd263...`, `8307fec8...`, `237f9a85...`,
 `a29fd4fa...`, `e2677d39...`, `3ee653b9...`, `e583cb95...`, `c4d4e06b...`,
-`3c18cea1...` and `2a04e1bc...` describe tunings production no longer loads and
+`3c18cea1...`, `2a04e1bc...` and `7c1cafd7...` describe tunings production no longer loads and
 are superseded, not evidence for the changed tuning. See
 `docs/development/monster-ai-activation-evidence/`.
 

@@ -1291,6 +1291,24 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "cellar_leaper",
         True,
     ),
+    MonsterSpecies(
+        "pit_sand_antlion",
+        "陷坑蟻獅",
+        "陷坑蟻獅是體長約有半個人高的蟻獅類魔獸，獨自棲息於西部丘陵的採石場、礦渣堆與河谷沙地。",
+        "身體肥圓，灰褐色的表皮長滿短硬的剛毛，背上沾著一層沙土。"
+        "頭部扁平寬大，前端一對鐮刀狀的長顎向內彎曲，內緣排著尖齒；"
+        "六條短腿習慣倒退著走。",
+        "牠在鬆軟的沙土裡倒退著挖出一個漏斗狀的深坑，把身體埋在坑底，只露出一對長顎，等待甲蟲、老鼠與失足的小動物滑落。"
+        "牠的扁平頭部帶著異常的力氣，一甩就能把一大片沙土拋向坑壁，讓獵物腳下的坡面整片滑落。"
+        "西部丘陵的採石場與礦坑外堆著大片碎石與礦渣，運石的板車與坡地上的羊群常在礦渣堆的小路上踩塌坑緣，車輪陷進沙坑，小羊也會滑進坑底。"
+        "近身時，牠甩頭把沙土揚向對手腳下，再以長顎鉗咬，咬中時對手腳下的沙土一起滑落，短時間內步伐遲緩。",
+        ("western_hills_valleys",),
+        "（作者私有：隱秘真相）本物種沒有已定的起源真相；扁平頭部異常力氣的成因不在設定中交代。",
+        "（作者私有：作者解釋）中階獨居蟻獅：甩沙屬於頭部的身體能力，不帶元素、不操控地形；沙坑是牠自己挖出的巢，戰鬥中不造出新的陷坑；戰鬥呈現為甩沙鉗咬與命中後短暫敏捷下降。描寫維持昆蟲幼蟲體態。連結採石場的運石板車與礦渣堆旁放牧的羊群。",
+        "（作者私有：尚未證實的猜想）灰岩城的採石工說陷坑蟻獅的坑挖得越深，那年冬天就越冷，這種說法尚未證實。",
+        "quarry_pit_lurker",
+        True,
+    ),
 )
 
 _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
@@ -2409,6 +2427,38 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         active_skill_keys=("coiled_hind_kick",),
         passive_skill_keys=(),
         behaviour_profile_key="instinctive",
+    ),
+    MonsterVariant(
+        "quarry_pit_lurker",
+        "pit_sand_antlion",
+        "伏坑型",
+        "普通版本，在採石場與河谷沙地挖坑伏擊。",
+        "mid",
+        True,
+        MonsterCombatProfile(
+            hp=140, mp=0, sp=24, atk_phys=23, agility=11, defense=13, magic_power=0
+        ),
+        "D",
+        True,
+        active_skill_keys=("sand_toss_pincer",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
+    ),
+    MonsterVariant(
+        "spoil_heap_elder",
+        "pit_sand_antlion",
+        "大坑型",
+        "在礦渣堆上挖出最寬沙坑的老個體，長顎最長，會鉗住任何踩上坑緣的身影。",
+        "mid",
+        False,
+        MonsterCombatProfile(
+            hp=195, mp=0, sp=36, atk_phys=27, agility=11, defense=15, magic_power=0
+        ),
+        "C",
+        True,
+        active_skill_keys=("sand_toss_pincer",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
 )
 
