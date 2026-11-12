@@ -170,21 +170,26 @@ _BIRTH_CELLS = SourceMemo()
 _REGION_CELLS = SourceMemo()
 
 
-def _chebyshev(first: tuple[int, int], second: tuple[int, int]) -> int:
-    return max(abs(first[0] - second[0]), abs(first[1] - second[1]))
-
-
-def _excluded(
-    cell: tuple[int, int],
+def _excluded_cells(
     sources: Mapping[str, tuple[tuple[int, int], ...]],
     buffers: Mapping[str, int],
-) -> bool:
-    """Whether ``cell`` lies inside any inhabited settlement's buffer."""
+) -> frozenset[tuple[int, int]]:
+    """Every cell inside any inhabited settlement's buffer, built once.
+
+    The predicate is a Chebyshev distance to the settlement's published cells,
+    so the whole exclusion is the union of those cells expanded by the
+    settlement's buffer. Materializing it once turns one zone's classification
+    into a single membership test per cell instead of a distance scan per
+    (cell, settlement, footprint cell) triple.
+    """
+    excluded: set[tuple[int, int]] = set()
     for anchor_key, cells in sources.items():
         buffer = buffers[anchor_key]
-        if any(_chebyshev(cell, source) <= buffer for source in cells):
-            return True
-    return False
+        for source in cells:
+            for x in range(source[0] - buffer, source[0] + buffer + 1):
+                for y in range(source[1] - buffer, source[1] + buffer + 1):
+                    excluded.add((x, y))
+    return frozenset(excluded)
 
 
 def eligible_birth_cells(
@@ -229,6 +234,7 @@ def _compute_birth_cells(
     )
     sources = _settlement_sources(geography, entries)
     buffers = _buffers(sources, policies)
+    excluded = _excluded_cells(sources, buffers)
     cells: set[tuple[int, int]] = set()
     for x_min, x_max, y_min, y_max in zone.rectangles:
         for x in range(x_min, x_max + 1):
@@ -240,7 +246,7 @@ def _compute_birth_cells(
                     continue
                 if not is_valid_wilderness_cell(terrain, footprints, cell):
                     continue
-                if _excluded(cell, sources, buffers):
+                if cell in excluded:
                     continue
                 cells.add(cell)
     return tuple(sorted(cells))
