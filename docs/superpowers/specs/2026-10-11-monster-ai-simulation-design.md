@@ -65,7 +65,7 @@ Measure the whole policy call, including snapshot construction, legality, estima
 
 The reference case has 16 live participants, up to 16 owned active skills per deciding actor, mixed single/area/support plans, and a candidate budget of 256. This is a benchmark envelope, not a restriction on live game participant or skill counts.
 
-Perform five warm-up calls followed by 50 measured decisions for legacy and utility, holding the snapshot state fixed and isolating policy dice from resolution dice. Include a cold first-call measurement separately. Report p50/p95, actual examined/accepted/omitted candidates, and query counts. The initial acceptance budget is warm complete utility p95 <= 50 ms on the recorded reference host, with no candidate-proportional ORM work.
+Perform five warm-up calls followed by 50 measured decisions for reflex and deliberation, holding the snapshot state fixed and isolating policy dice from resolution dice. Include a cold first-call measurement separately. Report p50/p95, actual examined/accepted/omitted candidates, and query counts. The initial acceptance budget is warm complete deliberation p95 <= 50 ms on the recorded reference host, with no candidate-proportional ORM work.
 
 Vary the proposed candidate count on the same recorded actor/participant data to expose repeated per-candidate queries. Query work may scale with the initial participant and owned-skill read, but not with subsequent enumeration of their target plans. If the budget fails, profile and improve the path; do not understate the cost by reducing the timed boundary or silently increasing the limit.
 
@@ -75,15 +75,15 @@ This performance operation runs manually once for initial acceptance. It is not 
 
 Use the attack design's initial archetype weights and explicit variant intelligence. Initial production variant values are authored independently according to lore; no tier-based intelligence band or monotonic stronger-variant rule is permitted. Record actual selected values in the report/configuration changes instead of asserting them in a second test approval table.
 
-Start with all existing variants on legacy. After attack/tactics regressions, real-path smoke, the small manual report, and the repository contract gate pass, enable a small explicitly named set via `variant_decision_mode`. Verify one affected real encounter and retain the mode switch as the rollback mechanism. Expand only after reviewing valid-action rates, waiting/exclusion causes, resource usage, and observed behavior.
+Start with all existing variants on reflex. After attack/tactics regressions, real-path smoke, the small manual report, and the repository contract gate pass, enable a small explicitly named set via `variant_decision_mode`. Verify one affected real encounter and retain the mode switch as the rollback mechanism. Expand only after reviewing valid-action rates, waiting/exclusion causes, resource usage, and observed behavior.
 
 Tuning edits may adjust weights and the temperature curve. A changed affected profile needs its focused scenario rerun; do not automatically rerun every archetype. Report a new fingerprint; earlier claims based on the old tuning no longer hold. Intelligence tuning does not include a statistic rebalance.
 
 ## 8. Rollback and release evidence
 
-Switch selected variants back to legacy and start a new session or restart according to the in-process configuration recording contract. No destructive data migration or database restoration is required. Existing active sessions retain their recorded configuration until termination unless a server restart deliberately rebuilds them using startup settings and empty memory.
+Switch selected variants back to reflex and start a new session or restart according to the in-process configuration recording contract. No destructive data migration or database restoration is required. Existing active sessions retain their recorded configuration until termination unless a server restart deliberately rebuilds them using startup settings and empty memory.
 
-Demonstrate legacy action behavior in focused smoke after the mode change. Preserve non-monster fallback, flee thresholds, mandatory rules, and normal transaction behavior. A rollback must not report database/resolver exceptions as an AI warning.
+Demonstrate reflex action behavior in focused smoke after the mode change. Preserve non-monster fallback, flee thresholds, mandatory rules, and normal transaction behavior. A rollback must not report database/resolver exceptions as an AI warning.
 
 Deliver the report, exact reproducible operations, seeds, configuration, focused test output, and exercised smoke evidence. Run `uv run --locked python -m tools.contract_gate` before handoff. Run relevant observability lint with focused tests when logging changes. Register any new non-browser test modules in exactly one Evennia shard; manual tool operations are not test modules.
 

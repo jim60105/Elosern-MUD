@@ -244,6 +244,40 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
                 self.assertEqual(_shape(before), _shape(after))
 
     @covers_requirement("monster-action-policy::area-versus-single-target-shape-is-decided-before-target-skill-selection-reusing-the")
+    def test_an_authored_area_kit_never_resolves_a_single_target(self):
+        # The innate attack makes a SINGLE domain resolvable, but an authored
+        # AREA kit never needs it: with two exactly tied enemies a target draw
+        # would consume a combat die for a target no request can use.
+        innate = synth_damage_skill(
+            INNATE_ATTACK_KEY,
+            "合成基本攻擊",
+            effects=[f"damage:{SYNTH_GLOW_ELEMENT}:physical"],
+            cost={},
+        )
+        actor = FakeMonster(
+            "actor", combat_identity='actor',
+            owned=[_T_AREA.key, INNATE_ATTACK_KEY],
+        )
+        enemies = [
+            FakeEntity("one", combat_identity='one', hp=50),
+            FakeEntity("two", combat_identity='two', hp=50),
+        ]
+        with (
+            patch.dict(
+                "world.skills.registry.SKILL_REGISTRY", {innate.key: innate}
+            ),
+            patch(
+                "world.rules.monster_behaviour.dice.roll_d100",
+                side_effect=AssertionError("an AREA-only kit drew a target"),
+            ),
+        ):
+            request = monster_behaviour_policy(
+                actor, _field(actor, enemies)
+            )
+        self.assertEqual(request.skill_key, _T_AREA.key)
+        self.assertEqual(request.targets, "all-enemies")
+
+    @covers_requirement("monster-action-policy::area-versus-single-target-shape-is-decided-before-target-skill-selection-reusing-the")
     def test_only_an_authored_area_kit_still_uses_the_all_enemies_shorthand(self):
         actor = FakeMonster("actor", combat_identity='actor', owned=[_T_AREA.key])
         actor.traits.mp = FakeGauge(24, 24)

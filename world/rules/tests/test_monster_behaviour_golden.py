@@ -23,12 +23,13 @@ _T_AREA = synth_damage_skill(
 )
 _SCOPE_EXTRA = {"skills": {_T_SINGLE.key: _T_SINGLE, _T_AREA.key: _T_AREA}}
 
-#: Two synthetic archetypes differing ONLY in their authored target metric, so
-#: the shipped tier-to-archetype mapping is never the thing under test.
+#: Two synthetic archetypes differed only by their authored target metric, and
+#: two synthetic tiers bind them: the shipped tier-to-archetype mapping is never
+#: the thing under test.
 _WEAKEST = "t_golden_weakest"
 _STRONGEST = "t_golden_strongest"
-_LOW_TIER = "low"
-_HIGH_TIER = "calamity"
+_LOW_TIER = "t_golden_low"
+_HIGH_TIER = "t_golden_high"
 
 
 def _profile(*, target_strategy: str, skill_choice: str = "first_owned"):
@@ -59,7 +60,27 @@ def _rulebook() -> dict:
             _WEAKEST: _profile(target_strategy="lowest_hp"),
             _STRONGEST: _profile(target_strategy="highest_effective_power"),
         },
+        "variant_intelligence": {},
+        "variant_decision_mode": {},
+        "candidate_budget": 64,
     }
+
+
+def _install(book: dict):
+    """Load one synthetic rulebook's profiles and tuning exactly as startup does."""
+    profiles = behaviour._load_behaviour_profiles(
+        book, tiers={_LOW_TIER, _HIGH_TIER}
+    )
+    tuning = behaviour._load_ai_tuning(
+        book, profiles=profiles, species={}, variants={}
+    )
+    patcher = patch.multiple(
+        behaviour,
+        MONSTER_BEHAVIOUR_YAML=book,
+        BEHAVIOUR_PROFILES=profiles,
+        MONSTER_AI_TUNING=tuning,
+    )
+    return profiles, tuning, patcher
 
 
 class _FixedDraw:
@@ -77,15 +98,7 @@ class MonsterBehaviourGoldenTests(unittest.TestCase):
         open_synthetic_scope(
             self, "skills", "elements", extra=_SCOPE_EXTRA
         )
-        book = _rulebook()
-        self.profiles = behaviour._load_behaviour_profiles(
-            book, tiers={_LOW_TIER, _HIGH_TIER}
-        )
-        patcher = patch.multiple(
-            behaviour,
-            MONSTER_BEHAVIOUR_YAML=book,
-            BEHAVIOUR_PROFILES=self.profiles,
-        )
+        self.profiles, self.tuning, patcher = _install(_rulebook())
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -146,15 +159,10 @@ class MonsterBehaviourGoldenTests(unittest.TestCase):
         book["archetypes"][_WEAKEST] = _profile(
             target_strategy="lowest_hp", skill_choice="highest_expected_damage"
         )
-        profiles = behaviour._load_behaviour_profiles(
-            book, tiers={_LOW_TIER, _HIGH_TIER}
-        )
-        with patch.multiple(
-            behaviour,
-            MONSTER_BEHAVIOUR_YAML=book,
-            BEHAVIOUR_PROFILES=profiles,
-        ):
-            first = self._decision(_LOW_TIER, rng=_FixedDraw(0.5))
-            replay = self._decision(_LOW_TIER, rng=_FixedDraw(0.5))
+        _profiles, _tuning, nested = _install(book)
+        nested.start()
+        self.addCleanup(nested.stop)
+        first = self._decision(_LOW_TIER, rng=_FixedDraw(0.5))
+        replay = self._decision(_LOW_TIER, rng=_FixedDraw(0.5))
         self.assertEqual(first, replay)
         self.assertEqual(first, (_T_AREA.key, ("all-enemies",)))

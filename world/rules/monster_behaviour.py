@@ -1465,11 +1465,12 @@ def _reflex_action(
     ]
     target: Any | None = None
     eligible_keys: frozenset[str] = frozenset()
-    if authored_single or innate:
+    if authored_single:
         # Target-dependent SINGLE eligibility is decided before scoring, with
         # the retained seal/positional/Taunt order and tie-break draw. An
-        # AREA-only kit never reaches this branch and so never spends a die on
-        # a target it will not use.
+        # authored AREA-only kit never reaches this branch, so a kit that owns
+        # the innate attack too still spends no die on a target it will not
+        # use.
         target, eligible = _single_target(
             entity, battlefield, enemies, authored_single + innate, profile
         )
@@ -1500,6 +1501,15 @@ def _reflex_action(
         if skill.target_spec is TargetSpec.AREA:
             return ActionRequest(entity, skill.key, "all-enemies", context)
         return ActionRequest(entity, skill.key, [target], context)
+    if not authored_single and any(
+        skill.target_spec is TargetSpec.SINGLE for skill in innate
+    ):
+        # Only the fallback can use a SINGLE target now, so the domain (and its
+        # tie-break draw) is resolved for exactly that case.
+        target, eligible = _single_target(
+            entity, battlefield, enemies, innate, profile
+        )
+        eligible_keys = frozenset(skill.key for skill in eligible)
     for skill in innate:
         if skill.target_spec is TargetSpec.AREA:
             return ActionRequest(entity, skill.key, "all-enemies", context)

@@ -20,7 +20,7 @@ Owned active healing, supported buff application, and supported hostile control 
 
 Mixed damage/heal/buff skills retain their submitted target plan. The estimator filters each effect's recipients through that plan and its actual binding rules. Do not sum an ally heal found in broad preview if the submitted plan omits that ally. Do not omit a self-bound effect merely because no explicit self target was submitted. Harmful ally damage and beneficial enemy healing reduce utility.
 
-A full-HP heal is legal when the resolver allows it, but has no health-recovery benefit and incurs its actual cost/waste. Unknown harmless benefit is worth zero. Unsupported potentially harmful effects or unrepresentable mixed recipient semantics exclude that candidate with a specific reason; they do not prevent other supported actions or change player/legacy resolution.
+A full-HP heal is legal when the resolver allows it, but has no health-recovery benefit and incurs its actual cost/waste. Unknown harmless benefit is worth zero. Unsupported potentially harmful effects or unrepresentable mixed recipient semantics exclude that candidate with a specific reason; they do not prevent other supported actions or change player/reflex resolution.
 
 ## 3. Healing and combined effects
 

@@ -95,7 +95,7 @@ from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 #: The authored initial candidate budget (the rulebook's ``candidate_budget``).
 DEFAULT_CANDIDATE_BUDGET = MONSTER_AI_TUNING.candidate_budget
 #: The canonical combat buff the single-target seal restriction keys on. The
-#: legacy decision body names the same key; the bearer's own climaxes lift it
+#: reflex decision body names the same key; the bearer's own climaxes lift it
 #: (church design section 5.7).
 SEAL_BUFF_KEY = "lamb_seal"
 

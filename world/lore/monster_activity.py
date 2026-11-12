@@ -2163,9 +2163,9 @@ _ACTIVITY_DECLARATIONS: tuple[MonsterActivity, ...] = (
     ),
     # Both bosses are solitary territorial animals: one individual roams its
     # whole grounds and turns hostile only inside its defended bay or den. The
-    # crocodile's utility binding never chooses a voluntary flee, so its fight
-    # is decided by the party's own legal retreat; the boar stays legacy and
-    # keeps its authored flee threshold.
+    # crocodile's deliberation binding never chooses a voluntary flee, so its
+    # fight is decided by the party's own legal retreat; the boar stays reflex
+    # and keeps its authored flee threshold.
     MonsterActivity(
         "reservoir_crocodile_territory_activity",
         "solitary_roaming",

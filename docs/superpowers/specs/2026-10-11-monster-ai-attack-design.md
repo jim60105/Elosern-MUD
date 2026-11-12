@@ -3,25 +3,25 @@
 **Date:** 2026-10-11
 **Status:** Conversational design approved; written-spec review required before implementation planning.
 **Parent:** [Upgrade roadmap](2026-10-11-monster-ai-design.md)
-**Deliverable:** A usable utility attack policy, corresponding to handoff PR 1 and PR 2.
+**Deliverable:** A usable deliberation attack policy, corresponding to handoff PR 1 and PR 2.
 
 ## 1. Boundaries and responsibilities
 
-`monster_behaviour_policy(entity, battlefield)` remains the public entry point. It delegates non-monsters unchanged, preserves the existing flee decision before combat selection, and dispatches registered monsters to their effective decision mode. Extract the current legacy body only as needed; do not change its branch order, skill order, target order, or dice consumption.
+`monster_behaviour_policy(entity, battlefield)` remains the public entry point. It delegates non-monsters unchanged, preserves the existing flee decision before combat selection, and dispatches registered monsters to their effective decision mode. Extract the current reflex body only as needed; do not change its branch order, target order, flee priority or target tie-break dice. Its skill comparison is the exact `E = A * c * R` estimate (`monster-decision-modes-rename-and-reflex-area-estimate`); the earlier unchanged skill-heuristic promise is superseded there.
 
 The utility package owns immutable decision data, candidate expansion, estimates, scores, sampling, and traces. Session/round orchestration owns ephemeral execution identity and observation lifetime. Existing rulebook validation owns authored tuning. Shared deterministic gates own legality. `ActionResolver` owns actual mutation and remains the final authority.
 
-Keep files focused by responsibility, following existing repository style. Proposed boundaries are `models`, `candidates`, `estimation`, `utility`, `selection`, and `trace` under `world/rules/monster_ai/`. Tactical memory is a later consumer of the same immutable snapshot contract, not part of effect settlement.
+Keep files focused by responsibility, following existing repository style. Proposed boundaries are `models`, `candidates`, `estimation`, `utility`, `selection`, and `trace` under `world/rules/monster_ai/`. Tactical memory is a later consumer of the same immutable snapshot contract, not part of effect settlement. `utility` names the score's mathematics, not the `deliberation` mode.
 
 ## 2. Strict authored configuration
 
-Preserve the four mandatory archetype fields and their existing validation. Add optional `decision_mode` and `utility_weights`. Default mode is `legacy`; utility weights have a complete named schema. Reject unknown fields, missing mandatory legacy fields, unrecognized modes, booleans used as numbers, negative or non-finite weights, and invalid primitive types.
+Preserve the four mandatory archetype fields and their existing validation. Add optional `decision_mode`, `utility_weights` and `reflex_temperature`. Default mode is `reflex`; utility weights have a complete named schema; a `highest_expected_damage` profile must author a finite positive non-boolean `reflex_temperature` while a `first_owned` profile may omit it. Reject unknown fields, missing mandatory behaviour fields, unrecognized modes (including the former `legacy` and `utility` values), booleans used as numbers, negative or non-finite weights, and invalid primitive types.
 
-Add top-level `variant_intelligence` and `variant_decision_mode` mappings to the existing YAML. Their keys must reference registered variant records with valid species relationships. Intelligence is a required explicit integer in 0..100 for every effective utility variant. The mode map is optional; a missing entry uses the actual resolved archetype mode. Validate all supplied intelligence values even for inactive legacy entries.
+Add top-level `variant_intelligence` and `variant_decision_mode` mappings to the existing YAML. Their keys must reference registered variant records with valid species relationships. Intelligence is a required explicit integer in 0..100 for every effective deliberation variant. The mode map is optional; a missing entry uses the actual resolved archetype mode. Validate all supplied intelligence values even for inactive reflex entries.
 
-No archetype or tier supplies intelligence. Do not add species defaults, per-entity copies, a trait multiplier, or variant inheritance. Utility tuning does not make a tier-only monster registered. Such an object can use legacy; selecting utility without a valid identity and explicit intelligence is a typed invalid decision state and must be diagnosed.
+No archetype or tier supplies intelligence. Do not add species defaults, per-entity copies, a trait multiplier, or variant inheritance. Deliberation tuning does not make a tier-only monster registered. Such an object can use reflex; selecting deliberation without a valid identity and explicit intelligence is a typed invalid decision state and must be diagnosed.
 
-Startup validation verifies authored references and utility activation coverage. Runtime resolution also verifies the actual `behaviour_tree` and species/variant binding because repair tools can alter stored data. The resulting immutable profile and AI configuration fingerprint are recorded for an in-process session. Fingerprints include decision algorithm version, variant intelligence, mode, weights, candidate budget, and relevant rulebook/skill estimation inputs.
+Startup validation verifies authored references and deliberation activation coverage. Runtime resolution also verifies the actual `behaviour_tree` and species/variant binding because repair tools can alter stored data. The resulting immutable profile and AI configuration fingerprint are recorded for an in-process session. Fingerprints include decision algorithm version, variant intelligence, mode, weights, each profile's reflex temperature, every registered damage skill's primary-damage projection, candidate budget, and relevant rulebook/skill estimation inputs.
 
 ## 3. Snapshot contract
 
@@ -51,11 +51,11 @@ Deduplicate by canonical skill, scale, and sorted stable explicit target identif
 
 ### Mandatory ordering
 
-Keep the legacy flee threshold and `FLEE_SKILL_KEY` unchanged and outside the scored attack pool.
+Keep the reflex flee threshold and `FLEE_SKILL_KEY` unchanged and outside the scored attack pool.
 
 For hostile single-target damage, first restrict to applicable `lamb_seal` bearers when any are present. If the actor lacks any genuinely castable non-strike hostile single-target damage skill, remove displaced targets. With an applicable seal, take the first remaining bearer in the existing canonical order; without a seal, retain the ordinary eligible target pool for utility comparison. A strike-only candidate must still exclude displaced targets even if another skill provides a legal non-strike alternative. Having a non-strike self-heal does not satisfy the alternative-attack condition. Area attacks and friendly support are not restricted by this single-target seal rule.
 
-A higher score cannot restore a removed target. Empty legal candidates return `None`. Do not force an attack or invoke legacy merely because utility found no legal candidates.
+A higher score cannot restore a removed target. Empty legal candidates return `None`. Do not force an attack or invoke reflex merely because deliberation found no legal candidates.
 
 ### Candidate budget
 
@@ -83,7 +83,7 @@ Damage benefit is projected effective HP loss of enemies divided by `H_enemy`; a
 
 Finishing is the supported knockout likelihood summed over hostile recipients, divided by the number of eligible live enemies. Do not award a certain kill merely because average damage exceeds current HP. Resource cost is the mean fraction of current spendable pools consumed, over pools charged by the skill. Include MP, HP, nutrition, and arousal under their actual spend rules; an unavailable pool was already rejected by legality.
 
-Preference combines the configured target strategy, owned-skill preference, and area preference into a bounded score. Use a stable rank normalized over the relevant legal choices; ties share rank. It remains a soft bias in utility, while legacy retains its mandatory old ordering.
+Preference combines the configured target strategy, owned-skill preference, and area preference into a bounded score. Use a stable rank normalized over the relevant legal choices; ties share rank. It remains a soft bias in deliberation, while reflex retains its mandatory old ordering and ignores the area flag entirely.
 
 Let `i = intelligence / 100`. The completed attack score is:
 
@@ -123,14 +123,14 @@ A direct two-argument inspection call without execution scope uses canonical act
 
 Detailed trace is opt-in for debugging/manual reports. It records scope, config/algorithm version, variant intelligence, seed, candidate/rejection counts, budget omissions, feature contributions, estimation limits, normalized target plans, and selected request. Full trace output uses explicit JSON report files or a programmatic result; normal facade context includes only a bounded summary.
 
-Malformed tuning fails startup. A narrowly typed invalid runtime decision state emits a facade warning with available identifiers and exception context. The initial configured invalid-state behavior is legacy fallback; a diagnostic setting may select `None`. This fallback does not include empty legal candidates, unsupported individual candidates, late resolver rejection, database errors, or unexpected programming exceptions. Those keep their normal boundaries.
+Malformed tuning fails startup. A narrowly typed invalid runtime decision state emits a facade warning with available identifiers and exception context. The initial configured invalid-state behavior is reflex fallback; a diagnostic setting may select `None`. This fallback does not include empty legal candidates, unsupported individual candidates, late resolver rejection, database errors, or unexpected programming exceptions. Those keep their normal boundaries.
 
 New logging paths use named facade imports and the existing exception policy. No console UI or player command is added.
 
 ## 9. Acceptance
 
-Small deterministic regressions establish legacy action/dice behavior, identity validation, malformed tuning, skill ownership/cost/cast gates, mandatory seal/displacement ordering, mixed target/scale preservation, semantic deduplication, bounded enumeration, read-only snapshots, independent RNG, multi-action and overwhelm identity, and late resolver revalidation. Tests assert consumer-visible behavior, not private source layout or authored tuning numbers.
+Small deterministic regressions establish reflex action/dice behavior, identity validation, malformed tuning, skill ownership/cost/cast gates, mandatory seal/displacement ordering, mixed target/scale preservation, semantic deduplication, bounded enumeration, read-only snapshots, independent RNG, multi-action and overwhelm identity, and late resolver revalidation. Tests assert consumer-visible behavior, not private source layout or authored tuning numbers.
 
-Smoke verification constructs synthetic registered monsters and opponents, selects utility through the production adapter, runs real settlement, and reloads committed resources/effects. Include a no-legal-action case and a fault after relevant writes. Run the focused labels, observability lint when its paths change, shard ownership gate for new modules, and repository contract gate.
+Smoke verification constructs synthetic registered monsters and opponents, selects deliberation through the production adapter, runs real settlement, and reloads committed resources/effects. Include a no-legal-action case and a fault after relevant writes. Run the focused labels, observability lint when its paths change, shard ownership gate for new modules, and repository contract gate.
 
 The one-time 128-seed selector check is owned by the manual simulation design, not permanent full-suite discovery. Completion requires the end-to-end attack path; configuration parsing alone is not this deliverable.

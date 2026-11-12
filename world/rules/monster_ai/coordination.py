@@ -91,7 +91,7 @@ _AMBIGUOUS_CONTROL_STATUSES = frozenset({"self_buff_applied", "equipment_immune"
 
 #: The target strategies whose profiles value observed threat at all. The
 #: existing highest_effective_power strategy is the one that already reads the
-#: opposing side's capacity, so it opts in; lowest_hp keeps its legacy metric
+#: opposing side's capacity, so it opts in; lowest_hp keeps its reflex metric
 #: ordering untouched.
 _THREAT_STRATEGIES = frozenset({"highest_effective_power"})
 
