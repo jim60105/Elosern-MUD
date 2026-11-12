@@ -848,7 +848,8 @@ that the added compositions initialize within their zones' existing bounds.
 gave each port a hinterland belt and deferred the hinterland of the inland ferry
 settlements because the region had no low-tier dry-ground species; the
 dry-ground ant now supplies that tier, so both ferry cities and the olive town
-receive the hinterland zones beside their own ground. The port hinterlands keep
+receive the hinterland zones beside their own ground. This resolves the deferral
+recorded under "Near-settlement belts: both coasts". The port hinterlands keep
 their rectangle, extent and configured behaviour exactly as they were; only the
 composition mix inside them changes. New trunk-road corridors follow the salt
 road and the routes between the ports and the inland towns, and deep-wild zones
