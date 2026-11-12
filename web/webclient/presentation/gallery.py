@@ -960,15 +960,14 @@ def _official_entries(subject, entity, generation, terminal) -> list[dict]:
     return entries
 
 
-def gallery_presenter(context: PresentationContext):
-    """Project one selected gallery. Reads never create or consolidate records."""
-    from .coordinator import PresentationCoordinator
+def _selected_subject_fields(subject, entity) -> dict:
+    """The selected subject's card facts, shared by every panel version.
 
-    if PresentationCoordinator.mode_for(context) != "exploration":
-        raise PanelUnavailableError
-    rail = gallery_subjects(context.actor)
-    selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
-    subject, entity = selected[1:]
+    Returns ``cards``, ``official_entries``, ``equipment_summary``,
+    ``capabilities`` (the version-three capability record), ``binding_warnings``,
+    ``error_state`` and ``filters`` (only version three publishes it). Reads
+    never create or consolidate records.
+    """
     capability = capabilities_for(subject.kind.value)
     # Observe jobs first: if one settles before the card read, dedupe favors the card.
     pending = pending_gallery_jobs(subject)
@@ -1024,12 +1023,26 @@ def gallery_presenter(context: PresentationContext):
             generation[0], descriptors.GENERATION_FAILED,
         ))
     rows.sort(key=lambda row: -row["created_at"])
-    return validate_gallery({
-        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
-        "subjects": [entry[0] for entry in rail], "selected": subject.full(),
+    return {
         "filters": _filters(rows), "cards": rows,
         "official_entries": _official_entries(subject, entity, generation, terminal),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
         "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,
+    }
+
+
+def gallery_presenter(context: PresentationContext):
+    """Project one selected gallery. Reads never create or consolidate records."""
+    from .coordinator import PresentationCoordinator
+
+    if PresentationCoordinator.mode_for(context) != "exploration":
+        raise PanelUnavailableError
+    rail = gallery_subjects(context.actor)
+    selected = next((entry for entry in rail if entry[0]["subject_key"] == context.gallery_subject), rail[0])
+    subject, entity = selected[1:]
+    return validate_gallery({
+        "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
+        "subjects": [entry[0] for entry in rail], "selected": subject.full(),
+        **_selected_subject_fields(subject, entity),
     })

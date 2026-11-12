@@ -4,7 +4,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 1. Shared helper
 
-- [ ] 1.1 Extract `_selected_subject_fields(subject, entity)` from `gallery_presenter` per design D1 and make v3 use it. Verify `<prefix> web.webclient.presentation.tests.test_gallery_panel web.webclient.presentation.tests.test_art_push` passes with no test edits.
+- [x] 1.1 Extract `_selected_subject_fields(subject, entity)` from `gallery_presenter` per design D1 and make v3 use it. Verify `<prefix> web.webclient.presentation.tests.test_gallery_panel web.webclient.presentation.tests.test_art_push` passes with no test edits.
 
 ## 2. Store
 
