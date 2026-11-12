@@ -175,6 +175,13 @@ class GalleryCategoryTests(EvenniaTest):
         self.assertEqual(refs[1].subject.full(), f"portrait:character:{low.pk}")
         self.assertEqual(category_of_subject(high, f"portrait:character:{low.pk}"), "mine")
 
+    def test_an_invalid_policy_falls_back_to_the_numeric_identity_in_mine(self):
+        self.actor.db.portrait_policy = {"mode": "named", "stable_key": "bad/key"}
+        refs = category_groups(self.actor, "mine")[0].subjects
+        self.assertEqual(
+            [ref.subject.full() for ref in refs], [f"portrait:character:{self.actor.pk}"]
+        )
+
     def test_possession_keeps_the_account_characters(self):
         other = self._add_character("測者丁")
         companion = self._companion("附身測者", other, stable_key="t_possessed_companion")

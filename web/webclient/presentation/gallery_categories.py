@@ -142,7 +142,8 @@ def _party(actor: Any) -> tuple[GalleryGroup, ...]:
 
 def _monster(actor: Any) -> tuple[GalleryGroup, ...]:
     # The holder is the rendered actor: the same object the lore codex reads,
-    # so the two surfaces agree on what has been sighted.
+    # so the two surfaces agree on what has been sighted. Unlike mine/party it
+    # deliberately does not resolve a possessed puppet to its owner (design D4).
     try:
         seen_keys = {
             key for category, key in list_discovered(actor, tolerant=True)
