@@ -7,7 +7,7 @@ Divides the monster population into settlement units whose settlement never read
 ## ADDED Requirements
 
 ### Requirement: Authored geometry resolves to settlement units
-Ecology zones and region-bound activity areas SHALL resolve to settlement units such that two of them share a unit exactly when a chain of rectangle overlaps inside one region connects them. A cell or room that belongs to none of them SHALL belong to the residual unit. The resolution SHALL be deterministic and SHALL read no database state.
+Ecology zones and region-bound activity areas SHALL resolve to settlement units such that two of them share a unit exactly when a chain of links connects them: a rectangle overlap inside one region, or a zone or site whose births can be bound to an area. A cell or room that belongs to none of them SHALL belong to the residual unit. The resolution SHALL be deterministic and SHALL read no database state.
 
 #### Scenario: Disjoint zones
 - **WHEN** two synthetic zones in one region have rectangles that do not overlap and no activity area touches both
@@ -16,6 +16,10 @@ Ecology zones and region-bound activity areas SHALL resolve to settlement units 
 #### Scenario: Area bridges two zones
 - **WHEN** a synthetic region-bound activity area overlaps the rectangles of two otherwise disjoint zones
 - **THEN** both zones and the area resolve to one unit
+
+#### Scenario: Birth binding links a zone to a distant area
+- **WHEN** a synthetic zone's pool can birth a group bound to a region-bound area whose rectangles do not overlap the zone
+- **THEN** the zone and the area resolve to one unit
 
 #### Scenario: Same rectangles in different regions
 - **WHEN** two synthetic zones have equal rectangles but different region keys
@@ -45,15 +49,11 @@ The units a group touches SHALL be the units of its home, its position, its jour
 - **THEN** it touches both units until its arrival is recorded
 
 ### Requirement: Each unit records its settlement progress
-The world SHALL store one settled-through tick per settlement unit, with a default for units not yet listed. Fresh provisioning SHALL create the record at the provisioning tick, a provisioned world without the record SHALL receive it at server start from the world's current settlement progress, and a rolled-back advance SHALL restore it.
+The world SHALL store one settled-through tick per settlement unit, with a default for units not yet listed. Fresh provisioning SHALL create the record at the provisioning tick, a pass SHALL record its endpoint, a rolled-back advance SHALL restore the record, and a missing or malformed record SHALL be refused by name.
 
 #### Scenario: Fresh world
 - **WHEN** a population is provisioned at tick 100
 - **THEN** every unit reports settled-through tick 100
-
-#### Scenario: Existing world without the record
-- **WHEN** the startup step runs on a provisioned world whose activity progress is 500 and that has no record, and then runs again
-- **THEN** every unit reports 500 after the first run and the second run changes nothing
 
 #### Scenario: Pass records its endpoint
 - **WHEN** a lifecycle pass settles through tick 260
@@ -64,5 +64,5 @@ The world SHALL store one settled-through tick per settlement unit, with a defau
 - **THEN** every unit reports 100 in memory and after reload
 
 #### Scenario: Malformed record
-- **WHEN** the stored record is not a mapping with an integer default and a mapping of unit identifiers to integers
+- **WHEN** the stored record is absent, or is not a mapping with an integer default and a mapping of unit identifiers to integers
 - **THEN** reading it raises the population owner's malformed-state error and nothing is rewritten

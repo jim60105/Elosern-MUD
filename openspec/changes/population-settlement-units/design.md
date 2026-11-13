@@ -6,7 +6,7 @@ See proposal.md - Why. Facts verified at commit `f9925e49`:
 
 - `world/lore/monster_placement.py::EcologyZone` has `key`, `region_key`, `rectangles` (inclusive `(x_min, x_max, y_min, y_max)`). `ECOLOGY_ZONE_REGISTRY` holds 175 zones.
 - `world/lore/monster_activity.py::ActivityArea` has `key` and either `region_key` + `rectangles` (260 areas) or `home_radius` (3 areas, all radius 0). `MonsterActivity.area_key` names the area.
-- Measured on the shipped registries with the rule of D1: 175 units, each of one zone. The design does not rely on that; tests use synthetic registries only.
+- Measured on the shipped registries with the rectangle-overlap rule alone: 175 units, each of one zone. The birth-binding links of D1 can merge some of them; task 2.3 records the resulting count as information. The design does not rely on that; tests use synthetic registries only.
 - `world/maps/monster_activity.py::MonsterGroup` has `home_owner: tuple[str, str]` (kind in `OWNER_KINDS = ("zone", "site", "quest", "explicit")`, then key), `home: LocationRef`, `position: LocationRef | None`, `journey_id`. `MonsterJourney` has `source` and `destination`. `_group_area(group)` returns the resolved locators of the group's area.
 - `world/rules/movement_edges.py::LocationRef` has `kind` (`"wilderness"` with `map`, `x`, `y`, or a room with `id`).
 - `world/lore/monster_placement.py::MONSTER_SITE_REGISTRY` rows have `key` and `coordinates`.
@@ -49,15 +49,22 @@ class UnitIndex:
 
 
 def build_unit_index(
-    zones: Mapping[str, EcologyZone], areas: Mapping[str, ActivityArea]
+    zones: Mapping[str, EcologyZone],
+    areas: Mapping[str, ActivityArea],
+    bound_areas: Mapping[str, frozenset[str]],   # zone key -> area keys its births can be bound to
 ) -> UnitIndex: ...
+
+
+def zone_bound_areas() -> dict[str, frozenset[str]]: ...
 ```
 
-Algorithm: nodes are `("zone", key)` for every zone and `("area", key)` for every area with `region_key is not None`. Two nodes are joined (union-find) when they have the same `region_key` and any rectangle of one overlaps any rectangle of the other (`a.x_min <= b.x_max and b.x_min <= a.x_max and a.y_min <= b.y_max and b.y_min <= a.y_max`). The unit identifier of a component is `"zone:" + smallest zone key` in it, or `"area:" + smallest area key` when it has no zone. `unit_of_cell` returns the unit of the first rectangle of that `region_key` that contains the cell, scanning rectangles sorted by `(unit_id, rectangle)`; no match, or `region_key is None`, returns `RESIDUAL_UNIT`. Rectangles of one region that contain the same cell are always in one unit by construction, so the scan order cannot change the answer.
+Algorithm: nodes are `("zone", key)` for every zone and `("area", key)` for every area with `region_key is not None`. Two nodes are joined (union-find) when they have the same `region_key` and any rectangle of one overlaps any rectangle of the other (`a.x_min <= b.x_max and b.x_min <= a.x_max and a.y_min <= b.y_max and b.y_min <= a.y_max`). A zone node is also joined with the node of every region-bound area in `bound_areas[zone key]`. `zone_bound_areas()` builds that mapping from the live registries: for every zone and every `WeightedComposition` of `zone.pool`, take `composition_row_bindings(ENCOUNTER_COMPOSITION_REGISTRY[row.composition_key])` (both in `world/lore/monster_placement.py`), map each activity key through `MONSTER_ACTIVITY_REGISTRY[key].area_key`, and keep the areas with `region_key is not None`. For every site of `MONSTER_SITE_REGISTRY`, do the same with `composition_row_bindings(composition, site=site)` for the site's composition (find the site's composition attribute with `grep -n "class MonsterSite" -A25 world/lore/monster_placement.py`) and add those areas to the entry of the zone whose rectangles contain `site.coordinates` in the site's region; a site inside no zone contributes a join between its areas only (join them with each other). This link is what keeps a group born by a pass inside the pass's own units: its home is in the zone and its area is in the same unit.
+
+The unit identifier of a component is `"zone:" + smallest zone key` in it, or `"area:" + smallest area key` when it has no zone. `unit_of_cell` returns the unit of the first rectangle of that `region_key` that contains the cell, scanning rectangles sorted by `(unit_id, rectangle)`; no match, or `region_key is None`, returns `RESIDUAL_UNIT`. Rectangles of one region that contain the same cell are always in one unit by construction, so the scan order cannot change the answer.
 
 Home-radius areas have no node; a group bound to one is placed by D3 through its home and area cells.
 
-`current_unit_index() -> UnitIndex` memoises `build_unit_index(ECOLOGY_ZONE_REGISTRY, ACTIVITY_AREA_REGISTRY)` on the identity of both registry objects (use `world.maps.monster_activity.SourceMemo` the way `_RESOLVED_AREAS` does), so tests that swap registries get a fresh index.
+`current_unit_index() -> UnitIndex` memoises `build_unit_index(ECOLOGY_ZONE_REGISTRY, ACTIVITY_AREA_REGISTRY, zone_bound_areas())` on the identity of the zone, area, activity, composition and site registry objects (use `world.maps.monster_activity.SourceMemo` the way `_RESOLVED_AREAS` does), so tests that swap registries get a fresh index.
 
 ### D2. Locating a locator
 
@@ -100,9 +107,11 @@ def advance_unit_cursors(wilderness, unit_ids: Iterable[str] | None, tick: int) 
 
 `population_lifecycle.settle_population_lifecycle`: at the end of the pass body, after `retire_settled_decision_receipts`, call `population_units.advance_unit_cursors(wilderness, None, end_tick)`.
 
-### D5. Startup provisioning for an existing world
+### D5. No migration; hand-provisioned fixtures write the record
 
-Add `population_units.ensure_unit_cursors(wilderness) -> bool`: when the wilderness is provisioned (`regional_population.population_provisioned`) and the attribute is absent, write `{"default": read_monster_activity(wilderness).settled_through_tick, "units": {}}` and return `True`; otherwise return `False`. Call it from the server-start step that registers the lifecycle stage: find it with `grep -rn "register_regional_population()" server/ world/maps/bootstrap.py`, and call `ensure_unit_cursors(regional_population.live_wilderness())` right after that registration when the wilderness is not `None`. Emit `log_info("population_unit_cursors_initialized", context={"tick": ...})` only when it returned `True`.
+There is no startup repair and no compatibility read: `read_unit_cursors` raises `MalformedPopulationState` when the attribute is absent. A development world created before this change is re-provisioned (`docs/development/database-reset.md`).
+
+Test fixtures that provision a population without `initialize_population_seed` must write the record themselves. Find them with `grep -rln "population_timeline = " --include='*.py' world commands server web tools`. In each fixture found, next to the statement that writes `population_timeline`, write `population_unit_cursors = {"default": <the same tick>, "units": {}}`. `world/maps/tests/test_monster_activity.py::ActivityFixture._reset_activity` is one of them. The two smoke tools `tools/monster_population_smoke.py` and `tools/monster_field_behaviour_smoke.py` provision through `initialize_population_seed` and need no edit; confirm with the same grep.
 
 ### D6. Tests
 
@@ -120,4 +129,5 @@ Add a section "Settlement units" to `docs/development/regional-monster-populatio
 
 - [Rectangle overlap merges zones whose real cells do not intersect] → only costs granularity, never correctness.
 - [A future rule lets one unit's settlement read another unit's state (for example a zone that counts monsters of a neighbouring zone)] → the independence argument in D7 names what a new rule must respect; `unit-scoped-population-settlement` adds the test that detects a violation.
+- [An existing development world has no cursor record and every advance on it refuses] → intended fail-closed behaviour of a pre-release project; the proposal states the re-provisioning step.
 - [A registry edit changes unit identifiers of a saved world] → unknown identifiers fall back to `default`; `observed-unit-advance` states the consequence for lagging units.
