@@ -73,10 +73,9 @@ class ArtServiceTests(EvenniaTestCase):
             if record.db_key.startswith(f"art:scene:{archetype}:gen:")
         )
 
-    # The startup-sync scenarios below cover the ADDED requirement "Startup
-    # synchronization requests gallery art for every registered scene and
-    # species"; their traceability annotation is added when the change is
-    # archived and the requirement gains its canonical id.
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_startup_sync_requests_one_gallery_card_per_registered_scene(self):
         art_sync_all()
         records = self._records()
@@ -107,6 +106,9 @@ class ArtServiceTests(EvenniaTestCase):
         ]
         self.assertEqual(len(monster_jobs), len(visual_registry))
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_a_carded_scene_requests_nothing(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         card = gallery_api.append_card(
@@ -127,6 +129,9 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
         self.assertEqual(gallery_api.cards_for(subject), [card])
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_a_scene_emptied_by_deletion_requests_nothing(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         identity = (
@@ -156,12 +161,18 @@ class ArtServiceTests(EvenniaTestCase):
                 ensure_scene_asset(_SYNTH_SCENE)
         self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_a_failed_first_scene_generation_is_retried_at_startup(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         gallery_api.record_error(subject, "sd_connection_error")
         art_sync_all()
         self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_a_pending_scene_job_is_left_untouched(self):
         ensure_scene_asset(_SYNTH_SCENE)
         job_keys = self._scene_job_keys(_SYNTH_SCENE)
@@ -172,6 +183,9 @@ class ArtServiceTests(EvenniaTestCase):
             self._records()[job_keys[0]].db.status, ArtAssetStatus.PENDING
         )
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-synchronization-requests-gallery-art-for-every-registered-scene-and-species"
+    )
     def test_an_operator_scene_image_still_requests_generation(self):
         from world.art import official
 

@@ -403,9 +403,8 @@ _MIGRATION_KEYS = (
 class SceneAssetMigrationTests(EvenniaTestCase):
     """The startup conversion turns settled classic scene outputs into gallery cards.
 
-    Covers the ADDED requirement "Startup converts classic scene outputs into
-    scene gallery cards". Its canonical id only exists after archive sync, so
-    these tests stay unannotated until then.
+    Change ``scene-asset-migration``: every settled classic scene record is
+    converted or dropped at startup and its files are reclaimed.
     """
 
     def setUp(self):
@@ -456,6 +455,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
     def _classic_exists(self, key):
         return ArtAssetRecord.objects.filter(db_key=record_key(scene_subject_for(key))).exists()
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_a_done_classic_scene_becomes_one_card(self):
         record = self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
         output = self.root / record.db.output_identity
@@ -480,6 +482,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
         self.assertFalse(self._classic_exists(_MIGRATION_DONE))
         self.assertFalse(output.exists())
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_an_existing_card_wins(self):
         subject = scene_subject_for(_MIGRATION_CARDED)
         identity = (
@@ -506,6 +511,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
         self.assertFalse(self._classic_exists(_MIGRATION_CARDED))
         self.assertFalse(output.exists())
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_failed_and_missing_records_are_dropped(self):
         failed = self._classic(_MIGRATION_FAILED, ArtAssetStatus.FAILED, prior=True)
         missing = self._classic(_MIGRATION_MISSING, ArtAssetStatus.MISSING)
@@ -528,6 +536,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
             with self.subTest(path=path.name):
                 self.assertFalse(path.exists())
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_an_unsettled_record_waits(self):
         pending = self._classic(_MIGRATION_PENDING, ArtAssetStatus.PENDING)
         in_progress = self._classic(
@@ -548,6 +559,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
                     (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS),
                 )
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_running_twice_changes_nothing_more(self):
         self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
         self.assertEqual(
@@ -575,6 +589,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
             files,
         )
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_one_bad_record_never_aborts_startup(self):
         from world.art import service as art_service
 
@@ -610,6 +627,9 @@ class SceneAssetMigrationTests(EvenniaTestCase):
             )
         )
 
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
     def test_a_failed_classic_unlink_is_bounded_and_visible(self):
         record = self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
         record_name = str(record.db_key)
