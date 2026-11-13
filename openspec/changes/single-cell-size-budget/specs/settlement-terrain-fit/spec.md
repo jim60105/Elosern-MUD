@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Size budget follows the population-area relation with a multi-cell floor
-The size budget SHALL compute built-up area as the reference area times (population divided by the reference population) raised to the configured exponent. Footprint cells SHALL be the larger of two and the area rounded up in square kilometres, except that a village or hamlet SHALL receive one cell and its node count from the single-cell tier table. The envelope radius SHALL be that of a circle of that area. Unsupported kinds and non-positive populations SHALL be rejected.
+The size budget SHALL compute built-up area as the reference area times (population divided by the reference population) raised to the configured exponent. Footprint cells SHALL be the larger of two and the area rounded up in km², except that a village or hamlet SHALL receive one cell and its node count from the single-cell tier table. The envelope radius SHALL be that of a circle of that area. Node, gate and loop targets of every other kind SHALL come from the supplied tier tables. Unsupported kinds and non-positive populations SHALL be rejected.
 
 #### Scenario: Area scales by the configured exponent
 - **WHEN** a synthetic configuration with reference population 10,000, reference density 100 inhabitants per hectare and exponent 0.5 is applied to population 40,000

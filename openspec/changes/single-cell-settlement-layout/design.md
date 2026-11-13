@@ -4,10 +4,11 @@
 
 `tools/settlement_synthesis/`:
 
-- `budget.py`: `NATIONAL_KINDS = ("capital", "city", "town", "port")`; `size_budget` rejects any other kind; `BudgetConfig.min_footprint_cells` must be at least 2.
+- `budget.py` (after `single-cell-size-budget`): `SINGLE_CELL_KINDS = ("village", "hamlet")`, `BUDGET_KINDS`, and a `size_budget` that gives the two kinds one cell, `node_count` 4 or 2, `gate_count` 0 and `loop_ratio` 0.0.
 - `workspace.py`: `analysis_input(view, location, ...)` builds a `GenerationInput`; `WorkspaceView.blocked_cells(map_id)` lists cells no footprint or approach may use.
 - `generate.py`: `generate_settlement(inp)` grows a footprint, places catalogue roles, builds a Gabriel-graph street network, emits the document through `document_from_data` and refuses any terrain-fit lint error. `_settlement_class` rejects kinds outside the national four. `_gate_bearings(inp)` gives the gate bearing priority order.
-- `fit_lint.py`: `lint_settlement(document, location_cell, terrain)`.
+- `fit_lint.py` (after `single-cell-size-budget`): `lint_settlement(document, location_cell, terrain, road_contacts=None)` reports `fit_entrance_mismatch` for a one-cell physical footprint whose gates differ from the contacts.
+- `workspace.py` (after `single-cell-size-budget`): `WorkspaceView.road_contacts(cell)` returns the road cells that precede or follow a cell on any road of the committed artifact.
 - `__main__.py`: `_generate_one` refuses a kind outside `NATIONAL_KINDS`; `--missing --nation` targets `NATIONAL_KINDS` rows with no document, largest population first.
 - `geometry.py`: `OCTANTS`, `OPPOSITE`, `OCTANT_VECTORS`.
 
@@ -33,33 +34,13 @@ The placement procedure of the tiers design regenerates the roads before it gene
 
 ## Decisions
 
-### D1. Budget
+### D1. Prerequisites
 
-`budget.py`:
+This change uses `SINGLE_CELL_KINDS`, `BUDGET_KINDS`, `WorkspaceView.road_contacts` and the `road_contacts` lint parameter exactly as `single-cell-size-budget` defines them, and changes none of them.
 
-```python
-#: The kinds that receive a one-cell footprint and the single-cell layout.
-SINGLE_CELL_KINDS = ("village", "hamlet")
-#: Every kind with a size budget.
-BUDGET_KINDS = NATIONAL_KINDS + SINGLE_CELL_KINDS
-```
+### D2. Generator input
 
-`BudgetConfig` gains `single_cell_nodes: Mapping[str, int]`, placed last, with the default `{"village": 4, "hamlet": 2}` in `DEFAULT_BUDGET`. `__post_init__` requires its keys to equal `set(SINGLE_CELL_KINDS)` and every value to be at least 2.
-
-`size_budget` for a kind in `SINGLE_CELL_KINDS`: the area and the envelope radius come from the existing formula; `footprint_cells = 1`; `node_count = config.single_cell_nodes[kind]`; `gate_count = 0`; `loop_ratio = 0.0`. A missing or non-positive population is rejected as today. A kind outside `BUDGET_KINDS` is rejected as today. `min_footprint_cells` keeps its meaning and its floor of 2 for the national kinds.
-
-### D2. Road contacts
-
-`WorkspaceView` gains:
-
-```python
-def road_contacts(self, cell: Cell) -> tuple[Cell, ...]:
-    """The road cells that precede or follow ``cell`` on any road of the artifact."""
-```
-
-It decodes `<root>/world/maps/data/road_network.json` once per view. For every road and every index `i` with `cells[i] == cell`, it collects `cells[i - 1]` and `cells[i + 1]` when they exist. The result is sorted and unique. A missing file gives `()`. An undecodable file raises `WorkspaceError`. The artifact's freshness is not checked: writing a settlement document changes the artifact's source signature without moving any road.
-
-`GenerationInput` gains `road_contacts: tuple[Cell, ...] = ()`, placed last. `analysis_input` fills it for a kind in `SINGLE_CELL_KINDS` and uses `reach = 1` there.
+`GenerationInput` gains `road_contacts: tuple[Cell, ...] = ()`, placed last. For a kind in `SINGLE_CELL_KINDS`, `analysis_input` fills it with `view.road_contacts(location.cell)` and uses `reach = 1`.
 
 ### D3. Entrances
 
@@ -136,14 +117,9 @@ Roads are a star: for each non-anchor slot, one road anchor → slot with `direc
 
 It then runs `document_from_data` and `lint_settlement` exactly as the national path does and returns a `GenerationResult` whose `footprint` is the one location cell. No random number is drawn, so the output is deterministic.
 
-### D7. Lint: entrances against road contacts
+### D7. Lint call
 
-`lint_settlement` gains a keyword parameter `road_contacts: tuple[Cell, ...] | None = None`. When it is not `None` and the entry is a one-cell physical footprint:
-
-- with contacts: the set of gate approach cells must equal the set of contacts, else one finding `fit_entrance_mismatch`, severity error, object `gates`, message listing the missing and the extra cells;
-- with no contact: more than one gate is the same finding.
-
-The `lint` command passes `view.road_contacts(cell)` for a document whose location kind is in `SINGLE_CELL_KINDS` and `None` otherwise. `_generate_single_cell` passes `inp.road_contacts` unless `forced_gates` is set.
+`_generate_single_cell` calls `lint_settlement` with `road_contacts=inp.road_contacts`, or with `None` when `forced_gates` is set, and refuses any error finding as the national path does.
 
 ### D8. Commands
 
@@ -152,12 +128,7 @@ The `lint` command passes `view.road_contacts(cell)` for a document whose locati
 
 ### D9. Tests
 
-Synthetic workspaces only, built as the two modules already do. A synthetic road artifact is written with `encode_road_document` to `<root>/world/maps/data/road_network.json`.
-
-`tests/test_settlement_terrain_fit.py`:
-
-- budget: a village and a hamlet get one cell and the configured node counts from a synthetic `single_cell_nodes`; a town at the same population still gets two cells; `single_cell_nodes` with a missing kind or a value of 1 is rejected; an `elven_village` is still rejected.
-- lint: matching gates pass; a missing gate, an extra gate, and two gates with no contact each give `fit_entrance_mismatch`; a national document is unaffected.
+Synthetic workspaces only, built as the module already does. A synthetic road artifact is written with `encode_road_document` to `<root>/world/maps/data/road_network.json`.
 
 `tests/test_settlement_graph_generation.py`:
 
@@ -176,9 +147,7 @@ Assert counts through the budget and the contact set, not through copied labels.
 
 `docs/development/settlement-synthesis.md`:
 
-- "Size budget": add the single-cell tier table (village 1 cell and 4 nodes, hamlet 1 cell and 2 nodes) and replace the sentence that no supported settlement is ever a single cell.
-- Add a section "Single-cell layout" after "Generation" with D3 to D6.
-- "Terrain-fit lint" table: add `fit_entrance_mismatch`.
+- Add a section "Single-cell layout" after "Generation" with D3 to D6 and D8.
 - "Commands": add `--kind`.
 - "Human review": add "Does a four-node village and a two-node hamlet give enough to do on arrival?" and "Do the entrances match the roads on the continent capture?".
 
@@ -187,5 +156,5 @@ Assert counts through the budget and the contact set, not through copied labels.
 ## Risks / Trade-offs
 
 - [The road artifact is older than the placement, so a new village has no contact] → A village is refused with `no_road`; a hamlet gets one entrance, and the lint reports `fit_entrance_mismatch` once the roads are regenerated.
-- [A later regeneration moves a spur and leaves a map with a stale gate] → The lint reports it. The fix is to regenerate that map by deleting its file and running `generate` again, then redoing its prose.
+- [A later regeneration moves a spur and leaves a map with a stale gate] → The lint reports it. The fix is to regenerate that map by deleting its file and running `generate` again, then redoing its prose. Plain `generate` does not read the reference index, so a stale index does not block this.
 - [A road passing diagonally gives a diagonal gate] → Supported: gate directions are any of the eight octants, and the approach cell is the diagonal neighbour.
