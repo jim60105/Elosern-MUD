@@ -316,6 +316,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::a-live-departure-plays-a-farewell-before-the-stage-releases"
+    )
     def test_live_departure_plays_a_farewell_before_the_stage_releases(self):
         _assert_cases_pass(
             "dream farewell",

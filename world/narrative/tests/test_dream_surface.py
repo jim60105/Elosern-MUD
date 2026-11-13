@@ -591,6 +591,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(self.request("finalize").result["outcome"], "success")
         self.assertEqual(self.request("draft", direction=dict(self.WISH)).result["outcome"], "success")
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_each_departure_outcome_selects_its_own_farewell_line(self):
         # The same dream at the same exchange count, left three ways: an
         # unconfirmed departure resumes on the next entry.
@@ -616,6 +619,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.request("awaken")
         self.assertEqual(service.dream_state(self.actor)["ending"], granted["ending"])
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_climax_selects_a_different_farewell_line_offline(self):
         from world.narrative.dream_track import CLIMAX_AFTERGLOW
 
@@ -639,6 +645,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertNotEqual(calm["ending_phase"], CLIMAX_AFTERGLOW)
         self.assertEqual(spent["ending_phase"], CLIMAX_AFTERGLOW)
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_farewell_line_needs_no_model_call(self):
         self.enter()
         with patch("world.ai.client.OpenAICompatClient", side_effect=AssertionError("farewell called model")), \
@@ -650,6 +659,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertFalse(state["open"])
         self.assertTrue(state["ending"])
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_farewell_line_is_delivered_once(self):
         self.enter()
         self.actor.msg.reset_mock()
@@ -663,6 +675,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(service.dream_state(self.actor)["ending"], ending)
         self.assertEqual(self.actor.msg.call_count, sent)
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_departure_does_not_wait_for_the_farewell(self):
         self.enter()
         self.live_sessions = []
@@ -676,6 +691,9 @@ class DreamSurfaceTests(EvenniaTest):
         state = service.dream_state(self.actor)
         self.assertFalse(state["pending"] or state["open"])
 
+    @covers_requirement(
+        "dream-sleep-surface::departure-ends-with-a-server-authored-farewell-line"
+    )
     def test_an_open_dream_has_no_ending_text(self):
         self.enter()
         state = service.dream_state(self.actor)
