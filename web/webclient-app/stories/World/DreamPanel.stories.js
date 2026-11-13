@@ -1,5 +1,5 @@
 // World/DreamPanel: the dream collaboration as co-editing a wish, played as the
-// staged server (design: stage 8 of
+// staged server (design: stages 8 and 9 of
 // docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md). The
 // fixture applies the design's scripted edit commands and publishes a schema-5
 // panel state. Reference only: synthetic fixtures, no model call, no game time.
@@ -248,6 +248,11 @@ export const Arrival = { render, args: { turns: 0 } };
 export const ArrivalNoThreads = { render, args: { turns: 0, threads: [] } };
 // After the first exchange: she wrote the wish, the thread is fixed.
 export const FirstWish = { render, args: { turns: 1 } };
+// A turn that rewrote the wish, added one item and struck another out: the
+// card names each changed field with its counts.
+export const ChangedWish = { render, args: { turns: 3, threadId: THREADS[0].id } };
+// She only asked a question: nothing changed, and the card says so.
+export const NothingChanged = { render, args: { turns: 4 } };
 export const Conversing = { render, args: { turns: 2 } };
 // The fifth exchange settled: the dream is about to end.
 export const Converging = { render, args: { turns: 5 } };
@@ -272,9 +277,11 @@ export const PreferredRefused = { render, args: { turns: 2, scene_art: dreamRefu
 // Every position is unavailable: nothing is presented and the stage states the
 // reached fact instead of a broken image.
 export const MissingArt = { render, args: { turns: 2, scene_art: dreamExhaustedDescriptor() } };
-// The whole wish, read-only, while she still holds the pen.
+// The whole wish, read-only, with the last exchange's changed fields marked,
+// its additions tagged and its removals named.
 export const WholeWish = { render, args: { turns: 3, open: "view" } };
 // The one irreversible step: what is given up, focus on staying.
 export const StopSpeaking = { render, args: { turns: 3, open: "take" } };
-// The player holds the form: every field edits, the thread stays fixed.
+// The player holds the form: every field and requirement row edits, the
+// thread stays fixed.
 export const OwnHand = { render, args: { turns: 3, stage: "finalized", drafted: true, open: "sheet" } };

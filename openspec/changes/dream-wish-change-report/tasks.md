@@ -18,7 +18,7 @@ Run `pnpm run build` in `web/webclient-app`; run `pnpm exec vitest run <file>` f
 
 ## 4. Stories and bridge
 
-- [ ] 4.1 Apply design decisions 5 and 6 (stories, bridge methods). Verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `<prefix> web.webclient.tests.test_vue_dream_stage_evidence` pass.
+- [x] 4.1 Apply design decisions 5 and 6 (stories, bridge methods). Verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `<prefix> web.webclient.tests.test_vue_dream_stage_evidence` pass.
 
 ## 5. Gates
 
