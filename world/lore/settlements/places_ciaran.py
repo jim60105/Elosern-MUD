@@ -1,4 +1,4 @@
-"""暗影谷村 (village_ciaran) place rows (settlement-shops design §6.2, §10 change 7).
+"""暗影谷村 (elven_village_ciaran) place rows (settlement-shops design §6.2, §10 change 7).
 
 Every trading place in the village is a private home, not a storefront: a
 villager who happens to make or collect things trades from their own
@@ -37,7 +37,7 @@ from elosern_map_core.references import interior_room_ref
 ROWS: tuple[PlaceDefinition, ...] = (
     PlaceDefinition(
         key="ciaran_elenis_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_elenis_home", "ciaran_elenis_home"),
         host_name="艾莉妮斯‧達恩斯特瑞德爾",
@@ -55,7 +55,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_gwenaera_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_gwenaera_home", "ciaran_gwenaera_home"),
         host_name="格威娜拉‧希爾維爾莉夫",
@@ -80,7 +80,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_hailiel_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_hailiel_home", "ciaran_hailiel_home"),
         host_name="海莉爾‧斯塔爾法爾",
@@ -105,7 +105,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_lareneth_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_lareneth_home", "ciaran_lareneth_home"),
         host_name="拉瑞內斯‧妮特布倫",
@@ -130,7 +130,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_nireth_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_nireth_home", "ciaran_nireth_home"),
         host_name="妮瑞斯‧米斯特瓦勒",
@@ -155,13 +155,13 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_shelter",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.COMMONS,
         room=interior_room_ref("ciaran_shelter", "ciaran_shelter"),
     ),
     PlaceDefinition(
         key="ciaran_teliel_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_teliel_home", "ciaran_teliel_home"),
         host_name="泰莉爾‧菲溫德",
@@ -179,7 +179,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_valwyn_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_valwyn_home", "ciaran_valwyn_home"),
         host_name="瓦爾溫‧斯蒂爾瓦特爾",
@@ -204,7 +204,7 @@ ROWS: tuple[PlaceDefinition, ...] = (
     ),
     PlaceDefinition(
         key="ciaran_vethiel_home",
-        settlement_key="village_ciaran",
+        settlement_key="elven_village_ciaran",
         kind=PlaceKind.HOME,
         room=interior_room_ref("ciaran_vethiel_home", "ciaran_vethiel_home"),
         host_name="維特希爾‧威爾德布瑞亞爾",

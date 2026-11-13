@@ -9,8 +9,8 @@ update.
 ```yaml
 version: 1
 kind: settlement
-id: village_ciaran
-location_ref: village_ciaran          # the location this map belongs to (the only link)
+id: elven_village_ciaran
+location_ref: elven_village_ciaran          # the location this map belongs to (the only link)
 options:                              # optional
   map_visual_range: 2
   map_mode: nodes
@@ -24,7 +24,7 @@ nodes:
     prototype_parent: anchor_room     # grid_room | anchor_room
     key: 村中廣場                      # room name shown in game
     desc: 村裡的空地……                 # zh-TW room prose
-    anchor_key: village_ciaran        # required exactly for anchor_room (= location_ref), else empty
+    anchor_key: elven_village_ciaran        # required exactly for anchor_room (= location_ref), else empty
     typeclass:                        # nullable Python typeclass path
     scene_archetype: city_street      # nullable; a registered scene archetype
 roads:                                # DIRECTED: A→B and B→A are two entries
@@ -193,7 +193,7 @@ the hand-authored path.
    - `version`, `kind`, `id`;
    - `location_ref`;
    - optionally `options` and `exit_prototype`; copying them from
-     `village_ciaran` is a sensible default;
+     `elven_village_ciaran` is a sensible default;
    - `nodes`, which must include one `anchor_room`;
    - `roads`;
    - `wilderness_entry`, usually a point mask at offset `(0, 0)` (the location

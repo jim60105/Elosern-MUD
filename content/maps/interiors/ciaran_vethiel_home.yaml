@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_vethiel_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: weaving_slope
   room: ciaran_vethiel_home
   doorway_key: 維特希爾的家

@@ -6,8 +6,8 @@
 # new map for an existing location needs no Python registration.
 version: 1
 kind: settlement
-id: village_ciaran
-location_ref: village_ciaran
+id: elven_village_ciaran
+location_ref: elven_village_ciaran
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -57,7 +57,7 @@ nodes:
     prototype_parent: anchor_room
     key: 村中廣場
     desc: 村裡的空地，老樹繞著一塊被腳步踩實的泥地。族人聚集在這裡交談，交換一天的見聞。
-    anchor_key: village_ciaran
+    anchor_key: elven_village_ciaran
     typeclass:
     scene_archetype: city_street
   training_clearing:

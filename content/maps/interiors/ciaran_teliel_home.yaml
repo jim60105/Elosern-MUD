@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_teliel_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: training_clearing
   room: ciaran_teliel_home
   doorway_key: 泰莉爾的家

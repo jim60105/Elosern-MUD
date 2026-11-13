@@ -220,19 +220,19 @@ SUBRACE_REGISTRY: dict[str, Subrace] = {
         StatModifiers(0.10, -0.15, 0.05),
     ),
     "fionnen": Subrace(
-        "fionnen", "elf", "斐歐恩族", "森林精靈", 120, "village_fionnen",
+        "fionnen", "elf", "斐歐恩族", "森林精靈", 120, "elven_village_fionnen",
         ("light",),
         "翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。",
         StatModifiers(),
     ),
     "ciaran": Subrace(
-        "ciaran", "elf", "基亞蘭族", "黑暗精靈", 100, "village_ciaran",
+        "ciaran", "elf", "基亞蘭族", "黑暗精靈", 100, "elven_village_ciaran",
         ("fire", "dark"),
         "暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。",
         StatModifiers(),
     ),
     "eolas": Subrace(
-        "eolas", "elf", "伊歐拉斯族", "幻童精靈", 80, "village_eolas",
+        "eolas", "elf", "伊歐拉斯族", "幻童精靈", 80, "elven_village_eolas",
         _ALL_ELEMENTS,
         "幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。",
         StatModifiers(),

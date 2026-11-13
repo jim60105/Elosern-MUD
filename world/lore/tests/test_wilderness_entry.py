@@ -72,8 +72,8 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
                 for gate in document.wilderness_entry.gates
             ],
         )
-        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
-        self.assertEqual(village.anchor_key, "village_ciaran")
+        village = WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"]
+        self.assertEqual(village.anchor_key, "elven_village_ciaran")
         self.assertLess(village.hash_cell_count, _capital().hash_cell_count)
         self.assertTrue(village.is_point_shape)
         self.assertEqual(
@@ -81,7 +81,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
                 (gate.return_direction, gate.z_map_key, gate.destination.object_id)
                 for gate in village.gates
             ],
-            [("n", "village_ciaran", "hidden_path")],
+            [("n", "elven_village_ciaran", "hidden_path")],
         )
         # A point entrance contributes no footprint at all, so it can never
         # collide with the capital's mask or another village-wide obstacle.
@@ -91,7 +91,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )
     def test_village_derived_geometry_matches_the_authored_mask(self):
-        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+        village = WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"]
         self.assertEqual(village.origin_xy, (1366, 554))
         self.assertEqual(village.shape, ("#",))
         self.assertEqual(village.anchor_cell, (1366, 554))
@@ -102,7 +102,7 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         # The gate returns to the village's entrance node on its own map.
         self.assertEqual(
             gate.destination,
-            settlement_node_ref("village_ciaran", "hidden_path"),
+            settlement_node_ref("elven_village_ciaran", "hidden_path"),
         )
 
     @covers_requirement(
@@ -207,7 +207,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
 
         world = runtime.current()
         self.assertIn("capital_altoria", world.settlements.wilderness_entries)
-        self.assertIn("village_ciaran", world.settlements.wilderness_entries)
+        self.assertIn("elven_village_ciaran", world.settlements.wilderness_entries)
         self.assertTrue(WILDERNESS_ENTRY_REGISTRY)
 
     @covers_requirement(
@@ -217,10 +217,10 @@ class WildernessEntryValidationTests(unittest.TestCase):
         from world.maps import runtime
 
         world = runtime.current()
-        village = world.settlements.wilderness_entries["village_ciaran"]
-        self.assertEqual(village.anchor_key, "village_ciaran")
+        village = world.settlements.wilderness_entries["elven_village_ciaran"]
+        self.assertEqual(village.anchor_key, "elven_village_ciaran")
         self.assertEqual(len(village.gates), 1)
-        self.assertEqual(village.gates[0].z_map_key, "village_ciaran")
+        self.assertEqual(village.gates[0].z_map_key, "elven_village_ciaran")
 
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-authored-data-is-validated-before-persistence"
@@ -251,7 +251,7 @@ class WildernessEntryValidationTests(unittest.TestCase):
         self.assertIn("not 4-connected", str(caught.exception))
 
         # Point entry with multiple gates
-        point_data = dict(shipped["village_ciaran"].data)
+        point_data = dict(shipped["elven_village_ciaran"].data)
         point_data["wilderness_entry"] = {
             "shape": ["#"],
             "offset": {"dx": 35, "dy": 270},
@@ -260,10 +260,10 @@ class WildernessEntryValidationTests(unittest.TestCase):
                 {"return_direction": "s", "destination_node": "village_plaza"},
             ],
         }
-        candidate_point = document_from_data(shipped["village_ciaran"].relative_path, point_data)
+        candidate_point = document_from_data(shipped["elven_village_ciaran"].relative_path, point_data)
         with self.assertRaises(SettlementError) as caught:
             build_settlements(
-                {**shipped, "village_ciaran": candidate_point},
+                {**shipped, "elven_village_ciaran": candidate_point},
                 locations,
                 frame_cells=world.geography.frame_cells,
             )

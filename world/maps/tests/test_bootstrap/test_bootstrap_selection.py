@@ -287,7 +287,7 @@ OLD_COORDINATES = {
         "academy": (5, 5),
         "palace_forecourt": (4, 6),
     },
-    "village_ciaran": {
+    "elven_village_ciaran": {
         "hidden_path": (0, 1),
         "village_plaza": (1, 1),
         "stream_path": (1, 0),
@@ -512,7 +512,7 @@ class MetricCutoverTests(EvenniaTest):
                     "first_seen_tick": 3,
                     "last_seen_tick": 5,
                 },
-                "grid:village_ciaran:1:1": {
+                "grid:elven_village_ciaran:1:1": {
                     "first_seen_tick": 7,
                     "last_seen_tick": 9,
                 },

@@ -211,13 +211,13 @@ class SampleCityCostedExitTests(_ChargeAssertions, EvenniaTest):
         # calculation as a capital street step.
         sync_test_settlements(
             (
-                WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+                WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"]
                 .gate_for("n")
                 .destination.map_id,
             )
         )
         village_entrance = settlement_node_xyz(
-            WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
+            WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"].gate_for("n").destination
         )
         entrance = GridRoom.objects.filter_xyz(xyz=village_entrance).first()
         self.char1.location = entrance

@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_silverfeather
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: old_tree_north
   room: ciaran_silverfeather
   doorway_key: 銀羽驛站

@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_lareneth_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: stream_path
   room: ciaran_lareneth_home
   doorway_key: 拉瑞內斯的家

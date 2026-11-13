@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_nireth_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: herb_garden
   room: ciaran_nireth_home
   doorway_key: 妮瑞斯的家

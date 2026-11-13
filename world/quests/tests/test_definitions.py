@@ -340,7 +340,7 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
 
     @covers_requirement("quest-blueprint::destinations-distinguish-permanent-locations-from-future-bound-instances")
     def test_lore_known_but_unplaced_anchor_is_rejected(self):
-        self.assertNotIn("village_fionnen", ANCHOR_PLACEMENT_REGISTRY)
+        self.assertNotIn("elven_village_fionnen", ANCHOR_PLACEMENT_REGISTRY)
         unplaced = QuestDefinition(
             key="anchor-unplaced",
             display_name="未落錨",
@@ -349,13 +349,13 @@ class DefinitionRegistrationTests(QuestRegistryIsolation, unittest.TestCase):
             stages=(
                 QuestStage(
                     0,
-                    reach(RoomLocator(DestinationKind.ANCHOR, anchor_key="village_fionnen")),
+                    reach(RoomLocator(DestinationKind.ANCHOR, anchor_key="elven_village_fionnen")),
                 ),
             ),
         )
         with self.assertRaises(QuestDefinitionError) as caught:
             register(unplaced)
-        self.assertIn("village_fionnen", str(caught.exception))
+        self.assertIn("elven_village_fionnen", str(caught.exception))
         self.assertNotIn("anchor-unplaced", QUEST_DEFINITION_REGISTRY)
 
     def test_ambiguous_and_malformed_locators_rejected(self):

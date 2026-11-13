@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_valwyn_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: old_tree_north
   room: ciaran_valwyn_home
   doorway_key: 瓦爾溫的家

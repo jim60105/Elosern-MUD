@@ -27,7 +27,7 @@ interior_links:                   # optional: exits into ANOTHER interior's room
     label: 公會大廳
     return_label: 後門             # nullable: a name makes it two-way IN THIS ONE RECORD
 exterior:                         # nullable but required key: the door to the street
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: village_plaza             # settlement node the doorway opens from
   room: ciaran_shelter            # room of this interior the doorway leads into
   doorway_key: 共食棚              # exit name on the street side

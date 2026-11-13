@@ -187,11 +187,11 @@ class GridBootstrapBridgingTests(_GridBootstrapCase):
         self.assertEqual(settlement_node_xyz(row.gate), SOUTH_GATE_XYZ)
         self.assertEqual(row.exit_key, "南門")
         self.assertEqual(row.exit_aliases, ("王都", "城門"))
-        village = CITY_GATE_REGISTRY["village_ciaran"]
+        village = CITY_GATE_REGISTRY["elven_village_ciaran"]
         self.assertEqual(
             settlement_node_xyz(village.gate),
             settlement_node_xyz(
-                WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
+                WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"].gate_for("n").destination
             ),
         )
         self.assertEqual(village.exit_key, "隱密小徑")
@@ -320,7 +320,7 @@ class GridBootstrapBridgingTests(_GridBootstrapCase):
             for exit_obj in Exit.objects.all()
             if exit_obj.destination == south_gate
         )
-        for room in GridRoom.objects.filter_xyz(xyz=("*", "*", "village_ciaran")):
+        for room in GridRoom.objects.filter_xyz(xyz=("*", "*", "elven_village_ciaran")):
             self.assertEqual(
                 [exit_obj for exit_obj in room.exits if exit_obj.destination == limbo],
                 [],
@@ -335,14 +335,14 @@ class GridBootstrapBridgingTests(_GridBootstrapCase):
         # only inside its own map key, never into the other's rooms.
         for map_key, node_id, key in (
             ("capital_altoria", "riverbank_road", "河岸道"),
-            ("village_ciaran", "training_clearing", "練刀場"),
+            ("elven_village_ciaran", "training_clearing", "練刀場"),
         ):
             coordinate = SETTLEMENT_GRAPHS[map_key].node(node_id).coordinate
             room = GridRoom.objects.filter_xyz(xyz=(*coordinate, map_key)).first()
             self.assertIsNotNone(room)
             self.assertEqual(room.key, key)
             other_map = (
-                "village_ciaran" if map_key == "capital_altoria" else "capital_altoria"
+                "elven_village_ciaran" if map_key == "capital_altoria" else "capital_altoria"
             )
             self.assertIsNone(
                 GridRoom.objects.filter_xyz(xyz=(*coordinate, other_map)).first()
@@ -474,7 +474,7 @@ class WildernessGateProvisioningTests(_WildernessBootstrapCase):
         # entrance node 隱密小徑, facing the wilderness with the authored
         # return direction "n".
         village_entrance = settlement_node_xyz(
-            WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
+            WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"].gate_for("n").destination
         )
         village_gate_exits = [
             e for e in GridRoom.objects.filter_xyz(xyz=village_entrance).first().exits
@@ -482,7 +482,7 @@ class WildernessGateProvisioningTests(_WildernessBootstrapCase):
         ]
         self.assertEqual(len(village_gate_exits), 1)
         self.assertEqual(village_gate_exits[0].key, "荒野")
-        self.assertEqual(village_gate_exits[0].db.anchor_key, "village_ciaran")
+        self.assertEqual(village_gate_exits[0].db.anchor_key, "elven_village_ciaran")
         self.assertEqual(village_gate_exits[0].db.gate_direction, "n")
         self.assertEqual(
             sorted(village_gate_exits[0].aliases.all()),

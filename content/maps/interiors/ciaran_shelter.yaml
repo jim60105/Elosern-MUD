@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_shelter
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: village_plaza
   room: ciaran_shelter
   doorway_key: 共食棚

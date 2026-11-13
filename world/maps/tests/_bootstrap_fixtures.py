@@ -25,7 +25,7 @@ from world.tests.geography_fixture import publish_shipped_geography
 publish_shipped_geography()
 
 _CAPITAL_ENTRY = WILDERNESS_ENTRY_REGISTRY["capital_altoria"]
-_VILLAGE_ENTRY = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+_VILLAGE_ENTRY = WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"]
 SOUTH_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("n").destination)
 EAST_GATE_XYZ = settlement_node_xyz(_CAPITAL_ENTRY.gate_for("w").destination)
 
