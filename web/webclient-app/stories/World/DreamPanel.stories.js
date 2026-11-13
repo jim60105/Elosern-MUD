@@ -228,9 +228,10 @@ const render = (args) => ({
     // never receive the click.
     const rowFor = { view: "main", sheet: "main", take: "take" };
     onMounted(async () => {
-      if (!openLayer) return;
+      const row = rowFor[openLayer];
+      if (!row) return;
       await nextTick();
-      root.value?.querySelector(`[data-row='${rowFor[openLayer] || "main"}']`)?.click();
+      root.value?.querySelector(`[data-row='${row}']`)?.click();
     });
     const tools = () => h("details", { style: "font-family: var(--f-sans); font-size: var(--text-sm); color: var(--paper-500);" }, [
       h("summary", "夢境分鏡工具（僅供展示）"),
