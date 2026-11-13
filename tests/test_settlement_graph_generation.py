@@ -948,6 +948,43 @@ class SingleCellLayoutTests(unittest.TestCase):
         self.assertEqual(serialised("village"), serialised("village"))
         self.assertEqual(serialised("hamlet"), serialised("hamlet"))
 
+    def test_hamlet_with_no_open_bearing_is_refused(self) -> None:
+        neighbours = frozenset(
+            (LOCATION[0] + delta_x, LOCATION[1] + delta_y)
+            for delta_x, delta_y in OCTANT_VECTORS.values()
+        )
+        inp = _single_cell_input(
+            _ref("single_hamlet", kind="hamlet", population=120),
+            blocked=neighbours,
+        )
+
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(inp)
+
+        self.assertIn("no_gate", str(caught.exception))
+
+    def test_blocked_or_unwalkable_location_cell_is_refused(self) -> None:
+        blocked = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            ((14, 15),),
+            blocked=frozenset({LOCATION}),
+        )
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(blocked)
+        self.assertIn("location cell not walkable", str(caught.exception))
+
+        sea = frozenset(
+            (x, y) for y in range(0, 31) for x in range(0, 31) if (x, y) != LOCATION
+        )
+        flooded = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            ((14, 15),),
+            terrain=_terrain(land=sea),
+        )
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(flooded)
+        self.assertIn("location cell not walkable", str(caught.exception))
+
     def test_beast_nation_reuses_the_tribal_vocabulary(self) -> None:
         human_input = _single_cell_input(
             _ref("single_village", kind="village", population=400),
