@@ -484,6 +484,13 @@ onBeforeUnmount(() => {
   filter: drop-shadow(0 0 calc(6px * var(--ui-scale)) rgba(228, 200, 142, 0.4));
 }
 
+/* The wide rail would push the count to the tab's far corner; it sits at the
+   emblem's shoulder instead. */
+.gwin__rail :deep(.icon-tabs__count) {
+  top: var(--sp-2);
+  right: calc(50% - calc(36px * var(--ui-scale)));
+}
+
 .gwin__rail :deep(.icon-tabs__tab.is-disabled .icon-tabs__label) {
   opacity: 0.5;
 }
@@ -574,6 +581,27 @@ onBeforeUnmount(() => {
 .gwin__page {
   min-width: 0;
   min-height: 0;
+}
+
+/* The page column is narrower in the window than the quest detail the footer
+   was drawn for: a character card's five buttons and its reason must sit on
+   one row at the 1451×790 reference without breaking a label. */
+.gwin__page :deep(.detail-footer) {
+  gap: var(--sp-2);
+  padding-inline: var(--sp-5);
+}
+
+.gwin__page :deep(.detail-footer__btn) {
+  padding-inline: var(--sp-4);
+  white-space: nowrap;
+}
+
+.gwin__page :deep(.detail-footer__btn--primary) {
+  min-width: calc(128px * var(--ui-scale));
+}
+
+.gwin__page :deep(.detail-footer__why) {
+  white-space: nowrap;
 }
 
 .gwin__page--empty {

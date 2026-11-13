@@ -286,6 +286,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The gallery image page, built and story-documented before the gallery
                 # window mounts it (gallery-image-page).
                 "Data/GalleryImagePage",
+                # The gallery window, composed and story-documented before it mounts
+                # (gallery-window-component).
+                "Overlays/GalleryWindow",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
