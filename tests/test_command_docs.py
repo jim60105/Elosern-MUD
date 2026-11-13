@@ -37,6 +37,7 @@ from evennia.commands.cmdhandler import CMD_NOMATCH
 
 from commands.character_creation import CharacterCreationCmdSet
 from commands.default_cmdsets import AccountCmdSet, CharacterCmdSet
+from commands.dream import _USAGE as DREAM_USAGE
 from commands.localized import (
     LOCALIZED_ACCOUNT_KEYS,
     LOCALIZED_CHARACTER_KEYS,
@@ -95,7 +96,7 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（需控制的身體正在沉睡）",
     },
     "dream": {
-        "syntax": "dream、dream enter、dream decline、dream say <文字>、dream draft [故事方向]、dream confirm [故事方向]、dream awaken",
+        "syntax": "dream、dream enter、dream decline、dream thread [編號|new]、dream say <文字>、dream finalize、dream draft [願望]、dream confirm [願望]、dream awaken",
         "context": "一般（夢境問題需主人未附身且仍在睡眠；查看狀態隨時可用）",
     },
     "wait": {"syntax": "wait until <midnight|dawn|noon|dusk>", "context": "一般"},
@@ -379,6 +380,33 @@ def parse_aliases(content: str) -> set[str]:
     if content in ("（無）", "無"):
         return set()
     return {token.strip().strip("`").strip() for token in content.split("、")}
+
+
+def parse_usage_forms(usage: str) -> set[str]:
+    """Parse the argument forms of one `用法：<key> […]` usage line.
+
+    The bracketed group is an alternation whose own alternatives may nest
+    (`thread [編號|new]`), so the split tracks bracket depth instead of
+    cutting at every pipe, and the brackets that carry a nested choice stay
+    part of the form they belong to.
+    """
+    forms: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for character in usage[usage.index("[") + 1:]:
+        if character == "[":
+            depth += 1
+        elif character == "]":
+            if depth == 0:
+                break
+            depth -= 1
+        if character == "|" and depth == 0:
+            forms.append("".join(current).strip())
+            current = []
+            continue
+        current.append(character)
+    forms.append("".join(current).strip())
+    return {form for form in forms if form}
 
 
 def parse_default_tables(text: str) -> dict[str, dict[str, str]]:
@@ -706,6 +734,21 @@ class CommandDocsContractTests(unittest.TestCase):
                 expected["context"],
                 f"context for {key!r} drifted from the curated manifest",
             )
+
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
+    def test_dream_syntax_matches_the_usage_the_command_prints(self):
+        # The documented syntax and the usage the command itself prints are one
+        # contract, so the document cannot describe a form the command refuses
+        # or omit one it accepts: thread choice and finalize included.
+        documented = {
+            form.strip()
+            for form in self.entries["dream"]["語法"].replace("`", "").split("、")
+        }
+        documented.discard("dream")
+        printed = {"dream " + form for form in parse_usage_forms(DREAM_USAGE)}
+        self.assertEqual(documented, printed)
 
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     def test_lineage_entry_documents_the_ledger_surface(self):
