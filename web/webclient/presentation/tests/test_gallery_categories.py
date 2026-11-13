@@ -308,6 +308,9 @@ class GalleryCategoryTests(EvenniaTest):
 
     # -- people -------------------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-people-category-lists-met-named-npcs-grouped-by-place"
+    )
     def test_people_groups_follow_recency(self):
         self._publish_regions({
             "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
@@ -348,6 +351,9 @@ class GalleryCategoryTests(EvenniaTest):
             (True, None, 3),
         )
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-people-category-lists-met-named-npcs-grouped-by-place"
+    )
     def test_a_party_member_is_listed_only_under_party(self):
         self._publish_regions({
             "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
@@ -366,6 +372,9 @@ class GalleryCategoryTests(EvenniaTest):
             ["portrait:character:t_npc_b"],
         )
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-people-category-lists-met-named-npcs-grouped-by-place"
+    )
     def test_a_vanished_npc_is_not_listed(self):
         self._publish_regions({
             "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
@@ -384,6 +393,9 @@ class GalleryCategoryTests(EvenniaTest):
         npc_b.delete()
         self.assertEqual(category_groups(self.actor, "people"), ())
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-people-category-lists-met-named-npcs-grouped-by-place"
+    )
     def test_possession_lists_the_owner_s_people(self):
         self._publish_regions({
             "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),

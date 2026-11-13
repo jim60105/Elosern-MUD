@@ -286,6 +286,9 @@ class GalleryV4PresenterTests(EvenniaTest):
 
     # -- the people category ------------------------------------------------
 
+    @covers_requirement(
+        "webclient-gallery-panel::exactly-one-people-group-is-expanded"
+    )
     def test_people_opens_the_most_recent_place_only(self):
         room_a = self._terrain("t_room_a", (1, 1))
         room_b = self._terrain("t_room_b", (2, 2))
@@ -321,6 +324,9 @@ class GalleryV4PresenterTests(EvenniaTest):
             "unknown_subject",
         )
 
+    @covers_requirement(
+        "webclient-gallery-panel::exactly-one-people-group-is-expanded"
+    )
     def test_a_remembered_place_that_is_gone_falls_back(self):
         room_a = self._terrain("t_room_a", (1, 1))
         room_b = self._terrain("t_room_b", (2, 2))
@@ -350,6 +356,9 @@ class GalleryV4PresenterTests(EvenniaTest):
         # A fallback is a read: the remembered place stays as stored.
         self.assertEqual(session.ndb.gallery_view.expanded, remembered)
 
+    @covers_requirement(
+        "webclient-gallery-panel::exactly-one-people-group-is-expanded"
+    )
     def test_admission_covers_a_person_in_a_collapsed_place(self):
         room_a = self._terrain("t_room_a", (1, 1))
         room_b = self._terrain("t_room_b", (2, 2))
