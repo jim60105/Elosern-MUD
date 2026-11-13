@@ -19,6 +19,10 @@ Test-to-requirement mapping (applied at archive):
   "collapsible group headings are buttons" (a collapsed heading is a button
   with ``aria-expanded`` emitting ``expand-group`` once, the expanded one
   inert, and tier headings plain while every group is expanded).
+- ``scene-tiles-are-landscape-and-open-no-tray``:
+  "draws a scene category's tiles landscape and opens no tray for its
+  one-card subject" (landscape tiles, no tray, no ``aria-expanded`` on the
+  owner tile).
 """
 
 from __future__ import annotations
@@ -79,3 +83,10 @@ class GalleryWallEvidenceTests(unittest.TestCase):
     def test_collapsible_group_headings_suite_passes(self):
         """Collapsed place headings are buttons; tier headings stay plain under Vitest."""
         _run_vitest_group("collapsible group headings are buttons")
+
+    @covers_requirement(
+        "webclient-gallery-wall::scene-tiles-are-landscape-and-open-no-tray"
+    )
+    def test_scene_tiles_landscape_suite_passes(self):
+        """Scene tiles are landscape and a selected scene opens no tray under Vitest."""
+        _run_vitest_group("draws a scene category's tiles landscape and opens no tray")
