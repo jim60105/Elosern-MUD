@@ -163,6 +163,22 @@ class WildernessEntryRegistryShapeTests(unittest.TestCase):
         # approach_cell IS the anchor cell for a point-shape gate.
         self.assertEqual(point.approach_cell(point.gates[0]), point.anchor_cell)
 
+    def test_a_flagged_one_cell_entry_resolves_gates_at_approach_cells(self):
+        gate_e = WildernessGate("e", _capital().gate_for("n").destination)
+        gate_w = WildernessGate("w", _capital().gate_for("w").destination)
+        entry = WildernessEntryPoint(
+            "t_one_cell",
+            ("#",),
+            (10, 20),
+            (gate_e, gate_w),
+            single_cell_footprint=True,
+        )
+
+        self.assertFalse(entry.is_point_shape)
+        self.assertEqual(entry.footprint_cells, frozenset({(10, 20)}))
+        self.assertEqual(entry.approach_cell(gate_e), (9, 20))
+        self.assertEqual(entry.approach_cell(gate_w), (11, 20))
+
     @covers_requirement(
         "wilderness-gateway::wilderness-entry-registry-links-a-grid-placed-anchor-to-an-authored-wilderness-footprint-and-gates"
     )

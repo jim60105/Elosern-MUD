@@ -378,6 +378,26 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             px, py = point.anchor_cell
             self.assertIsNone(find_gateway((px + 1, py), authored))
 
+    def test_find_gateway_matches_a_flagged_one_cell_footprint_at_approach_cells(self):
+        from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
+
+        destination = SYNTH_WILDERNESS_ENTRIES["t_split_cairn"].gates[0].destination
+        entry = WildernessEntryPoint(
+            anchor_key="t_one_cell",
+            shape=("#",),
+            origin_xy=(300, 300),
+            gates=(WildernessGate("e", destination), WildernessGate("w", destination)),
+            single_cell_footprint=True,
+        )
+        with synthetic_registries(
+            "wilderness_entries", extra={"wilderness_entries": {"t_one_cell": entry}}
+        ):
+            hit = find_gateway((299, 300), "e")
+            self.assertIsNotNone(hit)
+            self.assertEqual(hit[1].return_direction, "e")
+            self.assertIsNone(find_gateway((299, 300), "n"))
+            self.assertIsNone(find_gateway((300, 300), "e"))
+
     def test_wilderness_neighbor_matches_the_single_delta_table(self):
         # The exported geometry is the resolver's own: every direction steps
         # exactly one delta-table cell, and the shared helper agrees.

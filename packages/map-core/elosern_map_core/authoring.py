@@ -444,6 +444,20 @@ def diagnose_settlement_semantics(
         if geometry is None:
             continue
 
+        if geometry.single_cell_footprint and geometry.hash_cell_count != 1:
+            diagnostics.append(
+                _diagnostic(
+                    "single_cell_footprint_mask",
+                    SEMANTIC,
+                    f"settlement {settlement_id!r} sets single_cell_footprint on a "
+                    f"mask with {geometry.hash_cell_count} '#' cells; the field "
+                    "applies only to a one-cell mask",
+                    document=settlement,
+                    field_path="wilderness_entry.single_cell_footprint",
+                    object_id=settlement_id,
+                )
+            )
+
         all_footprints[settlement_id] = geometry.footprint_cells
         if geometry.is_point_shape and geometry.anchor_cell is not None:
             point_anchors[settlement_id] = geometry.anchor_cell

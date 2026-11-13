@@ -276,6 +276,7 @@ def _compose_document(
                     )
                     for gate in entry.gates
                 ),
+                single_cell_footprint=entry.single_cell_footprint,
             )
 
     problems.extend(defects)

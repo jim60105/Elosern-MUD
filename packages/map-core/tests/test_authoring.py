@@ -171,6 +171,110 @@ def test_gate_approach_cell_follows_the_authored_mask_rule():
     assert gate_approach_cell(empty, "n") is None
 
 
+def _entry_world(entry: dict, *, location_cell=(10, 20)):
+    """A synthetic settlement whose entry sits at one explicit location cell."""
+
+    data = fixtures.settlement_data()
+    data["wilderness_entry"] = entry
+    locations = fixtures.locations_data()
+    locations["locations"]["demo_location"]["cell"] = {
+        "cell_x": location_cell[0],
+        "cell_y": location_cell[1],
+    }
+    return load_authoring_world(
+        fixtures.custom_sources(settlement=data, locations=locations)
+    )
+
+
+def test_a_flagged_one_cell_entry_is_a_physical_footprint():
+    world = _entry_world(
+        {
+            "shape": ["#"],
+            "offset": {"dx": 0, "dy": 0},
+            "single_cell_footprint": True,
+            "gates": [
+                {"return_direction": "e", "destination_node": "gate"},
+                {"return_direction": "ne", "destination_node": "plaza"},
+            ],
+        }
+    )
+    assert "point_gate_count" not in {item.code for item in world.diagnostics}
+
+    geometry = world.settlements["demo_map"].wilderness_geometry((10, 20))
+    assert geometry.is_point_shape is False
+    assert geometry.footprint_cells == frozenset({(10, 20)})
+    assert gate_approach_cell(geometry, "e") == (9, 20)
+    assert gate_approach_cell(geometry, "ne") == (9, 19)
+
+
+@pytest.mark.parametrize("flag", [None, False], ids=["omitted", "false"])
+def test_an_unflagged_one_cell_entry_keeps_point_semantics(flag):
+    entry = {
+        "shape": ["#"],
+        "offset": {"dx": 0, "dy": 0},
+        "gates": [
+            {"return_direction": "e", "destination_node": "gate"},
+            {"return_direction": "ne", "destination_node": "plaza"},
+        ],
+    }
+    if flag is not None:
+        entry["single_cell_footprint"] = flag
+    world = _entry_world(entry)
+    assert "point_gate_count" in {item.code for item in world.diagnostics}
+
+    geometry = world.settlements["demo_map"].wilderness_geometry((10, 20))
+    assert geometry.is_point_shape is True
+    assert geometry.footprint_cells == frozenset()
+    assert gate_approach_cell(geometry, "e") == (10, 20)
+    assert gate_approach_cell(geometry, "ne") == (10, 20)
+    emitted = serialize_document(world.settlements["demo_map"])
+    if flag is None:
+        # An absent field is never defaulted into the serialized document.
+        assert "single_cell_footprint" not in emitted
+    else:
+        assert "single_cell_footprint: false" in emitted
+
+
+def test_a_flagged_multi_cell_mask_is_diagnosed_without_behaviour_change():
+    entry = {
+        "shape": ["#", "#"],
+        "offset": {"dx": 0, "dy": 0},
+        "single_cell_footprint": True,
+        "gates": [{"return_direction": "n", "destination_node": "gate"}],
+    }
+    flagged = _entry_world(entry)
+    diagnostic = next(
+        item for item in flagged.diagnostics if item.code == "single_cell_footprint_mask"
+    )
+    assert diagnostic.category == "semantic"
+    assert diagnostic.object_id == "demo_map"
+    assert "2 '#'" in diagnostic.message
+
+    plain_entry = dict(entry)
+    del plain_entry["single_cell_footprint"]
+    plain = _entry_world(plain_entry)
+    assert "single_cell_footprint_mask" not in {
+        item.code for item in plain.diagnostics
+    }
+
+    flagged_geometry = flagged.settlements["demo_map"].wilderness_geometry((10, 20))
+    plain_geometry = plain.settlements["demo_map"].wilderness_geometry((10, 20))
+    assert flagged_geometry.footprint_cells == plain_geometry.footprint_cells
+    assert flagged_geometry.anchor_cell == plain_geometry.anchor_cell
+    assert flagged_geometry.is_point_shape is plain_geometry.is_point_shape is False
+    assert gate_approach_cell(flagged_geometry, "n") == gate_approach_cell(
+        plain_geometry, "n"
+    )
+
+
+def test_single_cell_footprint_rejects_a_non_boolean():
+    data = fixtures.settlement_data()
+    data["wilderness_entry"]["single_cell_footprint"] = "yes"
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(fixtures.custom_sources(settlement=data))
+    assert "invalid_field_value" in _codes(captured.value)
+
+
 def test_interiors_load_and_resolve_their_references():
     world = load_authoring_world(
         fixtures.custom_sources(
