@@ -349,73 +349,69 @@ export const GALLERY_V4_PEOPLE_COLLAPSED = {
   ...NO_SELECTION,
 };
 
-// ---- scenes (change gallery-landscape-page) ----------------------------------
+// ---- scenes (changes gallery-landscape-page, gallery-scene-category) ---------
 //
-// Synthetic 背景 panels for the landscape page and tiles. Their subject keys
-// (`scene:<archetype>`) are admitted by the validators only in the later
-// change gallery-scene-category, so these panels are NOT protocol-valid yet
-// and are deliberately exported inside one container rather than as top-level
-// panels: the fixture test validates every top-level panel and pins that each
-// of these is still refused for its subject key alone. When
-// gallery-scene-category admits scene keys, that pin fails; the panels then
-// move into the validated set (top-level exports) and the pin is removed.
-// Their shapes follow that change's design: the tile artwork is the scene
-// descriptor in effect, and a card is the exact gallery original with the
-// archetype's bundled scene image as its terminal.
+// Synthetic 背景 panels for the landscape page and tiles. A tile carries the
+// scene descriptor in effect, as describe_scene builds it for an untrusted
+// gallery identity: the archetype's generated card (when there is one) ahead
+// of its bundled image, with the declared terminal image. A card row is the
+// exact gallery original — its decoded size, no face rectangle or stage — with
+// the archetype's OWN bundled image as its terminal; the single card is the
+// default, so its only chip is 目前預設.
 
 const SCENE_GROVE = "scene:synthetic_grove";
 const SCENE_SHORE = "scene:synthetic_shore";
 const SCENE_SIZE = { width: 1536, height: 864 };
-const SCENE_GEOMETRY = { image_size: SCENE_SIZE, face_rect: null, stage: null, aspect_ratio: "16:9" };
+
+const sceneKey = (subject) => subject.slice("scene:".length);
 
 const sceneBundled = (key, seed) => ({
   resource_id: `bundled-scene/${key}/${digest(seed)}.webp`,
   version: digest(seed),
   url: `/art/bundled-scene/${key}/${digest(seed)}.webp`,
   origin: "bundled_official",
-  geometry: { ...SCENE_GEOMETRY, aspect_ratio: null },
+  geometry: { image_size: SCENE_SIZE, face_rect: null, stage: null, aspect_ratio: null },
 });
 
-const sceneTerminal = () => ({
+const sceneTerminal = (key, seed) => ({
   kind: "scene_image",
-  source_id: "scene.terminal:synthetic_town",
+  source_id: `scene.terminal:${key}`,
   rank: 100,
-  resource: sceneBundled("synthetic_town", 70),
+  resource: sceneBundled(key, seed),
 });
 
-const sceneOriginal = (subject, index) => {
+const sceneOriginal = (subject, index, geometry) => {
   const imageId = GALLERY_V4_IDS[index];
-  const key = subject.slice("scene:".length);
   return {
-    resource_id: `gallery/scene/${key}/${imageId}.webp`,
+    resource_id: `gallery/scene/${sceneKey(subject)}/${imageId}.webp`,
     version: digest(index + 20),
-    url: `/art/gallery/scene/${key}/${imageId}.webp`,
+    url: `/art/gallery/scene/${sceneKey(subject)}/${imageId}.webp`,
     origin: "runtime",
-    geometry: { ...SCENE_GEOMETRY },
+    geometry,
   };
 };
 
-// The scene descriptor of a tile: the stored card's original (when there is
-// one) ahead of the archetype's bundled image.
-const sceneTileArtwork = (subject, seed, cardIndex = null) => {
-  const key = subject.slice("scene:".length);
-  return {
-    subject_id: `gallery:${subject}`,
-    revision: digest(seed),
-    generation_subject: subject,
-    generation_state: "done",
-    attempts: [
-      ...(cardIndex === null ? [] : [{
-        type: "image", source_id: `gallery.original:${GALLERY_V4_IDS[cardIndex]}`, rank: 10, resource: sceneOriginal(subject, cardIndex),
-      }]),
-      { type: "image", source_id: `scene.bundled:${key}`, rank: 40, resource: sceneBundled(key, seed + 1) },
-    ],
-    terminal: sceneTerminal(),
-    retention_sources: [],
-  };
-};
+// The scene descriptor of a tile: the generated card (when there is one) at
+// the generated position, ahead of the archetype's bundled image.
+const sceneTileArtwork = (subject, seed, cardIndex = null) => ({
+  subject_id: `gallery:${subject}`,
+  revision: digest(seed),
+  generation_subject: subject,
+  generation_state: cardIndex === null ? "missing" : "done",
+  attempts: [
+    ...(cardIndex === null ? [] : [{
+      type: "image",
+      source_id: `scene.generated:${subject}`,
+      rank: 20,
+      resource: sceneOriginal(subject, cardIndex, { image_size: null, face_rect: null, stage: null, aspect_ratio: null }),
+    }]),
+    { type: "image", source_id: `scene.bundled:${sceneKey(subject)}`, rank: 40, resource: sceneBundled(sceneKey(subject), seed + 1) },
+  ],
+  terminal: sceneTerminal("synthetic_town", 70),
+  retention_sources: [],
+});
 
-const sceneCard = (subject, index) => ({
+const sceneCard = (subject, index, seed) => ({
   image_id: GALLERY_V4_IDS[index],
   status: "card",
   label: "背景",
@@ -425,13 +421,16 @@ const sceneCard = (subject, index) => ({
     generation_subject: subject,
     generation_state: "done",
     attempts: [{
-      type: "image", source_id: `gallery.original:${GALLERY_V4_IDS[index]}`, rank: 10, resource: sceneOriginal(subject, index),
+      type: "image",
+      source_id: `gallery.original:${GALLERY_V4_IDS[index]}`,
+      rank: 10,
+      resource: sceneOriginal(subject, index, { image_size: SCENE_SIZE, face_rect: null, stage: null, aspect_ratio: "16:9" }),
     }],
-    terminal: sceneTerminal(),
+    terminal: sceneTerminal(sceneKey(subject), seed),
     retention_sources: [{ source_id: `gallery.original:${GALLERY_V4_IDS[index]}`, token: digest(index + 30) }],
   },
   is_default: true,
-  chips: [],
+  chips: ["目前預設"],
   requested_fields: [],
   binding_present: false,
   created_at: 1700000800 - index * 100,
@@ -447,16 +446,14 @@ const sceneTile = (subject, display_name, card_count, artwork) => ({
   subject_key: subject, kind: "scene", display_name, is_current: false, card_count, artwork,
 });
 
-const SCENE_GROUPS = [group("scene", [
-  sceneTile(SCENE_GROVE, "測試林地", 1, sceneTileArtwork(SCENE_GROVE, 80, 15)),
-  sceneTile(SCENE_SHORE, "測試海岸", 0, sceneTileArtwork(SCENE_SHORE, 82)),
-])];
-
 const SCENE_PANEL = {
   ...HEADER,
-  categories: categories({ mine: 2, party: 2, monster: 3, scene: 2 }, { scene: true }),
+  categories: categories({ mine: 2, party: 2, monster: 3, scene: 2 }, { people: true, scene: true }),
   category: "scene",
-  groups: SCENE_GROUPS,
+  groups: [group("scene", [
+    sceneTile(SCENE_GROVE, "測試林地", 1, sceneTileArtwork(SCENE_GROVE, 80, 15)),
+    sceneTile(SCENE_SHORE, "測試海岸", 0, sceneTileArtwork(SCENE_SHORE, 82)),
+  ])],
   official_entries: [],
   equipment_summary: null,
   capabilities: { ...SCENE_CAPABILITIES },
@@ -464,22 +461,31 @@ const SCENE_PANEL = {
   error_state: null,
 };
 
-export const GALLERY_V4_SCENE_PANELS = Object.freeze({
-  // 背景 with the generated scene selected: its one stored card.
-  generated: {
-    ...SCENE_PANEL,
-    selected: SCENE_GROVE,
-    description: "（示意文字）晨霧散去的林間空地，光線從枝葉縫隙落在長滿青苔的石階上。",
-    cards: [sceneCard(SCENE_GROVE, 15)],
-  },
-  // 背景 with a scene that has no stored card: the bundled image in effect.
-  bundled: {
-    ...SCENE_PANEL,
-    selected: SCENE_SHORE,
-    description: "（示意文字）退潮後的礁岸延伸到遠方，海鳥在灰藍色的天空下低低盤旋。",
-    cards: [],
-  },
-});
+// 背景 with the generated scene selected: its one stored card.
+export const GALLERY_V4_SCENE = {
+  ...SCENE_PANEL,
+  selected: SCENE_GROVE,
+  description: "（示意文字）晨霧散去的林間空地，光線從枝葉縫隙落在長滿青苔的石階上。",
+  cards: [sceneCard(SCENE_GROVE, 15, 81)],
+};
+
+// 背景 with a scene that has no stored card: the bundled image in effect.
+export const GALLERY_V4_SCENE_BUNDLED = {
+  ...SCENE_PANEL,
+  selected: SCENE_SHORE,
+  description: "（示意文字）退潮後的礁岸延伸到遠方，海鳥在灰藍色的天空下低低盤旋。",
+  cards: [],
+};
+
+// 背景 for a character who has entered no scene yet: no group, nothing
+// selected, so the wall shows its empty state.
+export const GALLERY_V4_SCENE_EMPTY = {
+  ...HEADER,
+  categories: categories({ mine: 2, party: 2, monster: 3, scene: 0 }, { people: true, scene: true }),
+  category: "scene",
+  groups: [],
+  ...NO_SELECTION,
+};
 
 // Story-only media remapping: the offline static server has no /art/gallery,
 // /art/official or /art/defaults route, so the committed fallback artwork is

@@ -17,7 +17,7 @@ import {
   trayOpen,
   wallTiles,
 } from "../../components/gallery-window-model.js";
-import { GALLERY_V4_SCENE_PANELS } from "../../stories/gallery-fixtures-v4.js";
+import { GALLERY_V4_SCENE } from "../../stories/gallery-fixtures-v4.js";
 
 const subject = (key, changes = {}) => ({
   subject_key: `portrait:character:${key}`,
@@ -358,11 +358,9 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       expect(tile("a").attributes("aria-expanded")).toBeUndefined();
     });
 
-    // Change gallery-landscape-page. The scene fixture is not yet
-    // protocol-valid (scene subject keys arrive with gallery-scene-category),
-    // so it is mounted as committed props without validation.
+    // Change gallery-landscape-page, on the protocol-valid scene fixture.
     it("draws a scene category's tiles landscape and opens no tray for its one-card subject", async () => {
-      const scene = GALLERY_V4_SCENE_PANELS.generated;
+      const scene = GALLERY_V4_SCENE;
       expect(scene.capabilities.max_cards).toBe(1);
       await mountWall({
         groups: structuredClone(scene.groups),

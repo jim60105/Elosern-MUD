@@ -35,8 +35,10 @@ from world.maps import wilderness_provider
 from world.rules.lore_knowledge import record_species_sighting
 from world.rules.met_people import PLACE_REGION, record_person_interaction
 from world.rules.party import bound_owner_of
+from world.rules.scene_visits import record_scene_entry
 from world.tests.geography_fixture import publish_geography
 from world.tests.synthetic_data import (
+    make_archetype,
     make_monster_species,
     make_monster_tier,
     make_monster_variant,
@@ -168,16 +170,15 @@ class GalleryCategoryTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-categories::the-gallery-has-a-closed-ordered-category-set"
     )
-    def test_unreleased_categories_are_disabled_with_a_reason(self):
+    def test_every_released_category_is_enabled_without_a_reason(self):
         record_species_sighting(self.actor, T_A)
         by_key = {category.key: category for category in gallery_categories(self.actor)}
-        self.assertFalse(by_key["scene"].enabled)
-        self.assertTrue(by_key["scene"].reason)
+        for key in CATEGORY_KEYS:
+            self.assertTrue(by_key[key].enabled, key)
+            self.assertIsNone(by_key[key].reason, key)
+        # scene is enabled but this character has entered no scene yet.
         self.assertEqual(by_key["scene"].count, 0)
         self.assertEqual(category_groups(self.actor, "scene"), ())
-        for key in ("mine", "party", "people", "monster"):
-            self.assertTrue(by_key[key].enabled)
-            self.assertIsNone(by_key[key].reason)
         # people is enabled but this character has met nobody yet.
         self.assertEqual(by_key["people"].count, 0)
         self.assertEqual(category_groups(self.actor, "people"), ())
@@ -457,3 +458,66 @@ class GalleryCategoryTests(EvenniaTest):
         self.assertFalse(is_subject_admitted(self.actor, f"portrait:monster:{T_B}"))
         self.assertTrue(is_subject_admitted(self.actor, f"portrait:monster:{T_A}"))
         self.assertFalse(is_subject_admitted(self.actor, "portrait:character:t_nobody"))
+
+
+T_ARCH = "t_arch"
+T_OTHER = "t_other"
+T_THIRD = "t_third"
+SCENE_EXTRA = {
+    "archetypes": {
+        T_ARCH: make_archetype(T_ARCH, display_name_zh="甲測景"),
+        T_OTHER: make_archetype(T_OTHER, display_name_zh="乙測景"),
+        T_THIRD: make_archetype(T_THIRD, display_name_zh="丙測景"),
+    },
+}
+
+
+@synthetic_registries("archetypes", extra=SCENE_EXTRA)
+class SceneCategoryTests(EvenniaTest):
+    """The scene category lists the owning character's entered archetypes."""
+
+    account_typeclass = Account
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        self.account.characters.add(self.char1)
+        self.actor = self.char1
+
+    def test_only_entered_archetypes_are_listed_in_registry_order(self):
+        record_scene_entry(self.actor, T_THIRD)
+        record_scene_entry(self.actor, T_ARCH)
+        groups = category_groups(self.actor, "scene")
+        self.assertEqual(len(groups), 1)
+        group = groups[0]
+        self.assertEqual((group.key, group.label, group.seen, group.total), ("scene", None, None, None))
+        self.assertEqual(
+            [ref.subject.full() for ref in group.subjects], [f"scene:{T_ARCH}", f"scene:{T_THIRD}"]
+        )
+        self.assertEqual([ref.display_name for ref in group.subjects], ["甲測景", "丙測景"])
+        self.assertTrue(all(ref.entity is None and not ref.is_current for ref in group.subjects))
+        by_key = {category.key: category for category in gallery_categories(self.actor)}
+        self.assertEqual((by_key["scene"].count, by_key["scene"].enabled), (2, True))
+
+    def test_nothing_entered_lists_nothing(self):
+        by_key = {category.key: category for category in gallery_categories(self.actor)}
+        self.assertEqual(
+            (by_key["scene"].enabled, by_key["scene"].reason, by_key["scene"].count), (True, None, 0)
+        )
+        self.assertEqual(category_groups(self.actor, "scene"), ())
+
+    def test_an_entered_scene_is_admitted_and_an_unentered_one_is_not(self):
+        record_scene_entry(self.actor, T_ARCH)
+        self.assertTrue(is_subject_admitted(self.actor, f"scene:{T_ARCH}"))
+        self.assertEqual(category_of_subject(self.actor, f"scene:{T_ARCH}"), "scene")
+        self.assertFalse(is_subject_admitted(self.actor, f"scene:{T_OTHER}"))
+
+    def test_a_possessed_companion_lists_its_owners_scenes(self):
+        record_scene_entry(self.actor, T_OTHER)
+        companion = create_object(NPC, key="同行測者", location=self.room1)
+        companion.db.party_member = self.actor.pk
+        self.actor.db.party = [companion.pk]
+        self.actor.db.party_meta = {str(companion.pk): {"general": True, "reasons": []}}
+        companion.db.possessed_by = self.actor.pk
+        refs = category_groups(companion, "scene")[0].subjects
+        self.assertEqual([ref.subject.full() for ref in refs], [f"scene:{T_OTHER}"])

@@ -76,6 +76,7 @@ var SOURCE_PREFIX = {
   original: "gallery.original:",
   official: "gallery.official:",
   alpha: "gallery.alpha:",
+  sceneTerminal: "scene.terminal:",
 };
 
 // --- Exact shapes ---------------------------------------------------------

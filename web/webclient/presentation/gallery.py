@@ -19,12 +19,14 @@ from world.art.gallery_kinds import capabilities_for
 from world.art.gallery_match import card_identity_resolution, fallback_for
 from world.art.gallery_prompt import GALLERY_PROMPT_FIELDS
 from world.art.presenter import (
-    GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, describe_portrait, media_url_for,
+    GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, SCENE_ASPECT_RATIO, describe_portrait,
+    describe_scene, media_url_for, scene_bundled_terminal,
 )
 from world.art.queue import MAX_PENDING_GALLERY_JOBS, pending_gallery_jobs
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind, parse_subject
 from world.lore.items import ITEM_REGISTRY
 from world.observability import log_warn
+from world.rules.art_view import SceneTarget
 
 from . import artwork as artwork_wire
 from .context import PresentationContext
@@ -78,6 +80,14 @@ GALLERY_MAX_GROUPS = 64
 GALLERY_MAX_REASON = 64
 GALLERY_MAX_DESCRIPTION = 512
 GALLERY_GROUP_KEY_PATTERN = r"[a-z0-9_:.-]{1,96}"
+# The gallery-bearing subject kinds and the media directory each one's card
+# originals live under (mirrored by the client's ``gallerySubject``).
+GALLERY_DIRECTORIES = {
+    ArtSubjectKind.CHARACTER: "character",
+    ArtSubjectKind.MONSTER: "monster",
+    ArtSubjectKind.SCENE: "scene",
+}
+FACE_CHIPS = ("預設臉框", "自訂臉框")
 PANEL_FIELDS = (
     "schema_version", "available", "kind", "categories", "category", "groups",
     "selected", "description", "cards", "official_entries", "equipment_summary",
@@ -126,7 +136,7 @@ def validate_gallery_subject_key(value) -> ArtSubject:
         subject = parse_subject(value)
     except (ArtSubjectError, UnicodeError) as exc:  # observability: ignore R2: typed validation rejection is returned to the caller
         raise ProtocolValidationError("invalid gallery subject") from exc
-    if subject.full() != value or subject.kind not in (ArtSubjectKind.CHARACTER, ArtSubjectKind.MONSTER):
+    if subject.full() != value or subject.kind not in GALLERY_DIRECTORIES:
         raise ProtocolValidationError("subject has no gallery")
     return subject
 
@@ -219,11 +229,28 @@ def _validate_gallery_url(url, selected, image_id):
     extension; the descriptor validator has already accepted at most the one
     closed ``?v=<sha256>`` cache-version suffix.
     """
-    directory = "character" if selected.kind is ArtSubjectKind.CHARACTER else "monster"
-    prefix = f"/art/gallery/{directory}/{selected.key}/{image_id}"
+    prefix = f"/art/gallery/{GALLERY_DIRECTORIES[selected.kind]}/{selected.key}/{image_id}"
     path = url.partition("?")[0]
     if not path.startswith(prefix) or path[len(prefix):] not in STORE_EXTENSIONS:
         raise ProtocolValidationError("url must name selected subject and image")
+
+
+def _validate_scene_terminal(terminal, selected):
+    """A scene card row's terminal: the archetype's own bundled image, or none.
+
+    A scene has no silhouette; its card falls back to the archetype's bundled
+    illustration. ``None`` is the recorded startup fault of a bundled image
+    the snapshot does not admit, which must not make the whole panel
+    unavailable.
+    """
+    if terminal is None:
+        return
+    if terminal["kind"] != descriptors.TERMINAL_SCENE_IMAGE or terminal["rank"] != descriptors.SCENE_RANK_TERMINAL:
+        raise ProtocolValidationError("scene terminal must be the scene image at its own rank")
+    if terminal["resource"]["origin"] != descriptors.ORIGIN_BUNDLED_OFFICIAL:
+        raise ProtocolValidationError("scene terminal must be the bundled scene image")
+    if terminal["source_id"] != descriptors.scene_terminal_source_id(selected.key):
+        raise ProtocolValidationError("scene terminal must name the archetype's own image")
 
 
 def _validate_card_artwork(row, selected):
@@ -244,7 +271,11 @@ def _validate_card_artwork(row, selected):
         if attempts or descriptor["terminal"] is not None:
             raise ProtocolValidationError("synthetic row fabricated an image")
         return
-    _validate_gallery_terminal(descriptor["terminal"])
+    scene = selected.kind is ArtSubjectKind.SCENE
+    if scene:
+        _validate_scene_terminal(descriptor["terminal"], selected)
+    else:
+        _validate_gallery_terminal(descriptor["terminal"])
     source = descriptors.gallery_original_source_id(row["image_id"])
     # Exactly one attempt overall, naming this row's own exact image: a second
     # entry (a candidate or an unrelated fault) would let another source stand
@@ -261,7 +292,11 @@ def _validate_card_artwork(row, selected):
         raise ProtocolValidationError("the exact original must be a runtime resource")
     _validate_gallery_url(resource["url"], selected, row["image_id"])
     geometry = resource["geometry"]
-    if geometry is None or None in (geometry["image_size"], geometry["face_rect"], geometry["stage"]):
+    if scene:
+        # A landscape carries its decoded size and no face rectangle or stage.
+        if geometry is None or geometry["image_size"] is None or geometry["face_rect"] is not None or geometry["stage"] is not None:
+            raise ProtocolValidationError("a scene original carries its size and no face or stage")
+    elif geometry is None or None in (geometry["image_size"], geometry["face_rect"], geometry["stage"]):
         raise ProtocolValidationError("the exact original must carry its stored geometry")
 
 
@@ -388,9 +423,10 @@ def _validate_card_facts(payload, capability, selected):
         if row["status"] != "card":
             continue
         slot_chips = [label for label in SLOT_LABELS.values() if label in chips]
-        face_chips = [c for c in chips if c in ("預設臉框", "自訂臉框")]
-        if len(face_chips) != 1:
-            raise ProtocolValidationError("exactly one face chip required")
+        face_chips = [c for c in chips if c in FACE_CHIPS]
+        # A face chip exactly when the kind declares face rectangles.
+        if len(face_chips) != (1 if capability["supports_face_rect"] else 0):
+            raise ProtocolValidationError("face chip differs from the face-rectangle capability")
         expected = slot_chips + face_chips + (["目前預設"] if row["is_default"] else [])
         if chips != expected or bool(slot_chips) != row["binding_present"]:
             raise ProtocolValidationError("incoherent chips")
@@ -568,6 +604,9 @@ def _equipment(snapshot):
 # never by a timestamp baked into this label.
 CARD_LABEL = "肖像"
 PENDING_LABEL = "肖像（生成中）"
+# A scene card is a background, not a portrait.
+SCENE_CARD_LABEL = "背景"
+SCENE_PENDING_LABEL = "背景（生成中）"
 
 # The exact-image tail of a descriptor's subject identity: a card's canonical
 # UUID verbatim, or the digest prefix of a catalog identity that has no UUID,
@@ -659,6 +698,17 @@ def _card_artwork(subject, card, generation, terminal):
     generation_subject, generation_state = generation
     source_id = descriptors.gallery_original_source_id(card["image_id"])
     identity, fault_reason = card_identity_resolution(subject, card)
+    size = descriptors.image_size_payload(**card["image_size"])
+    if subject.kind is ArtSubjectKind.SCENE:
+        # A landscape: its decoded size only, never a face rectangle or stage.
+        geometry = descriptors.geometry(image_size=size, aspect_ratio=SCENE_ASPECT_RATIO)
+    else:
+        geometry = descriptors.geometry(
+            image_size=size,
+            face_rect=card["face_rect"],
+            stage=card["stage"],
+            aspect_ratio=GALLERY_ASPECT_RATIO,
+        )
     if fault_reason is not None:
         attempts = [
             descriptors.fault_attempt(
@@ -676,12 +726,7 @@ def _card_artwork(subject, card, generation, terminal):
                     descriptors.identity_version(identity),
                     media_url_for(identity),
                     descriptors.ORIGIN_RUNTIME,
-                    geometry_payload=descriptors.geometry(
-                        image_size=descriptors.image_size_payload(**card["image_size"]),
-                        face_rect=card["face_rect"],
-                        stage=card["stage"],
-                        aspect_ratio=GALLERY_ASPECT_RATIO,
-                    ),
+                    geometry_payload=geometry,
                 ),
             )
         ]
@@ -874,18 +919,21 @@ def _selected_subject_fields(subject, entity) -> dict:
     # descriptor carries the same subject-level truth, and the exact-original
     # candidates it is presented beside never change it.
     generation = _generation_facts(subject, record, cards, pending)
-    terminal = _alpha_terminal(subject, entity)
+    scene = subject.kind is ArtSubjectKind.SCENE
+    terminal = scene_bundled_terminal(subject.key) if scene else _alpha_terminal(subject, entity)
+    card_label, pending_label = (SCENE_CARD_LABEL, SCENE_PENDING_LABEL) if scene else (CARD_LABEL, PENDING_LABEL)
     for card in cards:
         if card["image_id"] in seen:
             continue
         seen.add(card["image_id"])
         binding = card["binding"] if capability.supports_bindings else None
         chips = [SLOT_LABELS[slot] for slot in SLOTS if binding and slot in binding["mask"]]
-        chips.append("預設臉框" if card["face_rect"] == gallery_api.default_face_rect(card["image_size"]) else "自訂臉框")
+        if capability.supports_face_rect:
+            chips.append("預設臉框" if card["face_rect"] == gallery_api.default_face_rect(card["image_size"]) else "自訂臉框")
         is_default = card["image_id"] == default
         if is_default:
             chips.append("目前預設")
-        label = CARD_LABEL
+        label = card_label
         rows.append({
             "image_id": card["image_id"], "status": "card", "label": label,
             "artwork": _card_artwork(subject, card, generation, terminal),
@@ -905,7 +953,7 @@ def _selected_subject_fields(subject, entity) -> dict:
     for job in pending:
         if job["image_id"] not in seen:
             rows.append(_synthetic(
-                subject, job["image_id"], job["enqueued_at"], "pending", PENDING_LABEL,
+                subject, job["image_id"], job["enqueued_at"], "pending", pending_label,
                 generation[0], descriptors.GENERATION_PENDING,
             ))
     if error:
@@ -993,7 +1041,16 @@ def _tile_artwork(ref):
     degrades only this tile, never the panel.
     """
     try:
-        descriptor = artwork_wire.validate_artwork(describe_portrait(ref.subject, ref.entity))
+        if ref.subject.kind is ArtSubjectKind.SCENE:
+            # The background in effect, keyed by an untrusted gallery identity
+            # so it never authorizes retained room pixels.
+            raw = describe_scene(SceneTarget(
+                identity=f"gallery:{ref.subject.full()}", trusted_identity=False,
+                archetype=ref.subject.key, room_art_key=None, room_binding_invalid=False,
+            ))
+        else:
+            raw = describe_portrait(ref.subject, ref.entity)
+        descriptor = artwork_wire.validate_artwork(raw)
     except Exception as exc:  # observability: ignore R2: logged below; one bad tile must not fail the panel
         log_warn("gallery_tile_artwork_failed", context={"subject": ref.subject.full()}, exc=exc)
         return None
@@ -1010,6 +1067,17 @@ def _subject_row(ref):
         "card_count": len(gallery_api.cards_for(subject)),
         "artwork": _tile_artwork(ref),
     }
+
+
+def _description(subject) -> str | None:
+    """The selected scene's sentence; every other kind carries none."""
+    if subject.kind is not ArtSubjectKind.SCENE:
+        return None
+    from world.lore import scene_archetypes
+
+    archetype = scene_archetypes.SCENE_ARCHETYPE_REGISTRY.get(subject.key)
+    sentence = str(archetype.scene_sentence)[:GALLERY_MAX_DESCRIPTION] if archetype is not None else ""
+    return sentence or None
 
 
 def gallery_presenter(context: PresentationContext):
@@ -1049,7 +1117,7 @@ def gallery_presenter(context: PresentationContext):
     ]
     if selected is None:
         fields = {
-            "selected": None, "cards": [], "official_entries": [],
+            "selected": None, "description": None, "cards": [], "official_entries": [],
             "equipment_summary": None, "capabilities": None,
             "binding_warnings": [], "error_state": None,
         }
@@ -1057,8 +1125,9 @@ def gallery_presenter(context: PresentationContext):
         subject = selected.subject
         fields = _selected_subject_fields(subject, selected.entity)
         fields["selected"] = subject.full()
+        fields["description"] = _description(subject)
     return validate_gallery({
         "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
         "categories": category_rows, "category": category, "groups": group_rows,
-        "description": None, **fields,
+        **fields,
     })

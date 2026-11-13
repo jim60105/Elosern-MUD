@@ -317,6 +317,93 @@ def v4_case(modify):
     return value
 
 
+_SCENE_KEY = "t_scene"
+_SCENE_SUBJECT = f"scene:{_SCENE_KEY}"
+_SCENE_SIZE = {"width": 1536, "height": 864}
+_SCENE_CAPABILITIES = {
+    "supports_bindings": False, "supports_field_selection": False, "supports_free_text": False,
+    "supports_personal_official_preferences": False, "supports_face_rect": False,
+    "supports_stage": False, "supports_card_delete": True, "max_cards": 1,
+}
+
+
+def bundled_scene_resource(key=_SCENE_KEY):
+    """One synthetic admitted bundled scene image as a canonical resource."""
+    identity = f"bundled-scene/{key}/{_digest(key)}.webp"
+    return descriptors.resource(
+        identity, _digest(key), f"/art/{identity}", descriptors.ORIGIN_BUNDLED_OFFICIAL,
+        geometry_payload=descriptors.geometry(image_size=dict(_SCENE_SIZE)),
+    )
+
+
+def scene_terminal(key=_SCENE_KEY):
+    """The archetype's own bundled image as a scene card row's terminal."""
+    return descriptors.terminal(
+        descriptors.TERMINAL_SCENE_IMAGE, descriptors.scene_terminal_source_id(key),
+        descriptors.SCENE_RANK_TERMINAL, bundled_scene_resource(key),
+    )
+
+
+def scene_subject(key=_SCENE_KEY):
+    """One synthetic scene subject tile whose artwork is its bundled image."""
+    subject_key = f"scene:{key}"
+    return {
+        "subject_key": subject_key, "kind": "scene", "display_name": "測試背景",
+        "is_current": False, "card_count": 1,
+        "artwork": descriptors.descriptor(
+            subject_id=f"gallery:{subject_key}", generation_subject=subject_key,
+            generation_state="missing",
+            attempts=[descriptors.image_attempt(
+                descriptors.scene_bundled_source_id(key), descriptors.SCENE_RANK_BUNDLED,
+                bundled_scene_resource(key),
+            )],
+            terminal_payload=None, retention_sources=[],
+        ),
+    }
+
+
+def scene_card_row(number=1):
+    """One stored scene card: the exact landscape original and its bundled terminal."""
+    image = image_id(number)
+    source = descriptors.gallery_original_source_id(image)
+    identity = f"gallery/scene/{_SCENE_KEY}/{image}.png"
+    return {
+        "image_id": image, "status": "card", "label": "背景",
+        "artwork": descriptors.descriptor(
+            subject_id=f"{_digest(_SCENE_SUBJECT)}:{image}", generation_subject=_SCENE_SUBJECT,
+            generation_state="done",
+            attempts=[descriptors.image_attempt(
+                source, descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity, descriptors.identity_version(identity), f"/art/{identity}",
+                    descriptors.ORIGIN_RUNTIME,
+                    geometry_payload=descriptors.geometry(image_size=dict(_SCENE_SIZE), aspect_ratio="16:9"),
+                ),
+            )],
+            terminal_payload=scene_terminal(),
+            retention_sources=[descriptors.retention_source(source, _digest(f"retention:{image}"))],
+        ),
+        "is_default": True, "chips": ["目前預設"], "requested_fields": [],
+        "binding_present": False, "created_at": 100,
+    }
+
+
+def scene_payload():
+    """File-local synthetic version-4 scene panel: one entered scene with its card."""
+    payload = payload_v4()
+    for row in payload["categories"]:
+        row.update(enabled=True, reason=None)
+    payload["categories"][0]["count"] = 1
+    payload["categories"][4]["count"] = 1
+    payload.update(
+        category="scene", groups=[v4_group("scene", [scene_subject()])], selected=_SCENE_SUBJECT,
+        description="測試用的林間空地。", cards=[scene_card_row()], official_entries=[],
+        equipment_summary=None, capabilities=dict(_SCENE_CAPABILITIES), binding_warnings=[],
+        error_state=None,
+    )
+    return payload
+
+
 class GalleryCutoverTests(unittest.TestCase):
     """The registered gallery is version 4 on both sides of the wire."""
 
@@ -787,6 +874,53 @@ process.stdout.write(JSON.stringify(results));
             ("disabled scene", v4_case(lambda p: p.update(category="scene")), False),
         ])
 
+    def test_scene_payload_boundaries_match_on_both_sides(self):
+        """Scene subjects, their landscape card rows and their bundled-scene terminal."""
+        cases = [("scene panel", scene_payload(), True)]
+
+        def add(name, modify, accepted=False):
+            value = scene_payload()
+            modify(value)
+            cases.append((name, value, accepted))
+
+        def scene_candidate(p):
+            return p["cards"][0]["artwork"]["attempts"][0]["resource"]
+
+        def terminal(p):
+            return p["cards"][0]["artwork"]["terminal"]
+
+        def empty_scene(p):
+            p["categories"][4]["count"] = 0
+            p.update(
+                groups=[], selected=None, description=None, cards=[], capabilities=None,
+            )
+
+        add("no card yet", lambda p: p.update(cards=[]), True)
+        add("no description", lambda p: p.update(description=None), True)
+        add("nothing entered", empty_scene, True)
+        add("null terminal on a scene card", lambda p: p["cards"][0]["artwork"].update(terminal=None), True)
+        add("alpha terminal on a scene card", lambda p: p["cards"][0]["artwork"].update(terminal=alpha_terminal()))
+        add("terminal of another archetype", lambda p: p["cards"][0]["artwork"].update(terminal=scene_terminal("t_other")))
+        add("terminal at a foreign rank", lambda p: terminal(p).update(rank=descriptors.SCENE_RANK_BUNDLED))
+        add("terminal from the operator", lambda p: terminal(p)["resource"].update(origin=descriptors.ORIGIN_OFFICIAL))
+        add("terminal as an alpha mask", lambda p: terminal(p).update(kind=descriptors.TERMINAL_ALPHA_MASK))
+        add("scene url of another archetype", lambda p: scene_candidate(p).update(url=f"/art/gallery/scene/t_other/{image_id(1)}.png"))
+        add("scene url under the portrait directory", lambda p: scene_candidate(p).update(url=f"/art/gallery/character/{_SCENE_KEY}/{image_id(1)}.png"))
+        add("scene original with a face rectangle", lambda p: scene_candidate(p)["geometry"].update(face_rect=dict(_RECT)))
+        add("scene original with a stage", lambda p: scene_candidate(p)["geometry"].update(stage=dict(_STAGE)))
+        add("scene original without a size", lambda p: scene_candidate(p)["geometry"].update(image_size=None))
+        add("face chip on a scene card", lambda p: p["cards"][0].update(chips=["預設臉框", "目前預設"]))
+        add("default chip missing", lambda p: p["cards"][0].update(chips=[]))
+        add("selection not a gallery kind", lambda p: p.update(selected="scene:"))
+        # The scene terminal and geometry rules never apply to a portrait card.
+        cases.append(("scene terminal on a portrait card", v4_case(
+            lambda p: p["cards"][0]["artwork"].update(terminal=scene_terminal())
+        ), False))
+        cases.append(("portrait card without a face chip", v4_case(
+            lambda p: p["cards"][0].update(chips=["目前預設"])
+        ), False))
+        self.assert_parity(cases)
+
     @covers_requirement(
         "webclient-gallery-panel::the-version-4-gallery-payload-has-an-exact-category-scoped-shape"
     )
@@ -1030,7 +1164,9 @@ process.stdout.write(JSON.stringify(results));
         add("subject extra key", subject(extra=1))
         add("subject unknown key", subject(subject_key="portrait:character:a/b"))
         add("subject non-string key", subject(subject_key=7))
-        add("scene subject", subject(subject_key="scene:t_scene", kind="scene"))
+        add("scene subject listed beside the selection", lambda p: second_group(p, subjects=[scene_subject("t_scene")]), True)
+        add("scene subject with a portrait kind", lambda p: second_group(p, subjects=[dict(scene_subject("t_scene"), kind="portrait:character")]))
+        add("scene subject key grammar", lambda p: second_group(p, subjects=[scene_subject("t/scene")]))
         add("kind mismatch", subject(kind="portrait:monster"))
         add("monster subject", lambda p: second_group(p, subjects=[v4_subject(1, kind="monster")]), True)
         add("duplicate subject across groups", lambda p: second_group(p, subjects=[v4_subject(0)]))
