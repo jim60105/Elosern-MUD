@@ -276,6 +276,9 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertIsNone(character.max_cards)
         self.assertEqual(monster.max_cards, 1)
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-scene-kind-declares-a-one-card-gallery-without-geometry"
+    )
     def test_the_scene_kind_declares_a_one_card_gallery_without_geometry(self):
         scene = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
         self.assertTrue(scene.has_gallery)

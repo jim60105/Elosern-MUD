@@ -17,7 +17,7 @@ canonical-age precondition, prompt-field selection, and free-form prompt-text su
 - **THEN** each reports its gallery-bearing flag, store directory segment, maximum card count, binding support, age precondition, field-selection support, and free-text support without consulting any other module
 
 #### Scenario: A kind with no gallery is declared, not omitted
-- **WHEN** the capability record for the scene kind is read
+- **WHEN** a test declaration marks a synthetic kind as having no gallery and its record is read
 - **THEN** an entry exists that declares the kind as having no gallery, and reading it raises no error
 
 #### Scenario: The declaration is immutable
@@ -124,3 +124,14 @@ The gallery writer SHALL refuse, with a typed error and no write, a face-rectang
 #### Scenario: Declared operations keep working
 - **WHEN** the same operations are attempted for a kind declaring all three facts true
 - **THEN** each succeeds exactly as before this declaration existed
+
+### Requirement: The scene kind declares a one-card gallery without geometry
+The scene kind SHALL be declared gallery-bearing with the store directory `scene`, at most one card, card deletion, and no binding, age precondition, prompt field selection, free text, face rectangle or stage transform.
+
+#### Scenario: The scene record reads as declared
+- **WHEN** the capability record of the scene kind is read
+- **THEN** it reports a gallery, directory `scene`, `max_cards` 1, `supports_card_delete` true, and every other capability false
+
+#### Scenario: A second scene card replaces the first
+- **WHEN** a scene subject holding one card settles a new gallery job
+- **THEN** the record holds only the new card and the old card's file is deleted

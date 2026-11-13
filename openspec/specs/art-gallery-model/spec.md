@@ -93,7 +93,7 @@ API boundary and SHALL NOT be persisted.
 #### Scenario: Each contract key carries its documented type
 - **WHEN** a stored card's keys are validated
 - **THEN** `image_id` is a uuid string, unique inside its record
-- **AND** `stored_identity` is the store-relative path `gallery/<kind-directory>/<subject-key>/<image-id><extension>`, where the kind directory is exactly `character` or `monster` — scenes have no gallery
+- **AND** `stored_identity` is the store-relative path `gallery/<kind-directory>/<subject-key>/<image-id><extension>`, where the kind directory is exactly `character`, `monster` or `scene`
 - **AND** `prompt` is either `None` or a mapping of exactly `positive` and `negative` verbatim prompt text
 - **AND** `seed` is a non-negative integer or `None`, and `checkpoint` a non-empty string or `None`
 - **AND** `requested_fields` is a list of field ids, possibly empty

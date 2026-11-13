@@ -722,6 +722,9 @@ class CardGeometryCapabilityGateTests(EvenniaTestCase):
                     str(refused.exception), "this subject has no gallery record"
                 )
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-scene-kind-declares-a-one-card-gallery-without-geometry"
+    )
     def test_a_scene_card_refuses_player_geometry_it_does_not_declare(self):
         # ``scene-kind-gallery``: the scene kind holds cards but declares no
         # face rectangle and no stage, so both geometry writers refuse the

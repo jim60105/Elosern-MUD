@@ -215,6 +215,9 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertFalse(first_file.exists())
         self.assertTrue(second_file.exists())
 
+    @covers_requirement(
+        "art-gallery-kind-capabilities::the-scene-kind-declares-a-one-card-gallery-without-geometry"
+    )
     def test_a_second_scene_card_replaces_the_first_and_deletes_its_file(self):
         # ``scene-kind-gallery``: the scene kind declares the same one-card
         # shape as the monster kind, in its own store directory.
