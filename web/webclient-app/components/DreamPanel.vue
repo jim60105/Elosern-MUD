@@ -17,6 +17,12 @@
 // few local refs (arrival, turn, pending, reveal, failure, cap); committed
 // state is never gated by presentation. Escape never awakens by itself: it
 // closes the top layer, or moves focus to the 醒來 row.
+//
+// The farewell (dream-farewell-beat): when the committed state closes with
+// the goddess's closing line in `ending`, the host keeps this stage mounted.
+// The line types into the band, every dream control goes inert, and the next
+// activation after the line is shown in full starts the release; the
+// departure is already committed, so all of it is presentation only.
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { artworkAvailability } from "../lib/artwork.js";
 import { artworkFailureCategory } from "../lib/artwork-failure.js";
@@ -27,6 +33,7 @@ import { useTypewriter } from "../composables/use-typewriter.js";
 import { effectiveCps } from "../lib/message_reveal.js";
 
 const props = defineProps({ state: { type: Object, required: true }, store: { type: Object, required: true } });
+const emit = defineEmits(["departed"]);
 
 const MAX_SUMMARY = 2000;
 const EXCHANGES = 6;
@@ -108,6 +115,17 @@ const shown = reactive({
 });
 // The keepsake card's one-shot sweep when a new change line settles.
 const inked = ref(false);
+// The farewell: "" while dreaming, then how the dream was left ("confirmed"
+// or "awaken"); `departed` once the release has started.
+const leaving = ref("");
+const departed = ref(false);
+// The waking fade plays only at full motion; reduced and off release at once.
+const motionFull = computed(() => props.store.view.motionLevel === "full");
+// A safety net for a fade whose end never arrives (a hidden tab, an OS
+// override): longer than the whole waking sequence.
+const WAKING_FALLBACK_MS = 4000;
+let wakingTimer = null;
+let released = false;
 
 let rootTrap = null;
 let layerTrap = null;
@@ -280,7 +298,7 @@ watch([probes, presented], () => { void nextTick().then(reportCompleteLayers); }
 const artOpen = ref(false);
 const artView = ref(null);
 function openArt() {
-  if (artOpen.value || !artShown.value) return;
+  if (leaving.value || artOpen.value || !artShown.value) return;
   return openLayer(artOpen, artView, () => artView.value);
 }
 function closeArt() { closeLayer(artOpen); }
@@ -301,6 +319,8 @@ function responseBeats() {
   ].filter(Boolean);
 }
 const beat = computed(() => {
+  // A closed state may still carry the last failure; the farewell owns the band.
+  if (leaving.value) return beats.value[beatIndex.value] || { kind: "line", text: "" };
   if (props.state.pending) return { kind: "echo", text: lastSent.value ? `你：「${lastSent.value}」` : "你的話語飄向王座……" };
   if (props.state.failure) return { kind: "notice", text: "夢境一時模糊，女神沒有回應。這次不算數，再說一次吧。" };
   return beats.value[beatIndex.value] || { kind: "narration", text: "" };
@@ -312,7 +332,7 @@ const typewriter = useTypewriter({
 });
 const shownText = computed(() => beatUnits.value.slice(0, typewriter.typed.value).join(""));
 const moreToRead = computed(() => typewriter.typing.value || beatIndex.value < beats.value.length - 1);
-const speaking = computed(() => beat.value.kind === "line" || props.state.pending);
+const speaking = computed(() => beat.value.kind === "line" || (!leaving.value && props.state.pending));
 
 // ---- the settled wish: what the card and the whole-wish view show ----
 // A publication whose exchange count is above the count already settled is a
@@ -377,6 +397,7 @@ function advance() {
     page.value?.scrollTo?.({ top: 0 });
     return;
   }
+  if (leaving.value) { depart(); return; }
   focusHome();
 }
 function reread() {
@@ -403,6 +424,7 @@ onUnmounted(() => {
   rootTrap = null;
   load.dispose();
   clearTimeout(toastTimer);
+  clearTimeout(wakingTimer);
 });
 
 function initialFocus() {
@@ -418,6 +440,7 @@ function focusHome() {
 
 watch(() => props.state.session_id, () => { message.value = ""; lastSent.value = ""; });
 watch(() => props.state.completed, (completed) => {
+  if (leaving.value) return;
   // Only a live increase animates; a reconnect or same-count republish
   // keeps what is on screen.
   if (completed <= revealedCompleted) { revealedCompleted = completed; return; }
@@ -438,16 +461,17 @@ watch(() => props.state.completed, (completed) => {
 // A new send or a failed one ends the wait for an unread reveal: the card
 // settles on the committed wish instead of waiting behind the echo or notice.
 watch(() => props.state.pending || props.state.failure, (busy) => {
+  if (leaving.value) return;
   if (busy && props.state.completed > shownCompleted) settleShown();
 });
 watch(() => props.state.pending, (pending) => {
-  if (pending) {
+  if (pending && !leaving.value) {
     announcement.value = "女神正在回應。";
     if (document.activeElement === replyInput.value) page.value?.focus();
   }
 });
 watch(() => props.state.failure, (failure) => {
-  if (!failure) return;
+  if (!failure || leaving.value) return;
   announcement.value = "夢境一時模糊，女神沒有回應。這次不算數。";
   // Nothing was consumed: hand the player's words back for a retry.
   if (!message.value.trim() && lastSent.value) message.value = lastSent.value;
@@ -473,6 +497,40 @@ watch(() => JSON.stringify([props.state.session_id, props.state.proposal, props.
   }
   synced.reqs = JSON.stringify(serverReqs);
 }, { immediate: true });
+
+// ---- farewell ----
+// The departure is already committed when this plays: it is presentation only.
+watch(() => props.state.open, (open) => {
+  if (open || leaving.value || !props.state.ending) return;
+  sheetOpen.value = false; confirmOpen.value = false; viewOpen.value = false;
+  takeOpen.value = false; threadOpen.value = false; artOpen.value = false;
+  layerTrap = null;
+  clearTimeout(toastTimer);
+  toast.value = "";
+  leaving.value = props.state.confirmed ? "confirmed" : "awaken";
+  arrival.value = false;
+  present([{ kind: "line", text: props.state.ending }], true);
+  announcement.value = `王座上的女神說：${props.state.ending}`;
+  nextTick(() => page.value?.focus());
+});
+// Hands the stage back to the host once; every later call does nothing.
+function releaseStage() {
+  if (released) return;
+  released = true;
+  clearTimeout(wakingTimer);
+  emit("departed");
+}
+function depart() {
+  if (departed.value) { releaseStage(); return; }
+  departed.value = true;
+  if (!motionFull.value) { releaseStage(); return; }
+  wakingTimer = setTimeout(releaseStage, WAKING_FALLBACK_MS);
+}
+function onWakingEnd(event) {
+  if (event.animationName?.includes("dream-waking")) releaseStage();
+}
+// The fade is only rendered at full motion: leaving it mid-way releases now.
+watch(motionFull, (full) => { if (!full && departed.value) releaseStage(); });
 
 // ---- actions ----
 function directionPayload() {
@@ -528,6 +586,8 @@ function clearReqErrors() {
   if (refusal.value === REQUIREMENT_REFUSAL) refusal.value = "";
 }
 function dispatch(action, extra = {}) {
+  // The stage never dispatches during the farewell.
+  if (leaving.value) return null;
   return props.store.dispatchAction("dream." + action,
     { session_id: props.state.session_id, revision: props.state.revision, ...extra }, null);
 }
@@ -703,10 +763,16 @@ function onRowsKeydown(event) {
 function onKeydown(event) {
   // An IME composition (Traditional Chinese input) owns its own keys.
   if (event.isComposing) return;
-  if (event.key === "Tab") { (layerTrap || rootTrap)?.onKeydown(event); return; }
+  if (event.key === "Tab") {
+    // The band is the only control left during the farewell.
+    if (leaving.value) { event.preventDefault(); page.value?.focus(); return; }
+    (layerTrap || rootTrap)?.onKeydown(event);
+    return;
+  }
   event.stopPropagation();
   if (event.key === "Escape") {
     event.preventDefault();
+    if (leaving.value) return;
     if (artOpen.value) closeArt();
     else if (threadOpen.value) closeThreads();
     else if (takeOpen.value) closeTake();
@@ -719,7 +785,7 @@ function onKeydown(event) {
   }
   if (sheetOpen.value && event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); confirm(); return; }
   // An open thread list owns the keys until it closes.
-  if (!overlayOpen.value && !threadOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
+  if (!leaving.value && !overlayOpen.value && !threadOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
     event.preventDefault();
     rows.value?.querySelectorAll("button")[Number(event.key) - 1]?.click();
   }
@@ -727,10 +793,12 @@ function onKeydown(event) {
 </script>
 
 <template>
-  <section ref="stage" class="dream-scene" :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !artShown }"
+  <section ref="stage" class="dream-scene"
+    :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !artShown, 'dream-scene--leaving': leaving,
+      'dream-scene--departed': departed, 'dream-scene--full-motion': motionFull }"
     role="dialog" aria-modal="true" aria-labelledby="dream-title" tabindex="-1" data-testid="dream-panel"
-    :data-state="state.pending ? 'pending' : state.failure ? 'failure' : atCap ? 'cap' : arrival ? 'arrival' : 'turn'"
-    :data-stage="state.stage"
+    :data-state="leaving ? 'farewell' : state.pending ? 'pending' : state.failure ? 'failure' : atCap ? 'cap' : arrival ? 'arrival' : 'turn'"
+    :data-stage="state.stage" :data-leaving="leaving || null"
     :style="{ '--dream-ordinal': ordinal }" @keydown="onKeydown">
     <!-- The displayed picture: the live resolution of the committed descriptor,
          rendered by the element the shared driver itself issued. -->
@@ -749,11 +817,16 @@ function onKeydown(event) {
       @load="onLayerLoad(probe, $event)" @error="onLayerError(probe, $event)" />
     <div class="dream-scene__veil" aria-hidden="true"></div>
     <div v-if="bloom" class="dream-scene__bloom" aria-hidden="true" @animationend="bloom = false"></div>
+    <!-- The farewell's decoration (full motion only): a granted wish's light
+         reaching the throne, then the white of waking that hands the stage
+         back. The departure is already committed under both. -->
+    <div v-if="leaving === 'confirmed' && motionFull" class="dream-scene__wishlight" data-testid="dream-wishlight" aria-hidden="true"></div>
+    <div v-if="departed && motionFull" class="dream-scene__waking" data-testid="dream-waking" aria-hidden="true" @animationend.self="onWakingEnd"></div>
     <div v-if="$slots.storyTools" class="dream-scene__story-tools"><slot name="storyTools" /></div>
     <!-- The stage's own local status and full-view control. Both belong to the
          presented picture, so the marker stands beside the image the player is
          looking at and the view can never open on nothing. -->
-    <div v-if="artShown || artFailure" class="dream-art">
+    <div v-if="artShown || artFailure" class="dream-art" :inert="!!leaving || undefined">
       <p v-if="artFailure" class="dream-art__failure" role="status" data-testid="dream-art-failure">{{ artFailure }}</p>
       <button v-if="artShown" type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-art__control"
         data-testid="dream-art-control" aria-label="開啟夢境全圖" @click="openArt">全圖</button>
@@ -766,7 +839,7 @@ function onKeydown(event) {
       </header>
 
       <nav ref="keepsake" class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized, 'dream-keepsake--inked': inked }"
-        aria-labelledby="dream-keepsake-title" @animationend="onKeepsakeAnimationEnd">
+        aria-labelledby="dream-keepsake-title" :inert="!!leaving || undefined" @animationend="onKeepsakeAnimationEnd">
         <span class="dream-corners" aria-hidden="true"></span>
         <div class="dream-keepsake__head">
           <h3 id="dream-keepsake-title">此刻的願望</h3>
@@ -811,7 +884,8 @@ function onKeydown(event) {
         </div>
       </nav>
 
-      <div class="dream-reply-zone">
+      <Transition name="dream-zone" :css="store.view.motionLevel !== 'off'">
+      <div v-if="!leaving" class="dream-reply-zone" data-testid="dream-reply-zone">
         <p v-if="!store.view.connected" class="dream-reply__caption" role="status">與夢的聯繫中斷了，正在重新連結……你輸入的字句都會保留。</p>
         <p v-else-if="!finalized && state.remaining === 1" class="dream-reply__caption">夢將抵達盡頭 · 最後一次訴說</p>
         <p v-else-if="!finalized && state.track.converging" class="dream-reply__caption">夢將抵達盡頭</p>
@@ -850,6 +924,7 @@ function onKeydown(event) {
             :disabled="transportLocked || !state.can_input || !message.trim()">{{ state.failure ? "再說一次" : "訴說" }}</button>
         </form>
       </div>
+      </Transition>
 
       <section class="dream-window" aria-label="夢境對話">
         <header class="dream-plate" :class="{ 'dream-plate--quiet': !speaking }">
@@ -865,14 +940,14 @@ function onKeydown(event) {
           <p class="dream-page__beat" :class="`dream-page__beat--${beat.kind}`">{{ shownText }}</p>
         </div>
         <footer class="dream-strip">
-          <button v-if="beatIndex > 0 && !state.pending && !state.failure" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="reread">重讀</button>
-          <span id="dream-keys" class="dream-strip__keys">{{ moreToRead && !state.pending ? "Enter 繼續" : "Esc 前往醒來" }}</span>
-          <span class="dream-strip__marker" aria-hidden="true">{{ moreToRead && !state.pending ? "▼" : "■" }}</span>
+          <button v-if="beatIndex > 0 && !state.pending && !state.failure && !leaving" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="reread">重讀</button>
+          <span id="dream-keys" class="dream-strip__keys" :class="{ 'dream-strip__keys--wake': leaving && !moreToRead }" data-testid="dream-keys">{{ leaving ? (moreToRead ? "Enter 繼續" : "Enter 醒來") : moreToRead && !state.pending ? "Enter 繼續" : "Esc 前往醒來" }}</span>
+          <span class="dream-strip__marker" aria-hidden="true">{{ leaving || (moreToRead && !state.pending) ? "▼" : "■" }}</span>
         </footer>
       </section>
     </div>
 
-    <p v-if="toast" class="dream-toast" role="status">{{ toast }}</p>
+    <p v-if="toast && !leaving" class="dream-toast" role="status">{{ toast }}</p>
     <p class="dream-live" aria-live="polite">{{ announcement }}</p>
 
     <!-- 願望全貌: her writing, read-only. Plain text, not disabled inputs. -->
@@ -1398,8 +1473,59 @@ function onKeydown(event) {
 .dream-fixed p { color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
 .dream-fixed small { margin-left: var(--sp-3); color: var(--paper-500); font-size: var(--text-xs); }
 
+/* ---- farewell ---- */
+/* The chrome steps back so her last words stand alone: the crest, the art
+   control and the wish card fade, and the reply bar sinks away. At reduced
+   motion this is the only change (a short fade); at off it is instant. */
+.dream-scene--leaving .dream-crest, .dream-scene--leaving .dream-art, .dream-scene--leaving .dream-keepsake {
+  animation: none; opacity: 0; transition: opacity var(--motion-scene) var(--ease-standard); }
+.dream-zone-leave-active { transition: opacity var(--motion-scene) var(--ease-standard), transform var(--motion-scene) var(--ease-standard); }
+.dream-zone-leave-to { opacity: 0; transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel))); }
+/* Her last words stay crisp above the dimmed sky. */
+.dream-scene--leaving .dream-scene__main { z-index: 4; }
+.dream-scene--leaving .dream-plate__name { color: var(--gold-300); }
+/* Once the line is read, the hint names waking in gold. */
+.dream-strip__keys--wake { color: var(--gold-300); letter-spacing: 0.12em; }
+/* Full motion: a kept wish settles back into the player's hands and fades; a
+   granted wish leaves them and rises to the throne. */
+.dream-scene--full-motion.dream-scene--leaving .dream-keepsake { opacity: 1; transition: none;
+  animation: dream-keepsake-rest calc(var(--motion-scene) * 1.6) var(--ease-standard) forwards; }
+.dream-scene--full-motion.dream-scene--leaving[data-leaving="confirmed"] .dream-keepsake { transform-origin: 60% 40%;
+  animation: dream-keepsake-rise calc(var(--motion-scene) * 3) cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+@keyframes dream-keepsake-rest { to { opacity: 0; transform: translateY(calc(14px * var(--ui-scale) * var(--motion-travel))); filter: blur(calc(2px * var(--ui-scale))); } }
+@keyframes dream-keepsake-rise {
+  0% { opacity: 1; transform: none; filter: none; }
+  35% { opacity: 1; transform: translate(calc(4vw * var(--motion-travel)), calc(-2vh * var(--motion-travel))) scale(0.96); filter: brightness(1.35); }
+  100% { opacity: 0; transform: translate(calc(30vw * var(--motion-travel)), calc(6vh * var(--motion-travel))) scale(0.1); filter: brightness(2.4) blur(calc(6px * var(--ui-scale))); }
+}
+/* The throne receives it. The painting is nearly white there, so the light
+   reads through a dimmed sky and gold rings, not through brightness alone. */
+.dream-scene__wishlight { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 60% 40%, rgba(255, 238, 196, 0.95), rgba(236, 190, 104, 0.55) 5%, rgba(236, 190, 104, 0) 17%),
+    radial-gradient(circle at 60% 40%, rgba(11, 13, 16, 0) 20%, rgba(11, 13, 16, 0.62) 82%);
+  animation: dream-wishlight calc(var(--motion-scene) * 3.2) var(--ease-standard) calc(var(--motion-scene) * 2.2) forwards; }
+.dream-scene__wishlight::before, .dream-scene__wishlight::after { content: ""; position: absolute; left: 60%; top: 40%; width: 30vmin; aspect-ratio: 1; border-radius: 50%;
+  border: 1px solid var(--gold-300); box-shadow: 0 0 calc(22px * var(--ui-scale)) var(--gold-400), inset 0 0 calc(22px * var(--ui-scale)) var(--gold-glow);
+  opacity: 0; transform: translate(-50%, -50%) scale(0.1); animation: dream-wishring calc(var(--motion-scene) * 4.4) cubic-bezier(0.2, 0.6, 0.2, 1) calc(var(--motion-scene) * 2.8) forwards; }
+.dream-scene__wishlight::after { animation-delay: calc(var(--motion-scene) * 3.7); }
+@keyframes dream-wishlight { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dream-wishring { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); } }
+/* Waking mirrors arriving: the dream whitens, then the white thins away onto
+   the waking world beneath. The white's own end hands the stage back, by
+   which time the whole stage has faded out. */
+.dream-scene__waking { position: absolute; inset: 0; z-index: 11; pointer-events: none;
+  background: radial-gradient(ellipse 70% 80% at 60% 42%, #fffdf8, #fbfaf7 55%, #efece6);
+  animation: dream-waking calc(var(--motion-scene) * 3.2) var(--ease-standard) both; }
+@keyframes dream-waking { 0% { opacity: 0; } 50%, 100% { opacity: 1; } }
+.dream-scene--departed .dream-window { opacity: 0; transition: opacity var(--motion-scene) var(--ease-standard); }
+.dream-scene--departed.dream-scene--full-motion { animation: dream-release calc(var(--motion-scene) * 1.4) var(--ease-standard) calc(var(--motion-scene) * 1.8) both; }
+@keyframes dream-release { to { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .dream-pip--forfeit, .dream-keepsake--inked .dream-ink::after, .dream-keepsake--inked .dream-keepsake__preview { animation: none; }
+  .dream-scene--full-motion.dream-scene--leaving .dream-keepsake { animation: none; opacity: 0; }
+  .dream-scene__wishlight { animation: none; opacity: 1; }
+  .dream-scene__wishlight::before, .dream-scene__wishlight::after { animation: none; }
 }
 
 @media (max-height: 800px) {
