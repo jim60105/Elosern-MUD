@@ -1045,6 +1045,7 @@
       "labels": [
         "web.webclient.tests.test_vue_gallery_image_page_evidence",
         "web.webclient.tests.test_vue_gallery_wall_evidence",
+        "web.webclient.tests.test_vue_gallery_window_evidence",
         "web.webclient.tests.test_vue_showcase_world_evidence",
         "web.webclient.tests.test_vue_store_evidence",
         "web.webclient.tests.test_vue_window_primitives_evidence",
