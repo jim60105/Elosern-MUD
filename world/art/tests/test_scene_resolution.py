@@ -36,7 +36,15 @@ from world.art import descriptors, gallery as gallery_api, official, scene_defin
 # vocabulary from re-running that validation on a synthetic set.
 from world.maps import room_art  # noqa: F401
 from world.art.presenter import TOWN_TERMINAL_KEY, describe_scene
-from world.art.queue import claim, enqueue_gallery_job, ensure, record_key, requeue, settle
+from world.art.queue import (
+    claim,
+    enqueue_gallery_job,
+    ensure,
+    gallery_record_key,
+    record_key,
+    settle,
+    settle_gallery_failed,
+)
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
@@ -266,7 +274,7 @@ class SourceChainTests(_SceneFixture):
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
     def test_generated_artwork_precedes_the_operator_and_bundled_positions(self):
-        identity = self.publish()
+        _image_id, identity = self.publish_gallery_card()
         descriptor = describe_scene(self.target())
         entries = self.entries(descriptor)
         generated = entries[0]
@@ -279,7 +287,7 @@ class SourceChainTests(_SceneFixture):
         self.assertTrue(generated["resource"]["url"].startswith(f"/art/{identity}"))
         self.assertEqual(
             generated["resource"]["version"],
-            descriptors.generated_version(identity, str(ArtAssetRecord.objects.get(db_key=record_key(self.subject())).db.generation_token)),
+            descriptors.identity_version(identity),
         )
         self.assertEqual(descriptor["generation_subject"], self.subject().full())
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
@@ -292,21 +300,8 @@ class SourceChainTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
-    def test_recalled_failure_stays_visible_before_the_healthy_substitute(self):
-        subject = self.subject()
-        ensure(subject, SCENE_DESCRIPTION)
-        claimed = next(
-            record
-            for record in claim(ArtAssetRecord.objects.count() + 1)
-            if record.db_key == record_key(subject)
-        )
-        settle(
-            subject,
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="sd_connection_error",
-            generation_token=str(claimed.db.generation_token),
-        )
+    def test_a_recorded_gallery_error_is_a_reached_generation_fault(self):
+        gallery_api.record_error(self.subject(), "sd_connection_error")
         descriptor = describe_scene(self.target())
         entries = self.entries(descriptor)
         fault = entries[0]
@@ -365,9 +360,11 @@ class SourceChainTests(_SceneFixture):
 class GalleryGeneratedSourceTests(_SceneFixture):
     """The scene gallery's default card is the generated position.
 
-    Change ``scene-kind-gallery``: the generated step reads the archetype's
-    scene gallery default card first and falls back to the classic ``done``
-    record only when no card can be presented; the chain order is unchanged.
+    Change ``scene-classic-fallback-removal``: the generated step reads the
+    archetype's scene gallery default card and nothing else. A classic scene
+    record the old chain consulted is never attempted, whatever state it is
+    in, and a recorded gallery failure is a reached fact beside the card it
+    did not replace.
     """
 
     def setUp(self) -> None:
@@ -429,12 +426,20 @@ class GalleryGeneratedSourceTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
-    def test_a_scene_without_a_card_still_presents_its_classic_output(self):
+    def test_a_scene_without_a_card_has_no_generated_attempt(self):
         classic_identity = self.publish()
         descriptor = describe_scene(self.target())
         generated = self.generated_position(descriptor)
-        self.assertEqual(len(generated), 1)
-        self.assertEqual(generated[0]["resource"]["resource_id"], classic_identity)
+        # The classic output is not a fallback any more: an archetype without
+        # a card has no generated attempt at all.
+        self.assertEqual(generated, [])
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_MISSING)
+        image_identities = [
+            attempt["resource"]["resource_id"]
+            for attempt in descriptor["attempts"]
+            if attempt["type"] == "image"
+        ]
+        self.assertNotIn(classic_identity, image_identities)
 
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
@@ -467,15 +472,24 @@ class GalleryGeneratedSourceTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
-    def test_a_card_whose_file_vanished_falls_back_to_the_classic_output(self):
+    def test_a_card_whose_file_vanished_has_no_generated_attempt(self):
         classic_identity = self.publish()
         _image_id, identity = self.publish_gallery_card()
         (self.store_root / identity).unlink()
         descriptor = describe_scene(self.target())
         generated = self.generated_position(descriptor)
-        self.assertEqual(len(generated), 1)
-        self.assertEqual(generated[0]["type"], "image")
-        self.assertEqual(generated[0]["resource"]["resource_id"], classic_identity)
+        # A stored card whose bytes cannot be presented contributes no
+        # candidate and no retention token, and the classic output is still
+        # not an alternative.
+        self.assertEqual(generated, [])
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+        self.assertEqual(descriptor["retention_sources"], [])
+        image_identities = [
+            attempt["resource"]["resource_id"]
+            for attempt in descriptor["attempts"]
+            if attempt["type"] == "image"
+        ]
+        self.assertNotIn(classic_identity, image_identities)
 
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
@@ -493,7 +507,13 @@ class GalleryGeneratedSourceTests(_SceneFixture):
         gallery_api.record_error(self.subject(), "sd_connection_error")
         descriptor = describe_scene(self.target())
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
-        self.assertEqual(self.generated_position(descriptor), [])
+        self.assertEqual(
+            [
+                (entry["type"], entry["reason"])
+                for entry in self.generated_position(descriptor)
+            ],
+            [("fault", descriptors.REASON_GENERATION_FAILED)],
+        )
 
 
 class SourceFactAttributionTests(_SceneFixture):
@@ -677,7 +697,7 @@ class GenerationStateTests(_SceneFixture):
         self.addCleanup(client_patch.stop)
 
     def test_pending_generation_claims_no_candidate_and_counts_as_pending(self):
-        ensure(self.subject(), SCENE_DESCRIPTION)
+        self.pending_gallery_job()
         descriptor = describe_scene(self.target())
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_PENDING)
         self.assertEqual(
@@ -685,8 +705,8 @@ class GenerationStateTests(_SceneFixture):
             [],
         )
 
-    def test_a_vanished_generated_output_is_a_reached_output_missing_fact(self):
-        identity = self.publish()
+    def test_a_vanished_card_file_claims_no_generated_attempt(self):
+        _image_id, identity = self.publish_gallery_card()
         (self.store_root / identity).unlink()
         descriptor = describe_scene(self.target())
         generated = [
@@ -694,38 +714,30 @@ class GenerationStateTests(_SceneFixture):
             for entry in self.entries(descriptor)
             if entry["rank"] == descriptors.SCENE_RANK_GENERATED
         ]
-        self.assertEqual(len(generated), 1)
-        self.assertEqual(generated[0]["type"], "fault")
-        self.assertEqual(generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING)
+        # The stored card is the recorded generation truth; its vanished bytes
+        # authorize no candidate and no retention.
+        self.assertEqual(generated, [])
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+        self.assertEqual(descriptor["retention_sources"], [])
 
     def test_successive_real_publications_yield_distinct_versions_and_urls(self):
         """Two REAL worker publications of one scene are two resources.
 
-        The worker publishes through ``settle_generated``, which clears the
-        transient claim token. A version derived from that token would repeat
-        across regenerations, so every consumer would reuse the previous bytes;
-        the version therefore reads the token that PUBLISHED the output. This
-        walks the real drain/publication path twice and asserts the two
-        resources differ.
+        Each request is its own gallery job, and the worker publishes it as a
+        new immutable card identity: the two resolved resources therefore
+        differ in both their identity-derived version and their URL, so no
+        consumer can reuse the previous bytes.
         """
         from world.art.worker import drain_synchronous
 
         subject = self.subject()
         versions = []
         urls = []
-        for index in range(2):
-            if index:
-                # A regeneration is a requeue first: the record must be
-                # claimable again for the second publication.
-                requeue(subject)
-            ensure(subject, SCENE_DESCRIPTION)
+        for _index in range(2):
+            self.pending_gallery_job()
             drain_synchronous(1)
-            record = ArtAssetRecord.objects.get(db_key=record_key(subject))
-            self.assertEqual(record.db.status, ArtAssetStatus.DONE)
-            # The publication clears the transient claim token and keeps the
-            # publishing one, which is what the version reads.
-            self.assertEqual(str(record.db.generation_token), "")
-            self.assertNotEqual(str(record.db.published_generation_token), "")
+            cards = gallery_api.cards_for(subject)
+            self.assertEqual(len(cards), 1)
             descriptor = describe_scene(self.target())
             generated = [
                 entry
@@ -733,6 +745,9 @@ class GenerationStateTests(_SceneFixture):
                 if entry["rank"] == descriptors.SCENE_RANK_GENERATED
             ][0]
             self.assertEqual(generated["type"], "image")
+            self.assertEqual(
+                generated["resource"]["resource_id"], cards[0]["stored_identity"]
+            )
             versions.append(generated["resource"]["version"])
             urls.append(generated["resource"]["url"])
         self.assertNotEqual(versions[0], versions[1])
@@ -740,19 +755,7 @@ class GenerationStateTests(_SceneFixture):
 
     def test_disabled_generation_never_erases_a_recorded_failure(self):
         subject = self.subject()
-        ensure(subject, SCENE_DESCRIPTION)
-        claimed = next(
-            record
-            for record in claim(ArtAssetRecord.objects.count() + 1)
-            if record.db_key == record_key(subject)
-        )
-        settle(
-            subject,
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="sd_connection_error",
-            generation_token=str(claimed.db.generation_token),
-        )
+        gallery_api.record_error(subject, "sd_connection_error")
         with override_settings(ART_SCHEDULER_ENABLED=False):
             descriptor = describe_scene(self.target())
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
@@ -782,22 +785,30 @@ class RetentionAuthorizationTests(_SceneFixture):
         "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
     )
     def test_generated_authorization_survives_a_requeue_and_a_failed_regeneration(self):
-        self.publish()
+        _image_id, identity = self.publish_gallery_card()
         published = self.sources(describe_scene(self.target()))
         generated = descriptors.scene_generated_source_id(self.subject().full())
-        self.assertIn(generated, published)
+        self.assertEqual(
+            published[generated],
+            descriptors.retention_token(
+                PLACE_IDENTITY, self.subject().full(), "generated", identity
+            ),
+        )
 
-        requeue(self.subject())
+        image_id = self.pending_gallery_job()
         pending = self.sources(describe_scene(self.target()))
         self.assertEqual(pending.get(generated), published[generated])
 
-        claimed = claim(ArtAssetRecord.objects.count() + 1)[0]
-        settle(
-            self.subject(),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
+        claimed = claim(ArtAssetRecord.objects.count() + 1)
+        job = next(
+            (record for record in claimed if record.db.gallery_image_id == image_id),
+            None,
+        )
+        self.assertIsNotNone(job)
+        settle_gallery_failed(
+            gallery_record_key(self.subject(), image_id),
+            generation_token=str(job.db.generation_token),
             error="sd_connection_error",
-            generation_token=str(claimed.db.generation_token),
         )
         failed = self.sources(describe_scene(self.target()))
         self.assertEqual(failed.get(generated), published[generated])
@@ -806,7 +817,7 @@ class RetentionAuthorizationTests(_SceneFixture):
         "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
     )
     def test_generated_authorization_disappears_with_its_output(self):
-        identity = self.publish()
+        _image_id, identity = self.publish_gallery_card()
         (self.store_root / identity).unlink()
         self.assertEqual(self.sources(describe_scene(self.target())), {})
 
@@ -843,7 +854,7 @@ class RetentionAuthorizationTests(_SceneFixture):
         "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
     )
     def test_an_untrusted_identity_authorizes_nothing(self):
-        self.publish()
+        self.publish_gallery_card()
         untrusted = SceneTarget(
             identity="room:1",
             trusted_identity=False,
@@ -924,7 +935,7 @@ class ReadOnlyResolutionTests(_SceneFixture):
         self.addCleanup(settings_override.disable)
 
     def test_resolution_writes_no_record_and_no_room_attribute(self):
-        identity = self.publish()
+        _image_id, identity = self.publish_gallery_card()
 
         def attributes(obj):
             return sorted(
@@ -938,11 +949,11 @@ class ReadOnlyResolutionTests(_SceneFixture):
         room.room_art_key = ROOM_KEY
         room.scene_identity = PLACE_IDENTITY
         before_room = attributes(room)
-        record = ArtAssetRecord.objects.get(db_key=record_key(self.subject()))
+        record = gallery_api.record_for(self.subject())
         before_record = (
-            record.db.status,
-            str(record.db.output_identity),
-            str(record.db.generation_token),
+            tuple(card["image_id"] for card in gallery_api.cards_for(self.subject())),
+            record.db.default_image_id,
+            record.db.last_error_code,
             attributes(record),
         )
         before_count = ArtAssetRecord.objects.count()
@@ -952,7 +963,12 @@ class ReadOnlyResolutionTests(_SceneFixture):
 
         record.refresh_from_db()
         self.assertEqual(
-            (record.db.status, str(record.db.output_identity), str(record.db.generation_token), attributes(record)),
+            (
+                tuple(card["image_id"] for card in gallery_api.cards_for(self.subject())),
+                record.db.default_image_id,
+                record.db.last_error_code,
+                attributes(record),
+            ),
             before_record,
         )
         self.assertEqual(ArtAssetRecord.objects.count(), before_count)

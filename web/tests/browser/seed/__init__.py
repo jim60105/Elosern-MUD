@@ -46,7 +46,7 @@ from web.tests.browser.seed.identity import (
     CREATION_ACCOUNT_USERNAME,
     FIXTURE_VALID_PNG,
 )
-from web.tests.browser.seed.art_fixture import _art_fixture
+from web.tests.browser.seed.art_fixture import ART_SCENE_IMAGE_ID, _art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
 from web.tests.browser.seed.party_management_acceptance_fixture import (

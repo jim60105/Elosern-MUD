@@ -74,11 +74,13 @@ _ALLOWED_IDENTITY = re.compile(
     r"^(scene|portrait/monster|portrait/character)/[^/]+\.(png|webp|jpg|avif)$"
 )
 
-# The exact gallery identity shape: kind is exactly `character` or `monster`,
-# the subject key and image id are single clean segments, and the extension
-# is one of the same closed four store extensions.
+# The exact gallery identity shape: kind is exactly `character`, `monster` or
+# `scene`, the subject key and image id are single clean segments, and the
+# extension is one of the same closed four store extensions. The scene kind is
+# admitted because a scene's generated source IS its scene gallery card
+# (``scene-classic-fallback-removal``).
 _GALLERY_IDENTITY = re.compile(
-    r"^gallery/(character|monster)/([^/]+)/[^/]+\.(png|webp|jpg|avif)$"
+    r"^gallery/(character|monster|scene)/([^/]+)/[^/]+\.(png|webp|jpg|avif)$"
 )
 
 # The exact built-in fallback identity shape: one flat segment under
@@ -116,6 +118,7 @@ _MIME_BY_EXTENSION = {
 _GALLERY_KINDS = {
     "character": ArtSubjectKind.CHARACTER,
     "monster": ArtSubjectKind.MONSTER,
+    "scene": ArtSubjectKind.SCENE,
 }
 
 

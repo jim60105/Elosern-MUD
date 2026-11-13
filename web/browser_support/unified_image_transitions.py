@@ -297,53 +297,89 @@ def scene_subject_for_room(room):
         return None
 
 
-def _settle_scene(character, status: str, *, publish: bool) -> dict:
-    """Run one real scene generation lifecycle for the character's current room.
+def _scene_job(character) -> tuple:
+    """The current room's scene subject and one real in-flight gallery job id.
 
-    ``pending_scene`` requeues the record, which preserves the prior valid
-    output (the descriptor keeps authorizing it); ``failed_scene`` requeues and
-    then settles the claimed regeneration as failed; ``done_scene`` publishes a
-    fresh readable output under the runtime store and settles it done. Every
-    step uses the record's OWN claim token, never an assumed index.
+    A regeneration reuses the job a previous transition already left in
+    flight (``pending_gallery_jobs``), so a pending -> failed sequence settles
+    the SAME request instead of stacking a second one; otherwise the request
+    goes through ``request_gallery_image`` — the seam every scene producer
+    uses. A room with no registered archetype is rejected instead of guessing
+    a subject.
     """
-    from django.conf import settings
-
-    from world.art.queue import claim, record_key, requeue, settle
-    from world.art.store import ArtAssetRecord, ArtAssetStatus
+    from world.art.queue import pending_gallery_jobs
+    from world.art.service import request_gallery_image
 
     subject = scene_subject_for_room(character.location)
     if subject is None:
         raise UnsupportedTransitionError("the current room carries no registered scene archetype")
+    jobs = pending_gallery_jobs(subject)
+    if jobs:
+        return subject, jobs[0]["image_id"]
+    return subject, request_gallery_image(subject)
+
+
+def _settle_scene(character, status: str) -> dict:
+    """Run one real scene GALLERY lifecycle for the character's current room.
+
+    ``pending_scene`` leaves one real gallery job in flight (the scene gallery
+    record's own pending truth, exactly as the producers request it);
+    ``failed_scene`` settles that job failed through the gallery settle path
+    (a bounded error code on the scene's gallery record, no card, spent job
+    deleted); ``done_scene`` publishes the fixture image through
+    ``settle_gallery_generated``, which appends (or replaces) the scene's one
+    card. Every settle uses the job's OWN claim token, never an assumed index.
+    """
+    from django.conf import settings
+
+    from world.art.queue import (
+        claim,
+        gallery_record_key,
+        settle_gallery_failed,
+        settle_gallery_generated,
+    )
+    from world.art.store import ArtAssetRecord, ArtAssetStatus
+
+    subject, image_id = _scene_job(character)
     job = {
         "pending_scene": ArtAssetStatus.PENDING,
         "failed_scene": ArtAssetStatus.FAILED,
         "done_scene": ArtAssetStatus.DONE,
     }[status]
-    # Every one of these transitions is a REGENERATION of the same scene: the
-    # record must be requeued first (which also preserves its prior valid
-    # output, so the descriptor keeps authorizing it) before a fresh claim can
-    # own a token. Claiming a done record directly would find nothing.
-    requeue(subject)
     if job == ArtAssetStatus.PENDING:
         return {"subject_key": subject.full(), "status": job}
+    job_key = gallery_record_key(subject, image_id)
     claimed = claim(ArtAssetRecord.objects.count() + 1)
-    record = next((item for item in claimed if item.db_key == record_key(subject)), None)
+    record = next((item for item in claimed if item.db_key == job_key), None)
     if record is None:
-        raise UnsupportedTransitionError("the scene record was not claimable")
-    identity = None
+        raise UnsupportedTransitionError("the scene gallery job was not claimable")
+    token = str(record.db.generation_token)
     if job == ArtAssetStatus.DONE:
-        identity = f"scene/{subject.key}.png"
-        path = Path(settings.ART_STORE_ROOT).joinpath(*identity.split("/"))
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(_fixture_png())
-    settle(
-        subject,
-        status=job,
-        output_identity=identity,
-        error=None if job == ArtAssetStatus.DONE else "fixture",
-        generation_token=str(record.db.generation_token),
-    )
-    del publish
+        identity = store_identity_for(subject.full(), image_id)
+        target = Path(settings.ART_STORE_ROOT).joinpath(*identity.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # The settle moves the temporary bytes onto the card identity, so the
+        # temporary file must live on the same filesystem as its target.
+        tmp_path = target.parent / f".{image_id}.tmp"
+        tmp_path.write_bytes(_fixture_png())
+        stored = settle_gallery_generated(
+            job_key,
+            generation_token=token,
+            output_identity=identity,
+            tmp_path=str(tmp_path),
+            prompt={"positive": "browser scene fixture", "negative": ""},
+            seed=None,
+            checkpoint=None,
+            image_size=dict(ORIGINAL_IMAGE_SIZE),
+        )
+        if stored is None:
+            raise UnsupportedTransitionError("the scene gallery job was not publishable")
+    else:
+        applied = settle_gallery_failed(
+            job_key, generation_token=token, error="fixture"
+        )
+        if applied is None:
+            raise UnsupportedTransitionError("the scene gallery job was not settleable")
     return {"subject_key": subject.full(), "status": job}
 
 
@@ -432,7 +468,7 @@ def apply_transition(
             return _move_scene(character)
         if name == "reuse_place":
             return _reuse_place(character)
-        return _settle_scene(character, name, publish=True)
+        return _settle_scene(character, name)
     handler = _APPLIERS.get(name)
     if handler is None:
         raise UnsupportedTransitionError(

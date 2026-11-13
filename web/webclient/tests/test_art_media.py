@@ -186,7 +186,11 @@ class GalleryIdentityServingTests(EvenniaTestCase):
 
     def _card(self, subject, extension=".png", image_id=None, identity=None):
         image_id = image_id or str(uuid.uuid4())
-        kind_dir = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+        kind_dir = {
+            ArtSubjectKind.CHARACTER: "character",
+            ArtSubjectKind.MONSTER: "monster",
+            ArtSubjectKind.SCENE: "scene",
+        }[subject.kind]
         identity = identity or f"gallery/{kind_dir}/{subject.key}/{image_id}{extension}"
         append_card(
             subject,
@@ -196,7 +200,11 @@ class GalleryIdentityServingTests(EvenniaTestCase):
                 "prompt": {"positive": "a hero", "negative": "blur"},
                 "seed": 1,
                 "checkpoint": "realVision.safetensors",
-                "requested_fields": ["appearance"],
+                "requested_fields": (
+                    ["appearance"]
+                    if subject.kind is ArtSubjectKind.CHARACTER
+                    else []
+                ),
                 "binding": None,
                 "source": "generated",
                 "image_size": {"width": 1000, "height": 1000},
@@ -237,11 +245,28 @@ class GalleryIdentityServingTests(EvenniaTestCase):
     @covers_requirement(
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
     )
+    def test_a_scene_card_identity_is_served_same_origin(self):
+        # A scene's generated source IS its scene gallery card
+        # (``scene-classic-fallback-removal``), so that card identity is served
+        # through the same record-gated branch as every other card.
+        subject = self._subject(ArtSubjectKind.SCENE, key="t_synth_bazaar")
+        identity = self._card(subject)
+        self._write(identity)
+        response = self._get(identity)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
     def test_unreferenced_gallery_identity_returns_404(self):
         subject = self._subject(key="gallery-unref")
         stray = f"gallery/character/{subject.key}/{uuid.uuid4()}.png"
         self._write(stray)
         self.assertEqual(self._get(stray).status_code, 404)
+        scene_stray = "gallery/scene/t_synth_bazaar/" + str(uuid.uuid4()) + ".png"
+        self._write(scene_stray)
+        self.assertEqual(self._get(scene_stray).status_code, 404)
 
     @covers_requirement(
         "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"

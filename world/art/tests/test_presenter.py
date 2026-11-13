@@ -54,8 +54,8 @@ from world.art.presenter import (
     describe_scene,
     media_url_for,
 )
-from world.art import descriptors, subjects
-from world.art.queue import claim, ensure, record_key, settle
+from world.art import descriptors, gallery as gallery_api, subjects
+from world.art.queue import claim, enqueue_gallery_job, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.art_view import SceneTarget
@@ -169,72 +169,77 @@ class ArtPresenterTests(EvenniaTestCase):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
 
-    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_done_record_resolves_to_a_versioned_same_origin_url(self):
-        subject = _scene()
-        ensure(subject, "desc")
-        self._write_asset("scene/t_synth_forest.png")
-        claimed = claim(10)
-        settle(
+    def _append_scene_card(self, subject, *, write: bool = True):
+        """Append one real scene gallery card (its stored file optional)."""
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/scene/{subject.key}/{image_id}.png"
+        if write:
+            self._write_asset(identity)
+        append_card(
             subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_forest.png",
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 4, "height": 4},
         )
+        return image_id, identity
+
+    def _pending_scene_job(self, subject):
+        """Queue one real scene gallery job (the in-flight generation state)."""
+        image_id = str(uuid.uuid4())
+        enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        return image_id
+
+    @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
+    def test_scene_card_resolves_to_a_same_origin_media_url(self):
+        subject = _scene()
+        _image_id, identity = self._append_scene_card(subject)
         descriptor = _scene_descriptor(subject.key)
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         generated = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)
         self.assertEqual(len(generated), 1)
         resource = generated[0]["resource"]
         self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
-        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_forest.png"))
-        # A republishable generated path carries its bounded cache version, so
-        # a regeneration is a new request rather than the same cached bytes.
-        version = resource["url"].partition("?v=")[2]
-        self.assertEqual(version, descriptors.generated_version(
-            "scene/t_synth_forest.png",
-            str(ArtAssetRecord.objects.get(db_key=record_key(subject)).db.generation_token),
-        ))
+        self.assertEqual(resource["url"], f"/art/{identity}")
+        self.assertEqual(resource["version"], descriptors.identity_version(identity))
         self.assertNotIn("out_path", repr(descriptor))
         self.assertNotIn(self.root.as_posix(), repr(descriptor))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_done_record_with_a_missing_file_resolves_to_the_output_missing_fact(self):
+    def test_scene_card_with_a_missing_file_claims_no_generated_attempt(self):
         subject = _scene()
-        ensure(subject, "desc")
-        claimed = claim(10)
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_forest.png",
-            error=None,
-        )
+        self._append_scene_card(subject, write=False)
         descriptor = _scene_descriptor(subject.key)
         generated = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)
-        self.assertEqual(len(generated), 1)
-        self.assertEqual(generated[0]["type"], "fault")
-        self.assertEqual(
-            generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING
-        )
+        # The classic output-missing branch is gone with the classic fallback:
+        # an unpresentable card simply contributes no generated attempt.
+        self.assertEqual(generated, [])
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+        self.assertEqual(descriptor["retention_sources"], [])
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_missing_pending_and_failed_states_stay_truthful(self):
-        pending = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
-        ensure(pending, "desc")
-        claimed = claim(10)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-
         # No record at all is factually missing: nothing is claimed, and the
         # generated position carries no attempt.
         absent = _scene_descriptor(_SYNTH_SCENE)
         self.assertEqual(absent["generation_state"], descriptors.GENERATION_MISSING)
         self.assertEqual(_scene_attempt(absent, descriptors.SCENE_RANK_GENERATED), [])
 
-        # A claimed (in-progress) record is the same player-visible fact as a
-        # queued one: pending, with no synthesized candidate.
+        # An in-flight gallery job is the same player-visible fact as a queued
+        # one: pending, with no synthesized candidate.
+        self._pending_scene_job(ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern"))
         pending_descriptor = _scene_descriptor("t_synth_tavern")
         self.assertEqual(
             pending_descriptor["generation_state"], descriptors.GENERATION_PENDING
@@ -243,17 +248,10 @@ class ArtPresenterTests(EvenniaTestCase):
             _scene_attempt(pending_descriptor, descriptors.SCENE_RANK_GENERATED), []
         )
 
+        # A recorded gallery error is both the failed state and a reached fact
+        # at the generated position.
         failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_dungeon")
-        ensure(failed, "desc")
-        claimed = claim(10)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        settle(
-            failed,
-            generation_token=tokens[record_key(failed)],
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
+        gallery_api.record_error(failed, "boom")
         failed_descriptor = _scene_descriptor("t_synth_dungeon")
         self.assertEqual(
             failed_descriptor["generation_state"], descriptors.GENERATION_FAILED
@@ -313,26 +311,21 @@ class ArtPresenterTests(EvenniaTestCase):
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_claimed_record_is_presented_as_pending_while_the_worker_holds_it(self):
         subject = _scene()
-        ensure(subject, "desc")
-        claim(10)
+        self._pending_scene_job(subject)
+        claimed = claim(10)
+        self.assertTrue(claimed)
         descriptor = _scene_descriptor(subject.key)
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_PENDING)
         self.assertEqual(_scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED), [])
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        record = ArtAssetRecord.objects.filter(
+            db_key__startswith=f"{record_key(subject)}:gen:"
+        ).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_settled_statuses_pass_through_unchanged(self):
         failed = _scene("t_synth_dungeon")
-        ensure(failed, "desc")
-        claimed = claim(10)
-        settle(
-            failed,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
+        gallery_api.record_error(failed, "boom")
         self.assertEqual(
             _scene_descriptor("t_synth_dungeon")["generation_state"],
             descriptors.GENERATION_FAILED,
@@ -361,15 +354,18 @@ class ArtPresenterTests(EvenniaTestCase):
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_existing_png_asset_survives_a_switch_to_another_format(self):
-        subject = _scene()
+        # The classic store's identity validation now serves the portrait
+        # chain only (the scene chain reads gallery cards).
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "format-switch")
+        identity = "portrait/character/format-switch.png"
         ensure(subject, "desc")
-        self._write_asset("scene/t_synth_forest.png")
+        self._write_asset(identity)
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_forest.png",
+            output_identity=identity,
             error=None,
         )
         # Store mid-way through a format switch: the configured format is
@@ -378,11 +374,9 @@ class ArtPresenterTests(EvenniaTestCase):
         with override_settings(
             ART_SD_OUTPUT_FORMAT="webp", ART_SD_OUTPUT_EXTENSION=".webp"
         ):
-            descriptor = _scene_descriptor(subject.key)
-        resource = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)[0][
-            "resource"
-        ]
-        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_forest.png"))
+            descriptor = describe_portrait(subject)
+        resource = candidate(descriptor)
+        self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_foreign_directory_identity_resolves_to_unavailable(self):
@@ -415,8 +409,9 @@ class ArtPresenterTests(EvenniaTestCase):
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
         for extension in (".png", ".webp", ".jpg", ".avif"):
-            subject = _scene(f"mixed_store_{extension[1:]}")
-            identity = f"scene/mixed_store_{extension[1:]}{extension}"
+            key = f"mixed_store_{extension[1:]}"
+            subject = ArtSubject(ArtSubjectKind.CHARACTER, key)
+            identity = f"portrait/character/{key}{extension}"
             ensure(subject, "desc")
             self._write_asset(identity)
             claimed = claim(10)
@@ -427,10 +422,8 @@ class ArtPresenterTests(EvenniaTestCase):
                 output_identity=identity,
                 error=None,
             )
-            descriptor = _scene_descriptor(f"mixed_store_{extension[1:]}")
-            resource = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)[0][
-                "resource"
-            ]
+            descriptor = describe_portrait(subject)
+            resource = candidate(descriptor)
             with self.subTest(extension=extension):
                 self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
                 self.assertTrue(resource["url"].startswith(f"/art/{identity}"))

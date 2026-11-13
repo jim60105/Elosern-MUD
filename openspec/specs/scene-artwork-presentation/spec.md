@@ -6,7 +6,7 @@ Define room-aware scene source precedence, same-place retention and full-view be
 ## Requirements
 
 ### Requirement: Normal scenes use the complete authored source chain
-A normal scene SHALL attempt explicit room official art, archetype generated art (the archetype's scene gallery default card, else its classic generated record), optional operator archetype official art, required bundled type art, then a distinct declared town/forest terminal image. Source selection SHALL use authored scene type rather than game mode. Exhaustion SHALL produce a non-image background with persistent reached failures.
+A normal scene SHALL attempt explicit room official art, archetype generated art (the archetype's scene gallery default card), optional operator archetype official art, required bundled type art, then a distinct declared town/forest terminal image. Source selection SHALL use authored scene type rather than game mode. Exhaustion SHALL produce a non-image background with persistent reached failures.
 
 #### Scenario: Room override suppresses lower faults
 - **WHEN** a healthy room image precedes a failed archetype job
@@ -29,8 +29,8 @@ A normal scene SHALL attempt explicit room official art, archetype generated art
 - **THEN** town terminal is attempted with a configuration-failure indication
 
 #### Scenario: A scene gallery card is the generated source
-- **WHEN** a synthetic archetype holds a scene gallery default card and also a classic done record with a different output
-- **THEN** the generated position presents the gallery card, and the classic output is not attempted
+- **WHEN** a synthetic archetype holds a scene gallery default card
+- **THEN** the generated position presents that card, and an archetype without a card has no generated attempt
 
 ### Requirement: Retention is scoped to unchanged scene and generation subject
 A new scene identity SHALL immediately invalidate previous-place background content. Same-scene regeneration MAY retain a previously successful applicable image until a same/higher-priority replacement succeeds while continuing current attempts and reached-fault processing. Binding removal, revoked access, different subject or known failed retained source SHALL invalidate retention.

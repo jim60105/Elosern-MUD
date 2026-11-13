@@ -75,9 +75,10 @@ SHIPPED_ART_SCENE_LABEL = "酒館內部"
 def art_scene_values() -> "tuple[str, str]":
     """(archetype key, display label) for the current boot mode's art fixture.
 
-    The settled media file is always ``/art/scene/<archetype>.png`` (the art
-    service names its output after the archetype key), so journeys derive
-    the URL and the caption from this one resolver.
+    The seeded ``done`` state is the scene gallery's card, whose committed
+    stored identity the descriptor itself names (``gallery/scene/<archetype>/
+    <image-id>.png``); journeys read the media URL from that descriptor and
+    derive only the caption from this resolver.
     """
     if synth_mode_enabled():
         return SYNTH_ART_ARCHETYPE, SYNTH_ART_SCENE_LABEL

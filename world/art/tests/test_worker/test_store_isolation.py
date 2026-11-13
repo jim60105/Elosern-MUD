@@ -181,12 +181,16 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.last_error_code, "sd_connection_error")
         from world.art import descriptors
+        from world.art.gallery import record_error
         from world.art.presenter import describe_scene
         from world.art import subjects as art_subjects
         from world.rules.art_view import SceneTarget
 
-        # A scene position: the recorded failure is a reached fact of the
-        # canonical descriptor and no candidate is invented around it.
+        # The scene chain reads the scene gallery only
+        # (``scene-classic-fallback-removal``), so the canonical descriptor's
+        # reached failure is the gallery record's own recorded error; the
+        # classic record's failure above stays the worker's bounded fact.
+        record_error(subject, "sd_connection_error")
         with patch.object(
             art_subjects,
             "SCENE_ARCHETYPE_REGISTRY",
