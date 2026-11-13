@@ -859,6 +859,9 @@ class RoleTests(unittest.TestCase):
 class SingleCellLayoutTests(unittest.TestCase):
     """A one-cell village or hamlet, with entrances that follow the roads."""
 
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
     def test_through_road_gives_a_gate_per_contact(self) -> None:
         contacts = ((14, 15), (16, 15))
         village_input = _single_cell_input(
@@ -879,6 +882,9 @@ class SingleCellLayoutTests(unittest.TestCase):
             self.assertEqual(_gate_approaches(result), sorted(contacts))
             self.assertEqual(len(result.slots), inp.budget.node_count)
 
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
     def test_spur_end_gives_one_gate(self) -> None:
         contacts = ((14, 15),)
         inp = _single_cell_input(
@@ -892,6 +898,9 @@ class SingleCellLayoutTests(unittest.TestCase):
         self.assertEqual(_gate_approaches(result), sorted(contacts))
         self.assertEqual(len(result.slots), inp.budget.node_count)
 
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
     def test_junction_gives_a_gate_per_contact_and_one_extra_node(self) -> None:
         contacts = ((14, 15), (16, 15), (15, 16))
         village_input = _single_cell_input(
@@ -912,6 +921,9 @@ class SingleCellLayoutTests(unittest.TestCase):
             self.assertEqual(_gate_approaches(result), sorted(contacts))
             self.assertEqual(len(result.slots), inp.budget.node_count + 1)
 
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
     def test_no_road_hamlet_gets_one_gate_and_a_village_is_refused(self) -> None:
         hamlet_input = _single_cell_input(
             _ref("single_hamlet", kind="hamlet", population=120)
@@ -985,6 +997,9 @@ class SingleCellLayoutTests(unittest.TestCase):
             generate_settlement(flooded)
         self.assertIn("location cell not walkable", str(caught.exception))
 
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
     def test_beast_nation_reuses_the_tribal_vocabulary(self) -> None:
         human_input = _single_cell_input(
             _ref("single_village", kind="village", population=400),
