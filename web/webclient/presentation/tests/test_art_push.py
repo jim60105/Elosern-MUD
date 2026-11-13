@@ -135,16 +135,42 @@ class ArtPushPureGateTests(unittest.TestCase):
             {"scene:arena", "portrait:character:alice"},
         )
 
-    def test_gallery_subject_keys_selected_only(self):
+    def test_gallery_subject_keys_selected_and_listed(self):
+        """The selected subject and every rendered tile row both qualify."""
         self.assertEqual(_gallery_subject_keys({}), set())
         self.assertEqual(_gallery_subject_keys({"selected": None}), set())
         self.assertEqual(_gallery_subject_keys({"selected": ""}), set())
         self.assertEqual(
             _gallery_subject_keys({
                 "selected": "portrait:character:hero",
-                "groups": [{"subjects": [{"subject_key": "portrait:character:other"}]}],
+                "groups": [
+                    {
+                        "subjects": [
+                            {"subject_key": "portrait:character:other"},
+                            {"subject_key": ""},
+                        ]
+                    },
+                    {"subjects": [{"subject_key": "portrait:monster:t_low"}]},
+                    {"subjects": None},
+                ],
             }),
-            {"portrait:character:hero"},
+            {
+                "portrait:character:hero",
+                "portrait:character:other",
+                "portrait:monster:t_low",
+            },
+        )
+        # A listed subject qualifies on its own, with nothing selected.
+        self.assertEqual(
+            _gallery_subject_keys({
+                "groups": [{"subjects": [{"subject_key": "portrait:character:listed"}]}],
+            }),
+            {"portrait:character:listed"},
+        )
+        # Malformed group and row shapes claim no subject at all.
+        self.assertEqual(
+            _gallery_subject_keys({"groups": [None, {"subjects": [None, {"subject_key": 7}]}]}),
+            set(),
         )
 
     def test_art_portrait_catalog_keys_exclude_the_scene_reference(self):
@@ -375,6 +401,16 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.player.account = account
         return account
 
+    def _companion(self, key, stable_key):
+        """Bind one named-policy NPC to the player's party in this room."""
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key=key, location=self.room)
+        ensure_npc_canonical_age(companion, age=22, apparent_age=22)
+        companion.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        join_party(companion, self.player)
+        return companion
+
     def _view(self, session, category, subject_key):
         """Store the session's gallery view on one category's subject.
 
@@ -385,6 +421,18 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session.ndb.gallery_view = GalleryViewSelection(
             self.player.pk, category, ((category, subject_key),)
         )
+
+    def _commit_wall(self, session):
+        """Commit the session's current wall as the baseline a push compares to.
+
+        A push publishes only what differs from the committed panels, so a test
+        that first changes the wall commits it before driving the completion;
+        otherwise the wall change alone would publish.
+        """
+        session.ndb.elosern_coordinator.full_snapshot(
+            build_presentation_context(session, self.player)
+        )
+        session.sent.clear()
 
     def _complete_scene(self):
         ensure(self.subject, "desc")
@@ -610,6 +658,118 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertEqual(panels["gallery"]["selected"], monster_key)
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_a_listed_unselected_wall_subject_refreshes_its_tile(self):
+        """A listed companion's completion refreshes its tile, not the selection.
+
+        Companion A is selected and companion B is listed beside it on the
+        rendered wall, so B's settled gallery job qualifies the gallery panel:
+        B's own tile carries the newly stored card and image while ``selected``
+        still names A. The selected-only rule qualified no panel here, which
+        left B's tile on its stale spinner.
+        """
+        from world.art.queue import claim, settle_gallery_generated
+        from world.art.service import request_gallery_image
+
+        self._own_player()
+        companion_a = self._companion("同行甲", "t_wall_a")
+        companion_b = self._companion("同行乙", "t_wall_b")
+        a_key = ArtSubject(ArtSubjectKind.CHARACTER, "t_wall_a").full()
+        b_key = ArtSubject(ArtSubjectKind.CHARACTER, "t_wall_b").full()
+        self.assertEqual(companion_a.location, self.room)
+        self.assertEqual(companion_b.location, self.room)
+
+        session = self._make_session()
+        self._view(session, "party", a_key)
+        self._commit_wall(session)
+
+        image_id = request_gallery_image(companion_b, fields=[], custom_prompt="")
+        claimed = claim(50)
+        job = next(j for j in claimed if j.db.gallery_image_id == image_id)
+        identity = f"gallery/character/t_wall_b/{image_id}.png"
+        image = self.root / identity
+        image.parent.mkdir(parents=True, exist_ok=True)
+        image.write_bytes(b"wall tile")
+        settle_gallery_generated(
+            job.key,
+            generation_token=job.db.generation_token,
+            output_identity=identity,
+            tmp_path=str(image),
+            prompt={"positive": "companion", "negative": ""},
+            seed=1,
+            checkpoint="sd_v1-5",
+            image_size={"width": 1000, "height": 1000},
+        )
+
+        with (
+            patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+            patch("web.webclient.presentation.art_push.log_info") as info_mock,
+        ):
+            on_asset_completed(subject_key=b_key)
+
+        self.assertIn("gallery", info_mock.call_args.kwargs["context"]["panels"])
+        gallery = self._first_update(session)["panels"]["gallery"]
+        self.assertEqual(gallery["selected"], a_key, "the completion never moves the selection")
+        rows = {
+            row["subject_key"]: row
+            for group in gallery["groups"]
+            for row in group["subjects"]
+        }
+        self.assertEqual(set(rows), {a_key, b_key})
+        self.assertEqual(rows[b_key]["card_count"], 1)
+        images = [
+            entry
+            for entry in rows[b_key]["artwork"]["attempts"]
+            if entry["type"] == "image"
+        ]
+        self.assertEqual([entry["resource"]["resource_id"] for entry in images], [identity])
+        self.assertIsNone(rows[a_key]["artwork"], "A stores no image of its own")
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_an_unlisted_wall_subject_does_not_qualify_the_gallery(self):
+        """A subject the wall does not list cannot widen the gallery update.
+
+        Companion C is present with a named portrait but is not a party member,
+        so the rendered party wall lists only A and B while art's catalog
+        references C. C's completed portrait publishes art and never gallery,
+        and the wall keeps A selected.
+        """
+        self._own_player()
+        self._companion("同行甲", "t_wall_a")
+        self._companion("同行乙", "t_wall_b")
+        bystander = create_object(NPC, key="同行丙", location=self.room)
+        ensure_npc_canonical_age(bystander, age=22, apparent_age=22)
+        bystander.db.portrait_policy = {"mode": "named", "stable_key": "t_wall_c"}
+        a_key = ArtSubject(ArtSubjectKind.CHARACTER, "t_wall_a").full()
+        b_key = ArtSubject(ArtSubjectKind.CHARACTER, "t_wall_b").full()
+        self.assertEqual(bystander.location, self.room)
+
+        session = self._make_session()
+        self._view(session, "party", a_key)
+        self._commit_wall(session)
+        c_key, _identity = self._settle_named_portrait("t_wall_c")
+
+        with (
+            patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+            patch("web.webclient.presentation.art_push.log_info") as info_mock,
+        ):
+            on_asset_completed(subject_key=c_key)
+
+        candidates = info_mock.call_args.kwargs["context"]["panels"]
+        self.assertIn("art", candidates, "C's portrait completion is a real push")
+        self.assertNotIn("gallery", candidates)
+        updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
+        self.assertEqual(len(updates), 1)
+        self.assertNotIn("gallery", updates[0]["panels"])
+        rendered = session.ndb.elosern_coordinator.registry.render(
+            "gallery", build_presentation_context(session, self.player)
+        )
+        self.assertEqual(rendered["selected"], a_key)
+        self.assertEqual(
+            {row["subject_key"] for group in rendered["groups"] for row in group["subjects"]},
+            {a_key, b_key},
+        )
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_off_room_roster_sibling_refreshes_without_art_or_gallery_match(self):
         from evennia.utils.create import create_account
         account = create_account("test_acct_2", "t2@example.test", "testpassword", typeclass=Account)
@@ -628,8 +788,13 @@ class ArtPushPresenterTests(EvenniaTestCase):
         other_room = create_object(Room, key="distant room")
         sibling.location = other_room
         sibling_key = ArtSubject(ArtSubjectKind.CHARACTER, str(sibling.pk)).full()
+        companion_key = ArtSubject(ArtSubjectKind.CHARACTER, "t_wall_a").full()
+        self._companion("同行甲", "t_wall_a")
 
         session = self._make_session()
+        # The rendered wall shows another category, so the off-room sibling has
+        # no tile of its own to qualify the gallery panel.
+        self._view(session, "party", companion_key)
         with (
             patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
             patch("web.webclient.presentation.ingress.is_webclient", return_value=True),
@@ -648,6 +813,15 @@ class ArtPushPresenterTests(EvenniaTestCase):
             [k for k in session.sent if "ui_update" in k],
             [],
             "an unchanged candidate never costs a revision",
+        )
+        rendered = session.ndb.elosern_coordinator.registry.render(
+            "gallery", build_presentation_context(session, self.player)
+        )
+        self.assertEqual(rendered["category"], "party")
+        self.assertEqual(
+            {row["subject_key"] for group in rendered["groups"] for row in group["subjects"]},
+            {companion_key},
+            "the rendered wall lists no tile the off-room sibling could match",
         )
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
@@ -973,30 +1147,43 @@ class ArtPushPresenterTests(EvenniaTestCase):
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_changed_selection_cannot_be_restored_by_late_completion(self):
-        # Use two registered visual species keys
+        """A subject the wall dropped cannot restore the abandoned selection.
+
+        A was selected, then the session moved the wall to another category and
+        left the selection on that category's own current subject. A is in no
+        rendered group any more, so its late completion qualifies no panel: the
+        listed-wall rule never reaches back to a subject the wall dropped.
+        """
         sub_a = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_A)
-        sub_b = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_B)
         self._own_player()
         record_species_sighting(self.player, _MONSTER_KEY_A)
-        record_species_sighting(self.player, _MONSTER_KEY_B)
         session = self._make_session()
-        # Select A then B through the real selection store.
+        # Select A, then move the wall away from that category.
         with patch("web.webclient.presentation.ingress.is_webclient", return_value=True):
             self.assertEqual(select_gallery_category(session, self.player, "monster")["outcome"], "success")
             res_a = select_gallery_subject(session, self.player, sub_a.full())
             self.assertEqual(res_a["outcome"], "success")
-            res_b = select_gallery_subject(session, self.player, sub_b.full())
-            self.assertEqual(res_b["outcome"], "success")
+            self.assertEqual(select_gallery_category(session, self.player, "mine")["outcome"], "success")
         self.assertEqual(
-            gallery_view_snapshot(session, self.player).subjects, (("monster", sub_b.full()),)
+            gallery_view_snapshot(session, self.player).subjects, (("monster", sub_a.full()),)
         )
+        kept_key = ArtSubject(ArtSubjectKind.CHARACTER, str(self.player.pk)).full()
 
-        # A completes while B is selected
+        # A completes while the wall no longer lists it.
         session.sent.clear()
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
             on_asset_completed(subject_key=sub_a.full())
 
         self.assertEqual(session.sent, [])
+        rendered = session.ndb.elosern_coordinator.registry.render(
+            "gallery", build_presentation_context(session, self.player)
+        )
+        self.assertEqual(rendered["category"], "mine")
+        self.assertEqual(rendered["selected"], kept_key)
+        self.assertEqual(
+            [row["subject_key"] for group in rendered["groups"] for row in group["subjects"]],
+            [kept_key],
+        )
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_failed_gallery_settlement_removes_pending_row_truthfully(self):
