@@ -1,11 +1,12 @@
 """Behavior tests for the dream collaborator layer (dream-explicit-presentation).
 
 Covers the deterministic bounded prompt (server-supplied phase, spoiler-filtered
-permitted context, no shared director history), the guarded explicit-exchange
-acceptance, the semantic gates (phase fidelity, metadata/spoiler leak,
-state-change claim, named-deity identity, summary no-new-question), the
-retry/degrade paths, registration/atomic rollback, and the startup seam. All
-generation is recorded ``FakeLLMClient`` only; no test opens a model service.
+permitted context, the wish with line numbers, no shared director history), the
+guarded explicit-exchange acceptance with its proposal edits, the semantic gates
+(phase fidelity, edit applicance, metadata/spoiler leak, state-change claim,
+named-deity identity, summary no-new-question), the retry/degrade paths,
+registration/atomic rollback, and the startup seam. All generation is recorded
+``FakeLLMClient`` only; no test opens a model service.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from world.ai.fake_client import FakeLLMClient
 from world.ai.guardrail import GuardrailRegistrationError
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+from world.narrative import dream_proposal
 from world.narrative.authoring import CollaboratorBrief
 from world.narrative.dream_track import (
     MODE_CONVERGENCE,
@@ -52,6 +54,14 @@ _EXPLICIT_SCENE = (
     "手指沿著背脊一路撫下，濕熱的觸感讓彼此的呼吸越來越急。"
 )
 _COUNTERPART_LINE = "「別急，我們還有很多時間。」她貼著耳邊低語，掌心仍按在胸前。"
+
+# A proposal the model may edit: one summary line, one tag item and one
+# requirement row, all synthetic.
+_SUPPLIED_PROPOSAL = {
+    "summary": "南門的鐘聲停在半空。",
+    "themes": ["鐘聲"],
+    "requirements": [{"kind": "place", "text": "南門"}],
+}
 
 
 def _raw(**overrides):
@@ -148,25 +158,34 @@ class DreamPromptTests(unittest.TestCase):
             set(payload),
             {
                 "player_message",
+                "wish",
+                "edit_contract",
                 "preferences",
                 "adventure_summary",
-                "requirement_contract",
             },
         )
-        # The one added key is only the closed requirement vocabulary the
-        # deterministic authoring contract freezes: it is not a story fact, a
-        # hidden field or an owner identity, so the permitted-context tripwire
-        # above stays exact while the collaborator learns what it may propose.
-        from world.ai import dream as dream_module
-
+        # The closed edit vocabulary is the applier's own contract, not a second
+        # table: the model is never told a command, path or bound the server
+        # would refuse.
         self.assertEqual(
-            payload["requirement_contract"],
+            payload["edit_contract"],
             {
-                "kinds": list(dream_module.REQUIREMENT_KINDS),
-                "max_items": dream_module.MAX_REQUIREMENTS,
-                "max_text": dream_module.MAX_REQUIREMENT_TEXT,
+                "paths": list(dream_proposal.PATHS),
+                "commands": list(dream_proposal.COMMANDS),
+                "requirement_kinds": list(dream_proposal.REQUIREMENT_KINDS),
+                "max_edits": dream_proposal.MAX_EDITS,
+                "max_summary": dream_proposal.MAX_SUMMARY_CHARACTERS,
+                "max_list_items": dream_proposal.MAX_LIST_ITEMS,
+                "max_item": dream_proposal.MAX_ITEM_CHARACTERS,
+                "max_requirements": dream_proposal.MAX_REQUIREMENTS,
+                "max_requirement_text": dream_proposal.MAX_REQUIREMENT_TEXT,
+                "max_proposal_bytes": dream_proposal.MAX_PROPOSAL_BYTES,
+                "max_report_bytes": dream_proposal.MAX_CHANGES_BYTES,
             },
         )
+        # The empty wish still travels as every field, each with no line.
+        self.assertEqual(set(payload["wish"]), set(dream_proposal.PATHS))
+        self.assertTrue(all(lines == [] for lines in payload["wish"].values()))
         # No StoryDirector/system/hidden fields and no owner identities.
         lowered = user["content"]
         self.assertNotIn("director", lowered)
@@ -175,6 +194,89 @@ class DreamPromptTests(unittest.TestCase):
         self.assertNotIn("draft-secret", lowered)
         self.assertIn("神殿夜談", payload["preferences"]["summary"])
         self.assertEqual(payload["preferences"]["participants"], ["1001"])
+
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
+    def test_current_proposal_enters_the_prompt_with_line_numbers(self):
+        _system, user = build_dream_prompt(
+            state=prospective_state(1),
+            mode=MODE_EXCHANGE,
+            player_message="繼續。",
+            proposal={
+                "summary": "南門的鐘聲停在半空。\n她想知道是誰敲的。",
+                "themes": ["鐘聲", "尋人"],
+            },
+        )
+        wish = json.loads(user["content"])["wish"]
+        self.assertEqual(
+            wish["summary"],
+            [
+                {"line": 1, "text": "南門的鐘聲停在半空。"},
+                {"line": 2, "text": "她想知道是誰敲的。"},
+            ],
+        )
+        self.assertEqual(
+            wish["themes"], [{"line": 1, "text": "鐘聲"}, {"line": 2, "text": "尋人"}]
+        )
+        self.assertEqual(set(wish), set(dream_proposal.PATHS))
+
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
+    def test_chosen_thread_label_enters_the_prompt(self):
+        _system, chosen = build_dream_prompt(
+            state=prospective_state(1),
+            mode=MODE_EXCHANGE,
+            player_message="繼續。",
+            thread_label="  尋找鐘聲  ",
+        )
+        self.assertEqual(
+            json.loads(chosen["content"])["thread"], {"label": "尋找鐘聲"}
+        )
+        for absent in ("", None, "   "):
+            with self.subTest(absent=absent):
+                _system, user = build_dream_prompt(
+                    state=prospective_state(1),
+                    mode=MODE_EXCHANGE,
+                    player_message="繼續。",
+                    thread_label=absent,
+                )
+                self.assertNotIn("thread", json.loads(user["content"]))
+
+    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
+    def test_a_later_exchange_carries_no_transcript(self):
+        _system, user = build_dream_prompt(
+            state=prospective_state(3),
+            mode=MODE_EXCHANGE,
+            player_message="這次只談鐘聲。",
+            proposal={"summary": "南門的鐘聲停在半空。"},
+        )
+        payload = json.loads(user["content"])
+        self.assertEqual(set(payload), {"player_message", "wish", "edit_contract"})
+        # Every value is this turn's own input or the contract; no earlier
+        # message, scene or line travels anywhere in the request.
+        self.assertEqual(payload["player_message"], "這次只談鐘聲。")
+        self.assertEqual(
+            payload["wish"]["summary"], [{"line": 1, "text": "南門的鐘聲停在半空。"}]
+        )
+        self.assertTrue(
+            all(lines == [] for path, lines in payload["wish"].items() if path != "summary")
+        )
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_the_output_schema_is_the_applier_edit_contract(self):
+        self.assertEqual(
+            DREAM_EXCHANGE_SCHEMA["required"], ["scene", "dialogue", "phase"]
+        )
+        properties = DREAM_EXCHANGE_SCHEMA["properties"]
+        self.assertNotIn("requirements", properties)
+        self.assertEqual(
+            properties["edits"]["maxItems"], dream_proposal.MAX_EDITS
+        )
+        items = properties["edits"]["items"]
+        self.assertEqual(
+            items["properties"]["command"]["enum"], list(dream_proposal.COMMANDS)
+        )
+        self.assertEqual(
+            items["properties"]["path"]["enum"], list(dream_proposal.PATHS)
+        )
 
     @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_adventure_summary_is_capped_deterministically(self):
@@ -406,6 +508,200 @@ class DreamGenerationTests(unittest.TestCase):
         with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_valid_edits_yield_the_new_proposal_and_report(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _response(
+                edits=[
+                    {
+                        "command": "str_replace",
+                        "path": "summary",
+                        "old_str": "停在半空。",
+                        "new_str": "停在半空，然後又響了一次。",
+                    },
+                    {
+                        "command": "create",
+                        "path": "requirements",
+                        "file_text": "place: 南門\nnew_character: 敲鐘的女孩",
+                    },
+                ]
+            ),
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            result = await_result(
+                self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            result.proposal["summary"], "南門的鐘聲停在半空，然後又響了一次。"
+        )
+        self.assertEqual(
+            result.proposal["requirements"],
+            [
+                {"kind": "place", "text": "南門"},
+                {"kind": "new_character", "text": "敲鐘的女孩"},
+            ],
+        )
+        # The one tag item the edits did not touch survives untouched.
+        self.assertEqual(result.proposal["themes"], ["鐘聲"])
+        self.assertEqual(result.changes["summary"], "changed")
+        self.assertEqual(result.changes["lists"]["themes"], {"added": [], "removed": []})
+        self.assertEqual(
+            result.changes["requirements"],
+            {"added": [{"kind": "new_character", "text": "敲鐘的女孩"}], "removed": []},
+        )
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_no_edits_is_accepted_and_reports_no_change(self):
+        for extra in ({}, {"edits": []}):
+            with self.subTest(extra=extra):
+                client = FakeLLMClient()
+                client.add_response(lambda d: True, _response(**extra))
+                with override_settings(LLM_PROFILES=_raw()):
+                    result = await_result(
+                        self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+                    )
+                self.assertIsNotNone(result)
+                self.assertEqual(result.proposal["summary"], "南門的鐘聲停在半空。")
+                self.assertEqual(result.proposal["themes"], ["鐘聲"])
+                self.assertEqual(
+                    result.proposal["requirements"],
+                    [{"kind": "place", "text": "南門"}],
+                )
+                self.assertIsNone(result.changes["summary"])
+                self.assertTrue(
+                    all(
+                        report == {"added": [], "removed": []}
+                        for report in (
+                            *result.changes["lists"].values(),
+                            result.changes["requirements"],
+                        )
+                    )
+                )
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_invalid_edits_retry_and_the_retried_response_is_accepted(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _response(
+                edits=[
+                    {
+                        "command": "str_replace",
+                        "path": "summary",
+                        "old_str": "不存在的句子",
+                        "new_str": "換掉的句子",
+                    }
+                ]
+            ),
+        )
+        client.add_response(
+            lambda d: len(d.messages) == 3,
+            _response(
+                edits=[
+                    {
+                        "command": "create",
+                        "path": "summary",
+                        "file_text": "南門的鐘聲又響了一次。",
+                    }
+                ]
+            ),
+        )
+        with override_settings(LLM_PROFILES=_raw()):
+            result = await_result(
+                self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn(
+            "dream edits do not apply: no_match at edit 0",
+            client.calls[1].messages[-1]["content"],
+        )
+        # The retried attempt edits the very proposal the refused one carried:
+        # a per-attempt proposal would silently lose the caller's wish.
+        self.assertEqual(
+            json.loads(client.calls[0].messages[1]["content"])["wish"],
+            json.loads(client.calls[1].messages[1]["content"])["wish"],
+        )
+        self.assertEqual(
+            json.loads(client.calls[1].messages[1]["content"])["wish"]["summary"],
+            [{"line": 1, "text": "南門的鐘聲停在半空。"}],
+        )
+        # Exactly one exchange was accepted, built from the retried response.
+        self.assertEqual(result.proposal["summary"], "南門的鐘聲又響了一次。")
+        self.assertEqual(result.changes["summary"], "changed")
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_exhausted_edit_retries_degrade_to_none(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _response(
+                edits=[
+                    {
+                        "command": "str_replace",
+                        "path": "summary",
+                        "old_str": "不存在的句子",
+                        "new_str": "換掉的句子",
+                    }
+                ]
+            ),
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
+            result = await_result(
+                self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+            )
+        self.assertIsNone(result)
+        self.assertEqual(len(client.calls), 1)
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_forbidden_marker_inside_an_edit_is_rejected(self):
+        # Scene and dialogue are clean; only the text the edit would write
+        # carries the shipped metadata marker.
+        self.assertNotIn("系統提示", _EXPLICIT_SCENE + _COUNTERPART_LINE)
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: True,
+            _response(
+                edits=[
+                    {
+                        "command": "create",
+                        "path": "summary",
+                        "file_text": "系統提示：南門的鐘聲。",
+                    }
+                ]
+            ),
+        )
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 0})):
+            result = await_result(
+                self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+            )
+        self.assertIsNone(result)
+
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
+    def test_legacy_requirement_list_is_refused(self):
+        client = FakeLLMClient()
+        client.add_response(
+            lambda d: len(d.messages) == 2,
+            _response(requirements=[{"kind": "place", "text": "南門"}]),
+        )
+        client.add_response(lambda d: len(d.messages) == 3, _response())
+        with override_settings(LLM_PROFILES=_raw(dream={"max_retries": 1})):
+            result = await_result(
+                self._generate(client, proposal=dict(_SUPPLIED_PROPOSAL))
+            )
+        self.assertIsNotNone(result)
+        self.assertEqual(len(client.calls), 2)
+        self.assertIn("requirements", client.calls[1].messages[-1]["content"])
+        # The refused field wrote nothing: the retried clean response leaves the
+        # supplied proposal exactly as it was.
+        self.assertEqual(result.proposal["summary"], "南門的鐘聲停在半空。")
+        self.assertEqual(
+            result.proposal["requirements"], [{"kind": "place", "text": "南門"}]
+        )
 
     @covers_requirement("dream-explicit-presentation::server-owned-dream-arousal-advances-only-with-completed-exchanges")
     def test_transport_failure_degrades_to_none(self):

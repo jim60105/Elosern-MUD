@@ -2,15 +2,17 @@
 
 This module owns the generative half of the W3 dream-explicit-presentation
 boundary: one validated exchange that combines explicit sexual scene prose and
-the obscured counterpart's dialogue while the player negotiates story direction,
-and the deterministic, generation-free ending.
+the obscured counterpart's dialogue while the player tells her the wish she
+writes down, and the deterministic, generation-free ending.
 
 The layer is a separate collaborator capability, distinct from ``scenario_director``
-even when both share a deployment profile: it receives only the confirmed
-creative preferences and a caller-supplied spoiler-filtered adventure summary,
-never StoryDirector hidden answers, system fields, or another owner's private
-cognition. It declares its own guardrail hooks, output schema and profile slot,
-so capability history and permissions are never shared.
+even when both share a deployment profile: it receives only the current wish
+proposal, the chosen thread's player-visible label, the confirmed creative
+preferences and a caller-supplied spoiler-filtered adventure summary, never
+StoryDirector hidden answers, system fields, a transcript of earlier exchanges,
+or another owner's private cognition. It declares its own guardrail hooks,
+output schema and profile slot, so capability history and permissions are never
+shared.
 
 Server-owned track (design 6.4)
 -------------------------------
@@ -33,7 +35,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from twisted.internet import defer
@@ -51,6 +53,7 @@ from world.ai.schemas.registry import (
     register_output_schema,
 )
 from world.lore.sexual_vocab import AROUSAL_LEVELS
+from world.narrative import dream_proposal
 from world.narrative.dream_session import MAX_EXCHANGES, MAX_RENDERED_INPUT_CHARS
 from world.narrative.dream_track import (
     MODE_SUMMARY,
@@ -66,18 +69,6 @@ from world.prompts.loader import PromptUnavailableError, render_prompt
 # pair costs roughly 2,800 output tokens, so the layer profile reserves 3,072.
 MAX_SCENE_CHARS = 900
 MAX_DIALOGUE_CHARS = 500
-
-# Bounded shown experience requirements the collaborator may propose alongside
-# the direction. The vocabulary is the one the deterministic authoring contract
-# freezes; a repository-wide drift test pins the two equal, because ``world/ai``
-# may not import the ``world.narrative`` authoring writer.
-REQUIREMENT_KINDS: tuple[str, ...] = (
-    "place",
-    "new_character",
-    "private_commission",
-)
-MAX_REQUIREMENTS = 8
-MAX_REQUIREMENT_TEXT = 200
 
 # Bounded prompt context: the caller-supplied adventure summary and the
 # confirmed creative preferences are capped deterministically so a long history
@@ -140,23 +131,44 @@ DREAM_EXCHANGE_SCHEMA: dict[str, Any] = {
             "maxLength": MAX_DIALOGUE_CHARS,
         },
         "phase": {"type": "string", "enum": list(AROUSAL_LEVELS)},
-        # The bounded experience requirements the direction needs in order to
-        # be executable: an explicitly named place, a required new character or
-        # a requested private commission. Optional, so an exchange that
-        # proposes none stays exactly as valid as it was before.
-        "requirements": {
+        # The ordered edit commands that write the wish. An absent set means no
+        # edit; which parameters belong to which command is enforced by the
+        # applier, not by the schema, so the object stays one flat shape.
+        "edits": {
             "type": "array",
-            "maxItems": MAX_REQUIREMENTS,
+            "maxItems": dream_proposal.MAX_EDITS,
             "items": {
                 "type": "object",
-                "required": ["kind", "text"],
+                "required": ["command", "path"],
                 "additionalProperties": False,
                 "properties": {
-                    "kind": {"type": "string", "enum": list(REQUIREMENT_KINDS)},
-                    "text": {
+                    "command": {
+                        "type": "string",
+                        "enum": list(dream_proposal.COMMANDS),
+                    },
+                    "path": {"type": "string", "enum": list(dream_proposal.PATHS)},
+                    "old_str": {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": MAX_REQUIREMENT_TEXT,
+                        "maxLength": dream_proposal.MAX_EDIT_TEXT_CHARACTERS,
+                    },
+                    "new_str": {
+                        "type": "string",
+                        "maxLength": dream_proposal.MAX_EDIT_TEXT_CHARACTERS,
+                    },
+                    "insert_line": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": dream_proposal.MAX_LIST_ITEMS,
+                    },
+                    "insert_text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": dream_proposal.MAX_EDIT_TEXT_CHARACTERS,
+                    },
+                    "file_text": {
+                        "type": "string",
+                        "maxLength": dream_proposal.MAX_EDIT_TEXT_CHARACTERS,
                     },
                 },
             },
@@ -175,14 +187,20 @@ class DreamNotRegisteredError(RuntimeError):
 
 @dataclass(frozen=True)
 class DreamExchange:
-    """One validated explicit dream exchange: scene prose plus counterpart dialogue."""
+    """One validated explicit dream exchange: the scene, her dialogue and the
+    wish it edited, with the report naming what changed."""
 
     scene: str
     dialogue: str
     phase: str
     completed: int
     mode: str
-    requirements: tuple[dict[str, str], ...] = ()
+    proposal: dict = field(default_factory=dream_proposal.empty_proposal)
+    changes: dict = field(
+        default_factory=lambda: dream_proposal.diff(
+            dream_proposal.empty_proposal(), dream_proposal.empty_proposal()
+        )
+    )
 
 
 _DREAM_DEGRADED = object()
@@ -200,6 +218,26 @@ def _field(parsed: Any, name: str) -> Any:
 def _response_text(parsed: Any) -> str:
     fields = (_field(parsed, "scene"), _field(parsed, "dialogue"))
     parts = [value for value in fields if isinstance(value, str)]
+    return "\n".join(parts)
+
+
+def _edit_text(parsed: Any) -> str:
+    """Return the edit text that writes new content, or "" when there is none.
+
+    ``old_str`` is text that already exists in the proposal, so it is not
+    scanned: only what an edit would add to the wish.
+    """
+    edits = _field(parsed, "edits")
+    if not isinstance(edits, (list, tuple)):
+        return ""
+    parts: list[str] = []
+    for edit in edits:
+        if not isinstance(edit, Mapping):
+            continue
+        for name in ("new_str", "insert_text", "file_text"):
+            value = edit.get(name)
+            if isinstance(value, str):
+                parts.append(value)
     return "\n".join(parts)
 
 
@@ -227,8 +265,8 @@ def _validate_has_cjk(parsed: Any) -> list[str]:
 def _validate_no_forbidden_markers(parsed: Any, markers: Sequence[str], label: str) -> list[str]:
     # Casefolded so the ASCII policy markers are matched regardless of casing
     # (the CJK markers are unaffected); the response keys are schema-closed, so
-    # scanning scene+dialogue covers the whole response body.
-    text = _response_text(parsed).casefold()
+    # scanning scene, dialogue and the edit text covers the whole response body.
+    text = (_response_text(parsed) + "\n" + _edit_text(parsed)).casefold()
     return [
         f"dream response contains a forbidden {label}: {marker!r}"
         for marker in markers
@@ -270,6 +308,24 @@ def _make_phase_validator(phase: str) -> Callable[[Any], list[str]]:
     return validate
 
 
+def _make_edits_validator(proposal: dict) -> Callable[[Any], list[str]]:
+    """Return a per-call validator that applies this call's edits to its proposal."""
+
+    def validate(parsed: Any) -> list[str]:
+        edits = _field(parsed, "edits")
+        if edits is None:
+            return []
+        if not isinstance(edits, (list, tuple)):
+            return ["dream edits must be a list"]
+        try:
+            dream_proposal.apply_edits(proposal, edits)
+        except dream_proposal.ProposalEditError as error:  # observability: ignore R2: the refused edit set becomes the validator error string the guardrail retries on, not a swallowed failure
+            return [f"dream edits do not apply: {error.code} at edit {error.index}"]
+        return []
+
+    return validate
+
+
 def _make_no_new_question_validator() -> Callable[[Any], list[str]]:
     """Return a per-call validator rejecting a new question in the summary exchange."""
 
@@ -298,31 +354,6 @@ _HOOKS = GuardrailHooks(
     fallback=_degrade_fallback,
     validators=_VALIDATORS,
 )
-
-
-def _requirement_rows(value: Any) -> tuple[dict[str, str], ...]:
-    """Normalize a proposed requirement array into bounded frozen rows.
-
-    The output schema already bounds and closed-validates this field; this is
-    the defensive second reading, so a malformed row can only be dropped and
-    never reach the deterministic authoring contract.
-    """
-    if not isinstance(value, (list, tuple)):
-        return ()
-    rows: list[dict[str, str]] = []
-    for item in value:
-        if not isinstance(item, Mapping):
-            continue
-        kind = item.get("kind")
-        text = item.get("text")
-        if not isinstance(kind, str) or kind not in REQUIREMENT_KINDS:
-            continue
-        if not isinstance(text, str) or not text.strip():
-            continue
-        rows.append({"kind": kind, "text": text.strip()[:MAX_REQUIREMENT_TEXT]})
-        if len(rows) >= MAX_REQUIREMENTS:
-            break
-    return tuple(rows)
 
 
 def _cap_string(value: str, limit: int) -> str:
@@ -373,14 +404,18 @@ def build_dream_prompt(
     player_message: Any,
     brief: Any = None,
     adventure_summary: Any = None,
+    proposal: Any = None,
+    thread_label: Any = "",
 ) -> tuple[dict[str, str], dict[str, str]]:
     """Build a deterministic (system, user) message pair for one dream exchange.
 
     The system message renders ``dream.system`` with the server-owned phase and
     exchange metadata; the user message serializes the bounded player message,
-    confirmed creative preferences and the caller-supplied spoiler-filtered
-    adventure summary with stable sorted JSON. No StoryDirector context, hidden
-    answer, system field or another owner's data enters the request.
+    the wish as written so far with line numbers, the closed edit vocabulary,
+    the chosen thread's player-visible label, the confirmed creative preferences
+    and the caller-supplied spoiler-filtered adventure summary with stable
+    sorted JSON. No transcript of earlier exchanges, StoryDirector context,
+    hidden answer, system field or another owner's data enters the request.
     """
     system = {
         "role": "system",
@@ -393,21 +428,37 @@ def build_dream_prompt(
             remaining=str(max(0, MAX_EXCHANGES - state.completed)),
         ),
     }
+    current = dream_proposal.normalize_proposal(proposal or {})
     payload: dict[str, Any] = {
         "player_message": _cap_string(
             "" if player_message is None else str(player_message),
             MAX_RENDERED_INPUT_CHARS,
         ),
-        # The closed, bounded shape of the experience requirements the
-        # collaborator may propose with the direction. The deterministic
-        # authoring contract freezes exactly these fields, so the model is told
-        # the vocabulary rather than inventing one.
-        "requirement_contract": {
-            "kinds": list(REQUIREMENT_KINDS),
-            "max_items": MAX_REQUIREMENTS,
-            "max_text": MAX_REQUIREMENT_TEXT,
+        # The wish as she has written it so far: one small text file per field,
+        # every line paired with the number an edit uses to point at it.
+        "wish": {
+            path: dream_proposal.numbered_lines(current, path)
+            for path in dream_proposal.PATHS
+        },
+        # The closed, bounded shape of the edits she may return, so the model is
+        # told the vocabulary rather than inventing one.
+        "edit_contract": {
+            "paths": list(dream_proposal.PATHS),
+            "commands": list(dream_proposal.COMMANDS),
+            "requirement_kinds": list(dream_proposal.REQUIREMENT_KINDS),
+            "max_edits": dream_proposal.MAX_EDITS,
+            "max_summary": dream_proposal.MAX_SUMMARY_CHARACTERS,
+            "max_list_items": dream_proposal.MAX_LIST_ITEMS,
+            "max_item": dream_proposal.MAX_ITEM_CHARACTERS,
+            "max_requirements": dream_proposal.MAX_REQUIREMENTS,
+            "max_requirement_text": dream_proposal.MAX_REQUIREMENT_TEXT,
+            "max_proposal_bytes": dream_proposal.MAX_PROPOSAL_BYTES,
+            "max_report_bytes": dream_proposal.MAX_CHANGES_BYTES,
         },
     }
+    label = "" if thread_label is None else str(thread_label).strip()
+    if label:
+        payload["thread"] = {"label": _cap_string(label, 160)}
     preferences = _bounded_preferences(brief)
     if preferences is not None:
         payload["preferences"] = preferences
@@ -474,6 +525,8 @@ def generate_dream_exchange(
     player_message: Any,
     brief: Any = None,
     adventure_summary: Any = None,
+    proposal: Any = None,
+    thread_label: Any = "",
 ):
     """Run the dream layer's guarded pipeline for one exchange.
 
@@ -490,12 +543,20 @@ def generate_dream_exchange(
             only), or ``None``.
         adventure_summary: A caller-supplied spoiler-filtered adventure summary
             as plain strings, or ``None``.
+        proposal: The wish proposal as it stands before this turn, or ``None``
+            for the empty proposal. It is normalized once and carried in the
+            prompt with line numbers; an edit set that does not apply to it
+            invalidates the response and goes through the existing retry.
+        thread_label: The chosen story thread's player-visible label, or
+            ``None``/empty when the wish belongs to a new story.
 
     Returns:
         A Deferred resolving to a frozen ``DreamExchange`` on success, or to
         ``None`` -- the single public degraded marker -- when the profile is
         disabled, the transport fails, the retry budget is exhausted, the
         returned output is out of contract, or the prompt key is unavailable.
+        On success the exchange carries the proposal after those edits and the
+        report naming what changed.
         No state change is ever made: the dream track advances only through the
         durable exchange count.
     """
@@ -506,6 +567,7 @@ def generate_dream_exchange(
     _require_registered()
     state = prospective_state(completed)
     mode = exchange_mode(completed)
+    current = dream_proposal.normalize_proposal(proposal or {})
     try:
         system, user = build_dream_prompt(
             state=state,
@@ -513,11 +575,14 @@ def generate_dream_exchange(
             player_message=player_message,
             brief=brief,
             adventure_summary=adventure_summary,
+            proposal=current,
+            thread_label=thread_label,
         )
     except PromptUnavailableError:  # observability: ignore R2: a broken prompt key degrades to None; the guarded call never runs and the layer owns no prompt-layer event
         return None
     extra_validators: dict[str, Callable[[Any], list[str]]] = {
         "phase_fidelity": _make_phase_validator(state.level),
+        "edits_apply": _make_edits_validator(current),
     }
     if mode == MODE_SUMMARY:
         extra_validators["no_new_question"] = _make_no_new_question_validator()
@@ -540,11 +605,13 @@ def generate_dream_exchange(
             "climax_phase": state.climax_phase,
         },
     )
+    after = dream_proposal.apply_edits(current, parsed.get("edits") or [])
     return DreamExchange(
         scene=parsed["scene"],
         dialogue=parsed["dialogue"],
         phase=parsed["phase"],
         completed=state.completed,
         mode=mode,
-        requirements=_requirement_rows(parsed.get("requirements")),
+        proposal=after,
+        changes=dream_proposal.diff(current, after),
     )

@@ -269,9 +269,7 @@ def store_response(actor, response):
     value = association(actor)
     value["scene"] = response.scene
     value["dialogue"] = response.dialogue
-    value["requirements"] = [
-        dict(row) for row in (getattr(response, "requirements", ()) or ())
-    ]
+    value["requirements"] = [dict(row) for row in response.proposal["requirements"]]
     value["failure"] = False
     actor.db.dream_surface = value
 

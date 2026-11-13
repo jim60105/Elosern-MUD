@@ -692,20 +692,21 @@ class ShownRequirementTests(DreamDispatchTestCase):
     """Only what the surface actually showed can be frozen at confirmation."""
 
     def test_the_collaborator_vocabulary_is_the_authoring_contract(self):
-        # ``world/ai`` may not import the authoring writer, so the two closed
-        # vocabularies are pinned equal here instead: a drift would let the
-        # collaborator propose a requirement kind that confirmation can never
-        # freeze, silently turning every such direction into a stale review.
-        from world.ai import dream as collaborator
+        # The collaborator writes its proposal through the pure applier, which
+        # may not import the authoring writer, so the two closed vocabularies
+        # are pinned equal here instead: a drift would let the model write a
+        # requirement kind that confirmation can never freeze, silently turning
+        # every such direction into a stale review.
         from world.narrative import authoring
+        from world.narrative import dream_proposal
 
         self.assertEqual(
-            tuple(sorted(collaborator.REQUIREMENT_KINDS)),
+            tuple(sorted(dream_proposal.REQUIREMENT_KINDS)),
             tuple(sorted(authoring.REQUIREMENT_KINDS)),
         )
-        self.assertEqual(collaborator.MAX_REQUIREMENTS, authoring.MAX_REQUIREMENTS)
+        self.assertEqual(dream_proposal.MAX_REQUIREMENTS, authoring.MAX_REQUIREMENTS)
         self.assertEqual(
-            collaborator.MAX_REQUIREMENT_TEXT, authoring.MAX_REQUIREMENT_TEXT
+            dream_proposal.MAX_REQUIREMENT_TEXT, authoring.MAX_REQUIREMENT_TEXT
         )
 
     def _requirement_draft(self):

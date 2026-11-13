@@ -797,10 +797,16 @@ class DreamSurfaceTests(EvenniaTest):
             "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
             "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
             "phase": prospective_state(0).level,
-            "requirements": [
-                {"kind": "place", "text": "南門"},
-                {"kind": "new_character", "text": "一個女孩"},
-                {"kind": "private_commission", "text": "帶她找媽媽"},
+            "edits": [
+                {
+                    "command": "create",
+                    "path": "requirements",
+                    "file_text": (
+                        "place: 南門\n"
+                        "new_character: 一個女孩\n"
+                        "private_commission: 帶她找媽媽"
+                    ),
+                }
             ],
         }
         client = FakeLLMClient()
