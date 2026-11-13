@@ -1387,6 +1387,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(self.request("choose_thread", thread_id=None).result["code"], "thread_locked")
         self.assertEqual(surface.wish_state(self.actor)["thread_id"], thread.thread_id)
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_a_draft_with_content_is_refused_while_conversing(self):
         self.enter()
         submitted = {"kind": "new_story", "summary": "訴說期間寫下的願望。"}
@@ -1401,6 +1404,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertFalse(surface.associated_session(self.actor).draft_id)
         self.assertFalse(CreativeRequest.objects.exists())
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_confirm_before_finalize_is_refused(self):
         self.enter()
         refused = self.request(
@@ -1411,6 +1417,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertFalse(CreativeRequest.objects.exists())
         self.assertTrue(service.dream_state(self.actor)["open"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_a_bare_draft_while_conversing_saves_the_working_proposal(self):
         self.enter()
         client = self.exchange([
@@ -1426,6 +1435,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
         self.assertFalse(CreativeRequest.objects.exists())
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_finalize_closes_free_text_and_saves_the_draft(self):
         self.enter()
         client = self.exchange([
@@ -1447,6 +1459,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(refused["code"], "dream_finalized")
         self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 1)
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_finalize_is_refused_while_a_response_is_pending(self):
         self.enter()
         pending = Deferred()
@@ -1471,6 +1486,9 @@ class DreamSurfaceTests(EvenniaTest):
         )
         self.assertTrue(service.dream_state(self.actor)["pending"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_the_sixth_exchange_finalizes_and_saves_the_proposal_it_produced(self):
         self.enter()
         for index in range(6):
@@ -1496,6 +1514,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft.direction["summary"], "第六次之後的願望。")
         self.assertFalse(CreativeRequest.objects.exists())
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_a_finalized_form_replaces_the_proposal_and_clears_the_report(self):
         self.enter()
         client = self.exchange([
@@ -1531,6 +1552,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft.direction["themes"], ["重逢"])
         self.assertEqual(draft.direction["requirements"], submitted["requirements"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_the_finalized_form_keeps_the_locked_thread(self):
         self.enter()
         chosen = create_thread(
@@ -1569,6 +1593,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(released.result["outcome"], "success")
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_thread_choice_closes_with_the_stage(self):
         self.enter()
         thread = create_thread(
@@ -1583,6 +1610,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(refused["code"], "thread_choice_closed")
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_a_finalized_dream_stays_finalized_on_the_same_sleep(self):
         from world.rules.sleep_receipt import read_sleep_view_generation
 
@@ -1609,6 +1639,9 @@ class DreamSurfaceTests(EvenniaTest):
         ).result
         self.assertEqual(refused["code"], "dream_finalized")
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_awakening_keeps_the_right_version(self):
         first = self.enter()
         client = self.exchange([
@@ -1632,6 +1665,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(final.direction["summary"], "醒來前留下的鐘聲。")
         self.assertEqual(int(final.revision), int(conversing.revision))
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
     def test_a_finalized_awakening_ignores_supplied_content(self):
         # A departure is not a manual edit: content a caller sends with it
         # changes neither the working proposal nor the draft the finalize saved.
@@ -1658,6 +1694,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft_after.direction, draft_before.direction)
         self.assertEqual(int(draft_after.revision), int(draft_before.revision))
 
+    @covers_requirement(
+        "dream-session-lifecycle::a-later-sleep-reopens-an-unfinalized-conversation"
+    )
     def test_a_later_sleep_returns_to_conversing(self):
         first = self.enter()
         client = self.exchange([
