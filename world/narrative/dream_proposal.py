@@ -33,9 +33,15 @@ MAX_EDITS = 16
 # The largest legal field text: 32 items of 200 characters plus separators.
 MAX_EDIT_TEXT_CHARACTERS = 6500
 # Aggregate budgets on the canonical JSON, so the proposal and its change
-# report fit the draft store and the panel envelope that carry them.
+# report fit the draft store and the panel envelope that carry them. The
+# report budget is 7,680 (not 8,192) because the schema-4 dream panel
+# publishes the report beside the proposal AND repeats the proposal's summary
+# and requirement rows in its projection keys: with both aggregates at their
+# former ceilings that payload is 239 bytes over the 65,536-byte envelope, so
+# the report half reserves one bounded list item's worth of room. The envelope
+# test in web/webclient/presentation/tests/test_dream_artwork.py pins it.
 MAX_PROPOSAL_BYTES = 16384
-MAX_CHANGES_BYTES = 8192
+MAX_CHANGES_BYTES = 7680
 
 ERROR_CODES = (
     "malformed_proposal",
