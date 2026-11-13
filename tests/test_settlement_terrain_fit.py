@@ -744,6 +744,9 @@ class EntranceLintTests(unittest.TestCase):
     def _codes(self, findings, code: str = "fit_entrance_mismatch"):
         return [finding for finding in findings if finding.code == code]
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_matching_and_mismatching_gates(self) -> None:
         contacts = ((9, 10), (11, 10))
 
@@ -783,6 +786,9 @@ class EntranceLintTests(unittest.TestCase):
         self.assertEqual(len(extra), 1)
         self.assertIn("(10, 9)", extra[0].message)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_missing_and_extra_report_together(self) -> None:
         # Gate w serves (11, 10) and gate n walks onto (10, 9), so the road
         # contact (9, 10) is unserved and (10, 9) has no road at all.
@@ -799,6 +805,9 @@ class EntranceLintTests(unittest.TestCase):
         self.assertIn("road cells with no gate (9, 10)", findings[0].message)
         self.assertIn("gate cells with no road (10, 9)", findings[0].message)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_no_road_contact(self) -> None:
         one_gate = self._codes(
             lint_settlement(
@@ -822,6 +831,9 @@ class EntranceLintTests(unittest.TestCase):
         self.assertEqual(two_gates[0].severity, "error")
         self.assertIn("no road touches cell 10, 10", two_gates[0].message)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_national_settlements_are_unaffected(self) -> None:
         # A multi-cell footprint, and a concealed one-cell entry, are never
         # compared against roads even when the caller supplies contacts.
@@ -1094,6 +1106,9 @@ class CommandTests(unittest.TestCase):
         )
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_lint_matches_a_village_gate_to_its_road_contact(self) -> None:
         self._write_location_kind("village")
         data = synthetic.settlement_data()
@@ -1140,6 +1155,9 @@ class CommandTests(unittest.TestCase):
         self.assertIn("(6, 5)", mismatched.stdout)
         self.assertEqual(synthetic.tree_digest(self.root), digest)
 
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-single-cell-entrances-against-road-contacts"
+    )
     def test_national_kind_is_not_checked_against_roads(self) -> None:
         # The map is a one-cell physical footprint with two gates and the
         # artifact never touches its cell: passing empty contacts would report
