@@ -783,6 +783,22 @@ class EntranceLintTests(unittest.TestCase):
         self.assertEqual(len(extra), 1)
         self.assertIn("(10, 9)", extra[0].message)
 
+    def test_missing_and_extra_report_together(self) -> None:
+        # Gate w serves (11, 10) and gate n walks onto (10, 9), so the road
+        # contact (9, 10) is unserved and (10, 9) has no road at all.
+        findings = self._codes(
+            lint_settlement(
+                _entrance_document(("w", "n")),
+                LOCATION_CELL,
+                _terrain(),
+                road_contacts=((9, 10), (11, 10)),
+            )
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertIn("road cells with no gate (9, 10)", findings[0].message)
+        self.assertIn("gate cells with no road (10, 9)", findings[0].message)
+
     def test_no_road_contact(self) -> None:
         one_gate = self._codes(
             lint_settlement(
