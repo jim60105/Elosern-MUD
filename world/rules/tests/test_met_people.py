@@ -425,12 +425,11 @@ def _await_result(deferred):
 class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
     """The four player-initiated interactions write the record, and only those.
 
-    These tests establish the ADDED requirement "Four player-initiated
-    interactions write the met-person record" and its scenarios (look, talk,
-    service use, invite, being addressed, and a refused talk). The requirement
-    ID is not canonical until the change is archived and synced into
-    ``openspec/specs/met-person-record/spec.md``, so the tests carry no
-    ``covers_requirement`` annotation yet.
+    These tests establish the requirement "Four player-initiated interactions
+    write the met-person record" and its scenarios (look, talk, service use,
+    invite, being addressed, and a refused talk). Each test carries the
+    canonical ID from ``openspec/specs/met-person-record/spec.md``, obtained
+    through ``tools.spec_traceability`` after the archive sync.
     """
 
     def setUp(self):
@@ -495,6 +494,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
         profiles["npc_dialogue"]["enabled"] = False
         return profiles
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_looking_at_a_named_npc_records_it_on_both_surfaces(self):
         npc = self._npc(self.start)
         self.assertEqual(self._recorded_keys(), [])
@@ -506,6 +508,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
         self.call(CmdLook(), npc.key)
         self.assertEqual(self._recorded_keys(), [NAMED_KEY])
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_opening_a_conversation_records_it_on_both_surfaces(self):
         host = self._dialogue_host(self.start)
         self.assertEqual(self._recorded_keys(), [])
@@ -517,6 +522,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
         self.call(CmdsTalk(), host.key)
         self.assertEqual(self._recorded_keys(), [NAMED_KEY])
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_using_a_service_records_the_provider_on_both_surfaces(self):
         merchant = self._merchant(self.start)
         self.assertEqual(self._recorded_keys(), [])
@@ -536,6 +544,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
         self.call(CmdBuy(), f"{SHOP_ITEM} 1 @#{merchant.pk}")
         self.assertEqual(self._recorded_keys(), [MERCHANT_KEY])
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_inviting_records_the_invitee_whatever_the_answer(self):
         npc = self._llm_npc(self.start)
         self.assertEqual(self._recorded_keys(), [])
@@ -559,6 +570,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
             self.call(CmdInvite(), npc.key)
         self.assertEqual(self._recorded_keys(), [NAMED_KEY])
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_an_npc_initiated_conversation_writes_nothing(self):
         # The story-scene seam (an NPC addressing the player) refreshes the
         # live session through the sole session writer. Neither that writer nor
@@ -572,6 +586,9 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
         self.assertEqual(met_people(self.char1), ())
         self.assertIsNone(self.char1.attributes.get(MET_PEOPLE_ATTRIBUTE))
 
+    @covers_requirement(
+        "met-person-record::four-player-initiated-interactions-write-the-met-person-record"
+    )
     def test_a_refused_talk_writes_nothing(self):
         npc = self._dialogue_host(self.end)
         result = _talk_open_adapter(self.char1, {"npc_id": int(npc.pk)})
