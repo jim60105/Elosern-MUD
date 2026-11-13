@@ -8,6 +8,7 @@ Algorithm (official-roads design, change ``road-network-generation``):
 
 1. Cost field. Open cells are walkable cells outside the forbidden regions and
    outside non-node point gateways (anchor footprints are already unwalkable).
+   The footprint and gateway cells of the open-cell kinds stay open.
    A step joins two open cells in eight directions; a diagonal also needs both
    orthogonal cells open. A step costs, in integer milliseconds, its length
    times the slower endpoint's terrain time, a slope factor from the elevation
@@ -21,7 +22,10 @@ Algorithm (official-roads design, change ``road-network-generation``):
    the worst network detour while it exceeds the configured limit.
 4. Routing. Kept pairs are routed cheapest first; after each road, every step
    whose two ends are road cells costs the configured reuse fraction.
-5. Self-check. :func:`verify_roads` re-derives the cost field and checks the
+5. Spur stage. Every settlement of a spur kind is processed in key order; one
+   search on the repriced cost field finds both the cheapest node and the route
+   to it, and the road carries its owner in ``spur_of``.
+6. Self-check. :func:`verify_roads` re-derives the cost field and checks the
    candidate without reading any router state.
 
 Byte equality is promised within one locked NumPy and SciPy environment:
@@ -54,6 +58,10 @@ Cell = tuple[int, int]
 
 #: The authored parameter document a road input requires.
 ROAD_PARAMETER_PATH = "content/maps/road_network.yaml"
+#: Kinds routed in stage two: one spur each.
+SPUR_KINDS = ("village",)
+#: Kinds whose footprint and gateway cells stay open to roads in both stages.
+OPEN_CELL_KINDS = ("village", "hamlet")
 #: SciPy's marker for "no predecessor" and "no source".
 _NONE = -9999
 _SQRT2 = math.sqrt(2.0)
@@ -84,7 +92,9 @@ class RoadInput:
     ``region`` holds ``index + 1`` into ``region_names`` (0 = sea).
     ``blocked`` are non-node point anchors, which a road must never enter;
     ``point_gateways`` maps every point anchor to the cells its gates step
-    into, which no road may step to from the anchor.
+    into, which no road may step to from the anchor. ``spur_nodes`` are the
+    settlements that receive one spur each; their single approach is their own
+    cell, and they need no settlement document.
     """
 
     size: int
@@ -104,15 +114,21 @@ class RoadInput:
     detour_limit: float
     reuse_factor: float
     source_signature: str
+    spur_nodes: tuple[RoadNode, ...] = ()
 
 
 @dataclass(frozen=True)
 class Road:
-    """One road: ``first < second``; cells run from first's gate to second's."""
+    """One road: ``first < second``; cells run from first's gate to second's.
+
+    ``spur_of`` names the spur settlement that owns the road, or is ``None``
+    for a trunk road.
+    """
 
     first: str
     second: str
     cells: tuple[Cell, ...]
+    spur_of: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -131,16 +147,32 @@ def road_input(
         raise RoadGenerationError(
             [f"{ROAD_PARAMETER_PATH}: the road parameter document is missing"]
         )
+    open_cell_kinds = set(OPEN_CELL_KINDS)
+    node_kinds = set(params.node_kinds)
+    refused = sorted(node_kinds & (open_cell_kinds | set(SPUR_KINDS)))
+    if refused:
+        raise RoadGenerationError(
+            [
+                f"{ROAD_PARAMETER_PATH}: node_kinds lists {kind}, "
+                "which is a spur or open-cell kind"
+                for kind in refused
+            ]
+        )
     location_cells = location_cells_of(world.locations)
     entries = [
-        (settlement, settlement.wilderness_geometry(location_cells[settlement.location_ref]))
+        (
+            settlement,
+            settlement.wilderness_geometry(location_cells[settlement.location_ref]),
+            world.locations.locations[settlement.location_ref].kind,
+        )
         for _, settlement in sorted(world.settlements.items())
         if settlement.wilderness_entry is not None
         and settlement.location_ref in location_cells
     ]
     footprints: set[Cell] = set()
-    for _, geometry in entries:
-        footprints.update(geometry.footprint_cells)
+    for _, geometry, kind in entries:
+        if kind not in open_cell_kinds:
+            footprints.update(geometry.footprint_cells)
     region_names = tuple(sorted(world.continent.regions))
     try:
         rasters = partition_input(
@@ -156,14 +188,20 @@ def road_input(
     except PartitionError as error:
         raise RoadGenerationError(error.problems) from error
     size = rasters.size
-    node_kinds = set(params.node_kinds)
+    spur_kinds = set(SPUR_KINDS)
+    spur_nodes = tuple(
+        RoadNode(key, (location_cells[key],))
+        for key in sorted(location_cells)
+        if world.locations.locations[key].kind in spur_kinds
+    )
     nodes: dict[str, RoadNode] = {}
     problems: list[str] = []
     blocked: set[Cell] = set()
     gateways: dict[Cell, frozenset[Cell]] = {}
-    for settlement, geometry in entries:
+    for settlement, geometry, kind in entries:
+        if kind in open_cell_kinds:
+            continue
         key = settlement.location_ref
-        location = world.locations.locations[key]
         approaches = tuple(
             sorted(
                 {
@@ -178,7 +216,7 @@ def road_input(
                 }
             )
         )
-        is_node = bool(approaches) and location.kind in node_kinds
+        is_node = bool(approaches) and kind in node_kinds
         if is_node:
             if key in nodes:
                 problems.append(f"node {key}: declared by more than one settlement")
@@ -216,6 +254,7 @@ def road_input(
             elevation_fingerprint=elevation_fingerprint,
             region_speeds=region_speeds,
         ),
+        spur_nodes=spur_nodes,
     )
 
 
@@ -264,7 +303,7 @@ def _check_input(inp: RoadInput) -> list[str]:
         speed = inp.region_speeds.get(name)
         if isinstance(speed, bool) or not isinstance(speed, (int, float)) or speed <= 0:
             problems.append(f"region {name}: has no travel speed")
-    keys = [node.key for node in inp.nodes]
+    keys = [node.key for node in (*inp.nodes, *inp.spur_nodes)]
     for key in sorted({key for key in keys if keys.count(key) > 1}):
         problems.append(f"node {key}: duplicate node key")
     owners: dict[Cell, str] = {}
@@ -280,6 +319,14 @@ def _check_input(inp: RoadInput) -> list[str]:
             if other != node.key:
                 problems.append(
                     f"node {node.key}: gate approach {cell} is shared with {other}"
+                )
+    for node in inp.spur_nodes:
+        if not node.approaches:
+            problems.append(f"node {node.key}: has no village cell")
+        for cell in node.approaches:
+            if not _in_frame(inp, cell) or not open_cells[cell[1], cell[0]]:
+                problems.append(
+                    f"node {node.key}: village cell {cell} is off the cost field"
                 )
     return problems
 
@@ -459,29 +506,82 @@ def _route(field: _CostField, sources: np.ndarray, targets: np.ndarray) -> tuple
     return tuple((int(field.cells[i, 0]), int(field.cells[i, 1])) for i in path)
 
 
+def _carry(
+    field: _CostField, on_road: np.ndarray, reused: np.ndarray, cells: Sequence[Cell]
+) -> None:
+    """Mark ``cells`` as road, then reprice every step between two road cells."""
+    for x, y in cells:
+        on_road[field.index[y, x]] = True
+    both = on_road[field.rows] & on_road[field.graph.indices]
+    field.graph.data[both] = reused[both]
+
+
 def compute_roads(inp: RoadInput) -> tuple[Road, ...]:
     """The candidate road network, sorted by its settlement pair."""
     problems = _check_input(inp)
     if problems:
         raise RoadGenerationError(problems)
-    if not inp.nodes:
+    if not inp.nodes and not inp.spur_nodes:
         return ()
     field = _cost_field(inp)
-    approach = [_node_indices(field, node) for node in inp.nodes]
-    distances = _terrain_distances(field, approach)
-    kept = _relative_neighbourhood(distances)
-    kept = _repair(distances, kept, _terrain_neighbours(field, approach), inp.detour_limit)
-    keys = [node.key for node in inp.nodes]
     on_road = np.zeros(field.graph.shape[0], dtype=bool)
     reused = np.maximum(1.0, np.rint(field.base * inp.reuse_factor))
     roads: list[Road] = []
-    for i, j in sorted(kept, key=lambda pair: (distances[pair], keys[pair[0]], keys[pair[1]])):
-        cells = _route(field, approach[i], approach[j])
-        roads.append(Road(keys[i], keys[j], cells))
-        for x, y in cells:
-            on_road[field.index[y, x]] = True
-        both = on_road[field.rows] & on_road[field.graph.indices]
-        field.graph.data[both] = reused[both]
+    if inp.nodes:
+        approach = [_node_indices(field, node) for node in inp.nodes]
+        distances = _terrain_distances(field, approach)
+        kept = _relative_neighbourhood(distances)
+        kept = _repair(
+            distances, kept, _terrain_neighbours(field, approach), inp.detour_limit
+        )
+        keys = [node.key for node in inp.nodes]
+        for i, j in sorted(
+            kept, key=lambda pair: (distances[pair], keys[pair[0]], keys[pair[1]])
+        ):
+            cells = _route(field, approach[i], approach[j])
+            roads.append(Road(keys[i], keys[j], cells))
+            _carry(field, on_road, reused, cells)
+    # Stage two: one search per spur settlement gives both its target and its
+    # route, so the two can never disagree.
+    targets = {node.key: _node_indices(field, node) for node in inp.nodes}
+    problems = []
+    for node in inp.spur_nodes:
+        x, y = node.approaches[0]
+        source = int(field.index[y, x])
+        reach, predecessors = dijkstra(
+            field.graph, directed=True, indices=source, return_predecessors=True
+        )
+        costs = {
+            key: min(float(reach[index]) for index in indices)
+            for key, indices in targets.items()
+        }
+        best = min(costs, key=lambda key: (costs[key], key)) if costs else None
+        if best is None or not np.isfinite(costs[best]):
+            problems.append(f"node {node.key}: has no road")
+            continue
+        end = min(
+            (int(index) for index in targets[best]),
+            key=lambda index: (
+                reach[index],
+                int(field.cells[index, 1]),
+                int(field.cells[index, 0]),
+            ),
+        )
+        path = [end]
+        while predecessors[path[-1]] != _NONE:
+            path.append(int(predecessors[path[-1]]))
+        path.reverse()
+        cells = tuple(
+            (int(field.cells[index, 0]), int(field.cells[index, 1])) for index in path
+        )
+        if node.key < best:
+            roads.append(Road(node.key, best, cells, spur_of=node.key))
+        else:
+            roads.append(Road(best, node.key, tuple(reversed(cells)), spur_of=node.key))
+        _carry(field, on_road, reused, cells)
+        targets[node.key] = np.array([source], dtype=np.int64)
+    if problems:
+        raise RoadGenerationError(problems)
     return tuple(sorted(roads, key=lambda road: (road.first, road.second)))
 
 
@@ -494,7 +594,11 @@ def verify_roads(inp: RoadInput, roads: Sequence[Road]) -> list[str]:
     problems: list[str] = []
     open_cells = _open_mask(inp)
     labels, _ = ndimage.label(open_cells)
-    approaches = {node.key: set(node.approaches) for node in inp.nodes}
+    approaches = {
+        node.key: set(node.approaches) for node in (*inp.nodes, *inp.spur_nodes)
+    }
+    spur_keys = {node.key for node in inp.spur_nodes}
+    owned = {key: 0 for key in spur_keys}
 
     def is_open(cell: Cell) -> bool:
         return _in_frame(inp, cell) and bool(open_cells[cell[1], cell[0]])
@@ -537,14 +641,30 @@ def verify_roads(inp: RoadInput, roads: Sequence[Road]) -> list[str]:
                     problems.append(
                         f"{name}: leaves point gateway {anchor} in its gate direction"
                     )
+        if road.spur_of is not None:
+            if (
+                road.spur_of not in (road.first, road.second)
+                or road.spur_of not in spur_keys
+            ):
+                problems.append(
+                    f"{name}: spur owner {road.spur_of} is not a village end"
+                )
+            else:
+                owned[road.spur_of] += 1
+        elif road.first in spur_keys or road.second in spur_keys:
+            village = road.first if road.first in spur_keys else road.second
+            problems.append(f"{name}: trunk ends at village {village}")
         if road.first in parent and road.second in parent:
             parent[find(road.first)] = find(road.second)
 
-    for node in inp.nodes:
+    for node in (*inp.nodes, *inp.spur_nodes):
         if node.key not in served:
             problems.append(f"node {node.key}: has no road")
+    for key in sorted(owned):
+        if owned[key] != 1:
+            problems.append(f"node {key}: owns {owned[key]} spurs")
     networks: dict[int, list[str]] = {}
-    for node in inp.nodes:
+    for node in (*inp.nodes, *inp.spur_nodes):
         for label in sorted({int(labels[y, x]) for x, y in node.approaches if is_open((x, y))}):
             networks.setdefault(label, []).append(node.key)
     for label, keys in sorted(networks.items()):
@@ -564,8 +684,13 @@ def encode_roads(inp: RoadInput, roads: Sequence[Road]) -> str:
     return encode_road_document(
         frame_cells=inp.size,
         source_signature=inp.source_signature,
-        nodes=[node.key for node in inp.nodes],
+        nodes=sorted(node.key for node in (*inp.nodes, *inp.spur_nodes)),
         roads=[(road.first, road.second, road.cells) for road in roads],
+        spur_owners={
+            (road.first, road.second): road.spur_of
+            for road in roads
+            if road.spur_of is not None
+        },
     )
 
 
@@ -583,7 +708,9 @@ def generate_road_network(inp: RoadInput) -> str:
 
 __all__ = [
     "Cell",
+    "OPEN_CELL_KINDS",
     "ROAD_PARAMETER_PATH",
+    "SPUR_KINDS",
     "Road",
     "RoadGenerationError",
     "RoadInput",
