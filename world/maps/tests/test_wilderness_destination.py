@@ -378,6 +378,10 @@ class WildernessDestinationResolverTests(EvenniaTestCase):
             px, py = point.anchor_cell
             self.assertIsNone(find_gateway((px + 1, py), authored))
 
+    @covers_requirement(
+        "wilderness-gateway::"
+        "one-cell-physical-footprints-resolve-gateways-at-approach-cells"
+    )
     def test_find_gateway_matches_a_flagged_one_cell_footprint_at_approach_cells(self):
         from world.lore.wilderness_entry import WildernessEntryPoint, WildernessGate
 

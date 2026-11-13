@@ -464,6 +464,99 @@ class AuthoringRequirementTests(unittest.TestCase):
         )
 
     @covers_requirement(
+        "map-settlement-sources::"
+        "a-one-cell-mask-may-declare-a-physical-footprint"
+    )
+    def test_a_one_cell_mask_can_declare_a_physical_footprint(self):
+        from elosern_map_core.authoring import gate_approach_cell
+
+        def _world(entry: dict):
+            data = fixtures.settlement_data()
+            data["wilderness_entry"] = entry
+            locations = fixtures.locations_data()
+            locations["locations"]["demo_location"]["cell"] = {
+                "cell_x": 10,
+                "cell_y": 20,
+            }
+            return load_authoring_world(
+                fixtures.custom_sources(settlement=data, locations=locations)
+            )
+
+        gates = [
+            {"return_direction": "e", "destination_node": "gate"},
+            {"return_direction": "ne", "destination_node": "plaza"},
+        ]
+        flagged = _world(
+            {
+                "shape": ["#"],
+                "offset": {"dx": 0, "dy": 0},
+                "single_cell_footprint": True,
+                "gates": gates,
+            }
+        )
+        self.assertNotIn(
+            "point_gate_count", {item.code for item in flagged.diagnostics}
+        )
+        footprint = flagged.settlements["demo_map"].wilderness_geometry((10, 20))
+        self.assertFalse(footprint.is_point_shape)
+        self.assertEqual(footprint.footprint_cells, frozenset({(10, 20)}))
+        self.assertEqual(gate_approach_cell(footprint, "e"), (9, 20))
+        self.assertEqual(gate_approach_cell(footprint, "ne"), (9, 19))
+
+        point = _world(
+            {
+                "shape": ["#"],
+                "offset": {"dx": 0, "dy": 0},
+                "gates": gates,
+            }
+        )
+        self.assertIn("point_gate_count", {item.code for item in point.diagnostics})
+        point_geometry = point.settlements["demo_map"].wilderness_geometry((10, 20))
+        self.assertTrue(point_geometry.is_point_shape)
+        self.assertEqual(point_geometry.footprint_cells, frozenset())
+        self.assertEqual(gate_approach_cell(point_geometry, "e"), (10, 20))
+        self.assertEqual(gate_approach_cell(point_geometry, "ne"), (10, 20))
+
+        multi_entry = {
+            "shape": ["#", "#"],
+            "offset": {"dx": 0, "dy": 0},
+            "single_cell_footprint": True,
+            "gates": [{"return_direction": "n", "destination_node": "gate"}],
+        }
+        flagged_multi = _world(multi_entry)
+        diagnostic = next(
+            item
+            for item in flagged_multi.diagnostics
+            if item.code == "single_cell_footprint_mask"
+        )
+        self.assertEqual(diagnostic.category, "semantic")
+        self.assertEqual(diagnostic.object_id, "demo_map")
+        plain_multi = _world(
+            {
+                key: value
+                for key, value in multi_entry.items()
+                if key != "single_cell_footprint"
+            }
+        )
+        flagged_geometry = flagged_multi.settlements["demo_map"].wilderness_geometry(
+            (10, 20)
+        )
+        plain_geometry = plain_multi.settlements["demo_map"].wilderness_geometry(
+            (10, 20)
+        )
+        self.assertEqual(flagged_geometry.footprint_cells, plain_geometry.footprint_cells)
+        self.assertEqual(flagged_geometry.anchor_cell, plain_geometry.anchor_cell)
+
+        wrong_type = fixtures.settlement_data()
+        wrong_type["wilderness_entry"]["single_cell_footprint"] = "yes"
+        with self.assertRaises(AuthoringError) as captured:
+            load_authoring_world(fixtures.custom_sources(settlement=wrong_type))
+        self.assertIn(
+            "invalid_field_value",
+            {item.code for item in captured.exception.diagnostics},
+        )
+
+    @covers_requirement(
         "map-authoring-documents::"
         "authoring-diagnostics-and-runtime-acceptance-have-distinct-gates"
     )
