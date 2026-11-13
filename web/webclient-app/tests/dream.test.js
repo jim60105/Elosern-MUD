@@ -878,6 +878,11 @@ describe("thread choice", () => {
     expect(document.activeElement).toBe(options(wrapper)[0].element);
     await options(wrapper)[0].trigger("keydown", { key: "ArrowDown" });
     expect(document.activeElement).toBe(options(wrapper)[1].element);
+    // Digits do not reach the keepsake rows while the list is open.
+    await options(wrapper)[1].trigger("keydown", { key: "1" });
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    expect(options(wrapper)).toHaveLength(3);
     // Escape closes the list without choosing and returns to the picker.
     await wrapper.trigger("keydown", { key: "Escape" });
     await flushPromises();

@@ -570,7 +570,8 @@ function onKeydown(event) {
     return;
   }
   if (sheetOpen.value && event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); confirm(); return; }
-  if (!overlayOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
+  // An open thread list owns the keys until it closes.
+  if (!overlayOpen.value && !threadOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
     event.preventDefault();
     rows.value?.querySelectorAll("button")[Number(event.key) - 1]?.click();
   }
