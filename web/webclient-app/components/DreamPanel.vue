@@ -44,11 +44,12 @@ const SHORT_LABELS = { themes: "主題", atmosphere: "氛圍", participants: "�
 // meaning. Once finalized the player edits the rows; the form sends exactly
 // the rows it shows.
 const REQUIREMENT_KINDS = [
-  { key: "place", label: "指定的地點" },
-  { key: "new_character", label: "需要的新角色" },
-  { key: "private_commission", label: "私人委託" },
+  { key: "place", label: "指定的地點", example: "例如：南門" },
+  { key: "new_character", label: "需要的新角色", example: "例如：一位尋找母親的少女" },
+  { key: "private_commission", label: "私人委託", example: "例如：替她四處打聽消息" },
 ];
 const REQUIREMENT_LABELS = Object.fromEntries(REQUIREMENT_KINDS.map(({ key, label }) => [key, label]));
+const REQUIREMENT_EXAMPLES = Object.fromEntries(REQUIREMENT_KINDS.map(({ key, example }) => [key, example]));
 const MAX_REQUIREMENTS = 8;
 const REQUIREMENT_REFUSAL = "有一筆需求還沒有內容。填上內容，或把那一筆移除。";
 const emptyProposal = () => ({ summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] });
@@ -953,7 +954,7 @@ function onKeydown(event) {
             <button v-if="direction !== savedDirection && savedDirection" class="dream-link" type="button" @click="revertSummary">還原為訴說時的內容</button>
             <span class="dream-field__counter" :class="{ 'dream-field__counter--over': summaryTooLong }">{{ summaryLength }} / {{ MAX_SUMMARY }}</span>
           </div>
-          <p v-if="refusal" class="dream-field__error" role="alert">{{ refusal }}</p>
+          <p v-if="refusal && refusal !== REQUIREMENT_REFUSAL" class="dream-field__error" role="alert">{{ refusal }}</p>
 
           <!-- The rows are the player's now: a kind from the closed set and a
                bounded text each, at most eight. -->
@@ -967,13 +968,14 @@ function onKeydown(event) {
                 </select>
                 <input v-model="row.text" data-req-text type="text" maxlength="200" :aria-label="`第 ${index + 1} 筆需求的內容`"
                   :aria-invalid="reqErrors.includes(index) || undefined" :aria-describedby="reqErrors.includes(index) ? `dream-req-error-${row.id}` : undefined"
-                  :disabled="transportLocked" placeholder="例如：南門" @input="editReq(index)" />
+                  :disabled="transportLocked" :placeholder="REQUIREMENT_EXAMPLES[row.kind]" @input="editReq(index)" />
                 <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-requirements__remove" :aria-label="`移除第 ${index + 1} 筆需求`"
                   :disabled="transportLocked" @click="removeReq(index)">×</button>
                 <small v-if="reqErrors.includes(index)" :id="`dream-req-error-${row.id}`" class="dream-requirements__error" role="alert">請填上內容</small>
               </li>
             </ul>
-            <p v-else class="dream-requirements__empty">還沒有需求。願望不需要時，可以留空。</p>
+            <p v-if="refusal === REQUIREMENT_REFUSAL" class="dream-field__error" role="alert">{{ refusal }}</p>
+            <p v-if="!reqs.length" class="dream-requirements__empty">還沒有需求。願望不需要時，可以留空。</p>
             <button v-if="reqs.length < MAX_REQUIREMENTS" class="ui-btn ui-btn--ghost ui-btn--sm dream-requirements__add" type="button"
               data-testid="dream-requirement-add" :disabled="transportLocked" @click="addReq">＋ 添一筆需求</button>
             <small class="dream-requirements__note">地點、新角色與私人委託會原樣交給醒來後的故事。改了願望，記得一併核對。</small>
@@ -1256,7 +1258,8 @@ function onKeydown(event) {
 .dream-requirements__row select option { background: var(--ink-900); color: var(--paper-50); }
 .dream-requirements__row select:hover:enabled, .dream-requirements__row input:hover:enabled { border-color: var(--gold-600); }
 .dream-requirements__row select:focus-visible, .dream-requirements__row input:focus-visible { outline: none; border-color: var(--gold-500); box-shadow: var(--focus); }
-.dream-requirements__row--invalid input { border-color: var(--seal-500); background-color: rgba(124, 32, 38, 0.18); }
+.dream-requirements__row--invalid input, .dream-requirements__row--invalid input:hover:enabled,
+.dream-requirements__row--invalid input:focus-visible { border-color: var(--seal-400); background-color: rgba(124, 32, 38, 0.18); }
 .dream-requirements__error { grid-column: 2 / -1; color: var(--seal-400); font-size: var(--text-xs); }
 .dream-requirements__error::before { content: "◇ "; }
 .dream-requirements .dream-requirements__remove { width: calc(36px * var(--ui-scale)); min-width: 0; height: calc(36px * var(--ui-scale)); padding: 0;
@@ -1349,7 +1352,9 @@ function onKeydown(event) {
 .dream-scroll__requirements span { display: inline-block; min-width: calc(112px * var(--ui-scale)); margin-right: var(--sp-2); color: var(--paper-400); font-family: var(--f-sans); font-size: var(--text-xs); }
 /* The last exchange's marks: a gold rail on a changed field, a 新添 tag on an
    added item, and the struck-out names of what she removed. */
-.dream-scroll h4 .dream-scroll__mark { margin-left: var(--sp-2); color: var(--gold-300); font-style: normal; letter-spacing: 0.04em; }
+.dream-scroll h4 .dream-scroll__mark { margin-left: var(--sp-2); color: var(--gold-300); font-style: normal; letter-spacing: 0.04em; white-space: nowrap; }
+/* In the narrow label column the mark takes its own line under the name. */
+.dream-scroll__row h4 .dream-scroll__mark { display: block; margin: var(--sp-1) 0 0; font-weight: 400; }
 .dream-scroll--touched { margin-inline: calc(-1 * var(--sp-6)); padding-inline: var(--sp-6);
   background: linear-gradient(90deg, rgba(185, 154, 96, 0.13), transparent 85%); box-shadow: inset 2px 0 var(--gold-400); }
 .dream-scroll .dream-scroll__new { color: var(--gold-300); }
