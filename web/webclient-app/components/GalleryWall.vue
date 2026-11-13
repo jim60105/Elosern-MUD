@@ -118,6 +118,7 @@ function runAttrs(run) {
 const root = ref(null);
 const trayEl = ref(null);
 const notchX = ref(null);
+const reach = ref(null);
 const tileEls = new Map();
 const trayEls = new Map();
 
@@ -285,11 +286,15 @@ function placeNotch() {
   const tile = ownerKey.value ? tileEls.get(ownerKey.value) : null;
   if (!tile || !trayEl.value) {
     notchX.value = null;
+    reach.value = null;
     return;
   }
   const tileBox = tile.getBoundingClientRect();
   const trayBox = trayEl.value.getBoundingClientRect();
   notchX.value = tileBox.left + tileBox.width / 2 - trayBox.left;
+  // How far above the tray the owner tile starts: a tray taller than the
+  // wall scrolls into view with its owner still showing above it.
+  reach.value = Math.max(0, trayBox.top - tileBox.top);
 }
 
 async function measure() {
@@ -304,7 +309,10 @@ async function measure() {
   placeNotch();
 }
 
-const trayStyle = computed(() => (notchX.value === null ? undefined : { "--tray-notch-x": `${notchX.value}px` }));
+const trayStyle = computed(() => (notchX.value === null ? undefined : {
+  "--tray-notch-x": `${notchX.value}px`,
+  "--tray-reach": `${reach.value}px`,
+}));
 
 function scrollBehavior() {
   const level = document.documentElement?.dataset?.motion;
@@ -449,7 +457,10 @@ defineExpose({
         </div>
         <div v-if="officialItems.length" class="gtray__official" role="group" :aria-label="OFFICIAL_RUN_LABEL" data-testid="gallery-tray-official">
           <p class="gtray__label" aria-hidden="true">
-            <span>{{ GALLERY_OFFICIAL_LABEL }}</span><small>（唯讀）</small>
+            <span>{{ GALLERY_OFFICIAL_LABEL }}</span>
+            <span class="gtray__readonly">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M7 11V8a5 5 0 0 1 10 0v3M5.5 11h13v9.5h-13z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /></svg>唯讀
+            </span>
             <span class="gwall__rule"></span>
           </p>
           <div class="gwall__grid gtray__grid" :class="`gwall__grid--${tileShape(owner.subject.kind)}`">
@@ -627,7 +638,7 @@ defineExpose({
 }
 
 .gwall__grid {
-  --gwall-min: calc(96px * var(--ui-scale));
+  --gwall-min: calc(92px * var(--ui-scale));
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--gwall-min), 1fr));
@@ -740,17 +751,20 @@ defineExpose({
   color: var(--gold-300);
 }
 
+/* The live character's ribbon hangs down the tile's left edge as a vertical
+   swallowtail banner, so it never crowds the count badge on a narrow tile. */
 .gtile__current {
   position: absolute;
-  top: var(--sp-1);
-  left: 0;
-  padding: 0 var(--sp-3) 0 var(--sp-1);
+  top: 0;
+  left: var(--sp-1);
+  padding: var(--sp-1) calc(3px * var(--ui-scale)) var(--sp-3);
   color: var(--paper-50);
-  font: var(--text-xs) / 1.5 var(--f-display);
-  letter-spacing: 0.06em;
-  background: linear-gradient(180deg, var(--seal-600), var(--seal-700));
-  box-shadow: 0 calc(1px * var(--ui-scale)) calc(3px * var(--ui-scale)) rgba(0, 0, 0, 0.5);
-  clip-path: polygon(0 0, 100% 0, calc(100% - var(--sp-2)) 50%, 100% 100%, 0 100%);
+  font: var(--text-xs) / 1.1 var(--f-display);
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  background: linear-gradient(180deg, var(--seal-500), var(--seal-700));
+  filter: drop-shadow(0 calc(1px * var(--ui-scale)) calc(2px * var(--ui-scale)) rgba(0, 0, 0, 0.6));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - var(--sp-2)), 0 100%);
   pointer-events: none;
 }
 
@@ -940,6 +954,8 @@ defineExpose({
   border: var(--gwall-hair) solid var(--seal-600);
   border-radius: var(--radius-sm);
   box-shadow: inset 0 0 calc(24px * var(--ui-scale)) rgba(0, 0, 0, 0.45);
+  scroll-margin-top: calc(var(--tray-reach, calc(0px * var(--ui-scale))) + var(--sp-3));
+  scroll-margin-bottom: var(--sp-4);
   animation: gtray-in var(--motion-base) var(--ease-enter);
 }
 
@@ -971,22 +987,27 @@ defineExpose({
 
 .gtray__label {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp-1);
+  align-items: center;
+  gap: var(--sp-2);
   margin: 0;
-  color: var(--paper-300);
+  color: var(--paper-200);
   font: var(--text-xs) / 1.4 var(--f-display);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
 }
 
-.gtray__label small {
+.gtray__readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(2px * var(--ui-scale));
+  padding: 0 var(--sp-2) 0 var(--sp-1);
   color: var(--paper-500);
-  font-size: var(--text-xs);
-  letter-spacing: 0;
+  letter-spacing: 0.04em;
+  border: var(--gwall-hair) solid var(--ink-600);
+  border-radius: var(--radius-pill);
 }
 
-.gtray__label .gwall__rule {
-  align-self: center;
-  margin-left: var(--sp-2);
+.gtray__readonly svg {
+  width: calc(13px * var(--ui-scale));
+  height: calc(13px * var(--ui-scale));
 }
 </style>
