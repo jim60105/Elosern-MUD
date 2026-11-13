@@ -22,8 +22,8 @@ The size budget SHALL compute built-up area as the reference area times (populat
 - **THEN** the village and the hamlet each receive one footprint cell and their table's node count as a minimum, and the town still receives two cells
 
 #### Scenario: A geographic feature may extend the minimum
-- **WHEN** a village on a site with a geographic feature such as a ferry crossing is laid out
-- **THEN** the budget's node count is the tier minimum, and the layout may place one or two nodes beyond it
+- **WHEN** a village's single-cell tier is budgeted for a site with a geographic feature such as a ferry crossing
+- **THEN** its node count is the tier's value as a minimum rather than a cap, so the layout may place one or two nodes beyond it
 
 #### Scenario: Invalid single-cell table
 - **WHEN** a configuration's single-cell tier table omits one of the two kinds or gives a node count below two
