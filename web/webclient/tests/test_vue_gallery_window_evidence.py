@@ -22,6 +22,10 @@ Test-to-requirement mapping (applied at archive):
 - ``focus-is-rescued-and-escape-closes-in-layers``:
   "focus is rescued and Escape closes in layers" (rail rescue, tray to owner
   tile, then close).
+- ``expanding-a-group-is-one-server-round-trip``:
+  "expanding a group is one server round trip" (one ``gallery.group.select``
+  per press, the busy heading, the commit that clears it, and the presses that
+  send nothing).
 """
 
 from __future__ import annotations
@@ -92,3 +96,10 @@ class GalleryWindowEvidenceTests(unittest.TestCase):
     def test_focus_and_escape_suite_passes(self):
         """Focus rescue and layered Escape hold under Vitest."""
         _run_vitest_group("focus is rescued and Escape closes in layers")
+
+    @covers_requirement(
+        "webclient-gallery-window::expanding-a-group-is-one-server-round-trip"
+    )
+    def test_group_expansion_suite_passes(self):
+        """One dispatch per press, the busy heading and the commit gate hold under Vitest."""
+        _run_vitest_group("expanding a group is one server round trip")

@@ -129,9 +129,11 @@
     // nothing; only the confirmed `explore.cast` echoes a command line.
     "explore.skill_preview",
     // Gallery management is webclient-only (D14); no fabricated text commands.
-    // Switching the gallery category is a pure presentation selection too.
+    // Switching the gallery category, or the one expanded group of a paged
+    // category, is a pure presentation selection too.
     "gallery.subject.select",
     "gallery.category.select",
+    "gallery.group.select",
     "gallery.generate",
     "gallery.default.set",
     "gallery.card.delete",

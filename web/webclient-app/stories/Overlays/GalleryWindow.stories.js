@@ -7,6 +7,7 @@ import {
   GALLERY_V4_MINE_ROSTER,
   GALLERY_V4_MONSTER,
   GALLERY_V4_PARTY,
+  GALLERY_V4_PEOPLE,
   galleryStoryModel,
 } from "../gallery-fixtures-v4.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
@@ -71,10 +72,15 @@ export const OfficialImage = { ...atReference, args: { model: { ...GALLERY_V4_MI
 export const NoImages = { ...atReference, args: { model: GALLERY_V4_MINE_BLANK } };
 // 魔物: threat-tier groups with seen / total; one image each, so no tray.
 export const Monsters = { ...atReference, args: { model: GALLERY_V4_MONSTER } };
+// 人物: met people grouped by place, one place expanded and its first person
+// selected; the other places are heading buttons carrying their count, and a
+// press shows the gallery.group.select it would send.
+export const People = { ...atReference, args: { model: GALLERY_V4_PEOPLE } };
 
 export const MyCharactersFullHd = { ...atFullHd, args: { model: GALLERY_V4_MINE_ROSTER } };
 export const FirstReleaseFullHd = { ...atFullHd, args: { model: GALLERY_V4_MINE } };
 export const MonstersFullHd = { ...atFullHd, args: { model: GALLERY_V4_MONSTER } };
+export const PeopleFullHd = { ...atFullHd, args: { model: GALLERY_V4_PEOPLE } };
 
 // ---- the interactive storyboard ---------------------------------------------
 

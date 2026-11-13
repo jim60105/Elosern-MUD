@@ -21,6 +21,12 @@ UNKNOWN_CATEGORY = {
 UNKNOWN_SUBJECT = {
     "outcome": "rejected", "code": "unknown_subject", "message": "找不到此圖庫對象",
 }
+UNKNOWN_GROUP = {
+    "outcome": "rejected", "code": "unknown_group", "message": "找不到此分組",
+}
+
+#: The categories whose panel expands one group at a time.
+PAGED_CATEGORIES = frozenset({"people"})
 
 
 @dataclass(frozen=True)
@@ -31,7 +37,7 @@ class GalleryViewSelection:
     category: str
     subjects: tuple[tuple[str, str], ...]  # (category, subject_key) pairs
     #: (category, group_key) pairs: the one group the panel expands per
-    #: category. No action writes it yet (change gallery-group-expansion).
+    #: paged category, written by ``select_gallery_group``.
     expanded: tuple[tuple[str, str], ...] = ()
 
 
@@ -164,3 +170,41 @@ def select_gallery_subject(session, actor, subject_key) -> dict:
             context={"subject": subject_key, "kind": ref.subject.kind.value, "category": category},
         )
     return {"outcome": "success", "code": "gallery_selected", "message": "已切換圖庫對象"}
+
+
+def select_gallery_group(session, actor, group) -> dict:
+    """Remember the one expanded group of the currently resolved paged category.
+
+    Only a category in ``PAGED_CATEGORIES`` pages by group, and the key must
+    name one of its current groups; anything else is ``unknown_group``. The
+    category's previous entry is replaced. Invalid input never alters the
+    stored view.
+    """
+    from .gallery import _expanded_key, _resolve_category
+    from .gallery_categories import category_groups
+
+    if not _session_ready(session, actor) or not isinstance(group, str):
+        return UNKNOWN_GROUP
+    owner_id = _owner_id(actor)
+    if owner_id is None:
+        return UNKNOWN_GROUP
+    view = gallery_view_snapshot(session, actor)
+    category = _resolve_category(view)
+    if category not in PAGED_CATEGORIES:
+        return UNKNOWN_GROUP
+    try:
+        groups = category_groups(actor, category)
+    except GalleryCategoryError:  # observability: ignore R2: explicit unknown_group result reports the unresolvable owner
+        return UNKNOWN_GROUP
+    if group not in {row.key for row in groups}:
+        return UNKNOWN_GROUP
+    previous = _expanded_key(view, category, groups)
+    pairs = tuple(
+        pair for pair in (view.expanded if view is not None else ()) if pair[0] != category
+    ) + ((category, group),)
+    session.ndb.gallery_view = GalleryViewSelection(
+        owner_id, category, view.subjects if view is not None else (), pairs
+    )
+    if previous != group:
+        log_info("gallery_group_selected", context={"category": category, "group": group})
+    return {"outcome": "success", "code": "gallery_group_selected", "message": "已切換分組"}

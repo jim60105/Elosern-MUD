@@ -10,6 +10,9 @@
 // connected, locked and one-in-flight gates. The window renders committed
 // facts only: a pressed rail tab is marked while its `gallery.category.select`
 // is in flight, but the wall keeps the committed groups until the next panel.
+// A collapsed place heading of a paged category is the same round trip: its
+// `gallery.group.select` marks the heading busy, and the wall keeps the
+// committed expansion until a panel with that place expanded commits.
 // Image selection is client-local and follows the committed subject.
 //
 // Focus: a commit that removes the focused wall tile returns focus to the
@@ -142,6 +145,15 @@ watch(() => [props.result, props.revision], () => {
 // The subject whose selection is in flight: the wall marks its tile busy.
 const pendingSubject = computed(() => pending.value?.subject ?? null);
 
+// The pressed place heading, derived from the one in-flight request so it can
+// never outlive it: marked while that request is pending and the committed
+// panel still shows the place collapsed; a panel that expands (or drops) the
+// place, a settled result and a dropped request all clear it.
+const pendingGroup = computed(() => {
+  const key = pending.value?.group ?? null;
+  return key !== null && groups.value.some((group) => group.key === key && !group.expanded) ? key : null;
+});
+
 function openEditor(name) {
   if (locked.value || pending.value || !hasSubject.value || (name !== "generate" && selectedCard.value?.status !== "card")) return;
   opener = document.activeElement;
@@ -218,7 +230,7 @@ function submitOfficialGeometry(component, value) {
 // Category and subject selection carry exactly their committed key; every
 // other action names the committed selected subject (and, for a card action,
 // the selected card). Returns the request id, or null when nothing was sent.
-const SELECTION_ACTIONS = ["gallery.category.select", "gallery.subject.select"];
+const SELECTION_ACTIONS = ["gallery.category.select", "gallery.group.select", "gallery.subject.select"];
 function send(action, extra = {}) {
   if (locked.value || pending.value || !props.dispatch) return null;
   const isSelection = SELECTION_ACTIONS.includes(action);
@@ -235,6 +247,7 @@ function send(action, extra = {}) {
     editor: editor.value,
     category: action === "gallery.category.select" ? extra.category : null,
     subject: action === "gallery.subject.select" ? extra.subject_key : null,
+    group: action === "gallery.group.select" ? extra.group : null,
   };
   return id;
 }
@@ -265,6 +278,14 @@ function selectCategory(key) {
 function selectSubject(key) {
   if (key === props.model.selected) return;
   send("gallery.subject.select", { subject_key: key });
+}
+
+// A collapsed committed place asks the server to expand it; the expanded
+// place, an unknown key and a second press while one is in flight send nothing.
+function expandGroup(key) {
+  const group = groups.value.find((row) => row.key === key);
+  if (!group || group.expanded) return;
+  send("gallery.group.select", { group: key });
 }
 
 function selectImage(id) {
@@ -371,7 +392,9 @@ onBeforeUnmount(() => {
           :panel="model"
           :aria-label="categoryLabel"
           :pending-subject="pendingSubject"
+          :pending-group="pendingGroup"
           @select-subject="selectSubject"
+          @expand-group="expandGroup"
           @select-image="selectImage"
           @generate="openEditor('generate')"
           @focus-lost="onFocusLost"

@@ -19,6 +19,13 @@
 // the wall listbox adopts through `aria-owns`. Both runs share one grid
 // template, so the split is invisible.
 //
+// A paged category (people) commits one group expanded and the others
+// collapsed to a count. While any committed group is collapsed, every
+// labelled heading is a button with `aria-expanded`, and a collapsed one asks
+// for its expansion (`expand-group`). Those buttons are ordinary tab stops
+// outside the wall listbox: the listbox role moves from the run onto the tile
+// sets, each a named group of options, so the headings never sit inside it.
+//
 // The wall emits; it never dispatches. It renders committed facts only.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
 
@@ -37,13 +44,15 @@ const props = defineProps({
   panel: { type: Object, default: null },
   ariaLabel: { type: String, required: true },
   pendingSubject: { type: String, default: null },
+  pendingGroup: { type: String, default: null },
 });
-const emit = defineEmits(["select-subject", "select-image", "generate", "focus-lost"]);
+const emit = defineEmits(["select-subject", "select-image", "generate", "focus-lost", "expand-group"]);
 
 const uid = useId();
 const wallId = `${uid}-wall`;
 const trayId = `${uid}-tray`;
 const restId = (key) => `${uid}-rest-${key}`;
+const setId = (key) => `${uid}-set-${key}`;
 
 const OFFICIAL_RUN_LABEL = `${GALLERY_OFFICIAL_LABEL}（唯讀）`;
 
@@ -64,9 +73,14 @@ function groupShape(group) {
   return group.subjects.some((subject) => tileShape(subject.kind) === "landscape") ? "landscape" : "portrait";
 }
 
+// Headings are buttons while any committed group is collapsed (people).
+const collapsible = computed(() => props.groups.some((group) => !group.expanded));
+
 function groupCounts(group) {
   if (!group.expanded) return { kind: "count", text: `共 ${group.count}` };
   if (group.seen !== null && group.total !== null) return { kind: "seen", text: `${group.seen} / ${group.total}` };
+  // Beside collapsed places, the expanded one carries its count too.
+  if (collapsible.value) return { kind: "count", text: `共 ${group.count}` };
   return null;
 }
 
@@ -108,11 +122,48 @@ const runs = computed(() => [
   ...(parts.value.rest.length ? [{ kind: "wall", key: "rest", parts: parts.value.rest }] : []),
 ]);
 
+// The tile sets in DOM order, across both runs. With collapsible headings
+// the first set carries the wall listbox, which adopts every later set.
+const tileSets = computed(() => [...parts.value.first, ...parts.value.rest].filter((part) => part.subjects.length));
+
 function runAttrs(run) {
   if (run.key !== "first") return { class: "gwall__run gwall__run--rest" };
+  if (collapsible.value) return { class: "gwall__run" };
   // With every group collapsed there is no option, so no empty listbox.
   if (!tileKeys.value.length) return { class: "gwall__run", id: wallId, role: "group", "aria-label": props.ariaLabel };
   return { class: "gwall__run", id: wallId, role: "listbox", "aria-label": props.ariaLabel, "aria-owns": ownsRest.value };
+}
+
+// In collapsible mode a part's tiles sit in two wrappers: the outer one is the
+// wall listbox on the first set (plain elsewhere), the inner one names the
+// group. Without collapsible headings the run is the listbox and both stay
+// plain.
+function tilesAttrs(part) {
+  if (!collapsible.value || tileSets.value[0]?.key !== part.key) return { class: "gwall__tiles" };
+  const owned = tileSets.value.slice(1).map((set) => setId(set.key));
+  return {
+    class: "gwall__tiles",
+    id: wallId,
+    role: "listbox",
+    "aria-label": props.ariaLabel,
+    "aria-owns": owned.length ? owned.join(" ") : undefined,
+  };
+}
+
+function setAttrs(part) {
+  if (!collapsible.value) return { class: "gwall__set" };
+  return { class: "gwall__set", id: setId(part.key), role: "group", "aria-label": groupName(part.group) };
+}
+
+function sectionAttrs(part) {
+  const base = { id: restId(part.key), class: ["gwall__group", { "gwall__group--continued": !part.head }] };
+  if (collapsible.value) return base;
+  return { ...base, role: "group", "aria-label": groupName(part.group) };
+}
+
+// Only a collapsed heading asks for its expansion; the expanded one is inert.
+function expandGroup(group) {
+  if (!group.expanded) emit("expand-group", group.key);
 }
 
 // ---- element registry -----------------------------------------------------
@@ -382,8 +433,21 @@ watch([parts, items], () => {
   const tileKey = active.closest('[data-testid="gallery-subject"]')?.dataset.subjectKey ?? null;
   const itemId = active.closest('[data-testid="gallery-tray-item"]')?.dataset.itemId ?? null;
   const previousOwner = active.closest("[data-owner-key]")?.dataset.ownerKey ?? null;
+  const headKey = active.closest("[data-group-key]")?.dataset.groupKey ?? null;
   nextTick(() => {
     if (root.value?.contains(document.activeElement)) return;
+    if (headKey) {
+      // A heading whose section crossed between the runs is remounted. It is
+      // found in the patched DOM: a moved section mounts its new heading
+      // before (or after) the old one unmounts, so no element map can tell.
+      // A heading that is gone falls through to the owner tile or the wall's
+      // tab stop below.
+      const heading = [...(root.value?.querySelectorAll("[data-group-key]") ?? [])].find((el) => el.dataset.groupKey === headKey);
+      if (heading) {
+        heading.focus();
+        return;
+      }
+    }
     if (tileKey) {
       if (tileKeys.value.includes(tileKey)) focusTile(tileKey);
       return;
@@ -397,6 +461,8 @@ watch([parts, items], () => {
     }
     if (ownerKey.value) focusTile(ownerKey.value);
     else if (previousOwner && tileKeys.value.includes(previousOwner)) focusTile(previousOwner);
+    // A vanished heading with no tray to fall back on: the wall's tab stop.
+    else if (headKey && rovingKey.value) focusTile(rovingKey.value);
   });
 }, { flush: "pre" });
 
@@ -415,7 +481,7 @@ defineExpose({
 
 
 <template>
-  <div ref="root" class="gwall" data-testid="gallery-wall" @keydown="onWallKeydown" @focusout="onWallFocusout">
+  <div ref="root" class="gwall" :class="{ 'gwall--paged': collapsible }" data-testid="gallery-wall" @keydown="onWallKeydown" @focusout="onWallFocusout">
     <EmptyState v-if="!groups.length" class="gwall__empty" glyph="gallery" headline="此分類目前沒有可顯示的圖像" />
     <template v-for="run in groups.length ? runs : []" :key="run.key">
       <div
@@ -518,16 +584,29 @@ defineExpose({
       </div>
 
       <div v-else v-bind="runAttrs(run)">
-        <section
-          v-for="part in run.parts"
-          :id="restId(part.key)"
-          :key="part.key"
-          class="gwall__group"
-          :class="{ 'gwall__group--continued': !part.head }"
-          role="group"
-          :aria-label="groupName(part.group)"
-        >
-          <h3 v-if="part.head && part.group.label !== null" class="gwall__head" aria-hidden="true">
+        <section v-for="part in run.parts" :key="part.key" v-bind="sectionAttrs(part)">
+          <h3 v-if="part.head && part.group.label !== null && collapsible" class="gwall__head gwall__head--toggle">
+            <button
+              type="button"
+              class="gwall__toggle"
+              :class="{ 'is-busy': part.group.key === pendingGroup }"
+              data-testid="gallery-group-head"
+              :data-group-key="part.group.key"
+              :aria-expanded="String(part.group.expanded)"
+              :aria-busy="part.group.key === pendingGroup ? 'true' : undefined"
+              :aria-label="groupName(part.group)"
+              @click="expandGroup(part.group)"
+            >
+              <svg class="gwall__chevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span class="gwall__label">{{ part.group.label }}</span>
+              <span class="gwall__rule" aria-hidden="true"></span>
+              <span class="gwall__n" data-count="count">共 <b>{{ part.group.count }}</b></span>
+              <span v-if="part.group.key === pendingGroup" class="gwall__toggle-busy" aria-hidden="true"></span>
+            </button>
+          </h3>
+          <h3 v-else-if="part.head && part.group.label !== null" class="gwall__head" aria-hidden="true">
             <span class="gwall__label">{{ part.group.label }}</span>
             <span class="gwall__rule"></span>
             <span v-if="groupCounts(part.group)" class="gwall__n" :data-count="groupCounts(part.group).kind">
@@ -535,7 +614,8 @@ defineExpose({
               <template v-else>共 <b>{{ part.group.count }}</b></template>
             </span>
           </h3>
-          <div v-if="part.subjects.length" class="gwall__grid" :class="`gwall__grid--${groupShape(part.group)}`">
+          <div v-if="part.subjects.length" v-bind="tilesAttrs(part)"><div v-bind="setAttrs(part)">
+          <div class="gwall__grid" :class="`gwall__grid--${groupShape(part.group)}`">
             <div
               v-for="subject in part.subjects"
               :key="subject.subject_key"
@@ -583,6 +663,7 @@ defineExpose({
               <span v-if="subject.subject_key === pendingSubject" class="gtile__busy" aria-hidden="true"></span>
             </div>
           </div>
+          </div></div>
         </section>
       </div>
     </template>
@@ -623,6 +704,12 @@ defineExpose({
   gap: var(--sp-5);
 }
 
+/* A paged category reads as one list of places: the collapsed headings sit
+   close together, like the prototype's place list. */
+.gwall--paged .gwall__run {
+  gap: var(--sp-2);
+}
+
 /* The rest of a split wall: its first part continues the owner's group right
    under the tray, while a new group keeps the usual spacing. */
 .gwall__run--rest > .gwall__group:first-child:not(.gwall__group--continued) {
@@ -648,6 +735,107 @@ defineExpose({
 
 .gwall__label {
   flex: none;
+}
+
+/* ---- collapsible headings (a paged category's places) ---- */
+
+/* A place heading is a full-width toggle: a chevron that turns down on the
+   expanded place, the label, the rule and the count. The expanded place
+   reads in gold with a seal-gold edge; a collapsed one stays quiet until
+   hovered. Shape (the chevron's turn) carries the state beside colour. */
+.gwall__head--toggle {
+  display: block;
+}
+
+.gwall__toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: calc(44px * var(--ui-scale));
+  box-sizing: border-box;
+  padding: var(--sp-2) var(--sp-3);
+  overflow: hidden;
+  color: var(--paper-300);
+  font: var(--text-md) / 1.4 var(--f-display);
+  letter-spacing: 0.12em;
+  text-align: left;
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.06), rgba(0, 0, 0, 0.2));
+  border: var(--gwall-hair) solid rgba(185, 154, 96, 0.22);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+.gwall__toggle:hover {
+  color: var(--gold-300);
+  border-color: var(--gold-500);
+  background-color: rgba(185, 154, 96, 0.1);
+}
+
+.gwall__toggle:focus-visible {
+  outline: calc(2px * var(--ui-scale)) solid var(--gold-400);
+  outline-offset: calc(2px * var(--ui-scale));
+}
+
+.gwall__toggle[aria-expanded="true"] {
+  color: var(--gold-300);
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.18), rgba(185, 154, 96, 0.03) 70%);
+  border-color: var(--gold-500);
+  box-shadow: inset calc(3px * var(--ui-scale)) 0 0 var(--gold-400);
+  cursor: default;
+}
+
+.gwall__chevron {
+  flex: none;
+  width: calc(16px * var(--ui-scale));
+  height: calc(16px * var(--ui-scale));
+  color: var(--gold-500);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.gwall__toggle[aria-expanded="true"] .gwall__chevron {
+  color: var(--gold-300);
+  transform: rotate(90deg);
+}
+
+.gwall__toggle .gwall__n {
+  color: var(--paper-400);
+}
+
+/* A place whose expansion is in flight: the tiles' sweeping bar along the
+   heading's bottom edge, beside aria-busy. */
+.gwall__toggle.is-busy {
+  border-color: var(--gold-400);
+}
+
+.gwall__toggle-busy {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: calc(3px * var(--ui-scale));
+  overflow: hidden;
+  background: rgba(228, 200, 142, 0.25);
+  pointer-events: none;
+}
+
+.gwall__toggle-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: var(--gold-400);
+  animation: gtile-busy var(--motion-pending) linear infinite;
+}
+
+/* The expanded place's tiles hang directly under its heading. */
+.gwall__head--toggle + .gwall__tiles {
+  margin-top: calc(-1 * var(--sp-1));
 }
 
 .gwall__rule {

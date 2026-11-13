@@ -26,7 +26,10 @@ never edit, or even probe, the gallery of an arbitrary character in the world.
 
 import re
 
-from web.webclient.presentation.gallery import validate_gallery_subject_key
+from web.webclient.presentation.gallery import (
+    GALLERY_GROUP_KEY_PATTERN,
+    validate_gallery_subject_key,
+)
 from web.webclient.presentation.gallery_categories import (
     CATEGORY_KEYS,
     GalleryCategoryError,
@@ -34,6 +37,7 @@ from web.webclient.presentation.gallery_categories import (
 )
 from web.webclient.presentation.gallery_selection import (
     select_gallery_category,
+    select_gallery_group,
     select_gallery_subject,
 )
 from world.art import gallery as gallery_api
@@ -156,6 +160,16 @@ def validate_gallery_category_select_payload(payload):
     category = payload["category"]
     if not isinstance(category, str) or category not in CATEGORY_KEYS:
         raise GalleryActionError("category must be one of the gallery category keys")
+    return dict(payload)
+
+
+def validate_gallery_group_select_payload(payload):
+    """Accept exactly one grammar-valid group key; membership is domain state."""
+    if not isinstance(payload, dict) or set(payload) != {"group"}:
+        raise GalleryActionError("gallery payload requires exactly its declared fields")
+    group = payload["group"]
+    if not isinstance(group, str) or re.fullmatch(GALLERY_GROUP_KEY_PATTERN, group) is None:
+        raise GalleryActionError("group must be a grammar-valid gallery group key")
     return dict(payload)
 
 
@@ -321,6 +335,18 @@ def _gallery_category_select_adapter(actor, payload, session=None):
     result = dict(select_gallery_category(session, actor, payload["category"]))
     result["affected_panels"] = AFFECTED_GALLERY_PANELS
     context = {"category": payload["category"], "action_id": "gallery.category.select"}
+    if result["outcome"] == "success":
+        log_info("gallery_action", context=context)
+    else:
+        log_warn("gallery_action", context=context)
+    return result
+
+
+def _gallery_group_select_adapter(actor, payload, session=None):
+    # Copy: a refusal returns the shared module-level result constant.
+    result = dict(select_gallery_group(session, actor, payload["group"]))
+    result["affected_panels"] = AFFECTED_GALLERY_PANELS
+    context = {"group": payload["group"], "action_id": "gallery.group.select"}
     if result["outcome"] == "success":
         log_info("gallery_action", context=context)
     else:
