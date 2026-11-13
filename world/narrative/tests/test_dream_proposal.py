@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.narrative import authoring
 from world.narrative import dream_proposal
 from world.narrative.dream_proposal import ProposalEditError
@@ -58,6 +60,7 @@ class TestEditCommands(unittest.TestCase):
             "requirements": [],
         }
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_each_command_succeeds(self):
         edits = [
             {
@@ -84,6 +87,7 @@ class TestEditCommands(unittest.TestCase):
         self.assertEqual(self.proposal["themes"], ["tide"])
         self.assertEqual(self.proposal["atmosphere"], ["salt"])
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_later_edits_see_earlier_ones(self):
         edits = [
             _create("themes", "harbour light"),
@@ -100,6 +104,7 @@ class TestEditCommands(unittest.TestCase):
             ["dock light"],
         )
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_str_replace_spans_line_boundaries(self):
         proposal = dict(self.proposal, themes=["tide", "salt"])
         edits = [
@@ -116,6 +121,7 @@ class TestEditCommands(unittest.TestCase):
             ["tide", "salt mist"],
         )
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_search_text_does_not_match_exactly_once(self):
         cases = [
             ("the harbour at dusk", "tide", "no_match"),
@@ -140,6 +146,7 @@ class TestEditCommands(unittest.TestCase):
                 self.assertEqual(caught.exception.index, 0)
                 self.assertEqual(proposal["summary"], summary)
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_unknown_command_field_or_malformed_edit(self):
         cases = [
             ("not an edit", "malformed_edit"),
@@ -219,6 +226,7 @@ class TestEditCommands(unittest.TestCase):
                 self.assertEqual(caught.exception.index, 0)
                 self.assertEqual(self.proposal["themes"], ["tide"])
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_insert_at_start_of_an_empty_field(self):
         proposal = dict(self.proposal, themes=[])
         edits = [
@@ -240,6 +248,7 @@ class TestEditCommands(unittest.TestCase):
         self.assertEqual(caught.exception.code, "insert_out_of_range")
         self.assertEqual(caught.exception.index, 0)
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_failure_after_a_valid_edit_rolls_back(self):
         edits = [
             _create("themes", "moon"),
@@ -258,6 +267,7 @@ class TestEditCommands(unittest.TestCase):
         self.assertEqual(caught.exception.index, 1)
         self.assertEqual(self.proposal["themes"], ["tide"])
 
+    @covers_requirement("dream-proposal-editing::edit-commands-apply-in-order-and-all-or-nothing")
     def test_empty_edit_set(self):
         result = dream_proposal.apply_edits(self.proposal, [])
 
@@ -288,6 +298,7 @@ class TestEditCommands(unittest.TestCase):
 
 
 class TestFieldNormalization(unittest.TestCase):
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_list_normalization(self):
         edits = [_create("themes", "  tide  \n\n tide \n dawn ")]
 
@@ -317,6 +328,7 @@ class TestFieldNormalization(unittest.TestCase):
             dream_proposal.apply_edits(proposal, edits)["themes"], ["tide"]
         )
 
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_requirement_rows_parse_and_render(self):
         edits = [
             _create(
@@ -347,6 +359,7 @@ class TestFieldNormalization(unittest.TestCase):
             repeated["requirements"], [{"kind": "place", "text": "the harbour"}]
         )
 
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_full_width_colon(self):
         cases = [
             ("place：the harbour", "place", "the harbour"),
@@ -367,6 +380,7 @@ class TestFieldNormalization(unittest.TestCase):
                     f"{kind}: {text}",
                 )
 
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_malformed_requirement_line(self):
         cases = ["the harbour", "vessel: a ship", "place:", "place:   "]
         for line in cases:
@@ -380,6 +394,7 @@ class TestFieldNormalization(unittest.TestCase):
                 self.assertEqual(caught.exception.code, "malformed_requirement")
                 self.assertEqual(caught.exception.index, 0)
 
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_bounds(self):
         empty = dream_proposal.empty_proposal()
 
@@ -415,6 +430,7 @@ class TestFieldNormalization(unittest.TestCase):
 
 
 class TestBoundsMatchTheDirectionStore(unittest.TestCase):
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_bounds_match_the_direction_store(self):
         self.assertEqual(
             dream_proposal.MAX_SUMMARY_CHARACTERS, authoring.MAX_SUMMARY_CHARACTERS
@@ -448,6 +464,7 @@ class TestAggregateBudgets(unittest.TestCase):
         lines = [_item(f"p0{index}", 200) for index in range(6)]
         return "\n".join([*lines, _item("p06", last_item_length)])
 
+    @covers_requirement("dream-proposal-editing::aggregate-byte-budgets-bound-the-proposal-and-its-change-report")
     def test_result_inside_both_budgets_is_accepted(self):
         before = self._full_proposal()
         proposal = dream_proposal.apply_edits(
@@ -461,6 +478,7 @@ class TestAggregateBudgets(unittest.TestCase):
             _canonical_bytes(dream_proposal.diff(before, proposal)), 8192
         )
 
+    @covers_requirement("dream-proposal-editing::aggregate-byte-budgets-bound-the-proposal-and-its-change-report")
     def test_aggregate_size(self):
         before = self._full_proposal()
 
@@ -497,6 +515,7 @@ class TestChangeReport(unittest.TestCase):
             "requirements": [],
         }
 
+    @covers_requirement("dream-proposal-editing::the-change-report-names-what-an-edit-set-changed")
     def test_added_and_removed_list_items(self):
         after = dream_proposal.apply_edits(
             self.proposal,
@@ -518,6 +537,7 @@ class TestChangeReport(unittest.TestCase):
         self.assertIsNone(report["summary"])
         self.assertEqual(report["requirements"], {"added": [], "removed": []})
 
+    @covers_requirement("dream-proposal-editing::the-change-report-names-what-an-edit-set-changed")
     def test_summary_first_takes_shape_then_changes(self):
         empty = dream_proposal.empty_proposal()
         formed = dream_proposal.apply_edits(
@@ -542,6 +562,7 @@ class TestChangeReport(unittest.TestCase):
             {"added": [], "removed": []},
         )
 
+    @covers_requirement("dream-proposal-editing::the-change-report-names-what-an-edit-set-changed")
     def test_nothing_changed(self):
         report = dream_proposal.diff(self.proposal, dict(self.proposal))
 
@@ -551,6 +572,7 @@ class TestChangeReport(unittest.TestCase):
             self.assertEqual(report["lists"][field], {"added": [], "removed": []})
         self.assertEqual(report["requirements"], {"added": [], "removed": []})
 
+    @covers_requirement("dream-proposal-editing::the-change-report-names-what-an-edit-set-changed")
     def test_requirement_rows_compare_by_kind_and_text(self):
         before = {
             "requirements": [{"kind": "place", "text": "the harbour"}],
@@ -602,6 +624,7 @@ class TestProposalHelpers(unittest.TestCase):
             },
         )
 
+    @covers_requirement("dream-proposal-editing::edited-fields-are-normalized-and-bounded")
     def test_normalize_proposal_returns_a_canonical_copy(self):
         raw = {
             "summary": "  the harbour at dusk  ",
