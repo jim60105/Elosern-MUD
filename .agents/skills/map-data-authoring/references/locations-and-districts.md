@@ -11,7 +11,7 @@ kind: locations
 id: locations
 locations:
   elven_village_ciaran:                       # stable id; never rename
-    kind: elven_village                 # capital | city | town | port | elven_village | dungeon
+    kind: elven_village                 # capital | city | town | port | village | hamlet | elven_village | dungeon
     display_name_zh: 暗影谷村
     description: Ciaran village underground on the western side of the neutral
       central range.                    # map-facing English prose
@@ -49,8 +49,9 @@ Rules and joins:
 ### Location kinds
 
 `kind` is a closed list: `capital`, `city`, `town`, `port`, `elven_village`,
-`dungeon`. Use the matching ID prefix (`capital_`, `city_`, `town_`,
-`port_`, `elven_village_`, `dungeon_`).
+`dungeon`, `village`, `hamlet`. Use the matching ID prefix (`capital_`, `city_`,
+`town_`, `port_`, `village_`, `hamlet_`, `elven_village_`, `dungeon_`). The
+three elven villages use the `elven_village_` prefix.
 
 | Kind | Use it for |
 | --- | --- |
@@ -58,6 +59,8 @@ Rules and joins:
 | `city` | an inland national settlement of about 25,000 people or more, including a beast tribal city |
 | `town` | a smaller national settlement, a frontier keep or a ferry town |
 | `port` | a settlement whose role is a sea harbour, whatever its size |
+| `village` | a national settlement of 300 to 2,000 people |
+| `hamlet` | a national settlement of 50 to 300 people |
 | `elven_village` | hidden; neutral, no nation |
 | `dungeon` | hidden; carries floors, not population |
 
@@ -74,10 +77,13 @@ places, so ask before you do it:
   `LOCATION_KINDS` (the inspector's dropdown labels);
 - `web/webclient/presentation/world_map_geometry.py` → `_place_geometry`
   (which wire kind a place draws as);
+- `world/maps/population_geometry.py` → `INHABITED_SETTLEMENT_KINDS`
+  (the categories that exclude automatic monster births);
+- `world/rules/sight.py` → `SUPPORTED_SETTLEMENT_KINDS`, plus one
+  `settlement_silhouettes` row in `world/rules/rulebook/sight.yaml` for each
+  public settlement kind;
 - `world/rules/sight.py` and `world/rules/wilderness_disclosure.py` →
   `HIDDEN_ANCHOR_KINDS`, only when the new kind is hidden;
-- `world/lore/tests/test_anchors.py`, which expects every `AnchorKind` to be
-  used by some shipped location.
 
 A national location also needs its `ANCHOR_LORE` row (nation and population).
 That change stales the reference context; regenerate it.

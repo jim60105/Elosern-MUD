@@ -139,16 +139,17 @@ parent-region cell, even one that current terrain or exclusions make unusable.
 
 ### Settlement birth exclusion
 
-Inhabited settlement categories are `capital`, `city`, `town`, `port` and
-`elven_village` (`AnchorKind`). For a footprint settlement the distance source
-is every masked footprint cell; for a point-shaped or map-less settlement it is
-the published anchor cell. A cell is excluded when its minimum Chebyshev
-distance to any source cell is at most the effective buffer. The effective
-buffer is `max(1, policy.buffer_cells)`; a policy may only enlarge the generic
-one-cell ring and is rejected for an unknown anchor, a non-inhabited anchor, or
-a buffer below one. `dungeon` anchors receive no automatic exclusion — their
-footprint cells are removed only by the shared validity rule. Explicit manual
-and quest placement does not consult this module at all (see the ledger note).
+Inhabited settlement categories are `capital`, `city`, `town`, `port`,
+`elven_village`, `village` and `hamlet` (`AnchorKind`). For a footprint
+settlement the distance source is every masked footprint cell; for a
+point-shaped or map-less settlement it is the published anchor cell. A cell is
+excluded when its minimum Chebyshev distance to any source cell is at most the
+effective buffer. The effective buffer is `max(1, policy.buffer_cells)`; a
+policy may only enlarge the generic one-cell ring and is rejected for an
+unknown anchor, a non-inhabited anchor, or a buffer below one. `dungeon`
+anchors receive no automatic exclusion — their footprint cells are removed
+only by the shared validity rule. Explicit manual and quest placement does not
+consult this module at all (see the ledger note).
 
 ### Complete-composition recoverability
 

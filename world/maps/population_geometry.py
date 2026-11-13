@@ -15,13 +15,13 @@ population owner will call :func:`eligible_birth_cells` with the world it is
 already operating on.
 
 Settlement exclusion uses the authored anchor category, never a display name:
-an inhabited settlement (capital, city, town, port, or elven village) excludes
-at least its immediate neighbouring cells, measured as the minimum Chebyshev
-distance to the settlement's complete published footprint, or to its published
-anchor cell when the settlement is a point shape. A dungeon entrance gets no
-automatic buffer. An explicit :class:`SettlementBirthPolicy` row may only
-enlarge an inhabited settlement's buffer; it can never introduce a nonsettlement
-exclusion or shrink the generic one-cell ring.
+an inhabited settlement (capital, city, town, port, elven village, village, or
+hamlet) excludes at least its immediate neighbouring cells, measured as the
+minimum Chebyshev distance to the settlement's complete published footprint, or
+to its published anchor cell when the settlement is a point shape. A dungeon
+entrance gets no automatic buffer. An explicit :class:`SettlementBirthPolicy`
+row may only enlarge an inhabited settlement's buffer; it can never introduce a
+nonsettlement exclusion or shrink the generic one-cell ring.
 
 Explicit manual and quest placement does not use this module: the design keeps
 those exceptions outside automatic birth geometry, density and its exclusions.
@@ -53,6 +53,8 @@ INHABITED_SETTLEMENT_KINDS: frozenset[AnchorKind] = frozenset(
         AnchorKind.TOWN,
         AnchorKind.PORT,
         AnchorKind.ELVEN_VILLAGE,
+        AnchorKind.VILLAGE,
+        AnchorKind.HAMLET,
     }
 )
 

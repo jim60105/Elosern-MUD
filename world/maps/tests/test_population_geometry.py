@@ -46,6 +46,8 @@ from world.maps.population_geometry import (
 RECTANGLE = (10, 13, 10, 13)
 ZONE = "t_fixture_zone"
 TOWN = "t_fixture_town"
+VILLAGE = "t_fixture_village"
+HAMLET = "t_fixture_hamlet"
 CAPITAL = "t_fixture_capital"
 DUNGEON = "t_fixture_dungeon"
 COMPOSITION = "t_fixture_composition"
@@ -290,6 +292,24 @@ class BirthGeometryTests(unittest.TestCase):
         )
         expected = _rectangle_cells() - {(13, 11), (13, 12), (13, 13)}
         self.assertEqual(cells, tuple(sorted(expected)))
+
+    @covers_requirement(
+        "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"
+    )
+    def test_village_and_hamlet_kinds_exclude_their_neighbouring_ring(self):
+        # A village and a hamlet publish a cell and own no settlement document,
+        # so each measures from that cell alone: its own cell and the eight
+        # neighbours go, exactly as a town of the same point geometry does.
+        ring = {(x, y) for x in (11, 12, 13) for y in (11, 12, 13)}
+        point_town = _eligible(anchors=[(TOWN, AnchorKind.TOWN, (12, 12))])
+        for kind, key in ((AnchorKind.VILLAGE, VILLAGE), (AnchorKind.HAMLET, HAMLET)):
+            with self.subTest(kind=kind):
+                cells = _eligible(anchors=[(key, kind, (12, 12))])
+                self.assertEqual(cells, tuple(sorted(_rectangle_cells() - ring)))
+                self.assertEqual(cells, point_town)
+        # A dungeon entrance at the same published cell excludes nothing.
+        dungeon = _eligible(anchors=[(DUNGEON, AnchorKind.DUNGEON, (12, 12))])
+        self.assertEqual(dungeon, tuple(sorted(_rectangle_cells())))
 
     @covers_requirement(
         "regional-ecology::eligible-birth-area-excludes-inhabited-settlement-surroundings"

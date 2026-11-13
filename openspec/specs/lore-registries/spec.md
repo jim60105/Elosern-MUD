@@ -510,7 +510,7 @@ The game SHALL compose immutable location views from map-owned identity/kind/nam
 - **THEN** map-facing fields come from YAML, non-map values remain their authored lore values and unknown joins are diagnosed
 
 #### Scenario: National settlement lore joins
-- **WHEN** every shipped city, town or port location joins its non-map lore
+- **WHEN** every shipped city, town, port, village or hamlet location joins its non-map lore
 - **THEN** each carries a registered nation, a positive population and no floor count, without comparing authored magnitudes between locations
 
 #### Scenario: No invented local content

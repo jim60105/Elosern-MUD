@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c058344ed49d42494b3605debd9efc90833e1296ed50dc9de1dd22e43503be3c",
+  "fingerprint": "c164f7edbcdc21d4b98989f354336a7304337d4c16bb3bb26e89c86244a21ac9",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16059,7 +16059,7 @@
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/roads.py": "8f709b73b0b90417e0c95c5633b5970cdb018b4510025c653c74d541664746f1",
     "packages/map-core/elosern_map_core/roads_codec.py": "2e0bb6b7c03a7ba25fa108a84f09bf4502ccdf6aff73bf21524d153ecedc627c",
-    "packages/map-core/elosern_map_core/schema.py": "1ffd64121f4c784f547547780e6a3dc3df2f0855742dcf4f907ef96154655d38",
+    "packages/map-core/elosern_map_core/schema.py": "b5d6dcb4e2112fbabe505a5fd13d9f8697078a681c1bba9d64c5bde509427051",
     "packages/map-core/elosern_map_core/sources.py": "28bf407d12598d5c3933ac674f6b0ca4ad68792109f2880dbc10bcf27cd944de",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
@@ -16067,7 +16067,7 @@
     "world/lore/__init__.py": "7fb8ceb1f6bd963e0f574afdfa86b79e34c57d7d30cfc56ad6330d2f536bf28b",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
-    "world/lore/anchors.py": "3a4f70deaeb22102ed018d2e1faadd7fd5ce02479972076d8389d6aebd4aa085",
+    "world/lore/anchors.py": "87d29efe6f884aa219baf00772ca66f70338919c6812ce897880fca34f5e8843",
     "world/lore/bestiary_documentation.py": "004694a0d21709fdf088b50f9bff46251bbc9f49a23d7b50208f459dd779703b",
     "world/lore/church/__init__.py": "49eca094998f4e49bae0354201121d22e895b386b737144af356e0acdf454694",
     "world/lore/church/places.py": "65d5e913b93cb203373da101c8c500a1fedc3e9abb2a299bf367b8279091f8f3",
@@ -16392,7 +16392,7 @@
     "world/rules/rulebook/sexual_act_effects.yaml": "d244cb388edf3b2dc76b498fe87e211655d68b0caf93651ed898d86440a983b8",
     "world/rules/rulebook/sexual_pleasure.yaml": "80dde75dfcb4d77b0dca20491f29de3fe34bfcaccb40072640311932153d0eb4",
     "world/rules/rulebook/sexual_resist.yaml": "a7146fe53b3e7e13e37691cdd5f2a47f0bc92ceb933beeff07d75b0a4da6237c",
-    "world/rules/rulebook/sight.yaml": "3940feeb9f8b9dd419ed09df742126c3bf7276c0c9b18ac00568e5eb2c1cfe49",
+    "world/rules/rulebook/sight.yaml": "51046c928d02681b8ce8ebd6471bfb8f646e4cb0c87c9a5449e42d779e824a21",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
     "world/rules/rulebook/status_display.yaml": "b1b0496bfd76b7724a5019fcc6840d576b47bab3e648c4c43cb40139376da758",
     "world/rules/scene_visits.py": "1036e405aa9cb8fe3942c8c11e95d1d4635588eb4b385a81e0e99fa53ad8a28c",
@@ -16411,7 +16411,7 @@
     "world/rules/sexual_state/traits.py": "eb0b8495f68f47fb8b51654821200f22bfe7f008f1241ebc84e284833bf14f91",
     "world/rules/sexual_transitions.py": "69cf32779cfd749d35a7c6ffa62f1067698f3f30df04821b2efcccb98de67c87",
     "world/rules/shop_hours.py": "b212e7e9507b609d6b0ce3ca82f39f72fda2083c8e822fed6f7a7a0bd7af0d71",
-    "world/rules/sight.py": "4b660bda3f67de4c9e6420d8bf5ad81e87bbc38df540cbb32c87bc1278b55eef",
+    "world/rules/sight.py": "74da297384f39263b72ca83986a5d61ad99b28bd61e2f97523d446a8ef1ac758",
     "world/rules/skill_effects.py": "6fdffeed7109222c2d762b7784cb513631db43d5e1d8d8b7383a29d8e18a0856",
     "world/rules/skill_ownership.py": "a028bd224eb349c98ee829986dcdc9bdc518470ccf86ef719aba4ef8f0087205",
     "world/rules/skip_safety.py": "e77dbd7274e9fee56d45ca1ab3c9cf8765dd612fd524583198b8de92b5a25cc3",

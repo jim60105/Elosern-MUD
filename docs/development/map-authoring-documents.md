@@ -80,10 +80,10 @@ Every coordinate is explicitly named for its domain:
 
 ### locations
 
-`locations.<id>`: `kind` (`capital`, `elven_village`, `dungeon`),
-`display_name_zh`, `description`, `cell`, `geographic_constraint`,
-`scene_archetype` (nullable). Political/population/floor lore stays with its
-existing game owners.
+`locations.<id>`: `kind` (`capital`, `city`, `town`, `port`, `elven_village`,
+`dungeon`, `village`, `hamlet`), `display_name_zh`, `description`, `cell`,
+`geographic_constraint`, `scene_archetype` (nullable).
+Political/population/floor lore stays with its existing game owners.
 
 ### districts
 
