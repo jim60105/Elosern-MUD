@@ -28,6 +28,7 @@ from tools.settlement_spacing import (
     load_areas,
     main,
 )
+from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_TESTS = REPO_ROOT / "packages" / "map-core" / "tests"
@@ -113,6 +114,10 @@ def _straight(first: tuple[int, int], length: int, step: tuple[int, int]) -> tup
 class MinimumSpacingTests(unittest.TestCase):
     """Minimum spacing is checked by kind in straight-line distance."""
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_a_hamlet_at_the_minimum_passes_and_one_cell_closer_fails(self):
         town = _place("town_gate", "town", (0, 0))
         at_limit = _place("hamlet_edge", "hamlet", (0, 10))
@@ -132,6 +137,10 @@ class MinimumSpacingTests(unittest.TestCase):
         self.assertTrue(any("9.0 km" in message for message in messages))
         self.assertTrue(any("hamlet_edge" in message for message in messages))
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_a_village_below_the_minimum_is_reported_and_a_hamlet_pair_is_not(self):
         city = _place("city_big", "city", (0, 0))
         village = _place("village_fair", "village", (0, 19))
@@ -149,6 +158,10 @@ class MinimumSpacingTests(unittest.TestCase):
         self.assertEqual(_pairs(problems), [("village_spacing", "village_fair")])
         self.assertIn("city_big", problems[0].message)
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_a_hamlet_below_a_village_minimum_is_reported_under_the_hamlet(self):
         # The village comes first in the input, so a subject chosen by "the
         # small kind" rather than by "the hamlet" would report the village.
@@ -161,6 +174,10 @@ class MinimumSpacingTests(unittest.TestCase):
         self.assertEqual(_pairs(problems), [("hamlet_spacing", "hamlet_later")])
         self.assertIn("village_first", problems[0].message)
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_two_villages_too_close_are_reported_once(self):
         alpha = _place("village_alpha", "village", (0, 0))
         beta = _place("village_beta", "village", (0, 10))
@@ -174,6 +191,10 @@ class MinimumSpacingTests(unittest.TestCase):
         self.assertEqual(_pairs(problems), [("village_spacing", "village_alpha")])
         self.assertIn("village_beta", problems[0].message)
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_kinds_that_take_no_part_are_never_reported(self):
         places = [
             _place("hamlet_side", "hamlet", (0, 1)),
@@ -185,6 +206,10 @@ class MinimumSpacingTests(unittest.TestCase):
 
         self.assertEqual(check_spacing(_input(places), TIGHT), ())
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "minimum-spacing-is-checked-by-kind-in-straight-line-distance"
+    )
     def test_a_pair_is_reported_once_under_the_smaller_identifier(self):
         first = _place("hamlet_alpha", "hamlet", (0, 0))
         second = _place("hamlet_beta", "hamlet", (0, 5))
@@ -198,6 +223,7 @@ class MinimumSpacingTests(unittest.TestCase):
 class ExemptionTests(unittest.TestCase):
     """An exemption mark skips minimum spacing."""
 
+    @covers_requirement("settlement-spacing::an-exemption-mark-skips-minimum-spacing")
     def test_a_marked_hamlet_is_skipped_by_both_pairs(self):
         town = _place("town_bridge", "town", (0, 0))
         marked = _place(
@@ -213,6 +239,7 @@ class ExemptionTests(unittest.TestCase):
 
         self.assertEqual(check_spacing(_input([town, marked, unmarked]), TIGHT), ())
 
+    @covers_requirement("settlement-spacing::an-exemption-mark-skips-minimum-spacing")
     def test_a_mark_on_another_kind_has_no_effect(self):
         town = _place("town_marked", "town", (0, 0), exemption="A design exception.")
         hamlet = _place("hamlet_plain", "hamlet", (0, 5))
@@ -221,6 +248,7 @@ class ExemptionTests(unittest.TestCase):
 
         self.assertEqual(_pairs(problems), [("hamlet_spacing", "hamlet_plain")])
 
+    @covers_requirement("settlement-spacing::an-exemption-mark-skips-minimum-spacing")
     def test_a_marked_village_is_skipped_by_both_pairs(self):
         city = _place("city_anchor", "city", (0, 0))
         marked = _place(
@@ -246,6 +274,10 @@ class RoadCoverageTests(unittest.TestCase):
     def setUp(self):
         self.everywhere = Area("all_plain", PLAIN, None)
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
+    )
     def test_the_gap_boundary_is_inclusive(self):
         roads = [
             ("node_a", "node_b", _straight((0, 0), 5, (1, 0))),
@@ -262,6 +294,10 @@ class RoadCoverageTests(unittest.TestCase):
         self.assertIn("(5, 10)", message)
         self.assertIn("5.0 km", message)
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
+    )
     def test_a_hamlet_on_the_road_splits_the_gap(self):
         road = ("node_a", "node_c", _straight((0, 10), 6, (1, 0)))
         hamlet = _place("hamlet_on_road", "hamlet", (2, 10))
@@ -272,6 +308,10 @@ class RoadCoverageTests(unittest.TestCase):
 
         self.assertEqual(problems, ())
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
+    )
     def test_a_cell_that_elsewhere_is_a_road_end_counts(self):
         road = ("node_a", "node_c", _straight((0, 10), 6, (1, 0)))
         spur = ("node_d", "node_e", ((2, 11), (2, 10)))
@@ -282,6 +322,10 @@ class RoadCoverageTests(unittest.TestCase):
 
         self.assertEqual(problems, ())
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
+    )
     def test_off_road_places_and_elven_villages_do_not_count(self):
         road = ("node_a", "node_c", _straight((0, 10), 6, (1, 0)))
         beside = _place("hamlet_beside", "hamlet", (2, 11))
@@ -293,6 +337,10 @@ class RoadCoverageTests(unittest.TestCase):
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_c")])
 
+    @covers_requirement(
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
+    )
     def test_a_diagonal_step_is_the_square_root_of_two(self):
         straight_road = ("node_a", "node_b", _straight((0, 0), 5, (1, 0)))
         diagonal_road = ("node_a", "node_c", _straight((0, 20), 5, (1, 1)))
@@ -310,6 +358,9 @@ class RoadCoverageTests(unittest.TestCase):
 class CompletedAreaTests(unittest.TestCase):
     """Road coverage applies only inside completed areas."""
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_inside_a_crossing_and_outside_an_area(self):
         area = Area("west_box", PLAIN, (0, 0, 100, 100))
         roads = [
@@ -322,6 +373,9 @@ class CompletedAreaTests(unittest.TestCase):
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_b")])
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_a_rectangle_narrows_its_region(self):
         area = Area("narrow", PLAIN, (0, 0, 50, 50))
         road = ("node_a", "node_b", _straight((0, 80), 20, (1, 0)))
@@ -330,6 +384,9 @@ class CompletedAreaTests(unittest.TestCase):
             check_spacing(_input(roads=[road], areas=[area]), TIGHT), ()
         )
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_an_empty_area_list_checks_no_gap_but_keeps_the_other_rules(self):
         road = ("node_a", "node_b", _straight((0, 0), 20, (1, 0)))
         town = _place("town_mid", "town", (0, 40))
@@ -349,6 +406,9 @@ class AreaFileTests(unittest.TestCase):
             path.write_text(json.dumps(document), encoding="utf-8")
             return load_areas(path)
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_a_valid_list_keeps_its_bounds(self):
         areas = self._load(
             {
@@ -367,6 +427,9 @@ class AreaFileTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_invalid_files_fail_naming_the_entry(self):
         cases = [
             ({"areas": [], "extra": 1}, "extra"),
@@ -409,6 +472,9 @@ class AreaFileTests(unittest.TestCase):
 class IdentityTests(unittest.TestCase):
     """Villages and hamlets satisfy the placement identity rules."""
 
+    @covers_requirement(
+        "settlement-spacing::villages-and-hamlets-satisfy-the-placement-identity-rules"
+    )
     def test_one_fault_each(self):
         def region_of(cell):
             if 210 <= cell[0] < 260:
@@ -478,6 +544,9 @@ class IdentityTests(unittest.TestCase):
         )
         self.assertIn("hamlet_", prefix.message)
 
+    @covers_requirement(
+        "settlement-spacing::villages-and-hamlets-satisfy-the-placement-identity-rules"
+    )
     def test_a_reserved_prefix_and_a_duplicate_display_name(self):
         places = [
             _place("village_impostor", "town", (0, 0)),
@@ -568,6 +637,9 @@ class CommandTests(unittest.TestCase):
         data["locations"]["hamlet_test"]["cell"]["cell_y"] = cell_y
         path.write_text(fixtures.yaml_text(data), encoding="utf-8")
 
+    @covers_requirement(
+        "settlement-spacing::the-spacing-command-reports-by-exit-status-and-writes-nothing"
+    )
     def test_three_runs_report_by_exit_status_and_write_nothing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -597,6 +669,9 @@ class CommandTests(unittest.TestCase):
             self.assertIn("roads.json", err)
             self.assertEqual(self._digests(root), before)
 
+    @covers_requirement(
+        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+    )
     def test_an_undeclared_area_region_fails_by_exit_status(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

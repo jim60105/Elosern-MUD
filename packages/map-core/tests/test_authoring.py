@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import sys
+from pathlib import Path
 
 import pytest
+
+# The package keeps its own project and lock, so the repository root that hosts
+# the traceability helper is not on this interpreter's path.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from tools.spec_traceability import covers_requirement  # noqa: E402
 
 import authoring_fixtures as fixtures
 from elosern_map_core.authoring import (
@@ -566,6 +576,9 @@ def _locations_with_exemption(**fields):
     return locations
 
 
+@covers_requirement(
+    "map-geographic-sources::a-location-accepts-an-optional-spacing-exemption-reason"
+)
 def test_location_spacing_exemption_survives_parse_and_serialization():
     reason = "Border post beside the bridge town; the garrison lives outside the walls."
     world = load_authoring_world(
@@ -586,6 +599,9 @@ def test_location_spacing_exemption_survives_parse_and_serialization():
     assert reparsed.locations["demo_location"].spacing_exemption is None
 
 
+@covers_requirement(
+    "map-geographic-sources::a-location-accepts-an-optional-spacing-exemption-reason"
+)
 @pytest.mark.parametrize(
     "reason",
     [
