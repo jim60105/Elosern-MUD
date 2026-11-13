@@ -8,6 +8,7 @@ from django.db import transaction
 from twisted.internet import defer
 
 from web.webclient.presentation.protocol import check_json_safety, json_byte_size, ProtocolValidationError
+from world.narrative import dream_proposal
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
 from world.narrative.authoring import (
@@ -17,8 +18,6 @@ from world.narrative.authoring import (
     MAX_DIRECTION_BYTES,
     MAX_SUMMARY_CHARACTERS,
     collaborator_creative_brief,
-    get_draft,
-    reviewed_version_matches,
     validate_direction,
 )
 from world.observability import log_info, log_warn
@@ -42,6 +41,12 @@ def _result(outcome, code, message, *, panels=("dream",)):
         "message": message,
         "affected_panels": panels,
     }
+
+
+def _refuse(boundary, code, message):
+    """One stage refusal: a warn trace carrying the code, and nothing written."""
+    log_warn("dream_surface_rejected", context={**boundary, "reason": code})
+    return _result("rejected", code, message)
 
 
 def _direction_refusal(error: AuthoringError) -> str:
@@ -331,17 +336,36 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                     or current.session_id != session_id or current.revision != revision):
                 log_warn("dream_surface_rejected", context={**boundary, "reason": "stale_or_owner"})
                 return _result("rejected", "stale_dream", "夢境狀態已更新，請重新查看。")
-            if action not in {"choose_thread", "say", "draft", "confirm", "awaken"}:
+            if action not in {"choose_thread", "say", "finalize", "draft", "confirm", "awaken"}:
                 return _result("rejected", "unknown_dream_action", "無法執行這個夢境操作。")
             if action != "awaken" and current.state != lifecycle.STATE_OPEN:
                 return _result("rejected", "dream_closed", "夢境已結束。")
+            # One stage, one rule: manual editing is allowed exactly when free
+            # text is closed. Every refusal below writes nothing.
+            wish = surface.wish_state(actor)
+            supplied = (
+                direction
+                if isinstance(direction, dict)
+                else (direction or "").strip()
+            )
+            finalized = current.stage != lifecycle.STAGE_CONVERSING
+            if finalized and action in {"say", "finalize"}:
+                return _refuse(boundary, "dream_finalized", "你已停止訴說，願望改由你親自修改。")
+            if finalized and action == "choose_thread":
+                return _refuse(boundary, "thread_choice_closed", "這一夜的訴說已經結束，願望的歸屬不能再改。")
+            if action == "finalize" and current.pending_submission_id:
+                return _refuse(boundary, "dream_pending_response", "女神還在回應，請稍候再停止訴說。")
+            if action == "confirm" and not finalized:
+                return _refuse(boundary, "not_finalized", "請先停止訴說，再許下願望。")
+            if action == "draft" and not finalized and supplied:
+                return _refuse(boundary, "direction_locked", "訴說期間願望由女神修改；停止訴說後才能親自修改。")
             tick = int(surface.association(actor)["sleep"]["tick_to"])
             if action == "choose_thread":
                 # The choice precedes the first message and then locks: it is
                 # refused without a write both after an accepted message
                 # (including one whose generation failed) and for a thread this
                 # owner is not currently offered.
-                if surface.wish_state(actor)["thread_locked"]:
+                if wish["thread_locked"]:
                     log_warn("dream_surface_rejected", context={**boundary, "reason": "thread_locked"})
                     return _result("rejected", "thread_locked", "說出第一句話後，願望的歸屬便不能再改。")
                 if thread_id is not None and thread_id not in [
@@ -352,13 +376,21 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                 surface.bump_revision_if_unchanged(actor, revision)
                 log_info("dream_surface_action", context={**boundary, "tick": tick})
                 return _result("success", "dream_choose_thread", "已選定願望的歸屬。")
+            if action == "finalize":
+                # Closing free text is the owner's own act; the working
+                # proposal becomes the session draft it takes over from.
+                lifecycle.finalize_session(session_id, owner, tick=tick)
+                lifecycle.preserve_draft(session_id, owner, surface.working_direction(actor), tick=tick)
+                text = "你停止了訴說。接下來由你親自修改願望。"
+                actor.msg(text)
+                log_info("dream_surface_action", context={**boundary, "tick": tick})
+                return _result("success", "dream_finalize", text)
             if action == "say":
                 turn = lifecycle.begin_turn(session_id, owner, message, tick=tick)
                 # The message is the turn's input, never the proposal: the
                 # accepted turn locks the thread choice and the collaborator
                 # receives the proposal as it stands before this exchange.
                 surface.lock_thread(actor)
-                wish = surface.wish_state(actor)
                 proposal = wish["proposal"]
                 thread_label = next(
                     (entry["label"] for entry in surface.offered_threads(actor)
@@ -367,7 +399,13 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                 )
                 completed = current.completed_exchanges
             else:
-                if isinstance(direction, dict):
+                passthrough = {}
+                form_thread = wish["thread_id"]
+                proposal = wish["proposal"]
+                # Only the actions that take content can carry a form: a
+                # departure leaves both the proposal and the draft alone.
+                form = finalized and supplied and action in {"draft", "confirm"}
+                if form and isinstance(direction, dict):
                     check_json_safety(direction)
                     if (set(direction) - DIRECTION_KEYS or not isinstance(direction.get("summary", ""), str)
                             or len(direction.get("summary", "")) > MAX_SUMMARY_CHARACTERS):
@@ -378,20 +416,50 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                     # ingress must not refuse it with a tighter cap.
                     if json_byte_size(direction) > MAX_DIRECTION_BYTES:
                         return _result("rejected", "direction_too_large", f"故事方向 JSON 上限為 {MAX_DIRECTION_BYTES} 位元組。")
-                    payload = direction
-                elif direction.strip():
-                    if len(direction.strip()) > MAX_SUMMARY_CHARACTERS:
+                    # The form keeps the locked choice. The key's presence is
+                    # what the rule reads: an omitted key keeps the choice (a
+                    # text client's form never names it), a present string must
+                    # repeat it, and a present null may only release a choice
+                    # whose thread has ended.
+                    if "thread_id" in direction:
+                        candidate = direction["thread_id"]
+                        if isinstance(candidate, str):
+                            if candidate != wish["thread_id"]:
+                                return _refuse(boundary, "thread_locked", "說出第一句話後，願望的歸屬便不能再改。")
+                        elif candidate is None:
+                            offered = {entry["id"] for entry in surface.offered_threads(actor)}
+                            if wish["thread_id"] in offered:
+                                return _refuse(boundary, "thread_locked", "說出第一句話後，願望的歸屬便不能再改。")
+                        else:
+                            return _refuse(boundary, "thread_locked", "說出第一句話後，願望的歸屬便不能再改。")
+                        form_thread = candidate
+                    try:
+                        proposal = dream_proposal.normalize_proposal(direction)
+                    except dream_proposal.ProposalEditError:
+                        log_warn(
+                            "dream_surface_rejected",
+                            context={**boundary, "reason": "invalid_direction"},
+                        )
+                        return _result(
+                            "rejected", "invalid_direction", "願望的內容不完整或超出限制。"
+                        )
+                    passthrough = {
+                        key: direction[key] for key in ("effects", "revisions")
+                        if key in direction
+                    }
+                elif form:
+                    if len(supplied) > MAX_SUMMARY_CHARACTERS:
                         return _result("rejected", "direction_too_large", "故事方向摘要上限為 2000 字。")
-                    payload = {"kind": "new_story", "summary": direction.strip()}
-                else:
-                    # A bare draft saves the working proposal; a bare
-                    # confirmation or awakening echoes the saved draft, or
-                    # the working proposal when nothing was saved yet.
-                    if action == "draft" or not current.draft_id:
-                        payload = surface.working_direction(actor)
-                    else:
-                        payload = get_draft(current.draft_id, owner).direction
-                summary = str(payload.get("summary", ""))
+                    # A typed form rewrites the summary the player can read and
+                    # keeps the lists and requirement rows the stage shows.
+                    proposal = {**wish["proposal"], "summary": supplied}
+                # The refusal comes before the surface write: a confirmation
+                # without a formed wish must leave the dream exactly as it was.
+                if action == "confirm" and not str(proposal["summary"]).strip():
+                    return _refuse(boundary, "empty_direction", "請先讓願望成形，再許下願望。")
+                if form:
+                    surface.store_proposal(actor, proposal, thread_id=form_thread)
+                payload = {**surface.working_direction(actor), **passthrough}
                 if action == "draft":
                     try:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
@@ -408,25 +476,14 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                         )
                     surface.bump_revision_if_unchanged(actor, revision)
                 elif action == "confirm":
-                    if not summary.strip():
-                        return _result("rejected", "empty_direction", "請先提出要確認的故事方向。")
-                    # Bounded shown experience requirements: a submission may
-                    # only freeze what the surface actually showed for this
-                    # draft version. Deterministic equality, no model call.
-                    shown = get_draft(current.draft_id, owner) if current.draft_id else None
-                    if shown is not None and not reviewed_version_matches(payload, draft=shown):
-                        log_warn(
-                            "dream_surface_rejected",
-                            context={**boundary, "reason": "stale_requirements"},
-                        )
-                        return _result(
-                            "rejected",
-                            "stale_requirements",
-                            REASON_MESSAGES["stale_requirements"],
-                        )
-                    validation = validate_direction(payload, owner_id=owner)
+                    # The form the player submits here is the version shown:
+                    # saving it above stamped its requirement identity, so the
+                    # check runs on exactly what that save produced and what
+                    # gets confirmed is what the player wrote. Deterministic,
+                    # no model call.
+                    draft = lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    validation = validate_direction(draft.direction, owner_id=owner)
                     if not validation.valid:
-                        lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
                         surface.bump_revision_if_unchanged(actor, revision)
                         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_direction", "reason_codes": validation.reason_codes})
                         return _result("rejected", "invalid_direction", "；".join(reason.message for reason in validation.reasons))
@@ -435,7 +492,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                     # confirmation never claims an arrangement.
                     from world.narrative import dispatch_status
 
-                    lifecycle.confirm_session(session_id, owner, direction=payload, tick=tick)
+                    lifecycle.confirm_session(session_id, owner, tick=tick)
                     authorize_departure_continuation(actor)
                     # Delivered only once the confirmation has committed, so a
                     # rolled-back confirmation never produced a receipt. The
@@ -444,8 +501,13 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                         lambda: dispatch_status.deliver_status(actor)
                     )
                 else:
-                    if not current.draft_id and summary.strip() and current.state == lifecycle.STATE_OPEN:
-                        lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    # Awakening keeps the version that is right for the stage:
+                    # a conversation still in progress saves what the
+                    # collaborator last produced, while a finalized session
+                    # leaves the draft its finalize (or sixth exchange) saved.
+                    if (current.state == lifecycle.STATE_OPEN and not finalized
+                            and not dream_proposal.is_empty(wish["proposal"])):
+                        lifecycle.preserve_draft(session_id, owner, surface.working_direction(actor), tick=tick)
                     lifecycle.awaken_session(session_id, owner, tick=tick)
                     authorize_departure_continuation(actor)
                     # The departure is only durable once this transaction
@@ -456,7 +518,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                     # it has already left.
                     on_publication_commit(lambda: _refresh(actor, session))
                 state = dream_state(actor)
-                text = state["ending"] or "故事方向已存為私人草稿。"
+                text = state["ending"] or "願望已替你收著。"
                 actor.msg(text)
                 log_info("dream_surface_action", context={**boundary, "completed": state["completed"], "tick": tick})
                 # The departure changes the dream surface itself, so its result
@@ -502,6 +564,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
             wish = surface.wish_state(actor)
             if (not _controlled(actor, session) or latest is None
                     or latest.session_id != session_id or latest.state != lifecycle.STATE_OPEN
+                    or latest.stage != lifecycle.STAGE_CONVERSING
                     or latest.pending_submission_id != turn.submission_id
                     or wish is None or wish["proposal"] != proposal):
                 lifecycle.abandon_turn(session_id, owner, turn.submission_id, reason="stale_surface", tick=tick)
@@ -519,6 +582,13 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
             lifecycle.settle_exchange(session_id, owner, turn.submission_id,
                                       "dream:" + turn.submission_id, tick=tick)
             surface.store_response(actor, response)
+            if completed + 1 >= lifecycle.MAX_EXCHANGES:
+                # The sixth exchange closes free text: the proposal that
+                # exchange produced becomes the session draft in the same
+                # transaction that counted it.
+                lifecycle.preserve_draft(
+                    session_id, owner, surface.working_direction(actor), tick=tick
+                )
             log_info("dream_surface_action", context={**boundary, "completed": completed + 1, "tick": tick})
         return _result("success", "dream_delivered", "夢境回應已送達。")
     except Exception as error:

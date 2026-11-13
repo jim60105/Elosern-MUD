@@ -29,6 +29,8 @@ from world.narrative.authoring import (
 from world.narrative.dream_session import (
     MAX_EXCHANGES,
     MAX_RENDERED_INPUT_CHARS,
+    STAGE_CONVERSING,
+    STAGE_FINALIZED,
     DreamExchangeConflictError,
     DreamInputRejected,
     DreamOutstandingTurnError,
@@ -40,6 +42,7 @@ from world.narrative.dream_session import (
     begin_turn,
     choices,
     confirm_session,
+    finalize_session,
     get_session,
     list_exchanges,
     list_open_sessions,
@@ -48,6 +51,7 @@ from world.narrative.dream_session import (
     preserve_draft,
     progress,
     remaining_exchanges,
+    resume_saved_session,
     settle_exchange,
 )
 from world.narrative.models import (
@@ -270,6 +274,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
         self.assertTrue(view.at_cap)
         self.assertTrue(view.converging)
         self.assertFalse(view.free_text_allowed)
+        self.assertEqual(final.stage, STAGE_FINALIZED)
         offered = choices(final)
         self.assertFalse(offered.can_input)
         self.assertTrue(offered.can_confirm)
@@ -294,7 +299,7 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
         self.complete_exchanges(session, 2)
         offered = choices(get_session(session.session_id, self.owner_id))
         self.assertTrue(offered.can_input)
-        self.assertTrue(offered.can_confirm)
+        self.assertFalse(offered.can_confirm)
         self.assertTrue(offered.can_preserve_draft)
         self.assertTrue(offered.can_awaken)
         draft = preserve_draft(
@@ -302,6 +307,11 @@ class DreamSessionBudgetTests(DreamSessionTestCase):
         )
         self.assertEqual(CreativeRequest.objects.count(), 0)
         self.assertFalse(draft_is_confirmed(get_draft(draft.draft_id, self.owner_id)))
+        # An explicit finalize is what makes the confirmation available.
+        finalize_session(session.session_id, self.owner_id, tick=201)
+        self.assertTrue(
+            choices(get_session(session.session_id, self.owner_id)).can_confirm
+        )
 
     def test_a_second_different_turn_is_refused_while_one_is_outstanding(self):
         session = self.open()
@@ -497,6 +507,170 @@ class DreamSessionFailureTests(DreamSessionTestCase):
             [row.pk for row in list_open_sessions(self.owner_id)], [older.pk, newer.pk]
         )
         self.assertEqual(open_session_for(self.owner_id).pk, newer.pk)
+
+
+class DreamSessionStageTests(DreamSessionTestCase):
+    """One stage per session: conversing until the owner or the cap finalizes."""
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_progress_and_choices_follow_the_stage(self):
+        session = self.open()
+        self.assertEqual(session.stage, STAGE_CONVERSING)
+        self.assertTrue(progress(session).free_text_allowed)
+        self.assertFalse(choices(session).can_confirm)
+
+        finalized = finalize_session(session.session_id, self.owner_id, tick=200)
+        self.assertEqual(finalized.stage, STAGE_FINALIZED)
+        stored = get_session(session.session_id, self.owner_id)
+        self.assertFalse(progress(stored).free_text_allowed)
+        self.assertTrue(choices(stored).can_confirm)
+        # Draft preservation stays available: leaving early is not a stage.
+        self.assertTrue(choices(stored).can_preserve_draft)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_finalize_closes_free_text_once_and_survives_a_repeat(self):
+        session = self.open()
+        first = finalize_session(session.session_id, self.owner_id, tick=200)
+        self.assertEqual(first.stage, STAGE_FINALIZED)
+        revision = int(first.revision)
+
+        again = finalize_session(session.session_id, self.owner_id, tick=300)
+        self.assertEqual(again.stage, STAGE_FINALIZED)
+        self.assertEqual(int(again.revision), revision)
+
+        with self.assertRaises(DreamSessionClosedError):
+            begin_turn(
+                session.session_id,
+                self.owner_id,
+                "停止訴說後的訊息",
+                submission_id="submission_after_finalize",
+                tick=301,
+            )
+        stored = get_session(session.session_id, self.owner_id)
+        self.assertEqual(stored.pending_submission_id, "")
+        self.assertEqual(stored.completed_exchanges, 0)
+        self.assertEqual(DreamExchange.objects.count(), 0)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_finalize_refuses_an_outstanding_turn(self):
+        session = self.open()
+        begin_turn(
+            session.session_id,
+            self.owner_id,
+            "女神仍在回應的訊息",
+            submission_id="submission_pending",
+            tick=100,
+        )
+        with self.assertRaises(DreamOutstandingTurnError):
+            finalize_session(session.session_id, self.owner_id, tick=101)
+        stored = get_session(session.session_id, self.owner_id)
+        self.assertEqual(stored.stage, STAGE_CONVERSING)
+        self.assertEqual(stored.pending_submission_id, "submission_pending")
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_finalize_refuses_a_closed_session(self):
+        session = self.open()
+        awaken_session(session.session_id, self.owner_id, tick=100)
+        with self.assertRaises(DreamSessionClosedError):
+            finalize_session(session.session_id, self.owner_id, tick=101)
+        self.assertEqual(
+            get_session(session.session_id, self.owner_id).stage, STAGE_CONVERSING
+        )
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_the_sixth_exchange_finalizes_the_session(self):
+        session = self.open(session_id="dream_session_stage_cap")
+        self.complete_exchanges(session, MAX_EXCHANGES - 1)
+        self.assertEqual(
+            get_session(session.session_id, self.owner_id).stage, STAGE_CONVERSING
+        )
+
+        turn = begin_turn(
+            session.session_id,
+            self.owner_id,
+            "第六次交流",
+            submission_id="submission_sixth",
+            tick=106,
+        )
+        settle_exchange(
+            session.session_id,
+            self.owner_id,
+            turn.submission_id,
+            "delivery_sixth",
+            response_ref="response:sixth",
+            tick=106,
+        )
+        final = get_session(session.session_id, self.owner_id)
+        self.assertEqual(final.stage, STAGE_FINALIZED)
+        self.assertFalse(progress(final).free_text_allowed)
+        self.assertTrue(choices(final).can_confirm)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-later-sleep-reopens-an-unfinalized-conversation"
+    )
+    def test_a_later_sleep_reopens_a_finalized_conversation_with_exchanges_left(self):
+        session = self.open(session_id="dream_session_reopened")
+        self.complete_exchanges(session, 2)
+        finalize_session(session.session_id, self.owner_id, tick=200)
+        awaken_session(session.session_id, self.owner_id, tick=201)
+
+        resumed = resume_saved_session(
+            session.session_id, self.owner_id, reopen_conversation=True, tick=900
+        )
+        self.assertEqual(resumed.state, "open")
+        self.assertEqual(resumed.stage, STAGE_CONVERSING)
+        turn = begin_turn(
+            session.session_id,
+            self.owner_id,
+            "回到夢中繼續說",
+            submission_id="submission_reopened",
+            tick=901,
+        )
+        self.assertEqual(turn.progress.completed, 2)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-later-sleep-reopens-an-unfinalized-conversation"
+    )
+    def test_a_finalized_session_without_exchanges_left_stays_finalized(self):
+        session = self.open(session_id="dream_session_capped_reopened")
+        self.complete_exchanges(session, MAX_EXCHANGES)
+        awaken_session(session.session_id, self.owner_id, tick=300)
+
+        resumed = resume_saved_session(
+            session.session_id, self.owner_id, reopen_conversation=True, tick=900
+        )
+        self.assertEqual(resumed.state, "open")
+        self.assertEqual(resumed.stage, STAGE_FINALIZED)
+        with self.assertRaises(DreamSessionClosedError):
+            begin_turn(
+                session.session_id,
+                self.owner_id,
+                "第七次交流",
+                submission_id="submission_seven_reopened",
+                tick=901,
+            )
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-later-sleep-reopens-an-unfinalized-conversation"
+    )
+    def test_resume_within_the_same_sleep_does_not_reopen_the_stage(self):
+        session = self.open(session_id="dream_session_same_sleep")
+        self.complete_exchanges(session, 1)
+        finalize_session(session.session_id, self.owner_id, tick=200)
+
+        resumed = resume_saved_session(session.session_id, self.owner_id, tick=201)
+        self.assertEqual(resumed.state, "open")
+        self.assertEqual(resumed.stage, STAGE_FINALIZED)
 
 
 class DreamSessionConfirmationTests(DreamSessionTestCase):

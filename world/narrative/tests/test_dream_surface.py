@@ -285,6 +285,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(state["remaining"], 5)
         self.assertEqual(state["track"]["completed"], 1)
         with patch("world.ai.client.OpenAICompatClient", side_effect=AssertionError("escape called model")):
+            self.assertEqual(self.request("finalize").result["outcome"], "success")
             self.assertEqual(self.request("draft").result["outcome"], "success")
             self.assertEqual(CreativeRequest.objects.count(), 0)
             self.assertEqual(self.request("confirm", direction="在無名港繼續尋找失落的鐘聲。").result["outcome"], "success")
@@ -313,7 +314,11 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertFalse(state["can_input"])
         self.assertTrue(state["can_confirm"] and state["can_draft"] and state["can_awaken"])
         self.assertNotIn("dream say", render_state(state))
-        self.assertEqual(self.request("say", message="第七次", client=self.delivered()).result["outcome"], "rejected")
+        refused = self.request("say", message="第七次", client=self.delivered()).result
+        self.assertEqual(refused["outcome"], "rejected")
+        # The sixth exchange closed the conversation: the stage, not only the
+        # count, refuses the message.
+        self.assertEqual(refused["code"], "dream_finalized")
         self.assertEqual(self.request("draft").result["outcome"], "success")
         self.assertEqual(self.request("awaken").result["outcome"], "success")
         self.assertEqual(self.physical(), physical)
@@ -439,6 +444,13 @@ class DreamSurfaceTests(EvenniaTest):
         state = service.dream_state(self.actor)
         self.assertIn({"id": thread.thread_id, "label": "未命名的故事線"}, state["thread_choices"])
         self.assertNotIn("synthetic-private-thread", [choice["id"] for choice in state["thread_choices"]])
+        # The choice is open only while conversing; the direction the player
+        # writes afterwards may only keep it.
+        self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
         direction = {"kind": "thread_direction", "thread_id": thread.thread_id,
                      "summary": "沿著已知故事尋找鐘聲。", "themes": ["鐘聲"],
                      "atmosphere": ["安靜"], "emphasis": ["探索"], "exclusions": ["暴力"]}
@@ -481,6 +493,7 @@ class DreamSurfaceTests(EvenniaTest):
 
     def test_text_command_calls_shared_lifecycle_and_logs_no_prose(self):
         self.enter()
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
         command = CmdDream()
         command.caller = self.actor
         command.session = None
@@ -497,12 +510,18 @@ class DreamSurfaceTests(EvenniaTest):
         direction = {"kind": "thread_direction", "thread_id": thread.thread_id,
                      "summary": "在既有故事中尋找鐘聲。", "themes": ["鐘聲"],
                      "exclusions": ["暴力"]}
-        self.assertEqual(self.request("draft", direction=direction).result["outcome"], "success")
+        self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
         self.assertEqual(self.request("say", message="我還想繼續討論。", client=self.delivered()).result["outcome"], "success")
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("draft", direction=direction).result["outcome"], "success")
         state = service.dream_state(self.actor)
         self.assertEqual("".join(state["direction_parts"]), direction["summary"])
         self.assertEqual(state["draft_preferences"]["thread_id"], thread.thread_id)
-        self.assertEqual(self.request("confirm").result["outcome"], "success")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.request("confirm").result["outcome"], "success")
         stored = CreativeRequest.objects.get()
         self.assertEqual(stored.direction["kind"], "thread_direction")
         self.assertEqual(stored.direction["thread_id"], thread.thread_id)
@@ -514,12 +533,19 @@ class DreamSurfaceTests(EvenniaTest):
 
     def test_blank_confirmation_concrete_input_refusals_and_single_text_ending(self):
         self.enter()
-        self.assertEqual(self.request("confirm").result["code"], "empty_direction")
+        # A confirmation before the conversation stops is refused with a
+        # reason, and it writes nothing at all.
+        self.assertEqual(self.request("confirm").result["code"], "not_finalized")
         self.assertFalse(surface.associated_session(self.actor).draft_id)
         client = self.delivered()
         self.assertEqual(self.request("say", message="", client=client).result["code"], "empty_input")
         self.assertEqual(self.request("say", message="界" * 4001, client=client).result["code"], "oversized_input")
         self.assertEqual(client.calls, [])
+        # The finalize saves the (still empty) working proposal; the
+        # confirmation keeps refusing to freeze a wish with no content.
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("confirm").result["code"], "empty_direction")
+        self.assertFalse(CreativeRequest.objects.exists())
         command = CmdDream()
         command.caller = self.actor
         command.session = None
@@ -528,7 +554,6 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(command.func().result["outcome"], "success")
         ending = service.dream_state(self.actor)["ending"]
         self.assertEqual([call.args[0] for call in self.actor.msg.call_args_list].count(ending), 1)
-        self.assertFalse(surface.associated_session(self.actor).draft_id)
 
     @covers_requirement(
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
@@ -855,6 +880,7 @@ class DreamSurfaceTests(EvenniaTest):
             "summary": "在南門遇見一個女孩。",
             "requirements": [{"kind": "place", "text": "南門"}],
         }
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
         self.assertEqual(
             self.request("draft", direction=dict(direction)).result["outcome"],
             "success",
@@ -869,15 +895,13 @@ class DreamSurfaceTests(EvenniaTest):
         rendered = render_state(state)
         self.assertIn("已檢視的版本", rendered)
         self.assertIn(shown, rendered)
-        # A typed plain-text direction carries no reviewed version, so it is
-        # refused as a stale review; the argument-less confirmation echoes the
-        # stored draft and succeeds.
-        typed = self.request("confirm", direction="在南門遇見一個女孩。")
-        self.assertEqual(typed.result["code"], "stale_requirements")
-        self.assertFalse(CreativeRequest.objects.exists())
+        # The argument-less confirmation confirms the version the line names.
         with self.captureOnCommitCallbacks(execute=True):
             confirmed = self.request("confirm")
         self.assertEqual(confirmed.result["outcome"], "success")
+        self.assertEqual(
+            CreativeRequest.objects.get().direction["requirement_version"], shown
+        )
 
     def test_a_failed_confirmation_rolls_back_work_and_compensates_the_surface(self):
         # The delta's own failure scenario: the work record fails inside the
@@ -888,6 +912,7 @@ class DreamSurfaceTests(EvenniaTest):
         from world.narrative.models import DreamDispatch
 
         self.enter()
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
         before = surface.association(self.actor)
 
         def explode(*args, **kwargs):
@@ -904,41 +929,48 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertTrue(service.dream_state(self.actor)["open"])
         self.assertEqual(surface.association(self.actor), before)
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
+    )
     @covers_requirement(
         "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch",
         "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces",
     )
-    def test_confirmation_requires_the_shown_requirement_version(self):
-        # A proposed requirement set becomes reviewable only when the version
-        # that carries it is persisted, and confirmation must echo exactly that
-        # version: a blank or stale review is refused, never silently frozen.
+    def test_an_edited_proposal_confirms_what_was_submitted(self):
+        # The finalized stage is the player's own hand: an edited summary and
+        # edited requirement rows are saved as the shown version and confirmed
+        # as exactly that version, in one submit and with no model call.
         self.enter()
         requirements = [
             {"kind": "place", "text": "南門"},
             {"kind": "new_character", "text": "一個女孩"},
             {"kind": "private_commission", "text": "帶她找媽媽"},
         ]
-        direction = {
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        submitted = {
             "kind": "new_story",
             "thread_id": None,
-            "summary": "在南門遇見一個女孩，幫她找媽媽。",
+            "summary": "改寫後的念頭：在南門等一個女孩，帶她找媽媽。",
             "requirements": requirements,
-            "requirement_version": None,
+            "themes": ["重逢"],
         }
         self.assertEqual(
-            self.request("draft", direction=direction).result["outcome"], "success"
+            self.request("draft", direction=dict(submitted)).result["outcome"],
+            "success",
         )
-        shown = service.dream_state(self.actor)["requirement_version"]
+        state = service.dream_state(self.actor)
+        shown = state["requirement_version"]
         self.assertTrue(shown)
-        self.assertEqual(
-            self.request("confirm", direction=direction).result["code"],
-            "stale_requirements",
-        )
-        self.assertFalse(CreativeRequest.objects.exists())
+        # The submitted form is the working proposal and the shown version.
+        wish = surface.wish_state(self.actor)
+        self.assertEqual(wish["proposal"]["summary"], submitted["summary"])
+        self.assertEqual(wish["proposal"]["requirements"], requirements)
+        self.assertIsNone(wish["changes"])
+        self.assertEqual(state["requirements"], requirements)
         with self.captureOnCommitCallbacks(execute=True):
-            confirmed = self.request(
-                "confirm", direction={**direction, "requirement_version": shown}
-            )
+            confirmed = self.request("confirm")
         self.assertEqual(confirmed.result["outcome"], "success")
         # The receipt is truthful: it reports preparation, never an arrangement
         # or an existing encounter, and it travels as ordinary output.
@@ -946,64 +978,22 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertTrue(any("正在準備中" in line for line in receipts), receipts)
         self.assertFalse(any("已有可執行的安排" in line for line in receipts), receipts)
         stored = CreativeRequest.objects.get()
+        self.assertEqual(stored.direction["summary"], submitted["summary"])
         self.assertEqual(stored.direction["requirements"], requirements)
         self.assertEqual(stored.direction["requirement_version"], shown)
-
-    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
-    @covers_requirement(
-        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
-        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
-    )
-    def test_an_edited_summary_cannot_freeze_the_shown_requirement_version(self):
-        # The review is bound to the version the player actually read: echoing
-        # the shown rows and identity under a different summary freezes
-        # requirements that were never presented for that direction, so the
-        # confirmation is refused deterministically on the server, not only by
-        # whatever client happens to ask.
-        self.enter()
-        requirements = [
-            {"kind": "place", "text": "南門"},
-            {"kind": "new_character", "text": "一個女孩"},
-            {"kind": "private_commission", "text": "帶她找媽媽"},
-        ]
-        shown_direction = {
-            "kind": "new_story",
-            "thread_id": None,
-            "summary": "在南門遇見一個女孩，幫她找媽媽。",
-            "requirements": requirements,
-        }
-        self.assertEqual(
-            self.request("draft", direction=dict(shown_direction)).result["outcome"],
-            "success",
-        )
-        shown = service.dream_state(self.actor)["requirement_version"]
-        self.assertTrue(shown)
-
-        edited = {
-            **shown_direction,
-            "summary": "改寫後的念頭：我想在碼頭等一艘船。",
-            "requirement_version": shown,
-        }
-        refused = self.request("confirm", direction=edited)
-        self.assertEqual(refused.result["code"], "stale_requirements")
-        self.assertFalse(CreativeRequest.objects.exists())
-        # The shown version survived the refusal untouched, and the very same
-        # rows confirm under the summary they were shown with.
-        self.assertEqual(service.dream_state(self.actor)["requirement_version"], shown)
-        with self.captureOnCommitCallbacks(execute=True):
-            confirmed = self.request(
-                "confirm", direction={**shown_direction, "requirement_version": shown}
-            )
-        self.assertEqual(confirmed.result["outcome"], "success")
 
     def test_a_malformed_requirement_set_never_reaches_a_draft_or_the_panel(self):
         # The panel state is strict on both sides: rows the validator would
         # refuse must never be persisted, or the published payload could not be
-        # rendered by any client at all.
-        from world.narrative.authoring import REASON_MESSAGES
+        # rendered by any client at all. A submitted form reaches the applier
+        # first, so its refusal is the finalized stage's own reason.
         from world.narrative.models import AuthoringDraft
 
         self.enter()
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        # The finalize saved the still-empty working proposal: that is the one
+        # draft this dream has, and no malformed row may enter it.
+        self.assertEqual(AuthoringDraft.objects.count(), 1)
         for rows in (
             [{"kind": "explode", "text": "南門"}],
             [{"kind": "place", "text": "南門", "extra": "x"}],
@@ -1020,9 +1010,10 @@ class DreamSurfaceTests(EvenniaTest):
                 )
                 self.assertEqual(refused.result["code"], "invalid_direction")
                 self.assertEqual(
-                    refused.result["message"], REASON_MESSAGES["malformed_requirements"]
+                    refused.result["message"], "願望的內容不完整或超出限制。"
                 )
-        self.assertEqual(AuthoringDraft.objects.count(), 0)
+        self.assertEqual(AuthoringDraft.objects.count(), 1)
+        self.assertEqual(AuthoringDraft.objects.get().direction["requirements"], [])
         state = service.dream_state(self.actor)
         self.assertEqual(state["requirements"], [])
         self.assertIsNone(state["requirement_version"])
@@ -1237,9 +1228,14 @@ class DreamSurfaceTests(EvenniaTest):
             participants=[str(self.actor.pk)],
         )
         self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
             self.request("say", message="鐘聲", client=self.delivered()).result["outcome"],
             "success",
         )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
         self.assertEqual(
             self.request("draft", direction={
                 "kind": "thread_direction", "thread_id": thread.thread_id,
@@ -1390,6 +1386,426 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertTrue(wish["thread_locked"])
         self.assertEqual(self.request("choose_thread", thread_id=None).result["code"], "thread_locked")
         self.assertEqual(surface.wish_state(self.actor)["thread_id"], thread.thread_id)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_a_draft_with_content_is_refused_while_conversing(self):
+        self.enter()
+        submitted = {"kind": "new_story", "summary": "訴說期間寫下的願望。"}
+        for direction in (submitted, submitted["summary"]):
+            with self.subTest(direction=direction):
+                refused = self.request("draft", direction=direction).result
+                self.assertEqual(refused["outcome"], "rejected")
+                self.assertEqual(refused["code"], "direction_locked")
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"], dream_proposal.empty_proposal()
+        )
+        self.assertFalse(surface.associated_session(self.actor).draft_id)
+        self.assertFalse(CreativeRequest.objects.exists())
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_confirm_before_finalize_is_refused(self):
+        self.enter()
+        refused = self.request(
+            "confirm", direction={"kind": "new_story", "summary": "先行確認的願望。"}
+        ).result
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "not_finalized")
+        self.assertFalse(CreativeRequest.objects.exists())
+        self.assertTrue(service.dream_state(self.actor)["open"])
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_a_bare_draft_while_conversing_saves_the_working_proposal(self):
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("draft").result["outcome"], "success")
+        session = surface.associated_session(self.actor)
+        self.assertEqual(session.stage, lifecycle.STAGE_CONVERSING)
+        draft = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
+        self.assertFalse(CreativeRequest.objects.exists())
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_finalize_closes_free_text_and_saves_the_draft(self):
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        result = self.request("finalize").result
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "dream_finalize")
+        session = surface.associated_session(self.actor)
+        self.assertEqual(session.stage, lifecycle.STAGE_FINALIZED)
+        draft = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
+        self.assertFalse(CreativeRequest.objects.exists())
+        # A further message is refused without consuming an exchange.
+        refused = self.request("say", message="停止後仍想說", client=self.delivered()).result
+        self.assertEqual(refused["code"], "dream_finalized")
+        self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 1)
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_finalize_is_refused_while_a_response_is_pending(self):
+        self.enter()
+        pending = Deferred()
+        session = SimpleNamespace(puppet=self.actor)
+        self.live_sessions = [session]
+        with patch("world.ai.dream.generate_dream_exchange", return_value=pending), \
+                patch("server.dream_service._refresh"):
+            state = service.dream_state(self.actor)
+            said = adapter(
+                "say",
+                self.actor,
+                {"session_id": state["session_id"], "revision": state["revision"],
+                 "message": "鐘聲"},
+                session,
+            )
+            self.assertEqual(said["code"], "dream_pending")
+            refused = self.request("finalize").result
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "dream_pending_response")
+        self.assertEqual(
+            surface.associated_session(self.actor).stage, lifecycle.STAGE_CONVERSING
+        )
+        self.assertTrue(service.dream_state(self.actor)["pending"])
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_the_sixth_exchange_finalizes_and_saves_the_proposal_it_produced(self):
+        self.enter()
+        for index in range(6):
+            client = (
+                self.exchange(
+                    [{"command": "create", "path": "summary",
+                      "file_text": "第六次之後的願望。"}],
+                    index=index,
+                )
+                if index == 5
+                else self.delivered(index)
+            )
+            self.assertEqual(
+                self.request(
+                    "say", message=f"第 {index + 1} 次交流", client=client
+                ).result["outcome"],
+                "success",
+            )
+        session = surface.associated_session(self.actor)
+        self.assertEqual(session.completed_exchanges, 6)
+        self.assertEqual(session.stage, lifecycle.STAGE_FINALIZED)
+        draft = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft.direction["summary"], "第六次之後的願望。")
+        self.assertFalse(CreativeRequest.objects.exists())
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_a_finalized_form_replaces_the_proposal_and_clears_the_report(self):
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "themes", "file_text": "鐘聲"},
+        ])
+        self.assertEqual(
+            self.request("say", message="加入主題", client=client).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            surface.wish_state(self.actor)["changes"]["lists"]["themes"]["added"], ["鐘聲"]
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        submitted = {
+            "kind": "new_story",
+            "summary": "我自己寫下的願望。",
+            "themes": ["重逢"],
+            "atmosphere": ["安靜"],
+            "emphasis": ["探索"],
+            "exclusions": ["暴力"],
+            "requirements": [{"kind": "place", "text": "南門"}],
+        }
+        self.assertEqual(
+            self.request("draft", direction=dict(submitted)).result["outcome"], "success"
+        )
+        wish = surface.wish_state(self.actor)
+        self.assertIsNone(wish["changes"])
+        self.assertEqual(wish["proposal"]["summary"], submitted["summary"])
+        self.assertEqual(wish["proposal"]["themes"], ["重逢"])
+        self.assertEqual(wish["proposal"]["requirements"], submitted["requirements"])
+        draft = get_draft(surface.associated_session(self.actor).draft_id, str(self.actor.pk))
+        self.assertEqual(draft.direction["summary"], submitted["summary"])
+        self.assertEqual(draft.direction["themes"], ["重逢"])
+        self.assertEqual(draft.direction["requirements"], submitted["requirements"])
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_the_finalized_form_keeps_the_locked_thread(self):
+        self.enter()
+        chosen = create_thread(
+            thread_id="synthetic-form-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        other = create_thread(
+            thread_id="synthetic-other-form-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("choose_thread", thread_id=chosen.thread_id).result["outcome"],
+            "success",
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        form = {"kind": "thread_direction", "summary": "沿著鐘聲的故事線。"}
+        # An omitted thread keeps the locked choice.
+        self.assertEqual(
+            self.request("draft", direction=dict(form)).result["outcome"], "success"
+        )
+        self.assertEqual(surface.wish_state(self.actor)["thread_id"], chosen.thread_id)
+        # Naming another thread is refused without a write.
+        before = surface.association(self.actor)
+        refused = self.request(
+            "draft", direction={**form, "thread_id": other.thread_id}
+        ).result
+        self.assertEqual(refused["code"], "thread_locked")
+        self.assertEqual(surface.association(self.actor), before)
+        # A choice whose thread has ended may be released back to a new story.
+        resolve_thread(thread_id=chosen.thread_id, tick=100, actor_id=str(self.actor.pk))
+        released = self.request(
+            "draft", direction={**form, "kind": "new_story", "thread_id": None}
+        )
+        self.assertEqual(released.result["outcome"], "success")
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_thread_choice_closes_with_the_stage(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-stage-closed-choice",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        # Finalized before any message was sent: the choice is still closed.
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        refused = self.request("choose_thread", thread_id=thread.thread_id).result
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "thread_choice_closed")
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_a_finalized_dream_stays_finalized_on_the_same_sleep(self):
+        from world.rules.sleep_receipt import read_sleep_view_generation
+
+        sleep_id, _receipt = self.grant_sleep()
+        surface.enter_for_owner(
+            self.actor, sleep_id=sleep_id, revision=0,
+            generation=read_sleep_view_generation(self.actor),
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertFalse(service.dream_state(self.actor)["can_input"])
+        # Reading again, and re-entering the same accepted receipt, both keep it.
+        self.assertEqual(
+            surface.associated_session(self.actor).stage, lifecycle.STAGE_FINALIZED
+        )
+        surface.enter_for_owner(
+            self.actor, sleep_id=sleep_id, revision=0,
+            generation=read_sleep_view_generation(self.actor),
+        )
+        self.assertEqual(
+            surface.associated_session(self.actor).stage, lifecycle.STAGE_FINALIZED
+        )
+        refused = self.request(
+            "say", message="同一夜的下一句話", client=self.delivered()
+        ).result
+        self.assertEqual(refused["code"], "dream_finalized")
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_awakening_keeps_the_right_version(self):
+        first = self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "醒來前留下的鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        session = surface.associated_session(self.actor)
+        conversing = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(conversing.direction["summary"], "醒來前留下的鐘聲。")
+
+        # A later sleep resumes the dream; finalizing then awakening writes
+        # nothing further, so the draft keeps its identity and version.
+        later = self.enter(tick_from=100, tick_to=121, requested_seconds=21)
+        self.assertEqual(later["session_id"], first["session_id"])
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        final = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(final.direction["summary"], "醒來前留下的鐘聲。")
+        self.assertEqual(int(final.revision), int(conversing.revision))
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-session-is-conversing-until-it-is-finalized"
+    )
+    def test_a_finalized_awakening_ignores_supplied_content(self):
+        # A departure is not a manual edit: content a caller sends with it
+        # changes neither the working proposal nor the draft the finalize saved.
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "女神寫下的方向。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        before = surface.wish_state(self.actor)
+        session = surface.associated_session(self.actor)
+        draft_before = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(
+            self.request(
+                "awaken",
+                direction={"kind": "new_story", "summary": "離去時偷渡的願望。"},
+            ).result["outcome"],
+            "success",
+        )
+        self.assertEqual(surface.wish_state(self.actor), before)
+        draft_after = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft_after.direction, draft_before.direction)
+        self.assertEqual(int(draft_after.revision), int(draft_before.revision))
+
+    @covers_requirement(
+        "dream-session-lifecycle::a-later-sleep-reopens-an-unfinalized-conversation"
+    )
+    def test_a_later_sleep_returns_to_conversing(self):
+        first = self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+
+        resumed = self.enter(tick_from=100, tick_to=121, requested_seconds=21)
+        self.assertEqual(resumed["session_id"], first["session_id"])
+        self.assertEqual(
+            surface.associated_session(self.actor).stage, lifecycle.STAGE_CONVERSING
+        )
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"]["summary"], "在無名港尋找鐘聲。"
+        )
+        self.assertEqual(
+            self.request(
+                "say", message="回來後繼續說", client=self.delivered(index=1)
+            ).result["outcome"],
+            "success",
+        )
+        self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 2)
+
+    @covers_requirement("dream-session-lifecycle::convergence-and-exit-require-explicit-choices")
+    def test_exit_before_cap_offers_draft_preservation_and_finalize(self):
+        self.enter()
+        first = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "醒來前的願望。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="第一次交談", client=first).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            self.request(
+                "say", message="第二次交談", client=self.delivered(index=1)
+            ).result["outcome"],
+            "success",
+        )
+        # Draft preservation is available and schedules nothing; confirmation
+        # only after the explicit finalize.
+        self.assertEqual(self.request("draft").result["outcome"], "success")
+        self.assertFalse(CreativeRequest.objects.exists())
+        self.assertEqual(self.request("confirm").result["code"], "not_finalized")
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.request("confirm").result["outcome"], "success")
+        self.assertEqual(CreativeRequest.objects.count(), 1)
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements"
+    )
+    def test_a_motivating_direction_keeps_its_requirement_rows_through_confirmation(self):
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary",
+             "file_text": "在南門遇見一個女孩，幫她找媽媽。"},
+            {"command": "create", "path": "requirements",
+             "file_text": "place: 南門\nnew_character: 一個女孩\nprivate_commission: 帶她找媽媽"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(
+            [row["text"] for row in service.dream_state(self.actor)["requirements"]],
+            ["南門", "一個女孩", "帶她找媽媽"],
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self.request("confirm").result["outcome"], "success")
+        stored = CreativeRequest.objects.get()
+        self.assertEqual(
+            [(row["kind"], row["text"]) for row in stored.direction["requirements"]],
+            [
+                ("place", "南門"),
+                ("new_character", "一個女孩"),
+                ("private_commission", "帶她找媽媽"),
+            ],
+        )
+
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements"
+    )
+    def test_an_invalid_submitted_proposal_stays_the_unconfirmed_draft(self):
+        from world.narrative.authoring import REASON_MESSAGES
+
+        self.enter()
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        submitted = {
+            "kind": "new_story",
+            "summary": "我想得到一枚線索。",
+            "effects": ["clue"],
+        }
+        refused = self.request("confirm", direction=submitted).result
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "invalid_direction")
+        self.assertEqual(refused["message"], REASON_MESSAGES["unauthorized_effects"])
+        self.assertFalse(CreativeRequest.objects.exists())
+        session = surface.associated_session(self.actor)
+        self.assertTrue(service.dream_state(self.actor)["open"])
+        draft = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft.direction["summary"], submitted["summary"])
+        self.assertEqual(draft.direction["effects"], ["clue"])
+        self.assertIsNone(draft.confirmed_revision)
 
     def test_choose_thread_payload_validation(self):
         handle = {"session_id": "session:synthetic-dream", "revision": 1}

@@ -107,6 +107,13 @@ STATE_ENDED = "ended"
 OUTCOME_DRAFT = "draft"
 OUTCOME_CONFIRMED = "confirmed"
 
+# One stage per session: while conversing the collaborator edits the proposal
+# and free text is open; once finalized the player writes the proposal and the
+# conversation has stopped. The finalize action and the sixth settled exchange
+# are the only writers that close it.
+STAGE_CONVERSING = "conversing"
+STAGE_FINALIZED = "finalized"
+
 # Stable rejection reason codes: the identifiers callers and tests assert on.
 REASON_EMPTY_INPUT = "empty_input"
 REASON_OVERSIZED_INPUT = "oversized_input"
@@ -118,6 +125,7 @@ REASON_NO_OUTSTANDING_TURN = "no_outstanding_turn"
 REASON_NOT_DRAFTED = "not_drafted"
 REASON_DUPLICATE_DELIVERY = "duplicate_delivery"
 REASON_STALE_REQUIREMENTS = "stale_requirements"
+REASON_FINALIZED = "finalized"
 
 
 class DreamSessionError(Exception):
@@ -172,9 +180,9 @@ class DreamSessionProgress:
 class DreamSessionChoices:
     """Which actions a surface may offer; derived from the durable count only.
 
-    ``can_confirm``/``can_preserve_draft`` are offered for every open session —
-    they are the cap and early-departure choices — and ``can_awaken`` is always
-    available because ending requires no model call.
+    ``can_preserve_draft`` is offered for every open session — it is the
+    early-departure choice — ``can_confirm`` only once the session is finalized,
+    and ``can_awaken`` is always available because ending requires no model call.
     """
 
     session_id: str
@@ -352,7 +360,8 @@ def progress(session: DreamSession) -> DreamSessionProgress:
 
     Convergence begins at exchange five, so a session is converging once its
     upcoming exchange is number five or later (``completed + 1 >= 5``). The cap
-    is reached after the sixth exchange; only then does free text stop.
+    is reached after the sixth exchange; free text stops at the cap or as soon
+    as the session is finalized.
     """
     completed = int(session.completed_exchanges)
     open_state = session.state == STATE_OPEN
@@ -363,7 +372,9 @@ def progress(session: DreamSession) -> DreamSessionProgress:
         remaining=max(0, MAX_EXCHANGES - completed),
         converging=completed + 1 >= CONVERGENCE_EXCHANGE,
         at_cap=at_cap,
-        free_text_allowed=open_state and not at_cap,
+        free_text_allowed=open_state
+        and not at_cap
+        and session.stage == STAGE_CONVERSING,
     )
 
 
@@ -372,14 +383,28 @@ def remaining_exchanges(session: DreamSession) -> int:
     return progress(session).remaining
 
 
+def _closed_reason(session: DreamSession) -> str:
+    """Why free text is closed: the cap outranks the stage, which outranks the state."""
+    if int(session.completed_exchanges) >= MAX_EXCHANGES:
+        return REASON_AT_CAP
+    if session.stage != STAGE_CONVERSING:
+        return REASON_FINALIZED
+    return REASON_CLOSED
+
+
 def choices(session: DreamSession) -> DreamSessionChoices:
-    """The deterministic set of actions the surface may offer."""
+    """The deterministic set of actions the surface may offer.
+
+    ``can_preserve_draft`` is offered for every open session -- it is the
+    early-departure choice -- while ``can_confirm`` follows the stage: a
+    confirmation is only a finalized act.
+    """
     view = progress(session)
     open_state = session.state == STATE_OPEN
     return DreamSessionChoices(
         session_id=session.session_id,
         can_input=view.free_text_allowed,
-        can_confirm=open_state,
+        can_confirm=open_state and session.stage == STAGE_FINALIZED,
         can_preserve_draft=open_state,
         can_awaken=True,
     )
@@ -445,7 +470,7 @@ def begin_turn(
 
     view = progress(session)
     if not view.free_text_allowed:
-        reason = REASON_AT_CAP if view.at_cap else REASON_CLOSED
+        reason = _closed_reason(session)
         _reject(
             "dream_session_closed",
             reason=reason,
@@ -460,10 +485,14 @@ def begin_turn(
 
     with transaction.atomic():
         locked = _locked_session(session.session_id, clean_owner)
-        if locked.state != STATE_OPEN or int(locked.completed_exchanges) >= MAX_EXCHANGES:
+        if (
+            locked.state != STATE_OPEN
+            or int(locked.completed_exchanges) >= MAX_EXCHANGES
+            or locked.stage != STAGE_CONVERSING
+        ):
             _reject(
                 "dream_session_closed",
-                reason=REASON_CLOSED,
+                reason=_closed_reason(locked),
                 boundary={
                     "session_id": locked.session_id,
                     "owner": clean_owner,
@@ -686,15 +715,19 @@ def settle_exchange(
         locked.pending_submission_id = ""
         locked.saved_input = ""
         locked.revision = int(locked.revision) + 1
-        locked.save(
-            update_fields=[
-                "completed_exchanges",
-                "pending_submission_id",
-                "saved_input",
-                "revision",
-                "updated_at",
-            ]
-        )
+        update_fields = [
+            "completed_exchanges",
+            "pending_submission_id",
+            "saved_input",
+            "revision",
+            "updated_at",
+        ]
+        if exchange_number == MAX_EXCHANGES:
+            # The sixth settled exchange closes free text in the same save that
+            # counts it, so no session can sit at the cap still conversing.
+            locked.stage = STAGE_FINALIZED
+            update_fields.append("stage")
+        locked.save(update_fields=update_fields)
         _announce(
             "dream_session_exchange_completed",
             {
@@ -757,10 +790,74 @@ def abandon_turn(
         return progress(locked)
 
 
-def resume_saved_session(session_id: Any, owner_id: Any, *, tick: int = 0) -> DreamSession:
+def finalize_session(session_id: Any, owner_id: Any, *, tick: int = 0) -> DreamSession:
+    """Close free text so the player takes the wish over.
+
+    Owner-scoped and deterministic: no model call and no clock write. A session
+    with an outstanding turn is refused, because the response it is waiting for
+    still belongs to the conversation. Finalizing an already final session is a
+    pure no-op returning the same row, so a repeated request can never advance
+    the revision or announce twice.
+    """
+    clean_owner = _clean_owner(owner_id)
+    clean_tick = _clean_tick(tick)
+    session = get_session(session_id, clean_owner)
+    with transaction.atomic():
+        locked = _locked_session(session.session_id, clean_owner)
+        if locked.state != STATE_OPEN:
+            _reject(
+                "dream_session_closed",
+                reason=REASON_CLOSED,
+                boundary={
+                    "session_id": locked.session_id,
+                    "owner": clean_owner,
+                    "completed": int(locked.completed_exchanges),
+                    "tick": clean_tick,
+                },
+            )
+            raise DreamSessionClosedError("The dream session is closed.")
+        if locked.pending_submission_id:
+            _reject(
+                "dream_session_turn_conflict",
+                reason=REASON_OUTSTANDING_TURN,
+                boundary={
+                    "session_id": locked.session_id,
+                    "owner": clean_owner,
+                    "completed": int(locked.completed_exchanges),
+                    "tick": clean_tick,
+                },
+            )
+            raise DreamOutstandingTurnError("Another dream turn is in flight.")
+        if locked.stage == STAGE_FINALIZED:
+            return locked
+        locked.stage = STAGE_FINALIZED
+        locked.revision = int(locked.revision) + 1
+        locked.save(update_fields=["stage", "revision", "updated_at"])
+        _announce(
+            "dream_session_finalized",
+            {
+                "session_id": locked.session_id,
+                "owner": clean_owner,
+                "completed": int(locked.completed_exchanges),
+                "tick": clean_tick,
+            },
+        )
+        return locked
+
+
+def resume_saved_session(
+    session_id: Any,
+    owner_id: Any,
+    *,
+    reopen_conversation: bool = False,
+    tick: int = 0,
+) -> DreamSession:
     """Explicit later entry resumes unconfirmed discussion without a new budget.
 
-    Confirmed sessions remain final. Sleep settlement is the caller's separate
+    Confirmed sessions remain final. Entering on a later sleep
+    (``reopen_conversation``) returns an unconfirmed, finalized session with
+    exchanges left to the conversing stage, so the player can talk again; one at
+    the cap stays finalized. Sleep settlement is the caller's separate
     responsibility; this operation changes only narrative session state.
     """
     clean_owner = _clean_owner(owner_id)
@@ -768,13 +865,25 @@ def resume_saved_session(session_id: Any, owner_id: Any, *, tick: int = 0) -> Dr
     session = get_session(session_id, clean_owner)
     with transaction.atomic():
         locked = _locked_session(session.session_id, clean_owner)
+        changed: list[str] = []
         if locked.state == STATE_ENDED and locked.outcome != OUTCOME_CONFIRMED:
             locked.state = STATE_OPEN
+            changed.append("state")
+        if (
+            reopen_conversation
+            and locked.outcome != OUTCOME_CONFIRMED
+            and locked.stage == STAGE_FINALIZED
+            and int(locked.completed_exchanges) < MAX_EXCHANGES
+        ):
+            locked.stage = STAGE_CONVERSING
+            changed.append("stage")
+        if changed:
             locked.revision = int(locked.revision) + 1
-            locked.save(update_fields=["state", "revision", "updated_at"])
+            locked.save(update_fields=[*changed, "revision", "updated_at"])
             _announce("dream_session_resumed", {
                 "session_id": locked.session_id, "owner": clean_owner,
-                "completed": int(locked.completed_exchanges), "tick": clean_tick,
+                "completed": int(locked.completed_exchanges),
+                "stage": locked.stage, "tick": clean_tick,
             })
         return locked
 
