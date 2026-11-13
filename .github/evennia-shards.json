@@ -729,6 +729,7 @@
         "world.narrative.tests.test_adult_memory_projection",
         "world.narrative.tests.test_recent_deeds_selection",
         "world.narrative.tests.test_dream_authoring",
+        "world.narrative.tests.test_dream_proposal",
         "world.narrative.tests.test_dream_session",
         "world.narrative.tests.test_dream_track",
         "world.narrative.tests.test_story_director_beats",
