@@ -17,7 +17,7 @@ Do not change any read site, any stored format, `monster_activity.batched_state_
 
 - [ ] 3.1 Apply design D3 and D4 to `world/maps/regional_population.py`, `world/maps/monster_activity.py` and `world/maps/monster_sites.py`. Add the tests "Statements do not grow with boundary ticks" (timeline and coordinate rows), "Readers see pending values", "Contact sees stored state" and "Fault after deferred writes". Verify: the same test label passes, and the test prefix passes for each of `world.maps.tests.test_monster_activity`, `world.maps.tests.test_monster_journeys`, `world.maps.tests.test_regional_population_recovery`, `world.maps.tests.test_monster_sites`, `world.maps.tests.test_settlement_decode_reuse`, `world.maps.tests.test_settlement_outer_rollback` (one command per label).
 - [ ] 3.2 Apply design D3 to `fatigue.write_fatigue_state`. Extend "Statements do not grow with boundary ticks" with the reserve rows. Verify: the same test label passes, and the test prefix passes for `world.rules.tests.test_fatigue`.
-- [ ] 3.3 Apply design D5 to `clock._settle_gauge_regen`, after the shell confirmation D5 requires. Add the test "Three regenerating gauges". Verify: the same test label passes, and the test prefix passes for `world.rules.tests.test_clock` and for `world.rules.tests.test_world_escape`.
+- [ ] 3.3 Apply design D5 to `clock._settle_gauge_regen`. Add the test "Three regenerating gauges". Verify: the same test label passes, and the test prefix passes for `world.rules.tests.test_clock` and for `world.rules.tests.test_world_escape`.
 
 ## 4. Documentation and gates
 

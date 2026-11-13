@@ -39,7 +39,8 @@ See proposal.md - Why. Facts verified at commit `f9925e49` (re-locate by symbol 
 ```python
 @dataclass(slots=True)
 class _DeferredStores:
-    pending: dict[int, tuple[Any, Any]] = field(default_factory=dict)  # id(attribute) -> (attribute, original db_value)
+    # id(attribute) -> (attribute, original db_value, obj, key, category)
+    pending: dict[int, tuple[Any, Any, Any, str, str | None]] = field(default_factory=dict)
 
 
 _DEFERRED: _DeferredStores | None = None
@@ -63,10 +64,10 @@ def store_attribute(obj: Any, key: str, value: Any, category: str | None = None)
 
 1. If `_DEFERRED is None`: `obj.attributes.add(key, value, category=category)` and return.
 2. `attribute = obj.attributes.get(key, category=category, return_obj=True)`. If it is `None` (the row does not exist yet): `obj.attributes.add(...)` and return.
-3. If `id(attribute)` is not in `pending`, record `(attribute, attribute.db_value)`.
+3. If `id(attribute)` is not in `pending`, record `(attribute, attribute.db_value, obj, key, category)`.
 4. `attribute.db_value = to_pickle(value)` with `from evennia.utils.dbserialize import to_pickle`.
 
-Flush: for each pending attribute in insertion order call `attribute.save(update_fields=["db_value"])`, then clear `pending`. Discard (exception path): for each pending attribute in reverse insertion order assign `attribute.db_value = original`, then clear `pending`; store nothing. A nested `deferred_attribute_stores()` reuses the open buffer and neither flushes nor discards.
+Flush: for each pending entry in insertion order, first check that `obj.attributes.get(key, category=category, return_obj=True) is attribute`; when it is not (an attribute cache reset or an idmapper flush replaced the cached Attribute while a value was pending), raise `DeferredStoreLost(RuntimeError)` naming the object and key, which fails the advance and rolls everything back. Otherwise call `attribute.save(update_fields=["db_value"])`. Then clear `pending`. Discard (exception path): for each pending attribute in reverse insertion order assign `attribute.db_value = original`, then clear `pending`; store nothing. A nested `deferred_attribute_stores()` reuses the open buffer and neither flushes nor discards.
 
 ### D2. The pass opens the buffer
 
@@ -95,7 +96,7 @@ Keep the function's decisions and arithmetic unchanged. Collect, per entity, the
 - If `world.rules.surfaces._DEFERRED is None` (expose it through a function `attribute_stores_deferred() -> bool`), assign `gauge.current` and `gauge.regen_remainder` exactly as today.
 - Otherwise build the new record once: `record = deserialize(entity.attributes.get("traits", category="traits"))` with `from evennia.utils.dbserialize import deserialize`; for each collected gauge set `record[key]["current"] = round(min(max(new_current, gauge.min), gauge.max))` and `record[key]["regen_remainder"] = new_remainder`; `store_attribute(entity, "traits", record, category="traits")`; then re-point the handler as `_refresh_advance_entity_caches` does (`entity.traits.trait_data = entity.attributes.get("traits", default={}, category="traits")`; `entity.traits._cache.clear()`).
 
-Before writing this branch, the worker confirms in a shell that the trait record's gauge entry really holds the keys `current` and `regen_remainder` for a regenerated synthetic monster (`dict(entity.attributes.get("traits", category="traits")["hp"])`). If the key names differ, use the observed names; if the record shape is not a mapping of gauge key to mapping, stop and report.
+The key names are verified: the Evennia traits contrib stores a gauge's value under `current` in its trait record, and `regen_remainder` is an extra property stored in the same record (`allow_extra_properties`). A gauge that never regenerated has no `regen_remainder` key yet; writing it creates the key, exactly as the property assignment does.
 
 An entity without `attributes` (a test double) takes the first branch.
 
@@ -103,7 +104,7 @@ An entity without `attributes` (a test double) takes the first branch.
 
 New `world/maps/tests/test_settlement_deferred_writes.py`, on `ActivityFixture`, using `settlement_projection`, `self._register_lifecycle()` and `get_world_clock().advance(seconds, AdvanceSource.COMMAND, [])`.
 
-- Pure buffer tests against a throwaway object created with `evennia.utils.create.create_object`: deferred value is readable and not stored (re-read through `Attribute.objects.get(pk=...).db_value` shows the old value); flush stores once; an exception restores the original in memory and stores nothing; `flushed_attribute_stores` stores then resumes; a missing row falls back to `attributes.add`; nesting reuses the buffer.
+- Pure buffer tests against a throwaway object created with `evennia.utils.create.create_object`: deferred value is readable and not stored (re-read through `Attribute.objects.get(pk=...).db_value` shows the old value); flush stores once; an exception restores the original in memory and stores nothing; a pending attribute replaced in the handler cache (`obj.attributes.reset_cache()` between the write and the flush) raises `DeferredStoreLost`; `flushed_attribute_stores` stores then resumes; a missing row falls back to `attributes.add`; nesting reuses the buffer.
 - "Statements do not grow with boundary ticks": `CaptureQueriesContext(connection)`; count statements whose SQL starts with `UPDATE "typeclasses_attribute"` and ends with the row id of the timeline attribute, of the coordinate attribute and of each member's reserve attribute (ids read through `attributes.get(..., return_obj=True).pk`).
 - "Readers see pending values": patch `monster_activity._arrive` or use a `side_effect` wrapper on `regional_population.settle_timeline_through` to inspect `wilderness.db.itemcoordinates`, `read_population_timeline` and `presence_at` mid-pass.
 - "Contact sees stored state": wrap `world.rules.field_contact.settle_population_contact_at` as imported in `_settle_population_at` and assert `world.rules.surfaces._DEFERRED is None` and that the pending rows already equal their in-memory values in the database.
@@ -117,7 +118,7 @@ Add a section "Deferred stores inside an advance" to `docs/development/monster-f
 
 ## Risks / Trade-offs
 
-- [Code inside the pass resets an attribute cache or flushes the idmapper while values are pending, and loses them] → no such call exists in the pass outside the contact block, which flushes first; the cache-reset comparison in "Results are unchanged" detects a lost value.
+- [Code inside the pass resets an attribute cache or flushes the idmapper while values are pending, and loses them] → no such call exists in the pass outside the contact block, which flushes first; the flush check of D1 turns any such loss into a named failure of the advance instead of a silent wrong store.
 - [A raw SQL reader inside the pass sees the old row] → none exists in the pass; `server/saves` and `world/rules/npc_persona` raw reads run outside it.
 - [The direct trait record write of D5 bypasses a setter side effect] → `DeterministicGaugeTrait` disables the timer and its setter only clamps and rounds; D5 applies the same clamp and round, and the last scenario compares against the per-gauge writer.
 - [An in-place mutation of a saver value stores immediately and leaves the row newer than other pending rows] → harmless inside one transaction; the final flush stores the same in-memory value again.

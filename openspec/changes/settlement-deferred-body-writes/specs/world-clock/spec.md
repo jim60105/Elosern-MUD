@@ -24,6 +24,10 @@ A lifecycle settlement pass run by a clock advance SHALL store the population ti
 ### Requirement: A failed pass stores nothing it deferred
 When a lifecycle settlement pass inside an advance fails, no deferred value SHALL be stored, and every deferred record SHALL read its pre-pass value in memory before the advance's own restore runs.
 
+#### Scenario: Pending value lost before the store
+- **WHEN** the cached attribute object of a pending record is replaced before the pass completes
+- **THEN** the pass fails with the named lost-store error and the advance rolls back
+
 #### Scenario: Fault after deferred writes
 - **WHEN** a fault is injected at the third boundary tick of a pass that already deferred timeline, coordinate and reserve writes
 - **THEN** the advance raises, no update statement for those rows was issued, and the state projection equals the pre-advance projection in memory and after every attribute cache was reset
