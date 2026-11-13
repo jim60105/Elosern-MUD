@@ -103,6 +103,8 @@ const LOCATION_KINDS = [
   { value: "city", label: "city · 都市" },
   { value: "town", label: "town · 城鎮" },
   { value: "port", label: "port · 港市" },
+  { value: "village", label: "village · 村莊" },
+  { value: "hamlet", label: "hamlet · 小村莊" },
   { value: "elven_village", label: "elven_village · 精靈村落" },
   { value: "dungeon", label: "dungeon · 地城" },
 ];

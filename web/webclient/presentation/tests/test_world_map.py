@@ -209,6 +209,8 @@ class WorldMapPrivacyTests(TestCase):
             AnchorKind.CITY:("settlement",False),
             AnchorKind.TOWN:("settlement",False),
             AnchorKind.PORT:("settlement",False),
+            AnchorKind.VILLAGE:("settlement",False),
+            AnchorKind.HAMLET:("settlement",False),
             AnchorKind.ELVEN_VILLAGE:("hidden",True),
             AnchorKind.DUNGEON:("hidden",True),
         }

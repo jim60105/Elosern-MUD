@@ -80,7 +80,13 @@ class AnchorRegistryTests(unittest.TestCase):
     def test_national_settlements_carry_nation_and_population(self):
         from world.lore.nations import NATION_REGISTRY
 
-        settlement_kinds = {AnchorKind.CITY, AnchorKind.TOWN, AnchorKind.PORT}
+        settlement_kinds = {
+            AnchorKind.CITY,
+            AnchorKind.TOWN,
+            AnchorKind.PORT,
+            AnchorKind.VILLAGE,
+            AnchorKind.HAMLET,
+        }
         for key, anchor in anchors().items():
             if anchor.kind not in settlement_kinds:
                 continue

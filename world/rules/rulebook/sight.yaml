@@ -83,3 +83,9 @@ settlement_silhouettes:
   port:
     day: 港口桅杆與倉庫連成的長條剪影
     night: 碼頭水面上晃動的一線燈火
+  village:
+    day: 幾十戶屋頂聚成一簇，炊煙從中升起
+    night: 聚在一處的幾點窗火
+  hamlet:
+    day: 田野間幾戶人家低矮的屋影
+    night: 孤零零的一兩點燈火

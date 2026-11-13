@@ -30,6 +30,8 @@ class AnchorKind(StrEnum):
     PORT = "port"
     ELVEN_VILLAGE = "elven_village"
     DUNGEON = "dungeon"
+    VILLAGE = "village"
+    HAMLET = "hamlet"
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,8 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
     "dungeon_dragon_nest": AnchorLore("grandia", None, 50),
     "dungeon_arcane_ruins": AnchorLore("altoria", None, 60),
     # National cities, towns and ports, largest first. Their populations count
-    # settlements of at least 5,000; the rural majority lives in unnamed villages.
+    # settlements of at least 5,000. Settlement populations are a representative
+    # sample and are never reconciled against the national or continental totals.
     # Grandia Empire: 21 settlements, 757,000 people.
     "port_golden_sheaf": AnchorLore("grandia", 180_000, None),
     "city_twin_currents": AnchorLore("grandia", 90_000, None),
