@@ -130,8 +130,9 @@ edit `server/dream_service.py`, `world/narrative/dream_session.py`,
      "max_edits": MAX_EDITS, "max_summary": MAX_SUMMARY_CHARACTERS,
      "max_list_items": MAX_LIST_ITEMS, "max_item": MAX_ITEM_CHARACTERS,
      "max_requirements": MAX_REQUIREMENTS,
-     "max_requirement_text": MAX_REQUIREMENT_TEXT}` (all from
-     `dream_proposal`).
+     "max_requirement_text": MAX_REQUIREMENT_TEXT,
+     "max_proposal_bytes": MAX_PROPOSAL_BYTES,
+     "max_report_bytes": MAX_CHANGES_BYTES}` (all from `dream_proposal`).
    - `thread`: `{"label": _cap_string(str(thread_label).strip(), 160)}`, only
      when the stripped label is non-empty.
    Serialization stays `json.dumps(payload, sort_keys=True,

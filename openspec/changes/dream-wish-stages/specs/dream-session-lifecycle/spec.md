@@ -18,7 +18,7 @@ Exchange five SHALL begin convergence. Exchange six SHALL summarize spoiler-free
 
 ### Requirement: A session is conversing until it is finalized
 
-A session SHALL record one stage. While conversing, free text is allowed, and player-supplied proposal content and confirmation SHALL be refused without a write. The finalize action or the sixth settled exchange SHALL finalize it: free text closes for that dream and the working proposal is saved as the session draft. Manual proposal content and confirmation SHALL be accepted only when finalized. A session resumed on a later sleep SHALL return to conversing when exchanges remain.
+A session SHALL record one stage. While conversing, free text is allowed and the thread may still be chosen; supplied proposal content and confirmation SHALL be refused without a write. The finalize action or the sixth settled exchange SHALL finalize it: free text closes and the working proposal is saved as the session draft. Manual content and confirmation are accepted only when finalized, and a thread choice only while conversing.
 
 #### Scenario: Supplied content while conversing
 - **WHEN** a draft request carries proposal content while the session is conversing
@@ -49,17 +49,26 @@ A session SHALL record one stage. While conversing, free text is allowed, and pl
 - **THEN** the working proposal and the session draft equal the submitted form and the last change report is cleared
 
 #### Scenario: The thread stays locked in the form
-- **WHEN** a finalized form names a different thread than the locked choice, and when a form releases a locked thread that is no longer offered to a new story
-- **THEN** the first is refused without a write and the second is accepted
+- **WHEN** a finalized form omits the thread, names a different thread than the locked choice, and releases a locked thread that is no longer offered to a new story
+- **THEN** the omitted thread keeps the locked choice, the different one is refused without a write, and the release is accepted
+
+#### Scenario: Thread choice closes with the stage
+- **WHEN** thread choice is requested for a finalized session, including one finalized before any message was sent
+- **THEN** it is refused with a reason and the stored choice is unchanged
 
 #### Scenario: The same dream stays finalized
 - **WHEN** a finalized session is read again or re-entered during the same sleep
 - **THEN** it is still finalized and a message is refused
 
+#### Scenario: Awakening keeps the right version
+- **WHEN** the owner awakens while conversing with a non-empty working proposal, and when the owner awakens while finalized
+- **THEN** the first saves the working proposal as the session draft and the second leaves the last saved draft unchanged
+
+### Requirement: A later sleep reopens an unfinalized conversation
+
+A finalized, unconfirmed session that still has exchanges SHALL return to conversing when it is resumed on a later sleep, keeping its saved proposal as the starting proposal. One with no exchange remaining SHALL stay finalized.
+
 #### Scenario: A later sleep returns to conversing
 - **WHEN** a finalized, unconfirmed session with exchanges remaining is resumed on a later sleep, and when one with no exchange remaining is resumed
 - **THEN** the first is conversing with its saved proposal as the starting proposal and accepts a message, and the second stays finalized
 
-#### Scenario: Awakening keeps the right version
-- **WHEN** the owner awakens while conversing with a non-empty working proposal, and when the owner awakens while finalized
-- **THEN** the first saves the working proposal as the session draft and the second leaves the last saved draft unchanged

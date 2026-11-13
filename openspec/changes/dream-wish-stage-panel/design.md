@@ -11,7 +11,7 @@
   (layout, polish, wording): the Storybook story `Design/DreamWish` together
   with the "Player-Facing Wording" table of
   `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`.
-- The panel state (schema 4, `dream-wish-stages`) carries `stage`
+- The panel state (schema 4, `dream-wish-stage-wire`) carries `stage`
   (`"conversing"` | `"finalized"`), `proposal`, `changes`, `thread_id`,
   `thread_choices`, `can_choose_thread`, `can_input`, `can_finalize`,
   `can_edit`, `can_confirm`, `can_draft`, `drafted`, plus the schema-3 keys
@@ -35,7 +35,9 @@ stories and documents.
 
 **Non-Goals:** the change line and changed-field marks; editable requirement
 rows; the farewell; any wire, validator, action or server-rule change;
-`AppClient.vue`; removing the prototype directory.
+`AppClient.vue`; removing the prototype directory; the Storybook stories,
+fixtures, the `OPENING` sentence and the two documents
+(`dream-wish-stage-stories`).
 
 ## Decisions
 
@@ -104,36 +106,7 @@ rows; the farewell; any wire, validator, action or server-rule change;
    conversing and with `directionPayload()` when finalized.
    `directionPayload()` carries no `requirement_version`.
 
-7. **Server copy.** In `world/narrative/dream_surface.py::OPENING` replace
-   the last sentence `你可以在這裡商談故事方向，也可以隨時醒來。` with
-   `你可以在這裡向她訴說願望，也可以隨時醒來。`. Nothing else in the string
-   changes.
-
-8. **Stories.** Create `stories/fixtures/dream_wish.js` by copying
-   `THREADS`, `OPENING` and `SCRIPT` from
-   `docs/design/dream-proposal-coediting/prototype-data.js` (drop `sample`
-   from each turn and drop `FAREWELLS`). Rewrite
-   `stories/World/DreamPanel.stories.js` on the prototype story's pattern:
-   copy `fieldText`, `storeField`, `applyEdits`, `diffProposal`, `track`,
-   `fixture` and the `render` server (stage values `conversing` /
-   `finalized`; no `sample`, `farewell`, `outcome`, `leaveWith`; `dream.confirm`
-   and `dream.awaken` just set `open: false`). The fixture must be a valid
-   schema-4 state, so it also carries the four schema-3 keys with the values
-   the server would send (`direction_parts` from the summary, `requirements`
-   from the proposal, `draft_preferences: null`, `requirement_version: null`).
-   Keep every existing export name of this story file (`Storyboard`,
-   `Conversing`, `Converging`, `Pending`, `Failed`, `Drafted`,
-   `RequirementsProposed`, `RequirementsShown`, `AtCap`, `ManyThreads`,
-   `Disconnected`, `BundledDream`, `PreferredRefused`, `MissingArt`) with
-   states that mean the same under the new model, and add `Arrival`,
-   `ArrivalNoThreads`, `FirstWish`, `WholeWish`, `StopSpeaking`, `OwnHand`.
-   A story that must show an open layer clicks the row from its wrapper's
-   `onMounted` (`document.querySelector("[data-row='main']")?.click()` after
-   `nextTick`); no prop is added to the component for it. The title stays
-   `World/DreamPanel`, so `component-manifest.json` needs no edit; verify
-   with `showcase-coverage`.
-
-9. **Vitest.** Rewrite `tests/dream.test.js`: the `state()` fixture is a
+7. **Vitest.** Rewrite `tests/dream.test.js`: the `state()` fixture is a
    valid schema-4 state (conversing, empty proposal by default, with helper
    overrides for finalized). Keep the cases that do not concern the reworked
    regions (artwork, beats, budget and gauge, reply bar, protocol mirror)
@@ -143,20 +116,12 @@ rows; the farewell; any wire, validator, action or server-rule change;
    assert shipped wording except where the spec names a literal (`你：`, the
    dialog title). Reduced-motion and typing cases are untouched.
 
-10. **Evidence bridge.** In
+8. **Evidence bridge.** In
     `web/webclient/tests/test_vue_dream_stage_evidence.py`: update the
     Vitest case names of every method whose requirement survives; delete the
     two methods annotated with the removed requirements (keepsake 念頭, 念頭
     sheet); add one method per ADDED requirement listing its Vitest cases,
     without `covers_requirement` (the IDs do not exist before archive).
-
-11. **Documents.** In `docs/game/command-reference.md` rewrite the paragraph
-    that starts `網頁客戶端的等待畫面` from `夢境佔滿舞台` onward to describe:
-    the wish card with its four rows, the stage indicator, the read-only
-    view while speaking, the finalize confirmation, the thread choice above
-    the reply bar, editing only after finalize. In `docs/game/commands.md`
-    replace the remaining web statements that mention 念頭 or 記下念頭 with
-    the same facts.
 
 ## Risks / Trade-offs
 

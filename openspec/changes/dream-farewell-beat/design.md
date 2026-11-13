@@ -68,6 +68,18 @@ sleep continuation or the dream track; a generated closing line.
    session `"ending"` stays `""`. `"ending_phase"` is unchanged. Remove the
    two old ending sentences.
 
+   The old climax sentence began with `f"{ending.phase}，…"`. The main
+   requirement `dream-explicit-presentation` "Dream presentation changes no
+   live character effects" says the ending renders the canonical post-climax
+   phase before fading; the source design says the text client prints the
+   closing line "in place of the current ending sentence". Keeping the phase
+   inside the line would attribute narration to the goddess, because the
+   browser presents the whole `ending` string as her speech. This change
+   therefore carries a MODIFIED delta for that requirement: the ending
+   reports the canonical post-climax phase through `ending_phase` — still
+   populated, still validated, still the farewell's selection key — and
+   presents the farewell line as its text.
+
 2. **Composable `composables/use-dream-farewell.js` (new, verbatim API).**
 
    ```js
@@ -98,6 +110,20 @@ sleep continuation or the dream track; a generated closing line.
    `dreamOpen` becomes
    `computed(() => !!store.view?.panels?.dream?.state?.open || !!dreamActive?.value)`
    (the new option defaults to `undefined`).
+
+   The travel layout is a third reader of `panels.dream.state.open`:
+   `components/travel/travel-model.js::travelSelection` returns
+   `layout: false` while a conversation, dream or creation surface owns the
+   stage, and `stores/elosern/travel.js` (`layoutShown`, `travelView`) and
+   `stores/elosern/travel_log.js` call it. A held farewell is client-local
+   state the pure model cannot see, so the store carries the signal:
+   `stores/elosern.js` adds `ctx.dreamFarewellActive = ref(false)` and
+   exposes `setDreamFarewellActive(value)`; `travelSelection` gains a
+   `dreamActive = false` parameter that ORs into `dreaming`; each travel call
+   site passes `dreamActive: ctx.dreamFarewellActive.value`.
+   `useDreamFarewell(store)` sets the flag from `active` in an `immediate`
+   watcher and clears it when `release()` runs, so the travel layout returns
+   only after the stage is released. This mirrors `ctx.creation`.
 
 4. **Panel farewell state.** Port from the prototype into
    `components/DreamPanel.vue`: `defineEmits(["departed"])`, `leaving`,
@@ -138,15 +164,23 @@ sleep continuation or the dream track; a generated closing line.
      (held, `active` true), first value already closed (not held), different
      session id (not held), empty ending (not held), disconnect clears, a new
      open state clears, `release()` clears.
+     Also assert the store flag: `setDreamFarewellActive` is true while a
+     farewell is held and false after `release()`.
+   - `web/webclient-app/tests/travel/layout.test.js`: the existing
+     "gives the stage back to a conversation, a dream or creation" case gains
+     the `dreamActive: true` form, which returns `layout: false` while the
+     dream panel itself is closed.
    - `web/webclient-app/tests/dream.test.js`: panel cases for the farewell
      scenarios, mutating the reactive `state` prop from open to closed. The
      full-motion release is asserted by dispatching an `animationend` event
      on the fade element and, separately, by a further activation; no timers
      or real time.
-   - Extend the existing AppClient sleep-handoff test file
-     (`tests/app_client_sleep_handoff.test.js`) with one case that the
-     handoff cards stay closed while a farewell is held and open after
-     `departed`.
+   - The sleep-handoff half of the same contract is tested on
+     `useSleepHandoff` directly, not through `AppClient`:
+     `tests/app_client_sleep_handoff.test.js` has no schema-5 dream fixture,
+     and mounting one would test the fixture, not the option. One case with
+     `dreamActive` true and a closed dream panel keeps the cards closed, and
+     flipping it false opens them.
    - `web/webclient/tests/test_vue_dream_stage_evidence.py`: one new bridge
      method listing the farewell Vitest cases of both files, without
      `covers_requirement`.

@@ -10,7 +10,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 2. Web action
 
-- [ ] 2.1 Apply design decision 7 (`dream.choose_thread` validator and registration, command echo entry, echo test case, coverage manifest id, registry enumeration). Verify `<prefix> web.webclient.actions.tests.test_dispatcher.test_registry` passes and `node --test web/static/webclient/js/tests/command_echo.test.js` passes.
+- [ ] 2.1 Apply design decision 7 (`dream.choose_thread` validator and registration, command echo entry, echo test case, coverage manifest id, registry enumeration). Both roster scenarios of `specs/webclient-action-dispatch/spec.md` must hold, since they now list `dream.choose_thread`. Verify `<prefix> web.webclient.actions.tests.test_dispatcher.test_registry` passes and `node --test web/static/webclient/js/tests/command_echo.test.js` passes.
 
 ## 3. Gates
 

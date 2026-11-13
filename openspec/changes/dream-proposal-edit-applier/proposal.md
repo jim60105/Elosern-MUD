@@ -2,7 +2,7 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 1 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 1 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Edit Contract", "Module boundary").
 
 - depends-on: none
@@ -11,7 +11,8 @@ Stage 1 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-desi
 
 Order of the batch: `dream-proposal-edit-applier` →
 `dream-collaborator-proposal-edits` → `dream-working-proposal` →
-`dream-wish-stages` → `dream-wish-text-commands` → `dream-wish-stage-panel` →
+`dream-wish-stages` → `dream-wish-stage-wire` → `dream-wish-text-commands` →
+`dream-wish-stage-panel` → `dream-wish-stage-stories` →
 `dream-wish-change-report` → `dream-farewell-beat`.
 
 ## Why
@@ -25,9 +26,9 @@ no database and no session, lets every later stage depend on a tested contract.
 
 - New pure module `world/narrative/dream_proposal.py`: the canonical proposal
   shape, the three edit commands (`str_replace`, `insert`, `create`) over seven
-  fixed paths, all-or-nothing application, normalization, bounds, a closed set
-  of error codes, the per-field change report and the numbered-line rendering a
-  prompt will use.
+  fixed paths, all-or-nothing application, normalization, per-field bounds and
+  aggregate byte budgets, a closed set of error codes, the per-field change
+  report and the numbered-line rendering a prompt will use.
 - New test module `world/narrative/tests/test_dream_proposal.py`.
 - Nothing calls the module yet. No player-visible behaviour changes.
 
@@ -48,4 +49,4 @@ None.
   `world/narrative/tests/test_dream_proposal.py` (new),
   `.github/evennia-shards.json`.
 - No migration, no wire change, no prompt change, no dependency.
-- Estimate: 5 hours (module 2 h, tests 2.5 h, gates 0.5 h).
+- Estimate: 5.5 hours (module 2 h, tests 3 h, gates 0.5 h).

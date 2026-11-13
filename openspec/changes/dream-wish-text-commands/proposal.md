@@ -2,10 +2,10 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 5 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 6 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Text Commands", "Player-Facing Wording").
 
-- depends-on: dream-wish-stages
+- depends-on: dream-wish-stage-wire
 - conflict: `commands/dream.py`, `docs/game/commands.md`,
   `docs/game/command-reference.md`, `tests/test_command_docs.py` are touched
   only by this change in the batch.

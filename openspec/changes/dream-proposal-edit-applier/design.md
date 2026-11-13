@@ -30,8 +30,8 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
 ## Decisions
 
 1. **File and imports.** Create `world/narrative/dream_proposal.py`. It
-   imports only the standard library (`copy`, `collections.abc`, `typing`).
-   No Django, no Evennia, no `world.*` import, no logging.
+   imports only the standard library (`collections.abc`, `copy`, `json`,
+   `typing`). No Django, no Evennia, no `world.*` import, no logging.
 
 2. **Constants (verbatim).**
 
@@ -47,12 +47,28 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
    MAX_REQUIREMENT_TEXT = 200
    MAX_EDITS = 16
    MAX_EDIT_TEXT_CHARACTERS = 6500
+   MAX_PROPOSAL_BYTES = 16384
+   MAX_CHANGES_BYTES = 8192
    ```
 
    `MAX_EDITS` and `MAX_EDIT_TEXT_CHARACTERS` are new: the source design gives
    no bound for the number of edits or for one edit parameter, and an
    unbounded model field is not acceptable. 6500 covers the largest legal
    field text (32 items of 200 characters plus separators = 6431).
+
+   `MAX_PROPOSAL_BYTES` and `MAX_CHANGES_BYTES` are new aggregate budgets.
+   The per-field bounds above admit about 35,600 code points, roughly 107 KiB
+   of CJK text, which overflows both the direction store
+   (`world/narrative/authoring.py::MAX_DIRECTION_BYTES = 65536`, enforced by
+   `save_draft`) and the panel envelope
+   (`web/webclient/presentation/protocol.py::MAX_CANONICAL_JSON_BYTES =
+   65_536`). A byte is measured on the canonical JSON of the value:
+   `len(json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+   .encode("utf-8"))`. 16 KiB of proposal plus 8 KiB of change report leave
+   the rest of the worst legal dream panel — opening, scene, dialogue, up to
+   32 thread labels, artwork, track and sleep — inside the envelope; the
+   bound test in `dream-wish-stage-wire` pins that sum rather than trusting
+   this arithmetic.
 
 3. **Proposal shape (canonical).** A plain `dict` with exactly these keys:
    `summary: str`, the five `LIST_FIELDS` each `list[str]`, and
@@ -72,7 +88,8 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
    `unknown_command`, `unknown_path`, `no_match`, `multiple_matches`,
    `insert_out_of_range`, `malformed_requirement`, `summary_too_long`,
    `too_many_items`, `item_too_long`, `too_many_requirements`,
-   `requirement_too_long`. Export them as the tuple `ERROR_CODES`.
+   `requirement_too_long`, `proposal_too_large`, `changes_too_large`. Export
+   them as the tuple `ERROR_CODES`.
    `index` is the zero-based position of the failing edit.
 
 5. **Public functions (verbatim signatures).**
@@ -93,9 +110,11 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
      each list field a `list` of `str`, `requirements` a `list` of mappings
      with exactly the keys `kind` and `text` (both `str`, `kind` in
      `REQUIREMENT_KINDS`, `text` non-empty after trimming); applies the same
-     normalization and bounds as decision 7; raises
+     normalization and bounds as decision 7, including the aggregate
+     `MAX_PROPOSAL_BYTES` check; raises
      `ProposalEditError("malformed_proposal")` for a wrong type or row and
-     the bound's own code for a bound. Returns a new canonical dict.
+     the bound's own code for a bound (`proposal_too_large` included, with
+     `index=None`). Returns a new canonical dict.
    - `is_empty(proposal)`: true when the summary is `""` and all six
      collections are empty.
    - `field_text`: `summary` → the summary; a list field → items joined with
@@ -138,7 +157,9 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
      later duplicates; any item longer than `MAX_ITEM_CHARACTERS` →
      `item_too_long`; more than `MAX_LIST_ITEMS` items → `too_many_items`.
    - `requirements`: split and strip the same way; each non-empty line is
-     split at its first `":"`; no colon, a left part (stripped) not in
+     split at its first `":"` or `"："` (a Chinese-writing model often emits
+     the full-width colon; the stored shape and the rendering stay canonical
+     `kind: text`); no colon, a left part (stripped) not in
      `REQUIREMENT_KINDS`, or an empty right part (stripped) →
      `malformed_requirement`; text longer than `MAX_REQUIREMENT_TEXT` →
      `requirement_too_long`; drop later rows equal in both kind and text;
@@ -147,6 +168,12 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
      whose intermediate state is out of bounds is invalid. This follows the
      reference implementation (it re-stores the field after each edit) and
      keeps every intermediate state a valid proposal.
+   - The aggregate check runs with the per-field bounds: after storing a
+     field, the canonical bytes of the working proposal must not exceed
+     `MAX_PROPOSAL_BYTES` (else `proposal_too_large`). The change report is a
+     property of the whole set, so `apply_edits` ends by comparing the
+     normalized input with the result and rejecting a report larger than
+     `MAX_CHANGES_BYTES` (`changes_too_large`, `index=None`).
 
 8. **`diff(before, after)` (verbatim result shape).**
 
@@ -162,7 +189,8 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
    and `after["summary"]` is not; otherwise `"changed"`. `added` keeps the
    order of `after`, `removed` the order of `before`. Rows compare by both
    `kind` and `text`. All five list keys are always present. Returned rows
-   are copies.
+   are copies. `diff` itself is unbounded; `apply_edits` applies
+   `MAX_CHANGES_BYTES` to its result.
 
 9. **Tests.** `world/narrative/tests/test_dream_proposal.py`, classes based
    on `unittest.TestCase`, synthetic strings only (no shipped content). One
@@ -172,7 +200,11 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
    `set(REQUIREMENT_KINDS) == authoring.REQUIREMENT_KINDS`. Expected values
    in tests are written out by hand, never produced by calling the module.
    Register the module in `.github/evennia-shards.json` in the shard that
-   already holds `world.narrative.tests.test_dream_session`.
+   already holds `world.narrative.tests.test_dream_session`. Add the
+   full-width-colon case, the aggregate proposal bound at and just over its
+   byte limit, and the over-large change report to the same module; build
+   the over-limit inputs from repeated synthetic characters so the test does
+   not depend on shipped content.
 
 ## Risks / Trade-offs
 
@@ -180,3 +212,8 @@ change to `authoring.py`, `dream_session.py`, `dream_surface.py`,
   decision 9 fails on drift.
 - [Checking bounds after every edit rejects a set that is only temporarily
   over a bound] → accepted; the model retries, and it keeps one rule.
+- [The aggregate byte budget makes the per-field maxima unreachable together:
+  a full 32-item CJK list plus a full summary exceeds 16 KiB] → intended; the
+  panel and the draft store cannot carry both, so the model spreads a large
+  wish over several turns and the invalid set goes through the existing
+  retry.

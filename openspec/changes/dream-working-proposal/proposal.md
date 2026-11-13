@@ -2,7 +2,7 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 3 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 3 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Working Proposal", "Thread choice", "Server Actions" rows `choose_thread`
 and `say`, "Error Handling").
 
@@ -39,6 +39,8 @@ message so the model can write for it.
   or stale response changes nothing.
 - New action `choose_thread` (service and web action `dream.choose_thread`):
   allowed until the first `say` is accepted, then refused.
+- The production action roster in `webclient-action-dispatch` gains
+  `dream.choose_thread`; both roster scenarios are restated.
 - A draft saved with no supplied direction, and the automatic draft on
   awakening, take the working proposal instead of the last message.
 - **BREAKING** (internal): `dream_surface.store_direction` is removed.
@@ -53,6 +55,8 @@ None.
 
 - `dream-session-lifecycle`: adds the working proposal and the thread choice
   lock.
+- `webclient-action-dispatch`: the production action roster gains
+  `dream.choose_thread`.
 
 ## Impact
 
@@ -62,8 +66,9 @@ None.
   `web/static/webclient/js/tests/command_echo.test.js` and
   `command_echo_coverage_manifest.json`,
   `web/webclient/actions/tests/test_dispatcher/test_registry.py`,
-  `world/narrative/tests/test_dream_surface.py`.
+  `world/narrative/tests/test_dream_surface.py`,
+  `openspec/specs/webclient-action-dispatch` (synced at archive).
 - No migration (the association is an Evennia Attribute), no panel schema
   change, no prompt change.
-- Estimate: 7 hours (surface 1 h, service 1.5 h, web action and echo 1 h,
+- Estimate: 7.5 hours (surface 1.5 h, service 1.5 h, web action and echo 1 h,
   tests 2.5 h, existing-test repair and gates 1 h).

@@ -22,16 +22,18 @@ After `dream-working-proposal`:
   without a version; `confirm_draft` re-validates and submits once.
 - The panel is schema 3 (`web/webclient/presentation/dream.py`,
   `protocol/constants.js`, `protocol/panels/dream.js`), validated with exact
-  field lists.
+  field lists. This change leaves it there; `dream-wish-stage-wire` publishes
+  the stage.
 
 ## Goals / Non-Goals
 
-**Goals:** the stage, `finalize`, stage gating of every action, the resume
-rule, and the additive schema-4 wire.
+**Goals:** the stage, `finalize`, stage gating of every action, and the resume
+rule.
 
-**Non-Goals:** `DreamPanel.vue` behaviour (only its test and story fixtures
-gain the new keys so they stay valid payloads); removing schema-3 keys
-(`dream-wish-stage-panel`); text commands and `commands/dream.py`
+**Non-Goals:** the panel state keys and the schema-4 wire (read model,
+validator, action registration and fixtures: `dream-wish-stage-wire`);
+`DreamPanel.vue` behaviour; removing schema-3 keys
+(`dream-wish-change-report`); text commands and `commands/dream.py`
 (`dream-wish-text-commands`); the farewell; `world/narrative/authoring.py`;
 `world/ai/`; the exchange budget, sleep settlement and dispatch work.
 
@@ -40,7 +42,13 @@ gain the new keys so they stay valid payloads); removing schema-3 keys
 1. **Model and migration.** `DreamSession.stage =
    models.CharField(max_length=16, default="conversing")`. Create
    `world/narrative/migrations/0013_dream_session_stage.py` with one
-   `AddField` (dependency `0012_dream_dispatch`). No data migration.
+   `AddField` (dependency `0012_dream_dispatch`). No data migration: the
+   project is unreleased and this batch ships with a reset database, so no
+   in-progress wish crosses the upgrade; the repository rule is that a data
+   migration exists only when a task explicitly requires one. The
+   `dream-wish-stage-wire` invariant "no exchange remaining requires
+   finalized" holds without a backfill because `settle_exchange` is the only
+   writer that reaches the cap, and it sets the stage in that same save.
 
 2. **Lifecycle (`dream_session.py`).**
    - Constants `STAGE_CONVERSING = "conversing"`, `STAGE_FINALIZED =
@@ -91,6 +99,7 @@ gain the new keys so they stay valid payloads); removing schema-3 keys
    | Condition | Code | Message |
    |---|---|---|
    | `say` or `finalize` while finalized | `dream_finalized` | 你已停止訴說，願望改由你親自修改。 |
+   | `choose_thread` while finalized | `thread_choice_closed` | 這一夜的訴說已經結束，願望的歸屬不能再改。 |
    | `finalize` with `current.pending_submission_id` set | `dream_pending_response` | 女神還在回應，請稍候再停止訴說。 |
    | `confirm` while conversing | `not_finalized` | 請先停止訴說，再許下願望。 |
    | `draft` while conversing with `supplied` truthy | `direction_locked` | 訴說期間願望由女神修改；停止訴說後才能親自修改。 |
@@ -111,14 +120,28 @@ gain the new keys so they stay valid payloads); removing schema-3 keys
    - The settle transaction's stale check also treats
      `latest.stage != lifecycle.STAGE_CONVERSING` as stale.
 
+   `choose_thread` is stage-gated here, not in `dream-working-proposal`,
+   because the stage does not exist before this change. The first accepted
+   `say` still locks the choice through `surface.lock_thread`; `finalize`
+   deliberately does not, because a player who finalizes before speaking has
+   not chosen yet, and the later-sleep resume rule returns such a session to
+   the conversing stage where the choice is still open. While finalized the
+   stage gate refuses the action whatever `thread_locked` says;
+   `dream-wish-stage-wire` publishes `can_choose_thread` with the same stage
+   requirement.
+
 6. **Service: `draft`, `confirm`, `awaken` (replaces the payload logic).**
    - Finalized with `supplied` truthy:
      - dict: keep the existing shape checks (`check_json_safety`, keys within
        `DIRECTION_KEYS`, summary type and length, `MAX_DIRECTION_BYTES`).
-       `form_thread = supplied.get("thread_id") or None`. It must equal
-       `wish["thread_id"]`, or be `None` while `wish["thread_id"]` is not the
-       `id` of any entry of `surface.offered_threads(actor)`; otherwise
-       `thread_locked`. `proposal = dream_proposal.normalize_proposal(supplied)`;
+       `form_thread` follows the key's presence, not its truthiness: an
+       **absent** `thread_id` keeps `wish["thread_id"]` (a text-client form such
+       as `{"summary": …}` omits it, and "omitted" meant "new story" only in
+       the old flow); a present **string** must equal `wish["thread_id"]`; a
+       present **`null`** is allowed only while `wish["thread_id"]` is not the
+       `id` of any entry of `surface.offered_threads(actor)` — the chosen thread
+       ended, and the one permitted change is back to a new story. Anything
+       else is `thread_locked`. `proposal = dream_proposal.normalize_proposal(supplied)`;
        `ProposalEditError` → `invalid_direction`.
        `passthrough = {key: supplied[key] for key in ("effects", "revisions")
        if key in supplied}`.
@@ -152,46 +175,7 @@ gain the new keys so they stay valid payloads); removing schema-3 keys
    - The shared tail message for a saved draft becomes `願望已替你收著。`
      (was `故事方向已存為私人草稿。`).
 
-7. **Read model (`dream_state`).** Add keys: `stage` (`session.stage`),
-   `proposal` (copy of the working proposal), `changes`, `thread_id`,
-   `can_choose_thread` (open, conversing, not `thread_locked`, no pending
-   response), `can_finalize` (open, conversing, no pending response),
-   `can_edit` (open and finalized), `drafted` (`bool(session.draft_id)`).
-   Change `can_confirm` to open and finalized. `can_input` follows
-   `progress()`. Keep the schema-3 keys: `direction_parts` from
-   `proposal["summary"]`, `requirements` from `proposal["requirements"]`,
-   `requirement_version` and `draft_preferences` from the saved draft as
-   today.
-
-8. **Wire schema 4.** `DREAM_SCHEMA_VERSION = 4` in
-   `web/webclient/presentation/dream.py` and `dream: 4` in
-   `protocol/constants.js`. In `protocol/panels/dream.js` add the eight keys
-   to the exact field list and validate:
-   - `stage` is `"conversing"` or `"finalized"`;
-   - `proposal` has exactly `summary`, `themes`, `atmosphere`, `participants`,
-     `emphasis`, `exclusions`, `requirements`; `summary` is a string of at
-     most 2000 code points; each list has at most 32 non-blank strings of at
-     most 200 code points; `requirements` passes the existing row check with
-     at most 8 rows;
-   - `changes` is `null` or has exactly `summary` (`null`, `"formed"` or
-     `"changed"`), `lists` (exactly the five list keys, each exactly `added`
-     and `removed`, arrays of strings within the list bounds) and
-     `requirements` (exactly `added` and `removed`, arrays of rows within the
-     row bounds);
-   - `thread_id` is `null` or a string of 1..128 characters;
-   - `can_choose_thread`, `can_finalize`, `can_edit`, `drafted` are booleans;
-   - invariants (throw on violation): `can_input` requires `stage ===
-     "conversing"`; `can_finalize` and `can_choose_thread` require `open`,
-     `stage === "conversing"` and `!pending`; `can_edit` and `can_confirm`
-     require `open` and `stage === "finalized"`; `open && remaining === 0`
-     requires `stage === "finalized"`.
-
-9. **Web action.** `dream_actions.validate("finalize", payload)` requires
-   exactly `session_id` and `revision`. Register `dream.finalize`. Echo
-   `"dream.finalize": function () { return "dream finalize"; }` with its test
-   case and manifest id; add it to the registry enumeration test.
-
-10. **Tests.**
+7. **Tests.**
     - `world/narrative/tests/test_dream_session.py`: `finalize_session`
       (success, pending refusal, closed refusal, idempotent), `progress` /
       `choices` by stage, `settle_exchange` finalizing at six,
@@ -201,32 +185,23 @@ gain the new keys so they stay valid payloads); removing schema-3 keys
       (existing test, kept).
     - `world/narrative/tests/test_dream_surface.py`: one test per scenario of
       the `dream-session-lifecycle` and `dream-authoring` deltas, through
-      `service.act` and the web action adapter. Existing tests that confirm
-      or submit a direction before the cap now call `finalize` (and
-      `choose_thread` before the first `say` when they use a thread) first;
+      `service.act`. Existing tests that confirm or submit a direction
+      before the cap now call `finalize` (and `choose_thread` before the
+      first `say` when they use a thread) first;
       `test_confirmation_requires_the_shown_requirement_version` and
       `test_an_edited_summary_cannot_freeze_the_shown_requirement_version`
       are replaced by the "An edited proposal confirms what was submitted"
       test. Keep every existing `covers_requirement` ID on a test that still
       establishes it.
-    - `web/static/webclient/js/tests/protocol_dream.test.js`: schema 4
-      accept case and one reject case per rule of decision 8.
-    - Fixtures only: add the eight keys (conversing, empty proposal,
-      `changes: null`, `thread_id: null`, flags consistent with decision 8)
-      to the `state()` fixture of `web/webclient-app/tests/dream.test.js`, to
-      `fixture()` of `stories/World/DreamPanel.stories.js`, and change the
-      literal schema `3` to `4` in both test files. Do not change any
-      component or assertion about component behaviour.
-    - `web/webclient/presentation/tests/test_dream_artwork.py`: the version
-      assertion follows the constant.
+    - No wire, validator or fixture change belongs to this change; the panel
+      keeps publishing schema 3 until `dream-wish-stage-wire`.
 
 ## Risks / Trade-offs
 
 - [The unchanged browser panel sends a direction with every draft and
   confirms without finalizing] → both are refused with a reason until
   `dream-wish-stage-panel`; awaken, say and at-cap confirmation keep working.
-- [Schema bumped twice in the batch] → each bump is one constant on each side
-  plus fixtures; keeping the old panel untouched until its replacement costs
-  less than porting it twice.
+  The intermediate stages document the same window (`dream-wish-stage-wire`
+  publishes the stage, and the old panel is replaced two stages later).
 - [A confirmation refused by validation still stores the submitted form] →
   intended: the spec keeps an invalid direction as the unconfirmed draft.

@@ -2,7 +2,7 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 2 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 2 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Edit Contract", "Working Proposal", "Error Handling" row "Invalid edits").
 
 - depends-on: dream-proposal-edit-applier
@@ -10,7 +10,7 @@ Stage 2 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-desi
   `world/ai/tests/test_dream_presentation.py` are touched only by this change
   in the batch. `world/narrative/dream_surface.py` (`store_response`) and
   `world/narrative/tests/test_dream_surface.py` are touched again by
-  `dream-working-proposal`, `dream-wish-stages`, `dream-wish-stage-panel` and
+  `dream-working-proposal`, `dream-wish-stages`, `dream-wish-stage-wire` and
   `dream-farewell-beat`; apply the batch in its stated order.
 
 ## Why

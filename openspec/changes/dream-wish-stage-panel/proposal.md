@@ -2,23 +2,26 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 6 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 7 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Browser Surface" except the change line, changed-field marks, editable
-requirement rows and the farewell; "Player-Facing Wording").
+requirement rows, the farewell, the Storybook stories and the documents;
+"Player-Facing Wording").
 
 - depends-on: dream-wish-text-commands
 - conflict: `web/webclient-app/components/DreamPanel.vue`,
-  `web/webclient-app/tests/dream.test.js`,
-  `web/webclient-app/stories/World/DreamPanel.stories.js` and
+  `web/webclient-app/tests/dream.test.js` and
   `web/webclient/tests/test_vue_dream_stage_evidence.py` are touched again by
-  `dream-wish-change-report` and `dream-farewell-beat`; apply in batch order.
-  `openspec/specs/webclient-dream-stage` is rewritten here: requirement "The
-  dream is a full-stage AVG scene over its official artwork" was last
-  modified by `dream-wish-stages`.
-- interim (ended by the next stage): the panel still receives the schema-3
-  keys it no longer reads; `dream-wish-change-report` removes them. Requirement
-  rows are shown read-only in the edit sheet and the keepsake card has no
-  change line until that stage.
+  `dream-wish-change-report` and `dream-farewell-beat`;
+  `web/webclient-app/stories/World/DreamPanel.stories.js` is rewritten by
+  `dream-wish-stage-stories`. Apply in batch order.
+  `openspec/specs/webclient-dream-stage` requirement "The dream is a
+  full-stage AVG scene over its official artwork" was last modified by
+  `dream-wish-stage-wire`.
+- interim (ended by the next stage): the existing stories still describe the
+  old panel states; `dream-wish-stage-stories` rewrites them. The panel still
+  receives the schema-3 keys it no longer reads; `dream-wish-change-report`
+  removes them. Requirement rows are shown read-only in the edit sheet and
+  the keepsake card has no change line until that stage.
 
 ## Why
 
@@ -40,8 +43,8 @@ server refuses most of what it sends.
     shown as fixed;
   - draft without content while conversing, the form when finalized;
   - the awaken check and every label in the design's wording.
-- The opening narration's last sentence and the web paragraph of the command
-  reference follow the new wording.
+- `tests/dream.test.js` is rewritten for the new contract and the evidence
+  bridge follows the surviving and new requirements.
 - **BREAKING** (player-visible): the panel no longer confirms before
   finalize and no longer edits the form while conversing.
 - **Human-reviewed:** layout, visual polish and Traditional Chinese wording
@@ -67,12 +70,8 @@ None.
 
 - Code: `web/webclient-app/components/DreamPanel.vue`,
   `web/webclient-app/tests/dream.test.js`,
-  `web/webclient-app/stories/World/DreamPanel.stories.js`,
-  `web/webclient-app/stories/fixtures/dream_wish.js` (new),
-  `web/webclient/tests/test_vue_dream_stage_evidence.py`,
-  `world/narrative/dream_surface.py` (`OPENING`, one sentence),
-  `docs/game/command-reference.md` and `docs/game/commands.md` (web
-  paragraphs), rebuilt `dist`.
-- No wire change, no action change, no migration.
-- Estimate: 8 hours (port 2.5 h, Vitest rewrite 3.5 h, stories 1 h, evidence
-  bridge, documents and gates 1 h).
+  `web/webclient/tests/test_vue_dream_stage_evidence.py`, rebuilt `dist`.
+- No wire change, no action change, no story, fixture, document or server
+  change.
+- Estimate: 6.5 hours (port 2.5 h, Vitest rewrite 3.5 h, evidence bridge
+  0.5 h).

@@ -32,7 +32,7 @@ When the committed dream state of the mounted stage changes from open to closed 
 
 #### Scenario: Waking surfaces wait for the farewell
 - **WHEN** a farewell is held
-- **THEN** the surfaces that yield to an open dream (the sleep-handoff cards and the landmark arrival card) stay closed until the stage is released
+- **THEN** the surfaces that yield to an open dream (the sleep-handoff cards, the landmark arrival card and the wilderness travel layout) stay yielded until the stage is released
 
 #### Scenario: Departure without ending text closes at once
 - **WHEN** the state closes with an empty ending text

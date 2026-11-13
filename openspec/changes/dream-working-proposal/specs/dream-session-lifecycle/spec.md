@@ -34,6 +34,10 @@ Each dream session SHALL hold one structured working proposal and the change rep
 - **WHEN** a saved session is resumed on a later sleep
 - **THEN** its working proposal, last report and chosen thread are the ones it held before
 
+#### Scenario: Resume seeds from the saved draft
+- **WHEN** a saved session with a saved draft is resumed and the retained association holds no working proposal
+- **THEN** the working proposal and chosen thread are taken from the saved draft's direction, and a session that already accepted an exchange reports its thread as locked
+
 ### Requirement: Thread choice precedes the first message and then locks
 
 Before the first message of a session is accepted, the owner SHALL be able to choose a new story or one currently offered thread for the proposal; the default SHALL be a new story. Accepting the first message SHALL lock the choice for the session, including later resumes. The chosen thread's player-visible label SHALL be given to the collaborator. A choice after the lock, or of a thread that is not offered, SHALL be refused without a write.

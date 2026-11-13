@@ -2,18 +2,19 @@
 
 ## Batch: dream proposal co-editing
 
-Stage 7 of 8 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
+Stage 9 of 10 of `docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md`
 ("Keepsake card" change line, "Read-only view" changed-field marks,
 "Finalize" requirement rows).
 
-- depends-on: dream-wish-stage-panel
+- depends-on: dream-wish-stage-stories
 - conflict: `web/webclient-app/components/DreamPanel.vue`,
-  `tests/dream.test.js`, `stories/World/DreamPanel.stories.js`,
+  `tests/dream.test.js`, `stories/fixtures/dream_wish.js` and
+  `stories/World/DreamPanel.stories.js`,
   `test_vue_dream_stage_evidence.py` (shared with `dream-wish-stage-panel`
   and `dream-farewell-beat`); `world/narrative/dream_surface.py`,
   `web/webclient/presentation/dream.py`, `protocol/panels/dream.js`,
   `protocol/constants.js`, `protocol_dream.test.js` (shared with
-  `dream-wish-stages`); apply in batch order.
+  `dream-wish-stage-wire`); apply in batch order.
 
 ## Why
 

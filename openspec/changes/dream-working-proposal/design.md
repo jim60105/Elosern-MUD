@@ -40,7 +40,21 @@ how a supplied direction is validated, saved or confirmed, the panel wire
    the dict from `dream_proposal.diff`), `thread_id` (`None` or `str`),
    `thread_locked` (`bool`). In `enter_for_owner` the new association takes
    them from `retained` with defaults `dream_proposal.empty_proposal()`,
-   `None`, `None`, `False`.
+   `None`, `None`, `False`, except for two derived defaults:
+   - When `retained` carries no `proposal` and the resumed session has a
+     `draft_id`, seed the proposal from the saved draft:
+     `dream_proposal.normalize_proposal(get_draft(session.draft_id,
+     owner_id(actor)).direction or {})`, and take `thread_id` from the seed
+     when `retained` has none. The source design resumes a saved session
+     "with the saved draft as the starting proposal"; without this the
+     proposal would restart empty whenever the association is missing or was
+     written before this batch — a pre-batch browser draft, a cleared
+     attribute, or the camping attribute restore. A direction the applier
+     refuses falls back to `dream_proposal.empty_proposal()`.
+   - `thread_locked` is true when `retained` says so **or when the session
+     has already accepted an exchange** (`completed_exchanges > 0`): the lock
+     is a consequence of the first message, so a lost association must not
+     reopen a choice the player already made.
 
 2. **Surface functions (verbatim signatures), in `dream_surface.py`.**
 
@@ -141,6 +155,10 @@ how a supplied direction is validated, saved or confirmed, the panel wire
    `validate("choose_thread", ...)` accept and reject cases. Repair existing
    tests that read `association["direction"]`, call `store_direction` or
    expect the message as `direction_parts`. Synthetic strings only.
+   The seed case resumes a session whose retained association carries no
+   `proposal` but whose `draft_id` names a saved direction: the working
+   proposal and thread come from that direction, and a session with a
+   completed exchange reports `thread_locked`.
 
 ## Risks / Trade-offs
 

@@ -7,7 +7,7 @@
   `decline` to `answer_sleep_dream`, and routes `say`, `draft`, `confirm`,
   `awaken` to `server.dream_service.act(...)`, printing the refusal message
   and then `render_state(current)` when the dream is still open.
-- After `dream-wish-stages`, `dream_state` carries `stage`, `proposal`
+- After `dream-wish-stage-wire`, `dream_state` carries `stage`, `proposal`
   (`summary`, five lists, `requirements`), `changes` (`None` or
   `{"summary": None|"formed"|"changed", "lists": {field: {"added",
   "removed"}}, "requirements": {"added", "removed"}}`), `thread_id`,

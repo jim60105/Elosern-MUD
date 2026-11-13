@@ -36,7 +36,7 @@ An edit set SHALL be applied in order to a copy of the proposal, each proposal f
 
 ### Requirement: Edited fields are normalized and bounded
 
-After every edit the edited field SHALL be normalized: list items and requirement rows are trimmed, blank lines dropped and duplicates removed keeping the first; the summary is trimmed. A requirement row SHALL be one line of a known kind, a colon and non-empty text. A result outside the existing direction bounds for summary length, list item count, list item length, requirement count or requirement text length SHALL make the edit set invalid.
+After every edit the edited field SHALL be normalized: list items and requirement rows are trimmed, blank lines dropped and duplicates removed keeping the first; the summary is trimmed. A requirement row SHALL be one line of a known kind, a colon (either width) and non-empty text, stored and rendered in the canonical half-width form. A result outside any direction bound — summary length, item count, item length, requirement count or row length — SHALL make the edit set invalid.
 
 #### Scenario: List normalization
 - **WHEN** a list field is overwritten with padded lines, a blank line and a repeated item
@@ -45,6 +45,10 @@ After every edit the edited field SHALL be normalized: list items and requiremen
 #### Scenario: Requirement rows parse and render
 - **WHEN** a requirements field is overwritten with lines of the form kind, colon, text
 - **THEN** each row is stored as its kind and trimmed text and the field renders back one canonical line per row
+
+#### Scenario: Full-width colon
+- **WHEN** a requirements line separates its kind and text with a full-width colon
+- **THEN** the row is stored with the same kind and trimmed text as the half-width form and renders with the canonical half-width separator
 
 #### Scenario: Malformed requirement line
 - **WHEN** a requirements line has no colon, an unknown kind or empty text
@@ -57,6 +61,18 @@ After every edit the edited field SHALL be normalized: list items and requiremen
 #### Scenario: Bounds match the direction store
 - **WHEN** the editing bounds and requirement kinds are compared with those the direction store validates
 - **THEN** they are equal
+
+### Requirement: Aggregate byte budgets bound the proposal and its change report
+
+The canonical JSON of a stored proposal and of a computed change report SHALL each stay within a fixed byte budget, so that the published panel and the saved draft both fit the limits of the surfaces that carry them.
+
+#### Scenario: Aggregate size
+- **WHEN** the proposal or the change report of an edit set would exceed its aggregate byte budget while every field stays inside its own bound
+- **THEN** the edit set is invalid with the code of the exceeded budget and no edit is kept
+
+#### Scenario: A result inside both budgets is accepted
+- **WHEN** a proposal and its change report both sit at or below their byte budgets
+- **THEN** the edit set succeeds
 
 ### Requirement: The change report names what an edit set changed
 
