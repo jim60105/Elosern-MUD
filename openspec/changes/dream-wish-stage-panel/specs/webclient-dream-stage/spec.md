@@ -38,6 +38,10 @@ While the committed `dream` panel state is open, the browser SHALL present the d
 - **WHEN** a dream state carries a stage, proposal, change report, thread choice and stage flags
 - **THEN** the client validator accepts a consistent state and rejects an unknown stage, a proposal or change report outside its exact bounded shape, free text offered outside the conversing stage, and editing or confirmation offered outside the finalized stage
 
+#### Scenario: The largest legal stage state fits
+- **WHEN** a dream state carries a proposal and a change report at their aggregate bounds, 32 thread labels and the prose keys at their own bounds
+- **THEN** the published payload stays inside the protocol envelope and the client validator accepts it
+
 #### Scenario: Dream art leaves lifecycle unchanged
 - **WHEN** the dream descriptor resolves repeatedly
 - **THEN** no physical-room/archetype generation is enqueued and sleep/session/dialogue/authoring state is unchanged
