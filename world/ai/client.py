@@ -93,7 +93,7 @@ def _null_content_finish_reason(payload) -> str | None:
         if "content" not in message or message["content"] is not None:
             return None
         reason = choice.get("finish_reason")
-    except (KeyError, IndexError, TypeError, AttributeError):
+    except (KeyError, IndexError, TypeError, AttributeError):  # observability: ignore R2: a shape probe only; the caller's envelope validation reports a malformed body
         return None
     if reason is None:
         return "absent"
