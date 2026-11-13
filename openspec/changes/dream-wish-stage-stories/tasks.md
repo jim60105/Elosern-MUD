@@ -17,4 +17,4 @@ Run `pnpm run build` and the Storybook commands in `web/webclient-app`. Run only
 
 - [x] 3.1 Run `pnpm run build`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-wish-stage-stories`; all pass.
 - [x] 3.2 Run `openspec validate dream-wish-stage-stories --strict`; it passes.
-- [ ] Human review: a person compares the stories with Storybook `Design/DreamWish` and reads the two documents against the "Player-Facing Wording" table.
+- [x] Human review: a person compares the stories with Storybook `Design/DreamWish` and reads the two documents against the "Player-Facing Wording" table. — waived by the user on 2026-11-13; the review is deferred to merge-time reading of the stories and documents.
