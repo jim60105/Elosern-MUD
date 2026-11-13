@@ -1,9 +1,10 @@
 """Version-4 gallery projection and its remembered per-category selection.
 
 Characters and companions are created in each test; monster species, variants
-and tiers come from the synthetic kit plus file-local factory rows. Every
-projection goes through ``gallery_presenter``, which returns only payloads that
-passed ``validate_gallery``; the tests re-validate each one explicitly.
+and tiers come from the synthetic kit plus file-local factory rows; a met place
+is a synthetic terrain region. Every projection goes through
+``gallery_presenter``, which returns only payloads that passed
+``validate_gallery``; the tests re-validate each one explicitly.
 """
 
 from pathlib import Path
@@ -24,9 +25,11 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
+from typeclasses.rooms import TerrainRoom
 from web.webclient.presentation import gallery as gallery_module
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.gallery import gallery_presenter, validate_gallery
+from web.webclient.presentation.gallery_categories import is_subject_admitted
 from web.webclient.presentation.gallery_selection import (
     GalleryViewSelection,
     gallery_view_snapshot,
@@ -37,8 +40,10 @@ from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
 from world.art import gallery as gallery_api
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.maps import wilderness_provider
 from world.rules.clock import get_world_clock
 from world.rules.lore_knowledge import record_species_sighting
+from world.rules.met_people import PLACE_REGION, record_person_interaction
 from world.rules.party import join_party
 from world.rules.possession import enter_possession
 from world.tests.synthetic_data import (
@@ -131,12 +136,36 @@ class GalleryV4PresenterTests(EvenniaTest):
         owner = owner or self.actor
         companion = create_object(NPC, key=key, location=self.room1)
         companion.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        self._enlist(companion, owner)
+        return companion
+
+    def _enlist(self, companion, owner):
         companion.db.party_member = owner.pk
         owner.db.party = [*(owner.db.party or []), companion.pk]
         meta = dict(owner.db.party_meta or {})
         meta[str(companion.pk)] = {"general": True, "reasons": []}
         owner.db.party_meta = meta
         return companion
+
+    def _terrain(self, key, coordinates):
+        room = create_object(TerrainRoom, key=key, location=None)
+        room.ndb.active_coordinates = coordinates
+        return room
+
+    def _named_npc(self, key):
+        # A named NPC never needs to stand in the recorded place, and a fresh
+        # object inside a terrain room would trip the wilderness receive hook.
+        npc = create_object(NPC, key=key, location=self.room1)
+        npc.db.portrait_policy = {"mode": "named", "stable_key": key}
+        return npc
+
+    def _meet(self, npc, room, region_key, actor=None):
+        actor = actor or self.actor
+        actor.location = room
+        with patch.object(
+            wilderness_provider, "region_for_coordinates", return_value=region_key
+        ):
+            record_person_interaction(actor, npc)
 
     def _leave_party(self, companion, owner=None):
         owner = owner or self.actor
@@ -181,7 +210,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         self.assertTrue(panel["groups"][0]["expanded"])
         counts = {row["key"]: (row["count"], row["enabled"]) for row in panel["categories"]}
         self.assertEqual(counts, {
-            "mine": (2, True), "party": (1, True), "people": (0, False),
+            "mine": (2, True), "party": (1, True), "people": (0, True),
             "monster": (1, True), "scene": (0, False),
         })
         self.assertIsNotNone(companion)
@@ -255,6 +284,88 @@ class GalleryV4PresenterTests(EvenniaTest):
         )
         self.assertIs(session.ndb.gallery_view, view)
 
+    # -- the people category ------------------------------------------------
+
+    def test_people_opens_the_most_recent_place_only(self):
+        room_a = self._terrain("t_room_a", (1, 1))
+        room_b = self._terrain("t_room_b", (2, 2))
+        npc_a = self._named_npc("t_npc_a")
+        npc_b = self._named_npc("t_npc_b")
+        self._meet(npc_a, room_a, "t_region_a")
+        self._meet(npc_b, room_b, "t_region_b")
+        session = self._session()
+        self.assertEqual(select_gallery_category(session, self.actor, "people")["outcome"], "success")
+        panel = self._build(session)
+        self.assertEqual(panel["category"], "people")
+        self.assertEqual(
+            [(group["key"], group["expanded"], group["count"]) for group in panel["groups"]],
+            [
+                (f"{PLACE_REGION}:t_region_b", True, 1),
+                (f"{PLACE_REGION}:t_region_a", False, 1),
+            ],
+        )
+        # The collapsed place carries no subjects at all.
+        self.assertEqual(_listed(panel), ["portrait:character:t_npc_b"])
+        self.assertEqual(panel["selected"], "portrait:character:t_npc_b")
+        counts = {row["key"]: row["count"] for row in panel["categories"]}
+        self.assertEqual(counts["people"], 2)
+        # A stored person in the collapsed place is no candidate: the selected
+        # person falls back to the expanded place's first subject.
+        session.ndb.gallery_view = GalleryViewSelection(
+            self.actor.pk, "people", (("people", "portrait:character:t_npc_a"),)
+        )
+        self.assertEqual(self._build(session)["selected"], "portrait:character:t_npc_b")
+        # And that person cannot be selected directly: the panel never lists it.
+        self.assertEqual(
+            select_gallery_subject(session, self.actor, "portrait:character:t_npc_a")["code"],
+            "unknown_subject",
+        )
+
+    def test_a_remembered_place_that_is_gone_falls_back(self):
+        room_a = self._terrain("t_room_a", (1, 1))
+        room_b = self._terrain("t_room_b", (2, 2))
+        npc_a = self._named_npc("t_npc_a")
+        npc_b = self._named_npc("t_npc_b")
+        self._meet(npc_a, room_a, "t_region_a")
+        self._meet(npc_b, room_b, "t_region_b")
+        session = self._session()
+        remembered = (("people", f"{PLACE_REGION}:t_region_a"),)
+        session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "people", (), remembered)
+        # The remembered older place opens while it still has a listed person.
+        panel = self._build(session)
+        self.assertEqual(
+            [group["key"] for group in panel["groups"] if group["expanded"]],
+            [f"{PLACE_REGION}:t_region_a"],
+        )
+        self.assertEqual(_listed(panel), ["portrait:character:t_npc_a"])
+        self.assertEqual(panel["selected"], "portrait:character:t_npc_a")
+        # Once that place is gone, the most recent remaining place opens.
+        npc_a.delete()
+        panel = self._build(session)
+        self.assertEqual(
+            [(group["key"], group["expanded"]) for group in panel["groups"]],
+            [(f"{PLACE_REGION}:t_region_b", True)],
+        )
+        self.assertEqual(panel["selected"], "portrait:character:t_npc_b")
+        # A fallback is a read: the remembered place stays as stored.
+        self.assertEqual(session.ndb.gallery_view.expanded, remembered)
+
+    def test_admission_covers_a_person_in_a_collapsed_place(self):
+        room_a = self._terrain("t_room_a", (1, 1))
+        room_b = self._terrain("t_room_b", (2, 2))
+        npc_a = self._named_npc("t_npc_a")
+        npc_b = self._named_npc("t_npc_b")
+        self._meet(npc_a, room_a, "t_region_a")
+        self._meet(npc_b, room_b, "t_region_b")
+        session = self._session()
+        select_gallery_category(session, self.actor, "people")
+        panel = self._build(session)
+        collapsed = [group for group in panel["groups"] if not group["expanded"]]
+        self.assertEqual([group["key"] for group in collapsed], [f"{PLACE_REGION}:t_region_a"])
+        self.assertEqual(collapsed[0]["subjects"], [])
+        # Every mutating gallery adapter gates on this predicate.
+        self.assertTrue(is_subject_admitted(self.actor, "portrait:character:t_npc_a"))
+
     # -- the stored selection -----------------------------------------------
 
     @covers_requirement(
@@ -319,7 +430,7 @@ class GalleryV4PresenterTests(EvenniaTest):
     )
     def test_a_disabled_remembered_category_falls_back_to_mine(self):
         session = self._session()
-        session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "people", ())
+        session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "scene", ())
         panel = self._build(session)
         self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_v4_actor"))
 
@@ -396,7 +507,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         session = self._session()
         select_gallery_category(session, self.actor, "party")
         stored = session.ndb.gallery_view
-        for category in ("people", "scene", "t_unknown", None):
+        for category in ("scene", "t_unknown", None):
             result = select_gallery_category(session, self.actor, category)
             self.assertEqual(
                 result,
