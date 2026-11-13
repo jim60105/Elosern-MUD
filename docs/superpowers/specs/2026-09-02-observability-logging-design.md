@@ -197,6 +197,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
 | `defeat_aftermath` | `char`、`room`、`tick`、`hp_after`（擊敗善後邊界；defeat-aftermath-core） |
 | `met_person_recorded` | `char`、`npc`、`place`（角色與具名 NPC 互動的相識記錄提交邊界；`place` 為 `settlement:<map id>`／`region:<region key>`，本次互動的地點無法推導時為空；僅於耐用提交時發出） |
+| `scene_entry_recorded` | `char`、`archetype`（角色進場時首次記下某個已註冊場景類型的邊界；同一類型重複進場不寫入，故僅於實際新增一筆時發出） |
 | `monster_individual_constructed` | `individual`（dbref）、`species`、`variant`、`numeric_source`（物種個體建構邊界；`approved_profile` 或暫行 `interim_tier_band`，僅於耐用提交時發出） |
 | `monster_placement_sync` | 各 placement 類別的項目數（`ambient_placements`、`monster_sites`；lore 鏡射步驟邊界，啟動時一次） |
 | `monster_ambient_placed` | `region`、`coordinate`、`species`、`variant`（物種環境個體建立決策，僅於耐用提交時發出） |

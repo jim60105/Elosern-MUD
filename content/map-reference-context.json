@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "32fc228dcd2bfa43d1b2035a09c273bfcd572da0604d5db704f17b45c9cedaab",
+  "fingerprint": "8313133457345ab76b47ee80e06258f9869e1a61bd7d9ded95d8c18c6d575dd1",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16395,6 +16395,7 @@
     "world/rules/rulebook/sight.yaml": "3940feeb9f8b9dd419ed09df742126c3bf7276c0c9b18ac00568e5eb2c1cfe49",
     "world/rules/rulebook/state_reactions.yaml": "49c0953d2fc03d60dcf065530c9b01d0127661018a4727379208a62f351667b1",
     "world/rules/rulebook/status_display.yaml": "b1b0496bfd76b7724a5019fcc6840d576b47bab3e648c4c43cb40139376da758",
+    "world/rules/scene_visits.py": "1036e405aa9cb8fe3942c8c11e95d1d4635588eb4b385a81e0e99fa53ad8a28c",
     "world/rules/service_gate.py": "8c9584aa8ddbcff0d6a83c7cc461a2674035f4a464c5d3ef7ff1ffe66f56fdfb",
     "world/rules/service_messages.py": "0f79e5790c715c027ffe4bf0069698e5a5f82ee81a309507f8f1ea6fbfbb3192",
     "world/rules/service_targets.py": "5039f734ec0d0013ed257deec05d50ca2d7a3cdee791d794998450cccbd49708",
