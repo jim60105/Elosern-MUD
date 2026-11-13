@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "71eee54e77ec09edb92084a92051eee7a449d464c1abe30d80da4b00af23c8a8",
+  "fingerprint": "32fc228dcd2bfa43d1b2035a09c273bfcd572da0604d5db704f17b45c9cedaab",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16314,6 +16314,7 @@
     "world/rules/map_district_lighting.py": "45e346cefbff57dc213b7b0110b1d8bf34ec284bff85e8cbc06fbae616648a36",
     "world/rules/map_knowledge.py": "3d3dc3ff0d9b051f882b5256c403af919027c72a1b0cad7ff4902a334afdaa39",
     "world/rules/mental_time.py": "e89e5712fa09366112ffdde03e64a9a0c6f0715c83cb24a4e9a3daa5867c095b",
+    "world/rules/met_people.py": "1f6c79ed69223d35a1186cff423e201f7eb9f7aadf2fe5c01c8b1bfca71d7d4d",
     "world/rules/monster_ai/__init__.py": "2dfad84caa0fc799d4e3c9bdb50da1fc163ab95397c2e0c714f7052acb257a5e",
     "world/rules/monster_ai/candidates.py": "1bd45c5aa9c2d7e82a8c354c63a9af33116f91c8c8b43df3160f6311a280fd3c",
     "world/rules/monster_ai/coordination.py": "4bc705d86096afb73dcabb76e948bba1f513bf9be100b17630602ec074272394",
