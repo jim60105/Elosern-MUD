@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from pathlib import Path
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
@@ -435,18 +436,25 @@ class ArtPushPresenterTests(EvenniaTestCase):
         session.sent.clear()
 
     def _complete_scene(self):
-        ensure(self.subject, "desc")
-        from world.art.queue import claim
+        """Append one real scene gallery card (the completed generation)."""
+        from world.art import gallery as gallery_api
 
-        claimed = claim(10)
-        target = self.root / "scene" / "t_synth_bazaar.png"
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/scene/{self.subject.key}/{image_id}.png"
+        target = self.root.joinpath(*identity.split("/"))
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"asset")
-        settle(
+        return gallery_api.append_card(
             self.subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_bazaar.png",
-            error=None,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 4, "height": 4},
         )
 
     def _settle_named_portrait(self, stable_key):
@@ -886,7 +894,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
     def test_referencing_session_receives_one_newer_art_update(self):
         session = self._make_session()
         with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
-            self._complete_scene()
+            card = self._complete_scene()
             on_asset_completed(subject_key=self._scene_key)
         updates = [
             kwargs
@@ -904,8 +912,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
             and attempt["source_id"].startswith("scene.generated:")
         ]
         self.assertEqual(len(generated), 1)
-        self.assertTrue(
-            generated[0]["resource"]["url"].startswith("/art/scene/t_synth_bazaar.png")
+        self.assertEqual(
+            generated[0]["resource"]["url"],
+            f"/art/{card['stored_identity']}",
         )
         self.assertEqual(envelope["revision"], 2)
         self.assertEqual(envelope["base_revision"], 1)

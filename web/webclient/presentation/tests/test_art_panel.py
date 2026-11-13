@@ -14,6 +14,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
@@ -43,10 +44,21 @@ from web.webclient.presentation.registry import build_production_registry
 from web.webclient.presentation.tests._support import committed_view, recorded_frames
 from world.art import descriptors
 from world.art.fallback_keys import FALLBACK_KEYS
-from world.art.gallery import record_for as gallery_record_for
+from world.art.gallery import (
+    append_card,
+    record_for as gallery_record_for,
+)
 from world.art.official import load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
-from world.art.queue import claim, ensure, record_key, settle
+from world.art.queue import (
+    claim,
+    enqueue_gallery_job,
+    ensure,
+    gallery_record_key,
+    record_key,
+    settle,
+    settle_gallery_failed,
+)
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
@@ -968,11 +980,43 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             error=None,
         )
 
+    def _append_scene_card(self, subject, *, write=True):
+        """Append one real scene gallery card (its stored file optional)."""
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/scene/{subject.key}/{image_id}.png"
+        if write:
+            self._write_asset(identity)
+        append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 4, "height": 4},
+        )
+        return image_id, identity
+
+    def _pending_scene_job(self, subject):
+        """Queue one real scene gallery job (the in-flight generation state)."""
+        image_id = str(uuid.uuid4())
+        enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        return image_id
+
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_done_scene_renders_the_canonical_descriptor(self):
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
-            "scene/t_synth_bazaar.png",
+        _image_id, identity = self._append_scene_card(
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         )
         payload = self._render()
         self.assertTrue(payload["available"])
@@ -992,7 +1036,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(len(generated), 1)
         self.assertEqual(generated[0]["type"], "image")
         resource = generated[0]["resource"]
-        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_bazaar.png"))
+        self.assertEqual(resource["resource_id"], identity)
+        self.assertEqual(resource["url"], f"/art/{identity}")
         self.assertNotIn("http", resource["url"])
         self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
         # The generated source authorizes this scene's still-applicable output.
@@ -1005,13 +1050,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_pending_and_failed_generation_states_are_truthful(self):
-        from world.art.queue import claim
-
         subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
-        ensure(subject, "desc")
+        image_id = self._pending_scene_job(subject)
         claimed = claim(10)
+        self.assertTrue(claimed)
         artwork = self._render()["scene"]["artwork"]
-        # A claimed generation is the same player-visible fact as a queued one.
+        # An in-flight gallery job is the same player-visible fact as a queued
+        # one.
         self.assertEqual(artwork["generation_state"], descriptors.GENERATION_PENDING)
         self.assertEqual(
             [
@@ -1034,11 +1079,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             bundled[0]["reason"], descriptors.REASON_REQUIRED_RESOURCE_MISSING
         )
 
-        settle(
-            subject,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
+        settle_gallery_failed(
+            gallery_record_key(subject, image_id),
+            generation_token=str(
+                ArtAssetRecord.objects.get(
+                    db_key=gallery_record_key(subject, image_id)
+                ).db.generation_token
+            ),
             error="boom",
         )
         artwork = self._render()["scene"]["artwork"]
@@ -1056,7 +1103,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_claimed_record_renders_available_with_a_pending_placeholder(self):
         subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
-        ensure(subject, "desc")
+        self._pending_scene_job(subject)
         claim(10)
         payload = self._render()
         self.assertTrue(payload["available"])
@@ -1072,7 +1119,9 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             ],
             [],
         )
-        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        record = ArtAssetRecord.objects.filter(
+            db_key__startswith=f"{record_key(subject)}:gen:"
+        ).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
     def test_unresolvable_scene_archetype_states_the_configuration_failure(self):
@@ -1093,20 +1142,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertEqual(fault["rank"], descriptors.SCENE_RANK_TERMINAL)
 
-    def test_missing_file_for_done_record_is_a_reached_output_missing_fact(self):
-        ensure(ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"), "desc")
-        from world.art.queue import claim
-
-        claimed = claim(10)
-        settle(
+    def test_a_scene_card_with_a_missing_file_claims_no_generated_attempt(self):
+        self._append_scene_card(
             ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_bazaar.png",
-            error=None,
+            write=False,
         )
-        # The file is never written, so the recorded output cannot be presented:
-        # the generated position states that truth.
+        # The stored card cannot be presented and there is no classic fallback
+        # to reach: the generated position simply carries no attempt.
         payload = self._render()
         artwork = payload["scene"]["artwork"]
         generated = [
@@ -1114,11 +1156,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             for attempt in artwork["attempts"]
             if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
         ]
-        self.assertEqual(len(generated), 1)
-        self.assertEqual(generated[0]["type"], "fault")
-        self.assertEqual(
-            generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING
-        )
+        self.assertEqual(generated, [])
+        self.assertEqual(artwork["generation_state"], descriptors.GENERATION_DONE)
         self.assertEqual(artwork["retention_sources"], [])
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
@@ -1316,9 +1355,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # registered panel contract still round-trips through its own validator
         # for a complete portrait descriptor and the unchanged scene block at
         # once.
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
-            "scene/t_synth_bazaar.png",
+        _image_id, scene_identity = self._append_scene_card(
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         )
         guest = _player(key="enumeration guest")
         guest.location = self.room
@@ -1343,8 +1381,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
         ]
         self.assertEqual(len(generated), 1)
-        self.assertTrue(
-            generated[0]["resource"]["url"].startswith("/art/scene/t_synth_bazaar.png")
+        self.assertEqual(
+            generated[0]["resource"]["url"], f"/art/{scene_identity}"
         )
         self.assertEqual(
             sorted(normalized["scene"]),
@@ -1402,9 +1440,8 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes")
     def test_presenter_is_read_only(self):
-        self._settle_done(
-            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
-            "scene/t_synth_bazaar.png",
+        self._append_scene_card(
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
         )
         before = {
             "hp": self.player.traits.hp.current,
