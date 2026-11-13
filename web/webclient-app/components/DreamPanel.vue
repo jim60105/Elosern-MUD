@@ -1496,15 +1496,15 @@ function onKeydown(event) {
 @keyframes dream-keepsake-rise {
   0% { opacity: 1; transform: none; filter: none; }
   35% { opacity: 1; transform: translate(calc(4vw * var(--motion-travel)), calc(-2vh * var(--motion-travel))) scale(0.96); filter: brightness(1.35); }
-  100% { opacity: 0; transform: translate(calc(30vw * var(--motion-travel)), calc(6vh * var(--motion-travel))) scale(0.1); filter: brightness(2.4) blur(calc(6px * var(--ui-scale))); }
+  100% { opacity: 0; transform: translate(calc(31vw * var(--motion-travel)), calc(17vh * var(--motion-travel))) scale(0.1); filter: brightness(2.4) blur(calc(6px * var(--ui-scale))); }
 }
 /* The throne receives it. The painting is nearly white there, so the light
    reads through a dimmed sky and gold rings, not through brightness alone. */
 .dream-scene__wishlight { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
-  background: radial-gradient(circle at 60% 40%, rgba(255, 238, 196, 0.95), rgba(236, 190, 104, 0.55) 5%, rgba(236, 190, 104, 0) 17%),
-    radial-gradient(circle at 60% 40%, rgba(11, 13, 16, 0) 20%, rgba(11, 13, 16, 0.62) 82%);
+  background: radial-gradient(circle at 52% 42%, rgba(255, 238, 196, 0.95), rgba(236, 190, 104, 0.55) 5%, rgba(236, 190, 104, 0) 17%),
+    radial-gradient(circle at 52% 42%, rgba(11, 13, 16, 0) 20%, rgba(11, 13, 16, 0.62) 82%);
   animation: dream-wishlight calc(var(--motion-scene) * 3.2) var(--ease-standard) calc(var(--motion-scene) * 2.2) forwards; }
-.dream-scene__wishlight::before, .dream-scene__wishlight::after { content: ""; position: absolute; left: 60%; top: 40%; width: 30vmin; aspect-ratio: 1; border-radius: 50%;
+.dream-scene__wishlight::before, .dream-scene__wishlight::after { content: ""; position: absolute; left: 52%; top: 42%; width: 30vmin; aspect-ratio: 1; border-radius: 50%;
   border: 1px solid var(--gold-300); box-shadow: 0 0 calc(22px * var(--ui-scale)) var(--gold-400), inset 0 0 calc(22px * var(--ui-scale)) var(--gold-glow);
   opacity: 0; transform: translate(-50%, -50%) scale(0.1); animation: dream-wishring calc(var(--motion-scene) * 4.4) cubic-bezier(0.2, 0.6, 0.2, 1) calc(var(--motion-scene) * 2.8) forwards; }
 .dream-scene__wishlight::after { animation-delay: calc(var(--motion-scene) * 3.7); }
@@ -1514,7 +1514,7 @@ function onKeydown(event) {
    the waking world beneath. The white's own end hands the stage back, by
    which time the whole stage has faded out. */
 .dream-scene__waking { position: absolute; inset: 0; z-index: 11; pointer-events: none;
-  background: radial-gradient(ellipse 70% 80% at 60% 42%, #fffdf8, #fbfaf7 55%, #efece6);
+  background: radial-gradient(ellipse 70% 80% at 52% 42%, #fffdf8, #fbfaf7 55%, #efece6);
   animation: dream-waking calc(var(--motion-scene) * 3.2) var(--ease-standard) both; }
 @keyframes dream-waking { 0% { opacity: 0; } 50%, 100% { opacity: 1; } }
 .dream-scene--departed .dream-window { opacity: 0; transition: opacity var(--motion-scene) var(--ease-standard); }
