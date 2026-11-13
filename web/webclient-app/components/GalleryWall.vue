@@ -110,6 +110,8 @@ const runs = computed(() => [
 
 function runAttrs(run) {
   if (run.key !== "first") return { class: "gwall__run gwall__run--rest" };
+  // With every group collapsed there is no option, so no empty listbox.
+  if (!tileKeys.value.length) return { class: "gwall__run", id: wallId, role: "group", "aria-label": props.ariaLabel };
   return { class: "gwall__run", id: wallId, role: "listbox", "aria-label": props.ariaLabel, "aria-owns": ownsRest.value };
 }
 
@@ -161,10 +163,16 @@ const rovingKey = computed(() => {
   return keys[0] ?? null;
 });
 
+// The resolved track count of a grid, or null while it is unresolved (a
+// hidden or not yet laid out grid reports its `repeat(auto-fill, …)` source).
+function trackCount(grid) {
+  const tracks = grid ? getComputedStyle(grid).gridTemplateColumns ?? "" : "";
+  if (!tracks || tracks.includes("(")) return null;
+  return tracks.split(" ").filter(Boolean).length || null;
+}
+
 function columnsOf(el) {
-  const grid = el?.parentElement;
-  if (!grid) return 1;
-  return getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  return trackCount(el?.parentElement) ?? columns.value ?? 1;
 }
 
 async function focusTile(key) {
@@ -298,9 +306,8 @@ function placeNotch() {
 }
 
 async function measure() {
-  const grid = ownerGrid();
-  if (grid) {
-    const count = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  const count = trackCount(ownerGrid());
+  if (count !== null) {
     if (count !== columns.value) {
       columns.value = count;
       await nextTick();
@@ -355,17 +362,41 @@ watch(() => props.groups, (next) => {
   if (!wallTiles(next).some((tile) => tile.subject.subject_key === key)) {
     focusKey.value = null;
     trayFocusId.value = null;
+    reportedLoss = true;
+    nextTick(() => { reportedLoss = false; });
     emit("focus-lost");
   }
 });
 
-// A tray that closes under focus while its owner stays listed hands focus
-// back to the owner tile rather than dropping it to the document.
-watch(ownerKey, (next, previous) => {
-  if (!previous || next === previous || !trayEl.value) return;
-  if (!trayEl.value.contains(document.activeElement)) return;
+// Focus keeper. A tile that crosses between the wall's runs (the owner's row
+// moves when the selection or the column count changes) is remounted, and a
+// tray item can leave the tray, so a patch may drop focus to the document.
+// Before the patch, remember what held focus; after it, if focus fell out of
+// the wall, put it back: the same tile, else the same tray item, else the
+// tray's roving item, else the current or previous owner tile. A focus loss
+// the wall has already reported (focus-lost) is left to the host.
+let reportedLoss = false;
+watch([parts, items], () => {
+  const active = document.activeElement;
+  if (reportedLoss || !root.value || !active || !root.value.contains(active)) return;
+  const tileKey = active.closest('[data-testid="gallery-subject"]')?.dataset.subjectKey ?? null;
+  const itemId = active.closest('[data-testid="gallery-tray-item"]')?.dataset.itemId ?? null;
+  const previousOwner = active.closest("[data-owner-key]")?.dataset.ownerKey ?? null;
   nextTick(() => {
-    if (tileKeys.value.includes(previous)) focusTile(previous);
+    if (root.value?.contains(document.activeElement)) return;
+    if (tileKey) {
+      if (tileKeys.value.includes(tileKey)) focusTile(tileKey);
+      return;
+    }
+    if (trayShown.value && ownerKey.value === previousOwner) {
+      const id = trayEls.has(itemId) ? itemId : trayRovingId.value;
+      if (id) {
+        focusTrayItem(id);
+        return;
+      }
+    }
+    if (ownerKey.value) focusTile(ownerKey.value);
+    else if (previousOwner && tileKeys.value.includes(previousOwner)) focusTile(previousOwner);
   });
 }, { flush: "pre" });
 

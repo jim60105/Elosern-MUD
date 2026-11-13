@@ -219,6 +219,25 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       expect(wall.element.contains(trayEl)).toBe(false);
     });
 
+    it("needs no adopted run when the owner sits on the last row", async () => {
+      stubColumns(4);
+      const subjects = ["a", "b", "c", "d", "e"].map((key) => subject(key));
+      await mountWall({
+        groups: [group("g", subjects), group("h", [subject("f")], { label: "next" })],
+        selectedSubject: subjects[4].subject_key,
+        capabilities: MANY,
+      });
+      const wall = wrapper.get('[role="listbox"][aria-label="wall"]');
+      // The later group is adopted; the owner's own group is not split.
+      const owned = wall.attributes("aria-owns").split(" ").map((id) => document.getElementById(id));
+      expect(owned).toHaveLength(1);
+      expect(owned[0].contains(tile("f").element)).toBe(true);
+      expect(wall.element.contains(tile("e").element)).toBe(true);
+      await wrapper.setProps({ groups: [group("g", subjects)] });
+      await flushPromises();
+      expect(wrapper.get('[role="listbox"][aria-label="wall"]').attributes("aria-owns")).toBeUndefined();
+    });
+
     it("opens no tray for a one-card subject", async () => {
       await mountWall({
         groups: [group("g", [subject("a"), subject("b")])],
@@ -243,6 +262,51 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       expect(run.attributes("aria-label")).toBe("官方圖片（唯讀）");
       expect(run.findAll('[data-testid="gallery-tray-item"]')).toHaveLength(1);
       expect(tray().attributes("aria-label")).toBe("name-a的圖片");
+    });
+
+    it("scrolls an opening tray smoothly at full motion, and only on opening", async () => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      try {
+        await mountWall({
+          groups: [group("g", [subject("a"), subject("b")])],
+          selectedSubject: subject("a").subject_key,
+          capabilities: MANY,
+        });
+        expect(scroll).toHaveBeenCalledTimes(1);
+        expect(scroll).toHaveBeenLastCalledWith({ block: "nearest", behavior: "smooth" });
+        // A re-measure (a new commit of the same owner) does not scroll.
+        await wrapper.setProps({ groups: [group("g", [subject("a"), subject("b")])] });
+        await flushPromises();
+        expect(scroll).toHaveBeenCalledTimes(1);
+        await wrapper.setProps({ selectedSubject: subject("b").subject_key });
+        await flushPromises();
+        expect(scroll).toHaveBeenCalledTimes(2);
+      } finally {
+        delete Element.prototype.scrollIntoView;
+      }
+    });
+
+    it.each([
+      ["the reduced-motion media query", () => { window.matchMedia = () => ({ matches: true }); }],
+      ["the off motion level", () => { document.documentElement.dataset.motion = "off"; }],
+    ])("scrolls without motion under %s", async (_name, arrange) => {
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      const media = window.matchMedia;
+      arrange();
+      try {
+        await mountWall({
+          groups: [group("g", [subject("a")])],
+          selectedSubject: subject("a").subject_key,
+          capabilities: MANY,
+        });
+        expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "auto" });
+      } finally {
+        window.matchMedia = media;
+        delete document.documentElement.dataset.motion;
+        delete Element.prototype.scrollIntoView;
+      }
     });
 
     it("scrolls an opening tray into view without motion when reduced motion is set", async () => {
@@ -378,6 +442,78 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       await wrapper.setProps({ groups: [group("g", [subject("b")])], selectedSubject: subject("b").subject_key });
       await nextTick();
       expect(wrapper.emitted("focus-lost")).toHaveLength(1);
+    });
+
+    it("steps ArrowDown and ArrowUp by the measured columns across the tray", async () => {
+      stubColumns(2);
+      const subjects = ["a", "b", "c", "d", "e"].map((key) => subject(key));
+      await mountWall({
+        groups: [group("g", subjects)],
+        selectedSubject: subjects[0].subject_key,
+        capabilities: MANY,
+      });
+      tile("b").element.focus();
+      await press(tile("b"), "ArrowDown");
+      expect(document.activeElement).toBe(tile("d").element);
+      await press(tile("d"), "ArrowDown");
+      expect(document.activeElement).toBe(tile("e").element);
+      await press(tile("e"), "ArrowUp");
+      expect(document.activeElement).toBe(tile("c").element);
+      await press(tile("c"), "ArrowUp");
+      expect(document.activeElement).toBe(tile("a").element);
+      expect(wrapper.emitted("select-subject")).toBeUndefined();
+    });
+
+    it("keeps focus on a tile that the new selection moves across the tray", async () => {
+      stubColumns(2);
+      const subjects = ["a", "b", "c", "d", "e"].map((key) => subject(key));
+      await mountWall({
+        groups: [group("g", subjects)],
+        selectedSubject: subjects[0].subject_key,
+        capabilities: MANY,
+      });
+      tile("e").element.focus();
+      await press(tile("e"), "Enter");
+      await wrapper.setProps({ selectedSubject: subjects[4].subject_key });
+      await flushPromises();
+      expect(document.activeElement).toBe(tile("e").element);
+      expect(tile("e").attributes("aria-expanded")).toBe("true");
+    });
+
+    it("moves focus within the tray when the focused card leaves it", async () => {
+      await mountWall({
+        groups: [group("g", [subject("a")])],
+        selectedSubject: subject("a").subject_key,
+        capabilities: MANY,
+        cards: [card("c1"), card("c2")],
+      });
+      trayTiles()[1].element.focus();
+      await wrapper.setProps({ cards: [card("c1")] });
+      await flushPromises();
+      expect(tray().element.contains(document.activeElement)).toBe(true);
+    });
+
+    it("returns the wall's tab stop to the selected tile once focus leaves", async () => {
+      const hasFocus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      await mountWall({
+        groups: [group("g", [subject("a"), subject("b"), subject("c")])],
+        selectedSubject: subject("a").subject_key,
+        capabilities: MANY,
+      });
+      tile("a").element.focus();
+      await press(tile("a"), "End");
+      expect(tile("c").attributes("tabindex")).toBe("0");
+      trayTiles()[0].element.focus();
+      await nextTick();
+      expect(tile("a").attributes("tabindex")).toBe("0");
+      expect(tile("c").attributes("tabindex")).toBe("-1");
+      // A window blur keeps the stop where focus left it.
+      tile("a").element.focus();
+      await press(tile("a"), "End");
+      hasFocus.mockReturnValue(false);
+      tile("c").element.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+      await nextTick();
+      expect(tile("c").attributes("tabindex")).toBe("0");
     });
 
     it("keeps a still-listed focused tile without reporting a loss", async () => {
