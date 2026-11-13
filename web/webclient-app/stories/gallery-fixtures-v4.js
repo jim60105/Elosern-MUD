@@ -5,7 +5,7 @@
 // gallery-v4-cutover these are the only gallery fixtures stories and tests use.
 
 export const GALLERY_V4_IDS = Array.from(
-  { length: 12 },
+  { length: 16 },
   (_, index) => `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
@@ -228,6 +228,31 @@ export const GALLERY_V4_MINE_BLANK = {
   ])],
   cards: [],
   official_entries: [],
+  binding_warnings: [],
+  error_state: null,
+};
+
+// Mine with a full account roster: six characters, the live one first and
+// selected, so its tray opens under the first row and the rest of the roster
+// continues below it. Its tray holds three cards and one official entry.
+const ROSTER = [7005, 7006, 7007, 7008].map((id) => `portrait:character:${id}`);
+export const GALLERY_V4_MINE_ROSTER = {
+  ...GALLERY_V4_MINE,
+  categories: categories({ mine: 6, party: 2, monster: 3 }),
+  groups: [group("mine", [
+    tile(LIVE, "夜行者", { card_count: 3, is_current: true, artwork: original(LIVE, 8) }),
+    tile(TWIN, "晨星", { card_count: 0 }),
+    tile(ROSTER[0], "銀弦", { card_count: 2, artwork: original(ROSTER[0], 12) }),
+    tile(ROSTER[1], "灰燼", { artwork: original(ROSTER[1], 13) }),
+    tile(ROSTER[2], "潮汐守望者", { card_count: 5, artwork: original(ROSTER[2], 14) }),
+    tile(ROSTER[3], "白鴉", { card_count: 0 }),
+  ])],
+  cards: [
+    card(LIVE, 8, { is_default: true, chips: ["預設臉框", "目前預設"] }),
+    card(LIVE, 9),
+    card(LIVE, 10, { chips: ["自訂臉框"] }),
+  ],
+  official_entries: [GALLERY_V4_MINE.official_entries[0]],
   binding_warnings: [],
   error_state: null,
 };

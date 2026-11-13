@@ -271,6 +271,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The handbook titles tab replaced the title-codex big window
     # (handbook-titles-tab).
     "World/TitleCodexTab",
+    # The gallery wall, built and story-documented before the gallery
+    # window mounts it (gallery-wall-component).
+    "Data/GalleryWall",
 }
 
 # The World-directory story files that sit outside the B4 family: the

@@ -1043,6 +1043,7 @@
       "name": "webclient-27",
       "workers": 1,
       "labels": [
+        "web.webclient.tests.test_vue_gallery_wall_evidence",
         "web.webclient.tests.test_vue_showcase_world_evidence",
         "web.webclient.tests.test_vue_store_evidence",
         "web.webclient.tests.test_vue_window_primitives_evidence",
