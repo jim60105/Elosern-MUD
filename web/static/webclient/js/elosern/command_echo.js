@@ -215,6 +215,7 @@
     "letters.collect": function () { return "信件 領取"; },
     "dream.choose_thread": function (payload) { return "dream thread " + (payload.thread_id === null ? "new" : payload.thread_id); },
     "dream.say": function (payload) { return "dream say " + payload.message_parts.join(""); },
+    "dream.finalize": function () { return "dream finalize"; },
     "dream.draft": function (payload) { return "dream draft" + (payload.direction ? " " + (typeof payload.direction === "object" ? JSON.stringify(payload.direction) : payload.direction) : ""); },
     "dream.confirm": function (payload) { return "dream confirm" + (payload.direction ? " " + (typeof payload.direction === "object" ? JSON.stringify(payload.direction) : payload.direction) : ""); },
     "dream.awaken": function () { return "dream awaken"; },

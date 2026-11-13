@@ -17,6 +17,7 @@
     "dream.choose_thread",
     "dream.confirm",
     "dream.draft",
+    "dream.finalize",
     "dream.say",
     "explore.engage",
     "explore.cast",

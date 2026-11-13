@@ -125,6 +125,7 @@ class RegistryTests(unittest.TestCase):
                     "npc.persona.update",
                     "dream.choose_thread",
                     "dream.say",
+                    "dream.finalize",
                     "dream.draft",
                     "dream.confirm",
                     "dream.awaken",
