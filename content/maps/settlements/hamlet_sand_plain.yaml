@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_sand_plain
+location_ref: hamlet_sand_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 178
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 沙地路口
+    desc: 路口鋪在沙地上，車轍很快被風填平，路旁的枯草被吹得貼地，遠看只剩下幾道模糊的痕跡。
+    anchor_key: hamlet_sand_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 防風農舍
+    desc: 農舍前的空地圍著防風的矮籬，往西的路通往西風鎮，屋後的沙地一直延伸到海岸。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

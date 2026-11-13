@@ -1,3 +1,3 @@
 {"areas": [
-  {"id": "western_hills_trial", "region": "western_hills_valleys", "bounds": [1000, 501, 1340, 950]}
+  {"id": "western_hills_valleys", "region": "western_hills_valleys"}
 ]}

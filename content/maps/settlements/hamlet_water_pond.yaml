@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_water_pond
+location_ref: hamlet_water_pond
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 186
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 池塘路口
+    desc: 路口旁是一口引水的池塘，水面映著路樹，岸邊架著提水的木架，鴨群在淺水處撥著泥。
+    anchor_key: hamlet_water_pond
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 圳邊農舍
+    desc: 農舍前的空地攤著待曬的穀物，西邊的坡下就是河，屋後的水圳一路通到田裡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+city_gate:

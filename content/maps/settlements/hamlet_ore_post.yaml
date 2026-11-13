@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_ore_post
+location_ref: hamlet_ore_post
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 222
+    prototype_parent: anchor_room
+    key: 礦驛路口
+    desc: 路口是礦車換馬的地方，路邊堆著待運的礦石與備用的車軸，鐵鎚敲在輪箍上的聲音很清脆。
+    anchor_key: hamlet_ore_post
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 礦驛農舍
+    desc: 農舍前的空地拴著拉礦的牲口，南邊的路通往礦區的坑口，屋牆上掛著修車的工具。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_sheep_fold
+location_ref: village_sheep_fold
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 243
+    y_m: 172
+    prototype_parent: anchor_room
+    key: 寨中井台
+    desc: 村中的空地圍著石井與羊欄，井台邊曬著羊毛，柵欄的木樁被羊身磨得光滑。
+    anchor_key: village_sheep_fold
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 386
+    y_m: 172
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口的路往聖潔王都方向下坡，路旁圍著過夜的羊圈，空氣裡滿是草料與羊毛的氣味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 172
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口通向遺跡鎮，柵門由村民輪值開關，門外的坡地散著低頭啃草的羊群。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 243
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地壓著碎石，南邊是成片的牧草坡，剪毛的季節連庭前都堆滿羊毛捆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

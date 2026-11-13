@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_maple_hollow
+location_ref: village_maple_hollow
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 220
+    y_m: 220
+    prototype_parent: anchor_room
+    key: 坳中井台
+    desc: 村中的空地藏在楓樹環抱的坳底，石井旁堆著落葉，井繩上還掛著早晨的水珠。
+    anchor_key: village_maple_hollow
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 340
+    y_m: 340
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口的路爬出坳口通往合流城，兩側楓林濃密，陽光只在正午照到路面。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口順著鹽路下到白帆港，路邊的楓木被砍去做車軸，樹樁上冒著新芽。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 280
+    y_m: 160
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地舖著碎楓葉，講壇後方的窗朝著東南的坡谷，秋天時整片山坳轉紅。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

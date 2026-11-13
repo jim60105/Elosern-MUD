@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_river_islet
+location_ref: village_river_islet
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 188
+    y_m: 275
+    prototype_parent: anchor_room
+    key: 河洲井台
+    desc: 村中空地的石井靠著河洲邊緣，井水與河水只隔一層沙，漲水時井欄會浸在淺水裡。
+    anchor_key: village_river_islet
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 188
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口迎向河面，渡口的木樁與沙洲之間拉著粗繩，漁人踩著濕沙把船拖上灘來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 188
+    y_m: 450
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口往合流城方向接上大路，路邊的沙地上曬著網具，風起時細沙會蓋過車轍。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 100
+    y_m: 275
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地舖著河石，西邊的水面在傍晚映出整片霞光，禮拜後村民沿河散步。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: shrine_front
+  direction: w
+- source: shrine_front
+  destination: village_green
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:
