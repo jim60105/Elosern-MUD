@@ -6,17 +6,17 @@ Run only the focused test labels named below — one module, one Node file or on
 
 ## 1. Working proposal on the surface
 
-- [ ] 1.1 In `world/narrative/dream_surface.py` apply design decisions 1–3 (association keys, `offered_threads`, `wish_state`, `working_direction`, `choose_thread`, `lock_thread`, changed `store_response`, removed `store_direction`, `dream_state` reading the proposal). Verify `grep -n "store_direction\|\"direction\"" world/narrative/dream_surface.py` prints nothing.
-- [ ] 1.2 In `server/dream_service.py::act` apply design decisions 4–6 (`say` wiring and stale condition, `choose_thread`, drafts from the working proposal). Add the tests of design decision 8 for both `dream-session-lifecycle` requirements in the delta spec and repair the existing tests. Verify `<prefix> world.narrative.tests.test_dream_surface` passes.
+- [x] 1.1 In `world/narrative/dream_surface.py` apply design decisions 1–3 (association keys, `offered_threads`, `wish_state`, `working_direction`, `choose_thread`, `lock_thread`, changed `store_response`, removed `store_direction`, `dream_state` reading the proposal). Verify `grep -n "store_direction\|\"direction\"" world/narrative/dream_surface.py` prints nothing.
+- [x] 1.2 In `server/dream_service.py::act` apply design decisions 4–6 (`say` wiring and stale condition, `choose_thread`, drafts from the working proposal). Add the tests of design decision 8 for both `dream-session-lifecycle` requirements in the delta spec and repair the existing tests. Verify `<prefix> world.narrative.tests.test_dream_surface` passes.
 
 ## 2. Web action
 
-- [ ] 2.1 Apply design decision 7 (`dream.choose_thread` validator and registration, command echo entry, echo test case, coverage manifest id, registry enumeration). Both roster scenarios of `specs/webclient-action-dispatch/spec.md` must hold, since they now list `dream.choose_thread`. Verify `<prefix> web.webclient.actions.tests.test_dispatcher.test_registry` passes and `node --test web/static/webclient/js/tests/command_echo.test.js` passes.
+- [x] 2.1 Apply design decision 7 (`dream.choose_thread` validator and registration, command echo entry, echo test case, coverage manifest id, registry enumeration). Both roster scenarios of `specs/webclient-action-dispatch/spec.md` must hold, since they now list `dream.choose_thread`. Verify `<prefix> web.webclient.actions.tests.test_dispatcher.test_registry` passes and `node --test web/static/webclient/js/tests/command_echo.test.js` passes.
 
 ## 3. Gates
 
-- [ ] 3.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-working-proposal`; all pass.
-- [ ] 3.2 Run `openspec validate dream-working-proposal --strict`; it passes.
+- [x] 3.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-working-proposal`; all pass.
+- [x] 3.2 Run `openspec validate dream-working-proposal --strict`; it passes.
 
 ## Workflow follow-up
 
