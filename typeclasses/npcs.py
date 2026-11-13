@@ -263,6 +263,20 @@ class NPC(LivingEntity):
         line = affinity_stage_line(self, looker)
         return f"{desc}\n{line}" if line else desc
 
+    def at_desc(self, looker=None, **kwargs):
+        """Record a named-NPC look that produced this description.
+
+        Evennia's ``DefaultObject.at_look`` calls it for both the webclient
+        explore-look action and the text 看 command, so this one hook covers
+        both surfaces. The writer ignores non-player lookers and generic NPCs
+        and never raises.
+        """
+        super().at_desc(looker=looker, **kwargs)
+        if looker is not None:
+            from world.rules.met_people import record_person_interaction
+
+            record_person_interaction(looker, self)
+
 
 def _swallow_cancelled(failure):
     """Trap a timer cancellation so no CancelledError leaks to the speaker."""

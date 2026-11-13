@@ -42,8 +42,11 @@
 2. Talk: call `record_person_interaction(actor, npc)` immediately before
    `open_or_refresh_dialogue` in `_talk_open_adapter`; after the presence and
    schedule gates in `_talk_scripted_adapter` and `_talk_freeform_adapter`;
-   in `CmdTalk.func` immediately before its own `open_or_refresh_dialogue`
-   call. Not in `open_or_refresh_dialogue`.
+   in `CmdsTalk.func` after its presence, schedule and possession-context
+   gates, before the keyword and host branches. Not in
+   `open_or_refresh_dialogue`: the story-scene refresh
+   (`world.quests.story_dialogue`) and `refresh_dialogue_phase` call it for
+   NPC-initiated contact too.
 3. Services: in `_resolve_target` after a successful
    `require_service_mutation`. Text: list callers with
    `rg -n "resolve_selected_provider\(" commands`; add the call after a

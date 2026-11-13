@@ -22,6 +22,7 @@ from world.rules.service_gate import (
 )
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment_effects import equipment_adjustment_text
+from world.rules.met_people import record_person_interaction
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party_scope import (
     PartyScopeError,
@@ -198,6 +199,9 @@ class CmdBuy(_ShopCommandBase):
             return
         item_key, quantity, member = parsed
         recipient_id = int(member.pk) if member is not None else int(self.caller.pk)
+        # The player chose this merchant's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, merchant_host)
         try:
             result = buy(
                 self.caller, merchant_host, item_key, quantity, recipient_id
@@ -239,6 +243,9 @@ class CmdSell(_ShopCommandBase):
             return
         item_key, quantity, member = parsed
         seller_id = int(member.pk) if member is not None else int(self.caller.pk)
+        # The player chose this merchant's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, merchant_host)
         try:
             result = sell(
                 self.caller, merchant_host, item_key, quantity, seller_id

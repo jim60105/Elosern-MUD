@@ -37,6 +37,7 @@ from world.rules.guild_offers import (
     list_guild_offers,
 )
 from world.rules.guild_config import get_catalog
+from world.rules.met_people import record_person_interaction
 from world.rules.npc_schedules import interaction_reason
 from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.rules.surfaces import read_counter_trait
@@ -155,6 +156,9 @@ class CmdGuildRegister(_GuildCommandBase):
             return
         if self.gate_staff(staff):
             return
+        # The player chose this staff host's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, staff)
         try:
             record = register_adventurer(self.caller, staff)
         except (GuildDataError, GuildError) as error:
@@ -222,6 +226,9 @@ class CmdGuildAccept(_GuildCommandBase):
         if not definition_key:
             self.caller.msg("用法：guild accept <definition_key>")
             return
+        # The player chose this staff host's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, staff)
         try:
             record = accept_guild_offer(self.caller, staff, definition_key)
         except (BoardAccessError, GuildOfferError, QuestTargetsUnavailable) as error:
@@ -323,6 +330,9 @@ class CmdGuildAbandon(_GuildCommandBase):
         if not quest_id:
             self.caller.msg("用法：guild abandon <quest_id>")
             return
+        # The player chose this staff host's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, staff)
         try:
             record = abandon_guild_quest(self.caller, staff, quest_id)
         except QuestNotFound:
@@ -351,6 +361,9 @@ class CmdGuildTurnIn(_GuildCommandBase):
         if not quest_id:
             self.caller.msg("用法：guild turnin <quest_id>")
             return
+        # The player chose this staff host's service; the attempt is recorded
+        # before the domain API may reject it (design D3).
+        record_person_interaction(self.caller, staff)
         try:
             result = turn_in_quest(self.caller, staff, quest_id)
         except (RewardClaimError, GuildDataError) as error:
