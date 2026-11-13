@@ -28,6 +28,7 @@ from elosern_map_core.reference_context import (
     check_workspace_freshness,
     decode_reference_context,
 )
+from elosern_map_core.roads_codec import decode_road_network
 from elosern_map_core.terrain import (
     is_inland_water_cell,
     is_land_cell,
@@ -50,6 +51,9 @@ ELEVATION_PATH = Path("content") / "maps" / "wilderness_elevation.json"
 
 #: The committed external reference index, relative to the workspace root.
 REFERENCE_CONTEXT_PATH = Path("content") / "map-reference-context.json"
+
+#: The committed road artifact, relative to the workspace root.
+ROAD_PATH = Path("world") / "maps" / "data" / "road_network.json"
 
 #: One 64x64 elevation tile edge, matching the map core's tile format.
 TILE_CELLS = 64
@@ -120,6 +124,9 @@ class WorkspaceView:
     _decoded_tiles: dict[tuple[int, int], bytes] = field(
         init=False, repr=False, compare=False
     )
+    _road_contacts: dict[Cell, frozenset[Cell]] | None = field(
+        init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         definition = terrain_definition(self.world.continent)
@@ -134,6 +141,7 @@ class WorkspaceView:
         )
         object.__setattr__(self, "_elevation_tiles", self._load_elevation())
         object.__setattr__(self, "_decoded_tiles", {})
+        object.__setattr__(self, "_road_contacts", None)
 
     def _load_elevation(self) -> Mapping[tuple[int, int], str]:
         path = self.root / ELEVATION_PATH
@@ -172,6 +180,19 @@ class WorkspaceView:
             if ref.location_id == location_id:
                 return ref
         raise WorkspaceError(f"unknown location {location_id!r}")
+
+    def road_contacts(self, cell: Cell) -> tuple[Cell, ...]:
+        """The road cells that precede or follow ``cell`` on any road.
+
+        The committed artifact is decoded once per view. A workspace without it
+        has no contact, and an artifact that does not decode is a
+        ``WorkspaceError``. Freshness is not checked: writing a settlement
+        document changes the artifact's source signature without moving a road.
+        """
+
+        if self._road_contacts is None:
+            object.__setattr__(self, "_road_contacts", _road_contact_index(self.root))
+        return tuple(sorted(self._road_contacts.get(cell, frozenset())))
 
     def terrain_window(self, centre: Cell, radius: int) -> GridTerrain:
         """The terrain facts for the inclusive square around ``centre``."""
@@ -277,6 +298,26 @@ class WorkspaceView:
                 if approach is not None:
                     blocked.add(approach)
         return frozenset(blocked)
+
+
+def _road_contact_index(root: Path) -> dict[Cell, frozenset[Cell]]:
+    """Every road cell's neighbours on the committed artifact, cell by cell."""
+
+    path = Path(root) / ROAD_PATH
+    if not path.is_file():
+        return {}
+    try:
+        network = decode_road_network(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise WorkspaceError(f"{path}: {error}") from error
+    contacts: dict[Cell, set[Cell]] = {}
+    for _, _, cells in network.roads:
+        for index, cell in enumerate(cells):
+            found = contacts.setdefault(cell, set())
+            for neighbour in cells[max(index - 1, 0): index + 2]:
+                if neighbour != cell:
+                    found.add(neighbour)
+    return {cell: frozenset(found) for cell, found in contacts.items()}
 
 
 def _roster(

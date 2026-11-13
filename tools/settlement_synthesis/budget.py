@@ -8,13 +8,16 @@ anchored at the configured reference density. The constants live in one
 
 Two scales stay separate and both come from that one area: the wilderness
 footprint in whole 1 km cells, and the metre envelope radius of the street
-graph. The footprint floor of two cells keeps every settlement multi-gate, so a
-concealed one-cell entry is an authored exception and never a budget result.
+graph. The footprint floor of two cells keeps a capital, city, town or port
+multi-gate, so a concealed one-cell entry is an authored exception and never a
+budget result; a village or hamlet is a one-cell settlement by design and takes
+its node count from the single-cell tier table instead.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -23,6 +26,12 @@ if TYPE_CHECKING:
 
 #: The kinds that receive a population-based budget.
 NATIONAL_KINDS = ("capital", "city", "town", "port")
+
+#: The kinds that receive a one-cell footprint and the single-cell layout.
+SINGLE_CELL_KINDS = ("village", "hamlet")
+
+#: Every kind with a size budget.
+BUDGET_KINDS = NATIONAL_KINDS + SINGLE_CELL_KINDS
 
 
 @dataclass(frozen=True)
@@ -45,6 +54,7 @@ class BudgetConfig:
     min_footprint_cells: int
     tiers: tuple[Tier, ...]
     capital_tier: Tier
+    single_cell_nodes: Mapping[str, int]
 
     def __post_init__(self) -> None:
         if self.reference_population <= 0:
@@ -60,6 +70,14 @@ class BudgetConfig:
             )
         if not self.tiers:
             raise ValueError("at least one population tier is required")
+        if set(self.single_cell_nodes) != set(SINGLE_CELL_KINDS):
+            raise ValueError(
+                "single_cell_nodes must name exactly the single-cell kinds: "
+                + ", ".join(SINGLE_CELL_KINDS)
+            )
+        for kind, nodes in self.single_cell_nodes.items():
+            if nodes < 2:
+                raise ValueError(f"single_cell_nodes[{kind!r}] must be at least 2")
         for tier in (*self.tiers, self.capital_tier):
             _validate_tier(tier)
 
@@ -84,6 +102,7 @@ DEFAULT_BUDGET = BudgetConfig(
         Tier(0, 6, 2, 0.15),
     ),
     capital_tier=Tier(0, 28, 4, 0.35),
+    single_cell_nodes={"village": 4, "hamlet": 2},
 )
 
 
@@ -110,7 +129,7 @@ def size_budget(
 ) -> SizeBudget:
     """The derived size budget for one settlement location."""
 
-    if location.kind not in NATIONAL_KINDS:
+    if location.kind not in BUDGET_KINDS:
         raise BudgetError(
             f"{location.location_id}: kind {location.kind!r} has no size budget"
         )
@@ -127,10 +146,23 @@ def size_budget(
     area_km2 = reference_area_km2 * (
         population / config.reference_population
     ) ** config.area_exponent
+    envelope_radius_m = round(1000 * math.sqrt(area_km2 / math.pi))
+
+    if location.kind in SINGLE_CELL_KINDS:
+        return SizeBudget(
+            location_id=location.location_id,
+            population=population,
+            built_area_km2=area_km2,
+            footprint_cells=1,
+            envelope_radius_m=envelope_radius_m,
+            node_count=config.single_cell_nodes[location.kind],
+            gate_count=0,
+            loop_ratio=0.0,
+        )
+
     footprint_cells = max(
         config.min_footprint_cells, math.ceil(area_km2 - 1e-9)
     )
-    envelope_radius_m = round(1000 * math.sqrt(area_km2 / math.pi))
 
     if location.kind == "capital":
         tier = config.capital_tier

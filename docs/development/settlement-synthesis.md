@@ -63,10 +63,12 @@ The derivation, in order:
 
 1. reference area = reference population / reference density / 100 (ha per km²);
 2. area = reference area × (population / reference population) ^ exponent;
-3. footprint cells = `max(2, ceil(area km²))`, so no supported settlement is
-   ever a concealed single-cell entry;
+3. footprint cells = `max(2, ceil(area km²))` for a capital, city, town or port,
+   so a national settlement is never a concealed single-cell entry, and one
+   cell for a village or hamlet;
 4. envelope radius = `round(1000 × sqrt(area / π))`;
-5. the tier is chosen from the table below, or the capital tier for a capital.
+5. the tier is chosen from the table below, the capital tier for a capital, or
+   the single-cell tier table for a village or hamlet.
 
 | Tier (minimum population) | Nodes | Gates | Loop ratio |
 | --- | ---: | ---: | ---: |
@@ -79,6 +81,18 @@ The derivation, in order:
 
 The tiers grow log-like rather than linearly, because they budget gameplay
 structure, not floor space.
+
+A village and a hamlet are one-cell settlements and take their nodes from a
+second table. They have no gate and no street loop target: the single-cell
+layout derives their entrances from the roads that meet the cell.
+
+| Kind | Footprint cells | Nodes | Gates | Loop ratio |
+| --- | ---: | ---: | ---: | ---: |
+| `village` | 1 | 4 | 0 | 0.0 |
+| `hamlet` | 1 | 2 | 0 | 0.0 |
+
+Those node counts are minimums. A site with a geographic feature, such as a
+ferry crossing or a mine mouth, may add one or two nodes on top of the tier.
 
 Default output, for review:
 
@@ -98,9 +112,9 @@ recomputation: the magical-era setting has multi-storey building and regional
 supply, per the continental-geography "Large fantasy capitals" scenario. The
 budget explains their size; it never changes their population.
 
-A kind outside `capital`, `city`, `town` and `port`, or a population that is
-missing or not positive, is rejected with an error naming the location. No
-budget is produced.
+A kind outside `capital`, `city`, `town`, `port`, `village` and `hamlet`, or a
+population that is missing or not positive, is rejected with an error naming
+the location. No budget is produced.
 
 ## Site context
 
@@ -136,6 +150,7 @@ identifier.
 | `fit_node_outside_footprint` | error | For a multi-cell footprint, the node's cell is not one of the footprint cells. |
 | `fit_gate_approach_blocked` | error | For a multi-cell footprint, the gate has no approach cell, or the approach cell is not walkable. |
 | `fit_gate_side` | warning | For a multi-cell footprint, the gate's destination node lies more than 90 degrees from the gate's outward bearing. |
+| `fit_entrance_mismatch` | error | For a village or hamlet whose single-`#` mask is a physical footprint, the gate approach cells differ from the road cells that precede or follow its location cell on any road of the committed artifact. With no such road cell, more than one gate reports it too. |
 | `fit_direction_drift` | warning | The authored road direction is more than one octant from the 8-way bearing of the road's first segment. |
 
 The water-edge words are the whole underscore-separated tokens `quay`,
@@ -148,6 +163,15 @@ The 600 m water-edge limit exists because the wilderness raster is 1 km: a
 stream inside a cell cannot be represented, so a water-edge role is allowed a
 generous distance rather than an exact shoreline. Road polylines are sampled
 every 50 m or less, endpoints included.
+
+The entrance check reads `<root>/world/maps/data/road_network.json` through the
+road codec, once per lint run, and only for a village or hamlet: a national
+settlement's gates are not compared against roads. The artifact's freshness is
+not checked, because writing a settlement document changes its source signature
+without moving a road. A road that passes through the cell wants a gate on each
+of its two contacts; a spur or a road-less site wants exactly one gate. A gate
+with no resolvable approach is reported by `fit_gate_approach_blocked` instead,
+so one broken gate never yields two findings.
 
 The terrain window is sized from every cell the lint reads: the map's nodes,
 road bends, footprint cells and gate approaches. A window is a convex square, so

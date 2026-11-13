@@ -25,7 +25,7 @@ The site analysis SHALL derive, for one settlement location and search radius, e
 - **THEN** the neighbours are listed nearest first, with ties broken by identifier, the capital bearing is that capital's 8-way bearing, and a capital's own site has no capital bearing
 
 ### Requirement: Size budget follows the population-area relation with a multi-cell floor
-The size budget SHALL compute built-up area as the reference area times (population divided by the reference population) raised to the configured exponent. Footprint cells SHALL be the larger of two and the area rounded up in square kilometres. The envelope radius SHALL be that of a circle of that area. Node, gate and loop targets SHALL come from the supplied tier tables. Unsupported kinds and non-positive populations SHALL be rejected.
+The size budget SHALL compute built-up area as the reference area times (population divided by the reference population) raised to the configured exponent, and the envelope radius SHALL be that of a circle of that area. Footprint cells SHALL be the larger of two and the area rounded up in km², unless the kind is a single-cell kind. Node, gate and loop targets SHALL come from the configured tier tables. Unsupported kinds and non-positive populations SHALL be rejected.
 
 #### Scenario: Area scales by the configured exponent
 - **WHEN** a synthetic configuration with reference population 10,000, reference density 100 inhabitants per hectare and exponent 0.5 is applied to population 40,000
@@ -33,11 +33,23 @@ The size budget SHALL compute built-up area as the reference area times (populat
 
 #### Scenario: Multi-cell floor
 - **WHEN** a population yields 0.3 km² and another yields 3.2 km²
-- **THEN** their footprints are 2 and 4 cells; no supported settlement ever receives a single-cell footprint
+- **THEN** their footprints are 2 and 4 cells; no capital, city, town or port ever receives a single-cell footprint
 
 #### Scenario: Tier tables
 - **WHEN** a synthetic tier table is applied at, just below and just above each population boundary, and a capital-kind location is applied at a small population
 - **THEN** each boundary is inclusive of its lower bound, and the capital receives the capital node, gate and loop targets regardless of population
+
+#### Scenario: Single-cell kinds
+- **WHEN** a village and a hamlet are budgeted with a synthetic single-cell tier table, and a town is budgeted at the village's population
+- **THEN** the village and the hamlet each receive one footprint cell and their table's node count as a minimum, and the town still receives two cells and its own tier's node, gate and loop targets
+
+#### Scenario: A geographic feature may extend the minimum
+- **WHEN** a village's single-cell tier is budgeted for a site with a geographic feature such as a ferry crossing
+- **THEN** its node count is the tier's value as a minimum rather than a cap, so the layout may place one or two nodes beyond it
+
+#### Scenario: Invalid single-cell table
+- **WHEN** a configuration's single-cell tier table omits one of the two kinds or gives a node count below two
+- **THEN** the configuration is rejected
 
 #### Scenario: Rejected inputs
 - **WHEN** the budget is requested for an `elven_village` or `dungeon` kind, or for a population of 0 or none
@@ -90,3 +102,18 @@ The site, budget and lint commands SHALL read the workspace and the lore inputs 
 #### Scenario: Synthetic workspace runs
 - **WHEN** the lint runs on a synthetic workspace that is clean, then after a dry water-edge node is added, then after a structure error is introduced
 - **THEN** the exit statuses are 0, 1 and 2, and the workspace file digests are identical before and after every run
+
+### Requirement: Terrain-fit lint checks single-cell entrances against road contacts
+For a village or hamlet with a one-cell physical footprint, the lint SHALL report an error when its gate approach cells differ from the road cells that precede or follow its location cell on any road, or when it has more than one gate and no such road cell. Other settlements SHALL NOT receive this check.
+
+#### Scenario: Matching and mismatching gates
+- **WHEN** a synthetic village on a through road has gates on both road contacts, then loses one gate, then gains a gate on a cell with no road
+- **THEN** the first lint is clean and each of the other two reports the entrance mismatch naming the cell
+
+#### Scenario: No road contact
+- **WHEN** a synthetic hamlet with no road contact has one gate, and then two gates
+- **THEN** only the second reports the entrance mismatch
+
+#### Scenario: National settlements are unaffected
+- **WHEN** a synthetic town's gates lie on cells with no road
+- **THEN** no entrance mismatch is reported
