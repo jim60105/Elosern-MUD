@@ -330,8 +330,7 @@ function settleShown({ append = false } = {}) {
   shown.proposal = clone(proposal.value);
   shown.changes = props.state.changes ? clone(props.state.changes) : null;
   if (!fresh || !shown.changes || finalized.value) return;
-  inked.value = false;
-  nextTick(() => { inked.value = true; });
+  restartInk();
   announcement.value = append && announcement.value ? `${announcement.value}\n${strokeText.value}` : strokeText.value;
 }
 watch(() => JSON.stringify([props.state.proposal, props.state.changes]), () => {
@@ -339,6 +338,16 @@ watch(() => JSON.stringify([props.state.proposal, props.state.changes]), () => {
   settleShown();
 });
 watch(moreToRead, (more) => { if (!more && props.state.completed > shownCompleted) settleShown(); });
+// Restart the sweep even when one is still running: drop the class, let the
+// browser compute the bare style once, then add it again.
+const keepsake = ref(null);
+function restartInk() {
+  inked.value = false;
+  nextTick(() => {
+    void keepsake.value?.offsetWidth;
+    inked.value = true;
+  });
+}
 function onKeepsakeAnimationEnd(event) {
   if (event.animationName?.includes("dream-ink-sweep")) inked.value = false;
 }
@@ -425,6 +434,11 @@ watch(() => props.state.completed, (completed) => {
     bloom.value = true;
     nextTick(() => rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']")?.focus());
   }
+});
+// A new send or a failed one ends the wait for an unread reveal: the card
+// settles on the committed wish instead of waiting behind the echo or notice.
+watch(() => props.state.pending || props.state.failure, (busy) => {
+  if (busy && props.state.completed > shownCompleted) settleShown();
 });
 watch(() => props.state.pending, (pending) => {
   if (pending) {
@@ -751,7 +765,7 @@ function onKeydown(event) {
         <p>夢中無晝夜</p>
       </header>
 
-      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized, 'dream-keepsake--inked': inked }"
+      <nav ref="keepsake" class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized, 'dream-keepsake--inked': inked }"
         aria-labelledby="dream-keepsake-title" @animationend="onKeepsakeAnimationEnd">
         <span class="dream-corners" aria-hidden="true"></span>
         <div class="dream-keepsake__head">
@@ -971,7 +985,7 @@ function onKeydown(event) {
                   :disabled="transportLocked" :placeholder="REQUIREMENT_EXAMPLES[row.kind]" @input="editReq(index)" />
                 <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-requirements__remove" :aria-label="`移除第 ${index + 1} 筆需求`"
                   :disabled="transportLocked" @click="removeReq(index)">×</button>
-                <small v-if="reqErrors.includes(index)" :id="`dream-req-error-${row.id}`" class="dream-requirements__error" role="alert">請填上內容</small>
+                <small v-if="reqErrors.includes(index)" :id="`dream-req-error-${row.id}`" class="dream-requirements__error">請填上內容</small>
               </li>
             </ul>
             <p v-if="refusal === REQUIREMENT_REFUSAL" class="dream-field__error" role="alert">{{ refusal }}</p>

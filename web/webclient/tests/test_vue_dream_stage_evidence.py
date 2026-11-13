@@ -281,6 +281,8 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
                 'keepsake change line > announces a settled line once and not again on a republish of the same report',
                 'keepsake change line > shows the committed report at once on mount',
                 'keepsake change line > shows no change line once finalized',
+                'keepsake change line > announces no change line when the exchange finalizes the session',
+                'keepsake change line > settles a held wish when the player speaks again before reading it',
             ),
         )
 

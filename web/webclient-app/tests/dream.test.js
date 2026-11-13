@@ -1100,8 +1100,8 @@ describe("keepsake change line", () => {
   it("announces a settled line once and not again on a republish of the same report", async () => {
     const { wrapper } = fixture(state({ scene: "", dialogue: "" }));
     const live = () => wrapper.find(".dream-live").text();
-    const next = (revision) => state({ revision, completed: 1, remaining: 5, track: { ...state().track, completed: 1 },
-      scene: "", dialogue: "合成台詞", proposal: proposal({ summary: "合成願望" }), changes: report({ summary: "formed" }) });
+    const next = (revision, summary = "合成願望") => state({ revision, completed: 1, remaining: 5, track: { ...state().track, completed: 1 },
+      scene: "", dialogue: "合成台詞", proposal: proposal({ summary }), changes: report({ summary: "formed" }) });
     await wrapper.setProps({ state: next(3) });
     await nextTick();
     expect(live()).toContain("王座上的女神說：合成台詞");
@@ -1109,9 +1109,34 @@ describe("keepsake change line", () => {
     await escape(wrapper);
     const prompt = live();
     expect(prompt).not.toContain("女神為你改了");
-    await wrapper.setProps({ state: next(4) });
+    // A republish of the same exchange's report (here with a reworded wish,
+    // which settles at once) shows the new wish without announcing again.
+    await wrapper.setProps({ state: next(4, "合成改寫的願望") });
     await nextTick();
+    expect(cardWish(wrapper).text()).toBe("合成改寫的願望");
     expect(live()).toBe(prompt);
+  });
+  it("announces no change line when the exchange finalizes the session", async () => {
+    const { wrapper } = fixture(state({ completed: 5, remaining: 1, track: { ...state().track, completed: 5 },
+      proposal: proposal({ summary: "合成願望" }), changes: report() }));
+    await wrapper.setProps({ state: capped({ revision: 3, scene: "", dialogue: "合成台詞",
+      proposal: proposal({ summary: "合成願望", themes: ["重逢"] }), changes: report({ lists: { themes: { added: ["重逢"] } } }) }) });
+    await nextTick();
+    expect(wrapper.find(".dream-live").text()).toContain("王座上的女神說：合成台詞");
+    expect(wrapper.find(".dream-live").text()).not.toContain("女神為你改了");
+    expect(ink(wrapper).exists()).toBe(false);
+  });
+  it("settles a held wish when the player speaks again before reading it", async () => {
+    const store = { view: reactive({ connected: true, motionLevel: "full", textSpeed: "normal", dispatch: { inFlight: null } }), dispatchAction: vi.fn() };
+    const wrapper = mount(DreamPanel, { props: { state: state({ proposal: proposal({ summary: "舊願望" }) }), store } });
+    const after = { revision: 3, completed: 1, remaining: 5, track: { ...state().track, completed: 1 },
+      proposal: proposal({ summary: "新願望" }), changes: report({ summary: "changed" }) };
+    await wrapper.setProps({ state: state({ ...after, scene: "合成場景", dialogue: "合成台詞" }) });
+    expect(cardWish(wrapper).text()).toBe("舊願望");
+    await wrapper.setProps({ state: state({ ...after, revision: 4, pending: true, can_input: false, can_finalize: false, can_choose_thread: false,
+      scene: "合成場景", dialogue: "合成台詞" }) });
+    expect(cardWish(wrapper).text()).toBe("新願望");
+    wrapper.unmount();
   });
   it("shows the committed report at once on mount", () => {
     const { wrapper } = fixture(state({ completed: 2, remaining: 4, track: { ...state().track, completed: 2 },
@@ -1213,7 +1238,9 @@ describe("editable requirement rows", () => {
       expect(store.dispatchAction).not.toHaveBeenCalled();
       const invalid = sheetRows(wrapper)[1];
       expect(textOf(invalid).attributes("aria-invalid")).toBe("true");
-      expect(invalid.find("[role='alert']").text()).toBe("請填上內容");
+      expect(invalid.find(".dream-requirements__error").text()).toBe("請填上內容");
+      expect(textOf(invalid).attributes("aria-describedby")).toBe(invalid.find(".dream-requirements__error").attributes("id"));
+      expect(layer(wrapper, "dream-sheet").find(".dream-requirements [role='alert']").text()).toContain("有一筆需求還沒有內容");
       expect(document.activeElement).toBe(textOf(invalid).element);
       for (const index of [0, 2]) expect(textOf(sheetRows(wrapper)[index]).attributes("aria-invalid")).toBeUndefined();
       expect(textOf(sheetRows(wrapper)[0]).element.value).toBe(REQUIREMENTS[0].text);
