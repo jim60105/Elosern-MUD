@@ -144,8 +144,10 @@ const armed = computed(() => (
 // Another image disarms. Runs before the patch, while the focused footer
 // button still stands: if focus was in the footer, it moves to the new
 // footer's first button instead of falling to the document.
-watch(selectionKey, () => {
+watch(selectionKey, (next, previous) => {
   armedKey.value = null;
+  // One empty page to another keeps the same footer, so focus stays.
+  if (next.startsWith("empty:") && previous.startsWith("empty:")) return;
   if (root.value?.querySelector("footer")?.contains(document.activeElement)) {
     nextTick(() => root.value?.querySelector("footer button")?.focus());
   }
@@ -246,7 +248,7 @@ function onKeydown(event) {
           </svg>
           <span>{{ art.kind === "empty" ? "尚無圖片" : STATUS_LINE[art.kind] }}</span>
         </figcaption>
-        <span v-if="stateCell?.crown" class="gpage__badge gpage__badge--crown" aria-hidden="true">
+        <span v-if="type === 'card' && row.is_default && !landscape" class="gpage__badge gpage__badge--crown" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" /></svg>預設
         </span>
         <span v-if="type === 'official'" class="gpage__badge gpage__badge--lock" aria-hidden="true">

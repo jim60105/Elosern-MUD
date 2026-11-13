@@ -512,6 +512,14 @@ describe("GalleryImagePage (webclient-gallery-image-page)", () => {
       expect(buttonLabels()).toEqual(["生成新圖"]);
     });
 
+    it("drops the 預設 crown on a scene's one card but keeps it on a portrait default", async () => {
+      const row = card("c1", { is_default: true });
+      await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene({ card_count: 1 }), selection: { type: "card", row } });
+      expect(art().find(".gpage__badge--crown").exists()).toBe(false);
+      await wrapper.setProps({ subject: subjectRow, panel: panel({ capabilities: caps({ max_cards: 1 }) }) });
+      expect(art().find(".gpage__badge--crown").exists()).toBe(true);
+    });
+
     it("mounts another scene's bundled image afresh", async () => {
       await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene(), selection: { type: "empty" } });
       const before = art().element;
