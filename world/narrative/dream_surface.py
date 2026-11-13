@@ -431,6 +431,33 @@ def reset_cache(actor):
     flush_idmapper_cache()
 
 
+# The farewell (dream-farewell-beat): one fixed closing line per departure
+# outcome and per whether the track reached climax. Human-reviewed copy; a
+# departure must work with every model service offline.
+FAREWELL_LINES = {
+    ("confirmed", False): "「去吧。這個願望我收下了。醒來之後，它會在路上等你。」",
+    ("draft", False): "「願望先替你收著。下次入夢，再接著說給我聽。」",
+    ("empty", False): "「空著手也無妨。雲海一直都在。」",
+    ("confirmed", True): "「……哈啊。這個願望，我收下了。去吧，醒來之後，它會在路上等你。」",
+    ("draft", True): "「……哈啊。願望先替你收著。等我緩過氣來，下次入夢再接著說給我聽。」",
+    ("empty", True): "「……哈啊。空著手也無妨。雲海一直都在，我也是。」",
+}
+
+
+def farewell_line(outcome: str, climax_reached: bool) -> str:
+    """The closing line for one departure outcome and climax state."""
+    return FAREWELL_LINES[(outcome, bool(climax_reached))]
+
+
+def _departure_outcome(session, confirmed, proposal):
+    """How a closed session was left: confirmed, kept as a draft, or empty."""
+    if confirmed:
+        return "confirmed"
+    if session.draft_id and not dream_proposal.is_empty(proposal):
+        return "draft"
+    return "empty"
+
+
 def dream_state(actor):
     """Server-authored actions, count, track, stage, prose and sleep identity.
 
@@ -484,6 +511,9 @@ def dream_state(actor):
         "scene_art": describe_dream_scene(scene_subject_id(actor)),
         "dialogue": value.get("dialogue", ""),
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
-        "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",
+        # The goddess's closing line: fixed text keyed by how the player left
+        # and by the canonical ending phase, never generated. The phase
+        # itself travels in ``ending_phase``.
+        "ending": farewell_line(_departure_outcome(session, confirmed, wish["proposal"]), ending.climax_reached) if ending else "",
         "ending_phase": ending.phase if ending else "",
     }

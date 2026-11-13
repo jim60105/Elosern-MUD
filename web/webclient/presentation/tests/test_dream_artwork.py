@@ -364,7 +364,7 @@ class DreamArtworkWireTest(EvenniaTest):
         closed_payload = self.render()
         closed_state = closed_payload["state"]
         self.assertEqual(closed_state["stage"], lifecycle.STAGE_FINALIZED)
-        self.assertIn("醒了", closed_state["ending"])
+        self.assertTrue(closed_state["ending"])
         self.assertEqual(closed_state["thread_choices"], [])
         self.assertLessEqual(json_byte_size(closed_payload), MAX_CANONICAL_JSON_BYTES)
         verdict, stderr = _accepted_by_client(closed_payload)

@@ -316,7 +316,7 @@ class DreamSurfaceTests(EvenniaTest):
             self.assertEqual(CreativeRequest.objects.count(), 1)
             self.assertEqual(self.request("awaken").result["outcome"], "success")
         self.assertEqual(self.physical(), physical)
-        self.assertIn("醒了", service.dream_state(self.actor)["ending"])
+        self.assertTrue(service.dream_state(self.actor)["ending"])
 
     @covers_requirement(
         "dream-session-lifecycle::only-completed-exchanges-consume-the-six-exchange-budget",
@@ -582,6 +582,107 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(command.func().result["outcome"], "success")
         ending = service.dream_state(self.actor)["ending"]
         self.assertEqual([call.args[0] for call in self.actor.msg.call_args_list].count(ending), 1)
+
+    # ---- the farewell (dream-farewell-beat) ----
+    WISH = {"kind": "new_story", "thread_id": None, "summary": "合成的願望：在港口找回鐘聲。"}
+
+    def keep_wish(self):
+        """Stop speaking and keep a non-empty wish as the session's draft."""
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("draft", direction=dict(self.WISH)).result["outcome"], "success")
+
+    def test_each_departure_outcome_selects_its_own_farewell_line(self):
+        # The same dream at the same exchange count, left three ways: an
+        # unconfirmed departure resumes on the next entry.
+        self.enter()
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        empty = service.dream_state(self.actor)
+        self.enter()
+        self.keep_wish()
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        kept = service.dream_state(self.actor)
+        # The kept wish resumes on the next entry; this time it is granted.
+        self.enter()
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        self.assertEqual(self.request("confirm", direction=dict(self.WISH)).result["outcome"], "success")
+        granted = service.dream_state(self.actor)
+        self.assertTrue(granted["confirmed"])
+        for state in (empty, kept, granted):
+            self.assertFalse(state["open"])
+            self.assertEqual(state["completed"], 0)
+            self.assertTrue(state["ending"])
+        self.assertEqual(len({empty["ending"], kept["ending"], granted["ending"]}), 3)
+        # A later awaken of the granted, already closed session keeps its line.
+        self.request("awaken")
+        self.assertEqual(service.dream_state(self.actor)["ending"], granted["ending"])
+
+    def test_climax_selects_a_different_farewell_line_offline(self):
+        from world.narrative.dream_track import CLIMAX_AFTERGLOW
+
+        self.enter()
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        calm = service.dream_state(self.actor)
+        self.enter()
+        for index in range(6):
+            self.assertEqual(self.request("say", message="合成的訴說", client=self.delivered(index)).result["outcome"], "success")
+        # The sixth exchange saved a draft of a still-empty wish: leaving it is
+        # the same outcome as the calm session's.
+        state = service.dream_state(self.actor)
+        self.assertTrue(state["drafted"])
+        self.assertEqual(state["proposal"], dream_proposal.empty_proposal())
+        with patch("world.ai.client.OpenAICompatClient", side_effect=AssertionError("offline ending")):
+            self.assertEqual(self.request("awaken").result["outcome"], "success")
+            spent = service.dream_state(self.actor)
+        self.assertTrue(calm["ending"] and spent["ending"])
+        self.assertNotEqual(calm["ending"], spent["ending"])
+        self.assertTrue(calm["ending_phase"])
+        self.assertNotEqual(calm["ending_phase"], CLIMAX_AFTERGLOW)
+        self.assertEqual(spent["ending_phase"], CLIMAX_AFTERGLOW)
+
+    def test_farewell_line_needs_no_model_call(self):
+        self.enter()
+        with patch("world.ai.client.OpenAICompatClient", side_effect=AssertionError("farewell called model")), \
+                patch("world.ai.dream.generate_dream_exchange", side_effect=AssertionError("farewell generated")):
+            self.keep_wish()
+            result = self.request("confirm").result
+            state = service.dream_state(self.actor)
+        self.assertEqual(result["outcome"], "success")
+        self.assertFalse(state["open"])
+        self.assertTrue(state["ending"])
+
+    def test_farewell_line_is_delivered_once(self):
+        self.enter()
+        self.actor.msg.reset_mock()
+        result = self.request("awaken").result
+        ending = service.dream_state(self.actor)["ending"]
+        self.assertTrue(ending)
+        self.assertEqual(result["message"], ending)
+        self.assertEqual(self.printed().count(ending), 1)
+        # A later read returns the same text and sends nothing.
+        sent = self.actor.msg.call_count
+        self.assertEqual(service.dream_state(self.actor)["ending"], ending)
+        self.assertEqual(self.actor.msg.call_count, sent)
+
+    def test_departure_does_not_wait_for_the_farewell(self):
+        self.enter()
+        self.live_sessions = []
+        with patch("server.dream_service.authorize_departure_continuation",
+                   wraps=service.authorize_departure_continuation) as authorize:
+            self.assertEqual(self.request("awaken").result["outcome"], "success")
+        authorize.assert_called_once()
+        session = surface.associated_session(self.actor)
+        self.assertNotEqual(session.state, lifecycle.STATE_OPEN)
+        self.assertFalse(session.pending_submission_id)
+        state = service.dream_state(self.actor)
+        self.assertFalse(state["pending"] or state["open"])
+
+    def test_an_open_dream_has_no_ending_text(self):
+        self.enter()
+        state = service.dream_state(self.actor)
+        self.assertTrue(state["open"])
+        self.assertEqual(state["ending"], "")
+        self.keep_wish()
+        self.assertEqual(service.dream_state(self.actor)["ending"], "")
 
     @covers_requirement(
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
