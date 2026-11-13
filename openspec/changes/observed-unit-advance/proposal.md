@@ -11,7 +11,7 @@ This work is mandatory. No measurement decides whether it happens. Timings may b
 ## What Changes
 
 - **BREAKING (internal contract)** The registered population stage settles the observed units only. A unit that is observed while behind is first caught up, inside the same advance, to the advance's start.
-- The advance's snapshot registry, the living-individual scan of a pass, and the contact forecast (`next_population_lifecycle_boundary`) are limited to the observed units.
+- The advance's snapshot registry and the contact forecast (`next_population_lifecycle_boundary`) are limited to the observed units. The living-individual scan follows in `observed-unit-read-narrowing`; until then it reads the whole world once per pass, which is correct and only costs time.
 - The whole-world pass remains available as a function for tools and tests; it is no longer the clock stage.
 - Existing tests that advance the clock and then assert the state of unobserved groups catch the world up before asserting.
 - The design documents are amended (see Impact): unobserved monsters still act on game time with the same outcomes, but their settlement is materialised when they are observed.
@@ -30,7 +30,7 @@ None.
 
 ## Impact
 
-- Edits: `world/maps/population_lifecycle.py`, `world/maps/population_units.py`, `world/maps/regional_population.py`, `world/maps/monster_activity.py` (snapshot contract only), `world/maps/monster_sites.py` (snapshot contract only), `world/maps/population_forecast.py`.
+- Edits: `world/maps/population_lifecycle.py`, `world/maps/population_units.py`, `world/maps/monster_sites.py` (snapshot contract only), `world/maps/population_forecast.py`.
 - Tests: new `world/maps/tests/test_observed_unit_advance.py` (registered in `.github/evennia-shards.json`); a helper `catch_up_world` in `world/maps/tests/_settlement_projection.py`; mechanical edits in existing tests that fail (design D6).
 - Design documents amended in this change:
   - `docs/superpowers/specs/2026-11-03-monster-field-behaviour-and-escape-design.md` §1 (row "Simulation") and §5.2;
@@ -38,10 +38,10 @@ None.
   - `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md` §6.5 (world clock).
   The main design's decision D4 (player-driven clock) is not changed: no world time passes without a player action.
 - Development documentation: `docs/development/regional-monster-population.md`, `docs/development/monster-field-behaviour.md`.
-- Known limit until `population-backlog-drain` merges: a unit that was unobserved for a long game time is caught up in one step when first observed.
+- Known limit: a unit that was unobserved for a long game time is caught up in one synchronous step when first observed. Its cost grows with that unit's lag, not with the world. `population-backlog-drain` pays lag off between commands; a long time skip followed at once by travel into another unit still pays that unit's whole lag in one step.
 
 ## Batch:
 
-- depends-on: population-catch-up-entry-points
+- depends-on: population-writer-guards
 - conflicts: serial chain, see `settlement-decode-reuse`.
 - parallel with: `sqlite-wal-busy-timeout`.
