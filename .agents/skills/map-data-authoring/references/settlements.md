@@ -117,6 +117,24 @@ The entry is how the continent-scale wilderness connects to this map.
   cell and stepping in `return_direction` enters at `destination_node`. The
   neighbour cell in that direction must be walkable wilderness outside every
   footprint.
+- **One-cell footprint** (`single_cell_footprint: true` on a one-`#` mask) is
+  a real footprint, not a concealed entry: the cell is an obstacle and each
+  gate is taken from the neighbouring approach cell, exactly like a footprint
+  shape, so one cell may carry several gates. The field applies only to a
+  one-`#` mask; on any other mask it is a semantic diagnostic and changes
+  nothing.
+  ```yaml
+  wilderness_entry:
+    shape:
+      - '#'
+    offset: {dx: 0, dy: 0}
+    single_cell_footprint: true
+    gates:
+      - return_direction: e
+        destination_node: west_end
+      - return_direction: w
+        destination_node: east_end
+  ```
 - **Footprint shape** (several `#`): the `#` cells must be 4-connected and
   walkable, and the anchor must be a `#` cell. A gate's approach cell is found
   by walking from the anchor *opposite* to `return_direction` until you leave

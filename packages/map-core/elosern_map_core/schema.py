@@ -261,6 +261,7 @@ _WILDERNESS_ENTRY = _mapping(
         "shape": _list(_str(min_length=1), mask=True, min_items=1),
         "offset": _offset_cell(),
         "gates": _list(_GATE, min_items=1),
+        "single_cell_footprint": _bool(required=False),
     },
 )
 

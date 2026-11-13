@@ -94,6 +94,7 @@ class WildernessEntryGeometry:
     shape: tuple[str, ...]
     origin: Cell
     gates: tuple[GateDeclaration, ...]
+    single_cell_footprint: bool = False
 
     @property
     def hash_cell_count(self) -> int:
@@ -101,7 +102,7 @@ class WildernessEntryGeometry:
 
     @property
     def is_point_shape(self) -> bool:
-        return self.hash_cell_count == 1
+        return self.hash_cell_count == 1 and not self.single_cell_footprint
 
     def hash_cell(self, row: int, column: int) -> Cell:
         """The absolute cell of one mask row/column (row zero is the south row)."""
@@ -157,6 +158,7 @@ class WildernessEntryDeclaration:
     shape: tuple[str, ...]
     offset: Cell
     gates: tuple[GateDeclaration, ...]
+    single_cell_footprint: bool = False
 
     @property
     def hash_cell_count(self) -> int:
@@ -164,7 +166,7 @@ class WildernessEntryDeclaration:
 
     @property
     def is_point_shape(self) -> bool:
-        return self.hash_cell_count == 1
+        return self.hash_cell_count == 1 and not self.single_cell_footprint
 
     def geometry(self, location_cell: Cell) -> WildernessEntryGeometry:
         """The absolute geometry of this entry for one explicit location cell."""
@@ -173,6 +175,7 @@ class WildernessEntryDeclaration:
             shape=self.shape,
             origin=(location_cell[0] + self.offset[0], location_cell[1] + self.offset[1]),
             gates=self.gates,
+            single_cell_footprint=self.single_cell_footprint,
         )
 
 
@@ -574,6 +577,9 @@ class SettlementDocument(AuthoringDocument):
                         destination_node=str(gate["destination_node"]),
                     )
                     for gate in entry_data["gates"]
+                ),
+                single_cell_footprint=bool(
+                    entry_data.get("single_cell_footprint", False)
                 ),
             )
         gate_data = data.get("city_gate")

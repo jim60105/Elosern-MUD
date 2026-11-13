@@ -147,9 +147,13 @@ untouched node by the negative local delta; the mask and the location stay put.
   and one node may not declare the same outgoing compass direction twice.
 - `wilderness_entry`: `shape[]` (`#`/`.` footprint mask rows),
   `offset{dx, dy}` (signed integer cell delta from the location cell),
-  `gates[]` (`return_direction`, `destination_node`). A one-`#` mask is a point
-  entry: it owns no obstacle cells, and its single hash cell is both the
-  wilderness entrance and every gate's approach cell.
+  optional `single_cell_footprint` (boolean, default false), `gates[]`
+  (`return_direction`, `destination_node`). A one-`#` mask is a point entry
+  unless `single_cell_footprint` is true: a point entry owns no obstacle cells,
+  and its single hash cell is both the wilderness entrance and every gate's
+  approach cell. A flagged one-`#` mask is a physical footprint: the cell is an
+  obstacle and each gate is taken from the neighbouring approach cell. The
+  field on any other mask is a semantic diagnostic and has no effect.
 - `city_gate`: `node`, `exit_key`, `exit_aliases[]`.
 
 ### interior

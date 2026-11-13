@@ -117,7 +117,23 @@ def _road(source: str, destination: str, direction: str) -> dict:
     }
 
 
-def _document(nodes, roads=(), shape=None, offset=(0, 0), gates=()):
+def _document(
+    nodes,
+    roads=(),
+    shape=None,
+    offset=(0, 0),
+    gates=(),
+    single_cell_footprint=None,
+):
+    wilderness_entry = None
+    if shape is not None:
+        wilderness_entry = {
+            "shape": list(shape),
+            "offset": {"dx": offset[0], "dy": offset[1]},
+            "gates": [dict(gate) for gate in gates],
+        }
+        if single_cell_footprint is not None:
+            wilderness_entry["single_cell_footprint"] = single_cell_footprint
     data = {
         "version": 1,
         "kind": "settlement",
@@ -126,13 +142,7 @@ def _document(nodes, roads=(), shape=None, offset=(0, 0), gates=()):
         "options": {"map_visual_range": 2, "map_mode": "nodes"},
         "nodes": dict(nodes),
         "roads": [dict(road) for road in roads],
-        "wilderness_entry": None
-        if shape is None
-        else {
-            "shape": list(shape),
-            "offset": {"dx": offset[0], "dy": offset[1]},
-            "gates": [dict(gate) for gate in gates],
-        },
+        "wilderness_entry": wilderness_entry,
         "city_gate": None,
     }
     return document_from_data("content/maps/settlements/fit_case.yaml", data)
@@ -534,6 +544,42 @@ class FootprintAndGateLintTests(unittest.TestCase):
             ("fit_node_in_water", "water_node"),
             {(finding.code, finding.object_id) for finding in findings},
         )
+
+    @covers_requirement(
+        "settlement-terrain-fit::terrain-fit-lint-checks-footprint-water-gate-side-and-gate-approach"
+    )
+    def test_one_cell_physical_footprint(self) -> None:
+        nodes = {
+            "inn": _node(*ANCHOR_LOCAL, anchor=True),
+            "outside_inn": _node(1000, 500),
+        }
+        gates = [{"return_direction": "e", "destination_node": "outside_inn"}]
+        # The approach cell of the one-cell footprint is the adjacent land cell
+        # the outside node stands on; making it impassable blocks the gate.
+        terrain = _terrain(impassable=frozenset({(9, 10)}))
+
+        flagged = lint_settlement(
+            _document(
+                nodes,
+                shape=["#"],
+                gates=gates,
+                single_cell_footprint=True,
+            ),
+            LOCATION_CELL,
+            terrain,
+        )
+        findings = {(finding.code, finding.object_id) for finding in flagged}
+        self.assertIn(("fit_node_outside_footprint", "outside_inn"), findings)
+        self.assertIn(("fit_gate_approach_blocked", "gate:e"), findings)
+
+        unflagged = lint_settlement(
+            _document(nodes, shape=["#"], gates=gates),
+            LOCATION_CELL,
+            terrain,
+        )
+        codes = {finding.code for finding in unflagged}
+        self.assertNotIn("fit_node_outside_footprint", codes)
+        self.assertNotIn("fit_gate_approach_blocked", codes)
 
 
 class DirectionDriftLintTests(unittest.TestCase):

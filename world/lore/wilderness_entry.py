@@ -81,11 +81,14 @@ class WildernessEntryPoint:
 
     ``shape`` is an ASCII mask of ``#`` (footprint cell) and ``.`` (outside);
     ``shape[0][0]`` corresponds to wilderness cell ``origin_xy``. Exactly one
-    ``#`` encodes a point-shape anchor (concealed cave/path semantics): no
-    footprint, ``approach_cell(gate)`` IS the anchor cell, and only the gate's
-    authored ``return_direction`` is a gateway. Every other direction at the
-    anchor cell is an ordinary terrain-validity wilderness step, so a concealed
-    entry never hijacks an unrelated route.
+    ``#`` without ``single_cell_footprint`` encodes a point-shape anchor
+    (concealed cave/path semantics): no footprint, ``approach_cell(gate)`` IS
+    the anchor cell, and only the gate's authored ``return_direction`` is a
+    gateway. Every other direction at the anchor cell is an ordinary
+    terrain-validity wilderness step, so a concealed entry never hijacks an
+    unrelated route. ``single_cell_footprint`` makes that one cell a physical
+    footprint instead: it is an obstacle and each gate is taken from its
+    neighbouring approach cell like any multi-cell footprint.
 
     ``anchor_key`` resolves against change 12's placement registry; shared
     core diagnostics enforce this before publication.
@@ -95,6 +98,7 @@ class WildernessEntryPoint:
     shape: tuple[str, ...]
     origin_xy: tuple[int, int]
     gates: tuple[WildernessGate, ...]
+    single_cell_footprint: bool = False
 
     @property
     def footprint_cells(self) -> frozenset[tuple[int, int]]:
@@ -111,12 +115,14 @@ class WildernessEntryPoint:
 
     @property
     def hash_cell_count(self) -> int:
-        """Number of ``#`` cells in the mask (1 marks the point-shape variant)."""
+        """Number of ``#`` cells in the mask (1 marks the point-shape variant
+        unless ``single_cell_footprint`` makes that cell a footprint)."""
+
         return sum(line.count("#") for line in self.shape)
 
     @property
     def is_point_shape(self) -> bool:
-        return self.hash_cell_count == 1
+        return self.hash_cell_count == 1 and not self.single_cell_footprint
 
     @property
     def anchor_cell(self) -> tuple[int, int] | None:
