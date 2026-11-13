@@ -19,7 +19,7 @@ import DrawerHeader from "./DrawerHeader.vue";
 import { toolLabel } from "./nav-tools.js";
 
 const props = defineProps({
-  // The single open-overlay name (design D8): map | settings | help | gallery.
+  // The single open-overlay name (design D8): map | settings | help.
   overlay: { type: String, required: true },
   // The trigger control that opened this overlay, captured at open time
   // (design D7). Focus is restored to it on every close path.
@@ -56,7 +56,6 @@ function titleFor(name) {
 const OVERLAY_ICONS = {
   map: "map",
   settings: "settings",
-  gallery: "gallery",
   help: "help",
 };
 function iconFor(name) {
@@ -65,7 +64,6 @@ function iconFor(name) {
 
 function subtitleFor(name) {
   if (name === "settings") return "閱讀偏好與輔助顯示";
-  if (name === "gallery") return "記錄不同的你，也是旅途的一部分。";
   if (name === "help") return "按鍵、指令列與閱讀操作";
   return "";
 }
@@ -173,8 +171,8 @@ onBeforeUnmount(() => {
 
 /* The reference workspace, shared with the drawers: 12px under the top
    navigation, 16px side insets, `--workspace-bottom` above the viewport
-   bottom, a fully opaque ink panel. The tier stays 92 (below the modal
-   tier) so the gallery's teleported nested editors stack above it. */
+   bottom, a fully opaque ink panel. The tier stays 92, below the modal
+   tier of the drawers and teleported dialogs. */
 .overlay-host {
   position: fixed;
   inset: calc(var(--header-h) + 12px * var(--ui-scale)) calc(16px * var(--ui-scale)) var(--workspace-bottom);
@@ -211,7 +209,6 @@ onBeforeUnmount(() => {
   padding: 0;
   overflow: hidden;
 }
-.overlay-host[data-elosern-overlay="gallery"] .overlay-host__body { max-width: none; padding: 0; }
 
 @media (max-width: 700px) {
   .overlay-host__body { padding: calc(16px * var(--ui-scale)); }

@@ -4,8 +4,8 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 1. Mount and navigation
 
-- [ ] 1.1 Apply design decisions 1–4 (`hud.js`, `view.js` comment, `nav-tools.js`, `AppClient.vue`, `OverlayHost.vue`, `styles/app-shell.css`). Verify `rg -n "GalleryPanel|角色肖像圖庫" web/webclient-app --glob '!node_modules'` returns only the files task 2.1 deletes or edits.
-- [ ] 1.2 Add tests for the two ADDED `webclient-gallery-window` scenarios (AppClient-level: open from the tool, Escape restores focus; unavailable panel locks) and update `tests/desktop_navigation.test.js` and `tests/reference_surface_frame.test.js` for 圖庫, decorated with the modified desktop-shell requirement where they assert it. Verify `pnpm test -- desktop_navigation reference_surface_frame gallery_window` passes.
+- [x] 1.1 Apply design decisions 1–4 (`hud.js`, `view.js` comment, `nav-tools.js`, `AppClient.vue`, `OverlayHost.vue`, `styles/app-shell.css`). Verify `rg -n "GalleryPanel|角色肖像圖庫" web/webclient-app --glob '!node_modules'` returns only the files task 2.1 deletes or edits.
+- [x] 1.2 Add tests for the two ADDED `webclient-gallery-window` scenarios (AppClient-level: open from the tool, Escape restores focus; unavailable panel locks) and update `tests/desktop_navigation.test.js` and `tests/reference_surface_frame.test.js` for 圖庫, decorated with the modified desktop-shell requirement where they assert it. Verify `pnpm test -- desktop_navigation reference_surface_frame gallery_window` passes.
 
 ## 2. Removal
 

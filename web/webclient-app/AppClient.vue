@@ -32,7 +32,7 @@ import SkillUseDock from "./components/SkillUseDock.vue";
 import StatusPanel from "./components/StatusPanel.vue";
 import OverlayHost from "./components/OverlayHost.vue";
 import HelpOverlay from "./components/HelpOverlay.vue";
-import GalleryPanel from "./components/GalleryPanel.vue";
+import GalleryWindow from "./components/GalleryWindow.vue";
 import NpcPersonaEditor from "./components/NpcPersonaEditor.vue";
 import LettersPanel from "./components/LettersPanel.vue";
 import DreamPanel from "./components/DreamPanel.vue";
@@ -1781,8 +1781,22 @@ const rootStyle = computed(() => {
       @clear-notice="clearTradeNotice"
       @close="onHudDrawerClose"
     />
+    <!-- The gallery window (gallery-window-mount) owns its drawer chrome under
+         the `gallery` drawer key, beside the party and shop windows; its four
+         editors teleport to the body above it. -->
+    <GalleryWindow
+      v-if="store.view.hudDrawer === 'gallery'"
+      :model="panel('gallery')"
+      :disabled="!store.view.connected || store.view.mutationsLocked || store.view.dispatch.inFlight !== null"
+      :dispatch="dispatchIntent"
+      :result="store.view.lastActionResult"
+      :revision="store.view.revision"
+      @character="store.openHudDrawer('status')"
+      @log="openFullLog"
+      @close="onHudDrawerClose"
+    />
     <HudDrawer
-      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party' && store.view.hudDrawer !== 'shop'"
+      v-if="store.view.hudDrawer && store.view.hudDrawer !== 'npc_persona' && store.view.hudDrawer !== 'party' && store.view.hudDrawer !== 'shop' && store.view.hudDrawer !== 'gallery'"
       :open="true"
       :title="drawerTitle"
       :icon="drawerIcon"
@@ -1852,16 +1866,6 @@ const rootStyle = computed(() => {
           @text-speed-change="store.setTextSpeed"
           @auto-advance-change="store.setAutoAdvance"
         />
-        <GalleryPanel
-          v-else-if="openName === 'gallery'"
-          :model="panel('gallery')"
-          :disabled="!store.view.connected || store.view.mutationsLocked || store.view.dispatch.inFlight !== null"
-          :dispatch="dispatchIntent"
-          :result="store.view.lastActionResult"
-          :revision="store.view.revision"
-          @character="store.openHudDrawer('status')"
-          @log="openFullLog"
-        />
         <!-- The help surface renders the client-owned control reference and
              the statement of how the game's own `help` output is reached —
              no invented copy. -->
@@ -1884,12 +1888,15 @@ const rootStyle = computed(() => {
 
     <!-- The full-log surface (design D4): the complete retained narrative,
          reachable in one action from the caption card's control; focus-
-         trapped, Escape-closing, with focus restored to the opener. -->
+         trapped, Escape-closing, with focus restored to the opener. While
+         the gallery window is open it lifts above the modal tier, so a
+         查看伺服器訊息 link inside a teleported gallery editor opens the log
+         over that editor. -->
     <FullLogOverlay
       v-if="fullLogOpen"
       ref="fullLogRef"
       :lines="store.narrative"
-      :style="store.view.hudOverlay === 'gallery' ? { zIndex: 3100 } : null"
+      :style="store.view.hudDrawer === 'gallery' ? { zIndex: 3100 } : null"
       @close="closeFullLog(true)"
     />
 

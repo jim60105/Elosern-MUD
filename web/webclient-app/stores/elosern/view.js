@@ -331,7 +331,7 @@ export function applyView(ctx) {
       dialogueFocusTopic: ctx.dialogueFocusTopic,
       commandPrefill: ctx.commandPrefill,
       // H5 (task 5.2): the single open-overlay name (null | map | settings
-      // | help | codex | gallery), plus the opener element captured at open time —
+      // | help), plus the opener element captured at open time —
       // the anchor
       // for the host's focus restoration (design D7).
       hudOverlay: ctx.hudOverlay.value,
