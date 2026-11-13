@@ -75,6 +75,9 @@ jobs:
       - name: Validate road network freshness
         run: uv run --locked python -m tools.road_network --check
 
+      - name: Validate settlement spacing
+        run: uv run --locked python -m tools.settlement_spacing
+
       - name: Run Node DOM-independent test suite
         run: node --test web/static/webclient/js/tests/*.test.js
 
