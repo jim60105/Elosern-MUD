@@ -20,6 +20,8 @@ import numpy as np
 
 from elosern_map_core.authoring import load_authoring_world
 from elosern_map_core.roads import (
+    OPEN_CELL_KINDS,
+    SPUR_KINDS,
     Road,
     RoadGenerationError,
     RoadInput,
@@ -29,7 +31,11 @@ from elosern_map_core.roads import (
     road_input,
     verify_roads,
 )
-from elosern_map_core.roads_codec import decode_road_network, read_road_metadata
+from elosern_map_core.roads_codec import (
+    decode_road_network,
+    encode_road_document,
+    read_road_metadata,
+)
 from elosern_map_core.schema import LOCATION_KINDS
 from elosern_map_core.sources import make_source_document
 from elosern_map_core.terrain import REGION_KEYS
@@ -46,6 +52,9 @@ ROAD_PATH = "content/maps/road_network.yaml"
 #: A configured node kind and an unconfigured one, never named literally.
 NODE_KIND = LOCATION_KINDS[1]
 OTHER_KIND = LOCATION_KINDS[4]
+#: The kinds the generator treats specially: one spur each, or open cells only.
+SPUR_KIND = SPUR_KINDS[0]
+OPEN_KIND = next(kind for kind in OPEN_CELL_KINDS if kind not in SPUR_KINDS)
 #: Synthetic region names for raster-level inputs.
 PLAIN = "region_plain"
 BARRIER = "region_barrier"
@@ -98,6 +107,16 @@ def _pairs(roads) -> set[tuple[str, str]]:
 def _octile(dx: int, dy: int) -> float:
     dx, dy = abs(dx), abs(dy)
     return min(dx, dy) * 2**0.5 + abs(dx - dy)
+
+
+def _spurs(**cells: tuple[int, int]) -> tuple[RoadNode, ...]:
+    """One spur node per keyed cell, each approaching from its own cell."""
+    return tuple(RoadNode(key, (cell,)) for key, cell in sorted(cells.items()))
+
+
+def _end(road: Road, key: str) -> tuple[int, int]:
+    """The cell of ``road`` at the end named ``key``."""
+    return road.cells[0] if road.first == key else road.cells[-1]
 
 
 class _Legality:
@@ -244,6 +263,25 @@ class RoadNodeTests(unittest.TestCase):
         self.assertEqual([node.key for node in after.nodes], ["first", "late"])
         self.assertNotEqual(before.source_signature, after.source_signature)
 
+    @covers_requirement(
+        "road-network-generation::road-nodes-are-the-gated-settlements-of-the-configured-kinds"
+    )
+    def test_a_spur_kind_cannot_be_a_configured_node_kind(self):
+        world = _world(
+            {
+                "town_w": _location(NODE_KIND, (3, 5)),
+                "v_one": _location(SPUR_KIND, (9, 5)),
+            },
+            {"town_w_map": _settlement("town_w_map", "town_w", _point("w"))},
+            road=_road_document(node_kinds=[NODE_KIND, SPUR_KIND]),
+        )
+        with self.assertRaises(RoadGenerationError) as caught:
+            _authored_input(world)
+        self.assertIn(
+            f"{ROAD_PATH}: node_kinds lists {SPUR_KIND}, which is a spur or open-cell kind",
+            caught.exception.problems,
+        )
+
 
 class RoadCostFieldTests(_Legality, unittest.TestCase):
     """The road cost field admits only legal walkable steps."""
@@ -353,6 +391,259 @@ class RoadCostFieldTests(_Legality, unittest.TestCase):
         self.assertFalse(footprint_cells & set(road.cells))
         self.assertNotIn(hidden_anchor, road.cells)
         self.assertEqual(verify_roads(inp, (road,)), [])
+
+    @covers_requirement(
+        "road-network-generation::the-road-cost-field-admits-only-legal-walkable-steps"
+    )
+    def test_village_and_hamlet_cells_stay_open(self):
+        footprint = {
+            "shape": ["##"],
+            "offset": {"dx": 0, "dy": 0},
+            "gates": [{"return_direction": "n", "destination_node": "gate"}],
+        }
+        world = _world(
+            {
+                "town_w": _location(NODE_KIND, (3, 5)),
+                "town_e": _location(NODE_KIND, (19, 5)),
+                "hamlet_one": _location(OPEN_KIND, (10, 5)),
+                "village_one": _location(SPUR_KIND, (14, 5)),
+            },
+            {
+                "town_w_map": _settlement("town_w_map", "town_w", _point("w")),
+                "town_e_map": _settlement("town_e_map", "town_e", _point("e")),
+                "hamlet_map": _settlement("hamlet_map", "hamlet_one", _point("n")),
+                "village_map": _settlement("village_map", "village_one", footprint),
+            },
+        )
+        inp = _authored_input(world)
+        roads = {(road.first, road.second): road for road in compute_roads(inp)}
+        trunk = roads[("town_e", "town_w")]
+        self.assertIn((10, 5), trunk.cells)  # the hamlet's own cell
+        self.assertTrue({(14, 5), (15, 5)} & set(trunk.cells))  # a footprint cell
+        self.assertNotIn((10, 5), inp.blocked)
+        self.assertEqual([node.key for node in inp.spur_nodes], ["village_one"])
+        # A hamlet is never a road node, even where a road runs through it.
+        self.assertNotIn("hamlet_one", {key for pair in roads for key in pair})
+        self.assertEqual(verify_roads(inp, tuple(roads.values())), [])
+
+
+#: Two gated towns of the configured kind, joined along the row y = 5.
+TOWNS = {"town_w": (3, 5), "town_e": (19, 5)}
+
+
+def _towns_world(locations: dict | None = None, settlements: dict | None = None):
+    """A world with the two towns and whatever else the test adds."""
+    rows = {key: _location(NODE_KIND, cell) for key, cell in TOWNS.items()}
+    rows.update(locations or {})
+    documents = {
+        "town_w_map": _settlement("town_w_map", "town_w", _point("w")),
+        "town_e_map": _settlement("town_e_map", "town_e", _point("e")),
+    }
+    documents.update(settlements or {})
+    return _world(rows, documents)
+
+
+def _trunk_roads(inp: RoadInput) -> tuple[tuple[str, str, tuple], ...]:
+    """The roads between two towns: everything stage one routes."""
+    return tuple(
+        (road.first, road.second, road.cells)
+        for road in compute_roads(inp)
+        if road.first in TOWNS and road.second in TOWNS
+    )
+
+
+def _spur_roads(inp: RoadInput) -> dict[str, Road]:
+    """The spur of each village, keyed by its owner."""
+    return {
+        road.spur_of: road for road in compute_roads(inp) if road.spur_of is not None
+    }
+
+
+class RoadSpurStageTests(unittest.TestCase):
+    """Each village receives one spur to its cheapest node."""
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_one_spur_per_village(self):
+        inp = _authored_input(_towns_world({"v_one": _location(SPUR_KIND, (14, 8))}))
+        roads = compute_roads(inp)
+        self.assertEqual(sorted(_spur_roads(inp)), ["v_one"])
+        spur = _spur_roads(inp)["v_one"]
+        self.assertEqual(_end(spur, "v_one"), (14, 8))
+        # A point entry's gate approach is its own cell.
+        self.assertEqual(_end(spur, "town_e"), (19, 5))
+        self.assertEqual(verify_roads(inp, roads), [])
+        network = decode_road_network(generate_road_network(inp))
+        self.assertEqual(network.spur_owners, {("town_e", "v_one"): "v_one"})
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_the_cheapest_node_is_chosen(self):
+        size = 21
+        region = np.full((size, size), 2, dtype=np.uint8)
+        region[:, 5:8] = 1  # a slow band across the whole frame
+        inp = _input(
+            _open(size),
+            {"node_a": [(2, 10)], "node_b": [(18, 10)]},
+            region=region,
+            region_speeds={PLAIN: 4000, BARRIER: 400},
+            spur_nodes=_spurs(v_one=(9, 10)),
+        )
+        spur = _spur_roads(inp)["v_one"]
+        self.assertEqual(_end(spur, "v_one"), (9, 10))
+        self.assertEqual(_end(spur, "node_b"), (18, 10))
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_a_cost_tie_goes_to_the_smaller_key(self):
+        inp = _input(
+            _open(21),
+            {"node_a": [(2, 10)], "node_b": [(18, 10)]},
+            spur_nodes=_spurs(v_one=(10, 10)),
+        )
+        self.assertEqual(_end(_spur_roads(inp)["v_one"], "node_a"), (2, 10))
+
+    def _beside_a_trunk(self, reuse: float) -> tuple[Road, Road]:
+        inp = _input(
+            _open(44),
+            {"node_a": [(2, 5)], "node_b": [(40, 5)]},
+            reuse_factor=reuse,
+            spur_nodes=_spurs(v_one=(20, 10)),
+        )
+        roads = compute_roads(inp)
+        trunk = next(road for road in roads if road.spur_of is None)
+        return trunk, _spur_roads(inp)["v_one"]
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_a_spur_reuses_earlier_road_cells(self):
+        shared = {}
+        for reuse in (1.0, 0.4):
+            trunk, spur = self._beside_a_trunk(reuse)
+            shared[reuse] = len(set(spur.cells) & set(trunk.cells))
+        self.assertGreater(shared[0.4], 1)
+        self.assertGreater(shared[0.4], shared[1.0])
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_a_village_on_a_trunk_cell(self):
+        inp = _input(
+            _open(44),
+            {"node_a": [(2, 5)], "node_b": [(40, 5)]},
+            reuse_factor=0.4,
+            spur_nodes=_spurs(v_one=(12, 5)),
+        )
+        roads = compute_roads(inp)
+        trunk = next(road for road in roads if road.spur_of is None)
+        spur = _spur_roads(inp)["v_one"]
+        self.assertEqual(_end(spur, "v_one"), (12, 5))
+        self.assertEqual(_end(spur, "node_a"), (2, 5))
+        self.assertTrue(set(spur.cells) <= set(trunk.cells))
+        self.assertEqual(verify_roads(inp, roads), [])
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_fixed_order_decides_village_targets(self):
+        nearer_first = _input(
+            _open(21),
+            {"town_a": [(2, 10)]},
+            spur_nodes=_spurs(v_a=(10, 10), v_b=(16, 10)),
+        )
+        farther_first = _input(
+            _open(21),
+            {"town_a": [(2, 10)]},
+            spur_nodes=_spurs(v_a=(16, 10), v_b=(10, 10)),
+        )
+        # An unprocessed village is not a candidate: v_a sorts first here.
+        self.assertEqual(_end(_spur_roads(nearer_first)["v_b"], "v_a"), (10, 10))
+        self.assertEqual(_end(_spur_roads(farther_first)["v_a"], "town_a"), (2, 10))
+
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
+    def test_no_settlement_document_is_needed(self):
+        inp = _authored_input(
+            _towns_world(
+                {
+                    "v_bare": _location(SPUR_KIND, (8, 9)),
+                    "v_documented": _location(SPUR_KIND, (14, 8)),
+                },
+                {
+                    "v_documented_map": _settlement(
+                        "v_documented_map", "v_documented", _point("n")
+                    )
+                },
+            )
+        )
+        self.assertEqual(
+            [node.key for node in inp.spur_nodes], ["v_bare", "v_documented"]
+        )
+        self.assertEqual(
+            [node.approaches for node in inp.spur_nodes], [((8, 9),), ((14, 8),)]
+        )
+        self.assertNotIn((8, 9), inp.blocked)
+        self.assertEqual(sorted(_spur_roads(inp)), ["v_bare", "v_documented"])
+
+
+class RoadSpurIndependenceTests(unittest.TestCase):
+    """Stage one is independent of villages and hamlets."""
+
+    @covers_requirement(
+        "road-network-generation::stage-one-is-independent-of-villages-and-hamlets"
+    )
+    def test_trunks_do_not_move(self):
+        footprint = {
+            "shape": ["##"],
+            "offset": {"dx": 0, "dy": 0},
+            "gates": [{"return_direction": "n", "destination_node": "gate"}],
+        }
+        before = _trunk_roads(_authored_input(_towns_world()))
+        after = _trunk_roads(
+            _authored_input(
+                _towns_world(
+                    locations={
+                        "hamlet_one": _location(OPEN_KIND, (10, 5)),
+                        "village_one": _location(SPUR_KIND, (14, 5)),
+                        "village_two": _location(SPUR_KIND, (12, 9)),
+                    },
+                    settlements={
+                        "hamlet_map": _settlement("hamlet_map", "hamlet_one", _point("n")),
+                        "village_map": _settlement("village_map", "village_one", footprint),
+                        "village_two_map": _settlement(
+                            "village_two_map", "village_two", _point("s")
+                        ),
+                    },
+                )
+            )
+        )
+        self.assertEqual(len(before), 1)
+        self.assertEqual(before, after)
+
+    @covers_requirement(
+        "road-network-generation::stage-one-is-independent-of-villages-and-hamlets"
+    )
+    def test_no_village_keeps_the_artifact_format(self):
+        inp = _input(_open(21), {"node_a": [(2, 10)], "node_b": [(18, 10)]})
+        text = generate_road_network(inp)
+        self.assertNotIn("spur_of", text)
+        self.assertEqual(
+            text,
+            encode_road_document(
+                frame_cells=inp.size,
+                source_signature=inp.source_signature,
+                nodes=[node.key for node in inp.nodes],
+                roads=[
+                    (road.first, road.second, road.cells) for road in compute_roads(inp)
+                ],
+            ),
+        )
+        self.assertEqual(decode_road_network(text).spur_owners, {})
 
 
 class RoadTopologyTests(unittest.TestCase):
@@ -568,6 +859,88 @@ class RoadRefusalTests(unittest.TestCase):
     def test_a_valid_hand_built_network_passes(self):
         inp = _input(_open(8), {"node_a": [(1, 1)], "node_b": [(3, 3)]})
         self.assertEqual(verify_roads(inp, [Road("node_a", "node_b", ((1, 1), (2, 2), (3, 3)))]), [])
+
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
+    def test_unreachable_or_misplaced_village_is_named(self):
+        walled = _open(20)
+        walled[:, 13] = False  # one network west of the wall, the village east
+        wet = _open(12)
+        wet[7, 7] = False
+        for name, inp, problem in (
+            (
+                "no connection",
+                _input(
+                    walled,
+                    {"node_a": [(2, 2)], "node_b": [(5, 5)]},
+                    spur_nodes=_spurs(v_walled=(17, 5)),
+                ),
+                "node v_walled: has no road",
+            ),
+            (
+                "unwalkable cell",
+                _input(
+                    wet,
+                    {"node_a": [(2, 2)], "node_b": [(5, 5)]},
+                    spur_nodes=_spurs(v_wet=(7, 7)),
+                ),
+                "node v_wet: village cell (7, 7) is off the cost field",
+            ),
+        ):
+            with self.subTest(village=name):
+                with self.assertRaises(RoadGenerationError) as caught:
+                    generate_road_network(inp)
+                self.assertIn(problem, caught.exception.problems)
+
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
+    def test_a_key_that_is_both_node_and_village_is_named(self):
+        inp = _input(
+            _open(8),
+            {"node_a": [(1, 1)]},
+            spur_nodes=(RoadNode("node_a", ((5, 5),)),),
+        )
+        with self.assertRaises(RoadGenerationError) as caught:
+            generate_road_network(inp)
+        self.assertIn("node node_a: duplicate node key", caught.exception.problems)
+
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
+    def test_a_village_without_any_stage_one_node_is_named(self):
+        inp = _input(_open(8), {}, spur_nodes=_spurs(v_one=(4, 4)))
+        with self.assertRaises(RoadGenerationError) as caught:
+            generate_road_network(inp)
+        self.assertIn("node v_one: has no road", caught.exception.problems)
+
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
+    def test_self_check_names_hand_built_spur_faults(self):
+        inp = _input(
+            _open(12),
+            {"node_a": [(1, 1)], "node_b": [(1, 10)]},
+            spur_nodes=_spurs(v_one=(6, 6)),
+        )
+        trunk = Road("node_a", "node_b", tuple((1, y) for y in range(1, 11)))
+        spur = Road("node_a", "v_one", ((1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6)), spur_of="v_one")
+        other = Road(
+            "node_b",
+            "v_one",
+            ((1, 10), (2, 10), (3, 9), (4, 8), (5, 7), (6, 6)),
+            spur_of="v_one",
+        )
+        self.assertEqual(verify_roads(inp, [trunk, spur]), [])
+        self.assertIn(
+            "road node_a--v_one: spur owner node_a is not a village end",
+            verify_roads(inp, [trunk, Road("node_a", "v_one", spur.cells, spur_of="node_a")]),
+        )
+        self.assertIn("node v_one: owns 2 spurs", verify_roads(inp, [trunk, spur, other]))
+        unmarked = verify_roads(inp, [trunk, Road("node_a", "v_one", spur.cells)])
+        self.assertIn("road node_a--v_one: trunk ends at village v_one", unmarked)
+        self.assertIn("node v_one: owns 0 spurs", unmarked)
 
 
 class RoadDeterminismTests(unittest.TestCase):

@@ -432,6 +432,113 @@ class RoadCodecTests(unittest.TestCase):
                     encode_road_document(**arguments)
 
 
+def _spur_text(**overrides) -> str:
+    """One network with a trunk and a spur row."""
+    arguments = {
+        "frame_cells": 8,
+        "source_signature": "signature",
+        "nodes": ["bravo", "alpha", "v_one"],
+        "roads": [
+            ("alpha", "bravo", ((0, 0), (1, 0))),
+            ("alpha", "v_one", ((2, 0), (2, 1))),
+        ],
+        "spur_owners": {("alpha", "v_one"): "v_one"},
+    }
+    arguments.update(overrides)
+    return encode_road_document(**arguments)
+
+
+class SpurRoadCodecTests(unittest.TestCase):
+    """The road artifact marks spur roads."""
+
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
+    def test_a_spur_row_round_trips(self):
+        text = _spur_text()
+        network = decode_road_network(text)
+        self.assertEqual(network.nodes, ("alpha", "bravo", "v_one"))
+        self.assertEqual(
+            network.roads,
+            (
+                ("alpha", "bravo", ((0, 0), (1, 0))),
+                ("alpha", "v_one", ((2, 0), (2, 1))),
+            ),
+        )
+        self.assertEqual(
+            network.cells, frozenset({(0, 0), (1, 0), (2, 0), (2, 1)})
+        )
+        self.assertEqual(network.spur_owners, {("alpha", "v_one"): "v_one"})
+        self.assertEqual(
+            encode_road_document(
+                frame_cells=8,
+                source_signature="signature",
+                nodes=network.nodes,
+                roads=network.roads,
+                spur_owners=network.spur_owners,
+            ),
+            text,
+        )
+        # Exactly the spur row carries the mark, so a trunk row keeps its shape.
+        self.assertEqual(
+            sum(1 for line in text.splitlines() if '"spur_of"' in line), 1
+        )
+        self.assertEqual(
+            sum(1 for line in text.splitlines() if line.startswith("    {")), 2
+        )
+
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
+    def test_unmarked_networks_keep_their_bytes(self):
+        arguments = {
+            "frame_cells": 8,
+            "source_signature": "signature",
+            "nodes": ["bravo", "alpha"],
+            "roads": [("alpha", "bravo", ((0, 0), (1, 0)))],
+        }
+        plain = encode_road_document(**arguments)
+        empty = encode_road_document(**arguments, spur_owners={})
+        self.assertEqual(plain, empty)
+        self.assertNotIn("spur_of", plain)
+        self.assertEqual(decode_road_network(plain).spur_owners, {})
+
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
+    def test_an_owner_that_is_not_an_end_is_rejected(self):
+        with self.assertRaises(RoadDocumentError):
+            _spur_text(spur_owners={("alpha", "v_one"): "bravo"})
+
+    def _mutate_spur(self, mutate) -> dict:
+        document = json.loads(_spur_text())
+        mutate(next(row for row in document["roads"] if "spur_of" in row))
+        return document
+
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
+    def test_a_malformed_owner_is_rejected(self):
+        for name, owner in (
+            ("not an end", "bravo"),
+            ("not a string", 7),
+            ("absent value", None),
+        ):
+            with self.subTest(corrupt=name):
+                document = self._mutate_spur(lambda row: row.__setitem__("spur_of", owner))
+                with self.assertRaises(RoadDocumentError):
+                    decode_road_network(document)
+
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
+    def test_a_changed_owner_breaks_the_fingerprint(self):
+        document = self._mutate_spur(lambda row: row.__setitem__("spur_of", "alpha"))
+        with self.assertRaises(RoadDocumentError) as caught:
+            decode_road_network(document)
+        self.assertIn("fingerprint", str(caught.exception))
+
+
 def run_with_numpy_blocked(source: str) -> subprocess.CompletedProcess:
     """Run ``source`` in a fresh interpreter with the generation extra blocked."""
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT)}

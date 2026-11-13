@@ -55,6 +55,7 @@ _FORBIDDEN = (150, 168, 120)
 _UNWALKABLE = (96, 92, 88)
 _FORD = (90, 170, 230)
 _ROAD = (176, 32, 32)
+_SPUR = (230, 120, 20)
 _NODE = (250, 210, 40)
 
 
@@ -123,7 +124,7 @@ def write_preview(
     path: Path,
     fords: Iterable[tuple[int, int]] = (),
 ) -> None:
-    """Draw land, sea, unwalkable cells, fords, roads and nodes, north up."""
+    """Draw land, sea, unwalkable cells, fords, roads, spurs and nodes, north up."""
     from PIL import Image
 
     size = inp.size
@@ -146,8 +147,13 @@ def write_preview(
 
     paint(fords, _FORD)
     for road in roads:
-        paint(road.cells, _ROAD)
-    for node in inp.nodes:
+        if road.spur_of is None:
+            paint(road.cells, _ROAD)
+    # Spurs after the trunks, so a spur that follows a trunk stays visible.
+    for road in roads:
+        if road.spur_of is not None:
+            paint(road.cells, _SPUR)
+    for node in (*inp.nodes, *inp.spur_nodes):
         for x, y in node.approaches:
             paint(
                 ((x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)), _NODE
@@ -193,12 +199,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Informational only: never a pass/fail criterion. ru_maxrss is KiB on Linux.
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     print(
-        f"generated {len(inp.nodes)} nodes in {time.monotonic() - started:.1f} s "
+        f"generated {len(inp.nodes) + len(inp.spur_nodes)} nodes in "
+        f"{time.monotonic() - started:.1f} s "
         f"(peak resident {peak / 1024:.0f} MiB on Linux)"
     )
     if args.preview is not None:
         network = decode_road_network(text)
-        roads = [Road(first, second, cells) for first, second, cells in network.roads]
+        roads = [
+            Road(first, second, cells, network.spur_owners.get((first, second)))
+            for first, second, cells in network.roads
+        ]
         write_preview(inp, roads, args.preview, fords=_ford_cells())
         print(f"wrote preview {args.preview.resolve()}")
     current = args.output.read_text(encoding="utf-8") if args.output.exists() else None
