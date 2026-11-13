@@ -12,5 +12,5 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 3. Gates
 
-- [ ] 3.1 Run `pnpm run build`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-group-expansion`; all pass.
-- [ ] 3.2 Run `openspec validate gallery-group-expansion --strict`; it passes.
+- [x] 3.1 Run `pnpm run build`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-group-expansion`; all pass.
+- [x] 3.2 Run `openspec validate gallery-group-expansion --strict`; it passes.
