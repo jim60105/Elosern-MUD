@@ -9,8 +9,13 @@ from dataclasses import asdict
 from django.db import transaction
 from evennia.utils.dbserialize import deserialize
 
-from world.narrative import dream_session as lifecycle
-from world.narrative.authoring import REQUIREMENT_FIELDS, draft_is_confirmed, get_draft
+from world.narrative import dream_proposal, dream_session as lifecycle
+from world.narrative.authoring import (
+    REQUIREMENT_FIELDS,
+    AuthoringError,
+    draft_is_confirmed,
+    get_draft,
+)
 from world.narrative.dream_track import render_ending, track_state
 from world.narrative.models import StoryThread
 from world.narrative.threads import TERMINAL_THREAD_STATES, thread_accessible
@@ -77,6 +82,105 @@ def scene_subject_id(actor):
 def association(actor):
     value = actor.db.dream_surface
     return deserialize(value) if value else None
+
+
+def _stored_proposal(raw):
+    """One canonical working proposal, or the empty proposal for a refused value."""
+    try:
+        return dream_proposal.normalize_proposal(raw or {})
+    except dream_proposal.ProposalEditError:  # observability: ignore R2: a refused stored proposal reads as the empty proposal; the write path that produced it owns the fault
+        return dream_proposal.empty_proposal()
+
+
+def _seeded_from_draft(actor, session):
+    """The saved draft's direction as a starting proposal and chosen thread.
+
+    A resumed session that holds no working proposal yet - an association
+    written before this change, a cleared attribute or the camping restore -
+    still starts from what the player already saved. A direction the applier
+    refuses leaves the proposal empty and the thread unchosen.
+    """
+    if not session.draft_id:
+        return dream_proposal.empty_proposal(), None
+    try:
+        direction = get_draft(session.draft_id, owner_id(actor)).direction or {}
+        proposal = dream_proposal.normalize_proposal(direction)
+    except (AuthoringError, dream_proposal.ProposalEditError):  # observability: ignore R2: a foreign or refused saved direction seeds an empty proposal; entry itself still succeeds
+        return dream_proposal.empty_proposal(), None
+    thread_id = direction.get("thread_id")
+    if not isinstance(thread_id, str) or not thread_id.strip():
+        thread_id = None
+    return proposal, thread_id
+
+
+def _wish_values(value, session):
+    """The four working-proposal values a surface reads, with their defaults.
+
+    An association written before this change still reads: the proposal is
+    absent, the report and the thread are unchosen, and the lock is a
+    consequence of an accepted exchange, so a lost or pre-change association
+    never reopens a choice the player already made.
+    """
+    completed = int(session.completed_exchanges) if session is not None else 0
+    return {
+        "proposal": _stored_proposal(value.get("proposal")),
+        "changes": value.get("changes"),
+        "thread_id": value.get("thread_id"),
+        "thread_locked": bool(value.get("thread_locked")) or completed > 0,
+    }
+
+
+def wish_state(actor):
+    """The working proposal, its last settled report and the thread choice."""
+    value = association(actor)
+    if value is None:
+        return None
+    return _wish_values(value, associated_session(actor))
+
+
+def offered_threads(actor):
+    """The non-terminal story threads this owner may attach the wish to."""
+    threads = []
+    for thread in StoryThread.objects.exclude(state__in=TERMINAL_THREAD_STATES).order_by("-pk").iterator():
+        if thread_accessible(thread, owner_id(actor)):
+            threads.append({"id": thread.thread_id,
+                            "label": thread.factual_summary.strip()[:160] or "未命名的故事線"})
+            if len(threads) == 32:
+                break
+    return threads
+
+
+def working_direction(actor):
+    """The working proposal as one authoring direction, thread included."""
+    wish = wish_state(actor) or {
+        "proposal": dream_proposal.empty_proposal(),
+        "thread_id": None,
+    }
+    proposal = wish["proposal"]
+    direction = {
+        "kind": "thread_direction" if wish["thread_id"] else "new_story",
+        "thread_id": wish["thread_id"],
+        "summary": proposal["summary"],
+        "requirements": [dict(row) for row in proposal["requirements"]],
+    }
+    for field in dream_proposal.LIST_FIELDS:
+        if proposal[field]:
+            direction[field] = list(proposal[field])
+    return direction
+
+
+def choose_thread(actor, thread_id):
+    """Record the proposal's chosen thread; the service owns the validation."""
+    value = association(actor)
+    value["thread_id"] = thread_id
+    actor.db.dream_surface = value
+
+
+def lock_thread(actor):
+    """The first accepted message fixes the choice for this session."""
+    value = association(actor)
+    value["thread_locked"] = True
+    actor.db.dream_surface = value
 
 
 def associated_session(actor):
@@ -212,6 +316,11 @@ def enter_for_owner(
             session = lifecycle.open_session(owner_id(actor), tick=int(tick_to))
         old = association(owner)
         retained = old if old and old["session_id"] == session.session_id else {}
+        if "proposal" in retained:
+            proposal = _stored_proposal(retained.get("proposal"))
+            thread_id = retained.get("thread_id")
+        else:
+            proposal, thread_id = _seeded_from_draft(owner, session)
         owner.db.dream_surface = {
             "session_id": session.session_id,
             "owner_id": int(owner.pk),
@@ -226,7 +335,11 @@ def enter_for_owner(
             },
             "scene": retained.get("scene", ""),
             "dialogue": retained.get("dialogue", ""),
-            "direction": retained.get("direction", ""),
+            "proposal": proposal,
+            "changes": retained.get("changes"),
+            "thread_id": thread_id,
+            "thread_locked": bool(retained.get("thread_locked"))
+            or int(session.completed_exchanges) > 0,
             "failure": False,
         }
         if retained:
@@ -250,13 +363,6 @@ def enter_for_owner(
     return dream_state(owner)
 
 
-def store_direction(actor, message):
-    value = association(actor)
-    value["direction"] = message
-    value["failure"] = False
-    actor.db.dream_surface = value
-
-
 def bump_revision_if_unchanged(actor, revision):
     """Draft edits must invalidate surface requests even with the same handle."""
     session = associated_session(actor)
@@ -269,7 +375,8 @@ def store_response(actor, response):
     value = association(actor)
     value["scene"] = response.scene
     value["dialogue"] = response.dialogue
-    value["requirements"] = [dict(row) for row in response.proposal["requirements"]]
+    value["proposal"] = dream_proposal.normalize_proposal(response.proposal)
+    value["changes"] = response.changes
     value["failure"] = False
     actor.db.dream_surface = value
 
@@ -316,15 +423,8 @@ def dream_state(actor):
     draft = get_draft(session.draft_id, owner_id(actor)) if session.draft_id else None
     confirmed = bool(draft and draft_is_confirmed(draft))
     draft_direction = draft.direction if draft else None
-    threads = []
-    if opened:
-        for thread in StoryThread.objects.exclude(state__in=TERMINAL_THREAD_STATES).order_by("-pk").iterator():
-            if thread_accessible(thread, owner_id(actor)):
-                threads.append({"id": thread.thread_id,
-                                "label": thread.factual_summary.strip()[:160] or "未命名的故事線"})
-                if len(threads) == 32:
-                    break
-    displayed_direction = (draft_direction or {}).get("summary", value.get("direction", ""))
+    proposal = _wish_values(value, session)["proposal"]
+    displayed_direction = (draft_direction or {}).get("summary", proposal["summary"])
     return {
         "session_id": session.session_id, "revision": int(session.revision),
         "completed": view.completed, "remaining": view.remaining,
@@ -332,7 +432,7 @@ def dream_state(actor):
         "can_confirm": opened, "can_draft": opened, "can_awaken": True,
         "pending": bool(session.pending_submission_id), "open": opened,
         "confirmed": confirmed, "failure": bool(value.get("failure")),
-        "thread_choices": threads,
+        "thread_choices": offered_threads(actor) if opened else [],
         # The shown requirement rows and their identity are published once, as
         # the top-level keys below; carrying them a second time inside the
         # preference projection would only grow the payload every client must
@@ -354,7 +454,7 @@ def dream_state(actor):
         # version. A persisted draft's frozen rows win over the collaborator's
         # latest proposal, because that is the version confirmation compares.
         "requirements": (draft_direction or {}).get("requirements")
-        or list(value.get("requirements") or []),
+        or [dict(row) for row in proposal["requirements"]],
         "requirement_version": (draft_direction or {}).get("requirement_version"),
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
         "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",

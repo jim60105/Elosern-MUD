@@ -29,6 +29,7 @@ from world.art.scene_definitions import (
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+from world.narrative import dream_proposal
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
 from world.narrative.models import CreativeRequest
@@ -127,12 +128,27 @@ class DreamSurfaceTests(EvenniaTest):
         state = service.dream_state(self.actor)
         return service.act(self.actor, action, session_id=state["session_id"], revision=state["revision"], **kwargs)
 
+    def request_payload(self, client, index=-1):
+        """The bounded user message one recorded request carried, parsed."""
+        return json.loads(client.calls[index].messages[1]["content"])
+
     def delivered(self, index=0):
         client = FakeLLMClient()
         client.add_response(lambda descriptor: True, json.dumps({
             "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
             "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
             "phase": prospective_state(index).level,
+        }, ensure_ascii=False))
+        return client
+
+    def exchange(self, edits=(), index=0):
+        """A recorded collaborator response carrying exactly these edits."""
+        client = FakeLLMClient()
+        client.add_response(lambda descriptor: True, json.dumps({
+            "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
+            "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
+            "phase": prospective_state(index).level,
+            "edits": list(edits),
         }, ensure_ascii=False))
         return client
 
@@ -875,7 +891,7 @@ class DreamSurfaceTests(EvenniaTest):
         before = surface.association(self.actor)
 
         def explode(*args, **kwargs):
-            surface.store_direction(self.actor, "不該留下的內容")
+            surface.choose_thread(self.actor, "synthetic-exploded-thread")
             raise AuthoringError("synthetic work failure")
 
         with patch.object(service.lifecycle, "confirm_session", side_effect=explode):
@@ -1010,6 +1026,350 @@ class DreamSurfaceTests(EvenniaTest):
         state = service.dream_state(self.actor)
         self.assertEqual(state["requirements"], [])
         self.assertIsNone(state["requirement_version"])
+
+    # The working proposal and its thread choice. The traceability ids for
+    # these delta requirements only exist after the archive sync, so the new
+    # tests stay unannotated until then.
+
+    def test_a_player_message_never_becomes_the_proposal(self):
+        self.enter()
+        client = self.delivered()
+        self.assertEqual(
+            self.request("say", message="合成的秘密鐘聲", client=client).result["outcome"],
+            "success",
+        )
+        wish = surface.wish_state(self.actor)
+        self.assertEqual(wish["proposal"], dream_proposal.empty_proposal())
+        self.assertNotIn(
+            "合成的秘密鐘聲", json.dumps(wish["proposal"], ensure_ascii=False)
+        )
+        self.assertIsNone(wish["changes"]["summary"])
+        self.assertEqual(wish["changes"]["lists"]["themes"], {"added": [], "removed": []})
+
+    def test_edits_accumulate_across_exchanges(self):
+        self.enter()
+        first = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="先寫下開頭", client=first).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"]["summary"], "在無名港尋找鐘聲。"
+        )
+        second = self.exchange([
+            {"command": "str_replace", "path": "summary",
+             "old_str": "鐘聲", "new_str": "失落的鐘聲"},
+        ], index=1)
+        self.assertEqual(
+            self.request("say", message="再補一段", client=second).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            self.request_payload(second)["wish"]["summary"],
+            [{"line": 1, "text": "在無名港尋找鐘聲。"}],
+        )
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"]["summary"],
+            "在無名港尋找失落的鐘聲。",
+        )
+
+    def test_the_change_report_follows_the_last_settled_exchange(self):
+        self.enter()
+        first = self.exchange([
+            {"command": "create", "path": "themes", "file_text": "鐘聲"},
+        ])
+        self.assertEqual(
+            self.request("say", message="加入主題", client=first).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            surface.wish_state(self.actor)["changes"]["lists"]["themes"]["added"],
+            ["鐘聲"],
+        )
+        self.assertEqual(
+            self.request("say", message="不再改動", client=self.delivered(index=1)).result["outcome"],
+            "success",
+        )
+        changes = surface.wish_state(self.actor)["changes"]
+        self.assertIsNone(changes["summary"])
+        self.assertEqual(changes["lists"]["themes"], {"added": [], "removed": []})
+
+    def test_failed_generation_leaves_the_proposal_and_report_unchanged(self):
+        self.enter()
+        first = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="先寫下開頭", client=first).result["outcome"],
+            "success",
+        )
+        before = surface.wish_state(self.actor)
+        failed = FakeLLMClient()
+        failed.add_connection_error(lambda descriptor: True)
+        result = self.request("say", message="鐘聲", client=failed).result
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "dream_unavailable")
+        after = surface.wish_state(self.actor)
+        self.assertEqual(after["proposal"], before["proposal"])
+        self.assertEqual(after["changes"], before["changes"])
+        self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 1)
+
+    def test_a_stale_response_applies_no_edits(self):
+        self.enter()
+        pending = Deferred()
+        session = SimpleNamespace(puppet=self.actor)
+        self.live_sessions = [session]
+        edited = {**dream_proposal.empty_proposal(), "summary": "不該套用的方向"}
+        with patch("world.ai.dream.generate_dream_exchange", return_value=pending), \
+                patch("server.dream_service._refresh"):
+            result = self.request("say", message="鐘聲", session=session, client=self.delivered())
+            self.assertEqual(self.request("awaken").result["outcome"], "success")
+            pending.callback(dream.DreamExchange(
+                "合成場景", "合成對話", prospective_state(0).level, 1, "exchange",
+                proposal=edited,
+                changes=dream_proposal.diff(dream_proposal.empty_proposal(), edited),
+            ))
+        self.assertEqual(result.result["outcome"], "rejected")
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"], dream_proposal.empty_proposal()
+        )
+        self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 0)
+
+    def test_a_draft_saved_without_a_direction_takes_the_working_proposal(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-working-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+            {"command": "create", "path": "themes", "file_text": "鐘聲"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("draft").result["outcome"], "success")
+        draft = get_draft(
+            surface.associated_session(self.actor).draft_id, str(self.actor.pk)
+        )
+        self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
+        self.assertEqual(draft.direction["themes"], ["鐘聲"])
+        self.assertEqual(draft.direction["kind"], "thread_direction")
+        self.assertEqual(draft.direction["thread_id"], thread.thread_id)
+
+    def test_awakening_saves_the_working_proposal_when_no_draft_exists(self):
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertFalse(surface.associated_session(self.actor).draft_id)
+        self.assertEqual(self.request("awaken").result["outcome"], "success")
+        draft = get_draft(
+            surface.associated_session(self.actor).draft_id, str(self.actor.pk)
+        )
+        self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
+        self.assertEqual(draft.direction["kind"], "new_story")
+        self.assertIsNone(draft.direction["thread_id"])
+
+    def test_resume_restores_the_proposal(self):
+        first = self.enter()
+        thread = create_thread(
+            thread_id="synthetic-resume-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "在無名港尋找鐘聲。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        before = surface.wish_state(self.actor)
+        resumed = self.enter(tick_from=100, tick_to=111, requested_seconds=11)
+        after = surface.wish_state(self.actor)
+        self.assertEqual(resumed["session_id"], first["session_id"])
+        self.assertEqual(after["proposal"], before["proposal"])
+        self.assertEqual(after["changes"], before["changes"])
+        self.assertEqual(after["thread_id"], thread.thread_id)
+
+    def test_resume_seeds_the_proposal_from_the_saved_draft(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-seed-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=self.delivered()).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            self.request("draft", direction={
+                "kind": "thread_direction", "thread_id": thread.thread_id,
+                "summary": "從草稿接續的鐘聲。", "themes": ["鐘聲"],
+            }).result["outcome"],
+            "success",
+        )
+        value = surface.association(self.actor)
+        value.pop("proposal", None)
+        value.pop("thread_locked", None)
+        self.actor.db.dream_surface = value
+        self.enter(tick_from=100, tick_to=121, requested_seconds=21)
+        wish = surface.wish_state(self.actor)
+        self.assertEqual(wish["proposal"]["summary"], "從草稿接續的鐘聲。")
+        self.assertEqual(wish["proposal"]["themes"], ["鐘聲"])
+        self.assertEqual(wish["thread_id"], thread.thread_id)
+        self.assertTrue(wish["thread_locked"])
+
+    def test_choosing_an_offered_thread_precedes_the_first_message(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-choice-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+            factual_summary="  選擇的鐘聲線  ",
+        )
+        revision = service.dream_state(self.actor)["revision"]
+        result = self.request("choose_thread", thread_id=thread.thread_id).result
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(result["code"], "dream_choose_thread")
+        self.assertEqual(surface.wish_state(self.actor)["thread_id"], thread.thread_id)
+        self.assertGreater(service.dream_state(self.actor)["revision"], revision)
+        client = self.delivered()
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request_payload(client)["thread"], {"label": "選擇的鐘聲線"})
+
+    def test_the_default_choice_is_a_new_story(self):
+        self.enter()
+        client = self.delivered()
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+        self.assertNotIn("thread", self.request_payload(client))
+
+    def test_the_choice_locks_after_the_first_accepted_message(self):
+        self.enter()
+        chosen = create_thread(
+            thread_id="synthetic-locked-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        other = create_thread(
+            thread_id="synthetic-other-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("choose_thread", thread_id=chosen.thread_id).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=self.delivered()).result["outcome"],
+            "success",
+        )
+        result = self.request("choose_thread", thread_id=other.thread_id).result
+        self.assertEqual(result["code"], "thread_locked")
+        self.assertEqual(surface.wish_state(self.actor)["thread_id"], chosen.thread_id)
+
+    def test_the_choice_locks_even_when_the_first_generation_fails(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-failed-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        failed = FakeLLMClient()
+        failed.add_connection_error(lambda descriptor: True)
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=failed).result["outcome"], "rejected"
+        )
+        result = self.request("choose_thread", thread_id=thread.thread_id).result
+        self.assertEqual(result["code"], "thread_locked")
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    def test_an_unoffered_thread_is_refused(self):
+        self.enter()
+        create_thread(
+            thread_id="synthetic-foreign-thread",
+            origin="synthetic-origin",
+            participants=[str(self.other.pk)],
+        )
+        ended = create_thread(
+            thread_id="synthetic-ended-thread",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        resolve_thread(thread_id=ended.thread_id, tick=100, actor_id=str(self.actor.pk))
+        for thread_id in (
+            "synthetic-foreign-thread",
+            "synthetic-ended-thread",
+            "synthetic-absent-thread",
+        ):
+            with self.subTest(thread_id=thread_id):
+                result = self.request("choose_thread", thread_id=thread_id).result
+                self.assertEqual(result["outcome"], "rejected")
+                self.assertEqual(result["code"], "unknown_thread")
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    def test_a_locked_choice_survives_resume(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-resumed-lock",
+            origin="synthetic-origin",
+            participants=[str(self.actor.pk)],
+        )
+        self.assertEqual(
+            self.request("choose_thread", thread_id=thread.thread_id).result["outcome"],
+            "success",
+        )
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=self.delivered()).result["outcome"],
+            "success",
+        )
+        self.enter(tick_from=100, tick_to=111, requested_seconds=11)
+        wish = surface.wish_state(self.actor)
+        self.assertEqual(wish["thread_id"], thread.thread_id)
+        self.assertTrue(wish["thread_locked"])
+        self.assertEqual(self.request("choose_thread", thread_id=None).result["code"], "thread_locked")
+        self.assertEqual(surface.wish_state(self.actor)["thread_id"], thread.thread_id)
+
+    def test_choose_thread_payload_validation(self):
+        handle = {"session_id": "session:synthetic-dream", "revision": 1}
+        self.assertEqual(
+            validate("choose_thread", {**handle, "thread_id": "synthetic-thread"}),
+            {**handle, "thread_id": "synthetic-thread"},
+        )
+        self.assertIsNone(
+            validate("choose_thread", {**handle, "thread_id": None})["thread_id"]
+        )
+        for payload in (
+            dict(handle),
+            {**handle, "thread_id": ""},
+            {**handle, "thread_id": "t" * 129},
+            {**handle, "thread_id": 7},
+            {**handle, "thread_id": "synthetic-thread", "extra": 1},
+            {"session_id": "session:synthetic-dream", "revision": True, "thread_id": None},
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    validate("choose_thread", payload)
 
 
 def _synthetic_webp():
