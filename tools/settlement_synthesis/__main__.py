@@ -26,6 +26,7 @@ from elosern_map_core.diagnostics import AuthoringError
 
 from tools.settlement_synthesis.budget import (
     NATIONAL_KINDS,
+    SINGLE_CELL_KINDS,
     BudgetError,
     size_budget,
 )
@@ -157,13 +158,22 @@ def _lint(args: argparse.Namespace) -> int:
             return 2
         try:
             location = view.location(document.location_ref)
+            road_contacts = (
+                view.road_contacts(location.cell)
+                if location.kind in SINGLE_CELL_KINDS
+                else None
+            )
             terrain = view.terrain_window(
                 location.cell, _lint_radius(document, location.cell)
             )
         except WorkspaceError as error:
             print(f"settlement_synthesis: {error}", file=sys.stderr)
             return 2
-        findings.extend(lint_settlement(document, location.cell, terrain))
+        findings.extend(
+            lint_settlement(
+                document, location.cell, terrain, road_contacts=road_contacts
+            )
+        )
     for finding in findings:
         print(
             f"{finding.severity.upper()} {finding.code} {finding.map_id} "

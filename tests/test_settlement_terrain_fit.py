@@ -18,6 +18,7 @@ import unittest
 from pathlib import Path
 
 from elosern_map_core.codec import document_from_data
+from elosern_map_core.roads_codec import encode_road_document
 
 from tools.settlement_synthesis.budget import (
     BudgetConfig,
@@ -33,6 +34,7 @@ from tools.settlement_synthesis.fit_lint import (
 )
 from tools.settlement_synthesis.site import SettlementRef, analyse_site
 from tools.settlement_synthesis.terrain_view import GridTerrain
+from tools.settlement_synthesis.workspace import WorkspaceError, load_workspace
 from tools.spec_traceability import covers_requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -172,6 +174,47 @@ def _ref(
     return SettlementRef(location_id, kind, nation, population, cell)
 
 
+#: One gate per direction, with the node it targets: the node stands outward
+#: along the gate's bearing from the anchor, so no gate-side warning fires.
+GATE_NODES = {
+    "w": ("gate_w", 3000, 500),
+    "e": ("gate_e", 1000, 500),
+    "n": ("gate_n", 2000, -500),
+    "s": ("gate_s", 2000, 1500),
+}
+
+
+def _entrance_document(
+    directions: tuple[str, ...],
+    *,
+    shape: tuple[str, ...] = ("#",),
+    single_cell_footprint: bool = True,
+) -> object:
+    """One map whose gates take the given return directions."""
+
+    nodes = {"inn": _node(*ANCHOR_LOCAL, anchor=True)}
+    gates = []
+    for direction in directions:
+        node_id, x_m, y_m = GATE_NODES[direction]
+        nodes[node_id] = _node(x_m, y_m)
+        gates.append({"return_direction": direction, "destination_node": node_id})
+    return _document(
+        nodes,
+        shape=list(shape),
+        gates=gates,
+        single_cell_footprint=True if single_cell_footprint else None,
+    )
+
+
+def _road_network_text(roads) -> str:
+    return encode_road_document(
+        frame_cells=40,
+        source_signature="synthetic",
+        nodes=[f"synthetic_road_{letter}" for letter in ("a", "b", "c")],
+        roads=roads,
+    )
+
+
 class SiteContextTests(unittest.TestCase):
     @covers_requirement(
         "settlement-terrain-fit::site-context-derives-water-relief-and-neighbour-bearings-from-terrain"
@@ -301,6 +344,7 @@ class SizeBudgetTests(unittest.TestCase):
             "min_footprint_cells": 2,
             "tiers": (Tier(0, 6, 2, 0.15),),
             "capital_tier": Tier(0, 28, 4, 0.35),
+            "single_cell_nodes": {"village": 4, "hamlet": 2},
         }
         values.update(overrides)
         return BudgetConfig(**values)
@@ -369,6 +413,8 @@ class SizeBudgetTests(unittest.TestCase):
             ("dungeon", 100),
             ("town", 0),
             ("town", None),
+            ("village", 0),
+            ("hamlet", None),
         )
 
         for kind, population in cases:
@@ -385,6 +431,52 @@ class SizeBudgetTests(unittest.TestCase):
     def test_config_validation(self) -> None:
         with self.assertRaises(ValueError):
             self._config(min_footprint_cells=1)
+
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
+    def test_single_cell_kinds(self) -> None:
+        config = self._config(single_cell_nodes={"village": 3, "hamlet": 2})
+
+        village = size_budget(_ref(kind="village", population=5_000), config)
+        hamlet = size_budget(_ref(kind="hamlet", population=5_000), config)
+        town = size_budget(_ref(kind="town", population=5_000), config)
+
+        self.assertEqual(
+            (village.footprint_cells, village.node_count, village.gate_count,
+             village.loop_ratio),
+            (1, 3, 0, 0.0),
+        )
+        self.assertEqual(
+            (hamlet.footprint_cells, hamlet.node_count, hamlet.gate_count,
+             hamlet.loop_ratio),
+            (1, 2, 0, 0.0),
+        )
+        # Both kinds keep the area and the envelope radius of the formula.
+        for small in (village, hamlet):
+            self.assertEqual(small.built_area_km2, town.built_area_km2)
+            self.assertEqual(small.envelope_radius_m, town.envelope_radius_m)
+
+        # A town at the village's population still gets the two-cell floor and
+        # its own tier's targets.
+        self.assertEqual(town.footprint_cells, 2)
+        self.assertEqual(
+            (town.node_count, town.gate_count, town.loop_ratio), (6, 2, 0.15)
+        )
+
+    @covers_requirement(
+        "settlement-terrain-fit::size-budget-follows-the-population-area-relation-with-a-multi-cell-floor"
+    )
+    def test_single_cell_table_validation(self) -> None:
+        for table in (
+            {"village": 4},
+            {"village": 4, "hamlet": 2, "town": 3},
+            {"village": 4, "hamlet": 1},
+            {"village": 0, "hamlet": 2},
+        ):
+            with self.subTest(table=table):
+                with self.assertRaises(ValueError):
+                    self._config(single_cell_nodes=table)
 
 
 class WaterAndCrossingLintTests(unittest.TestCase):
@@ -582,6 +674,166 @@ class FootprintAndGateLintTests(unittest.TestCase):
         self.assertNotIn("fit_gate_approach_blocked", codes)
 
 
+class RoadContactTests(unittest.TestCase):
+    """The road cells that touch a location cell, from the committed artifact."""
+
+    def setUp(self) -> None:
+        self._workspace_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._workspace_dir.cleanup)
+        self.root = synthetic.write_workspace(Path(self._workspace_dir.name))
+
+    def _write_artifact(self, text: str) -> None:
+        path = self.root / "world" / "maps" / "data" / "road_network.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def test_contacts_follow_each_road_and_union_across_roads(self) -> None:
+        self._write_artifact(
+            _road_network_text(
+                [
+                    (
+                        "synthetic_road_a",
+                        "synthetic_road_b",
+                        [(10, 10), (11, 10), (12, 10)],
+                    ),
+                    (
+                        "synthetic_road_b",
+                        "synthetic_road_c",
+                        [(11, 10), (11, 11), (11, 12)],
+                    ),
+                ]
+            )
+        )
+
+        view = load_workspace(self.root)
+
+        # An inner cell of one road has the cell before and the cell after it.
+        self.assertEqual(view.road_contacts((11, 11)), ((11, 10), (11, 12)))
+        # A road's last cell has exactly one contact.
+        self.assertEqual(view.road_contacts((12, 10)), ((11, 10),))
+        # A cell on two roads has the union, sorted and without duplicates.
+        self.assertEqual(
+            view.road_contacts((11, 10)), ((10, 10), (11, 11), (12, 10))
+        )
+        # A cell on no road has none.
+        self.assertEqual(view.road_contacts((30, 30)), ())
+
+    def test_absent_artifact_gives_no_contact(self) -> None:
+        self.assertFalse(
+            (self.root / "world" / "maps" / "data" / "road_network.json").exists()
+        )
+
+        view = load_workspace(self.root)
+
+        self.assertEqual(view.road_contacts((10, 10)), ())
+        self.assertEqual(view.road_contacts((0, 0)), ())
+
+    def test_corrupt_artifact_raises(self) -> None:
+        self._write_artifact("{ not a road document")
+
+        view = load_workspace(self.root)
+
+        with self.assertRaises(WorkspaceError) as caught:
+            view.road_contacts((10, 10))
+        self.assertIn("road_network.json", str(caught.exception))
+
+
+class EntranceLintTests(unittest.TestCase):
+    """A one-cell village or hamlet's gates checked against its road contacts."""
+
+    def _codes(self, findings, code: str = "fit_entrance_mismatch"):
+        return [finding for finding in findings if finding.code == code]
+
+    def test_matching_and_mismatching_gates(self) -> None:
+        contacts = ((9, 10), (11, 10))
+
+        matched = lint_settlement(
+            _entrance_document(("w", "e")),
+            LOCATION_CELL,
+            _terrain(),
+            road_contacts=contacts,
+        )
+        self.assertEqual(self._codes(matched), [])
+
+        # Gate w alone approaches (11, 10): the road contact (9, 10) is unserved.
+        missing = self._codes(
+            lint_settlement(
+                _entrance_document(("w",)),
+                LOCATION_CELL,
+                _terrain(),
+                road_contacts=contacts,
+            )
+        )
+        self.assertEqual(len(missing), 1)
+        self.assertEqual(
+            (missing[0].severity, missing[0].object_id, missing[0].map_id),
+            ("error", "gates", "fit_case"),
+        )
+        self.assertIn("(9, 10)", missing[0].message)
+
+        # The n gate approaches (10, 9), which no road touches.
+        extra = self._codes(
+            lint_settlement(
+                _entrance_document(("w", "e", "n")),
+                LOCATION_CELL,
+                _terrain(),
+                road_contacts=contacts,
+            )
+        )
+        self.assertEqual(len(extra), 1)
+        self.assertIn("(10, 9)", extra[0].message)
+
+    def test_no_road_contact(self) -> None:
+        one_gate = self._codes(
+            lint_settlement(
+                _entrance_document(("w",)),
+                LOCATION_CELL,
+                _terrain(),
+                road_contacts=(),
+            )
+        )
+        self.assertEqual(one_gate, [])
+
+        two_gates = self._codes(
+            lint_settlement(
+                _entrance_document(("w", "e")),
+                LOCATION_CELL,
+                _terrain(),
+                road_contacts=(),
+            )
+        )
+        self.assertEqual(len(two_gates), 1)
+        self.assertEqual(two_gates[0].severity, "error")
+        self.assertIn("no road touches cell 10, 10", two_gates[0].message)
+
+    def test_national_settlements_are_unaffected(self) -> None:
+        # A multi-cell footprint, and a concealed one-cell entry, are never
+        # compared against roads even when the caller supplies contacts.
+        footprint = lint_settlement(
+            _entrance_document(("w", "e"), shape=("##",), single_cell_footprint=False),
+            LOCATION_CELL,
+            _terrain(),
+            road_contacts=((30, 30),),
+        )
+        self.assertEqual(self._codes(footprint), [])
+
+        point = lint_settlement(
+            _entrance_document(("w", "e"), single_cell_footprint=False),
+            LOCATION_CELL,
+            _terrain(),
+            road_contacts=((30, 30),),
+        )
+        self.assertEqual(self._codes(point), [])
+
+        # Without contacts the check does not run at all.
+        unchecked = self._codes(
+            lint_settlement(
+                _entrance_document(("w", "e")), LOCATION_CELL, _terrain()
+            )
+        )
+        self.assertEqual(unchecked, [])
+
+
 class DirectionDriftLintTests(unittest.TestCase):
     @covers_requirement(
         "settlement-terrain-fit::road-direction-drift-is-a-warning"
@@ -647,6 +899,28 @@ class CommandTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def _write_location_kind(self, kind: str) -> None:
+        locations = synthetic.locations_data()
+        locations["locations"][synthetic.LOCATION_ID]["kind"] = kind
+        (
+            self.root / "content" / "maps" / "locations.yaml"
+        ).write_text(synthetic.yaml_text(locations), encoding="utf-8")
+
+    def _write_settlement(self, data: dict) -> None:
+        path = (
+            self.root
+            / "content"
+            / "maps"
+            / "settlements"
+            / f"{synthetic.SETTLEMENT_ID}.yaml"
+        )
+        path.write_text(synthetic.yaml_text(data), encoding="utf-8")
+
+    def _write_road_artifact(self, text: str) -> None:
+        path = self.root / "world" / "maps" / "data" / "road_network.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
     @covers_requirement(
         "settlement-terrain-fit::the-fit-commands-are-read-only-and-report-by-exit-status"
@@ -775,6 +1049,110 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(synthetic.tree_digest(self.root), self.digest)
         self.assertEqual(lore.read_bytes(), lore_before)
+
+    def test_budget_command_accepts_a_village(self) -> None:
+        self._write_location_kind("village")
+        lore = Path(self._lore_dir.name) / "lore.json"
+        lore.write_text(
+            json.dumps(
+                {"synthetic_place": {"nation": None, "population": 120}}
+            ),
+            encoding="utf-8",
+        )
+        digest = synthetic.tree_digest(self.root)
+
+        result = self._run(
+            "budget", "synthetic_place", "--lore", str(lore)
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            (
+                payload["footprint_cells"],
+                payload["node_count"],
+                payload["gate_count"],
+                payload["loop_ratio"],
+            ),
+            (1, 4, 0, 0.0),
+        )
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+    def test_lint_matches_a_village_gate_to_its_road_contact(self) -> None:
+        self._write_location_kind("village")
+        data = synthetic.settlement_data()
+        data["wilderness_entry"]["single_cell_footprint"] = True
+        data["wilderness_entry"]["gates"] = [
+            {"return_direction": "w", "destination_node": "gate"}
+        ]
+        self._write_settlement(data)
+        # The road ends on the village cell from the east, so the single
+        # contact of cell (5, 5) is (6, 5) and the west gate walks onto it.
+        self._write_road_artifact(
+            _road_network_text(
+                [
+                    (
+                        "synthetic_road_a",
+                        "synthetic_road_b",
+                        [(5, 5), (6, 5), (7, 5)],
+                    )
+                ]
+            )
+        )
+        digest = synthetic.tree_digest(self.root)
+
+        matched = self._run("lint")
+
+        self.assertEqual(matched.returncode, 0, matched.stdout + matched.stderr)
+        self.assertNotIn("fit_entrance_mismatch", matched.stdout)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+        # The north gate walks onto (5, 4) instead, and the road contact is
+        # left without a gate.
+        data["wilderness_entry"]["gates"] = [
+            {"return_direction": "n", "destination_node": "gate"}
+        ]
+        self._write_settlement(data)
+        digest = synthetic.tree_digest(self.root)
+
+        mismatched = self._run("lint")
+
+        self.assertEqual(mismatched.returncode, 1, mismatched.stderr)
+        self.assertIn(
+            "fit_entrance_mismatch synthetic_town gates", mismatched.stdout
+        )
+        self.assertIn("(6, 5)", mismatched.stdout)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+    def test_national_kind_is_not_checked_against_roads(self) -> None:
+        # The map is a one-cell physical footprint with two gates and the
+        # artifact never touches its cell: passing empty contacts would report
+        # the entrance mismatch, so exit 0 proves the command passed None.
+        data = synthetic.settlement_data()
+        data["wilderness_entry"]["single_cell_footprint"] = True
+        data["wilderness_entry"]["gates"] = [
+            {"return_direction": "n", "destination_node": "gate"},
+            {"return_direction": "e", "destination_node": "yard"},
+        ]
+        self._write_settlement(data)
+        self._write_road_artifact(
+            _road_network_text(
+                [
+                    (
+                        "synthetic_road_a",
+                        "synthetic_road_b",
+                        [(20, 20), (21, 20), (21, 21)],
+                    )
+                ]
+            )
+        )
+        digest = synthetic.tree_digest(self.root)
+
+        result = self._run("lint")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("fit_entrance_mismatch", result.stdout)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
 
 
 if __name__ == "__main__":

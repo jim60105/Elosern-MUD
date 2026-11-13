@@ -8,7 +8,9 @@ exact shoreline. Ford cells never count as water.
 
 The lint reads documents and writes nothing. It never edits a direction, a
 coordinate or an identifier: a finding names the object and leaves the decision
-to the author.
+to the author. A caller that knows the settlement is a village or hamlet passes
+the road contacts of its location cell, and the lint then checks the entrances
+of a one-cell physical footprint against the roads that reach it.
 """
 
 from __future__ import annotations
@@ -102,13 +104,25 @@ def _crosses_water(
     return False
 
 
+def _cells_text(cells: list[Cell]) -> str:
+    """One readable list of the cells in a finding's message."""
+
+    return ", ".join(f"({cell[0]}, {cell[1]})" for cell in cells)
+
+
 def lint_settlement(
     document: Any,
     location_cell: Cell,
     terrain: GridTerrain,
     config: LintConfig = LintConfig(),
+    road_contacts: tuple[Cell, ...] | None = None,
 ) -> tuple[FitFinding, ...]:
-    """Every terrain-fit finding for one settlement map, errors first."""
+    """Every terrain-fit finding for one settlement map, errors first.
+
+    ``road_contacts`` is the road cells that reach the location cell, or
+    ``None`` when the settlement is not a village or hamlet. Only a one-cell
+    physical footprint is checked against them.
+    """
 
     map_id = document.identity
     anchor = document.local_anchor_m
@@ -289,6 +303,58 @@ def lint_settlement(
                         message=(
                             f"{object_id} faces outward {OPPOSITE[gate.return_direction]} "
                             f"but its node {gate.destination_node} lies the other way"
+                        ),
+                    )
+                )
+
+    if (
+        geometry is not None
+        and geometry.single_cell_footprint
+        and road_contacts is not None
+    ):
+        contacts = set(road_contacts)
+        # A one-cell footprint always resolves every gate's approach: the walk
+        # leaves the mask after one step. The filter only keeps a degenerate
+        # geometry with no '#' cell from adding a None to the comparison.
+        approaches = {
+            approach
+            for gate in geometry.gates
+            if (approach := gate_approach_cell(geometry, gate.return_direction))
+            is not None
+        }
+        if not contacts:
+            if len(geometry.gates) > 1:
+                findings.append(
+                    FitFinding(
+                        code="fit_entrance_mismatch",
+                        severity="error",
+                        map_id=map_id,
+                        object_id="gates",
+                        message=(
+                            f"the settlement has {len(geometry.gates)} gates but "
+                            f"no road touches cell {location_cell[0]}, "
+                            f"{location_cell[1]}"
+                        ),
+                    )
+                )
+        else:
+            missing = sorted(contacts - approaches)
+            extra = sorted(approaches - contacts)
+            if missing or extra:
+                parts = []
+                if missing:
+                    parts.append("road cells with no gate " + _cells_text(missing))
+                if extra:
+                    parts.append("gate cells with no road " + _cells_text(extra))
+                findings.append(
+                    FitFinding(
+                        code="fit_entrance_mismatch",
+                        severity="error",
+                        map_id=map_id,
+                        object_id="gates",
+                        message=(
+                            "gate approaches do not match the road contacts: "
+                            + "; ".join(parts)
                         ),
                     )
                 )
