@@ -223,6 +223,50 @@ describe("image selection is client-local and follows the committed subject", ()
     expect(trayItem(replacement).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("keeps the generate drawer open when its selected image vanishes", async () => {
+    const { wrapper } = mountWindow();
+    const doomed = GALLERY_V4_MINE.cards[1];
+    await click(trayItem(doomed.image_id));
+    await click(trayItem("generate"));
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).not.toBeNull();
+    await wrapper.setProps({ model: withCards(GALLERY_V4_MINE, GALLERY_V4_MINE.cards.filter((row) => row.image_id !== doomed.image_id)) });
+    await flushPromises();
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).not.toBeNull();
+  });
+
+  it("closes every editor when the committed subject changes", async () => {
+    const { wrapper } = mountWindow();
+    await click(trayItem("generate"));
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).not.toBeNull();
+    await wrapper.setProps({ model: structuredClone(GALLERY_V4_PARTY) });
+    await flushPromises();
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).toBeNull();
+  });
+
+  it("closes an editor only after its own request commits successfully", async () => {
+    const { wrapper, dispatch } = mountWindow({ model: structuredClone(GALLERY_V4_MONSTER) });
+    await click(footerButton("regenerate"));
+    const drawer = document.querySelector('[data-drawer-key="gallery-generate"]');
+    const submit = [...drawer.querySelectorAll("button")].find((el) => el.textContent.trim() === "開始生成");
+    await click(submit);
+    expect(dispatch).toHaveBeenCalledWith("gallery.generate", expect.objectContaining({ subject_key: GALLERY_V4_MONSTER.selected }));
+    await wrapper.setProps({ result: { requestId: "foreign", outcome: "success", presentationRevision: 2 }, revision: 2 });
+    await flushPromises();
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).not.toBeNull();
+    await wrapper.setProps({ result: { requestId: "request:1", outcome: "success", presentationRevision: 3 }, revision: 3 });
+    await flushPromises();
+    expect(document.querySelector('[data-drawer-key="gallery-generate"]')).toBeNull();
+  });
+
+  it("marks the subject whose selection is in flight busy", async () => {
+    const { dispatch } = mountWindow();
+    const twin = GALLERY_V4_MINE.groups[0].subjects[1].subject_key;
+    const tile = () => document.querySelector(`[data-testid="gallery-subject"][data-subject-key="${twin}"]`);
+    await click(tile());
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.subject.select", { subject_key: twin });
+    expect(tile().getAttribute("aria-busy")).toBe("true");
+  });
+
   it("adopts the first image that appears on an empty page", async () => {
     const { wrapper } = mountWindow({ model: structuredClone(GALLERY_V4_MINE_BLANK) });
     expect(pageSelection()).toBe("empty");

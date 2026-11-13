@@ -100,6 +100,7 @@ let opener = null;
 // on the subject's own image.
 watch([() => props.model?.selected, available], () => {
   closeEditor();
+  rejected.value = false;
   selectedImage.value = initialImage(cards.value, officialEntries.value);
 }, { immediate: true });
 
@@ -133,6 +134,7 @@ watch(() => [props.result, props.revision], () => {
     const name = request.editor;
     const current = request.official ? entryEditor.value : editor.value;
     pending.value = null;
+    if (request.category) pendingCategory.value = null;
     if (name && name === current) closeEditor();
   }
 });
@@ -164,7 +166,7 @@ function closeEditor() {
   rejected.value = false;
   const target = opener;
   void nextTick().then(() => {
-    if (target?.isConnected) target.focus();
+    if (target?.isConnected && target !== document.body) target.focus();
     else rail.value?.focusSelected();
   });
 }
@@ -268,6 +270,7 @@ function selectSubject(key) {
 function selectImage(id) {
   if (id === selectedImage.value) return;
   closeEditor();
+  rejected.value = false;
   selectedImage.value = id;
 }
 
