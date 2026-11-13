@@ -5,6 +5,7 @@ import {
   GALLERY_V4_MINE,
   GALLERY_V4_MINE_BLANK,
   GALLERY_V4_MONSTER,
+  GALLERY_V4_SCENE_PANELS,
   galleryStoryModel,
 } from "../gallery-fixtures-v4.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
@@ -121,6 +122,13 @@ const pendingCard = { model: MINE, pick: card(4) };
 const failedCard = { model: MINE, pick: card(5) };
 // A subject without any image: 生成新圖.
 const noImage = { model: galleryStoryModel(GALLERY_V4_MINE_BLANK), pick: () => ({ type: "empty" }) };
+// A scene's generated image (gallery-landscape-page): the landscape page, the
+// 16:9 art above, the description left and the facts right; 生成圖 with
+// 刪除 · 重新生成.
+const sceneCard = { model: galleryStoryModel(GALLERY_V4_SCENE_PANELS.generated), pick: card(0) };
+// A scene without a generated image: its bundled tile artwork as 官方內建圖,
+// 生成新圖.
+const sceneBundled = { model: galleryStoryModel(GALLERY_V4_SCENE_PANELS.bundled), pick: () => ({ type: "empty" }) };
 
 // 刪除 pressed once: the alert warning, 確認刪除 and 取消 (focused).
 async function armDelete({ canvasElement }) {
@@ -142,6 +150,8 @@ export const Pending = { ...atReference, args: pendingCard };
 export const Failed = { ...atReference, args: failedCard };
 export const Empty = { ...atReference, args: noImage };
 export const ArmedDelete = { ...atReference, args: characterCard, play: armDelete };
+export const Scenes = { ...atReference, args: sceneCard };
+export const SceneBundled = { ...atReference, args: sceneBundled };
 
 export const CharacterCardFullHd = { ...atFullHd, args: characterCard };
 export const DefaultCardFullHd = { ...atFullHd, args: defaultCard };
@@ -151,3 +161,5 @@ export const PendingFullHd = { ...atFullHd, args: pendingCard };
 export const FailedFullHd = { ...atFullHd, args: failedCard };
 export const EmptyFullHd = { ...atFullHd, args: noImage };
 export const ArmedDeleteFullHd = { ...atFullHd, args: characterCard, play: armDelete };
+export const ScenesFullHd = { ...atFullHd, args: sceneCard };
+export const SceneBundledFullHd = { ...atFullHd, args: sceneBundled };

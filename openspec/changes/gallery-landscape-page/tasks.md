@@ -8,7 +8,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 2. Stories
 
-- [ ] 2.1 Add Scenes and SceneBundled stories (reference and full HD) to `stories/Data/GalleryImagePage.stories.js` and `stories/Overlays/GalleryWindow.stories.js` with v4 scene fixtures. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
+- [x] 2.1 Add Scenes and SceneBundled stories (reference and full HD) to `stories/Data/GalleryImagePage.stories.js` and `stories/Overlays/GalleryWindow.stories.js` with v4 scene fixtures. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
 
 ## 3. Gates
 
