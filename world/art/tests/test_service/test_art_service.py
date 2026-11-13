@@ -1,5 +1,6 @@
 """Slice of ``test_service``: ArtServiceTests.
 """
+import io
 from unittest.mock import patch
 import unittest
 from contextlib import contextmanager
@@ -7,6 +8,7 @@ import tempfile
 from pathlib import Path
 from django.db import transaction
 from django.test import override_settings
+from PIL import Image
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
@@ -64,30 +66,39 @@ class ArtServiceTests(EvenniaTestCase):
     def _records(self):
         return {record.db_key: record for record in ArtAssetRecord.objects.all()}
 
-    @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
-    def test_startup_sync_ensures_every_registered_subject_on_a_fresh_db(self):
+    def _scene_job_keys(self, archetype):
+        return sorted(
+            record.db_key
+            for record in ArtAssetRecord.objects.all()
+            if record.db_key.startswith(f"art:scene:{archetype}:gen:")
+        )
+
+    # The startup-sync scenarios below cover the ADDED requirement "Startup
+    # synchronization requests gallery art for every registered scene and
+    # species"; their traceability annotation is added when the change is
+    # archived and the requirement gains its canonical id.
+    def test_startup_sync_requests_one_gallery_card_per_registered_scene(self):
         art_sync_all()
         records = self._records()
         for archetype in SYNTH_ARCHETYPES:
-            self.assertIn(f"art:scene:{archetype}", records)
-            self.assertIn(
-                records[f"art:scene:{archetype}"].db.status,
-                (ArtAssetStatus.MISSING, ArtAssetStatus.PENDING),
-            )
+            with self.subTest(archetype=archetype):
+                # The scene kind is gallery-bearing: no classic subject record
+                # and exactly one gallery request on a fresh database.
+                self.assertNotIn(f"art:scene:{archetype}", records)
+                job_keys = self._scene_job_keys(archetype)
+                self.assertEqual(len(job_keys), 1)
+                self.assertEqual(
+                    records[job_keys[0]].db.status, ArtAssetStatus.PENDING
+                )
         # ``gallery-monster-autogen``: every registered VISUAL species gets a
         # gallery request, never a classic fixed-identity record.
         visual_registry = get_monster_visual_registry()
         for visual_key in visual_registry:
             self.assertNotIn(f"art:portrait:monster:{visual_key}", records)
-        classic = {
-            key: record
-            for key, record in records.items()
-            if not str(record.db.gallery_image_id or "")
-        }
-        self.assertEqual(
-            sorted(classic),
-            sorted(f"art:scene:{archetype}" for archetype in SYNTH_ARCHETYPES),
-        )
+        classic = [
+            key for key, record in records.items() if not str(record.db.gallery_image_id or "")
+        ]
+        self.assertEqual(classic, [])
         monster_jobs = [
             record
             for record in ArtAssetRecord.objects.all()
@@ -96,33 +107,94 @@ class ArtServiceTests(EvenniaTestCase):
         ]
         self.assertEqual(len(monster_jobs), len(visual_registry))
 
-    @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
-    def test_startup_sync_leaves_pending_in_progress_and_done_records_untouched(self):
-        subject = _scene(_SYNTH_SCENE)
-        ensure(subject, "desc")
+    def test_a_carded_scene_requests_nothing(self):
+        subject = scene_subject_for(_SYNTH_SCENE)
+        card = gallery_api.append_card(
+            subject,
+            image_id="dddd0000-0000-4000-8000-000000000001",
+            stored_identity=(
+                f"gallery/scene/{_SYNTH_SCENE}/dddd0000-0000-4000-8000-000000000001.png"
+            ),
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            image_size={"width": 16, "height": 9},
+            source="seed",
+        )
         art_sync_all()
-        # Only classic records remain counted: monster tiers hold gallery jobs
-        # (per-image records that drain away), never fixed-identity records.
-        classic = [
-            key
-            for key, record in self._records().items()
-            if not str(record.db.gallery_image_id or "")
-        ]
-        self.assertEqual(len(classic), len(SYNTH_ARCHETYPES))
+        self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
+        self.assertEqual(gallery_api.cards_for(subject), [card])
 
-    @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
-    def test_startup_sync_consolidates_duplicate_records(self):
-        from world.art.queue import _create_record
+    def test_a_scene_emptied_by_deletion_requests_nothing(self):
+        subject = scene_subject_for(_SYNTH_SCENE)
+        identity = (
+            f"gallery/scene/{_SYNTH_SCENE}/dddd0000-0000-4000-8000-000000000002.png"
+        )
+        with tempfile.TemporaryDirectory() as tempdir:
+            with override_settings(ART_STORE_ROOT=tempdir):
+                target = Path(tempdir) / identity
+                target.parent.mkdir(parents=True)
+                target.write_bytes(b"card")
+                gallery_api.append_card(
+                    subject,
+                    image_id="dddd0000-0000-4000-8000-000000000002",
+                    stored_identity=identity,
+                    prompt=None,
+                    seed=None,
+                    checkpoint=None,
+                    requested_fields=[],
+                    binding=None,
+                    image_size={"width": 16, "height": 9},
+                    source="seed",
+                )
+                gallery_api.remove_card(subject, "dddd0000-0000-4000-8000-000000000002")
+                self.assertEqual(gallery_api.cards_for(subject), [])
+                self.assertIsNotNone(gallery_api.record_for(subject))
+                art_sync_all()
+                ensure_scene_asset(_SYNTH_SCENE)
+        self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), [])
 
-        subject = _scene(_SYNTH_SCENE)
-        first = _create_record(subject)
-        second = _create_record(subject)
-        second.db.status = ArtAssetStatus.DONE
-        second.db.output_identity = f"scene/{_SYNTH_SCENE}.png"
+    def test_a_failed_first_scene_generation_is_retried_at_startup(self):
+        subject = scene_subject_for(_SYNTH_SCENE)
+        gallery_api.record_error(subject, "sd_connection_error")
         art_sync_all()
-        records = ArtAssetRecord.objects.filter(db_key=record_key(subject))
-        self.assertEqual(records.count(), 1)
-        self.assertEqual(records.first().db.status, ArtAssetStatus.DONE)
+        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
+
+    def test_a_pending_scene_job_is_left_untouched(self):
+        ensure_scene_asset(_SYNTH_SCENE)
+        job_keys = self._scene_job_keys(_SYNTH_SCENE)
+        self.assertEqual(len(job_keys), 1)
+        art_sync_all()
+        self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), job_keys)
+        self.assertEqual(
+            self._records()[job_keys[0]].db.status, ArtAssetStatus.PENDING
+        )
+
+    def test_an_operator_scene_image_still_requests_generation(self):
+        from world.art import official
+
+        official.reset_catalog()
+        self.addCleanup(official.reset_catalog)
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir) / "official"
+            folder = root / "scene" / _SYNTH_SCENE
+            folder.mkdir(parents=True)
+            buffer = io.BytesIO()
+            Image.new("RGB", (1536, 864)).save(buffer, format="PNG")
+            (folder / "operator.png").write_bytes(buffer.getvalue())
+            with (
+                override_settings(ART_OFFICIAL_ROOT=str(root)),
+                patch.object(
+                    official,
+                    "_registered_scene_keys",
+                    return_value=frozenset({_SYNTH_SCENE}),
+                ),
+            ):
+                self.assertEqual(official.load_catalog()["images"], 1)
+                art_sync_all()
+        self.assertEqual(len(self._scene_job_keys(_SYNTH_SCENE)), 1)
 
     @covers_requirement("art-asset-lifecycle::startup-recovery-rescans-explicit-unique-portrait-policies")
     @covers_requirement(
@@ -208,13 +280,13 @@ class ArtServiceTests(EvenniaTestCase):
         self.assertTrue(self.player.creation_pending is not None)
 
     @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
-    def test_ensure_scene_asset_creates_or_leaves_a_record_for_a_validated_archetype(self):
+    def test_ensure_scene_asset_requests_one_gallery_card_for_a_validated_archetype(self):
         ensure_scene_asset(_SYNTH_SCENE)
-        self.assertIn(f"art:scene:{_SYNTH_SCENE}", self._records())
+        job_keys = self._scene_job_keys(_SYNTH_SCENE)
+        self.assertEqual(len(job_keys), 1)
         ensure_scene_asset(_SYNTH_SCENE)
-        self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SYNTH_SCENE}").count(), 1
-        )
+        self.assertEqual(self._scene_job_keys(_SYNTH_SCENE), job_keys)
+        self.assertNotIn(f"art:scene:{_SYNTH_SCENE}", self._records())
 
     @covers_requirement("art-asset-lifecycle::successful-room-entry-ensures-the-scene-asset-for-a-validated-archetype")
     def test_ensure_scene_asset_is_a_noop_for_none_or_unresolvable_archetype(self):
@@ -225,7 +297,7 @@ class ArtServiceTests(EvenniaTestCase):
     @covers_requirement("art-asset-lifecycle::queue-failure-never-rolls-back-gameplay")
     def test_scene_asset_failure_is_bounded_and_never_blocks_the_move(self):
         with patch(
-            "world.art.service.queue_ensure",
+            "world.art.service._ensure_scene_gallery_subject",
             side_effect=RuntimeError("art boom"),
         ):
             ensure_scene_asset(_SYNTH_SCENE)

@@ -42,6 +42,7 @@ _BODY_TARGETS = (
     "world.rules.titles.register_title_planner",
     "world.prompts.loader.load_prompt_library",
     "world.art.service.art_sync_all",
+    "world.art.service.migrate_classic_scene_records",
     "world.art.service.prune_gallery_orphans",
     "world.art.gallery_seed.sync_all",
     "world.art.official.load_catalog",
