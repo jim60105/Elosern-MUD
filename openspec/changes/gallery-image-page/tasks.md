@@ -20,5 +20,5 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 4. Gates
 
-- [ ] 4.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-image-page`; both pass.
-- [ ] 4.2 Run `openspec validate gallery-image-page --strict`; it passes.
+- [x] 4.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-image-page`; both pass.
+- [x] 4.2 Run `openspec validate gallery-image-page --strict`; it passes.
