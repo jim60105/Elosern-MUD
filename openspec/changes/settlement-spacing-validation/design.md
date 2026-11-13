@@ -111,7 +111,7 @@ The design states the rule twice: "the next settlement of any kind is at most 75
 
 For each road `(first, second, cells)`:
 
-1. Settlement positions are index 0, the last index, and every index whose cell equals the cell of a place with `kind in SMALL_KINDS`. The two ends always count, because a road ends at the gates of its two settlements.
+1. Settlement positions are index 0, the last index, every index whose cell is the first or last cell of any road of the input, and every index whose cell equals the cell of a place with `kind in SMALL_KINDS`. A road's ends are gate approach cells or village cells, so an end cell of another road marks a settlement this road passes: the reuse factor merges roads, and a trunk can run through the gate approach of a town it does not end at.
 2. Step length is 1 for a cardinal step and `math.sqrt(2)` for a diagonal one.
 3. For each pair of consecutive settlement positions `i < j`, the gap length is the sum of the step lengths from `i` to `j`.
 4. A gap longer than `road_gap_max_km + 1e-9` is `road_gap`, subject `f"{first}--{second}"`, message with the two cells and the length to one decimal.
@@ -213,6 +213,7 @@ Do not add `covers_requirement` to these tests; every requirement here is ADDED.
 
 - `.agents/skills/map-data-authoring/references/locations-and-districts.md`: add a section "Spacing rules for villages and hamlets" with the three rules of D2 and D3, the `spacing_exemption` field of D6 and the command of D7.
 - `.agents/skills/map-data-authoring/references/verification.md`: add the command after the road network lines.
+- `docs/development/map-authoring-documents.md`, the `locations.<id>` field list near line 83: add the optional `spacing_exemption`. `tests.test_map_authoring_contract` reads this document, so task 3.3 runs it.
 
 ## Risks / Trade-offs
 

@@ -36,7 +36,7 @@ The validation SHALL skip every minimum-spacing pair in which a village or hamle
 - **THEN** the hamlet is reported
 
 ### Requirement: Road coverage bounds the gap between consecutive road settlements
-For each checked road, the validation SHALL treat the two road ends and every village or hamlet whose cell is on the road as settlement positions, and SHALL report each pair of consecutive positions whose road length exceeds the configured maximum, counting a diagonal step as the square root of two.
+For each checked road, the validation SHALL treat as settlement positions the road's two ends, every cell on it that is an end of any road, and every village or hamlet cell on it, and SHALL report each pair of consecutive positions whose road length exceeds the configured maximum, counting a diagonal step as the square root of two.
 
 #### Scenario: Gap boundary
 - **WHEN** a straight synthetic road has its ends exactly the maximum apart, and a second road is one cell longer
@@ -44,6 +44,10 @@ For each checked road, the validation SHALL treat the two road ends and every vi
 
 #### Scenario: A hamlet on the road splits a gap
 - **WHEN** a hamlet's cell is a cell of the longer road such that both parts are within the maximum
+- **THEN** the road is not reported
+
+#### Scenario: A settlement the road passes counts
+- **WHEN** the longer road passes through a cell that is the end of another road, such that both parts are within the maximum
 - **THEN** the road is not reported
 
 #### Scenario: Off-road places do not count

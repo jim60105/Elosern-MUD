@@ -17,7 +17,7 @@ Do not add `covers_requirement` in any task here (design D9).
 
 - [ ] 3.1 Add `build_input` and `main` per design D7, with the scenario of "The spacing command reports by exit status and writes nothing". Verify: `uv run --locked python -m unittest tests.test_settlement_spacing` passes, and `uv run --locked python -m tools.settlement_spacing` prints `spacing: 0 problems` and exits 0 on the shipped data.
 - [ ] 3.2 Add the workflow step and the contract test of design D8. Verify: `uv run --locked python -m unittest tests.test_quality_gate_contract` passes.
-- [ ] 3.3 Apply the documentation edits of design D10. Verify: the command line in `verification.md` runs as written and exits 0.
+- [ ] 3.3 Apply the three documentation edits of design D10. Verify: the command line in `verification.md` runs as written and exits 0, and `uv run --locked python -m unittest tests.test_map_authoring_contract` passes.
 
 ## 4. Gates
 
