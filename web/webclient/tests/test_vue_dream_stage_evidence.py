@@ -267,9 +267,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # dream-wish-change-report: the three requirements below are ADDED by the
-    # change's delta spec, so their IDs exist only once archive syncs it; the
-    # covers_requirement annotations are applied at archive.
+    @covers_requirement(
+        "webclient-dream-stage::the-keepsake-card-reports-what-the-last-exchange-changed"
+    )
     def test_keepsake_card_reports_last_exchange_changes(self):
         _assert_cases_pass(
             "dream keepsake change line",
@@ -286,6 +286,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::the-whole-wish-view-marks-changes-and-names-removed-items"
+    )
     def test_whole_wish_marks_changes_and_names_removed_items(self):
         _assert_cases_pass(
             "dream whole-wish change marks",
@@ -297,6 +300,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "webclient-dream-stage::requirement-rows-are-editable-when-finalized"
+    )
     def test_requirement_rows_are_editable_when_finalized(self):
         _assert_cases_pass(
             "dream editable requirement rows",
