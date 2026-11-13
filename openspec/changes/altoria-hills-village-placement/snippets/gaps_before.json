@@ -1,0 +1,19 @@
+[
+  {"road": "capital_altoria -- city_confluence", "from": [861, 1039], "to": [607, 807], "km": 351.9},
+  {"road": "capital_altoria -- city_east_river", "from": [861, 1039], "to": [1052, 1073], "km": 205.1},
+  {"road": "capital_altoria -- town_ruins_gate", "from": [861, 1045], "to": [507, 1135], "km": 391.3},
+  {"road": "capital_altoria -- town_vineyard", "from": [863, 1044], "to": [995, 1160], "km": 180.0},
+  {"road": "city_border_bridge -- town_ruins_gate", "from": [819, 1362], "to": [997, 1160], "km": 277.1},
+  {"road": "city_border_bridge -- town_ruins_gate", "from": [995, 1160], "to": [863, 1044], "km": 180.0},
+  {"road": "city_border_bridge -- town_ruins_gate", "from": [861, 1045], "to": [507, 1135], "km": 391.3},
+  {"road": "city_border_bridge -- town_vineyard", "from": [819, 1362], "to": [997, 1160], "km": 277.1},
+  {"road": "city_confluence -- city_salt_ferry", "from": [607, 807], "to": [405, 501], "km": 399.3},
+  {"road": "city_confluence -- town_honey_vale", "from": [607, 807], "to": [1040, 697], "km": 485.5},
+  {"road": "city_east_river -- town_scarp", "from": [1053, 1072], "to": [1162, 943], "km": 174.1},
+  {"road": "city_greyrock -- port_west_ore", "from": [332, 1000], "to": [204, 699], "km": 368.9},
+  {"road": "city_greyrock -- port_westwind", "from": [329, 1000], "to": [132, 1008], "km": 206.9},
+  {"road": "city_greyrock -- town_ruins_gate", "from": [332, 1000], "to": [505, 1136], "km": 233.5},
+  {"road": "port_hills_mouth -- port_westwind", "from": [155, 839], "to": [132, 1008], "km": 178.5},
+  {"road": "town_east_ferry -- town_vineyard", "from": [1147, 1359], "to": [997, 1160], "km": 261.7},
+  {"road": "town_ruins_gate -- town_west_ferry", "from": [505, 1136], "to": [448, 1342], "km": 229.6}
+]

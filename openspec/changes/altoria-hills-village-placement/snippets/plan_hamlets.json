@@ -1,0 +1,458 @@
+[
+  {
+    "id": "hamlet_stone_post",
+    "kind": "hamlet",
+    "cell": [
+      663,
+      788
+    ],
+    "display_name_zh": "石鋪",
+    "description": "Stone staging post on the road from the confluence to the honey vale.",
+    "geographic_constraint": "Staging post on the confluence-honey vale road",
+    "population": 180
+  },
+  {
+    "id": "hamlet_brick_kiln",
+    "kind": "hamlet",
+    "cell": [
+      712,
+      741
+    ],
+    "display_name_zh": "磚窯",
+    "description": "Brick kiln hamlet on the road east of the confluence.",
+    "geographic_constraint": "Clay pit and kiln beside the road east of the confluence",
+    "population": 210
+  },
+  {
+    "id": "hamlet_copper_ore",
+    "kind": "hamlet",
+    "cell": [
+      346,
+      932
+    ],
+    "display_name_zh": "銅礦",
+    "description": "Copper-mining hamlet in the ore hills above the western port road.",
+    "geographic_constraint": "Copper seam in the ore hills above the western port road",
+    "population": 260
+  },
+  {
+    "id": "hamlet_stone_well",
+    "kind": "hamlet",
+    "cell": [
+      813,
+      988
+    ],
+    "display_name_zh": "石井",
+    "description": "Wellside hamlet on the road between the capital and the confluence.",
+    "geographic_constraint": "Stone well on the capital-confluence road",
+    "population": 140
+  },
+  {
+    "id": "hamlet_pine_hollow",
+    "kind": "hamlet",
+    "cell": [
+      770,
+      714
+    ],
+    "display_name_zh": "松坳",
+    "description": "Pine hollow hamlet on the road from the confluence to the honey vale.",
+    "geographic_constraint": "Pine hollow on the road from the confluence to the honey vale",
+    "population": 120
+  },
+  {
+    "id": "hamlet_hemp_slope",
+    "kind": "hamlet",
+    "cell": [
+      763,
+      938
+    ],
+    "display_name_zh": "麻坡",
+    "description": "Hemp-growing hamlet on the slope above the capital river road.",
+    "geographic_constraint": "Hemp slope above the capital-confluence road",
+    "population": 160
+  },
+  {
+    "id": "hamlet_maple_slope",
+    "kind": "hamlet",
+    "cell": [
+      839,
+      714
+    ],
+    "display_name_zh": "楓坡",
+    "description": "Maple slope hamlet on the road to the honey vale.",
+    "geographic_constraint": "Maple slope on the honey vale road",
+    "population": 110
+  },
+  {
+    "id": "hamlet_deer_slope",
+    "kind": "hamlet",
+    "cell": [
+      1101,
+      1313
+    ],
+    "display_name_zh": "鹿坡",
+    "description": "Deer-hunting hamlet on the hill road below the eastern border crossing.",
+    "geographic_constraint": "Deer slope on the road between the eastern crossing and the vineyard town",
+    "population": 90
+  },
+  {
+    "id": "hamlet_lime_kiln",
+    "kind": "hamlet",
+    "cell": [
+      374,
+      1040
+    ],
+    "display_name_zh": "灰窯",
+    "description": "Lime kiln hamlet on the road from the ore city to the ruins gate.",
+    "geographic_constraint": "Limestone kiln beside the ore city-ruins gate road",
+    "population": 230
+  },
+  {
+    "id": "hamlet_stone_palisade",
+    "kind": "hamlet",
+    "cell": [
+      487,
+      1186
+    ],
+    "display_name_zh": "石寨",
+    "description": "Palisaded farmstead on the long road between the ruins gate and the western crossing.",
+    "geographic_constraint": "Stone palisade on the ruins gate-western crossing road",
+    "population": 130
+  },
+  {
+    "id": "hamlet_tea_slope",
+    "kind": "hamlet",
+    "cell": [
+      311,
+      825
+    ],
+    "display_name_zh": "茶坡",
+    "description": "Tea slope hamlet above the ore road in the western hills.",
+    "geographic_constraint": "Tea slope above the ore road in the western hills",
+    "population": 150
+  },
+  {
+    "id": "hamlet_stone_farm",
+    "kind": "hamlet",
+    "cell": [
+      713,
+      890
+    ],
+    "display_name_zh": "石莊",
+    "description": "Stone farmstead on the road between the capital and the confluence.",
+    "geographic_constraint": "Stone farmstead on the capital-confluence road",
+    "population": 170
+  },
+  {
+    "id": "hamlet_hemp_hollow",
+    "kind": "hamlet",
+    "cell": [
+      906,
+      709
+    ],
+    "display_name_zh": "麻坳",
+    "description": "Hemp hollow hamlet on the road to the honey vale.",
+    "geographic_constraint": "Hemp hollow on the honey vale road",
+    "population": 120
+  },
+  {
+    "id": "hamlet_lime_slope",
+    "kind": "hamlet",
+    "cell": [
+      260,
+      1000
+    ],
+    "display_name_zh": "灰坡",
+    "description": "Lime-burning hamlet on the upland road between the ore city and the western shore.",
+    "geographic_constraint": "Lime slope on the upland road to the western shore",
+    "population": 190
+  },
+  {
+    "id": "hamlet_willow_pond",
+    "kind": "hamlet",
+    "cell": [
+      929,
+      1039
+    ],
+    "display_name_zh": "柳塘",
+    "description": "Willow pond hamlet on the road east of the capital.",
+    "geographic_constraint": "Willow pond beside the capital-east river road",
+    "population": 140
+  },
+  {
+    "id": "hamlet_deer_ridge",
+    "kind": "hamlet",
+    "cell": [
+      1057,
+      1266
+    ],
+    "display_name_zh": "鹿嶺",
+    "description": "Deer ridge hamlet on the road between the eastern crossing and the vineyard town.",
+    "geographic_constraint": "Deer ridge on the eastern crossing-vineyard road",
+    "population": 100
+  },
+  {
+    "id": "hamlet_sea_plain",
+    "kind": "hamlet",
+    "cell": [
+      155,
+      899
+    ],
+    "display_name_zh": "海埔",
+    "description": "Salt-rimed plain hamlet on the coast road between the hills river mouth and the western fishing town.",
+    "geographic_constraint": "Coastal plain on the road between the hills river mouth and the western shore",
+    "population": 110
+  },
+  {
+    "id": "hamlet_charcoal_slope",
+    "kind": "hamlet",
+    "cell": [
+      416,
+      1079
+    ],
+    "display_name_zh": "炭坡",
+    "description": "Charcoal slope hamlet on the road between the ore city and the ruins gate.",
+    "geographic_constraint": "Charcoal slope on the ore city-ruins gate road",
+    "population": 200
+  },
+  {
+    "id": "hamlet_ridge_foot",
+    "kind": "hamlet",
+    "cell": [
+      1084,
+      1027
+    ],
+    "display_name_zh": "嶺腳",
+    "description": "Hamlet at the foot of the ridge on the hill road from the east river city.",
+    "geographic_constraint": "Foot of the ridge on the hill road below the scarp",
+    "population": 160
+  },
+  {
+    "id": "hamlet_stone_hollow",
+    "kind": "hamlet",
+    "cell": [
+      478,
+      1240
+    ],
+    "display_name_zh": "石坳",
+    "description": "Stone hollow hamlet on the long road between the ruins gate and the western crossing.",
+    "geographic_constraint": "Stone hollow on the ruins gate-western crossing road",
+    "population": 90
+  },
+  {
+    "id": "hamlet_cypress_slope",
+    "kind": "hamlet",
+    "cell": [
+      271,
+      785
+    ],
+    "display_name_zh": "柏坡",
+    "description": "Cypress slope hamlet on the ore road above the western port.",
+    "geographic_constraint": "Cypress slope above the western ore road",
+    "population": 130
+  },
+  {
+    "id": "hamlet_wheat_post",
+    "kind": "hamlet",
+    "cell": [
+      663,
+      840
+    ],
+    "display_name_zh": "麥鋪",
+    "description": "Wheat staging post on the road from the confluence to the capital.",
+    "geographic_constraint": "Staging post on the confluence-capital road",
+    "population": 180
+  },
+  {
+    "id": "hamlet_honey_pond",
+    "kind": "hamlet",
+    "cell": [
+      975,
+      709
+    ],
+    "display_name_zh": "蜜塘",
+    "description": "Beekeeping hamlet at a pond below the honey vale.",
+    "geographic_constraint": "Pond below the honey vale ford",
+    "population": 80
+  },
+  {
+    "id": "hamlet_sand_plain",
+    "kind": "hamlet",
+    "cell": [
+      191,
+      1000
+    ],
+    "display_name_zh": "沙埔",
+    "description": "Sandy plain hamlet on the road between the ore city and the western shore.",
+    "geographic_constraint": "Sandy plain on the road to the western shore",
+    "population": 70
+  },
+  {
+    "id": "hamlet_well_slope",
+    "kind": "hamlet",
+    "cell": [
+      993,
+      1050
+    ],
+    "display_name_zh": "井坡",
+    "description": "Well slope hamlet on the road east of the capital.",
+    "geographic_constraint": "Well slope on the capital-east river road",
+    "population": 150
+  },
+  {
+    "id": "hamlet_brick_slope",
+    "kind": "hamlet",
+    "cell": [
+      1034,
+      1210
+    ],
+    "display_name_zh": "磚坡",
+    "description": "Brick clay slope hamlet on the road between the eastern crossing and the vineyard town.",
+    "geographic_constraint": "Brick clay slope on the eastern crossing-vineyard road",
+    "population": 90
+  },
+  {
+    "id": "hamlet_charcoal_hollow",
+    "kind": "hamlet",
+    "cell": [
+      496,
+      588
+    ],
+    "display_name_zh": "炭坳",
+    "description": "Charcoal hollow hamlet on the salt ferry road above the capital river.",
+    "geographic_constraint": "Charcoal hollow on the salt ferry road above the capital river",
+    "population": 170
+  },
+  {
+    "id": "hamlet_sea_end",
+    "kind": "hamlet",
+    "cell": [
+      149,
+      956
+    ],
+    "display_name_zh": "海尾",
+    "description": "Hamlet on the flats at the western end of the coast road, below the fishing town.",
+    "geographic_constraint": "Flats at the western end of the coast road below the western fishing town",
+    "population": 60
+  },
+  {
+    "id": "hamlet_stone_gate",
+    "kind": "hamlet",
+    "cell": [
+      458,
+      1118
+    ],
+    "display_name_zh": "石門",
+    "description": "Stone gate hamlet on the road east of the ruins gate.",
+    "geographic_constraint": "Stone outcrop on the ruins gate road",
+    "population": 120
+  },
+  {
+    "id": "hamlet_lime_post",
+    "kind": "hamlet",
+    "cell": [
+      1124,
+      985
+    ],
+    "display_name_zh": "灰鋪",
+    "description": "Lime staging post on the hill road below the scarp.",
+    "geographic_constraint": "Lime staging post on the hill road below the scarp",
+    "population": 210
+  },
+  {
+    "id": "hamlet_cypress_hollow",
+    "kind": "hamlet",
+    "cell": [
+      463,
+      1291
+    ],
+    "display_name_zh": "柏坳",
+    "description": "Cypress hollow hamlet on the road between the western crossing and the ruins gate.",
+    "geographic_constraint": "Cypress hollow near the western border crossing",
+    "population": 100
+  },
+  {
+    "id": "hamlet_ore_post",
+    "kind": "hamlet",
+    "cell": [
+      231,
+      745
+    ],
+    "display_name_zh": "礦鋪",
+    "description": "Ore staging post on the road down from the western ore port.",
+    "geographic_constraint": "Ore staging post on the road from the western ore port",
+    "population": 240
+  },
+  {
+    "id": "hamlet_wheat_ridge",
+    "kind": "hamlet",
+    "cell": [
+      569,
+      1128
+    ],
+    "display_name_zh": "麥嶺",
+    "description": "Wheat ridge hamlet on the ruins road east of the capital.",
+    "geographic_constraint": "Wheat ridge on the ruins road east of the capital city",
+    "population": 190
+  },
+  {
+    "id": "hamlet_stone_ridge",
+    "kind": "hamlet",
+    "cell": [
+      953,
+      1209
+    ],
+    "display_name_zh": "石嶺",
+    "description": "Stone ridge hamlet on the road between the eastern crossing and the vineyard town.",
+    "geographic_constraint": "Stone ridge on the eastern crossing-vineyard road",
+    "population": 110
+  },
+  {
+    "id": "hamlet_willow_shallows",
+    "kind": "hamlet",
+    "cell": [
+      627,
+      791
+    ],
+    "display_name_zh": "柳灘",
+    "description": "Willow shallows hamlet on the hills river below the confluence.",
+    "geographic_constraint": "Willow shallows on the hills river below the confluence",
+    "population": 130
+  },
+  {
+    "id": "hamlet_water_pond",
+    "kind": "hamlet",
+    "cell": [
+      837,
+      1036
+    ],
+    "display_name_zh": "水塘",
+    "description": "Riverside farmstead at an irrigation pond below the capital city.",
+    "geographic_constraint": "Irrigation pond on the capital river below the capital city",
+    "population": 90
+  },
+  {
+    "id": "hamlet_creek_mouth",
+    "kind": "hamlet",
+    "cell": [
+      177,
+      846
+    ],
+    "display_name_zh": "溪口",
+    "description": "Hamlet at the mouth of the hills river, below the hill port.",
+    "geographic_constraint": "Mouth of the hills river below the hill port",
+    "population": 160
+  },
+  {
+    "id": "hamlet_ridge_end",
+    "kind": "hamlet",
+    "cell": [
+      1115,
+      1331
+    ],
+    "display_name_zh": "嶺尾",
+    "description": "Hamlet at the end of the ridge road above the border valley.",
+    "geographic_constraint": "End of the ridge road on the spur below the eastern crossing",
+    "population": 90
+  }
+]

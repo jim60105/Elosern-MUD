@@ -1,0 +1,206 @@
+[
+  {
+    "id": "village_stone_slope",
+    "kind": "village",
+    "cell": [
+      600,
+      747
+    ],
+    "display_name_zh": "石坡村",
+    "description": "Village on a stone terrace above the capital river bend, on the road south from the confluence.",
+    "geographic_constraint": "Stone terrace above the capital river bend, on the road from the confluence to the salt ferry",
+    "population": 780
+  },
+  {
+    "id": "village_pine_vale",
+    "kind": "village",
+    "cell": [
+      798,
+      1051
+    ],
+    "display_name_zh": "松谷村",
+    "description": "Village in a pine-lined vale north of the capital, on the road to the ruins gate.",
+    "geographic_constraint": "Pine vale on the ruins road north of the capital city",
+    "population": 640
+  },
+  {
+    "id": "village_tea_ridge",
+    "kind": "village",
+    "cell": [
+      567,
+      688
+    ],
+    "display_name_zh": "茶嶺村",
+    "description": "Tea-growing village on the ridge of the hill road between the confluence and the salt ferry.",
+    "geographic_constraint": "Tea ridge on the hill road above the capital river south of the confluence",
+    "population": 720
+  },
+  {
+    "id": "village_wheat_hollow",
+    "kind": "village",
+    "cell": [
+      734,
+      1054
+    ],
+    "display_name_zh": "麥坳村",
+    "description": "Wheat-growing village in a broad hollow of the ruins road, halfway to the ruins gate.",
+    "geographic_constraint": "Wheat hollow on the trunk road between the capital and the ruins gate",
+    "population": 950
+  },
+  {
+    "id": "village_willow_creek",
+    "kind": "village",
+    "cell": [
+      350,
+      865
+    ],
+    "display_name_zh": "柳溪村",
+    "description": "Willow-lined village on the north bank of the hills river, where the ore road runs down to the western port.",
+    "geographic_constraint": "North bank terrace of the hills river on the ore road west of the ore hills",
+    "population": 1140
+  },
+  {
+    "id": "village_stone_enclosure",
+    "kind": "village",
+    "cell": [
+      855,
+      1307
+    ],
+    "display_name_zh": "石圍村",
+    "description": "Walled farmstead village where the two roads from the border bridge divide.",
+    "geographic_constraint": "Dry upland where the roads from the border bridge divide",
+    "population": 460
+  },
+  {
+    "id": "village_stone_pit",
+    "kind": "village",
+    "cell": [
+      683,
+      1088
+    ],
+    "display_name_zh": "石坑村",
+    "description": "Quarry village in the dry northern hills, on the road up to the ruins gate.",
+    "geographic_constraint": "Quarry hollow on the ruins road in the dry northern hills",
+    "population": 520
+  },
+  {
+    "id": "village_maple_hollow",
+    "kind": "village",
+    "cell": [
+      532,
+      638
+    ],
+    "display_name_zh": "楓坳村",
+    "description": "Village in a maple hollow on the upland stretch of the salt ferry road.",
+    "geographic_constraint": "Maple hollow on the upland salt ferry road above the capital river",
+    "population": 600
+  },
+  {
+    "id": "village_horse_ridge",
+    "kind": "village",
+    "cell": [
+      904,
+      1258
+    ],
+    "display_name_zh": "馬嶺村",
+    "description": "Horse-breeding village on the high ridge between the border bridge roads.",
+    "geographic_constraint": "High ridge pasture between the roads from the border bridge",
+    "population": 410
+  },
+  {
+    "id": "village_sheep_fold",
+    "kind": "village",
+    "cell": [
+      628,
+      1112
+    ],
+    "display_name_zh": "羊寨村",
+    "description": "Stockaded sheep-farming village on the high ground of the ruins road.",
+    "geographic_constraint": "High pasture of the ruins road, west of the dry northern hills",
+    "population": 380
+  },
+  {
+    "id": "village_cattle_ridge",
+    "kind": "village",
+    "cell": [
+      953,
+      1118
+    ],
+    "display_name_zh": "牛嶺村",
+    "description": "Cattle-raising village on the ridge east of the capital, on the vineyard road.",
+    "geographic_constraint": "Ridge pasture on the vineyard road east of the capital city",
+    "population": 560
+  },
+  {
+    "id": "village_charcoal_ridge",
+    "kind": "village",
+    "cell": [
+      455,
+      540
+    ],
+    "display_name_zh": "炭嶺村",
+    "description": "Charcoal-burning village at the southern end of the salt ferry road, above the capital river.",
+    "geographic_constraint": "Charcoal upland at the southern end of the salt ferry road above the capital river",
+    "population": 340
+  },
+  {
+    "id": "village_well_hollow",
+    "kind": "village",
+    "cell": [
+      910,
+      1075
+    ],
+    "display_name_zh": "井坳村",
+    "description": "Village around a deep well east of the capital, on the vineyard road.",
+    "geographic_constraint": "Well hollow on the vineyard road east of the capital city",
+    "population": 690
+  },
+  {
+    "id": "village_river_islet",
+    "kind": "village",
+    "cell": [
+      627,
+      851
+    ],
+    "display_name_zh": "河洲村",
+    "description": "Village on a gravel islet reach of the capital river, below the confluence.",
+    "geographic_constraint": "Gravel bar in the capital river below the confluence, off the trunk road",
+    "population": 660
+  },
+  {
+    "id": "village_sand_islet",
+    "kind": "village",
+    "cell": [
+      392,
+      1336
+    ],
+    "display_name_zh": "沙洲村",
+    "description": "Village on a sand bar of the border river, downstream of the western crossing.",
+    "geographic_constraint": "Sand bar on the south bank of the border river downstream of the western crossing",
+    "population": 520
+  },
+  {
+    "id": "village_maple_bank",
+    "kind": "village",
+    "cell": [
+      1102,
+      1071
+    ],
+    "display_name_zh": "楓岸村",
+    "description": "Maple-banked village on the upper capital river, upstream of the east river city.",
+    "geographic_constraint": "Maple bank of the upper capital river upstream of the east river city",
+    "population": 540
+  },
+  {
+    "id": "village_sand_bank",
+    "kind": "village",
+    "cell": [
+      1082,
+      1356
+    ],
+    "display_name_zh": "沙岸村",
+    "description": "Village on the sandy south bank of the border river, downstream of the eastern crossing.",
+    "geographic_constraint": "Sandy south bank of the border river downstream of the eastern crossing",
+    "population": 480
+  }
+]
