@@ -147,8 +147,10 @@ class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZR
 
         if isinstance(obj, PlayerCharacter):
             from world.art.service import ensure_scene_asset
+            from world.rules.scene_visits import record_scene_entry
 
             ensure_scene_asset(self.scene_archetype)
+            record_scene_entry(obj, self.scene_archetype)
 
 
 class AnchorRoom(GridRoom):
@@ -210,8 +212,10 @@ class InstanceRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, 
         if isinstance(obj, PlayerCharacter):
             self.db.interacted = True
             from world.art.service import ensure_scene_asset
+            from world.rules.scene_visits import record_scene_entry
 
             ensure_scene_asset(self.scene_archetype)
+            record_scene_entry(obj, self.scene_archetype)
 
     def at_object_delete(self):
         if not super().at_object_delete():

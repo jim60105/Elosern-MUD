@@ -325,7 +325,8 @@
         "world.rules.tests.test_lore_species_research",
         "world.rules.tests.test_map_district_lighting",
         "world.rules.tests.test_map_knowledge",
-        "world.rules.tests.test_met_people"
+        "world.rules.tests.test_met_people",
+        "world.rules.tests.test_scene_visits"
       ]
     },
     {
