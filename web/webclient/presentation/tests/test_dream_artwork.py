@@ -323,6 +323,9 @@ class DreamArtworkWireTest(EvenniaTest):
                 factual_summary=f"{index:02d}：" + "線" * 157,
             )
 
+    @covers_requirement(
+        "webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork"
+    )
     def test_the_largest_legal_wish_fits_the_envelope(self):
         # The aggregate proposal and report budgets are only useful if the
         # largest panel they admit still travels: one byte more in either
