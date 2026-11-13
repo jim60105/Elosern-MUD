@@ -8,16 +8,27 @@ from pathlib import Path
 from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
 
 
+#: The deterministic image id of the seeded ``done`` scene card. The
+#: image-load-failure journey routes this card's exact media path, so the
+#: identity must stay stable across runs.
+ART_SCENE_IMAGE_ID = "10000000-0000-4000-8000-0000000ed176"
+
+#: The decoded size of the fixture PNG the seeded scene card stores.
+SCENE_CARD_SIZE = {"width": 4, "height": 4}
+
+
 def _art_fixture(character, room) -> None:
     """Deterministically prepare art records for browser acceptance.
 
     Opted-in with ``ELOSERN_BROWSER_ART=<mode>``. Each mode places the
     character in a room that carries the validated ``scene_archetype`` seam and
-    settles art records (done/pending/failed) whose output files are written
-    under the runtime art store, so browser journeys can assert the real scene
-    renderer and portrait catalog without any image service. ``missing`` leaves
-    records untouched (missing placeholders). No remote, LLM, or image service
-    is involved.
+    writes the scene's real gallery state (a card for ``done``, one in-flight
+    gallery job for ``pending``, and that job settled failed for ``failed``)
+    through the production writers, plus the named portrait records the art
+    panel admits. Every stored file is written under the runtime art store, so
+    browser journeys can assert the real scene renderer and portrait catalog
+    without any image service. ``missing`` leaves records untouched (missing
+    placeholders). No remote, LLM, or image service is involved.
     """
     import os
 
@@ -114,13 +125,30 @@ def _art_fixture(character, room) -> None:
     if not art_root:
         return
     root = Path(art_root)
-    (root / "scene").mkdir(parents=True, exist_ok=True)
 
     scene = ArtSubject(ArtSubjectKind.SCENE, archetype)
-    ensure(scene, "desc")
     if mode == "done":
-        identity = f"scene/{archetype}.png"
-        (root / identity).write_bytes(FIXTURE_VALID_PNG)
+        from world.art import gallery as gallery_api
+
+        # The scene chain reads the scene gallery's default card and nothing
+        # else (``scene-classic-fallback-removal``), so the fixture appends a
+        # real card through the sole writer instead of a classic record.
+        identity = f"gallery/scene/{archetype}/{ART_SCENE_IMAGE_ID}.png"
+        path = root.joinpath(*identity.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(FIXTURE_VALID_PNG)
+        gallery_api.append_card(
+            scene,
+            image_id=ART_SCENE_IMAGE_ID,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+            image_size=dict(SCENE_CARD_SIZE),
+        )
         from world.art.queue import claim, record_key
         from world.art.store import ArtAssetRecord
 
@@ -136,13 +164,6 @@ def _art_fixture(character, room) -> None:
                 ensure(subject, "desc")
         claimed = claim(50)
         tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        settle(
-            scene,
-            generation_token=tokens[record_key(scene)],
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
         (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
         for subject, stable_key in (
             (actor_subject, f"browser-{character.pk}"),
@@ -170,35 +191,28 @@ def _art_fixture(character, room) -> None:
                 output_identity=portrait_identity,
                 error=None,
             )
-    elif mode in ("failed", "pending"):
-        # A regeneration of the SAME scene: the first output is published and
-        # then requeued, so the record keeps its prior valid output (and the
-        # descriptor therefore authorizes that still-applicable image) while
-        # the regeneration is pending or has failed. A pending/failed record
-        # with no preserved output would authorize nothing, which is exactly
-        # the case the descriptor states by omitting the source.
-        from world.art.queue import claim, record_key, requeue
+    elif mode in ("pending", "failed"):
+        # One real scene gallery request: the pending journey needs an
+        # in-flight job with NO card (so the chain presents the required
+        # bundled illustration), and the failed mode settles that same job
+        # terminal so the recorded error is a reached fact.
+        from world.art.queue import claim, gallery_record_key, settle_gallery_failed
+        from world.art.service import request_gallery_image
+        from world.art.store import ArtAssetRecord
 
-        identity = f"scene/{archetype}.png"
-        (root / identity).write_bytes(FIXTURE_VALID_PNG)
-        claimed = claim(50)
-        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-        settle(
-            scene,
-            generation_token=tokens[record_key(scene)],
-            status=ArtAssetStatus.DONE,
-            output_identity=identity,
-            error=None,
-        )
-        requeue(scene)
+        image_id = request_gallery_image(scene)
         if mode == "failed":
-            claimed = claim(50)
-            tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
-            settle(
-                scene,
-                generation_token=tokens[record_key(scene)],
-                status=ArtAssetStatus.FAILED,
-                output_identity=None,
+            claim(50)
+            job_key = gallery_record_key(scene, image_id)
+            record = ArtAssetRecord.objects.filter(db_key=job_key).first()
+            if record is None or record.db.status != ArtAssetStatus.IN_PROGRESS:
+                raise RuntimeError(
+                    f"art fixture: scene gallery job {image_id} not claimed "
+                    f"(status={None if record is None else record.db.status})"
+                )
+            settle_gallery_failed(
+                job_key,
+                generation_token=str(record.db.generation_token),
                 error="fixture",
             )
     print(f"seeded art fixture: {mode}")

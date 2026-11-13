@@ -380,10 +380,10 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         generated_url = self._wait_source(page, GENERATED_SOURCE)
         self.assertNotEqual(generated_url, room_url)
 
-        # (4) A same-scene regeneration retains the good generated image: the
-        # descriptor commits with no generated candidate (pending) while the
-        # browser keeps the pixels it is authorized to hold, with the factual
-        # progress notice and no error.
+        # (4) A same-scene regeneration retains the good generated card: the
+        # descriptor commits the archetype's card with a pending generation
+        # state, so the browser keeps the pixels it is authorized to hold, with
+        # the factual progress notice and no error.
         self._transition(page, "pending_scene")
         wait_for_store_state(
             page,
@@ -435,7 +435,11 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertTrue(page.locator(FAILURE).inner_text().strip())
 
         # (6) A move to a different logical place discards the previous place's
-        # pixels at the commit and shows only the new place's own background.
+        # pixels at the commit: whatever stays on screen must be a resource the
+        # NEW place's own descriptor names. The scene gallery card belongs to
+        # the archetype, so a destination carrying the same archetype
+        # legitimately names the same card; retention from the old place is
+        # never what keeps it there.
         self._transition(page, "move_scene")
         wait_for_store_state(
             page,
@@ -449,17 +453,11 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         self.assertNotEqual(moved["subject_id"], artwork["subject_id"])
         displayed = self._displayed(page)
         if displayed is not None:
-            admitted = {
-                entry["resource"]["url"]
-                for entry in moved["attempts"]
-                if entry["type"] == "image"
-            }
             self.assertIn(
                 displayed,
-                admitted,
-                "the previous place's image survived the move",
+                self._admitted_urls(page),
+                "the moved place presented a resource its own descriptor does not name",
             )
-            self.assertNotEqual(displayed, generated_url)
 
         # (7) Re-entering the place the character left commits that EXISTING
         # logical identity again: whatever is on screen belongs to its own
@@ -548,7 +546,7 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             lambda route: route.fulfill(status=404, content_type="text/plain", body=b"missing"),
         )
         page.route(
-            "**/art/scene/**",
+            "**/art/gallery/scene/**",
             lambda route: route.fulfill(status=404, content_type="text/plain", body=b"missing"),
         )
         page.route(
@@ -684,7 +682,11 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         fresh = self.new_page()
         fresh_requests: list[str] = []
         fresh.on("request", lambda request: fresh_requests.append(request.url))
-        for pattern in ("**/art/scene/**", "**/art/official/**/scene/**", "**/art/bundled-scene/**"):
+        for pattern in (
+            "**/art/gallery/scene/**",
+            "**/art/official/**/scene/**",
+            "**/art/bundled-scene/**",
+        ):
             fresh.route(
                 pattern,
                 lambda route: route.fulfill(

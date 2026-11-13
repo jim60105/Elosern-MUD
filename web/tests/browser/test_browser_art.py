@@ -3,8 +3,8 @@
 Drives the real Evennia server's art panel through the Vue SPA scene
 renderer and contextual portrait overlay. The seed fixture (``ELOSERN_BROWSER_ART``)
 places the character in a validated scene room carrying authored scene metadata
-with a generated record (done / a pending regeneration with its prior output
-preserved / a failed regeneration) and a named-policy NPC plus a living monster.
+with a real scene gallery state (a done card / one in-flight gallery job / that
+job settled failed) and a named-policy NPC plus a living monster.
 Journeys assert the canonical descriptor's own facts, same-origin URL rendering,
 the required bundled fallback for an ungenerated scene, the reached failure of a
 failed regeneration, keyboard-only full view, portrait overlay with name/role
@@ -33,7 +33,7 @@ from .browser_helpers import (
     wait_for_store_state,
 )
 from .harness import ManagedServerTearDownMixin
-from .seed import FIXTURE_VALID_PNG
+from .seed import ART_SCENE_IMAGE_ID, FIXTURE_VALID_PNG
 
 # The art fixture's archetype/display pair for the CURRENT boot mode (kit row
 # under the synthetic install, shipped row otherwise). Resolved lazily from the
@@ -319,7 +319,10 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         generated = _scene_candidate(store_state(page), "scene.generated:")
         self.assertIsNotNone(generated, "the done scene carries no generated candidate")
         resource = generated["resource"]
-        self.assertTrue(resource["url"].startswith(f"/art/scene/{_scene_archetype_key()}.png"))
+        # The generated source is the scene gallery's committed card; its
+        # stored identity is the only resource the descriptor may name.
+        self.assertTrue(resource["resource_id"].startswith("gallery/scene/"))
+        self.assertEqual(resource["url"], f"/art/{resource['resource_id']}")
         self.assertEqual(resource["origin"], "runtime")
         # The image element is present with a same-origin src: the element the
         # shared driver issued, presenting the descriptor's own resource.
@@ -767,12 +770,14 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
     def _generated_path(self) -> str:
-        """The generated scene output's stable path for the current boot mode.
+        """The seeded scene card's stable media path for the current boot mode.
 
-        Its bounded cache version is part of the URL, so the route matches the
-        path and counts every request the browser makes for it.
+        The card identity is deterministic, so the route matches the path and
+        counts every request the browser makes for it.
         """
-        return f"/art/scene/{_scene_archetype_key()}.png"
+        return (
+            f"/art/gallery/scene/{_scene_archetype_key()}/{ART_SCENE_IMAGE_ID}.png"
+        )
 
     def _abort_art_media(self, page) -> None:
         """Abort the generated scene media and count its requests."""
@@ -787,7 +792,7 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
 
         # Abort the generated output's own path, before the shared local-only
         # guard is consulted.
-        page.route("**/art/scene/**", _handler)
+        page.route("**/art/gallery/scene/**", _handler)
 
     @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
     def test_image_load_failure_shows_fallback_without_refetch(self):
