@@ -167,10 +167,12 @@ def _pair_rule(
         code, minimum = "village_spacing", config.village_min_km
     if first.kind == second.kind:
         return code, min(first.location_id, second.location_id), minimum
-    # One small kind against a larger one, or a village against a hamlet: the
-    # small kind is the subject, and a village-hamlet pair is governed by the
-    # hamlet rule only.
-    subject = first if first.kind in SMALL_KINDS else second
+    # A village-hamlet pair is governed by the hamlet rule only, so the hamlet
+    # is always the subject; otherwise the small kind is.
+    if "hamlet" in kinds:
+        subject = first if first.kind == "hamlet" else second
+    else:
+        subject = first if first.kind == "village" else second
     return code, subject.location_id, minimum
 
 

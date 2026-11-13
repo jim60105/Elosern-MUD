@@ -120,11 +120,17 @@ class MinimumSpacingTests(unittest.TestCase):
 
         problems = check_spacing(_input([town, at_limit, too_close]), TIGHT)
 
-        self.assertEqual({problem.subject for problem in problems}, {"hamlet_alpha"})
-        self.assertTrue(all(problem.code == "hamlet_spacing" for problem in problems))
+        # Two pairs are too close and both name the hamlet that stands closer
+        # than the minimum to the town: the pair with the town and the pair with
+        # the hamlet that sits exactly at the minimum.
+        self.assertEqual(
+            _pairs(problems),
+            [("hamlet_spacing", "hamlet_alpha"), ("hamlet_spacing", "hamlet_alpha")],
+        )
         messages = [problem.message for problem in problems]
         self.assertTrue(any("town_gate" in message for message in messages))
         self.assertTrue(any("9.0 km" in message for message in messages))
+        self.assertTrue(any("hamlet_edge" in message for message in messages))
 
     def test_a_village_below_the_minimum_is_reported_and_a_hamlet_pair_is_not(self):
         city = _place("city_big", "city", (0, 0))
@@ -142,6 +148,31 @@ class MinimumSpacingTests(unittest.TestCase):
 
         self.assertEqual(_pairs(problems), [("village_spacing", "village_fair")])
         self.assertIn("city_big", problems[0].message)
+
+    def test_a_hamlet_below_a_village_minimum_is_reported_under_the_hamlet(self):
+        # The village comes first in the input, so a subject chosen by "the
+        # small kind" rather than by "the hamlet" would report the village.
+        village = _place("village_first", "village", (0, 0))
+        hamlet = _place("hamlet_later", "hamlet", (0, 5))
+        roads = [("node_village_a", "node_village_b", ((0, 0), (1, 0)))]
+
+        problems = check_spacing(_input([village, hamlet], roads=roads), TIGHT)
+
+        self.assertEqual(_pairs(problems), [("hamlet_spacing", "hamlet_later")])
+        self.assertIn("village_first", problems[0].message)
+
+    def test_two_villages_too_close_are_reported_once(self):
+        alpha = _place("village_alpha", "village", (0, 0))
+        beta = _place("village_beta", "village", (0, 10))
+        roads = [
+            ("node_alpha_a", "node_alpha_b", ((0, 0), (1, 0))),
+            ("node_beta_a", "node_beta_b", ((0, 10), (1, 10))),
+        ]
+
+        problems = check_spacing(_input([beta, alpha], roads=roads), TIGHT)
+
+        self.assertEqual(_pairs(problems), [("village_spacing", "village_alpha")])
+        self.assertIn("village_beta", problems[0].message)
 
     def test_kinds_that_take_no_part_are_never_reported(self):
         places = [
@@ -189,6 +220,24 @@ class ExemptionTests(unittest.TestCase):
         problems = check_spacing(_input([town, hamlet]), TIGHT)
 
         self.assertEqual(_pairs(problems), [("hamlet_spacing", "hamlet_plain")])
+
+    def test_a_marked_village_is_skipped_by_both_pairs(self):
+        city = _place("city_anchor", "city", (0, 0))
+        marked = _place(
+            "village_marked",
+            "village",
+            (0, 19),
+            exemption="Design exception; the shrine village belongs to the city.",
+        )
+        unmarked = _place("village_plain", "village", (0, 30))
+        roads = [
+            ("node_marked_a", "node_marked_b", ((0, 19), (1, 19))),
+            ("node_plain_a", "node_plain_b", ((0, 30), (1, 30))),
+        ]
+
+        self.assertEqual(
+            check_spacing(_input([city, marked, unmarked], roads=roads), TIGHT), ()
+        )
 
 
 class RoadCoverageTests(unittest.TestCase):
