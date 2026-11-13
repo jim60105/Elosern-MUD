@@ -38,13 +38,19 @@ const tagFields = [
   { key: "emphasis", label: "想多描寫的部分" },
   { key: "exclusions", label: "不想出現的內容", exclude: true },
 ];
-// The experience requirements are server-authored rows: the panel shows their
-// readable meaning and sends exactly the rows it shows.
-const REQUIREMENT_LABELS = {
-  place: "指定的地點",
-  new_character: "需要的新角色",
-  private_commission: "私人委託",
-};
+// The short field names of the change line on the keepsake card.
+const SHORT_LABELS = { themes: "主題", atmosphere: "氛圍", participants: "人物", emphasis: "描寫", exclusions: "避開" };
+// The experience requirements: the closed set of kinds, each with its readable
+// meaning. Once finalized the player edits the rows; the form sends exactly
+// the rows it shows.
+const REQUIREMENT_KINDS = [
+  { key: "place", label: "指定的地點" },
+  { key: "new_character", label: "需要的新角色" },
+  { key: "private_commission", label: "私人委託" },
+];
+const REQUIREMENT_LABELS = Object.fromEntries(REQUIREMENT_KINDS.map(({ key, label }) => [key, label]));
+const MAX_REQUIREMENTS = 8;
+const REQUIREMENT_REFUSAL = "有一筆需求還沒有內容。填上內容，或把那一筆移除。";
 const emptyProposal = () => ({ summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] });
 
 const stage = ref(null);
@@ -82,7 +88,25 @@ const arrival = ref(false);
 // The authoritative summary, thread and list snapshot most recently copied
 // into the local form. A local edit that differs from it is the player's own
 // and is never overwritten by a later publication.
-const synced = reactive({ direction: "", thread: "", tags: JSON.stringify(tagFields.map(() => [])) });
+const synced = reactive({ direction: "", thread: "", tags: JSON.stringify(tagFields.map(() => [])), reqs: "[]" });
+// The player's own requirement rows once finalized. Each carries a local id so
+// a removal never hands one row's input to another; the id is never sent.
+const reqs = ref([]);
+const reqList = ref(null);
+// Indexes of the rows a draft or confirm refused for a blank text.
+const reqErrors = ref([]);
+let reqSerial = 0;
+const reqRow = (kind, text) => ({ id: ++reqSerial, kind, text });
+const clone = (value) => JSON.parse(JSON.stringify(value));
+// What the card and the whole-wish view show of her writing. It follows the
+// server proposal, but a live exchange holds it back until her words have been
+// read out, so the change line never competes with the text being revealed.
+const shown = reactive({
+  proposal: clone(props.state.proposal || emptyProposal()),
+  changes: props.state.changes ? clone(props.state.changes) : null,
+});
+// The keepsake card's one-shot sweep when a new change line settles.
+const inked = ref(false);
 
 let rootTrap = null;
 let layerTrap = null;
@@ -102,8 +126,9 @@ const summary = computed(() => direction.value.trim());
 const summaryLength = computed(() => Array.from(direction.value.trim()).length);
 const summaryTooLong = computed(() => summaryLength.value > MAX_SUMMARY);
 const tagsSnapshot = () => JSON.stringify(tagFields.map(({ key }) => tags[key]));
+const reqsSnapshot = () => JSON.stringify(reqs.value.map((row) => [row.kind, row.text.trim()]));
 const directionDirty = computed(() => direction.value.trim() !== synced.direction.trim() || thread.value !== synced.thread
-  || tagsSnapshot() !== synced.tags);
+  || tagsSnapshot() !== synced.tags || reqsSnapshot() !== synced.reqs);
 // While conversing the form cannot be edited, so only unsent words can be
 // lost; once finalized, the player's own unsaved rewrite can be too.
 const dirty = computed(() => !!message.value.trim() || (finalized.value && directionDirty.value));
@@ -113,8 +138,35 @@ const knownThread = computed(() => props.state.thread_choices.find((choice) => c
 const threadLabel = computed(() => !thread.value ? "一段新的故事"
   : knownThread.value ? "延續：" + knownThread.value.label : "先前選定的故事線");
 const provenance = computed(() => (finalized.value && directionDirty.value ? "已修改・尚未收好" : ""));
-// The card: her wording while conversing, the player's own form once finalized.
-const cardSummary = computed(() => (finalized.value ? summary.value : proposal.value.summary.trim()));
+// The card: her wording (as last settled) while conversing, the player's own
+// form once finalized.
+const cardSummary = computed(() => (finalized.value ? summary.value : shown.proposal.summary.trim()));
+// Her changes in the settled report: null before any exchange, [] when the
+// last exchange changed nothing.
+const strokes = computed(() => {
+  const changes = shown.changes;
+  if (!changes) return null;
+  const out = [];
+  if (changes.summary) out.push({ key: "summary", label: "願望", rewritten: changes.summary === "formed" ? "成形" : "更動" });
+  for (const { key } of tagFields) {
+    const list = changes.lists?.[key];
+    if (list && (list.added.length || list.removed.length)) out.push({ key, label: SHORT_LABELS[key], added: list.added.length, removed: list.removed.length });
+  }
+  const rows = changes.requirements;
+  if (rows && (rows.added.length || rows.removed.length)) out.push({ key: "requirements", label: "需求", added: rows.added.length, removed: rows.removed.length });
+  return out;
+});
+const strokeText = computed(() => {
+  if (!strokes.value) return "";
+  if (!strokes.value.length) return "女神這次沒有更動願望。";
+  return "女神為你改了：" + strokes.value.map((item) => (item.rewritten ? `${item.label}${item.rewritten}`
+    : `${item.label}${item.added ? `新添 ${item.added}` : ""}${item.removed ? `劃去 ${item.removed}` : ""}`)).join("、") + "。";
+});
+const touched = (key) => !!strokes.value?.some((item) => item.key === key);
+const addedIn = (key) => (key === "requirements" ? shown.changes?.requirements?.added : shown.changes?.lists?.[key]?.added) || [];
+const removedIn = (key) => (key === "requirements" ? shown.changes?.requirements?.removed : shown.changes?.lists?.[key]?.removed) || [];
+const isAdded = (key, value) => addedIn(key).some((item) => (key === "requirements"
+  ? item.kind === value.kind && item.text === value.text : item === value));
 const lockedThreadGone = computed(() => !!thread.value && !knownThread.value);
 // ---- the stage's picture: the shared scene render/load path ----
 // The dream stage's artwork is the SAME canonical scene descriptor and the
@@ -261,6 +313,35 @@ const shownText = computed(() => beatUnits.value.slice(0, typewriter.typed.value
 const moreToRead = computed(() => typewriter.typing.value || beatIndex.value < beats.value.length - 1);
 const speaking = computed(() => beat.value.kind === "line" || props.state.pending);
 
+// ---- the settled wish: what the card and the whole-wish view show ----
+// A publication whose exchange count is above the count already settled is a
+// reveal about to play: it settles once the last beat has been read in full.
+// Every other publication (a republish, a draft, a reconnect, a new session)
+// settles at once. The announcement key carries the count, so a republish of
+// the same report never re-announces while a new exchange always does.
+let shownCompleted = props.state.completed;
+let settledKey = JSON.stringify([props.state.session_id, props.state.completed, props.state.changes || null]);
+function settleShown({ append = false } = {}) {
+  shownCompleted = props.state.completed;
+  const key = JSON.stringify([props.state.session_id, props.state.completed, props.state.changes || null]);
+  const fresh = key !== settledKey;
+  settledKey = key;
+  shown.proposal = clone(proposal.value);
+  shown.changes = props.state.changes ? clone(props.state.changes) : null;
+  if (!fresh || !shown.changes || finalized.value) return;
+  inked.value = false;
+  nextTick(() => { inked.value = true; });
+  announcement.value = append && announcement.value ? `${announcement.value}\n${strokeText.value}` : strokeText.value;
+}
+watch(() => JSON.stringify([props.state.proposal, props.state.changes]), () => {
+  if (props.state.completed > shownCompleted) return;
+  settleShown();
+});
+watch(moreToRead, (more) => { if (!more && props.state.completed > shownCompleted) settleShown(); });
+function onKeepsakeAnimationEnd(event) {
+  if (event.animationName?.includes("dream-ink-sweep")) inked.value = false;
+}
+
 // Every change of the presented beat either types (a live reveal or the
 // next beat) or shows in full (echo, notice, reconnect, re-read).
 let typeNext = false;
@@ -336,6 +417,9 @@ watch(() => props.state.completed, (completed) => {
   const plate = `女神的興奮：${props.state.track.level}。`;
   announcement.value = [props.state.scene, props.state.dialogue && `王座上的女神說：${props.state.dialogue}`, plate,
     completed >= EXCHANGES ? "六次訴說已盡，接下來由你親自修改。" : `尚可訴說 ${EXCHANGES - completed} 次。`].filter(Boolean).join("\n");
+  // Nothing left to read (instant text, or no beat at all): the wish settles
+  // now, and its change line joins this exchange's announcement.
+  if (!moreToRead.value) settleShown({ append: true });
   if (completed >= EXCHANGES) {
     bloom.value = true;
     nextTick(() => rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']")?.focus());
@@ -367,6 +451,12 @@ watch(() => JSON.stringify([props.state.session_id, props.state.proposal, props.
   const serverTags = tagFields.map(({ key }) => [...(proposal.value[key] || [])]);
   if (unedited) tagFields.forEach(({ key }, index) => { tags[key] = serverTags[index]; });
   synced.tags = JSON.stringify(serverTags);
+  const serverReqs = (proposal.value.requirements || []).map((row) => [row.kind, row.text.trim()]);
+  if (reqsSnapshot() === synced.reqs) {
+    reqs.value = serverReqs.map(([kind, text]) => reqRow(kind, text));
+    reqErrors.value = [];
+  }
+  synced.reqs = JSON.stringify(serverReqs);
 }, { immediate: true });
 
 // ---- actions ----
@@ -377,9 +467,50 @@ function directionPayload() {
     kind: thread.value ? "thread_direction" : "new_story",
     thread_id: thread.value || null,
     summary: summary.value,
-    // Requirement rows are shown read-only: the form sends exactly those rows.
-    requirements: proposal.value.requirements.map((row) => ({ kind: row.kind, text: row.text })),
+    // Exactly the rows the form shows, in display order: a blank row is
+    // refused before dispatch, never silently dropped.
+    requirements: reqs.value.map((row) => ({ kind: row.kind, text: row.text.trim() })),
   };
+}
+// A row whose text is blank blocks draft and confirm: it is marked at the row,
+// the sheet opens on it and every other local value stays as it is.
+// Synchronous, so a valid form dispatches in the same task as the activation.
+function refuseBlankRows() {
+  const blank = reqs.value.flatMap((row, index) => (row.text.trim() ? [] : [index]));
+  if (!blank.length) return false;
+  reqErrors.value = blank;
+  refusal.value = REQUIREMENT_REFUSAL;
+  void (async () => {
+    if (!sheetOpen.value) await openSheet();
+    await nextTick();
+    reqList.value?.querySelectorAll("[data-req-text]")[blank[0]]?.focus();
+  })();
+  return true;
+}
+function addReq() {
+  if (reqs.value.length >= MAX_REQUIREMENTS) return;
+  reqs.value = [...reqs.value, reqRow("place", "")];
+  clearReqErrors();
+  nextTick(() => Array.from(reqList.value?.querySelectorAll("[data-req-text]") || []).at(-1)?.focus());
+}
+function removeReq(index) {
+  reqs.value = reqs.value.filter((_, at) => at !== index);
+  clearReqErrors();
+  // Focus stays in the section: on the row that took this one's place, or on
+  // the add control when the last row went.
+  nextTick(() => {
+    const texts = reqList.value?.querySelectorAll("[data-req-text]") || [];
+    (texts[Math.min(index, texts.length - 1)] || sheetEl.value?.querySelector("[data-testid='dream-requirement-add']"))?.focus();
+  });
+}
+function editReq(index) {
+  if (!reqErrors.value.includes(index)) return;
+  reqErrors.value = reqErrors.value.filter((at) => at !== index);
+  if (!reqErrors.value.length && refusal.value === REQUIREMENT_REFUSAL) refusal.value = "";
+}
+function clearReqErrors() {
+  reqErrors.value = [];
+  if (refusal.value === REQUIREMENT_REFUSAL) refusal.value = "";
 }
 function dispatch(action, extra = {}) {
   return props.store.dispatchAction("dream." + action,
@@ -400,6 +531,7 @@ async function confirm() {
     summaryInput.value?.focus();
     return;
   }
+  if (refuseBlankRows()) return;
   dispatch("confirm", { direction: directionPayload() });
 }
 function draft() {
@@ -410,6 +542,7 @@ function draft() {
     if (!sheetOpen.value) openSheet();
     return;
   }
+  if (finalized.value && refuseBlankRows()) return;
   // While conversing there is nothing of the player's to send: the server
   // keeps the wish as she worded it.
   const request = dispatch("draft", finalized.value ? { direction: directionPayload() } : {});
@@ -507,7 +640,7 @@ function closeLayer(open) {
   nextTick(() => trap?.restore());
 }
 function openSheet() { return openLayer(sheetOpen, sheetEl, () => summaryInput.value); }
-function closeSheet() { refusal.value = ""; closeLayer(sheetOpen); }
+function closeSheet() { refusal.value = ""; reqErrors.value = []; closeLayer(sheetOpen); }
 function openConfirm() { return openLayer(confirmOpen, confirmEl, () => confirmStay.value); }
 function openView() { return openLayer(viewOpen, viewEl, () => viewClose.value); }
 function closeView() { closeLayer(viewOpen); }
@@ -617,7 +750,8 @@ function onKeydown(event) {
         <p>夢中無晝夜</p>
       </header>
 
-      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized }" aria-labelledby="dream-keepsake-title">
+      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized, 'dream-keepsake--inked': inked }"
+        aria-labelledby="dream-keepsake-title" @animationend="onKeepsakeAnimationEnd">
         <span class="dream-corners" aria-hidden="true"></span>
         <div class="dream-keepsake__head">
           <h3 id="dream-keepsake-title">此刻的願望</h3>
@@ -629,7 +763,17 @@ function onKeydown(event) {
         </div>
         <blockquote v-if="cardSummary" class="dream-keepsake__preview" :title="cardSummary">{{ cardSummary }}</blockquote>
         <p v-else class="dream-keepsake__empty">願望尚未成形。向女神說說看，她會替你把願望理清。</p>
-        <p v-if="provenance" class="dream-ink"><span class="dream-ink__lead" aria-hidden="true">✎</span><span class="dream-ink__label">{{ provenance }}</span></p>
+        <!-- What she changed in the last settled exchange: fields in words,
+             counts as text with a glyph, never colour alone. -->
+        <p v-if="!finalized && strokes" class="dream-ink" :class="{ 'dream-ink--quiet': !strokes.length }" data-testid="dream-ink">
+          <span class="dream-ink__lead" aria-hidden="true">✎</span>
+          <template v-if="strokes.length">
+            <span class="dream-ink__label">女神為你改了</span>
+            <span v-for="item in strokes" :key="item.key" class="dream-ink__stroke" :data-stroke="item.key">{{ item.label }}<i v-if="item.rewritten" class="dream-ink__rewritten">{{ item.rewritten }}</i><template v-else><i v-if="item.added" class="dream-ink__plus">＋{{ item.added }}</i><i v-if="item.removed" class="dream-ink__minus">−{{ item.removed }}</i></template></span>
+          </template>
+          <span v-else class="dream-ink__label dream-ink__label--quiet">女神這次沒有更動願望</span>
+        </p>
+        <p v-else-if="provenance" class="dream-ink"><span class="dream-ink__lead" aria-hidden="true">✎</span><span class="dream-ink__label">{{ provenance }}</span></p>
         <p class="dream-keepsake__target" data-testid="dream-thread-line"><span v-if="!state.can_choose_thread" class="dream-keepsake__lock" data-testid="dream-thread-lock" aria-hidden="true">◆</span>歸屬：{{ threadLabel }}</p>
         <div ref="rows" class="dream-choice" role="group" aria-label="願望與醒來" @keydown="onRowsKeydown">
           <button class="ui-btn dream-choice__row" type="button" data-row="main" :disabled="transportLocked" @click="openMain">
@@ -726,27 +870,33 @@ function onKeydown(event) {
           <button ref="viewClose" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="closeView">返回</button>
         </header>
         <div class="dream-sheet__body dream-scroll">
-          <section class="dream-scroll__wish">
-            <h4>願望</h4>
-            <p v-if="proposal.summary" class="dream-scroll__text">{{ proposal.summary }}</p>
+          <!-- The same settled wish and report the card shows: changed fields
+               carry ✎, added items 新添, and removed items are named under
+               their field. -->
+          <section class="dream-scroll__wish" :class="{ 'dream-scroll--touched': touched('summary') }" data-field="summary">
+            <h4>願望<em v-if="touched('summary')" class="dream-scroll__mark" :data-mark="shown.changes.summary">✎ {{ shown.changes.summary === "formed" ? "這次成形" : "這次更動" }}</em></h4>
+            <p v-if="shown.proposal.summary" class="dream-scroll__text">{{ shown.proposal.summary }}</p>
             <p v-else class="dream-scroll__none">尚未成形</p>
           </section>
-          <section class="dream-scroll__row">
-            <h4>這個願望需要</h4>
+          <section class="dream-scroll__row" :class="{ 'dream-scroll--touched': touched('requirements') }" data-field="requirements">
+            <h4>這個願望需要<em v-if="touched('requirements')" class="dream-scroll__mark">✎ 這次更動</em></h4>
             <div>
-              <ul v-if="proposal.requirements.length" class="dream-scroll__requirements" data-testid="dream-view-requirements">
-                <li v-for="(row, index) in proposal.requirements" :key="index"><span>{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}</li>
+              <ul v-if="shown.proposal.requirements.length" class="dream-scroll__requirements" data-testid="dream-view-requirements">
+                <li v-for="(row, index) in shown.proposal.requirements" :key="index" :class="{ 'dream-scroll__new': isAdded('requirements', row) }"><span>{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}<b v-if="isAdded('requirements', row)">新添</b></li>
               </ul>
               <p v-else class="dream-scroll__none">—</p>
+              <p v-if="removedIn('requirements').length" class="dream-scroll__gone" data-testid="dream-view-removed"><span>劃去</span><s v-for="(row, index) in removedIn('requirements')" :key="index">{{ row.text }}</s></p>
             </div>
           </section>
-          <section v-for="field in tagFields" :key="field.key" class="dream-scroll__row" :class="{ 'dream-scroll__row--exclude': field.exclude }">
-            <h4>{{ field.label }}</h4>
+          <section v-for="field in tagFields" :key="field.key" class="dream-scroll__row" :data-field="field.key"
+            :class="{ 'dream-scroll--touched': touched(field.key), 'dream-scroll__row--exclude': field.exclude }">
+            <h4>{{ field.label }}<em v-if="touched(field.key)" class="dream-scroll__mark">✎ 這次更動</em></h4>
             <div>
-              <p v-if="proposal[field.key].length" class="dream-scroll__tags">
-                <span v-for="value in proposal[field.key]" :key="value">{{ value }}</span>
+              <p v-if="shown.proposal[field.key].length" class="dream-scroll__tags">
+                <span v-for="value in shown.proposal[field.key]" :key="value" :class="{ 'dream-scroll__new': isAdded(field.key, value) }">{{ value }}<b v-if="isAdded(field.key, value)">新添</b></span>
               </p>
               <p v-else class="dream-scroll__none">—</p>
+              <p v-if="removedIn(field.key).length" class="dream-scroll__gone" data-testid="dream-view-removed"><span>劃去</span><s v-for="value in removedIn(field.key)" :key="value">{{ value }}</s></p>
             </div>
           </section>
           <section class="dream-scroll__row">
@@ -805,14 +955,28 @@ function onKeydown(event) {
           </div>
           <p v-if="refusal" class="dream-field__error" role="alert">{{ refusal }}</p>
 
-          <!-- The rows are shown as she worded them and sent back unchanged. -->
-          <section v-if="proposal.requirements.length" class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
-            <h4 id="dream-requirements-title">這個願望需要</h4>
-            <ul class="dream-requirements__list">
-              <li v-for="(row, index) in proposal.requirements" :key="index">
-                <span class="dream-requirements__kind">{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}
+          <!-- The rows are the player's now: a kind from the closed set and a
+               bounded text each, at most eight. -->
+          <section class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
+            <h4 id="dream-requirements-title">這個願望需要
+              <span class="dream-requirements__count" data-testid="dream-requirement-count">{{ reqs.length }} / {{ MAX_REQUIREMENTS }}</span></h4>
+            <ul v-if="reqs.length" ref="reqList" class="dream-requirements__list">
+              <li v-for="(row, index) in reqs" :key="row.id" class="dream-requirements__row" :class="{ 'dream-requirements__row--invalid': reqErrors.includes(index) }">
+                <select v-model="row.kind" class="dream-requirements__kind" :aria-label="`第 ${index + 1} 筆需求的種類`" :disabled="transportLocked" @change="editReq(index)">
+                  <option v-for="kind in REQUIREMENT_KINDS" :key="kind.key" :value="kind.key">{{ kind.label }}</option>
+                </select>
+                <input v-model="row.text" data-req-text type="text" maxlength="200" :aria-label="`第 ${index + 1} 筆需求的內容`"
+                  :aria-invalid="reqErrors.includes(index) || undefined" :aria-describedby="reqErrors.includes(index) ? `dream-req-error-${row.id}` : undefined"
+                  :disabled="transportLocked" placeholder="例如：南門" @input="editReq(index)" />
+                <button type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-requirements__remove" :aria-label="`移除第 ${index + 1} 筆需求`"
+                  :disabled="transportLocked" @click="removeReq(index)">×</button>
+                <small v-if="reqErrors.includes(index)" :id="`dream-req-error-${row.id}`" class="dream-requirements__error" role="alert">請填上內容</small>
               </li>
             </ul>
+            <p v-else class="dream-requirements__empty">還沒有需求。願望不需要時，可以留空。</p>
+            <button v-if="reqs.length < MAX_REQUIREMENTS" class="ui-btn ui-btn--ghost ui-btn--sm dream-requirements__add" type="button"
+              data-testid="dream-requirement-add" :disabled="transportLocked" @click="addReq">＋ 添一筆需求</button>
+            <small class="dream-requirements__note">地點、新角色與私人委託會原樣交給醒來後的故事。改了願望，記得一併核對。</small>
           </section>
 
           <section class="dream-tags" aria-labelledby="dream-tags-title">
@@ -1076,10 +1240,34 @@ function onKeydown(event) {
 .dream-tags__chip button { padding: 0 var(--sp-1); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .dream-requirements { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
 .dream-requirements__list { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-size: var(--text-sm); }
-.dream-requirements__list li { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr; align-items: baseline; gap: var(--sp-3); }
-/* The kind labels share the chip rows' label column, so the read-only rows
-   line up with the editable fields below them. */
-.dream-requirements__kind { color: var(--paper-400); font-size: var(--text-xs); }
+/* Each row: the kind in the chip rows' label column, the text beside it, the
+   remove control last; an invalid row's message sits under its text. */
+.dream-requirements__row { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr auto; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.dream-requirements__row select, .dream-requirements__row input { box-sizing: border-box; width: 100%; min-height: calc(40px * var(--ui-scale));
+  padding: var(--sp-1) var(--sp-3); border: 1px solid var(--ink-600); border-radius: var(--radius-sm); background-color: var(--ink-900);
+  color: var(--paper-50); font: inherit; font-size: var(--text-sm); transition: border-color var(--motion-fast) var(--ease-standard); }
+.dream-requirements__row input { font-family: var(--f-serif); }
+.dream-requirements__row input::placeholder { color: var(--paper-500); }
+/* The kind reads as a label with a gold caret, not a system dropdown. */
+.dream-requirements__row select { appearance: none; padding-right: calc(28px * var(--ui-scale)); color: var(--gold-300); cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--gold-400) 50%), linear-gradient(-45deg, transparent 50%, var(--gold-400) 50%);
+  background-position: right calc(14px * var(--ui-scale)) center, right calc(9px * var(--ui-scale)) center;
+  background-size: calc(5px * var(--ui-scale)) calc(5px * var(--ui-scale)); background-repeat: no-repeat; }
+.dream-requirements__row select option { background: var(--ink-900); color: var(--paper-50); }
+.dream-requirements__row select:hover:enabled, .dream-requirements__row input:hover:enabled { border-color: var(--gold-600); }
+.dream-requirements__row select:focus-visible, .dream-requirements__row input:focus-visible { outline: none; border-color: var(--gold-500); box-shadow: var(--focus); }
+.dream-requirements__row--invalid input { border-color: var(--seal-500); background-color: rgba(124, 32, 38, 0.18); }
+.dream-requirements__error { grid-column: 2 / -1; color: var(--seal-400); font-size: var(--text-xs); }
+.dream-requirements__error::before { content: "◇ "; }
+.dream-requirements .dream-requirements__remove { width: calc(36px * var(--ui-scale)); min-width: 0; height: calc(36px * var(--ui-scale)); padding: 0;
+  border-color: transparent; border-radius: 50%; color: var(--paper-400); font-size: var(--text-md); }
+.dream-requirements .dream-requirements__remove:hover:enabled, .dream-requirements .dream-requirements__remove:focus-visible { border-color: var(--seal-600); color: var(--seal-400); }
+.dream-requirements__count { margin-left: var(--sp-2); padding: 0 var(--sp-2); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill);
+  color: var(--paper-300); font-size: var(--text-xs); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.dream-requirements .dream-requirements__add { justify-self: start; border-style: dashed; border-color: var(--gold-600); color: var(--gold-300); }
+.dream-requirements .dream-requirements__add:hover:enabled { border-style: solid; }
+.dream-requirements__empty { color: var(--paper-500); font-size: var(--text-sm); }
+.dream-requirements__note { color: var(--paper-500); font-size: var(--text-xs); line-height: 1.5; }
 .dream-sheet__foot { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-6) var(--sp-5); border-top: 1px solid var(--band-edge-dim); }
 .dream-sheet__foot p { color: var(--paper-500); font-size: var(--text-xs); }
 .dream-sheet__foot div { display: flex; justify-content: flex-end; gap: var(--sp-2); }
@@ -1105,6 +1293,24 @@ function onKeydown(event) {
   box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-200); font-size: var(--text-xs); line-height: 1.5; }
 .dream-ink__lead { color: var(--gold-400); }
 .dream-ink__label { color: var(--gold-300); letter-spacing: 0.08em; }
+/* An exchange that changed nothing reads quieter than one that did. */
+.dream-scene .dream-ink--quiet { background: linear-gradient(90deg, rgba(185, 154, 96, 0.08), transparent 70%); box-shadow: inset 2px 0 var(--paper-700); }
+.dream-ink--quiet .dream-ink__lead { color: var(--paper-500); }
+.dream-ink__label--quiet { color: var(--paper-300); letter-spacing: 0.04em; }
+/* One pill per changed field: its name, then the counts as signed numbers. */
+.dream-ink__stroke { display: inline-flex; align-items: baseline; gap: calc(4px * var(--ui-scale)); padding: 0 var(--sp-2);
+  border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill); background: rgba(11, 13, 16, 0.35); color: var(--paper-100); white-space: nowrap; }
+.dream-ink__stroke i { font-style: normal; font-variant-numeric: tabular-nums; }
+.dream-ink__stroke .dream-ink__rewritten, .dream-ink__stroke .dream-ink__plus { color: var(--gold-300); }
+.dream-ink__stroke .dream-ink__minus { color: var(--seal-400); }
+/* A newly settled line: a light sweep across the ribbon while the wish above
+   warms to gold and settles back to paper. Decoration only. */
+.dream-keepsake--inked .dream-ink::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 244, 214, 0.45) 50%, transparent 70%); transform: translateX(-100%);
+  animation: dream-ink-sweep calc(var(--motion-scene) + var(--motion-slow)) var(--ease-standard) 1 forwards; }
+.dream-keepsake--inked .dream-keepsake__preview { animation: dream-ink-settle calc(var(--motion-scene) + var(--motion-slow)) var(--ease-standard) 1; }
+@keyframes dream-ink-sweep { to { transform: translateX(100%); } }
+@keyframes dream-ink-settle { 0% { color: var(--gold-300); border-left-color: var(--gold-300); } 100% { color: var(--paper-50); } }
 .dream-keepsake__lock { margin-right: calc(6px * var(--ui-scale)); color: var(--gold-500); font-size: 0.7em; vertical-align: 0.15em; }
 
 /* The story this wish belongs to, chosen above the reply bar. */
@@ -1141,6 +1347,17 @@ function onKeydown(event) {
 .dream-scroll__row--exclude .dream-scroll__tags { color: var(--seal-400); }
 .dream-scroll__requirements { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-family: var(--f-serif); font-size: var(--text-md); }
 .dream-scroll__requirements span { display: inline-block; min-width: calc(112px * var(--ui-scale)); margin-right: var(--sp-2); color: var(--paper-400); font-family: var(--f-sans); font-size: var(--text-xs); }
+/* The last exchange's marks: a gold rail on a changed field, a 新添 tag on an
+   added item, and the struck-out names of what she removed. */
+.dream-scroll h4 .dream-scroll__mark { margin-left: var(--sp-2); color: var(--gold-300); font-style: normal; letter-spacing: 0.04em; }
+.dream-scroll--touched { margin-inline: calc(-1 * var(--sp-6)); padding-inline: var(--sp-6);
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.13), transparent 85%); box-shadow: inset 2px 0 var(--gold-400); }
+.dream-scroll .dream-scroll__new { color: var(--gold-300); }
+.dream-scroll__new b { margin-left: var(--sp-1); padding: 0 var(--sp-2); border: 1px solid var(--gold-600); border-radius: var(--radius-pill);
+  color: var(--gold-400); font-family: var(--f-sans); font-size: var(--text-xs); font-weight: 400; letter-spacing: 0.04em; vertical-align: 0.1em; }
+.dream-scroll__gone { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-1); color: var(--paper-500); font-size: var(--text-xs); }
+.dream-scroll__gone span { color: var(--seal-400); letter-spacing: 0.08em; }
+.dream-scroll__gone s { color: var(--paper-400); font-family: var(--f-serif); font-size: var(--text-sm); text-decoration-color: var(--seal-500); text-decoration-thickness: 1px; }
 .dream-scroll__none, .dream-scroll__plain { color: var(--paper-500); font-size: var(--text-sm); }
 .dream-scroll .dream-scroll__plain { color: var(--paper-200); }
 
@@ -1163,7 +1380,7 @@ function onKeydown(event) {
 .dream-fixed small { margin-left: var(--sp-3); color: var(--paper-500); font-size: var(--text-xs); }
 
 @media (prefers-reduced-motion: reduce) {
-  .dream-pip--forfeit { animation: none; }
+  .dream-pip--forfeit, .dream-keepsake--inked .dream-ink::after, .dream-keepsake--inked .dream-keepsake__preview { animation: none; }
 }
 
 @media (max-height: 800px) {

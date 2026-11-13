@@ -6,11 +6,11 @@ Run `pnpm run build` in `web/webclient-app`; run `pnpm exec vitest run <file>` f
 
 ## 1. Change report
 
-- [ ] 1.1 Apply design decisions 1 and 2 in `components/DreamPanel.vue`. Add the Vitest cases for "The keepsake card reports what the last exchange changed" and "The whole-wish view marks changes and names removed items" to `tests/dream.test.js`. Verify `pnpm exec vitest run tests/dream.test.js` passes.
+- [x] 1.1 Apply design decisions 1 and 2 in `components/DreamPanel.vue`. Add the Vitest cases for "The keepsake card reports what the last exchange changed" and "The whole-wish view marks changes and names removed items" to `tests/dream.test.js`. Verify `pnpm exec vitest run tests/dream.test.js` passes.
 
 ## 2. Requirement rows
 
-- [ ] 2.1 Apply design decision 3 in `components/DreamPanel.vue`. Add the Vitest cases for "Requirement rows are editable when finalized". Verify `pnpm exec vitest run tests/dream.test.js` passes.
+- [x] 2.1 Apply design decision 3 in `components/DreamPanel.vue`. Add the Vitest cases for "Requirement rows are editable when finalized". Verify `pnpm exec vitest run tests/dream.test.js` passes.
 
 ## 3. Schema 5
 
