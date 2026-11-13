@@ -50,7 +50,7 @@ Rules and joins:
 
 `kind` is a closed list: `capital`, `city`, `town`, `port`, `elven_village`,
 `dungeon`. Use the matching ID prefix (`capital_`, `city_`, `town_`,
-`port_`, `village_`, `dungeon_`).
+`port_`, `elven_village_`, `dungeon_`).
 
 | Kind | Use it for |
 | --- | --- |
