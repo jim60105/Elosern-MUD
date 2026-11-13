@@ -34,5 +34,5 @@ None.
 ## Batch:
 
 - depends-on: population-maintenance-log-tally
-- conflicts: `world/maps/population_lifecycle.py` and `world/maps/regional_population.py` are edited by every later change of the settlement chain; the chain is strictly serial: `population-maintenance-log-tally` → `settlement-decode-reuse` → `settlement-outer-rollback` → `settlement-deferred-body-writes` → `population-settlement-units` → `unit-scoped-population-settlement` → `population-catch-up-entry-points` → `observed-unit-advance` → `population-backlog-drain`.
+- conflicts: `world/maps/population_lifecycle.py` and `world/maps/regional_population.py` are edited by every later change of the settlement chain; the chain is strictly serial: `population-maintenance-log-tally` → `settlement-decode-reuse` → `settlement-outer-rollback` → `settlement-deferred-body-writes` → `population-settlement-units` → `unit-scoped-population-settlement` → `population-catch-up-entry-points` → `population-writer-guards` → `observed-unit-advance` → `observed-unit-read-narrowing` → `population-backlog-drain`.
 - parallel with: `sqlite-wal-busy-timeout`.
