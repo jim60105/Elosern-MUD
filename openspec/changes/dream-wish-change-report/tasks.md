@@ -22,9 +22,9 @@ Run `pnpm run build` in `web/webclient-app`; run `pnpm exec vitest run <file>` f
 
 ## 5. Gates
 
-- [ ] 5.1 Run `pnpm exec vitest run tests/dream.test.js` (from the repository root) and `pnpm run build`; both pass. Do not run the whole `pnpm test` suite.
-- [ ] 5.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-wish-change-report`; both pass.
-- [ ] 5.3 Run `openspec validate dream-wish-change-report --strict`; it passes.
+- [x] 5.1 Run `pnpm exec vitest run tests/dream.test.js` (from the repository root) and `pnpm run build`; both pass. Do not run the whole `pnpm test` suite.
+- [x] 5.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-wish-change-report`; both pass.
+- [x] 5.3 Run `openspec validate dream-wish-change-report --strict`; it passes.
 
 ## Workflow follow-up
 
