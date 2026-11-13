@@ -12,7 +12,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 from twisted.internet.defer import Deferred
 
-from commands.dream import CmdDream, render_state
+from commands.dream import CmdDream, render_changes, render_state
 from commands.skip import CmdSleep
 from server import dream_service as service
 from tools.spec_traceability import covers_requirement
@@ -131,6 +131,19 @@ class DreamSurfaceTests(EvenniaTest):
     def request_payload(self, client, index=-1):
         """The bounded user message one recorded request carried, parsed."""
         return json.loads(client.calls[index].messages[1]["content"])
+
+    def run_dream(self, arguments):
+        """The text client's dream command, ready to run as the owner."""
+        command = CmdDream()
+        command.caller = self.actor
+        command.session = None
+        command.args = arguments
+        self.actor.msg.reset_mock()
+        return command
+
+    def printed(self):
+        """Every message the owner received since the last command ran."""
+        return [call.args[0] for call in self.actor.msg.call_args_list]
 
     def delivered(self, index=0):
         client = FakeLLMClient()
@@ -880,14 +893,15 @@ class DreamSurfaceTests(EvenniaTest):
         rendered = render_state(state)
         self.assertIn("南門", rendered)
         self.assertIn("帶她找媽媽", rendered)
-        # Nothing was persisted yet, so the text line says exactly that instead
-        # of implying a review that has not happened.
-        self.assertIn("尚未檢視", rendered)
+        # The rows are rendered from the working wish itself, so the text line
+        # carries no review-version marker at all.
+        self.assertNotIn("尚未檢視", rendered)
+        self.assertNotIn("已檢視的版本", rendered)
 
     @covers_requirement(
         "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements"
     )
-    def test_the_text_line_names_the_reviewed_version_once_it_is_persisted(self):
+    def test_the_published_version_is_what_a_bare_confirmation_confirms(self):
         self.enter()
         direction = {
             "kind": "new_story",
@@ -908,9 +922,11 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertNotIn("requirements", state["draft_preferences"])
         self.assertNotIn("requirement_version", state["draft_preferences"])
         rendered = render_state(state)
-        self.assertIn("已檢視的版本", rendered)
-        self.assertIn(shown, rendered)
-        # The argument-less confirmation confirms the version the line names.
+        self.assertIn("南門", rendered)
+        # The identity stays on the published state: the text surface renders
+        # the rows, and the confirmation carries the version, not the prose.
+        self.assertNotIn(shown, rendered)
+        # The argument-less confirmation confirms the version the state names.
         with self.captureOnCommitCallbacks(execute=True):
             confirmed = self.request("confirm")
         self.assertEqual(confirmed.result["outcome"], "success")
@@ -1877,6 +1893,241 @@ class DreamSurfaceTests(EvenniaTest):
             with self.subTest(payload=payload):
                 with self.assertRaises(ValueError):
                     validate("finalize", payload)
+
+    def test_the_thread_command_chooses_an_offered_number_and_the_new_story_word(self):
+        self.enter()
+        for index, label in enumerate(("合成甲故事線", "合成乙故事線")):
+            create_thread(
+                thread_id=f"synthetic-choice-{index}",
+                origin=f"synthetic-choice-origin-{index}",
+                participants=[str(self.actor.pk)],
+                factual_summary=label,
+            )
+        choices = service.dream_state(self.actor)["thread_choices"]
+        self.assertEqual(len(choices), 2)
+        chosen = self.run_dream("thread 2").func()
+        # The shared thread-choice operation, not a local write, records it.
+        self.assertEqual(chosen.result["code"], "dream_choose_thread")
+        self.assertEqual(
+            surface.wish_state(self.actor)["thread_id"], choices[1]["id"]
+        )
+        # Both spellings the listing offers resolve to a new story.
+        for argument in ("new", "NEW", "0"):
+            with self.subTest(argument=argument):
+                self.assertEqual(
+                    self.run_dream("thread 1").func().result["outcome"], "success"
+                )
+                self.assertEqual(
+                    surface.wish_state(self.actor)["thread_id"], choices[0]["id"]
+                )
+                released = self.run_dream("thread " + argument).func()
+                self.assertEqual(released.result["code"], "dream_choose_thread")
+                self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    def test_the_thread_command_without_argument_lists_the_choices_and_writes_nothing(self):
+        self.enter()
+        for index, label in enumerate(("合成列表甲", "合成列表乙")):
+            create_thread(
+                thread_id=f"synthetic-listing-{index}",
+                origin=f"synthetic-listing-origin-{index}",
+                participants=[str(self.actor.pk)],
+                factual_summary=label,
+            )
+        before = service.dream_state(self.actor)
+        self.assertIsNone(self.run_dream("thread").func())
+        printed = self.printed()
+        self.assertEqual(len(printed), 1)
+        lines = printed[0].splitlines()
+        self.assertEqual(len(lines), 1 + len(before["thread_choices"]))
+        self.assertIn("0", lines[0])
+        self.assertIn("new", lines[0])
+        for number, choice in enumerate(before["thread_choices"], start=1):
+            self.assertTrue(lines[number].startswith(f"{number}"), lines[number])
+            self.assertIn(choice["label"], lines[number])
+        after = service.dream_state(self.actor)
+        self.assertEqual(after["revision"], before["revision"])
+        self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    def test_an_unknown_thread_argument_is_refused_without_the_shared_operation(self):
+        self.enter()
+        create_thread(
+            thread_id="synthetic-only-thread",
+            origin="synthetic-only-origin",
+            participants=[str(self.actor.pk)],
+            factual_summary="合成唯一故事線",
+        )
+        before = service.dream_state(self.actor)
+        for argument in ("7", "synthetic-unoffered-thread"):
+            with self.subTest(argument=argument):
+                with patch("server.dream_service.act") as shared:
+                    self.run_dream("thread " + argument).func()
+                    shared.assert_not_called()
+                printed = self.printed()
+                self.assertEqual(len(printed), 1)
+                self.assertTrue(printed[0])
+                after = service.dream_state(self.actor)
+                self.assertEqual(after["revision"], before["revision"])
+                self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
+
+    def test_the_finalize_command_closes_free_text_and_offers_editing(self):
+        self.enter()
+        before = service.dream_state(self.actor)
+        self.assertTrue(before["can_input"])
+        self.assertTrue(before["can_finalize"])
+        # The departure carries no content of its own: anything after it is
+        # a usage refusal, not a silent edit.
+        self.assertIsNone(self.run_dream("finalize 現在").func())
+        self.assertIn("用法", self.printed()[-1])
+        self.assertEqual(service.dream_state(self.actor)["revision"], before["revision"])
+        finalized = self.run_dream("finalize").func()
+        self.assertEqual(finalized.result["code"], "dream_finalize")
+        after = service.dream_state(self.actor)
+        self.assertFalse(after["can_input"] or after["can_finalize"])
+        self.assertTrue(after["can_edit"] and after["can_confirm"])
+        rendered = self.printed()[-1]
+        self.assertIn("dream draft", rendered)
+        self.assertIn("dream confirm", rendered)
+        self.assertNotIn("dream say", rendered)
+
+    def test_bare_dream_shows_the_whole_wish_its_thread_and_both_moved_items(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-wish-thread",
+            origin="synthetic-wish-origin",
+            participants=[str(self.actor.pk)],
+            factual_summary="合成歸屬故事線",
+        )
+        self.assertEqual(self.run_dream("thread 1").func().result["outcome"], "success")
+        self.assertEqual(
+            self.request("say", message="先說第一句", client=self.exchange([
+                {"command": "create", "path": "summary", "file_text": "合成願望的摘要。"},
+                {"command": "create", "path": "themes", "file_text": "合成舊主題"},
+                {"command": "create", "path": "atmosphere", "file_text": "合成氛圍"},
+                {"command": "create", "path": "requirements", "file_text": "place: 合成地點"},
+            ])).result["outcome"],
+            "success",
+        )
+        self.assertEqual(surface.wish_state(self.actor)["thread_id"], thread.thread_id)
+        self.assertEqual(
+            self.request("say", message="再說一句", client=self.exchange([
+                {"command": "str_replace", "path": "themes",
+                 "old_str": "合成舊主題", "new_str": "合成新主題"},
+            ], index=1)).result["outcome"],
+            "success",
+        )
+        changes = service.dream_state(self.actor)["changes"]
+        self.assertEqual(changes["lists"]["themes"]["added"], ["合成新主題"])
+        self.assertEqual(changes["lists"]["themes"]["removed"], ["合成舊主題"])
+        self.run_dream("").func()
+        printed = self.printed()
+        self.assertEqual(len(printed), 1)
+        rendered = printed[0]
+        for value in ("合成願望的摘要。", "合成新主題", "合成氛圍", "合成地點"):
+            self.assertIn(value, rendered)
+        # The chosen thread, and a report that names the removed item too.
+        self.assertIn("合成歸屬故事線", rendered)
+        self.assertIn("合成舊主題", rendered)
+
+    def test_a_delivered_say_ends_with_the_change_summary(self):
+        self.enter()
+        with patch(
+            "world.ai.client.OpenAICompatClient",
+            return_value=self.exchange([
+                {"command": "create", "path": "themes", "file_text": "合成新增主題"},
+            ]),
+        ):
+            self.assertEqual(
+                self.run_dream("say 鐘聲").func().result["outcome"], "success"
+            )
+        edited = service.dream_state(self.actor)
+        edited_line = self.printed()[-1].splitlines()[-1]
+        self.assertEqual(edited_line, render_changes(edited["changes"]))
+        self.assertIn("合成新增主題", edited_line)
+        with patch(
+            "world.ai.client.OpenAICompatClient",
+            return_value=self.delivered(index=1),
+        ):
+            self.assertEqual(
+                self.run_dream("say 再一次").func().result["outcome"], "success"
+            )
+        settled = service.dream_state(self.actor)
+        settled_line = self.printed()[-1].splitlines()[-1]
+        self.assertEqual(settled_line, render_changes(settled["changes"]))
+        self.assertNotIn("合成新增主題", settled_line)
+        self.assertNotEqual(settled_line, edited_line)
+
+    def test_the_text_draft_replaces_only_the_summary_after_finalize(self):
+        self.enter()
+        thread = create_thread(
+            thread_id="synthetic-summary-thread",
+            origin="synthetic-summary-origin",
+            participants=[str(self.actor.pk)],
+            factual_summary="合成摘要故事線",
+        )
+        self.assertEqual(self.run_dream("thread 1").func().result["outcome"], "success")
+        self.assertEqual(
+            self.request("say", message="先說一句", client=self.exchange([
+                {"command": "create", "path": "summary", "file_text": "訴說時的摘要。"},
+                {"command": "create", "path": "themes", "file_text": "合成主題"},
+                {"command": "create", "path": "requirements", "file_text": "place: 合成地點"},
+            ])).result["outcome"],
+            "success",
+        )
+        refused = self.run_dream("draft 訴說期間的改寫").func().result
+        self.assertEqual(refused["outcome"], "rejected")
+        self.assertEqual(refused["code"], "direction_locked")
+        self.assertEqual(
+            surface.wish_state(self.actor)["proposal"]["summary"], "訴說時的摘要。"
+        )
+        self.assertEqual(
+            self.run_dream("finalize").func().result["outcome"], "success"
+        )
+        before = surface.wish_state(self.actor)["proposal"]
+        self.assertEqual(
+            self.run_dream("draft 斟酌後的摘要").func().result["outcome"], "success"
+        )
+        wish = surface.wish_state(self.actor)
+        self.assertEqual(wish["proposal"]["summary"], "斟酌後的摘要")
+        self.assertEqual(wish["proposal"]["themes"], before["themes"])
+        self.assertEqual(wish["proposal"]["requirements"], before["requirements"])
+        self.assertEqual(wish["thread_id"], thread.thread_id)
+
+    def test_the_change_renderer_names_every_moved_item_on_one_line(self):
+        moved = {
+            "summary": "formed",
+            "lists": {
+                field: {"added": [], "removed": []}
+                for field in dream_proposal.LIST_FIELDS
+            },
+            "requirements": {
+                "added": [],
+                "removed": [{"kind": "place", "text": "合成舊地點"}],
+            },
+        }
+        moved["lists"]["themes"] = {"added": ["合成新添"], "removed": ["合成劃去"]}
+        rendered = render_changes(moved)
+        self.assertNotIn("\n", rendered)
+        self.assertIn("合成新添", rendered)
+        self.assertIn("合成劃去", rendered)
+        self.assertIn("合成舊地點", rendered)
+        # One segment per changed field: the two moved items of a single list
+        # stay together, and the changed requirements keep their own segment.
+        segments = rendered.split("；")
+        self.assertEqual(len(segments), 3)
+        self.assertIn("合成新添", segments[1])
+        self.assertIn("合成劃去", segments[1])
+        self.assertIn("合成舊地點", segments[2])
+        unchanged = {
+            "summary": None,
+            "lists": {
+                field: {"added": [], "removed": []}
+                for field in dream_proposal.LIST_FIELDS
+            },
+            "requirements": {"added": [], "removed": []},
+        }
+        self.assertNotEqual(render_changes(unchanged), rendered)
+        self.assertNotIn("合成新添", render_changes(unchanged))
+        self.assertEqual(render_changes(None), "")
 
 
 def _synthetic_webp():
