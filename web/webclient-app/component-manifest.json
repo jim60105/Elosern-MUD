@@ -64,8 +64,6 @@
     "Overlays/PartySkillTab",
     "Overlays/ObjectiveTracker",
     "Feedback/ToastQueue",
-    "Data/GalleryPanel",
-    "Data/GalleryDetailRail",
     "Overlays/GalleryGenerateDrawer",
     "Overlays/GalleryBindingDrawer",
     "Overlays/GalleryFaceRectModal",

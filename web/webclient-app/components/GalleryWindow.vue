@@ -88,7 +88,7 @@ const selection = computed(() => {
   return { type: "empty" };
 });
 
-// ---- the editor lifecycle (moved from GalleryPanel) -------------------------
+// ---- the editor lifecycle ----------------------------------------------------
 
 const editor = ref(null);
 const entryEditor = ref(null);

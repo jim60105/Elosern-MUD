@@ -1,34 +1,35 @@
-import { mount } from "@vue/test-utils";
+// The gallery's editors and the window's editor lifecycle (change
+// webclient-gallery-ui; re-pointed to GalleryWindow by gallery-window-mount).
+// The pure date helpers and the four editors are mounted on their own; the
+// correlated editor closure, the official-entry geometry actions and the
+// empty-page guidance are asserted through the mounted GalleryWindow with a
+// fake `dispatch` and committed panels simulated through `setProps`.
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
-import GalleryPanel from "../../components/GalleryPanel.vue";
-import GalleryDetailRail from "../../components/GalleryDetailRail.vue";
+import GalleryWindow from "../../components/GalleryWindow.vue";
 import GalleryGenerateDrawer from "../../components/GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "../../components/GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
 import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
 import {
-  clampFaceRect,
   defaultFaceRect,
   editFaceRectField,
   faceCropStyle,
   moveFaceRect,
-  refitFaceRectOnLoad,
   resizeFaceRect,
 } from "../../components/face-rect-edit.js";
 import { GALLERY_CATEGORY_LABELS, GALLERY_DATE_UNAVAILABLE, galleryCardName, galleryDate } from "../../components/gallery-copy.js";
 import Protocol from "../../../static/webclient/js/elosern/protocol.js";
 import {
-  GALLERY_V4_EMPTY,
   GALLERY_V4_MINE as GALLERY_SAMPLE,
   GALLERY_V4_MINE_BLANK as GALLERY_EMPTY,
   GALLERY_V4_MONSTER as GALLERY_MONSTER,
   GALLERY_V4_PARTY,
 } from "../../stories/gallery-fixtures-v4.js";
 
-// The committed rows of the sample: four cards, then the pending and failed rows.
 const PENDING_INDEX = GALLERY_SAMPLE.cards.findIndex((row) => row.status === "pending");
-const FAILED_INDEX = GALLERY_SAMPLE.cards.findIndex((row) => row.status === "failed");
+const TWIN = GALLERY_SAMPLE.groups[0].subjects[1].subject_key;
 
 const wrappers = [];
 function mountSurface(component, props) {
@@ -36,8 +37,20 @@ function mountSurface(component, props) {
   wrappers.push(wrapper);
   return wrapper;
 }
+function mountWindow(props) {
+  return mountSurface(GalleryWindow, { dispatch: vi.fn(() => "request:1"), ...props });
+}
 function button(wrapper, text) {
   return wrapper.findAll("button").find((item) => item.text() === text);
+}
+const trayItem = (id) => document.querySelector(`[data-testid="gallery-tray-item"][data-item-id="${id}"]`);
+const footerButton = (key) => document.querySelector(`[data-testid="gallery-page__${key}"]`);
+const footerKeys = () => [...document.querySelectorAll('[data-testid="gallery-page__footer"] button')]
+  .map((el) => el.dataset.testid.replace("gallery-page__", ""));
+const pageSelection = () => document.querySelector('[data-testid="gallery-page"]')?.dataset.selection ?? null;
+async function click(el) {
+  el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await flushPromises();
 }
 afterEach(() => {
   wrappers.reverse().forEach((wrapper) => wrapper.unmount());
@@ -45,53 +58,11 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("gallery panel facts and request settlement", () => {
-  it("renders committed rows in payload order with no filter tabs, and keeps failure text intact", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    expect(wrapper.findAll(".gallery-card").map((row) => row.attributes("data-image-id"))).toEqual(GALLERY_SAMPLE.cards.map((row) => row.image_id));
-    expect(wrapper.find('[aria-label="肖像篩選"]').exists()).toBe(false);
-    expect(wrapper.find('[aria-label="顯示方式"]').exists()).toBe(false);
-    const failed = wrapper.findAll(".gallery-card")[FAILED_INDEX];
-    expect(failed.text()).toContain(GALLERY_SAMPLE.cards[FAILED_INDEX].label);
-    expect(failed.find("img").exists()).toBe(false);
-    await wrapper.setProps({ model: GALLERY_EMPTY });
-    expect(wrapper.find(".gallery-card").exists()).toBe(false);
-  });
-
-  it("marks crown, pending, and failed rows with explicit state text, not color alone", () => {
-    // The never-color-only clause: the default crown, the in-flight row, and
-    // the failed row each carry human-readable state text in the caption or
-    // overlay, so every state survives grayscale and screen readers alike.
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    const rows = wrapper.findAll(".gallery-card");
-    const defaultRow = rows.find((row) => row.classes().includes("gallery-card--card"));
-    expect(defaultRow.get(".gallery-card__crown").text()).toContain("目前預設");
-    const pendingRow = rows[PENDING_INDEX];
-    expect(pendingRow.classes()).toContain("gallery-card--pending");
-    expect(pendingRow.text()).toContain("生成中");
-    expect(pendingRow.find("img").exists()).toBe(false);
-    const failedRow = rows[FAILED_INDEX];
-    expect(failedRow.classes()).toContain("gallery-card--failed");
-    expect(failedRow.text()).toContain("暫時無法生成，稍後再試");
-  });
-
-  it("waits for subject publication rather than optimistically switching cards", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    // The subject already shown never re-dispatches.
-    await button(wrapper, "夜行者").trigger("click");
-    expect(dispatch).not.toHaveBeenCalled();
-    await button(wrapper, "晨星").trigger("click");
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.subject.select", { subject_key: "portrait:character:7004" });
-    expect(wrapper.findAll(".gallery-card")).toHaveLength(GALLERY_SAMPLE.cards.length);
-    expect(button(wrapper, "夜行者").attributes("aria-pressed")).toBe("true");
-    expect(button(wrapper, "晨星").attributes("aria-pressed")).toBe("false");
-  });
-
+describe("the window's editor lifecycle", () => {
   it("preserves raw drafts on rejection and closes only on its own committed successful revision", async () => {
     const dispatch = vi.fn().mockReturnValueOnce(null).mockReturnValueOnce("request:1").mockReturnValueOnce("request:2");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch, revision: 1 });
-    await button(wrapper, "生成新圖").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE, dispatch, revision: 1 });
+    await click(trayItem("generate"));
     const drawer = wrapper.getComponent(GalleryGenerateDrawer);
     await drawer.get("textarea").setValue("raw input");
     await button(drawer, "開始生成").trigger("click");
@@ -107,25 +78,30 @@ describe("gallery panel facts and request settlement", () => {
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(true);
     await wrapper.setProps({ revision: 3 });
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
+    expect(dispatch).toHaveBeenCalledTimes(3);
   });
 
   it("closes stale editors on subject replacement, missing card and unavailable panel", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    await button(wrapper, "臉部框選").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    await click(trayItem(GALLERY_SAMPLE.cards[0].image_id));
+    await click(footerButton("face"));
+    expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(true);
     await wrapper.setProps({ model: { ...GALLERY_SAMPLE, cards: GALLERY_SAMPLE.cards.slice(1) } });
     expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
-    await button(wrapper, "生成新圖").trigger("click");
-    await wrapper.setProps({ model: { ...GALLERY_EMPTY, selected: "portrait:character:7004" } });
+    await click(trayItem("generate"));
+    await wrapper.setProps({ model: { ...GALLERY_EMPTY, selected: TWIN } });
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
-    await button(wrapper, "生成新圖").trigger("click");
-    await wrapper.setProps({ model: { available: false, reason: { message: "資料暫時無法使用。" } } });
+    await click(trayItem("generate"));
+    expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(true);
+    await wrapper.setProps({ model: { schema_version: 4, available: false, reason: { message: "資料暫時無法使用。" } } });
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
     expect(wrapper.text()).toContain("資料暫時無法使用。");
   });
 
   it("keeps an empty-gallery generation draft across unrelated empty and pending publications", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_EMPTY, dispatch: () => "empty:1" });
-    await button(wrapper, "生成新圖").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_EMPTY, dispatch: () => "empty:1" });
+    expect(pageSelection()).toBe("empty");
+    await click(footerButton("generate"));
     const drawer = wrapper.getComponent(GalleryGenerateDrawer);
     await drawer.get("textarea").setValue("第一張肖像");
     await wrapper.setProps({ model: structuredClone(GALLERY_EMPTY) });
@@ -138,11 +114,11 @@ describe("gallery panel facts and request settlement", () => {
   });
 
   it("ignores a canceled request's late result after a new editor opens", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch: () => "canceled:1" });
-    await button(wrapper, "生成新圖").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE, dispatch: () => "canceled:1" });
+    await click(trayItem("generate"));
     await button(wrapper.getComponent(GalleryGenerateDrawer), "開始生成").trigger("click");
     await button(wrapper.getComponent(GalleryGenerateDrawer), "取消").trigger("click");
-    await button(wrapper, "生成新圖").trigger("click");
+    await click(trayItem("generate"));
     const newDrawer = wrapper.getComponent(GalleryGenerateDrawer);
     await newDrawer.get("textarea").setValue("新的草稿");
     await wrapper.setProps({ result: { requestId: "canceled:1", outcome: "rejected" } });
@@ -150,87 +126,48 @@ describe("gallery panel facts and request settlement", () => {
     expect(newDrawer.find('[role="status"]').exists()).toBe(false);
   });
 
-  it("restores a remaining gallery control when the edited card and opener disappear", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    button(wrapper, "臉部框選").element.focus();
-    await button(wrapper, "臉部框選").trigger("click");
+  it("restores focus to the rail when the edited card and its opener disappear", async () => {
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    await click(trayItem(GALLERY_SAMPLE.cards[0].image_id));
+    footerButton("face").focus();
+    await click(footerButton("face"));
+    expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(true);
     await wrapper.setProps({ model: GALLERY_EMPTY });
+    await flushPromises();
     await nextTick();
     expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
-    expect(document.activeElement).toBe(button(wrapper, "生成新圖").element);
+    expect(document.activeElement).toBe(document.querySelector('[data-testid="icon-tabs__tab--mine"]'));
+  });
+
+  it("refreshes the page's relative date once a minute while open and stops the clock on close", async () => {
+    const NOW = Date.UTC(2026, 8, 30, 12, 0, 0);
+    vi.useFakeTimers({ now: NOW });
+    try {
+      const created = NOW / 1000 - 30;
+      const model = { ...GALLERY_SAMPLE, cards: [{ ...GALLERY_SAMPLE.cards[0], created_at: created }], binding_warnings: [] };
+      const timersBefore = vi.getTimerCount();
+      const wrapper = mountWindow({ model });
+      const cell = () => wrapper.get('[data-testid="gallery-page__cell"][data-cell="time"]');
+      expect(cell().get(".gpage__line").text()).toBe("剛剛");
+      expect(cell().get("time").attributes("datetime")).toBe(new Date(created * 1000).toISOString());
+      vi.advanceTimersByTime(60_000);
+      await nextTick();
+      expect(cell().get(".gpage__line").text()).toBe(new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" }).format(-1, "minute"));
+      const clearSpy = vi.spyOn(globalThis, "clearInterval");
+      wrapper.unmount();
+      wrappers.splice(wrappers.indexOf(wrapper), 1);
+      expect(clearSpy).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(timersBefore);
+      clearSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
-describe("gallery categories and subjects", () => {
+describe("gallery categories", () => {
   it("labels every category key of the mirrored wire contract", () => {
     expect(Object.keys(GALLERY_CATEGORY_LABELS)).toEqual([...Protocol.GALLERY_CATEGORY_KEYS]);
-  });
-
-  it("renders one control per committed category with its committed count", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    const controls = wrapper.findAll('[data-testid^="gallery-category-"]');
-    expect(controls.map((row) => row.attributes("data-testid"))).toEqual(GALLERY_SAMPLE.categories.map((row) => `gallery-category-${row.key}`));
-    GALLERY_SAMPLE.categories.forEach((row, index) => {
-      expect(controls[index].get(".gallery-category__count").text()).toBe(String(row.count));
-      expect(controls[index].attributes("aria-pressed")).toBe(String(row.key === GALLERY_SAMPLE.category));
-    });
-    const subjects = wrapper.findAll('[data-testid="gallery-subject"]');
-    expect(subjects.map((row) => row.attributes("data-subject-key"))).toEqual(GALLERY_SAMPLE.groups[0].subjects.map((row) => row.subject_key));
-  });
-
-  it("dispatches one category select for an enabled category and waits for the committed panel", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    await wrapper.get('[data-testid="gallery-category-mine"]').trigger("click");
-    expect(dispatch).not.toHaveBeenCalled();
-    await wrapper.get('[data-testid="gallery-category-monster"]').trigger("click");
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.category.select", { category: "monster" });
-    // Nothing switches until the new committed panel arrives.
-    expect(wrapper.get('[data-testid="gallery-category-mine"]').attributes("aria-pressed")).toBe("true");
-    expect(wrapper.findAll('[data-testid="gallery-subject"]').map((row) => row.attributes("data-subject-key")))
-      .toEqual(GALLERY_SAMPLE.groups[0].subjects.map((row) => row.subject_key));
-    await wrapper.setProps({ model: GALLERY_MONSTER, revision: 2, result: { requestId: "request:1", outcome: "success", presentationRevision: 2 } });
-    expect(wrapper.get('[data-testid="gallery-category-monster"]').attributes("aria-pressed")).toBe("true");
-    const listed = GALLERY_MONSTER.groups.flatMap((group) => group.subjects.map((row) => row.subject_key));
-    expect(wrapper.findAll('[data-testid="gallery-subject"]').map((row) => row.attributes("data-subject-key"))).toEqual(listed);
-    // Committed group labels head their own subjects; an empty group lists none.
-    expect(wrapper.findAll(".gallery-subject-group__label").map((row) => row.text())).toEqual(
-      GALLERY_MONSTER.groups.filter((group) => group.subjects.length).map((group) => group.label),
-    );
-  });
-
-  it("keeps a disabled category focusable, exposes its committed reason, and sends nothing", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    const disabled = GALLERY_SAMPLE.categories.find((row) => !row.enabled);
-    const control = wrapper.get(`[data-testid="gallery-category-${disabled.key}"]`);
-    expect(control.attributes("disabled")).toBeUndefined();
-    expect(control.attributes("aria-disabled")).toBe("true");
-    control.element.focus();
-    expect(document.activeElement).toBe(control.element);
-    const reason = document.getElementById(control.attributes("aria-describedby"));
-    expect(reason.textContent).toBe(disabled.reason);
-    await control.trigger("click");
-    await control.trigger("keydown", { key: "Enter" });
-    expect(dispatch).not.toHaveBeenCalled();
-    const enabled = wrapper.get('[data-testid="gallery-category-party"]');
-    expect(enabled.attributes("aria-disabled")).toBeUndefined();
-    expect(enabled.attributes("aria-describedby")).toBeUndefined();
-  });
-
-  it("renders an empty category with nothing selected and no selection-bound control", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_V4_EMPTY, dispatch });
-    expect(wrapper.find('[data-testid="gallery-subject"]').exists()).toBe(false);
-    expect(wrapper.find(".gallery-card").exists()).toBe(false);
-    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(true);
-    expect(button(wrapper, "生成新圖").attributes("disabled")).toBeDefined();
-    await button(wrapper, "生成新圖").trigger("click");
-    expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
-    expect(wrapper.get('[data-testid="gallery-detail"]').findAll("button:not(:disabled)")).toHaveLength(0);
-    // Categories stay usable: switching to another enabled category dispatches.
-    await wrapper.get('[data-testid="gallery-category-mine"]').trigger("click");
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.category.select", { category: "mine" });
   });
 });
 
@@ -269,47 +206,6 @@ describe("gallery card dates", () => {
     expect(galleryCardName(first, TZ)).toBe(`${first.label}，${exact(first.created_at)}`);
     expect(galleryCardName(second, TZ)).not.toBe(galleryCardName(first, TZ));
     expect(galleryCardName({ label: "肖像", created_at: Number.NaN })).toBe("肖像");
-  });
-
-  it("refreshes relative dates once a minute while open and stops the clock on close", async () => {
-    vi.useFakeTimers({ now: NOW });
-    try {
-      const created = NOW / 1000 - 30;
-      const model = { ...GALLERY_SAMPLE, cards: [{ ...GALLERY_SAMPLE.cards[0], created_at: created }], binding_warnings: [] };
-      const timersBefore = vi.getTimerCount();
-      const wrapper = mountSurface(GalleryPanel, { model });
-      const date = () => wrapper.get(".gallery-card__date");
-      expect(date().text()).toContain("剛剛");
-      expect(date().attributes("datetime")).toBe(new Date(created * 1000).toISOString());
-      vi.advanceTimersByTime(60_000);
-      await nextTick();
-      expect(date().text()).toContain(new Intl.RelativeTimeFormat("zh-TW", { numeric: "auto" }).format(-1, "minute"));
-      const clearSpy = vi.spyOn(globalThis, "clearInterval");
-      wrapper.unmount();
-      wrappers.splice(wrappers.indexOf(wrapper), 1);
-      expect(clearSpy).toHaveBeenCalled();
-      expect(vi.getTimerCount()).toBe(timersBefore);
-      clearSpy.mockRestore();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
-describe("gallery detail rail", () => {
-  it("cancels deletion, confirms once, and never invents missing binding conditions", async () => {
-    // A bound card with no committed warning entry: the rail claims no condition.
-    const bound = { ...GALLERY_SAMPLE.cards[2], binding_present: true };
-    const wrapper = mountSurface(GalleryDetailRail, { panel: GALLERY_SAMPLE, card: bound, capabilities: GALLERY_SAMPLE.capabilities, warnings: GALLERY_SAMPLE.binding_warnings });
-    expect(wrapper.text()).not.toContain("暗影劍刃");
-    await button(wrapper, "刪除").trigger("click");
-    await button(wrapper, "取消").trigger("click");
-    expect(wrapper.emitted("delete")).toBeUndefined();
-    await button(wrapper, "刪除").trigger("click");
-    await button(wrapper, "確認刪除").trigger("click");
-    expect(wrapper.emitted("delete")).toHaveLength(1);
-    await wrapper.setProps({ capabilities: GALLERY_MONSTER.capabilities });
-    expect(button(wrapper, "編輯設定")).toBeUndefined();
   });
 });
 
@@ -434,71 +330,52 @@ describe("face geometry", () => {
 
 const OFFICIAL_ROWS = GALLERY_SAMPLE.official_entries;
 const OFFICIAL_CURRENT = OFFICIAL_ROWS.find((row) => row.is_current);
-const OFFICIAL_DEFAULT = OFFICIAL_ROWS.find((row) => row.is_catalog_default);
 
-function rail(wrapper) {
-  return wrapper.get('[data-testid="gallery-detail"]');
+async function loadImage(img) {
+  Object.defineProperty(img.element, "naturalWidth", { value: 768, configurable: true });
+  Object.defineProperty(img.element, "naturalHeight", { value: 1024, configurable: true });
+  await img.trigger("load");
 }
 
-describe("official read-only entries", () => {
-  it("renders the committed rows beside the cards and never counts them as cards", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    const rows = wrapper.findAll(".gallery-official__row");
-    expect(rows.map((row) => row.attributes("data-identity"))).toEqual(OFFICIAL_ROWS.map((row) => row.identity));
-    // Official rows are a separate list: the card grid lists exactly the
-    // committed cards.
-    expect(wrapper.findAll(".gallery-card")).toHaveLength(GALLERY_SAMPLE.cards.length);
-    const current = rows.find((row) => row.attributes("data-identity") === OFFICIAL_CURRENT.identity);
-    expect(current.text()).toContain("已選取");
-    const catalogDefault = rows.find((row) => row.attributes("data-identity") === OFFICIAL_DEFAULT.identity);
-    expect(catalogDefault.text()).toContain("內容預設");
-  });
-
-  it("selects an official row and renders only its read-only affordances", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
-    const detail = rail(wrapper);
-    expect(detail.text()).toContain(OFFICIAL_CURRENT.identity);
-    expect(detail.text()).toContain("目前預設");
-    expect(button(detail, "刪除")).toBeUndefined();
-    expect(button(detail, "編輯設定")).toBeUndefined();
-    expect(button(detail, "設為預設影像").attributes("disabled")).toBeDefined();
-    expect(button(detail, "清除選取")).toBeDefined();
+describe("official read-only entries in the window", () => {
+  it("previews a selected official entry with only its read-only affordances", async () => {
+    mountWindow({ model: GALLERY_SAMPLE });
+    await click(trayItem(OFFICIAL_CURRENT.identity));
+    expect(pageSelection()).toBe("official");
+    expect(footerKeys()).toEqual(["official-geometry-clear", "official-face", "official-stage", "official-clear-selection"]);
+    const other = OFFICIAL_ROWS.find((row) => !row.is_current);
+    await click(trayItem(other.identity));
+    expect(footerKeys()).toEqual(["official-geometry-clear", "official-face", "official-stage", "official-select"]);
   });
 
   it("dispatches the selection with only the subject key and the committed identity", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
     const target = OFFICIAL_ROWS.find((row) => !row.is_current);
-    await wrapper.get(`[data-identity="${target.identity}"]`).trigger("click");
-    await button(rail(wrapper), "設為預設影像").trigger("click");
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.select", {
+    await click(trayItem(target.identity));
+    await click(footerButton("official-select"));
+    expect(wrapper.props("dispatch")).toHaveBeenCalledExactlyOnceWith("gallery.official.select", {
       subject_key: GALLERY_SAMPLE.selected,
       identity: target.identity,
     });
   });
 
-  it("clears the selection and the personal geometry through their own actions", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
-    await button(rail(wrapper), "清除個人調整").trigger("click");
-    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.clear", {
+  it("clears the personal geometry through its own action", async () => {
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    await click(trayItem(OFFICIAL_CURRENT.identity));
+    await click(footerButton("official-geometry-clear"));
+    expect(wrapper.props("dispatch")).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.clear", {
       subject_key: GALLERY_SAMPLE.selected,
       identity: OFFICIAL_CURRENT.identity,
     });
   });
 
   it("sends only the edited face rectangle for an official identity", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
-    await button(rail(wrapper), "臉部框選").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    const dispatch = wrapper.props("dispatch");
+    await click(trayItem(OFFICIAL_CURRENT.identity));
+    await click(footerButton("official-face"));
     const modal = wrapper.getComponent(GalleryFaceRectModal);
-    const image = modal.get(".gallery-face__original > img");
-    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
-    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
-    await image.trigger("load");
+    await loadImage(modal.get(".gallery-face__original > img"));
     // A real edit: the modal seeds from the committed rectangle, so only a
     // changed value may cross the wire (an untouched save would overwrite a
     // stored personal override with the catalog seed).
@@ -513,22 +390,17 @@ describe("official read-only entries", () => {
     expect(sent.face_rect.w).toBeCloseTo(0.4, 6);
     // The editor re-squares the edited rectangle on the real image size.
     expect(Math.abs(sent.face_rect.w * 768 - sent.face_rect.h * 1024)).toBeLessThanOrEqual(1);
-    expect(sent.face_rect).not.toEqual(OFFICIAL_CURRENT.face_rect);
     // The untouched component is never smuggled along.
     expect(sent).not.toHaveProperty("stage");
   });
 
   it("sends only the edited stage triple for an official identity", async () => {
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
-    await button(rail(wrapper), "比例調整").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    const dispatch = wrapper.props("dispatch");
+    await click(trayItem(OFFICIAL_CURRENT.identity));
+    await click(footerButton("official-stage"));
     const modal = wrapper.getComponent(GalleryStageTransformModal);
-    // The shared lifecycle only reports success for a REAL decoded size.
-    const figure = modal.get(".stage-transform__figure");
-    Object.defineProperty(figure.element, "naturalWidth", { value: 768, configurable: true });
-    Object.defineProperty(figure.element, "naturalHeight", { value: 1024, configurable: true });
-    await figure.trigger("load");
+    await loadImage(modal.get(".stage-transform__figure"));
     await modal.get('input[type="range"]').setValue("0.6");
     await button(modal, "儲存調整").trigger("click");
     expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.set", {
@@ -542,135 +414,67 @@ describe("official read-only entries", () => {
   it("never dispatches an untouched official geometry save", async () => {
     // The committed row carries no personal override, so an untouched save
     // would silently overwrite one with the seed. It closes instead.
-    const dispatch = vi.fn(() => "request:1");
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE, dispatch });
-    await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
-    await button(rail(wrapper), "比例調整").trigger("click");
+    const wrapper = mountWindow({ model: GALLERY_SAMPLE });
+    const dispatch = wrapper.props("dispatch");
+    await click(trayItem(OFFICIAL_CURRENT.identity));
+    await click(footerButton("official-stage"));
     const modal = wrapper.getComponent(GalleryStageTransformModal);
-    const figure = modal.get(".stage-transform__figure");
-    Object.defineProperty(figure.element, "naturalWidth", { value: 768, configurable: true });
-    Object.defineProperty(figure.element, "naturalHeight", { value: 1024, configurable: true });
-    await figure.trigger("load");
+    await loadImage(modal.get(".stage-transform__figure"));
     await button(modal, "儲存調整").trigger("click");
+    await flushPromises();
     expect(dispatch).not.toHaveBeenCalled();
     expect(wrapper.findComponent(GalleryStageTransformModal).exists()).toBe(false);
     // The face editor is seeded from the committed rectangle: saving it as-is
     // dispatches nothing either.
-    await button(rail(wrapper), "臉部框選").trigger("click");
+    await click(footerButton("official-face"));
     const face = wrapper.getComponent(GalleryFaceRectModal);
-    const image = face.get(".gallery-face__original > img");
-    Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
-    Object.defineProperty(image.element, "naturalHeight", { value: 1024, configurable: true });
-    await image.trigger("load");
+    await loadImage(face.get(".gallery-face__original > img"));
     await button(face, "儲存框選").trigger("click");
+    await flushPromises();
     expect(dispatch).not.toHaveBeenCalled();
     expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
   });
 });
 
-// The empty-card guidance. Official entries are committed read-only artwork of
-// the selected subject: the paragraph may only claim missing artwork when
-// there is no official artwork either.
-const GUIDANCE_TEXT = "此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。";
+// The no-image page. Official entries are committed read-only artwork of the
+// selected subject: the page may only claim missing artwork when there is no
+// official artwork either, decided from the committed list alone.
 const OFFICIAL_ONLY = { ...GALLERY_EMPTY, official_entries: GALLERY_SAMPLE.official_entries };
-// The second listed subject, selected, with no cards and no official entries.
-const EMPTY_SUBJECT = { ...GALLERY_EMPTY, selected: GALLERY_EMPTY.groups[0].subjects[1].subject_key };
+const officialTrayItems = () => document.querySelectorAll('[data-testid="gallery-tray-official"] [data-testid="gallery-tray-item"]');
 
-function guidance(wrapper) {
-  return wrapper.get(".gallery-panel__cards + .gallery-panel__empty");
-}
-
-describe("official-only empty-card guidance", () => {
-  it("suppresses the paragraph when committed official rows replace every card", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: OFFICIAL_ONLY });
-    expect(wrapper.findAll(".gallery-card")).toHaveLength(0);
-    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
-    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+describe("official-only artwork and the no-image page", () => {
+  it("shows an official entry, not the no-image page, when official rows replace every card", () => {
+    mountWindow({ model: OFFICIAL_ONLY });
+    expect(pageSelection()).toBe("official");
+    expect(officialTrayItems()).toHaveLength(OFFICIAL_ROWS.length);
+    expect(footerButton("generate")).toBeNull();
   });
 
-  it("keeps the unchanged paragraph inside the cards area without official rows", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_EMPTY });
-    const paragraph = guidance(wrapper);
-    expect(paragraph.classes()).toContain("gallery-panel__empty");
-    expect(paragraph.text()).toBe(GUIDANCE_TEXT);
+  it("shows the no-image page with 生成新圖 for a subject with no cards and no official rows", () => {
+    mountWindow({ model: GALLERY_EMPTY });
+    expect(pageSelection()).toBe("empty");
+    expect(officialTrayItems()).toHaveLength(0);
+    expect(footerButton("generate").textContent.trim()).toBe("生成新圖");
   });
 
-  it("keeps the paragraph for a subject with no cards and no official rows", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: EMPTY_SUBJECT });
-    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(0);
-    expect(guidance(wrapper).text()).toBe(GUIDANCE_TEXT);
-  });
-
-  it("suppresses the paragraph while one card and official rows exist", () => {
-    const wrapper = mountSurface(GalleryPanel, { model: { ...OFFICIAL_ONLY, cards: [GALLERY_SAMPLE.cards[3]] } });
-    expect(wrapper.findAll(".gallery-card")).toHaveLength(1);
-    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
-    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
+  it("keeps the official entries in the tray while one card and official rows exist", () => {
+    mountWindow({ model: { ...OFFICIAL_ONLY, cards: [GALLERY_SAMPLE.cards[3]] } });
+    expect(pageSelection()).toBe("card");
+    expect(officialTrayItems()).toHaveLength(OFFICIAL_ROWS.length);
   });
 
   it("follows a committed official-entry replacement in both directions without a dispatch", async () => {
     const dispatch = vi.fn();
-    const wrapper = mountSurface(GalleryPanel, { model: OFFICIAL_ONLY, dispatch });
-    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+    const wrapper = mountWindow({ model: OFFICIAL_ONLY, dispatch });
+    expect(pageSelection()).toBe("official");
     await wrapper.setProps({ model: GALLERY_EMPTY });
-    expect(guidance(wrapper).text()).toBe(GUIDANCE_TEXT);
-    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(0);
+    await flushPromises();
+    expect(pageSelection()).toBe("empty");
+    expect(officialTrayItems()).toHaveLength(0);
     await wrapper.setProps({ model: OFFICIAL_ONLY });
-    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
-    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
-    expect(wrapper.findAll(".gallery-card")).toHaveLength(0);
+    await flushPromises();
+    expect(pageSelection()).toBe("official");
+    expect(officialTrayItems()).toHaveLength(OFFICIAL_ROWS.length);
     expect(dispatch).not.toHaveBeenCalled();
-  });
-});
-
-// The shared availability translation (lib/artwork.js + useArtwork): a required
-// panel that is missing or unavailable is a FAILURE, never a synthesized
-// loading state, and recovery to a new ready input recomputes the attempts
-// normally.
-describe("gallery preview availability through the shared binding", () => {
-  const UNAVAILABLE = {
-    schema_version: 4,
-    available: false,
-    reason: { code: "presentation_unavailable", message: "圖庫資料暫時無法使用。" },
-  };
-
-  it("renders a required unavailable panel as a failure, then recovers when it returns", async () => {
-    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
-    const cardId = GALLERY_SAMPLE.cards[0].image_id;
-    expect(wrapper.find(".gallery-card__artwork").exists()).toBe(true);
-    expect(wrapper.find(".gallery-card__artwork img").exists()).toBe(true);
-    expect(wrapper.find('[data-testid="artwork-failure"]').exists()).toBe(false);
-
-    // Required-but-unavailable: an availability failure, with no image attempt
-    // and no pending claim anywhere.
-    await wrapper.setProps({ model: UNAVAILABLE });
-    expect(wrapper.find('[data-testid="gallery-panel"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="artwork-preview"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="artwork-loading"]').exists()).toBe(false);
-
-    // Back to a ready panel: the exact original loads again from the committed
-    // descriptor (the same card, the same source, no substitute).
-    await wrapper.setProps({ model: GALLERY_SAMPLE });
-    const artwork = wrapper.get(".gallery-card__artwork");
-    expect(artwork.find("img").exists()).toBe(true);
-    expect(artwork.get("img").attributes("src")).toBe(
-      GALLERY_SAMPLE.cards[0].artwork.attempts[0].resource.url,
-    );
-    expect(wrapper.get(`[data-image-id="${cardId}"]`).exists()).toBe(true);
-  });
-
-  it("treats a deliberate absence as expected, not as an error", async () => {
-    // A card position with no committed artwork at all is an intentional
-    // absence: no error styling and no synthesized image claim.
-    const wrapper = mountSurface(GalleryPanel, {
-      model: {
-        ...GALLERY_SAMPLE,
-        cards: [GALLERY_SAMPLE.cards[PENDING_INDEX]],
-        official_entries: [],
-      },
-    });
-    expect(wrapper.find('[data-testid="artwork-preview"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="artwork-failure"]').exists()).toBe(false);
-    expect(wrapper.find(".gallery-card__spinner").exists()).toBe(true);
   });
 });

@@ -97,7 +97,7 @@ export function artworkOriginal(artwork) {
 // card or catalog entry (`gallery.original:<image_id>`, `gallery.official:
 // <identity>`) and a runtime resource path embeds its kind directory, subject
 // key and image id — while the dispatched payload's subject comes independently
-// from the committed panel (`GalleryPanel.send`).
+// from the committed panel (`GalleryWindow.send`).
 export function artworkOriginalIdentity(artwork) {
   const entry = artworkOriginal(artwork);
   if (!artwork || !entry) {
