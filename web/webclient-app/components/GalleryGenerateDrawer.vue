@@ -28,9 +28,8 @@ const puppet = computed(() => subject.value?.is_current === true);
 // committed tile artwork (its bundled image) — and the copy speaks of a
 // background shared by every traveller, not of a portrait.
 const landscape = computed(() => pageShape(subject.value?.kind) === "landscape");
-const preview = computed(() => props.preview);
 const reference = computed(() => {
-  if (preview.value?.artwork) return { artwork: preview.value.artwork, id: preview.value.image_id, alt: preview.value.label };
+  if (props.preview?.artwork) return { artwork: props.preview.artwork, id: props.preview.image_id, alt: props.preview.label };
   if (landscape.value && subject.value?.artwork) {
     return { artwork: subject.value.artwork, id: subject.value.subject_key, alt: subject.value.display_name };
   }

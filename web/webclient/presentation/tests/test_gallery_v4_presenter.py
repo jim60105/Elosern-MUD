@@ -709,3 +709,26 @@ class GallerySceneProjectionTests(EvenniaTest):
         validate_gallery(panel)
         self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_scene_actor"))
         self.assertIsNone(panel["description"])
+
+    def test_scene_pending_and_unreadable_rows_keep_the_scene_shape(self):
+        from world.art.queue import enqueue_gallery_job
+
+        image, identity = self._card()
+        (self.root / identity).unlink()
+        pending = str(uuid.UUID(int=8))
+        enqueue_gallery_job(
+            self.subject, "測試背景", image_id=pending, binding=None, face_rect=None, requested_fields=[],
+        )
+        panel = self._scene_panel()
+        rows = {row["image_id"]: row for row in panel["cards"]}
+        self.assertEqual(
+            (rows[pending]["status"], rows[pending]["label"], rows[pending]["chips"]),
+            ("pending", "背景（生成中）", []),
+        )
+        self.assertIsNone(rows[pending]["artwork"]["terminal"])
+        # A card whose output vanished is a named fault at its own rank, no URL.
+        [fault] = rows[image]["artwork"]["attempts"]
+        self.assertEqual(
+            (fault["type"], fault["source_id"]), ("fault", descriptors.gallery_original_source_id(image))
+        )
+        self.assertEqual(_client_verdict(panel), "ok")

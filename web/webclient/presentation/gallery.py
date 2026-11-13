@@ -684,6 +684,23 @@ def _alpha_terminal(subject, entity):
     )
 
 
+def _card_geometry(subject, card):
+    """One readable card original's stored geometry, shaped by its kind.
+
+    A scene is a landscape: its decoded size only, never a face rectangle or a
+    stage. Built only for a presentable card, so a faulted card never reads it.
+    """
+    size = descriptors.image_size_payload(**card["image_size"])
+    if subject.kind is ArtSubjectKind.SCENE:
+        return descriptors.geometry(image_size=size, aspect_ratio=SCENE_ASPECT_RATIO)
+    return descriptors.geometry(
+        image_size=size,
+        face_rect=card["face_rect"],
+        stage=card["stage"],
+        aspect_ratio=GALLERY_ASPECT_RATIO,
+    )
+
+
 def _card_artwork(subject, card, generation, terminal):
     """The exact-original descriptor of one stored card row.
 
@@ -698,17 +715,6 @@ def _card_artwork(subject, card, generation, terminal):
     generation_subject, generation_state = generation
     source_id = descriptors.gallery_original_source_id(card["image_id"])
     identity, fault_reason = card_identity_resolution(subject, card)
-    size = descriptors.image_size_payload(**card["image_size"])
-    if subject.kind is ArtSubjectKind.SCENE:
-        # A landscape: its decoded size only, never a face rectangle or stage.
-        geometry = descriptors.geometry(image_size=size, aspect_ratio=SCENE_ASPECT_RATIO)
-    else:
-        geometry = descriptors.geometry(
-            image_size=size,
-            face_rect=card["face_rect"],
-            stage=card["stage"],
-            aspect_ratio=GALLERY_ASPECT_RATIO,
-        )
     if fault_reason is not None:
         attempts = [
             descriptors.fault_attempt(
@@ -726,7 +732,7 @@ def _card_artwork(subject, card, generation, terminal):
                     descriptors.identity_version(identity),
                     media_url_for(identity),
                     descriptors.ORIGIN_RUNTIME,
-                    geometry_payload=geometry,
+                    geometry_payload=_card_geometry(subject, card),
                 ),
             )
         ]
