@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "c164f7edbcdc21d4b98989f354336a7304337d4c16bb3bb26e89c86244a21ac9",
+  "fingerprint": "7f6dc3fc97abb46e0ef6cddc2aa6a5edc54e5b0ca22d58711764fcabeda463ec",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16045,10 +16045,10 @@
   "source_manifest": {
     "packages/map-core/elosern_map_core/__init__.py": "59b3cecd4635134b52d8cbdcde36495ed1bcc96ea4a827e7b6e7880e83faea75",
     "packages/map-core/elosern_map_core/__main__.py": "13613e2202d4caa31c5ec535d8cd34392f04058a9fcf1f8f54df1a737deb0528",
-    "packages/map-core/elosern_map_core/authoring.py": "14bcca8477b30750797c5038b5e79407a356011e1f70fee0784fb001f9ffb9d4",
+    "packages/map-core/elosern_map_core/authoring.py": "5255b4bb1cd29cf39137cb8ed0551a344b535b2954c0865ff6965a4279ace33c",
     "packages/map-core/elosern_map_core/codec.py": "432eb131d27b408d0a1e967f2818be1f464729981b0067d10b871dabe8e8ad93",
     "packages/map-core/elosern_map_core/diagnostics.py": "dfec5c3f7c2cc9becf393d337bf806d82aefa4f5911e969764983c1ddbc36ba5",
-    "packages/map-core/elosern_map_core/documents.py": "bc0c1425119fbc764c318271be6f85a39897b7a7441a63db182e35c205238a33",
+    "packages/map-core/elosern_map_core/documents.py": "95faf2f9bde565b363aa783df303684dfe073b7395ff66a2a90caf990ad0c61c",
     "packages/map-core/elosern_map_core/elevation.py": "4a39b109f5673e8119ba413554da15f507473413dad250cb335fcaecde2189e0",
     "packages/map-core/elosern_map_core/elevation_codec.py": "cac73e00dd59c56073f7aae3de37aa847257f1c0e78dd1ba7354eec2b6a799ac",
     "packages/map-core/elosern_map_core/geometry.py": "4ee8e4d4591476716b3225d74fd8f37c73848227a03c600e2a99706428bfadac",
@@ -16059,7 +16059,7 @@
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/roads.py": "8f709b73b0b90417e0c95c5633b5970cdb018b4510025c653c74d541664746f1",
     "packages/map-core/elosern_map_core/roads_codec.py": "2e0bb6b7c03a7ba25fa108a84f09bf4502ccdf6aff73bf21524d153ecedc627c",
-    "packages/map-core/elosern_map_core/schema.py": "b5d6dcb4e2112fbabe505a5fd13d9f8697078a681c1bba9d64c5bde509427051",
+    "packages/map-core/elosern_map_core/schema.py": "7b018b03745fe60bbb31f697a8f32455d1ca0ff7c3c946cdcd7432b91c5e7fdd",
     "packages/map-core/elosern_map_core/sources.py": "28bf407d12598d5c3933ac674f6b0ca4ad68792109f2880dbc10bcf27cd944de",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
@@ -16142,7 +16142,7 @@
     "world/lore/starting_kits.py": "7a030a0bc4cdf985868f6cdb5dd6bf7362afdbba3e4194f2316431fc84571fa8",
     "world/lore/sync.py": "045d594a1f3eb873eef1567fb7a2a9c62332b50dc76eb59b1e0b18554796bf66",
     "world/lore/titles.py": "5878ad1e457a6a644a0ad9b93035c55d6f7a7649e266049b2bfd66d4dc860793",
-    "world/lore/wilderness_entry.py": "68eb52bcdc05a965e95f5f42d61a273354cec01c0de18eb4babe5da6645031be",
+    "world/lore/wilderness_entry.py": "15f449bbafe237b52c84537056bb8fe93adaf63b877c4a5892bbbce4c7fbf63b",
     "world/lore/wilderness_regions.py": "78e42745940b8be25119259399ed92f25a8af67dc02af030c4828dc53f5af37f",
     "world/quests/__init__.py": "1ee2230f6b2f2893c1c1c71a339ccd2aabad28c2425c80d5989ac963d13a7f0d",
     "world/quests/acquire.py": "d7eb47755b3f8df62964fde5e2bb2302381dad7a82b3ff37eee804900382dfc8",
