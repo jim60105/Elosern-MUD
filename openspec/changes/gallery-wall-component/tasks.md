@@ -17,5 +17,5 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 3. Gates
 
-- [ ] 3.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-wall-component`; both pass.
-- [ ] 3.2 Run `openspec validate gallery-wall-component --strict`; it passes.
+- [x] 3.1 Run `pnpm test` and `uv run --locked python -m tools.contract_gate --change gallery-wall-component`; both pass.
+- [x] 3.2 Run `openspec validate gallery-wall-component --strict`; it passes.
