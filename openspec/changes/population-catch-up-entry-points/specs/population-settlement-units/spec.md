@@ -29,7 +29,7 @@ The observed units SHALL be the residual unit, every unit with a cell within the
 - **THEN** the third zone's unit is observed during the action and no longer afterwards
 
 ### Requirement: Actions begin with the units they touch current
-A command SHALL catch up the observed units before it parses or runs, a movement edge SHALL announce and catch up its destination before it is settled, and quest materialisation, GM placement, GM removal and the quest site-target read SHALL catch up their target cell before they read or write it. A failed catch-up before a command SHALL be reported as an error event and SHALL NOT prevent the command.
+A command SHALL catch up the observed units before it parses or runs, a movement edge SHALL announce and catch up its destination before it is settled, and quest materialisation, GM placement, GM removal, a GM hit-point edit of a monster and the quest site-target read SHALL catch up their target cell before they read or write it. A failed catch-up before a command SHALL be reported as an error event and SHALL NOT prevent the command.
 
 #### Scenario: Command after an untracked relocation
 - **WHEN** a player character was relocated beside a lagging unit without a clock advance and then runs any command
@@ -43,20 +43,3 @@ A command SHALL catch up the observed units before it parses or runs, a movement
 - **WHEN** the catch-up before a command raises
 - **THEN** one `population_catch_up_failed` error event is emitted and the command still runs
 
-### Requirement: Population writers refuse a lagging unit
-Outside a running settlement pass, registering an explicit group, recording a presence transition, recording a cell protection, and committing a monster departure SHALL raise a named error and write nothing when a unit of a cell they touch is behind the current world tick.
-
-#### Scenario: Explicit registration into a lagging unit
-- **WHEN** an explicit group is registered on a cell whose unit is at 100 while the world tick is 700
-- **THEN** the named not-current error is raised and no group, registration or transition is stored
-
-#### Scenario: Current unit and running pass
-- **WHEN** the same writers run for a cell of a current unit, or inside a settlement pass of the cell's unit
-- **THEN** they write as before
-
-### Requirement: The GM monster view reports settlement progress without settling
-The GM monster placement read SHALL report the settled-through tick of the monster's unit and SHALL mark a unit that is behind the world tick. The read SHALL NOT change any state.
-
-#### Scenario: Lagging monster
-- **WHEN** the placement section is read for a monster of a unit at 100 while the world tick is 700
-- **THEN** the section carries the progress row with 100 and the behind marker, and the unit still reports 100

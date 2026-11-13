@@ -13,8 +13,7 @@ This work is mandatory. No measurement decides whether it happens.
 - A catch-up operation settles the closed set of units around given cells from its cursor to the current tick, in its own transaction with full rollback, and emits one info event when it did work.
 - The set of observed units is defined: the residual unit, the units within ground sight of every player character, and the units around locations an action announced it is about to enter.
 - Every command starts by catching up the observed units. A movement edge announces and catches up its destination before it is settled. Quest materialisation, the GM placement and removal verbs and the quest site-target read catch up their target cell first.
-- Population writers refuse a cell whose unit is behind the current tick, with a named error and no write.
-- The GM monster view shows the settlement progress of the monster's unit and marks a unit that is behind. GM views never catch up.
+- Not in this change: the refusal of writes into a lagging unit and the GM progress read (`population-writer-guards`).
 
 ## Capabilities
 
@@ -24,12 +23,12 @@ None.
 
 ### Modified Capabilities
 
-- `population-settlement-units`: catch-up, observed units, the refusal of writes into a lagging unit, and the GM progress read.
+- `population-settlement-units`: catch-up, observed units, and the entry points that catch up before they act.
 
 ## Impact
 
-- Edits: `world/maps/population_units.py`, `world/maps/population_lifecycle.py`, `world/rules/clock.py`, `world/maps/regional_population.py`, `world/maps/monster_activity.py`, `world/maps/gm.py`, `world/quests/materializer.py`, `world/quests/runtime.py`, `world/rules/movement_settlement.py`, `commands/command.py`, `web/gm/readers/monsters.py`.
-- Tests: new `world/maps/tests/test_population_catch_up.py` (registered in `.github/evennia-shards.json`); one addition to the GM reader test that already asserts `placement_section` labels.
+- Edits: `world/maps/population_units.py`, `world/maps/population_lifecycle.py`, `world/rules/clock.py`, `world/maps/gm.py`, `world/rules/gm.py`, `world/quests/materializer.py`, `world/quests/runtime.py`, `world/rules/movement_settlement.py`, `commands/command.py`.
+- Tests: new `world/maps/tests/test_population_catch_up.py` (registered in `.github/evennia-shards.json`).
 - Documentation: `docs/development/regional-monster-population.md`, the event catalog §4.2 of `docs/superpowers/specs/2026-09-02-observability-logging-design.md`.
 - No command is added, removed or renamed; `docs/game/commands.md` is unaffected.
 
