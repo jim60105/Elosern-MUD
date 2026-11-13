@@ -88,6 +88,46 @@ places, so ask before you do it:
 A national location also needs its `ANCHOR_LORE` row (nation and population).
 That change stales the reference context; regenerate it.
 
+### Spacing rules for villages and hamlets
+
+Every new village and hamlet obeys these rules, measured in a straight line
+between cell centres:
+
+- a hamlet is at least 15 km from every capital, city, town, port, village and
+  other hamlet;
+- a village is at least 40 km from every capital, city, town, port and other
+  village.
+
+Elven villages and dungeons take no part, and no pair among the four larger
+kinds is checked. Along an official road, consecutive settlements are at most
+75 km apart by road length, and a road's own end cells count as settlements; a
+hamlet or village that is not on that road does not shorten the distance. That
+rule is checked only inside a completed area, and the completed-area list
+(`tools/settlement_spacing_areas.json`) is empty for now.
+
+A site whose design requires it carries an optional `spacing_exemption` with a
+non-blank English reason. A marked village or hamlet is skipped by the two
+minimum-spacing rules; the mark does nothing on any other kind.
+
+```yaml
+  hamlet_border_watch:
+    kind: hamlet
+    display_name_zh: 界橋哨
+    description: A garrison hamlet beside the bridge town.
+    cell: {cell_x: 880, cell_y: 1040}
+    geographic_constraint: Bridge approach on the trunk road
+    scene_archetype:
+    spacing_exemption: Border post beside the bridge town; the garrison lives outside the walls.
+```
+
+Validate the committed result with
+`uv run --locked python -m tools.settlement_spacing`; it writes nothing and
+prints one line per problem. Besides the spacing rules it checks the placement
+identity of every village and hamlet: the ID prefix, a unique display name, a
+lore row whose nation matches the nation of the cell's region and whose
+population lies in the kind's range, a cell outside the road-forbidden regions,
+and a village on a road cell.
+
 ## `content/maps/districts.yaml`
 
 A singleton (`id: districts`). These are the world-map districts that the

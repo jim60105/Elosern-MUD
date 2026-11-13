@@ -258,6 +258,21 @@ class QualityGateContractTests(unittest.TestCase):
             names.index("Validate map reference context freshness") + 1,
         )
 
+    def test_preflight_checks_the_settlement_spacing_after_the_road_network(self):
+        workflow = yaml.safe_load(
+            (REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8")
+        )
+        names = [step["name"] for step in workflow["jobs"]["preflight"]["steps"]]
+        steps = {step["name"]: step for step in workflow["jobs"]["preflight"]["steps"]}
+        self.assertEqual(
+            steps["Validate settlement spacing"]["run"],
+            "uv run --locked python -m tools.settlement_spacing",
+        )
+        self.assertEqual(
+            names.index("Validate settlement spacing"),
+            names.index("Validate road network freshness") + 1,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

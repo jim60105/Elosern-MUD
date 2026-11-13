@@ -39,6 +39,9 @@ uv run --locked python -m tools.map_reference_context [--check]
 uv run --locked python -m tools.road_network [--check]
 uv run --locked python -m tools.road_network --preview /tmp/roads.png   # review image, never committed
 
+# 5. Village and hamlet spacing, road coverage and placement identity (read-only)
+uv run --locked python -m tools.settlement_spacing
+
 # Settlement site context, size budget and terrain fit (read-only)
 uv run --locked python -m tools.settlement_synthesis site <location_id>
 uv run --locked python -m tools.settlement_synthesis budget <location_id>
@@ -48,6 +51,11 @@ uv run --locked python -m tools.settlement_synthesis lint [<map_id> ...]
 uv run --locked python -m unittest tests.test_map_authoring_contract
 uv run --locked python -m tools.contract_gate
 ```
+
+`tools.settlement_spacing` reads the map sources, the road artifact, the lore
+join and `tools/settlement_spacing_areas.json` and writes nothing. It prints
+one line per problem and then a summary; it exits 0 with no problem, 1 with any,
+and 2 when one of those inputs does not load.
 
 The three `settlement_synthesis` commands read the workspace and write nothing.
 `site` and `budget` print JSON. `lint` prints one line per finding and then a

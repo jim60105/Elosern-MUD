@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import sys
+from pathlib import Path
 
 import pytest
+
+# The package keeps its own project and lock, so the repository root that hosts
+# the traceability helper is not on this interpreter's path.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from tools.spec_traceability import covers_requirement  # noqa: E402
 
 import authoring_fixtures as fixtures
 from elosern_map_core.authoring import (
@@ -548,6 +558,73 @@ def test_a_zero_range_or_bound_is_legal_without_a_silhouette():
     assert world.diagnostics == ()
     district = world.districts.districts["demo_district"]
     assert (district.sight_km, district.light_km, district.silhouette_zh) == (0.0, 0.0, None)
+
+
+def _locations_with_exemption(**fields):
+    """The synthetic locations fixture with one extra flagged location."""
+
+    locations = fixtures.locations_data()
+    locations["locations"]["demo_hamlet"] = {
+        "kind": "hamlet",
+        "display_name_zh": "合成小村",
+        "description": "A synthetic hamlet.",
+        "cell": {"cell_x": 9, "cell_y": 9},
+        "geographic_constraint": "synthetic",
+        "scene_archetype": None,
+        **fields,
+    }
+    return locations
+
+
+@covers_requirement(
+    "map-geographic-sources::a-location-accepts-an-optional-spacing-exemption-reason"
+)
+def test_location_spacing_exemption_survives_parse_and_serialization():
+    reason = "Border post beside the bridge town; the garrison lives outside the walls."
+    world = load_authoring_world(
+        fixtures.custom_sources(
+            settlement=fixtures.settlement_data(),
+            locations=_locations_with_exemption(spacing_exemption=reason),
+        )
+    )
+    assert world.diagnostics == ()
+    assert world.locations.locations["demo_hamlet"].spacing_exemption == reason
+    # An unauthored exemption stays absent; no reason is invented for it.
+    assert world.locations.locations["demo_location"].spacing_exemption is None
+
+    reparsed = parse_document(
+        fixtures.LOCATIONS_PATH, serialize_document(world.locations)
+    ).document
+    assert reparsed.locations["demo_hamlet"].spacing_exemption == reason
+    assert reparsed.locations["demo_location"].spacing_exemption is None
+
+
+@covers_requirement(
+    "map-geographic-sources::a-location-accepts-an-optional-spacing-exemption-reason"
+)
+@pytest.mark.parametrize(
+    "reason",
+    [
+        # An empty or whitespace-only reason is not authored text.
+        "",
+        "   ",
+        # The reason bound is counted in code points.
+        "字" * 257,
+    ],
+)
+def test_location_spacing_exemption_rejects_unauthored_reasons(reason):
+    with pytest.raises(AuthoringError) as captured:
+        load_authoring_world(
+            fixtures.custom_sources(
+                settlement=fixtures.settlement_data(),
+                locations=_locations_with_exemption(spacing_exemption=reason),
+            )
+        )
+    assert "invalid_field_value" in _codes(captured.value)
+    assert any(
+        "spacing_exemption" in item.field_path
+        for item in captured.value.diagnostics
+    )
 
 
 def test_elevation_shapes_valid_candidate_loads_and_preserves_order():

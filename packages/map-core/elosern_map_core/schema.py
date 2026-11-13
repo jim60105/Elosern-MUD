@@ -426,6 +426,9 @@ _LOCATION = _mapping(
         "cell": _cell(),
         "geographic_constraint": _str(),
         "scene_archetype": _nullable(_str()),
+        "spacing_exemption": _str(
+            required=False, max_length=256, non_blank=True
+        ),
     },
 )
 

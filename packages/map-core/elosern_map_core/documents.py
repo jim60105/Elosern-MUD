@@ -248,6 +248,7 @@ class LocationDeclaration:
     cell: Cell
     geographic_constraint: str
     scene_archetype: str | None
+    spacing_exemption: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -485,6 +486,7 @@ class LocationsDocument(AuthoringDocument):
                 cell=_cell(value["cell"]),
                 geographic_constraint=str(value["geographic_constraint"]),
                 scene_archetype=value.get("scene_archetype"),
+                spacing_exemption=value.get("spacing_exemption"),
             )
             for key, value in self.data["locations"].items()
         }
