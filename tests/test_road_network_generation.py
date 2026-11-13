@@ -489,6 +489,14 @@ class RoadSpurStageTests(unittest.TestCase):
         self.assertEqual(_end(spur, "v_one"), (9, 10))
         self.assertEqual(_end(spur, "node_b"), (18, 10))
 
+    def test_a_cost_tie_goes_to_the_smaller_key(self):
+        inp = _input(
+            _open(21),
+            {"node_a": [(2, 10)], "node_b": [(18, 10)]},
+            spur_nodes=_spurs(v_one=(10, 10)),
+        )
+        self.assertEqual(_end(_spur_roads(inp)["v_one"], "node_a"), (2, 10))
+
     def _beside_a_trunk(self, reuse: float) -> tuple[Road, Road]:
         inp = _input(
             _open(44),
@@ -870,6 +878,15 @@ class RoadRefusalTests(unittest.TestCase):
         with self.assertRaises(RoadGenerationError) as caught:
             generate_road_network(inp)
         self.assertIn("node node_a: duplicate node key", caught.exception.problems)
+
+    @covers_requirement(
+        "road-network-generation::generation-refuses-an-invalid-network"
+    )
+    def test_a_village_without_any_stage_one_node_is_named(self):
+        inp = _input(_open(8), {}, spur_nodes=_spurs(v_one=(4, 4)))
+        with self.assertRaises(RoadGenerationError) as caught:
+            generate_road_network(inp)
+        self.assertIn("node v_one: has no road", caught.exception.problems)
 
     @covers_requirement(
         "road-network-generation::generation-refuses-an-invalid-network"

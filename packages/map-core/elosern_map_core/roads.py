@@ -321,8 +321,8 @@ def _check_input(inp: RoadInput) -> list[str]:
                     f"node {node.key}: gate approach {cell} is shared with {other}"
                 )
     for node in inp.spur_nodes:
-        if not node.approaches:
-            problems.append(f"node {node.key}: has no village cell")
+        if len(node.approaches) != 1:
+            problems.append(f"node {node.key}: needs exactly one village cell")
         for cell in node.approaches:
             if not _in_frame(inp, cell) or not open_cells[cell[1], cell[0]]:
                 problems.append(
