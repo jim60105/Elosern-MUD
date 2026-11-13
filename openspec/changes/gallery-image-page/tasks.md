@@ -8,7 +8,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 2. Component
 
-- [ ] 2.1 Create `components/GalleryImagePage.vue` per design D1, D3, D4, D5; add component tests for the deletion and fact-cell requirements and a style lint to the same test file. Verify `pnpm test -- gallery_image_page` passes.
+- [x] 2.1 Create `components/GalleryImagePage.vue` per design D1, D3, D4, D5; add component tests for the deletion and fact-cell requirements and a style lint to the same test file. Verify `pnpm test -- gallery_image_page` passes.
 
 ## 3. Stories
 
