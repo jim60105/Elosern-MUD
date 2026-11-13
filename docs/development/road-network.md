@@ -28,9 +28,9 @@ uv run --locked python -m tools.road_network --preview /tmp/roads.png
   byte for byte. It never writes. CI runs it in the preflight job, in the step
   "Validate road network freshness".
 - `--preview PATH` also writes a PNG of the whole frame. North is up. The image
-  shows sea, land, unwalkable land, forbidden-region land, fords, road cells and
-  the nodes' gate approaches. Keep the path outside the repository; the image is
-  never committed.
+  shows sea, land, unwalkable land, forbidden-region land, fords, trunk road
+  cells, spur road cells in a second colour and every node's gate approaches.
+  Keep the path outside the repository; the image is never committed.
 - `--output PATH` writes or checks another file instead of the committed one.
 
 When the self-check fails, the command prints every problem, naming the node or
@@ -96,10 +96,16 @@ document, or with no wilderness gate, is not a node. It joins the network after
 its document gains gates and the network is regenerated. No other change is
 needed.
 
+A village is not that kind of node. It is a spur endpoint by its kind and its
+cell alone: it needs no settlement document and no gate, and its own cell is
+the cell the spur approaches. No hamlet is ever a road endpoint.
+
 Roads begin and end on gate approach cells. They never enter an anchor
 footprint or the point gateway of a location that is not a node. They also
 never cross a forbidden region, so each side of a forbidden barrier forms its
-own network.
+own network. The footprint and gateway cells of a village or a hamlet are the
+one exception: they stay open to roads. A hamlet may therefore stand on a road
+cell, and no stage-one road depends on a village placed later.
 
 ## Determinism
 
@@ -135,6 +141,38 @@ The generator runs three stages, and each parameter acts on one or more of them.
    `reuse_factor` times its cost, so later roads join earlier ones. This
    discount affects routing only. It never changes which pairs are kept.
 
+### Spur stage
+
+Routing is not the last stage. After it, on the same cost field and with every
+trunk step already priced at `reuse_factor`:
+
+1. The villages are processed in identifier order, each exactly once.
+2. One search walks outward from the village cell over the repriced field. That
+   single pass gives the walking cost of every candidate node and the path to
+   it, so the chosen node and the route can never disagree.
+3. The candidates are the stage-one nodes and the villages already processed.
+   The cheapest candidate wins, and a tie goes to the smaller identifier. A
+   village that sorts later may therefore end its spur on a village that sorts
+   earlier, but never on one that sorts later.
+4. The spur is recorded with its village as owner, and its cells are marked on
+   the road exactly as a trunk's are, so a later spur may reuse them.
+
+A village standing on a trunk cell still gets its own spur row. The row runs
+along the trunk to the cheapest node and adds no new road cell; it is what
+marks the village as served. A statistic over road length must therefore count
+distinct cells rather than add up road lengths.
+
+Generation fails, naming the village, when a village cell is not on the cost
+field or when the village reaches no candidate node.
+
+In the artifact a road row is
+`{"cells": [...], "first": "...", "second": "...", "spur_of": "..."}` when it is
+a spur, and it has no `spur_of` key when it is a trunk. The owner is always one
+of the row's two settlement keys, and the fingerprint covers it, so a mark
+edited without re-signing the artifact is rejected on read. A network with no
+village carries no mark at all and encodes to exactly the bytes the generator
+wrote before spurs existed.
+
 ### The parameters
 
 | Parameter | Range | Stage | Effect |
@@ -145,7 +183,7 @@ The generator runs three stages, and each parameter acts on one or more of them.
 | `noise_amplitude` | 0 to 0.9 | Cost field | The strength of the seeded noise on step costs. At 0 there is no noise. |
 | `noise_wavelength_cells` | ≥ 2 | Cost field | The size of the noise features, in cells. Small values jitter, large values vary gently. |
 | `noise_seed` | integer ≥ 0 | Cost field | Which noise pattern is used. A different seed rerolls the pattern. |
-| `node_kinds` | list | Nodes | Which location kinds become nodes. See "What a node is". |
+| `node_kinds` | list | Nodes | Which location kinds become nodes. See "What a node is". A spur or open-cell kind is refused, because a village is a spur endpoint and never a node. |
 | `forbidden_regions` | list | Cost field | Regions that carry no road. Today only `north_deep_forest`. |
 
 `forbidden_regions` and `node_kinds` are decisions about the world, not tuning.
