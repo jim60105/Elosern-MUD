@@ -15,8 +15,8 @@ The gallery SHALL expose exactly the categories `mine`, `party`, `people`, `mons
 - **THEN** their keys are exactly `mine`, `party`, `people`, `monster`, `scene` in that order
 
 #### Scenario: Unreleased categories are disabled with a reason
-- **WHEN** the categories are built while the scene source is not released
-- **THEN** `scene` is disabled with a non-empty reason and a count of zero, and the other four are enabled with a null reason
+- **WHEN** the categories are built with every source released
+- **THEN** all five categories are enabled with a null reason
 
 #### Scenario: Building reads only
 - **WHEN** the categories and their groups are built twice for the same actor
@@ -84,3 +84,14 @@ The `people` category SHALL list every named NPC in the owning character's met-p
 #### Scenario: Possession lists the owner's people
 - **WHEN** the puppet is a companion possessed by character C
 - **THEN** `people` lists C's met people
+
+### Requirement: The scene category lists entered archetypes
+The `scene` category SHALL list, in one unlabeled group and in registry order, the scene archetypes recorded in the owning character's scene-entry record that are still registered, each as its scene subject named by the archetype's display name.
+
+#### Scenario: Only entered archetypes are listed
+- **WHEN** the synthetic registry declares `t_arch`, `t_other` and `t_third` and the owner has entered `t_third` and `t_arch`
+- **THEN** `scene` lists `t_arch` then `t_third` in one group without a label
+
+#### Scenario: Nothing entered lists nothing
+- **WHEN** the owner has entered no archetype
+- **THEN** `scene` is enabled with count zero and no subject

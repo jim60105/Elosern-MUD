@@ -28,8 +28,12 @@ subjects).
 1. Source: `_scene_groups(actor)` → one group `("scene", None, None, None,
    refs)` with `GallerySubjectRef(scene_subject_for(k), None,
    registry[k].display_name_zh[:64], False)` for `k in
-   entered_archetypes(gallery_owner(actor))`. Delete `DISABLED_REASONS` and
-   its use (every category enabled); keep the `enabled`/`reason` fields.
+   entered_archetypes(gallery_owner(actor))`; no group at all when nothing is
+   entered, so the wall shows its empty state. Every category is enabled:
+   `DISABLED_REASONS` becomes empty rather than deleted, because the selection
+   store's refusal of a disabled category and the stored-view fallback from a
+   disabled category stay specified (`webclient-gallery-management-actions`,
+   `webclient-gallery-panel`); keep the `enabled`/`reason` fields.
 2. Tile artwork for scene subjects: `validate_artwork(describe_scene(SceneTarget(
    identity=f"gallery:scene:{key}", trusted_identity=False, archetype=key,
    room_art_key=None, room_binding_invalid=False)))`.
@@ -38,8 +42,16 @@ subjects).
    way `describe_scene` builds it (extract a presenter helper
    `scene_bundled_terminal(archetype)` in `world/art/presenter.py`).
    `_validate_card_artwork` and its JS mirror accept, for a scene subject,
-   a `TERMINAL_SCENE_IMAGE` terminal, and keep requiring the alpha terminal
-   for portrait kinds.
+   a `TERMINAL_SCENE_IMAGE` terminal naming the archetype's own bundled image
+   (`scene.terminal:<key>`, bundled origin, terminal rank) or no terminal when
+   the bundled snapshot does not admit that image (a logged startup fault
+   that must not make the panel unavailable), and keep requiring the alpha
+   terminal for portrait kinds. A scene original carries its decoded size and
+   no face rectangle or stage. The card's terminal is deliberately the
+   archetype's own image, not `describe_scene`'s declared terminal key.
+   Chips follow the declared capabilities: the face chip appears exactly when
+   the kind declares face rectangles, so a scene card's chips are
+   `["目前預設"]`; scene rows are labelled 背景 / 背景（生成中）.
 4. `description = SCENE_ARCHETYPE_REGISTRY[key].scene_sentence[:512]` when the
    selected subject is a scene, else `None`.
 5. Validators: Python admits `ArtSubjectKind.SCENE`; JS regex becomes
@@ -47,6 +59,9 @@ subjects).
    for the scene kind; gallery URL checks use that directory. Add parity cases.
 6. Actions: in `_mutate` and `_mutate_official`, `elif parsed.kind is
    ArtSubjectKind.SCENE: subject, entity = scene_subject_for(parsed.key), None`.
+   A scene holds no official entry and no personal official preference, so
+   `_mutate_official` refuses a scene subject with `official_unsupported`
+   before any write.
 
 ## Risks / Trade-offs
 

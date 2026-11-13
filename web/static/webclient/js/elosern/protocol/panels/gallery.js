@@ -54,6 +54,10 @@ var GALLERY_CARD_FIELDS = [
 // (mirror of world/art/descriptors.py and the fallback-key vocabulary).
 var GALLERY_RANK_ORIGINAL = 10;
 var GALLERY_RANK_ALPHA = 100;
+// The scene chain's terminal rank (mirror of descriptors.SCENE_RANK_TERMINAL):
+// a scene card row's fallback is the archetype's own bundled image there.
+var SCENE_RANK_TERMINAL = 100;
+var GALLERY_FACE_CHIPS = ["預設臉框", "自訂臉框"];
 var GALLERY_DEFAULTS_URL_PREFIX = "/art/defaults/";
 var GALLERY_DEFAULTS_IDENTITY_PREFIX = "defaults/";
 var GALLERY_FALLBACK_EXTENSION = ".webp";
@@ -97,14 +101,16 @@ function galleryNumber(value, name) {
 function gallerySubject(value) {
   galleryText(value, 128, "subject_key");
 
-  var match = /^(portrait:(character|monster)):(.+)$/u.exec(value);
+  // The gallery-bearing kinds: a portrait (its directory is the portrait
+  // kind's tail) or a scene archetype (directory `scene`).
+  var match = /^(portrait:(character|monster)|scene):(.+)$/u.exec(value);
   if (!match) throw new Error("invalid gallery subject");
   var key = match[3];
   if (codePoints(key) > 64 || utf8Bytes(key) > 200 || /[|/:{}]/u.test(key) ||
       /[\p{C}\p{Z}]/u.test(key.replace(/ /g, ""))) {
     throw new Error("invalid subject key");
   }
-  return { kind: match[1], directory: match[2], key: key };
+  return { kind: match[1], directory: match[2] || "scene", key: key };
 }
 
 function galleryUuid(value) {
@@ -200,6 +206,22 @@ function validateGalleryTerminal(terminal) {
 }
 
 
+// A scene card row's terminal: the archetype's own bundled image at the scene
+// terminal rank, or none (a bundled image the server snapshot does not admit).
+function validateGallerySceneTerminal(terminal, selected) {
+  if (terminal === null) return;
+  if (terminal.kind !== "scene_image" || terminal.rank !== SCENE_RANK_TERMINAL) {
+    throw new Error("scene terminal must be the scene image at its own rank");
+  }
+  if (terminal.resource.origin !== artwork.ORIGIN_BUNDLED_OFFICIAL) {
+    throw new Error("scene terminal must be the bundled scene image");
+  }
+  if (terminal.source_id !== artwork.SOURCE_PREFIX.sceneTerminal + selected.key) {
+    throw new Error("scene terminal must name the archetype's own image");
+  }
+}
+
+
 // One card row's descriptor: its exact original at its own rank, or its named
 // fault. A stored card contributes exactly one rank-10 runtime candidate
 // naming the selected subject's own image with the exact stored geometry; a
@@ -217,7 +239,9 @@ function validateGalleryCardArtwork(row, selected) {
     }
     return;
   }
-  validateGalleryTerminal(descriptor.terminal);
+  var scene = selected.kind === "scene";
+  if (scene) validateGallerySceneTerminal(descriptor.terminal, selected);
+  else validateGalleryTerminal(descriptor.terminal);
   var source = artwork.SOURCE_PREFIX.original + row.image_id;
   if (attempts.length !== 1 || attempts[0].source_id !== source) {
     throw new Error("a card row carries exactly one exact-original attempt");
@@ -241,7 +265,13 @@ function validateGalleryCardArtwork(row, selected) {
     throw new Error("url must name selected subject and image");
   }
   var geometry = resource.geometry;
-  if (geometry === null || geometry.image_size === null ||
+  if (scene) {
+    // A landscape carries its decoded size and no face rectangle or stage.
+    if (geometry === null || geometry.image_size === null ||
+        geometry.face_rect !== null || geometry.stage !== null) {
+      throw new Error("a scene original carries its size and no face or stage");
+    }
+  } else if (geometry === null || geometry.image_size === null ||
       geometry.face_rect === null || geometry.stage === null) {
     throw new Error("the exact original must carry its stored geometry");
   }
@@ -493,8 +523,11 @@ function validateGalleryCardFacts(payload, capability, selected) {
     validateGalleryCardArtwork(row, selected);
     if (row.status !== "card") return;
     var slotChips = GALLERY_SLOT_LABELS.filter(function (label) { return chips.indexOf(label) !== -1; });
-    var faceChips = chips.filter(function (c) { return c === "預設臉框" || c === "自訂臉框"; });
-    if (faceChips.length !== 1) throw new Error("exactly one face chip required");
+    var faceChips = chips.filter(function (c) { return GALLERY_FACE_CHIPS.indexOf(c) !== -1; });
+    // A face chip exactly when the kind declares face rectangles.
+    if (faceChips.length !== (capability.supports_face_rect ? 1 : 0)) {
+      throw new Error("face chip differs from the face-rectangle capability");
+    }
     var expected = slotChips.concat(faceChips, row.is_default ? ["目前預設"] : []);
     if (JSON.stringify(chips) !== JSON.stringify(expected) || Boolean(slotChips.length) !== row.binding_present) {
       throw new Error("incoherent chips");

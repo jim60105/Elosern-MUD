@@ -7,7 +7,8 @@ The gallery window's closed category set, each bounded by its own source:
 - ``party``: the owning character's live companions in party order;
 - ``people``: the owning character's met named NPCs, one group per place in
   recency order;
-- ``scene``: disabled in this programme stage;
+- ``scene``: the scene archetypes the owning character has entered, in
+  registry order, in one unlabeled group;
 - ``monster``: sighted visual species grouped by the threat tier of their
   default variant, in tier-registry order, each tier carrying ``seen / total``.
 
@@ -25,7 +26,7 @@ from typing import Any
 from evennia.objects.models import ObjectDB
 
 from world.art.subjects import (
-    ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
+    ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for, scene_subject_for,
 )
 from world.lore.monster_species import MONSTER_SPECIES_REGISTRY, MONSTER_VARIANT_REGISTRY
 from world.lore.monster_visuals import get_monster_visual_registry
@@ -35,9 +36,13 @@ from world.rules.account_roster import AccountRosterError, build_account_roster
 from world.rules.lore_knowledge import LoreRecordError, list_discovered
 from world.rules.met_people import met_people, place_label
 from world.rules.party import bound_owner_of, live_companions
+from world.rules.scene_visits import entered_archetypes
 
 CATEGORY_KEYS = ("mine", "party", "people", "monster", "scene")
-DISABLED_REASONS = {"scene": "背景分類尚未開放。"}
+# Every category is released (``gallery-scene-category``). The mapping stays
+# as the one place a category could be withheld again: the selection store and
+# the stored-view fallback still honor a disabled category, as specified.
+DISABLED_REASONS: dict[str, str] = {}
 MAX_DISPLAY_NAME = 64
 
 
@@ -234,7 +239,37 @@ def _people(actor: Any) -> tuple[GalleryGroup, ...]:
     )
 
 
-_SOURCES = {"mine": _mine, "party": _party, "people": _people, "monster": _monster}
+def _scene(actor: Any) -> tuple[GalleryGroup, ...]:
+    # Imported here so the registry is read as currently bound (a scoped
+    # synthetic registry included), never captured at import.
+    from world.lore import scene_archetypes
+
+    registry = scene_archetypes.SCENE_ARCHETYPE_REGISTRY
+    refs = []
+    for key in entered_archetypes(gallery_owner(actor)):
+        archetype = registry.get(key)
+        if archetype is None:
+            continue
+        try:
+            subject = scene_subject_for(key)
+        except ArtSubjectError as exc:
+            log_warn(
+                "gallery_subject_invalid",
+                context={"archetype": key, "category": "scene"}, exc=exc,
+            )
+            continue
+        refs.append(
+            GallerySubjectRef(subject, None, _display_name(archetype.display_name_zh), False)
+        )
+    # Nothing entered lists no group at all, so the wall shows its empty state.
+    if not refs:
+        return ()
+    return (GalleryGroup("scene", None, None, None, tuple(refs)),)
+
+
+_SOURCES = {
+    "mine": _mine, "party": _party, "people": _people, "monster": _monster, "scene": _scene,
+}
 
 
 def _enabled(key: str) -> bool:

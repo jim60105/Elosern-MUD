@@ -44,7 +44,13 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.maps import wilderness_provider
 from world.rules.clock import get_world_clock
 from world.rules.met_people import PLACE_REGION, record_person_interaction
-from world.tests.synthetic_data import make_monster_species, make_monster_tier, make_monster_variant
+from world.art import descriptors, scene_definitions
+from world.art.presenter import describe_scene
+from world.rules.art_view import SceneTarget
+from world.rules.scene_visits import record_scene_entry
+from world.tests.synthetic_data import (
+    make_archetype, make_monster_species, make_monster_tier, make_monster_variant, synthetic_registries,
+)
 
 ROOT = Path(__file__).resolve().parents[4]
 SUBJECT = "portrait:character:t_gallery_actor"
@@ -84,9 +90,11 @@ def wire_cases():
         add(action, action, accepted=True)
         add(action, action + " extra", lambda p: p.update(item_key="t_smuggled"))
         add(action, action + " missing", lambda p: p.pop("subject_key"))
-        for key in (None, 7, "scene:t_room", "portrait:character:", "portrait:character:a/b", "portrait:character:" + "a" * 65, "portrait:character:" + "𠮷" * 51, "portrait:character:a\u200db"):
+        for key in (None, 7, "scene:", "scene:t/room", "portrait:character:", "portrait:character:a/b", "portrait:character:" + "a" * 65, "portrait:character:" + "𠮷" * 51, "portrait:character:a\u200db"):
             add(action, action + " bad subject " + repr(key), lambda p, key=key: p.update(subject_key=key))
         add(action, action + " key cap", lambda p: p.update(subject_key="portrait:character:" + "𠮷" * 50), True)
+        # A scene archetype is a gallery subject; admission is the adapter's.
+        add(action, action + " scene subject", lambda p: p.update(subject_key="scene:t_room"), True)
         if "image_id" in PAYLOADS[action]:
             for value in (None, True, IMAGE.upper(), IMAGE.replace("-", ""), IMAGE + "\n"):
                 add(action, action + " UUID " + repr(value), lambda p, value=value: p.update(image_id=value))
@@ -889,7 +897,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         with patch.object(actions, "is_subject_admitted") as admitted:
             for adapter in (actions._gallery_default_set_adapter, actions._gallery_official_select_adapter):
                 with self.subTest(adapter=adapter.__name__), self.assertRaises(ProtocolValidationError):
-                    adapter(self.actor, {"subject_key": "scene:t_room", "image_id": IMAGE, "identity": OFFICIAL_IDENTITY}, self.transport)
+                    adapter(self.actor, {"subject_key": "scene:t/room", "image_id": IMAGE, "identity": OFFICIAL_IDENTITY}, self.transport)
         admitted.assert_not_called()
 
     def category_dispatch(self, category, payload=None):
@@ -1802,3 +1810,164 @@ class OfficialPreferenceActionTests(EvenniaTest):
         self.assertEqual(stored["stored_identity"], identity)
         self.assertEqual(self._world()[0], official_before)
         self.assertTrue(target.exists())
+
+
+T_SCENE = "t_scene_arch"
+T_SCENE_UNENTERED = "t_scene_unentered"
+SCENE_EXTRA = {
+    "archetypes": {
+        T_SCENE: make_archetype(T_SCENE, display_name_zh="甲測景"),
+        T_SCENE_UNENTERED: make_archetype(T_SCENE_UNENTERED, display_name_zh="乙測景"),
+    },
+}
+
+
+def _bundled_scene(key):
+    """One synthetic admitted bundled scene illustration."""
+    fingerprint = f"{key}".encode("utf-8").hex().ljust(64, "0")[:64]
+    return scene_definitions.BundledSceneImage(
+        key=key,
+        identity=f"{scene_definitions.BUNDLED_SCENE_IDENTITY_PREFIX}{key}/{fingerprint}"
+        f"{scene_definitions.BUNDLED_SCENE_EXTENSION}",
+        filename=scene_definitions.bundled_asset_filename(key),
+        fingerprint=fingerprint,
+        image_size={"width": 16, "height": 9},
+    )
+
+
+@synthetic_registries("archetypes", extra=SCENE_EXTRA)
+class SceneGalleryActionTests(EvenniaTest):
+    """The existing gallery actions resolve scene subjects through the scene producer."""
+
+    account_typeclass = Account
+
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        settings = override_settings(ART_STORE_ROOT=self.tmp.name)
+        settings.enable()
+        self.addCleanup(settings.disable)
+        get_world_clock()
+        definitions = {
+            key: scene_definitions.SceneArtDefinition(key=key, terminal_key=key)
+            for key in (T_SCENE, T_SCENE_UNENTERED)
+        }
+        catalog = scene_definitions.BundledSceneCatalog(
+            {key: _bundled_scene(key) for key in (T_SCENE, T_SCENE_UNENTERED)}
+        )
+        for name, value in (("SCENE_ART_DEFINITIONS", definitions), ("_BUNDLED", catalog)):
+            patcher = patch.object(scene_definitions, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.catalog = catalog
+        self.actor = create_object(PlayerCharacter, key="測試角色", location=self.room1)
+        self.actor.db.portrait_policy = {"mode": "named", "stable_key": "t_scene_actor"}
+        self.actor.account = self.account
+        self.account.characters.add(self.actor)
+        self.subject = ArtSubject(ArtSubjectKind.SCENE, T_SCENE)
+        self.registry = build_production_registry()
+        self.action_registry = build_production_action_registry()
+        self.transport = SimpleNamespace(
+            ndb=SimpleNamespace(), puppet=self.actor, protocol_key="websocket", msg=lambda **kwargs: None,
+        )
+        attach_coordinator(self.transport, self.registry)
+
+    def run_action(self, action, payload):
+        # The entry is recorded inside the synthetic registry scope (setUp is
+        # outside it, where the synthetic archetype is not registered).
+        record_scene_entry(self.actor, T_SCENE)
+        return self.action_registry.spec(action).adapter(self.actor, payload, self.transport)
+
+    def card(self):
+        image_id = str(uuid.UUID(int=11))
+        identity = f"gallery/scene/{T_SCENE}/{image_id}.png"
+        path = self.root / identity
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic-scene")
+        api.append_card(
+            self.subject, image_id=image_id, stored_identity=identity, prompt=None, seed=None,
+            checkpoint=None, requested_fields=[], binding=None, source="generated",
+            image_size={"width": 1536, "height": 864}, created_at=100,
+        )
+        return image_id
+
+    def background(self):
+        return describe_scene(SceneTarget(
+            identity=f"t:{T_SCENE}", trusted_identity=False, archetype=T_SCENE,
+            room_art_key=None, room_binding_invalid=False,
+        ))
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
+    def test_generating_a_scene_image_queues_one_job(self):
+        result = self.run_action(
+            "gallery.generate", {"subject_key": self.subject.full(), "fields": [], "custom_prompt": ""}
+        )
+        self.assertEqual(result["outcome"], "success")
+        jobs = queue.pending_gallery_jobs(self.subject)
+        self.assertEqual([job["image_id"] for job in jobs], [result["data"]["image_id"]])
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
+    def test_deleting_a_scene_card_returns_to_the_bundled_image(self):
+        image_id = self.card()
+        first = self.background()["attempts"][0]
+        self.assertEqual(first["source_id"], descriptors.scene_generated_source_id(self.subject.full()))
+        result = self.run_action(
+            "gallery.card.delete", {"subject_key": self.subject.full(), "image_id": image_id}
+        )
+        self.assertEqual(result["outcome"], "success")
+        self.assertEqual(api.cards_for(self.subject), [])
+        images = [entry for entry in self.background()["attempts"] if entry["type"] == "image"]
+        self.assertEqual(images[0]["source_id"], descriptors.scene_bundled_source_id(T_SCENE))
+        self.assertEqual(images[0]["resource"]["url"], self.catalog.url_for(T_SCENE))
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
+    def test_a_face_rectangle_on_a_scene_card_is_refused(self):
+        image_id = self.card()
+        before = api.cards_for(self.subject)
+        result = self.run_action("gallery.face_rect.update", {
+            "subject_key": self.subject.full(), "image_id": image_id,
+            "face_rect": {"x": 0.1, "y": 0.1, "w": 0.4, "h": 0.4},
+        })
+        self.assertEqual((result["outcome"], result["code"]), ("rejected", "face_rect_unsupported"))
+        self.assertEqual(api.cards_for(self.subject), before)
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
+    def test_an_unentered_scene_is_not_admitted(self):
+        unentered = ArtSubject(ArtSubjectKind.SCENE, T_SCENE_UNENTERED)
+        result = self.run_action(
+            "gallery.generate", {"subject_key": unentered.full(), "fields": [], "custom_prompt": ""}
+        )
+        self.assertEqual((result["outcome"], result["code"]), ("rejected", "subject_not_admitted"))
+        self.assertEqual(queue.pending_gallery_jobs(unentered), [])
+
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
+    def test_official_preferences_are_refused_for_a_scene_without_a_write(self):
+        self.card()
+        before = [
+            (record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
+            for record in api.GalleryRecord.objects.order_by("pk")
+        ]
+        for action, payload in (
+            ("gallery.official.clear_selection", {"subject_key": self.subject.full()}),
+            ("gallery.official.select", {"subject_key": self.subject.full(), "identity": OFFICIAL_IDENTITY}),
+        ):
+            with self.subTest(action=action):
+                result = self.run_action(action, payload)
+                self.assertEqual((result["outcome"], result["code"]), ("rejected", "official_unsupported"))
+        after = [
+            (record.pk, {attribute.key: deepcopy(attribute.value) for attribute in record.attributes.all()})
+            for record in api.GalleryRecord.objects.order_by("pk")
+        ]
+        self.assertEqual(before, after)

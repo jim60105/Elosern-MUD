@@ -642,7 +642,7 @@ function onKeydown(event) {
 
 .gpage--landscape .gpage__facts {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas:
     "head facts"
@@ -671,13 +671,20 @@ function onKeydown(event) {
   line-height: 1.8;
 }
 
+/* The facts keep the quest detail's two cells to a row: the 圖片 cell (its
+   label and note) spans the row, and 生成時間 sits beside 標記, so a stored
+   card's facts still read without scrolling at the reference viewport. */
 .gpage--landscape .gpage__cond {
   grid-area: facts;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: var(--sp-4);
+  gap: var(--sp-4) var(--sp-5);
   padding-left: var(--sp-5);
   border-left: var(--gpage-hair) solid var(--gpage-line);
+}
+
+.gpage--landscape .gpage__cell[data-cell="image"] {
+  grid-column: 1 / -1;
 }
 
 /* The narrow facts column breaks a note at its punctuation, never inside a

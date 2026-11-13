@@ -5,7 +5,8 @@ import {
   GALLERY_V4_MINE,
   GALLERY_V4_MINE_BLANK,
   GALLERY_V4_MONSTER,
-  GALLERY_V4_SCENE_PANELS,
+  GALLERY_V4_SCENE,
+  GALLERY_V4_SCENE_BUNDLED,
   galleryStoryModel,
 } from "../gallery-fixtures-v4.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
@@ -125,10 +126,10 @@ const noImage = { model: galleryStoryModel(GALLERY_V4_MINE_BLANK), pick: () => (
 // A scene's generated image (gallery-landscape-page): the landscape page, the
 // 16:9 art above, the description left and the facts right; 生成圖 with
 // 刪除 · 重新生成.
-const sceneCard = { model: galleryStoryModel(GALLERY_V4_SCENE_PANELS.generated), pick: card(0) };
+const sceneCard = { model: galleryStoryModel(GALLERY_V4_SCENE), pick: card(0) };
 // A scene without a generated image: its bundled tile artwork as 官方內建圖,
 // 生成新圖.
-const sceneBundled = { model: galleryStoryModel(GALLERY_V4_SCENE_PANELS.bundled), pick: () => ({ type: "empty" }) };
+const sceneBundled = { model: galleryStoryModel(GALLERY_V4_SCENE_BUNDLED), pick: () => ({ type: "empty" }) };
 
 // 刪除 pressed once: the alert warning, 確認刪除 and 取消 (focused).
 async function armDelete({ canvasElement }) {

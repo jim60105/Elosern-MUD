@@ -7,7 +7,10 @@ is a synthetic terrain region. Every projection goes through
 ``validate_gallery``; the tests re-validate each one explicitly.
 """
 
+import hashlib
+import json
 from pathlib import Path
+import subprocess
 import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -27,6 +30,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
 from typeclasses.rooms import TerrainRoom
 from web.webclient.presentation import gallery as gallery_module
+from web.webclient.presentation import gallery_categories
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.gallery import gallery_presenter, validate_gallery
 from web.webclient.presentation.gallery_categories import is_subject_admitted
@@ -38,6 +42,7 @@ from web.webclient.presentation.gallery_selection import (
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
+from world.art import descriptors, scene_definitions
 from world.art import gallery as gallery_api
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.maps import wilderness_provider
@@ -46,7 +51,9 @@ from world.rules.lore_knowledge import record_species_sighting
 from world.rules.met_people import PLACE_REGION, record_person_interaction
 from world.rules.party import join_party
 from world.rules.possession import enter_possession
+from world.rules.scene_visits import record_scene_entry
 from world.tests.synthetic_data import (
+    make_archetype,
     make_monster_species,
     make_monster_tier,
     make_monster_variant,
@@ -211,7 +218,7 @@ class GalleryV4PresenterTests(EvenniaTest):
         counts = {row["key"]: (row["count"], row["enabled"]) for row in panel["categories"]}
         self.assertEqual(counts, {
             "mine": (2, True), "party": (1, True), "people": (0, True),
-            "monster": (1, True), "scene": (0, False),
+            "monster": (1, True), "scene": (0, True),
         })
         self.assertIsNotNone(companion)
 
@@ -440,7 +447,8 @@ class GalleryV4PresenterTests(EvenniaTest):
     def test_a_disabled_remembered_category_falls_back_to_mine(self):
         session = self._session()
         session.ndb.gallery_view = GalleryViewSelection(self.actor.pk, "scene", ())
-        panel = self._build(session)
+        with patch.dict(gallery_categories.DISABLED_REASONS, {"scene": "測試停用"}):
+            panel = self._build(session)
         self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_v4_actor"))
 
     @covers_requirement(
@@ -517,7 +525,8 @@ class GalleryV4PresenterTests(EvenniaTest):
         select_gallery_category(session, self.actor, "party")
         stored = session.ndb.gallery_view
         for category in ("scene", "t_unknown", None):
-            result = select_gallery_category(session, self.actor, category)
+            with patch.dict(gallery_categories.DISABLED_REASONS, {"scene": "測試停用"}):
+                result = select_gallery_category(session, self.actor, category)
             self.assertEqual(
                 result,
                 {"outcome": "rejected", "code": "unknown_category", "message": "找不到此圖庫分類"},
@@ -536,3 +545,205 @@ class GalleryV4PresenterTests(EvenniaTest):
         telnet.protocol_key = "telnet"
         self.assertEqual(select_gallery_category(telnet, self.actor, "monster")["code"], "unknown_category")
         self.assertIsNone(telnet.ndb.__dict__.get("gallery_view"))
+
+
+ROOT = Path(__file__).resolve().parents[4]
+T_ARCH = "t_arch"
+T_OTHER = "t_other"
+T_ARCH_SENTENCE = "測試用的林間空地，霧氣低垂。"
+SCENE_EXTRA = {
+    "archetypes": {
+        T_ARCH: make_archetype(T_ARCH, display_name_zh="甲測景", scene_sentence=T_ARCH_SENTENCE),
+        T_OTHER: make_archetype(T_OTHER, display_name_zh="乙測景"),
+    },
+}
+
+
+def _bundled_image(key):
+    """One synthetic admitted bundled scene illustration."""
+    fingerprint = hashlib.sha256(f"bundled:{key}".encode("utf-8")).hexdigest()
+    return scene_definitions.BundledSceneImage(
+        key=key,
+        identity=f"{scene_definitions.BUNDLED_SCENE_IDENTITY_PREFIX}{key}/{fingerprint}"
+        f"{scene_definitions.BUNDLED_SCENE_EXTENSION}",
+        filename=scene_definitions.bundled_asset_filename(key),
+        fingerprint=fingerprint,
+        image_size={"width": 16, "height": 9},
+    )
+
+
+def _client_verdict(panel):
+    """``ok`` when the client mirror's validator accepts ``panel``, else its error."""
+    script = """
+const fs = require('node:fs');
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+try { protocol.validateGalleryPanel(JSON.parse(fs.readFileSync(0, 'utf8'))); process.stdout.write('ok'); }
+catch (error) { process.stdout.write(String(error.message)); }
+"""
+    output = subprocess.run(
+        ["node", "-e", script], input=json.dumps(panel), text=True, capture_output=True, cwd=ROOT, check=True,
+    )
+    return output.stdout
+
+
+@synthetic_registries("archetypes", extra=SCENE_EXTRA)
+class GallerySceneProjectionTests(EvenniaTest):
+    """Scene subjects carry the background in effect, their cards and their sentence."""
+
+    account_typeclass = Account
+    character_typeclass = PlayerCharacter
+
+    def setUp(self):
+        super().setUp()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        settings = override_settings(ART_STORE_ROOT=self.tmp.name)
+        settings.enable()
+        self.addCleanup(settings.disable)
+        definitions = {
+            key: scene_definitions.SceneArtDefinition(key=key, terminal_key=T_OTHER)
+            for key in (T_ARCH, T_OTHER)
+        }
+        catalog = scene_definitions.BundledSceneCatalog(
+            {key: _bundled_image(key) for key in (T_ARCH, T_OTHER)}
+        )
+        for name, value in (("SCENE_ART_DEFINITIONS", definitions), ("_BUNDLED", catalog)):
+            patcher = patch.object(scene_definitions, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.catalog = catalog
+        self.registry = build_production_registry()
+        self.actor = self.char1
+        self.account.characters.add(self.actor)
+        self.actor.db.portrait_policy = {"mode": "named", "stable_key": "t_scene_actor"}
+        self.subject = ArtSubject(ArtSubjectKind.SCENE, T_ARCH)
+
+    def _session(self):
+        session = SimpleNamespace(
+            ndb=SimpleNamespace(), puppet=self.actor,
+            protocol_key="websocket", msg=lambda *args, **kwargs: None,
+        )
+        attach_coordinator(session, self.registry)
+        return session
+
+    def _scene_panel(self):
+        # Entered inside the test's synthetic registry scope (setUp is outside
+        # it, where the synthetic archetype is not registered).
+        record_scene_entry(self.actor, T_ARCH)
+        session = self._session()
+        self.assertEqual(select_gallery_category(session, self.actor, "scene")["outcome"], "success")
+        panel = gallery_presenter(build_presentation_context(session, self.actor))
+        validate_gallery(panel)
+        return panel
+
+    def _card(self):
+        image = str(uuid.UUID(int=7))
+        identity = f"gallery/scene/{T_ARCH}/{image}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"image")
+        gallery_api.append_card(
+            self.subject, image_id=image, stored_identity=identity, prompt=None, seed=None,
+            checkpoint=None, requested_fields=[], binding=None, source="generated",
+            created_at=200, image_size={"width": 1536, "height": 864},
+        )
+        return image, identity
+
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
+    def test_a_scene_without_a_card_shows_its_bundled_image(self):
+        panel = self._scene_panel()
+        self.assertEqual((panel["category"], panel["selected"]), ("scene", f"scene:{T_ARCH}"))
+        tile = panel["groups"][0]["subjects"][0]
+        self.assertEqual((tile["kind"], tile["display_name"], tile["card_count"]), ("scene", "甲測景", 0))
+        images = [entry for entry in tile["artwork"]["attempts"] if entry["type"] == "image"]
+        self.assertEqual(images[0]["source_id"], descriptors.scene_bundled_source_id(T_ARCH))
+        self.assertEqual(images[0]["resource"]["url"], self.catalog.url_for(T_ARCH))
+        # An untrusted gallery identity authorizes no retained room pixels.
+        self.assertEqual(tile["artwork"]["subject_id"], f"gallery:scene:{T_ARCH}")
+        self.assertEqual(tile["artwork"]["retention_sources"], [])
+        self.assertEqual(panel["cards"], [])
+        self.assertEqual(panel["description"], T_ARCH_SENTENCE)
+        self.assertEqual(
+            (panel["capabilities"]["supports_face_rect"], panel["capabilities"]["max_cards"]), (False, 1)
+        )
+        self.assertEqual(_client_verdict(panel), "ok")
+
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
+    def test_a_scene_card_row_is_a_landscape_original(self):
+        image, identity = self._card()
+        panel = self._scene_panel()
+        tile = panel["groups"][0]["subjects"][0]
+        self.assertEqual(tile["card_count"], 1)
+        self.assertEqual(
+            tile["artwork"]["attempts"][0]["source_id"],
+            descriptors.scene_generated_source_id(f"scene:{T_ARCH}"),
+        )
+        [row] = panel["cards"]
+        self.assertEqual((row["image_id"], row["status"], row["label"]), (image, "card", "背景"))
+        self.assertEqual((row["is_default"], row["chips"]), (True, ["目前預設"]))
+        [attempt] = row["artwork"]["attempts"]
+        resource = attempt["resource"]
+        self.assertTrue(resource["url"].startswith(f"/art/gallery/scene/{T_ARCH}/{image}"))
+        self.assertEqual(resource["resource_id"], identity)
+        self.assertEqual(
+            resource["geometry"],
+            {"image_size": {"width": 1536, "height": 864}, "face_rect": None, "stage": None, "aspect_ratio": "16:9"},
+        )
+        terminal = row["artwork"]["terminal"]
+        self.assertEqual(terminal["kind"], descriptors.TERMINAL_SCENE_IMAGE)
+        self.assertEqual(terminal["source_id"], descriptors.scene_terminal_source_id(T_ARCH))
+        self.assertEqual(terminal["resource"]["url"], self.catalog.url_for(T_ARCH))
+        self.assertEqual(_client_verdict(panel), "ok")
+
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
+    def test_a_scene_card_without_an_admitted_bundled_image_has_no_terminal(self):
+        self._card()
+        partial = scene_definitions.BundledSceneCatalog({T_OTHER: _bundled_image(T_OTHER)})
+        with patch.object(scene_definitions, "_BUNDLED", partial), \
+                patch("world.art.presenter.log_warn") as warn:
+            panel = self._scene_panel()
+        self.assertIsNone(panel["cards"][0]["artwork"]["terminal"])
+        self.assertIn("gallery_scene_terminal_missing", [call.args[0] for call in warn.call_args_list])
+        self.assertEqual(_client_verdict(panel), "ok")
+
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
+    def test_non_scene_subjects_carry_no_description(self):
+        panel = gallery_presenter(build_presentation_context(self._session(), self.actor))
+        validate_gallery(panel)
+        self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_scene_actor"))
+        self.assertIsNone(panel["description"])
+
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
+    def test_scene_pending_and_unreadable_rows_keep_the_scene_shape(self):
+        from world.art.queue import enqueue_gallery_job
+
+        image, identity = self._card()
+        (self.root / identity).unlink()
+        pending = str(uuid.UUID(int=8))
+        enqueue_gallery_job(
+            self.subject, "測試背景", image_id=pending, binding=None, face_rect=None, requested_fields=[],
+        )
+        panel = self._scene_panel()
+        rows = {row["image_id"]: row for row in panel["cards"]}
+        self.assertEqual(
+            (rows[pending]["status"], rows[pending]["label"], rows[pending]["chips"]),
+            ("pending", "背景（生成中）", []),
+        )
+        self.assertIsNone(rows[pending]["artwork"]["terminal"])
+        # A card whose output vanished is a named fault at its own rank, no URL.
+        [fault] = rows[image]["artwork"]["attempts"]
+        self.assertEqual(
+            (fault["type"], fault["source_id"]), ("fault", descriptors.gallery_original_source_id(image))
+        )
+        self.assertEqual(_client_verdict(panel), "ok")

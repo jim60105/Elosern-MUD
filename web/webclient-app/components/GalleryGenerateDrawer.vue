@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import HudDrawer from "./HudDrawer.vue";
 import ArtworkPreview from "./ArtworkPreview.vue";
 import { GALLERY_FIELDS, GALLERY_SLOTS } from "./gallery-copy.js";
+import { pageShape } from "./gallery-window-model.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -15,11 +16,26 @@ const emit = defineEmits(["close", "submit", "character", "log"]);
 const fields = ref([]);
 const prompt = ref("");
 const count = computed(() => [...prompt.value].length);
-// The character-data link belongs only to the live character: the committed
-// subject tile of the selection marks it `is_current`.
-const puppet = computed(() => props.model.groups
+// The committed subject tile of the selection.
+const subject = computed(() => props.model.groups
   ?.flatMap((group) => group.subjects)
-  .find((row) => row.subject_key === props.model.selected)?.is_current === true);
+  .find((row) => row.subject_key === props.model.selected) ?? null);
+// The character-data link belongs only to the live character: its tile is
+// marked `is_current`.
+const puppet = computed(() => subject.value?.is_current === true);
+// A scene (change gallery-scene-category) is a landscape: the reference shows
+// the background in effect at 16:9 — the stored card, else the subject's
+// committed tile artwork (its bundled image) — and the copy speaks of a
+// background shared by every traveller, not of a portrait.
+const landscape = computed(() => pageShape(subject.value?.kind) === "landscape");
+const reference = computed(() => {
+  if (props.preview?.artwork) return { artwork: props.preview.artwork, id: props.preview.image_id, alt: props.preview.label };
+  if (landscape.value && subject.value?.artwork) {
+    return { artwork: subject.value.artwork, id: subject.value.subject_key, alt: subject.value.display_name };
+  }
+  return null;
+});
+
 function submit() {
   if (!props.disabled) emit("submit", {
     fields: props.model.capabilities?.supports_field_selection ? [...fields.value] : [],
@@ -31,6 +47,18 @@ function submit() {
 <template>
   <div class="gallery-ui">
     <HudDrawer :open="true" title="生成新圖" drawer-key="gallery-generate" @close="emit('close')">
+      <template v-if="landscape">
+      <p class="gallery-muted">依照這個場景的設定，重新繪製它的背景圖。</p>
+      <figure class="gallery-editor-scene" data-testid="gallery-generate__scene">
+        <ArtworkPreview v-if="reference" class="gallery-editor-scene__art" :artwork="reference.artwork" :panel="model" :view-subject-id="reference.id" :alt="reference.alt" />
+        <p v-else class="gallery-editor-placeholder gallery-editor-scene__art">新的風景<br>即將展開</p>
+        <figcaption>
+          <strong>{{ subject?.display_name }}</strong>
+          <span class="gallery-muted">{{ preview?.artwork ? "目前的背景" : "目前使用官方內建圖" }}</span>
+        </figcaption>
+      </figure>
+      </template>
+      <template v-else>
       <p class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
@@ -48,6 +76,7 @@ function submit() {
       <p v-if="model.capabilities?.supports_field_selection" class="gallery-counter">已選 {{ fields.length }} / 5</p>
       </div>
       </div>
+      </template>
       <section v-if="model.equipment_summary" class="gallery-section">
         <h4>目前裝備摘要</h4>
         <button v-if="puppet" class="gallery-link" @click="emit('character')">從角色資料檢視</button>
@@ -68,7 +97,8 @@ function submit() {
         <textarea id="gallery-prompt" v-model="prompt" :disabled="disabled" placeholder="例如：月光下的城牆、回頭凝視、微笑……"></textarea>
         <p class="gallery-counter">{{ count }} / 512</p>
       </section>
-      <p v-if="model.capabilities?.max_cards === 1" class="gallery-note">此圖庫保留一張肖像，生成完成後會替換原圖。</p>
+      <p v-if="landscape" class="gallery-note">背景只保留一張，生成完成後會替換原圖；這是世界共用的背景，所有旅人看到的都會一起改變。</p>
+      <p v-else-if="model.capabilities?.max_cards === 1" class="gallery-note">此圖庫保留一張肖像，生成完成後會替換原圖。</p>
       <p class="gallery-note">送出後會在圖庫中顯示生成中卡片，完成時自動加入圖庫。</p>
       <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，輸入已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
       <template #foot>

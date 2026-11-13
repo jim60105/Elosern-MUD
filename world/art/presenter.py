@@ -122,6 +122,10 @@ MAX_PORTRAIT_MEDIA_URL = 256
 # matching the wire validator's portrait aspect.
 GALLERY_ASPECT_RATIO = "3:4"
 
+# The fixed aspect ratio of a scene gallery card row's geometry: a scene card
+# is a 16:9 landscape (the same ratio the scene generation requests).
+SCENE_ASPECT_RATIO = "16:9"
+
 
 def _record_for(subject: ArtSubject) -> ArtAssetRecord | None:
     return ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
@@ -781,6 +785,37 @@ def _scene_bundled_resource(catalog, key: str) -> dict | None:
     )
 
 
+def _scene_image_terminal(key: str, resource: dict) -> dict:
+    """One bundled scene image as a descriptor's scene-image terminal."""
+    return descriptors.terminal(
+        descriptors.TERMINAL_SCENE_IMAGE,
+        descriptors.scene_terminal_source_id(key),
+        descriptors.SCENE_RANK_TERMINAL,
+        resource,
+    )
+
+
+def scene_bundled_terminal(archetype: str) -> dict | None:
+    """The archetype's OWN bundled illustration as a scene-image terminal.
+
+    The terminal a scene gallery card row carries (``gallery-scene-category``):
+    when the card's exact original cannot be shown, the archetype's bundled
+    image stands in for it. This deliberately differs from ``describe_scene``,
+    whose terminal is the archetype's DECLARED terminal key (omitted when it
+    is the archetype itself): a card row names one archetype's image, so its
+    fallback is that archetype's own bundled illustration. ``None`` when the
+    bundled snapshot does not admit it (a recorded startup fault), logged once
+    per call so the missing required image stays visible.
+    """
+    from world.art.scene_definitions import current_bundled_scenes
+
+    resource = _scene_bundled_resource(current_bundled_scenes(), archetype)
+    if resource is None:
+        log_warn("gallery_scene_terminal_missing", context={"archetype": archetype})
+        return None
+    return _scene_image_terminal(archetype, resource)
+
+
 def _scene_official_resource(official_catalog, identity: str) -> dict | None:
     """The admitted operator image of one identity as a canonical resource.
 
@@ -968,14 +1003,7 @@ def _malformed_scene_descriptor(identity: str) -> dict:
     source_id = descriptors.scene_terminal_source_id(TOWN_TERMINAL_KEY)
     resource = _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
     terminal_payload = (
-        None
-        if resource is None
-        else descriptors.terminal(
-            descriptors.TERMINAL_SCENE_IMAGE,
-            source_id,
-            descriptors.SCENE_RANK_TERMINAL,
-            resource,
-        )
+        None if resource is None else _scene_image_terminal(TOWN_TERMINAL_KEY, resource)
     )
     return descriptors.descriptor(
         subject_id=identity,
@@ -1165,12 +1193,7 @@ def describe_scene(target) -> dict:
                 )
             )
         else:
-            terminal_payload = descriptors.terminal(
-                descriptors.TERMINAL_SCENE_IMAGE,
-                terminal_source,
-                descriptors.SCENE_RANK_TERMINAL,
-                terminal_resource,
-            )
+            terminal_payload = _scene_image_terminal(terminal_key, terminal_resource)
 
     gallery_failed = (
         gallery_record is not None and bool(gallery_record.db.last_error_code)
@@ -1288,12 +1311,7 @@ def describe_dream_scene(subject_id: str) -> dict:
                 )
             )
         else:
-            terminal_payload = descriptors.terminal(
-                descriptors.TERMINAL_SCENE_IMAGE,
-                terminal_source,
-                descriptors.SCENE_RANK_TERMINAL,
-                terminal_resource,
-            )
+            terminal_payload = _scene_image_terminal(terminal_key, terminal_resource)
 
     return descriptors.descriptor(
         subject_id=subject_id,

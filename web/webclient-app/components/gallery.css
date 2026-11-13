@@ -53,3 +53,10 @@
 .gallery-editor-layout .gallery-choice { padding: calc(10px * var(--ui-scale)); gap: calc(8px * var(--ui-scale)); }
 .gallery-editor-layout .gallery-choice__glyph { width: calc(22px * var(--ui-scale)); font-size: var(--text-xl); }
 .gallery-editor-layout .gallery-muted { font-size: var(--text-xs); }
+/* The scene reference (gallery-scene-category): the background in effect at
+   16:9 across the sheet, its name and source beneath, in the page's frame. */
+.gallery-editor-scene { margin: calc(18px * var(--ui-scale)) 0; padding: calc(6px * var(--ui-scale)); border: 1px solid #bca57977; border-radius: var(--radius-sm); background: linear-gradient(145deg, #51402733, #11141c); }
+.gallery-editor-scene__art { aspect-ratio: 16 / 9; width: 100%; height: auto; overflow: hidden; border-radius: var(--radius-sm); }
+.gallery-editor-scene .gallery-editor-placeholder { height: auto; margin: 0; }
+.gallery-editor-scene figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: calc(12px * var(--ui-scale)); padding: calc(10px * var(--ui-scale)) calc(6px * var(--ui-scale)) calc(4px * var(--ui-scale)); }
+.gallery-editor-scene figcaption strong { color: var(--paper-50); font-family: var(--f-display); letter-spacing: .06em; font-weight: normal; font-size: var(--text-lg); }

@@ -8,7 +8,9 @@ import {
   GALLERY_V4_MONSTER,
   GALLERY_V4_PARTY,
   GALLERY_V4_PEOPLE,
-  GALLERY_V4_SCENE_PANELS,
+  GALLERY_V4_SCENE,
+  GALLERY_V4_SCENE_BUNDLED,
+  GALLERY_V4_SCENE_EMPTY,
   galleryStoryModel,
 } from "../gallery-fixtures-v4.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
@@ -77,20 +79,22 @@ export const Monsters = { ...atReference, args: { model: GALLERY_V4_MONSTER } };
 // selected; the other places are heading buttons carrying their count, and a
 // press shows the gallery.group.select it would send.
 export const People = { ...atReference, args: { model: GALLERY_V4_PEOPLE } };
-// 背景 (gallery-landscape-page; enabled here ahead of gallery-scene-category):
+// 背景 (gallery-scene-category): the scenes the character has entered —
 // 16:9 tiles, no tray, and the landscape page on the generated scene — 生成圖,
 // 刪除 · 重新生成.
-export const Scenes = { ...atReference, args: { model: GALLERY_V4_SCENE_PANELS.generated } };
+export const Scenes = { ...atReference, args: { model: GALLERY_V4_SCENE } };
 // A scene without a generated image: the page shows its bundled image as
 // 官方內建圖 and offers 生成新圖.
-export const SceneBundled = { ...atReference, args: { model: GALLERY_V4_SCENE_PANELS.bundled } };
+export const SceneBundled = { ...atReference, args: { model: GALLERY_V4_SCENE_BUNDLED } };
+// A character who has entered no scene yet: the wall's empty state.
+export const SceneNoneEntered = { ...atReference, args: { model: GALLERY_V4_SCENE_EMPTY } };
 
 export const MyCharactersFullHd = { ...atFullHd, args: { model: GALLERY_V4_MINE_ROSTER } };
 export const FirstReleaseFullHd = { ...atFullHd, args: { model: GALLERY_V4_MINE } };
 export const MonstersFullHd = { ...atFullHd, args: { model: GALLERY_V4_MONSTER } };
 export const PeopleFullHd = { ...atFullHd, args: { model: GALLERY_V4_PEOPLE } };
-export const ScenesFullHd = { ...atFullHd, args: { model: GALLERY_V4_SCENE_PANELS.generated } };
-export const SceneBundledFullHd = { ...atFullHd, args: { model: GALLERY_V4_SCENE_PANELS.bundled } };
+export const ScenesFullHd = { ...atFullHd, args: { model: GALLERY_V4_SCENE } };
+export const SceneBundledFullHd = { ...atFullHd, args: { model: GALLERY_V4_SCENE_BUNDLED } };
 
 // ---- the interactive storyboard ---------------------------------------------
 

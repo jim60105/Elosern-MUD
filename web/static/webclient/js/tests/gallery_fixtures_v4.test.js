@@ -32,19 +32,16 @@ test("every exported v4 gallery fixture passes validateGalleryPanel", async () =
   }
 });
 
-// The scene panels (change gallery-landscape-page) are rendered by the
-// landscape page before gallery-scene-category admits `scene:<archetype>`
-// subject keys, so they live in a container rather than among the validated
-// panels. This pin fails once the validator admits scene keys; the panels then
-// move into the validated set and this test is removed.
-test("the scene panels are refused for their scene subject key until scenes are admitted", async () => {
+// The scene panels (change gallery-scene-category) are validated members of
+// the exported set: scene subject keys, landscape card originals and the
+// bundled-scene terminal are protocol-valid on the client mirror.
+test("the scene panels are validated exports", async () => {
   const module = await import(FIXTURES);
-  const panels = Object.entries(module.GALLERY_V4_SCENE_PANELS);
-  assert.ok(panels.length >= 2, `expected the scene panels, found ${panels.length}`);
-  for (const [name, panel] of panels) {
-    assert.equal(panel.kind, "gallery", name);
-    assert.equal(panel.schema_version, Protocol.GALLERY_SCHEMA_VERSION, name);
+  for (const name of ["GALLERY_V4_SCENE", "GALLERY_V4_SCENE_BUNDLED", "GALLERY_V4_SCENE_EMPTY"]) {
+    const panel = module[name];
+    assert.equal(panel.category, "scene", name);
     assert.ok(panel.groups.every((group) => group.subjects.every((row) => row.subject_key.startsWith("scene:"))), name);
-    assert.throws(() => Protocol.validateGalleryPanel(panel), /^Error: invalid gallery subject$/, name);
+    assert.doesNotThrow(() => Protocol.validateGalleryPanel(panel), name);
   }
+  assert.equal(module.GALLERY_V4_SCENE_PANELS, undefined);
 });
