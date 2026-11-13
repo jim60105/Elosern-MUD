@@ -37,7 +37,11 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monster_visuals
 
 from tools.spec_traceability import covers_requirement
-from world.tests.synthetic_data import SYNTH_MONSTER_SPECIES, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
+    synthetic_registries,
+)
 
 # Deterministic 1x1 valid PNG bytes so Pillow decodes a valid size
 _SEED_BYTES = base64.b64decode(
@@ -74,6 +78,10 @@ def _character(key):
 
 def _monster(key):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
+
+
+def _scene(key):
+    return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
 class _SeedTree:
@@ -155,7 +163,11 @@ class _TempRoots(EvenniaTestCase):
 
     def _identity_for(self, subject: ArtSubject, filename: str) -> tuple[str, str]:
         """(image_id, stored_identity) a seed file must sync under."""
-        kind_dir = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+        kind_dir = {
+            ArtSubjectKind.CHARACTER: "character",
+            ArtSubjectKind.MONSTER: "monster",
+            ArtSubjectKind.SCENE: "scene",
+        }[subject.kind]
         image_id = derive_image_id(f"{kind_dir}/{subject.key}/{filename}")
         return image_id, f"gallery/{kind_dir}/{subject.key}/{image_id}{Path(filename).suffix}"
 
@@ -677,6 +689,51 @@ class MonsterCapTests(_TempRoots):
         self.assertEqual(summary["appended"], 0)
         self.assertIn("invalid_subject_key_skipped", self._reasons())
         self.assertEqual(cards_for(_monster(retired)), [])
+
+
+@synthetic_registries("archetypes")
+class SceneDirectoryTests(_TempRoots):
+    """``scene/`` folders seed cards only for registered archetypes.
+
+    Change ``scene-kind-gallery`` made the scene kind gallery-bearing, so the
+    seed traversal now admits ``scene/``; the typed producer is the registry
+    check an unregistered folder must fail.
+    """
+
+    @covers_requirement(
+        "art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive"
+    )
+    def test_a_registered_scene_folder_syncs_exactly_one_card(self):
+        archetype = sorted(SYNTH_ARCHETYPES)[0]
+        self.tree.image("scene", archetype, "a.png")
+        summary = sync_all()
+        cards = cards_for(_scene(archetype))
+        image_id, identity = self._identity_for(_scene(archetype), "a.png")
+        self.assertEqual(summary["appended"], 1)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["image_id"], image_id)
+        self.assertEqual(cards[0]["stored_identity"], identity)
+        self.assertTrue((self.store_root / identity).is_file())
+        self.assertEqual(record_for(_scene(archetype)).db.default_image_id, image_id)
+
+    def test_an_unregistered_scene_folder_is_refused_with_nothing_written(self):
+        unregistered = _unique("scene")
+        self.tree.image("scene", unregistered, "a.png")
+        summary = sync_all()
+        self.assertEqual(summary["appended"], 0)
+        self.assertIn("invalid_subject_key_skipped", self._reasons())
+        self.assertIsNone(record_for(_scene(unregistered)))
+        gallery_root = self.store_root / "gallery"
+        self.assertEqual(
+            [
+                path
+                for path in gallery_root.rglob("*")
+                if path.is_file()
+            ]
+            if gallery_root.is_dir()
+            else [],
+            [],
+        )
 
 
 class GeneratedCardIsolationTests(_TempRoots):

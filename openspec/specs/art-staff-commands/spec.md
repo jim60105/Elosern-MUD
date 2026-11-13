@@ -140,14 +140,14 @@ request seam. It SHALL report both counts.
 ### Requirement: @art requeue accepts one validated full subject key and forces regeneration under the lock
 `commands/art.py::CmdArtRequeue` (`@art requeue <full-subject-key>`) SHALL parse and validate exactly
 one full subject key through the subject parser. An invalid key SHALL be rejected with a named error
-and no record change. A key whose subject kind declares NO gallery — a scene key — SHALL reset the
-classic record to `pending` under the queue lock, preserve the prior valid output, and SHALL be the
-only way an ordinary-lifecycle pass can force regeneration of that record.
+and no record change. A key whose subject kind declares a gallery — character, species-keyed monster and scene alike —
+SHALL request one gallery generation through the shared seam and SHALL NOT reset or create a classic
+record.
 
 #### Scenario: A validated key forces regeneration
-- **WHEN** staff runs `@art requeue scene:forest_path`
-- **THEN** the scene record becomes `pending`, its prior valid output is preserved, and a regeneration
-  is queued under the queue lock
+- **WHEN** staff runs `@art requeue scene:<archetype>` for a registered synthetic archetype that holds one card
+- **THEN** one gallery generation is requested, no classic record is reset or created, and the existing
+  card stays until the new card replaces it under the declared maximum
 
 #### Scenario: An invalid key is rejected with no record change
 - **WHEN** staff runs `@art requeue` with a malformed or unknown full subject key
@@ -193,8 +193,8 @@ only way an ordinary-lifecycle pass can force regeneration of that record.
 - **THEN** a named invalid-subject error is returned with no generation, record reset or conversion
 
 ### Requirement: Players have no access to any art control
-No `@art` subcommand SHALL be available to ordinary players, and no player-triggered retry or
-regeneration surface SHALL exist.
+No `@art` subcommand SHALL be available to ordinary players. Player-triggered generation SHALL exist
+only through the gallery management actions, for subjects admitted to the acting player.
 
 #### Scenario: All subcommands require staff
 - **WHEN** every `@art` subcommand's access is exercised with a non-staff caller

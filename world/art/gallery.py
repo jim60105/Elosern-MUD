@@ -212,8 +212,8 @@ def record_for(
     """Return the subject's gallery record, never scanning.
 
     The read path (``create=False``) never creates: a subject with no record
-    is the legal empty-gallery state. Creation is guarded against scene
-    subjects — scenes have no gallery (declared, not compared).
+    is the legal empty-gallery state. Creation is guarded against a subject
+    kind whose declaration grants no gallery (declared, not compared).
     """
     with gallery_lock:
         record = (
@@ -223,7 +223,9 @@ def record_for(
         if record is not None or not create:
             return record
         if not gallery_kinds.has_gallery(subject.kind.value):
-            raise GalleryRecordError("scene subjects have no gallery")
+            raise GalleryRecordError(
+                f"subject kind {subject.kind.value!r} declares no gallery"
+            )
         return _create_record(subject)
 
 
@@ -548,7 +550,9 @@ def validate_card(
         )
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:
-        raise GalleryRecordError("scene subjects have no gallery cards")
+        raise GalleryRecordError(
+            f"subject kind {capability.kind_value!r} declares no gallery cards"
+        )
     kind_directory = capability.store_directory
 
     image_id = _canonical_uuid_text(card["image_id"])

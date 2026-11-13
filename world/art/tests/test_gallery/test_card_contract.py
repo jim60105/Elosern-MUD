@@ -181,23 +181,29 @@ class CardContractTests(unittest.TestCase):
                     )
 
     @covers_requirement("art-gallery-model::an-image-card-carries-the-exact-reproduction-placement-and-provenance-contract")
-    def test_a_scene_subject_can_have_no_cards(self):
+    def test_a_scene_card_carries_the_scene_directory_identity(self):
+        # ``scene-kind-gallery``: ``scene`` is one of the three kind
+        # directories a stored card may name, and a card naming any other
+        # directory for a scene subject is still refused.
         scene = _scene()
         image_id = _new_id()
-        with self.assertRaises(GalleryRecordError):
-            validate_card(
-                {
-                    "image_id": image_id,
-                    "stored_identity": f"gallery/scene/{scene.key}/{image_id}.png",
-                    "prompt": None,
-                    "seed": None,
-                    "checkpoint": None,
-                    "requested_fields": [],
-                    "binding": None,
-                    "source": "seed",
-                },
-                scene,
-            )
+        stored = validate_card(_card_fields(scene, image_id=image_id), scene)
+        self.assertEqual(
+            stored["stored_identity"], f"gallery/scene/{scene.key}/{image_id}.png"
+        )
+        for wrong_directory in ("character", "monster"):
+            with self.subTest(directory=wrong_directory):
+                with self.assertRaises(GalleryRecordError):
+                    validate_card(
+                        _card_fields(
+                            scene,
+                            image_id=image_id,
+                            stored_identity=(
+                                f"gallery/{wrong_directory}/{scene.key}/{image_id}.png"
+                            ),
+                        ),
+                        scene,
+                    )
 
     @covers_requirement("art-gallery-model::malformed-stored-cards-are-skipped-never-fatal")
     def test_a_stored_entry_needs_the_complete_contract(self):

@@ -440,10 +440,24 @@ class GalleryJobQueueTests(EvenniaTestCase):
         self.assertEqual(failed_keys(), ["scene:t_synth_cave"])
         self.assertNotIn(job.db_key.removeprefix("art:"), failed_keys())
 
-    def test_a_scene_subject_has_no_gallery(self):
-        with self.assertRaises(GalleryRecordError):
-            _enqueue_gallery(_scene("t_synth_forest"))
-        self.assertEqual(ArtAssetRecord.objects.all().count(), 0)
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_a_scene_subject_queues_one_gallery_job(self):
+        # ``scene-kind-gallery``: the scene kind is gallery-bearing, so the
+        # per-image enqueue writes exactly one pending job for it.
+        subject = _scene("t_synth_forest")
+        job = _enqueue_gallery(subject)
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if is_gallery_job(record)
+        ]
+        self.assertEqual(jobs, [job])
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        self.assertEqual(job.db.kind, ArtSubjectKind.SCENE.value)
+        self.assertEqual(job.db.subject_key, subject.key)
+        self.assertFalse(job.db.output_identity)
 
     @covers_requirement(
         "art-gallery-kind-capabilities::gallery-enforcement-reads-the-declaration-instead-of-comparing-kinds"

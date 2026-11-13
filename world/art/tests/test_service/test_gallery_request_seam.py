@@ -178,6 +178,84 @@ class GalleryRequestSeamTests(EvenniaTestCase):
         self.assertEqual(record.db.last_error_code, "sd_connection_error")
         self.assertIsNotNone(record.db.last_error_at)
 
+
+class SceneGalleryRequestSeamTests(EvenniaTestCase):
+    """The seam serves the gallery-bearing scene kind (``scene-kind-gallery``)."""
+
+    def setUp(self):
+        open_synthetic_scope(self, "archetypes")
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(
+            ART_STORE_ROOT=str(self.root),
+            ART_SD_CLIENT="world.art.fake_sd_client.FakeSDWebUIClient",
+        )
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+        self.archetype = sorted(SYNTH_ARCHETYPES)[0]
+        self.subject = scene_subject_for(self.archetype)
+
+    def _gallery_jobs(self):
+        return [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if str(record.db.gallery_image_id or "")
+        ]
+
+    @covers_requirement(
+        "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
+    )
+    def test_a_scene_subject_queues_one_job_and_settles_one_card(self):
+        with patch("world.art.service.log_info") as info:
+            image_id = request_gallery_image(self.subject)
+        jobs = self._gallery_jobs()
+        self.assertEqual(len(jobs), 1)
+        job = jobs[0]
+        self.assertEqual(job.db_key, f"art:scene:{self.archetype}:gen:{image_id}")
+        self.assertEqual(job.db.kind, ArtSubjectKind.SCENE.value)
+        self.assertEqual(job.db.status, ArtAssetStatus.PENDING)
+        # The declared scene render is landscape, unlike every portrait kind.
+        self.assertEqual(job.db.aspect_ratio, "16:9")
+        self.assertEqual(gallery_api.cards_for(self.subject), [])
+        self.assertFalse(
+            ArtAssetRecord.objects.filter(
+                db_key=f"art:scene:{self.archetype}"
+            ).exists()
+        )
+        generates = [
+            call
+            for call in info.call_args_list
+            if call.args and call.args[0] == "gallery_generate"
+        ]
+        self.assertEqual(len(generates), 1)
+        self.assertEqual(
+            generates[0].kwargs["context"],
+            {
+                "subject": self.subject.full(),
+                "image_id": image_id,
+                "kind": ArtSubjectKind.SCENE.value,
+            },
+        )
+        from world.art.worker import drain_synchronous
+
+        with patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        ):
+            drain_synchronous(10)
+        cards = gallery_api.cards_for(self.subject)
+        self.assertEqual([card["image_id"] for card in cards], [image_id])
+        self.assertTrue(
+            cards[0]["stored_identity"].startswith(
+                f"gallery/scene/{self.archetype}/{image_id}"
+            )
+        )
+        self.assertTrue((self.root / cards[0]["stored_identity"]).is_file())
+        # The settled job is spent: nothing is left in flight.
+        self.assertEqual(self._gallery_jobs(), [])
+
+
 class GalleryPromptCompositionTests(EvenniaTestCase):
     """The seam's field selection: provenance on the card, validation first."""
 

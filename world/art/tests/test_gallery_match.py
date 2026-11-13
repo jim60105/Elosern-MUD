@@ -351,8 +351,18 @@ class MonsterChainTests(_ChainBase):
     @covers_requirement(
         "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
     )
-    def test_a_scene_subject_resolves_to_nothing(self):
-        self.assertIsNone(resolve_card(_scene(), _FakeEntity()))
+    def test_a_kind_without_a_gallery_resolves_to_nothing(self):
+        # The preserved no-gallery machinery, read through the declaration: a
+        # gallery-less kind contributes no chain slots at all.
+        subject = _monster("nogalleries")
+        no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.MONSTER.value
+        ].with_values(has_gallery=False, store_directory=None)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.MONSTER.value: no_gallery},
+        ):
+            self.assertIsNone(resolve_card(subject, _FakeEntity()))
 
 
 class IdentitySkipTests(_ChainBase):

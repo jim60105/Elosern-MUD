@@ -5,9 +5,11 @@ per ``ArtSubjectKind`` member: whether the kind has a gallery at all, the
 store-path directory segment its stored identities use, the maximum number of
 cards one gallery record may hold (``None`` means genuinely unbounded; only
 ``None`` and ``1`` are admitted), and whether its cards may carry equipment
-bindings. A kind without a gallery — the scene kind — is declared explicitly
-as such rather than represented by an absent entry, so "this kind has no
-gallery" is an assertion in the table, not an accident of a missing key.
+bindings. A kind without a gallery is declared explicitly as such rather than
+represented by an absent entry, so "this kind has no gallery" is an assertion
+in the table, not an accident of a missing key — the machinery stays even
+though every kind declared today is gallery-bearing, and the contract test
+exercises it through a patched synthetic declaration.
 
 ``gallery-monster-generation`` adds the three request-precondition fields the
 generation seam reads: whether a generation request for the kind requires the
@@ -21,6 +23,11 @@ player-set face rectangle, whether it may carry a player-set stage transform,
 and whether a player may delete a card. The character kind declares all three;
 the monster kind declares the two geometry facts but not deletion (its single
 card is replaced by regeneration); a kind without a gallery declares none.
+
+``scene-kind-gallery`` makes the scene kind gallery-bearing: directory
+``scene``, one card, deletion allowed, and no bindings, age precondition,
+field selection, free text, face rectangle or stage transform — the monster
+kind's set plus card deletion and without the two geometry facts.
 
 This module lives HERE — with zero imports — exactly like
 ``world/art/fallback_keys.py`` and for the same reason: ``world/art/subjects.py``
@@ -202,7 +209,8 @@ class _ReadOnlyLookup:
 # keyed by the kind's declared string value. `character` declares a null
 # maximum — it is uncapped today and stays uncapped; `monster` declares the
 # one-card cap without binding, age-precondition, field-selection, or
-# free-text support; `scene` is declared explicitly as having no gallery.
+# free-text support; `scene` declares the same one-card shape under its own
+# directory, with card deletion and none of the portrait geometry facts.
 # Only None and 1 are admitted as maxima (enforced by
 # validate_declaration_contract below); the contract test rejects anything
 # else, so no real declaration needs an N-card eviction algorithm.
@@ -235,16 +243,16 @@ _CAPABILITIES_BY_KIND_VALUE: dict = {
     ),
     _SCENE_KIND_VALUE: GalleryKindCapabilities(
         kind_value=_SCENE_KIND_VALUE,
-        has_gallery=False,
-        store_directory=None,
-        max_cards=None,
+        has_gallery=True,
+        store_directory="scene",
+        max_cards=1,
         supports_bindings=False,
         requires_age_precondition=False,
         supports_field_selection=False,
         supports_free_text=False,
         supports_face_rect=False,
         supports_stage=False,
-        supports_card_delete=False,
+        supports_card_delete=True,
     ),
 }
 
@@ -304,9 +312,9 @@ def store_directory_for(kind: object) -> str:
 def kind_value_for_store_directory(directory: object) -> "str | None":
     """The gallery-bearing kind value owning a store directory, else ``None``.
 
-    The reverse lookup the seed traversal uses; a no-gallery kind's name (e.g.
-    ``scene``) is deliberately NOT in the reverse vocabulary and resolves to
-    ``None`` exactly as it did under the previous directory dict.
+    The reverse lookup the seed traversal uses; a directory no gallery-bearing
+    kind declares (and a no-gallery kind's name) is deliberately NOT in the
+    reverse vocabulary and resolves to ``None``.
     """
     key = _kind_value_of(directory)
     for value, record in _CAPABILITIES_BY_KIND_VALUE.items():

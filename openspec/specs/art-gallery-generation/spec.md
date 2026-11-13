@@ -47,7 +47,7 @@ typed subject producers.
 - **THEN** a typed error is raised, no record is created, and no prompt content is produced
 
 #### Scenario: A kind declaring no gallery is refused at the seam
-- **WHEN** a gallery image is requested for a scene subject
+- **WHEN** a gallery image is requested for a subject whose kind a test declaration marks as having no gallery
 - **THEN** a typed error is raised and no job record is created
 
 #### Scenario: Preconditions are read from the capability declaration
@@ -80,6 +80,10 @@ typed subject producers.
 #### Scenario: Unknown visual subjects refuse all request shapes
 - **WHEN** a monster request names an unregistered key or threat tier, with otherwise valid empty fields
 - **THEN** it is rejected before prompt rendering, queue writing or card mutation
+
+#### Scenario: A scene subject queues one job through the same seam
+- **WHEN** a gallery image is requested for a registered scene archetype subject with empty fields, no binding and no face rectangle
+- **THEN** exactly one gallery job is queued for that scene subject and the settled image is a scene-sized card
 
 ### Requirement: Generation while the image server is unreachable is a reported failure, never a gate
 `request_gallery_image` SHALL NOT consult the connectivity probe and SHALL NOT import

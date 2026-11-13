@@ -2,10 +2,11 @@
 
 Pure ``unittest.TestCase``: the declaration module imports nothing and performs
 no I/O, so every contract here — exhaustive kind coverage, the admitted card
-maxima, the four readable capability fields, the explicit no-gallery scene
-declaration, and the immutability of both records and table — runs without
-Evennia, settings, or the database. Synthetic violations are injected through
-the one supported seam: ``unittest.mock.patch.dict`` against the module-private
+maxima, the readable capability fields, the scene one-card declaration, the
+explicit no-gallery declaration (exercised through a patched synthetic
+entry), and the immutability of both records and table — runs without Evennia,
+settings, or the database. Synthetic violations are injected through the one
+supported seam: ``unittest.mock.patch.dict`` against the module-private
 declaration dict.
 """
 
@@ -32,6 +33,36 @@ def _violations_with(key: str, **changes):
         gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
         {key: _record(key=key, **changes)},
     ):
+        return gallery_kinds.validate_declaration_contract(_ALL_KIND_VALUES)
+
+
+def _gallery_less(key: str) -> "gallery_kinds.GalleryKindCapabilities":
+    """A synthetic declaration for a kind with no gallery.
+
+    Every kind shipped today is gallery-bearing, so the preserved
+    no-gallery machinery is exercised by declaring one through this record.
+    """
+    return gallery_kinds.GalleryKindCapabilities(
+        kind_value=key,
+        has_gallery=False,
+        store_directory=None,
+        max_cards=None,
+        supports_bindings=False,
+        requires_age_precondition=False,
+        supports_field_selection=False,
+        supports_free_text=False,
+        supports_face_rect=False,
+        supports_stage=False,
+        supports_card_delete=False,
+    )
+
+
+def _violations_with_no_gallery(key: str, **changes):
+    """Contract violations with one real kind re-declared as gallery-less."""
+    record = _gallery_less(key)
+    if changes:
+        record = record.with_values(**changes)
+    with patch.dict(gallery_kinds._CAPABILITIES_BY_KIND_VALUE, {key: record}):
         return gallery_kinds.validate_declaration_contract(_ALL_KIND_VALUES)
 
 
@@ -138,17 +169,27 @@ class DeclarationContractTests(unittest.TestCase):
                 any(character_value in v and "store directory" in v for v in violations),
                 violations,
             )
-        scene_value = ArtSubjectKind.SCENE.value
+        gallery_less = ArtSubjectKind.MONSTER.value
         with self.subTest(case="no-gallery kind claiming a directory"):
-            violations = _violations_with(scene_value, store_directory="scene")
+            violations = _violations_with_no_gallery(
+                gallery_less, store_directory="scene"
+            )
             self.assertTrue(
-                any(scene_value in v and "store directory" in v for v in violations),
+                any(gallery_less in v and "store directory" in v for v in violations),
+                violations,
+            )
+        with self.subTest(case="no-gallery kind claiming a maximum"):
+            violations = _violations_with_no_gallery(gallery_less, max_cards=1)
+            self.assertTrue(
+                any(gallery_less in v and "maximum" in v for v in violations),
                 violations,
             )
         with self.subTest(case="no-gallery kind claiming binding support"):
-            violations = _violations_with(scene_value, supports_bindings=True)
+            violations = _violations_with_no_gallery(
+                gallery_less, supports_bindings=True
+            )
             self.assertTrue(
-                any(scene_value in v and "binding" in v for v in violations),
+                any(gallery_less in v and "binding" in v for v in violations),
                 violations,
             )
         # A no-gallery kind may not claim any request precondition either.
@@ -161,9 +202,11 @@ class DeclarationContractTests(unittest.TestCase):
             "supports_card_delete",
         ):
             with self.subTest(case=f"no-gallery kind claiming {flag}"):
-                violations = _violations_with(scene_value, **{flag: True})
+                violations = _violations_with_no_gallery(
+                    gallery_less, **{flag: True}
+                )
                 self.assertTrue(
-                    any(scene_value in v and flag in v for v in violations),
+                    any(gallery_less in v and flag in v for v in violations),
                     violations,
                 )
 
@@ -234,24 +277,35 @@ class DeclarationContractTests(unittest.TestCase):
         self.assertEqual(monster.max_cards, 1)
 
     @covers_requirement(
-        "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
+        "art-gallery-kind-capabilities::the-scene-kind-declares-a-one-card-gallery-without-geometry"
     )
-    def test_the_scene_kind_is_declared_as_having_no_gallery(self):
+    def test_the_scene_kind_declares_a_one_card_gallery_without_geometry(self):
         scene = gallery_kinds.capabilities_for(ArtSubjectKind.SCENE.value)
-        self.assertFalse(scene.has_gallery)
-        self.assertIsNone(scene.store_directory)
-        self.assertIsNone(scene.max_cards)
-        self.assertFalse(scene.supports_bindings)
-        for flag in ("supports_face_rect", "supports_stage", "supports_card_delete"):
+        self.assertTrue(scene.has_gallery)
+        self.assertEqual(scene.store_directory, "scene")
+        self.assertEqual(scene.max_cards, 1)
+        self.assertTrue(scene.supports_card_delete)
+        for flag in (
+            "supports_bindings",
+            "requires_age_precondition",
+            "supports_field_selection",
+            "supports_free_text",
+            "supports_face_rect",
+            "supports_stage",
+        ):
             self.assertIs(getattr(scene, flag), False, flag)
-        # A no-gallery kind contributes no store directory segment.
-        self.assertNotIn("scene", gallery_kinds.gallery_store_directory_segments())
+        # The directory vocabulary is derived from the declaration.
         self.assertEqual(
             gallery_kinds.gallery_store_directory_segments(),
-            frozenset({"character", "monster"}),
+            frozenset({"character", "monster", "scene"}),
         )
-        # The reverse lookup only knows gallery-bearing segments.
-        self.assertIsNone(gallery_kinds.kind_value_for_store_directory("scene"))
+        self.assertEqual(
+            gallery_kinds.kind_value_for_store_directory("scene"),
+            ArtSubjectKind.SCENE.value,
+        )
+        self.assertEqual(
+            gallery_kinds.store_directory_for(ArtSubjectKind.SCENE.value), "scene"
+        )
         self.assertEqual(
             gallery_kinds.kind_value_for_store_directory("monster"),
             ArtSubjectKind.MONSTER.value,
@@ -261,6 +315,26 @@ class DeclarationContractTests(unittest.TestCase):
             ArtSubjectKind.CHARACTER.value,
         )
         self.assertIsNone(gallery_kinds.kind_value_for_store_directory("bogus"))
+
+    @covers_requirement(
+        "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
+    )
+    def test_a_gallery_less_kind_is_declared_not_omitted(self):
+        # The preserved no-gallery machinery: a patched declaration entry is
+        # read without error, and contributes no directory segment.
+        key = ArtSubjectKind.MONSTER.value
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE, {key: _gallery_less(key)}
+        ):
+            self.assertEqual(
+                gallery_kinds.validate_declaration_contract(_ALL_KIND_VALUES), []
+            )
+            read = gallery_kinds.capabilities_for(key)
+            self.assertFalse(read.has_gallery)
+            self.assertIsNone(read.store_directory)
+            self.assertNotIn(
+                "monster", gallery_kinds.gallery_store_directory_segments()
+            )
 
     @covers_requirement(
         "art-gallery-kind-capabilities::one-closed-declaration-states-what-every-subject-kind-s-gallery-may-do"
@@ -281,7 +355,7 @@ class DeclarationContractTests(unittest.TestCase):
         ):
             self.assertEqual(
                 gallery_kinds.gallery_store_directory_segments(),
-                frozenset({"character"}),
+                frozenset({"character", "scene"}),
             )
 
     @covers_requirement(
@@ -313,10 +387,10 @@ class CardOperationDeclarationTests(unittest.TestCase):
         "art-gallery-kind-capabilities::each-kind-declares-its-card-face-rectangle-stage-and-deletion-support"
     )
     def test_a_gallery_less_entry_claiming_stage_support_fails_naming_it(self):
-        scene_value = ArtSubjectKind.SCENE.value
-        violations = _violations_with(scene_value, supports_stage=True)
+        gallery_less = ArtSubjectKind.MONSTER.value
+        violations = _violations_with_no_gallery(gallery_less, supports_stage=True)
         self.assertEqual(len(violations), 1, violations)
-        self.assertIn(scene_value, violations[0])
+        self.assertIn(gallery_less, violations[0])
         self.assertIn("supports_stage", violations[0])
 
     def test_the_copy_seam_carries_the_three_facts(self):

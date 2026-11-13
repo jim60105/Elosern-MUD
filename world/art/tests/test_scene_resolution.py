@@ -21,6 +21,7 @@ key, room key or catalog symbol appears in this file.
 import hashlib
 import tempfile
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,13 +30,13 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.rooms import Room
-from world.art import descriptors, official, scene_definitions, subjects
+from world.art import descriptors, gallery as gallery_api, official, scene_definitions, subjects
 # The map layer's authored tables validate themselves at import time; importing
 # them here (against the REAL registries) keeps a later patch of the room-art
 # vocabulary from re-running that validation on a synthetic set.
 from world.maps import room_art  # noqa: F401
 from world.art.presenter import TOWN_TERMINAL_KEY, describe_scene
-from world.art.queue import claim, ensure, record_key, requeue, settle
+from world.art.queue import claim, enqueue_gallery_job, ensure, record_key, requeue, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
@@ -188,6 +189,42 @@ class _SceneFixture(EvenniaTestCase):
         )
         return identity
 
+    def publish_gallery_card(
+        self, key: str = SCENE_KEY, *, body: bytes = b"synthetic gallery output"
+    ) -> tuple[str, str]:
+        """Append one readable scene gallery card; returns ``(image_id, identity)``."""
+        image_id = str(uuid.uuid4())
+        identity = f"gallery/scene/{key}/{image_id}.png"
+        path = self.store_root / identity
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(body)
+        gallery_api.append_card(
+            self.subject(key),
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="generated",
+            image_size={"width": 16, "height": 9},
+        )
+        return image_id, identity
+
+    def pending_gallery_job(self, key: str = SCENE_KEY) -> str:
+        """Queue one real gallery job for the archetype; returns its image id."""
+        image_id = str(uuid.uuid4())
+        enqueue_gallery_job(
+            self.subject(key),
+            SCENE_DESCRIPTION,
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        return image_id
+
     def entries(self, descriptor: dict) -> list[dict]:
         return list(descriptor["attempts"])
 
@@ -325,6 +362,140 @@ class SourceChainTests(_SceneFixture):
 
 
 @override_settings()
+class GalleryGeneratedSourceTests(_SceneFixture):
+    """The scene gallery's default card is the generated position.
+
+    Change ``scene-kind-gallery``: the generated step reads the archetype's
+    scene gallery default card first and falls back to the classic ``done``
+    record only when no card can be presented; the chain order is unchanged.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        settings_override = override_settings(ART_STORE_ROOT=str(self.store_root))
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+
+    def generated_position(self, descriptor: dict) -> list[dict]:
+        return [
+            entry
+            for entry in self.entries(descriptor)
+            if entry["rank"] == descriptors.SCENE_RANK_GENERATED
+        ]
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_scene_gallery_card_is_the_generated_source(self):
+        classic_identity = self.publish()
+        _image_id, identity = self.publish_gallery_card()
+        descriptor = describe_scene(self.target())
+        generated = self.generated_position(descriptor)
+        self.assertEqual(len(generated), 1)
+        entry = generated[0]
+        self.assertEqual(entry["type"], "image")
+        self.assertEqual(entry["resource"]["resource_id"], identity)
+        self.assertEqual(
+            entry["resource"]["version"], descriptors.identity_version(identity)
+        )
+        self.assertTrue(entry["resource"]["url"].startswith(f"/art/{identity}"))
+        self.assertEqual(entry["resource"]["origin"], descriptors.ORIGIN_RUNTIME)
+        # A landscape card carries the scene's empty geometry.
+        self.assertIsNone(entry["resource"]["geometry"]["face_rect"])
+        self.assertIsNone(entry["resource"]["geometry"]["stage"])
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+        # The classic output is not attempted beside the card.
+        image_identities = [
+            attempt["resource"]["resource_id"]
+            for attempt in descriptor["attempts"]
+            if attempt["type"] == "image"
+        ]
+        self.assertNotIn(classic_identity, image_identities)
+        # The generated retention token covers the exact card identity.
+        generated_source = descriptors.scene_generated_source_id(self.subject().full())
+        self.assertEqual(
+            [
+                entry["token"]
+                for entry in descriptor["retention_sources"]
+                if entry["source_id"] == generated_source
+            ],
+            [
+                descriptors.retention_token(
+                    PLACE_IDENTITY, self.subject().full(), "generated", identity
+                )
+            ],
+        )
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_scene_without_a_card_still_presents_its_classic_output(self):
+        classic_identity = self.publish()
+        descriptor = describe_scene(self.target())
+        generated = self.generated_position(descriptor)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["resource"]["resource_id"], classic_identity)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_card_wins_over_a_legacy_classic_failure(self):
+        # A classic record the producers left failed must not report the carded
+        # scene as failed: the card is the generated source and the state.
+        subject = self.subject()
+        ensure(subject, SCENE_DESCRIPTION)
+        claimed = next(
+            record
+            for record in claim(ArtAssetRecord.objects.count() + 1)
+            if record.db_key == record_key(subject)
+        )
+        settle(
+            subject,
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+            generation_token=str(claimed.db.generation_token),
+        )
+        _image_id, identity = self.publish_gallery_card()
+        descriptor = describe_scene(self.target())
+        generated = self.generated_position(descriptor)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "image")
+        self.assertEqual(generated[0]["resource"]["resource_id"], identity)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_card_whose_file_vanished_falls_back_to_the_classic_output(self):
+        classic_identity = self.publish()
+        _image_id, identity = self.publish_gallery_card()
+        (self.store_root / identity).unlink()
+        descriptor = describe_scene(self.target())
+        generated = self.generated_position(descriptor)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "image")
+        self.assertEqual(generated[0]["resource"]["resource_id"], classic_identity)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_pending_gallery_job_reports_pending(self):
+        self.pending_gallery_job()
+        descriptor = describe_scene(self.target())
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_PENDING)
+        self.assertEqual(self.generated_position(descriptor), [])
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
+    def test_a_recorded_gallery_error_reports_failed(self):
+        gallery_api.record_error(self.subject(), "sd_connection_error")
+        descriptor = describe_scene(self.target())
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
+        self.assertEqual(self.generated_position(descriptor), [])
+
+
 class SourceFactAttributionTests(_SceneFixture):
     """A directory fact and an image fact never collide on one position."""
 

@@ -133,7 +133,29 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertIn("2", output)
 
     @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
-    def test_retry_reenqueues_failed_records(self):
+    def test_retry_requests_a_scene_gallery_failure(self):
+        # ``scene-kind-gallery``: a scene subject's failures are driven by the
+        # gallery arm, so a recorded gallery error is re-requested exactly once.
+        from world.art import gallery as gallery_api
+
+        subject = _scene(_SCENE_KEY)
+        gallery_api.record_error(subject, "sd_connection_error")
+        with patch("world.art.worker.drain"):
+            output = self.call(CmdArtRetry(), "")
+        jobs = [
+            record
+            for record in ArtAssetRecord.objects.all()
+            if is_gallery_job(record)
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].db.kind, ArtSubjectKind.SCENE.value)
+        self.assertEqual(jobs[0].db.subject_key, _SCENE_KEY)
+        self.assertIn("並重新請求 1 次圖庫生成", output)
+
+    @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
+    def test_retry_never_reactivates_a_failed_classic_scene_record(self):
+        # Routing follows the declaration, so a legacy classic scene record is
+        # left exactly as found — never reset, never re-enqueued.
         subject = _scene(_SCENE_KEY)
         ensure(subject, "desc")
         claimed = claim(10)
@@ -144,14 +166,20 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             output_identity=None,
             error="boom",
         )
-        with patch("world.art.worker.drain"):
-            output = self.call(CmdArtRetry(), "")
+        output = self.call(CmdArtRetry(), "")
         record = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertIn("1", output)
+        self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
+        self.assertIn("已重新排入 0 個失敗記錄，並重新請求 0 次圖庫生成", output)
+        self.assertFalse(
+            any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
+        )
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
-    def test_requeue_valid_key_forces_regeneration_preserving_prior_output(self):
+    def test_requeue_scene_key_requests_a_gallery_job_and_keeps_the_classic_record(self):
+        import uuid
+
+        from world.art import gallery as gallery_api
+
         subject = _scene(_SCENE_KEY)
         ensure(subject, "desc")
         claimed = claim(10)
@@ -162,10 +190,38 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             output_identity=f"scene/{_SCENE_KEY}.png",
             error=None,
         )
+        # The subject already holds its one card: requeue must leave it in
+        # place until the new card replaces it under the declared maximum.
+        held = str(uuid.uuid4())
+        gallery_api.append_card(
+            subject,
+            image_id=held,
+            stored_identity=f"gallery/scene/{_SCENE_KEY}/{held}.png",
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            source="seed",
+            image_size={"width": 16, "height": 9},
+        )
         output = self.call(CmdArtRequeue(), f"scene:{_SCENE_KEY}")
+        self.assertEqual(
+            [card["image_id"] for card in gallery_api.cards_for(subject)], [held]
+        )
         record = ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first()
-        self.assertEqual(record.db.status, ArtAssetStatus.PENDING)
-        self.assertEqual(record.db.prior_output_identity, f"scene/{_SCENE_KEY}.png")
+        # The classic record is untouched: the gallery seam owns regeneration.
+        self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+        self.assertEqual(record.db.output_identity, f"scene/{_SCENE_KEY}.png")
+        jobs = [
+            job
+            for job in ArtAssetRecord.objects.all()
+            if is_gallery_job(job)
+        ]
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0].db.kind, ArtSubjectKind.SCENE.value)
+        self.assertEqual(jobs[0].db.subject_key, _SCENE_KEY)
+        self.assertEqual(jobs[0].db.status, ArtAssetStatus.PENDING)
         self.assertIn(f"scene:{_SCENE_KEY}", output)
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
@@ -182,10 +238,11 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_unregistered_scene_key_is_rejected_with_no_record_change(self):
         output = self.call(CmdArtRequeue(), "scene:not_registered")
-        self.assertIn("無效", output)
-        self.assertEqual(
-            ArtAssetRecord.objects.filter(db_key="art:scene:not_registered").count(), 0
-        )
+        # The gallery seam re-validates through the scene producer, so the
+        # registered-archetype rejection is the named refusal.
+        self.assertIn("無法重新排入", output)
+        self.assertIn("not_registered", output)
+        self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     @covers_requirement("art-asset-lifecycle::the-age-check-runs-on-every-lifecycle-path-and-rejects-deterministically-without-a-persisted-marker")
@@ -489,22 +546,11 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         from world.art import gallery as gallery_api
 
         # An erroring subject whose entity no longer exists: typed rejection,
-        # error kept, no record change — and a healthy scene record in the
-        # same store still re-enqueues.
+        # error kept, no record change and no job.
         ghost = ArtSubject(ArtSubjectKind.CHARACTER, "999999")
         gallery_api.record_error(ghost, "sd_connection_error")
-        scene = _scene(_SCENE_KEY)
-        ensure(scene, "desc")
-        claimed = claim(10)
-        settle(
-            scene,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="boom",
-        )
         output = self.call(CmdArtRetry(), "")
-        self.assertIn("已重新排入 1 個失敗記錄，並重新請求 0 次圖庫生成", output)
+        self.assertIn("已重新排入 0 個失敗記錄，並重新請求 0 次圖庫生成", output)
         # The ghost keeps its recorded error (typed rejection keeps it).
         self.assertEqual(
             [state.subject for state in gallery_api.erroring_subjects()], [ghost]
@@ -563,10 +609,10 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
     def test_retry_never_reactivates_a_legacy_failed_monster_classic_record(self):
-        # ``gallery-monster-autogen``: the classic arm skips every
-        # gallery-bearing kind, so a legacy failed monster record is left
-        # exactly as found (failed, output untouched, never re-ensqueued)
-        # while a healthy scene failed record still re-enqueues normally.
+        # ``gallery-monster-autogen`` / ``scene-kind-gallery``: the classic arm
+        # skips every gallery-bearing kind, so legacy failed monster and scene
+        # records are left exactly as found (failed, output untouched, never
+        # re-enqueued).
         key = _MONSTER_KEY
         subject = monster_subject_for(key)
         ensure(subject, "desc")
@@ -589,15 +635,14 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             error="boom",
         )
         output = self.call(CmdArtRetry(), "")
-        # Only the scene was re-enqueued.
-        self.assertIn("已重新排入 1 個失敗記錄", output)
+        self.assertIn("已重新排入 0 個失敗記錄", output)
         monster_record = ArtAssetRecord.objects.filter(
             db_key=f"art:portrait:monster:{key}"
         ).first()
         self.assertEqual(monster_record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(
             ArtAssetRecord.objects.filter(db_key=f"art:scene:{_SCENE_KEY}").first().db.status,
-            ArtAssetStatus.PENDING,
+            ArtAssetStatus.FAILED,
         )
         self.assertFalse(
             any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
@@ -727,10 +772,20 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         self.assertNotIn("prompt", output)
         self.assertNotIn("stored_identity", output)
         self.assertNotIn("/app", output)
-        # A scene filter yields no gallery rows (gallery kinds are portraits).
+        # A portrait gallery row never appears under the scene filter.
         scene_output = self.call(CmdArtStatus(), "scene")
         self.assertNotIn("portrait:character:42", scene_output)
         self.assertNotIn("圖庫狀態:", scene_output)
+        # ``scene-kind-gallery``: a scene gallery row appears under its own
+        # filter and never under the portrait one.
+        gallery_api.record_error(_scene(_SCENE_KEY), "sd_internal_error")
+        scene_output = self.call(CmdArtStatus(), "scene")
+        self.assertIn("圖庫狀態:", scene_output)
+        self.assertIn(f"scene:{_SCENE_KEY}", scene_output)
+        self.assertNotIn("portrait:character:42", scene_output)
+        portrait_output = self.call(CmdArtStatus(), "portrait")
+        self.assertIn("portrait:character:42", portrait_output)
+        self.assertNotIn(f"scene:{_SCENE_KEY}", portrait_output)
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_a_healthy_gallery_line_shows_cards_and_default_with_no_error(self):

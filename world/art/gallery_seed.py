@@ -1,14 +1,16 @@
 """Idempotent startup synchronization of the external bulk seed-art folder.
 
 ``gallery-seed-sync`` (design §7.1, D10): an operator prepares hundreds of
-character/monster images offline and hands the server one read-only folder
-(``ART_SEED_ROOT``, the ``PROMPT_ROOT`` precedent; compose bind-mounts the host
-folder at ``/app/art-seed``). ``sync_all()`` walks the closed layout
+character/monster/scene images offline and hands the server one read-only
+folder (``ART_SEED_ROOT``, the ``PROMPT_ROOT`` precedent; compose bind-mounts
+the host folder at ``/app/art-seed``). ``sync_all()`` walks the closed layout
 ``<seed root>/<kind-dir>/<subject-key>/<filename><ext>`` (``kind-dir`` exactly
-``character`` / ``monster``), copies every accepted image into the store's
-gallery path through the single confinement helper, and appends one unbound
-``source`` ``seed`` card (no prompt pair, no generation seed/checkpoint/fields)
-through the gallery write API.
+``character`` / ``monster`` / ``scene``), copies every accepted image into the
+store's gallery path through the single confinement helper, and appends one
+unbound ``source`` ``seed`` card (no prompt pair, no generation
+seed/checkpoint/fields) through the gallery write API. A ``monster`` folder
+must name a registered visual species and a ``scene`` folder a registered
+scene archetype; any other subject name is a bounded skip and writes nothing.
 
 **Path-derived idempotency, no bookkeeping.** A file's card ``image_id`` is
 ``uuid5`` of its slash-joined path relative to the seed root, so a re-run finds
@@ -51,11 +53,11 @@ subject's default only when the subject has no default yet — including a
 character whose default was deleted while other cards remain — so a player's
 chosen default always survives a restart.
 
-Monster subjects hold exactly one card by contract and ``append_card`` REPLACES
-a full monster record, so a monster subject receives at most one seed card —
-the candidate file — and no card ever replaces an existing raw entry (the
-occupancy check reads the raw stored list, so even a malformed entry is
-never replaced).
+A kind declaring a one-card maximum (monster and scene) holds exactly one card
+by contract and ``append_card`` REPLACES a full record, so such a subject
+receives at most one seed card — the candidate file — and no card ever
+replaces an existing raw entry (the occupancy check reads the raw stored list,
+so even a malformed entry is never replaced).
 
 One bad entry never aborts the run: each failure is a bounded
 ``gallery_seed_sync`` diagnostic and the walk continues, with a per-run
@@ -100,7 +102,12 @@ from world.art.no_follow import (
     open_nofollow,
 )
 from world.art.paths import resolved_under_store_root
-from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
+from world.art.subjects import (
+    ArtSubject,
+    ArtSubjectError,
+    ArtSubjectKind,
+    scene_subject_for,
+)
 from world.lore.monster_visuals import is_registered_monster_visual_key
 from world.observability import log_info, log_warn
 
@@ -370,7 +377,13 @@ def _sync_subject(
     """Synchronize one ``<kind-dir>/<subject-key>/`` folder; never raises."""
     try:
         subject = ArtSubject(kind, subject_name)
-        if kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(subject_name):
+        if kind is ArtSubjectKind.SCENE:
+            # The scene kind became gallery-bearing (``scene-kind-gallery``),
+            # so a ``scene/`` folder now seeds cards: only a registered
+            # archetype may be one, and the typed producer is the registry
+            # check (an unregistered folder is the ordinary bounded skip).
+            subject = scene_subject_for(subject_name)
+        elif kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(subject_name):
             diagnostics.emit(
                 "invalid_subject_key_skipped", kind=kind_directory, entry=subject_name
             )

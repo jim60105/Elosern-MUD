@@ -2,9 +2,10 @@
 
 Restricted to staff: ``@art status`` (list/filter records), ``@art run``
 (drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
-``@art requeue <full-subject-key>`` (forced regeneration — gallery-bearing
-kinds through the validated gallery seam, scene keys through the classic
-record reset), ``@art
+``@art requeue <full-subject-key>`` (forced regeneration — every kind that
+declares a gallery, character, monster and scene alike, through the validated
+gallery seam; a kind declaring no gallery keeps the classic record reset as
+preserved machinery), ``@art
 options <kind>`` (list the live server's selectable option names), and
 ``@art health`` (forced connectivity verdict + scheduler/queue/gallery/
 output-policy dashboard). ``@art status`` additionally reports per-subject
@@ -81,8 +82,9 @@ class CmdArtStatus(_ArtCommand):
         # Gallery STATE (change gallery-failure-visibility): one line per
         # gallery record from the gallery module's read-only state accessor —
         # never a query of the record class, never a gallery JOB row. The
-        # same kind filter applies: gallery kinds serialize under the
-        # ``portrait`` prefix, so a ``scene`` filter yields no gallery rows.
+        # same kind filter applies: portrait kinds serialize under the
+        # ``portrait`` prefix and the gallery-bearing scene kind under
+        # ``scene``, so each filter lists its own gallery rows.
         gallery_rows = [
             state
             for state in gallery_api.gallery_states()
@@ -179,11 +181,12 @@ class CmdArtRetry(_ArtCommand):
                 subject = parse_subject(full_key)
             except ArtSubjectError:
                 continue
-            # ``gallery-monster-autogen``: a gallery-bearing kind never
-            # re-enters the classic pipeline. Its gallery failures are driven
-            # exclusively by the gallery arm below, so a legacy classic
-            # monster record is left exactly as found — never reset, never
-            # re-ensqueued, never newly produced.
+            # ``gallery-monster-autogen`` / ``scene-kind-gallery``: a
+            # gallery-bearing kind never re-enters the classic pipeline. Its
+            # gallery failures are driven exclusively by the gallery arm
+            # below, so a legacy classic monster or scene record is left
+            # exactly as found — never reset, never re-ensqueued, never newly
+            # produced.
             if gallery_kinds.has_gallery(subject.kind):
                 continue
             record = ArtAssetRecord.objects.filter(
@@ -230,11 +233,11 @@ class CmdArtRequeue(_ArtCommand):
         except ArtSubjectError as error:
             self.caller.msg(f"無效的 subject key：{error}")
             return
-        # Gallery-bearing kinds (change ``gallery-monster-generation``) are
-        # force-regenerated through the kind-neutral gallery seam, which
-        # re-checks the kind's declared preconditions and respects the
-        # declared card cap. Only no-gallery kinds (scene) keep the classic
-        # fixed-identity record reset.
+        # Gallery-bearing kinds (changes ``gallery-monster-generation`` and
+        # ``scene-kind-gallery``) are force-regenerated through the
+        # kind-neutral gallery seam, which re-checks the kind's declared
+        # preconditions and respects the declared card cap. Only a kind
+        # declaring no gallery keeps the classic fixed-identity record reset.
         if gallery_kinds.has_gallery(subject.kind):
             from world.art.service import requeue_gallery_subject
 
@@ -245,6 +248,9 @@ class CmdArtRequeue(_ArtCommand):
                 return
             self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
             return
+        # No shipped kind reaches this branch any more (every one declares a
+        # gallery); it is the preserved classic reset a gallery-less
+        # declaration would still use.
         try:
             scene_subject_for(subject.key)
         except ArtSubjectError as error:
