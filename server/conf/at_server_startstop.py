@@ -77,6 +77,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_title_nomination_layer",
     "register_story_director_layer",
     "register_nomination_triggers",
+    "art_scene_migration",
     "art_gallery_prune",
     "art_seed_sync",
     "art_official_catalog",
@@ -617,6 +618,17 @@ def at_server_start():
         _register_nomination_triggers,
         fail_loud=False,
         tolerant_on=_ALL_ERRORS,
+    )
+
+    # Classic scene conversion (scene-asset-migration): converts every
+    # settled classic scene record into the scene gallery, then deletes the
+    # classic record and its own output files. Runs BEFORE the orphan prune
+    # so a copy whose card append failed is reclaimed as an orphan file in the
+    # same startup, and a record whose deletion failed is retried next boot.
+    # The seam is bounded per record; an unforeseen leak stays fail-loud.
+    _startup_step(
+        "art_scene_migration",
+        lambda: _late("world.art.service", "migrate_classic_scene_records"),
     )
 
     # Gallery orphan reclaim (gallery-generation-jobs): deletes unreferenced

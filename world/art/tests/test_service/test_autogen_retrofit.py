@@ -118,8 +118,8 @@ class AutogenRetrofitTests(EvenniaTestCase):
         with patch(
             "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
         ):
-            # Startup sync enqueues the classic registry subjects too; drain
-            # past them so the gallery job is always claimed.
+            # Startup sync enqueues the registry scene subjects too; drain
+            # past them so the character gallery job is always claimed.
             drain_synchronous(200)
 
     def _schedule(self):

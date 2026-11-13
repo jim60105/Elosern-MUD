@@ -1,5 +1,6 @@
 """Slice of ``test_service``: GalleryPruneTests.
 """
+import io
 from unittest.mock import patch
 import unittest
 from contextlib import contextmanager
@@ -7,6 +8,7 @@ import tempfile
 from pathlib import Path
 from django.db import transaction
 from django.test import override_settings
+from PIL import Image
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
@@ -20,7 +22,7 @@ from world.art.gallery_prompt import (
 )
 from world.art.sd_worker import SDError
 from world.art.service import requeue_gallery_subject
-from world.art.service import prune_gallery_orphans
+from world.art.service import migrate_classic_scene_records, prune_gallery_orphans
 from world.art.subjects import (
     ArtSubjectError,
     monster_description,
@@ -40,9 +42,12 @@ from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
     SYNTH_MONSTER_TIERS,
+    make_archetype,
     make_monster_species,
     synthetic_registries,
 )
+
+from ._support import open_synthetic_scope
 
 class GalleryPruneTests(EvenniaTestCase):
     """The startup prune reclaims orphan files and spent job records only."""
@@ -372,3 +377,286 @@ class UnregisteredMonsterPruneTests(EvenniaTestCase):
         self.assertEqual(self._records_naming(_GONE), [])
         self.assertFalse(self.gone_output.exists())
         self.assertFalse(self.gone_prior.exists())
+
+
+_MIGRATION_DONE = "t_mig_done"
+_MIGRATION_CARDED = "t_mig_carded"
+_MIGRATION_FAILED = "t_mig_failed"
+_MIGRATION_MISSING = "t_mig_missing"
+_MIGRATION_NO_OUTPUT = "t_mig_no_output"
+_MIGRATION_PENDING = "t_mig_pending"
+_MIGRATION_IN_PROGRESS = "t_mig_in_progress"
+_MIGRATION_BAD = "t_mig_bad"
+
+_MIGRATION_KEYS = (
+    _MIGRATION_DONE,
+    _MIGRATION_CARDED,
+    _MIGRATION_FAILED,
+    _MIGRATION_MISSING,
+    _MIGRATION_NO_OUTPUT,
+    _MIGRATION_PENDING,
+    _MIGRATION_IN_PROGRESS,
+    _MIGRATION_BAD,
+)
+
+
+class SceneAssetMigrationTests(EvenniaTestCase):
+    """The startup conversion turns settled classic scene outputs into gallery cards.
+
+    Change ``scene-asset-migration``: every settled classic scene record is
+    converted or dropped at startup and its files are reclaimed.
+    """
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "archetypes",
+            extra={
+                "archetypes": {
+                    key: make_archetype(key) for key in _MIGRATION_KEYS
+                }
+            },
+        )
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.root = Path(self.tempdir.name)
+        self.art_settings = override_settings(ART_STORE_ROOT=str(self.root))
+        self.art_settings.enable()
+        self.addCleanup(self.art_settings.disable)
+
+    @staticmethod
+    def _png_bytes(width=1536, height=864):
+        buffer = io.BytesIO()
+        Image.new("RGB", (width, height)).save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    def _write(self, identity):
+        path = self.root / identity
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(self._png_bytes())
+        return path
+
+    def _classic(self, key, status, *, output=True, present=True, prior=False):
+        record = ensure(scene_subject_for(key), "synthetic classic scene")
+        record.db.status = status
+        if output:
+            identity = f"scene/{key}.png"
+            if present:
+                self._write(identity)
+            record.db.output_identity = identity
+        if prior:
+            prior_identity = f"scene/{key}-prior.png"
+            self._write(prior_identity)
+            record.db.prior_output_identity = prior_identity
+        record.db.completed_at = 1234.5
+        return record
+
+    def _classic_exists(self, key):
+        return ArtAssetRecord.objects.filter(db_key=record_key(scene_subject_for(key))).exists()
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_a_done_classic_scene_becomes_one_card(self):
+        record = self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
+        output = self.root / record.db.output_identity
+        original = output.read_bytes()
+        with patch("world.art.service.log_info") as info:
+            result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 1, "dropped": 0, "skipped": 0})
+        info.assert_called_once_with("art_scene_migration", context=result)
+        subject = scene_subject_for(_MIGRATION_DONE)
+        cards = gallery_api.cards_for(subject)
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(cards[0]["source"], "generated")
+        self.assertEqual(cards[0]["image_size"], {"width": 1536, "height": 864})
+        self.assertEqual(cards[0]["created_at"], 1234.5)
+        self.assertEqual(
+            (self.root / cards[0]["stored_identity"]).read_bytes(), original
+        )
+        self.assertEqual(
+            gallery_api.record_for(subject).db.default_image_id,
+            cards[0]["image_id"],
+        )
+        self.assertFalse(self._classic_exists(_MIGRATION_DONE))
+        self.assertFalse(output.exists())
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_an_existing_card_wins(self):
+        subject = scene_subject_for(_MIGRATION_CARDED)
+        identity = (
+            f"gallery/scene/{subject.key}/eeee0000-0000-4000-8000-000000000001.png"
+        )
+        self._write(identity)
+        existing = gallery_api.append_card(
+            subject,
+            image_id="eeee0000-0000-4000-8000-000000000001",
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            image_size={"width": 1536, "height": 864},
+            source="seed",
+        )
+        record = self._classic(_MIGRATION_CARDED, ArtAssetStatus.DONE)
+        output = self.root / record.db.output_identity
+        result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 0, "dropped": 1, "skipped": 0})
+        self.assertEqual(gallery_api.cards_for(subject), [existing])
+        self.assertFalse(self._classic_exists(_MIGRATION_CARDED))
+        self.assertFalse(output.exists())
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_failed_and_missing_records_are_dropped(self):
+        failed = self._classic(_MIGRATION_FAILED, ArtAssetStatus.FAILED, prior=True)
+        missing = self._classic(_MIGRATION_MISSING, ArtAssetStatus.MISSING)
+        no_output = self._classic(
+            _MIGRATION_NO_OUTPUT, ArtAssetStatus.DONE, present=False
+        )
+        files = [
+            self.root / failed.db.output_identity,
+            self.root / failed.db.prior_output_identity,
+            self.root / missing.db.output_identity,
+        ]
+        self.assertTrue(all(path.is_file() for path in files))
+        result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 0, "dropped": 3, "skipped": 0})
+        for key in (_MIGRATION_FAILED, _MIGRATION_MISSING, _MIGRATION_NO_OUTPUT):
+            with self.subTest(key=key):
+                self.assertFalse(self._classic_exists(key))
+                self.assertEqual(gallery_api.cards_for(scene_subject_for(key)), [])
+        for path in files:
+            with self.subTest(path=path.name):
+                self.assertFalse(path.exists())
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_an_unsettled_record_waits(self):
+        pending = self._classic(_MIGRATION_PENDING, ArtAssetStatus.PENDING)
+        in_progress = self._classic(
+            _MIGRATION_IN_PROGRESS, ArtAssetStatus.IN_PROGRESS
+        )
+        result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 0, "dropped": 0, "skipped": 2})
+        for record, key in (
+            (pending, _MIGRATION_PENDING),
+            (in_progress, _MIGRATION_IN_PROGRESS),
+        ):
+            with self.subTest(key=key):
+                self.assertTrue(self._classic_exists(key))
+                self.assertEqual(gallery_api.cards_for(scene_subject_for(key)), [])
+                self.assertTrue((self.root / record.db.output_identity).exists())
+                self.assertIn(
+                    record.db.status,
+                    (ArtAssetStatus.PENDING, ArtAssetStatus.IN_PROGRESS),
+                )
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_running_twice_changes_nothing_more(self):
+        self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
+        self.assertEqual(
+            migrate_classic_scene_records(),
+            {"converted": 1, "dropped": 0, "skipped": 0},
+        )
+        subject = scene_subject_for(_MIGRATION_DONE)
+        cards = gallery_api.cards_for(subject)
+        files = sorted(
+            path.relative_to(self.root).as_posix()
+            for path in self.root.rglob("*")
+            if path.is_file()
+        )
+        self.assertEqual(
+            migrate_classic_scene_records(),
+            {"converted": 0, "dropped": 0, "skipped": 0},
+        )
+        self.assertEqual(gallery_api.cards_for(subject), cards)
+        self.assertEqual(
+            sorted(
+                path.relative_to(self.root).as_posix()
+                for path in self.root.rglob("*")
+                if path.is_file()
+            ),
+            files,
+        )
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_one_bad_record_never_aborts_startup(self):
+        from world.art import service as art_service
+
+        bad = self._classic(_MIGRATION_BAD, ArtAssetStatus.DONE)
+        self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
+        real_convert = art_service._convert_classic_scene_output
+
+        def _boom(record, subject, identity):
+            if subject.key == _MIGRATION_BAD:
+                raise RuntimeError("conversion boom")
+            return real_convert(record, subject, identity)
+
+        with (
+            patch(
+                "world.art.service._convert_classic_scene_output", side_effect=_boom
+            ),
+            patch("world.art.service.log_warn") as warn,
+        ):
+            result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 1, "dropped": 0, "skipped": 0})
+        self.assertEqual(
+            len(gallery_api.cards_for(scene_subject_for(_MIGRATION_DONE))), 1
+        )
+        # The bad record and its classic file stay for the next startup.
+        self.assertTrue(self._classic_exists(_MIGRATION_BAD))
+        self.assertTrue((self.root / bad.db.output_identity).exists())
+        self.assertTrue(
+            any(
+                call.args
+                and call.args[0] == "art_scene_migration_failed"
+                and call.kwargs["context"] == {"record": bad.db_key}
+                for call in warn.call_args_list
+            )
+        )
+
+    @covers_requirement(
+        "art-asset-lifecycle::startup-converts-classic-scene-outputs-into-scene-gallery-cards"
+    )
+    def test_a_failed_classic_unlink_is_bounded_and_visible(self):
+        record = self._classic(_MIGRATION_DONE, ArtAssetStatus.DONE)
+        record_name = str(record.db_key)
+        identity = record.db.output_identity
+        output = self.root / identity
+        real_unlink = Path.unlink
+
+        def _busy(path, *args, **kwargs):
+            if path.name == output.name:
+                raise OSError("busy")
+            return real_unlink(path, *args, **kwargs)
+
+        with (
+            patch("pathlib.Path.unlink", _busy),
+            patch("world.art.service.log_warn") as warn,
+        ):
+            result = migrate_classic_scene_records()
+        self.assertEqual(result, {"converted": 1, "dropped": 0, "skipped": 0})
+        self.assertTrue(output.exists())
+        self.assertTrue(
+            any(
+                call.args
+                and call.args[0] == "art_scene_migration_failed"
+                and call.kwargs["context"] == {
+                    "record": record_name,
+                    "identity": identity,
+                }
+                for call in warn.call_args_list
+            )
+        )

@@ -372,6 +372,13 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             if key.startswith(f"art:portrait:monster:{visual_key}:gen:")
         ]
 
+    def _scene_job_keys(self, archetype):
+        return [
+            key
+            for key in self._job_keys()
+            if key.startswith(f"art:scene:{archetype}:gen:")
+        ]
+
     def _classic_keys(self):
         return sorted(
             record.db_key
@@ -385,12 +392,9 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         with patch(
             "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
         ):
-            # Drain past the scene classic jobs too so every gallery job is claimed.
+            # Drain past every scene and monster gallery job.
             drain_synchronous(200)
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
-    )
     @covers_requirement(
         "art-gallery-autogen::automatic-character-portraits-produce-exactly-one-unbound-default-card"
     )
@@ -402,11 +406,11 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         ages.assert_not_called()
         for tier in self.tiers:
             self.assertEqual(len(self._monster_job_keys(tier)), 1)
-        # No classic monster record was ever written; scenes keep theirs.
-        classic = self._classic_keys()
-        self.assertEqual(
-            classic, sorted(f"art:scene:{archetype}" for archetype in _SYNTH_SCENES)
-        )
+        # Neither kind writes a classic record any more; both request one
+        # gallery card per registered subject.
+        self.assertEqual(self._classic_keys(), [])
+        for archetype in _SYNTH_SCENES:
+            self.assertEqual(len(self._scene_job_keys(archetype)), 1)
         self._drain()
         for tier in self.tiers:
             subject = monster_subject_for(tier)
@@ -418,8 +422,8 @@ class MonsterStartupSyncTests(EvenniaTestCase):
                 gallery_api.record_for(subject).db.default_image_id, cards[0]["image_id"]
             )
             self.assertTrue((self.root / cards[0]["stored_identity"]).exists())
-        # The drained per-image jobs are spent and gone; still zero classic monster keys.
-        self.assertEqual(self._classic_keys(), sorted(f"art:scene:{a}" for a in _SYNTH_SCENES))
+        # The drained per-image jobs are spent and gone; no classic record remains.
+        self.assertEqual(self._classic_keys(), [])
 
     @covers_requirement(
         "art-gallery-autogen::automatic-generation-is-idempotent-against-the-subject-s-gallery"
@@ -489,7 +493,12 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         (folder / "sentinel.png").write_bytes(valid_png)
         expected_id = derive_image_id(f"monster/{tier}/sentinel.png")
         launched: list[str] = []
-        art_steps = ("art_gallery_prune", "art_seed_sync", "art_sync_all")
+        art_steps = (
+            "art_scene_migration",
+            "art_gallery_prune",
+            "art_seed_sync",
+            "art_sync_all",
+        )
         real_startup_step = at._startup_step
 
         def _recording_step(name, run, **kwargs):
@@ -519,9 +528,6 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         self.assertEqual(gallery_api.cards_for(subject), cards)
         self.assertEqual(seed_file.read_bytes(), seed_bytes)
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
-    )
     def test_a_failing_tier_is_bounded_and_the_remaining_tiers_still_synchronize(self):
         failing = self.tiers[0]
         real_request = request_gallery_image
@@ -547,15 +553,12 @@ class MonsterStartupSyncTests(EvenniaTestCase):
                 for call in warn.call_args_list
             )
         )
-        # Scenes were unaffected by the failing tier.
-        self.assertEqual(
-            self._classic_keys(),
-            sorted(f"art:scene:{a}" for a in _SYNTH_SCENES),
-        )
+        # Scenes were unaffected by the failing tier: no classic record and
+        # one gallery request per registered archetype.
+        self.assertEqual(self._classic_keys(), [])
+        for archetype in _SYNTH_SCENES:
+            self.assertEqual(len(self._scene_job_keys(archetype)), 1)
 
-    @covers_requirement(
-        "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
-    )
     def test_a_pre_existing_classic_record_is_left_alone_and_still_resolves_classic(self):
         from world.art.presenter import describe_portrait
         from world.art.queue import claim, settle
