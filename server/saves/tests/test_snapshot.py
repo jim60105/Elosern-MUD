@@ -130,6 +130,34 @@ class CreateSnapshotTests(SnapshotTestCase):
         self.assertEqual((art_dir / "scene/forest.webp").read_bytes(), b"forest-v1")
         self.assertEqual((art_dir / "portrait/character/hero.webp").read_bytes(), b"hero-v1")
 
+    def test_a_write_ahead_source_saves_one_rollback_journal_file(self):
+        live = self.world.root / "live-wal"
+        live.mkdir()
+        source = live / "evennia.db3"
+        saved = self.world.root / "saved-wal"
+        target = saved / "evennia.db3"
+        connection = sqlite3.connect(source)
+        self.addCleanup(connection.close)
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA wal_autocheckpoint=0")
+        connection.execute("CREATE TABLE world (key TEXT PRIMARY KEY, value TEXT)")
+        connection.execute("INSERT INTO world VALUES ('state', 'committed')")
+        connection.commit()
+        # The committed row lives only in the log until this writer closes.
+        self.assertTrue((live / "evennia.db3-wal").exists())
+
+        snapshot._backup_database(source, target)
+
+        copy = sqlite3.connect(target)
+        try:
+            self.assertEqual(copy.execute("PRAGMA journal_mode").fetchone()[0], "delete")
+            self.assertEqual(copy.execute("SELECT value FROM world").fetchall(), [("committed",)])
+        finally:
+            copy.close()
+        read_only = sqlite3.connect(f"{target.resolve().as_uri()}?mode=ro", uri=True)
+        read_only.close()
+        self.assertEqual([path.name for path in saved.iterdir()], ["evennia.db3"])
+
     @covers_requirement("gm-save-management::consistent-snapshots-without-damaged-art-history")
     def test_art_publication_is_held_during_the_snapshot(self):
         self.world.art("scene/forest.webp", b"forest")
