@@ -13,6 +13,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, InstanceRoom
@@ -63,6 +64,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
     def _stored(self, character=None):
         return (character or self.char1).attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE)
 
+    @covers_requirement(
+        "scene-entry-record::room-entry-records-the-entered-scene-archetype-per-character"
+    )
     def test_entering_rooms_records_each_archetype_once(self):
         with synthetic_registries("archetypes"), patch(
             "world.rules.scene_visits.log_info"
@@ -84,6 +88,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
                 ["scene_entry_recorded", "scene_entry_recorded"],
             )
 
+    @covers_requirement(
+        "scene-entry-record::room-entry-records-the-entered-scene-archetype-per-character"
+    )
     def test_another_characters_entries_are_separate(self):
         twin = create_object(
             PlayerCharacter, key="t-scene-twin", location=self.room1, home=self.room1
@@ -96,6 +103,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
             self.assertEqual(entered_archetypes(twin), ())
             self.assertIsNone(self._stored(twin))
 
+    @covers_requirement(
+        "scene-entry-record::room-entry-records-the-entered-scene-archetype-per-character"
+    )
     def test_an_unresolvable_archetype_records_nothing(self):
         with synthetic_registries("archetypes"):
             self.char1.move_to(self._grid_room(BAZAAR, 1), quiet=True)
@@ -110,6 +120,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
             self.assertEqual(entered_archetypes(self.char1), (BAZAAR,))
             self.assertEqual(self._stored(), recorded)
 
+    @covers_requirement(
+        "scene-entry-record::room-entry-records-the-entered-scene-archetype-per-character"
+    )
     def test_a_failing_write_never_blocks_the_move(self):
         with synthetic_registries("archetypes"):
             self.char1.move_to(self._grid_room(BAZAAR, 1), quiet=True)
@@ -131,6 +144,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
             )
             self.assertIsInstance(warn.call_args.kwargs["exc"], RuntimeError)
 
+    @covers_requirement(
+        "scene-entry-record::room-entry-records-the-entered-scene-archetype-per-character"
+    )
     def test_a_non_player_arrival_records_nothing(self):
         npc = create_object(NPC, key="t-scene-npc", location=self.room1, home=self.room1)
         with synthetic_registries("archetypes"):
@@ -156,6 +172,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
                 ["scene_entry_record_corrupt", "scene_entry_record_corrupt"],
             )
 
+    @covers_requirement(
+        "scene-entry-record::reads-list-registered-entered-archetypes-only"
+    )
     def test_read_returns_registry_order_not_stored_order(self):
         with synthetic_registries("archetypes", extra={"archetypes": _local(ZETA, ALPHA)}):
             self.char1.move_to(self._grid_room(ZETA, 1), quiet=True)
@@ -165,6 +184,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
             self.assertEqual(self._stored()["archetypes"], sorted([ALPHA, ZETA]))
             self.assertEqual(entered_archetypes(self.char1), (ZETA, ALPHA))
 
+    @covers_requirement(
+        "scene-entry-record::reads-list-registered-entered-archetypes-only"
+    )
     def test_a_removed_archetype_is_not_returned(self):
         with synthetic_registries("archetypes", extra={"archetypes": _local(ZETA)}):
             self.char1.move_to(self._grid_room(BAZAAR, 1), quiet=True)
