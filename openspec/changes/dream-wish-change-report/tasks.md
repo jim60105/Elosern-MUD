@@ -14,7 +14,7 @@ Run `pnpm run build` in `web/webclient-app`; run `pnpm exec vitest run <file>` f
 
 ## 3. Schema 5
 
-- [ ] 3.1 Apply design decision 4 on the server, the validator, the constants and every fixture and test it names. Verify `grep -rn "direction_parts\|draft_preferences\|requirement_version" world/narrative/dream_surface.py web/webclient/presentation/dream.py web/static/webclient/js/elosern/protocol/panels/dream.js web/webclient-app/components commands/dream.py` prints nothing, `node --test web/static/webclient/js/tests/protocol_dream.test.js` passes, and `<prefix> world.narrative.tests.test_dream_surface web.webclient.presentation.tests.test_dream_artwork tests.test_panel_schema_version_parity_contract` passes.
+- [x] 3.1 Apply design decision 4 on the server, the validator, the constants and every fixture and test it names. Verify `grep -rn "direction_parts\|draft_preferences\|requirement_version" world/narrative/dream_surface.py web/webclient/presentation/dream.py web/static/webclient/js/elosern/protocol/panels/dream.js web/webclient-app/components commands/dream.py` prints nothing, `node --test web/static/webclient/js/tests/protocol_dream.test.js` passes, and `<prefix> world.narrative.tests.test_dream_surface web.webclient.presentation.tests.test_dream_artwork tests.test_panel_schema_version_parity_contract` passes.
 
 ## 4. Stories and bridge
 

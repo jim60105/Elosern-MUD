@@ -32,7 +32,7 @@ from world.ai.schemas.registry import _OUTPUT_SCHEMAS
 from world.narrative import dream_proposal
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
-from world.narrative.models import CreativeRequest
+from world.narrative.models import AuthoringDraft, CreativeRequest
 from world.narrative.dream_track import prospective_state
 from world.narrative.threads import create_thread, resolve_thread
 from world.narrative.authoring import get_draft
@@ -546,8 +546,8 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(self.request("finalize").result["outcome"], "success")
         self.assertEqual(self.request("draft", direction=direction).result["outcome"], "success")
         state = service.dream_state(self.actor)
-        self.assertEqual("".join(state["direction_parts"]), direction["summary"])
-        self.assertEqual(state["draft_preferences"]["thread_id"], thread.thread_id)
+        self.assertEqual(state["proposal"]["summary"], direction["summary"])
+        self.assertEqual(state["thread_id"], thread.thread_id)
         with self.captureOnCommitCallbacks(execute=True):
             self.assertEqual(self.request("confirm").result["outcome"], "success")
         stored = CreativeRequest.objects.get()
@@ -886,10 +886,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(result.result["outcome"], "success")
         state = service.dream_state(self.actor)
         self.assertEqual(
-            [row["text"] for row in state["requirements"]],
+            [row["text"] for row in state["proposal"]["requirements"]],
             ["南門", "一個女孩", "帶她找媽媽"],
         )
-        self.assertIsNone(state["requirement_version"])
         rendered = render_state(state)
         self.assertIn("南門", rendered)
         self.assertIn("帶她找媽媽", rendered)
@@ -915,12 +914,13 @@ class DreamSurfaceTests(EvenniaTest):
             "success",
         )
         state = service.dream_state(self.actor)
-        shown = state["requirement_version"]
+        # The rows are published once, inside the working proposal; the panel
+        # carries no separate row copy and no version identity (schema 5).
+        for retired in ("direction_parts", "draft_preferences", "requirements", "requirement_version"):
+            self.assertNotIn(retired, state)
+        self.assertEqual(state["proposal"]["requirements"], direction["requirements"])
+        shown = AuthoringDraft.objects.get().direction["requirement_version"]
         self.assertTrue(shown)
-        # The rows are published once, as top-level keys: the quoted preference
-        # projection no longer repeats what the stage already renders.
-        self.assertNotIn("requirements", state["draft_preferences"])
-        self.assertNotIn("requirement_version", state["draft_preferences"])
         rendered = render_state(state)
         self.assertIn("南門", rendered)
         # The identity stays on the published state: the text surface renders
@@ -992,14 +992,14 @@ class DreamSurfaceTests(EvenniaTest):
             "success",
         )
         state = service.dream_state(self.actor)
-        shown = state["requirement_version"]
+        shown = AuthoringDraft.objects.get().direction["requirement_version"]
         self.assertTrue(shown)
         # The submitted form is the working proposal and the shown version.
         wish = surface.wish_state(self.actor)
         self.assertEqual(wish["proposal"]["summary"], submitted["summary"])
         self.assertEqual(wish["proposal"]["requirements"], requirements)
         self.assertIsNone(wish["changes"])
-        self.assertEqual(state["requirements"], requirements)
+        self.assertEqual(state["proposal"]["requirements"], requirements)
         with self.captureOnCommitCallbacks(execute=True):
             confirmed = self.request("confirm")
         self.assertEqual(confirmed.result["outcome"], "success")
@@ -1018,8 +1018,6 @@ class DreamSurfaceTests(EvenniaTest):
         # refuse must never be persisted, or the published payload could not be
         # rendered by any client at all. A submitted form reaches the applier
         # first, so its refusal is the finalized stage's own reason.
-        from world.narrative.models import AuthoringDraft
-
         self.enter()
         self.assertEqual(self.request("finalize").result["outcome"], "success")
         # The finalize saved the still-empty working proposal: that is the one
@@ -1046,8 +1044,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(AuthoringDraft.objects.count(), 1)
         self.assertEqual(AuthoringDraft.objects.get().direction["requirements"], [])
         state = service.dream_state(self.actor)
-        self.assertEqual(state["requirements"], [])
-        self.assertIsNone(state["requirement_version"])
+        self.assertEqual(state["proposal"]["requirements"], [])
 
     @covers_requirement(
         "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
@@ -1815,7 +1812,7 @@ class DreamSurfaceTests(EvenniaTest):
             self.request("say", message="鐘聲", client=client).result["outcome"], "success"
         )
         self.assertEqual(
-            [row["text"] for row in service.dream_state(self.actor)["requirements"]],
+            [row["text"] for row in service.dream_state(self.actor)["proposal"]["requirements"]],
             ["南門", "一個女孩", "帶她找媽媽"],
         )
         self.assertEqual(self.request("finalize").result["outcome"], "success")

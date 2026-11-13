@@ -16,7 +16,7 @@ const LISTS = { themes: [], atmosphere: [], participants: [], emphasis: [], excl
 function proposal(overrides = {}) {
   return { summary: "", ...LISTS, requirements: [], ...overrides };
 }
-// A valid schema-4 dream state: conversing, nothing said yet, an empty wish.
+// A valid schema-5 dream state: conversing, nothing said yet, an empty wish.
 function state(overrides = {}) {
   return { session_id: "synthetic-dream", revision: 2, completed: 0, remaining: 6,
     can_input: true, can_confirm: false, can_finalize: true, can_choose_thread: true,
@@ -25,9 +25,7 @@ function state(overrides = {}) {
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
     // The shared canonical scene descriptor of the dream's own source chain.
     scene_art: dreamDescriptor(),
-    // Schema-3 keys the wire still carries; the panel never reads them.
-    direction_parts: [], thread_choices: [], draft_preferences: null,
-    requirements: [], requirement_version: null,
+    thread_choices: [],
     stage: "conversing", drafted: false, thread_id: null, changes: null,
     proposal: proposal(),
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
@@ -285,15 +283,15 @@ describe("server-authored dream surface", () => {
     expect(wrapper.find(".dream-toast").attributes("role")).toBe("status");
   });
   it("mirrors the strict panel schema and truthful command echoes", () => {
-    const payload = { schema_version: 4, available: true, state: state() };
-    expect(Protocol.validatePanel("dream", 4, payload)).toEqual(payload);
-    // The finalized fixtures are legal schema-4 payloads too.
+    const payload = { schema_version: 5, available: true, state: state() };
+    expect(Protocol.validatePanel("dream", 5, payload)).toEqual(payload);
+    // The finalized fixtures are legal schema-5 payloads too.
     for (const value of [finalized(), capped(), finalized({ thread_choices: THREADS, thread_id: "synthetic-a" })]) {
-      expect(Protocol.validatePanel("dream", 4, { ...payload, state: value }).state).toEqual(value);
+      expect(Protocol.validatePanel("dream", 5, { ...payload, state: value }).state).toEqual(value);
     }
-    expect(Protocol.validatePanel("dream", 4, { ...payload, state: null }).state).toBeNull();
-    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ remaining: 0 }) })).toThrow();
-    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ pending: true }) })).toThrow();
+    expect(Protocol.validatePanel("dream", 5, { ...payload, state: null }).state).toBeNull();
+    expect(() => Protocol.validatePanel("dream", 5, { ...payload, state: state({ remaining: 0 }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 5, { ...payload, state: state({ pending: true }) })).toThrow();
     // The retired raw-URL shape is refused, not adapted: the state's artwork is
     // the canonical scene descriptor or nothing at all.
     for (const retired of [
@@ -302,13 +300,13 @@ describe("server-authored dream surface", () => {
       null,
       { ...dreamDescriptor(), attempts: [{ type: "image", source_id: "scene.operator:dream_throne", rank: 30, resource: { resource_id: "x", version: "y", url: "/art/x", origin: "official", geometry: null } }] },
     ]) {
-      expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ scene_art: retired }) }))
+      expect(() => Protocol.validatePanel("dream", 5, { ...payload, state: state({ scene_art: retired }) }))
         .toThrow();
     }
-    expect(Protocol.validatePanel("dream", 4, { ...payload, state: state({
+    expect(Protocol.validatePanel("dream", 5, { ...payload, state: state({
       thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
     }) }).state.thread_choices[0].label).toBe("合成已知故事");
-    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 5, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
     expect(CommandEcho.commandLine("explore.wait", { sleep: true })).toBe("sleep");
     expect(CommandEcho.commandLine("explore.sleep_party", {})).toBe("sleep all");
     expect(CommandEcho.commandLine("explore.sleep_continue", {})).toBe("sleep continue");

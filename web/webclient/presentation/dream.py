@@ -13,9 +13,11 @@ from web.webclient.presentation.registry import PanelUnavailableError
 # surface. No old-shape field survives: a raw URL string fails the wire.
 # v4 publishes the two-stage wish: the session stage, the working proposal, the
 # last settled change report, the chosen thread and the flags a surface offers
-# per stage. The stage-3 keys stay until the change-report stage removes them,
-# so this version is additive on the server and a strict superset on the wire.
-DREAM_SCHEMA_VERSION = 4
+# per stage. The stage-3 keys stayed until the change-report stage.
+# v5 drops the four stage-3 keys (the old summary parts, the preference
+# projection and the top-level requirement rows with their version identity):
+# the working proposal is the one published wish, and a v4 payload is refused.
+DREAM_SCHEMA_VERSION = 5
 
 
 def dream_presenter(context):

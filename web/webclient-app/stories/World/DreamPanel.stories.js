@@ -1,7 +1,7 @@
 // World/DreamPanel: the dream collaboration as co-editing a wish, played as the
 // staged server (design: stage 8 of
 // docs/superpowers/specs/2026-11-13-dream-proposal-coediting-design.md). The
-// fixture applies the design's scripted edit commands and publishes a schema-4
+// fixture applies the design's scripted edit commands and publishes a schema-5
 // panel state. Reference only: synthetic fixtures, no model call, no game time.
 //
 // Try it: pick the story the wish belongs to, speak (an empty Enter does
@@ -88,10 +88,10 @@ function track(completed) {
     converging: completed + 1 >= 5 && completed < EXCHANGES };
 }
 
-// The state after `turns` scripted exchanges: exactly the schema-4 shape the
-// server publishes, including the four schema-3 keys a client may still read.
+// The state after `turns` scripted exchanges: exactly the schema-5 shape the
+// server publishes.
 function fixture({ turns = 0, threads = THREADS, threadId = null, stage = null, drafted = false,
-  pending = false, failure = false, requirementVersion = null, ...overrides } = {}) {
+  pending = false, failure = false, ...overrides } = {}) {
   let proposal = emptyProposal();
   let changes = null;
   for (const turn of SCRIPT.slice(0, turns)) {
@@ -115,9 +115,7 @@ function fixture({ turns = 0, threads = THREADS, threadId = null, stage = null, 
     opening: OPENING, scene: last?.scene || "", dialogue: last?.dialogue || "",
     // The shared canonical scene descriptor of the dream's own source chain.
     scene_art: dreamDescriptor(),
-    direction_parts: proposal.summary ? [proposal.summary] : [],
-    thread_choices: threads, draft_preferences: null,
-    requirements: clone(proposal.requirements), requirement_version: requirementVersion,
+    thread_choices: threads,
     stage: resolved, proposal, changes, thread_id: threadId,
     track: track(turns), sleep: { tick_from: 100, tick_to: 100, requested_seconds: 0, seconds: 0, event_kinds: [] },
     ending: "", ending_phase: "",
@@ -147,7 +145,7 @@ const render = (args) => ({
         return "synthetic-request";
       },
     };
-    // Every fabricated frame stays a legal schema-4 payload: the stage decides
+    // Every fabricated frame stays a legal schema-5 payload: the stage decides
     // which flags a surface may offer, so each synthetic transition re-derives
     // the set instead of leaving a stale one behind.
     function syncStageFlags() {
@@ -161,11 +159,6 @@ const render = (args) => ({
       // The server publishes no offered thread once the dream is closed.
       if (!state.open) state.thread_choices = [];
     }
-    // The schema-3 keys mirror what the server derives from the working wish.
-    function syncPublished() {
-      state.direction_parts = state.proposal.summary ? [state.proposal.summary] : [];
-      state.requirements = clone(state.proposal.requirements);
-    }
     function publishSuccess() {
       if (!intent.value) { note.value = "請先提交操作意圖。"; return; }
       const { action, payload } = intent.value;
@@ -176,7 +169,6 @@ const render = (args) => ({
           const next = applyEdits(state.proposal, turn.edits);
           state.changes = diffProposal(state.proposal, next);
           state.proposal = next;
-          syncPublished();
           state.scene = turn.scene;
           state.dialogue = turn.dialogue;
           state.completed += 1;
@@ -195,7 +187,6 @@ const render = (args) => ({
           const { summary, requirements, kind, thread_id: threadId, ...lists } = payload.direction;
           state.proposal = { ...emptyProposal(), ...lists, summary, requirements: requirements || [] };
           state.thread_id = threadId;
-          syncPublished();
         }
         state.drafted = true;
         if (action === "dream.confirm") Object.assign(state, { open: false, confirmed: true });
@@ -263,11 +254,10 @@ export const Converging = { render, args: { turns: 5 } };
 export const Pending = { render, args: { turns: 2, pending: true } };
 export const Failed = { render, args: { turns: 2, failure: true } };
 export const Drafted = { render, args: { turns: 2, drafted: true } };
-// The wish's requirement rows as she wrote them, with no saved version yet.
-export const RequirementsProposed = { render, args: { turns: 1 } };
-// The same rows frozen into the saved draft that confirmation compares.
-export const RequirementsShown = { render, args: { turns: 1, stage: "finalized", drafted: true,
-  requirementVersion: "synthetic-dream-wish:v1" } };
+// The wish's requirement rows as she wrote them, read-only while conversing.
+export const RequirementsProposed = { render, args: { turns: 1, open: "view" } };
+// The same rows in the player's hands once finalized: editable in the sheet.
+export const RequirementsShown = { render, args: { turns: 1, stage: "finalized", drafted: true, open: "sheet" } };
 // Six exchanges spent: the form is the player's without a warning.
 export const AtCap = { render, args: { turns: 6 } };
 export const ManyThreads = { render, args: { turns: 0, threads: Array.from({ length: 32 }, (_, index) => ({
