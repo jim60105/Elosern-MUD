@@ -1,8 +1,14 @@
 """Gallery category sources and subject admission (webclient-gallery-categories).
 
 Characters and companions are created in each test; monster species, variants
-and tiers come from the synthetic kit plus file-local factory rows.
+and tiers come from the synthetic kit plus file-local factory rows. A met place
+is a synthetic terrain region published through the geography fixture, so the
+group label comes from the published region view rather than the key.
 """
+
+from dataclasses import replace
+from types import MappingProxyType
+from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
 from evennia.typeclasses.attributes import Attribute
@@ -14,6 +20,7 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from typeclasses.rooms import TerrainRoom
 from web.webclient.presentation.gallery_categories import (
     CATEGORY_KEYS,
     GalleryCategoryError,
@@ -22,8 +29,13 @@ from web.webclient.presentation.gallery_categories import (
     gallery_categories,
     is_subject_admitted,
 )
+from world.lore.wilderness_regions import WildernessRegion
+from world.maps import geography as geography_module
+from world.maps import wilderness_provider
 from world.rules.lore_knowledge import record_species_sighting
+from world.rules.met_people import PLACE_REGION, record_person_interaction
 from world.rules.party import bound_owner_of
+from world.tests.geography_fixture import publish_geography
 from world.tests.synthetic_data import (
     make_monster_species,
     make_monster_tier,
@@ -101,12 +113,41 @@ class GalleryCategoryTests(EvenniaTest):
         companion = create_object(NPC, key=key, location=self.room1)
         if stable_key is not None:
             companion.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        return self._enlist(companion, owner)
+
+    def _enlist(self, companion, owner):
         companion.db.party_member = owner.pk
         owner.db.party = [*(owner.db.party or []), companion.pk]
         meta = dict(owner.db.party_meta or {})
         meta[str(companion.pk)] = {"general": True, "reasons": []}
         owner.db.party_meta = meta
         return companion
+
+    def _publish_regions(self, regions):
+        """Publish synthetic terrain regions so a place label reads its name."""
+        previous = geography_module.current()
+        self.addCleanup(publish_geography, previous)
+        publish_geography(replace(previous, regions=MappingProxyType(dict(regions))))
+
+    def _terrain(self, key, coordinates):
+        room = create_object(TerrainRoom, key=key, location=None)
+        room.ndb.active_coordinates = coordinates
+        return room
+
+    def _named_npc(self, key):
+        # A named NPC never needs to stand in the recorded place, and a fresh
+        # object inside a terrain room would trip the wilderness receive hook.
+        npc = create_object(NPC, key=key, location=self.room1)
+        npc.db.portrait_policy = {"mode": "named", "stable_key": key}
+        return npc
+
+    def _meet(self, npc, room, region_key, actor=None):
+        actor = actor or self.actor
+        actor.location = room
+        with patch.object(
+            wilderness_provider, "region_for_coordinates", return_value=region_key
+        ):
+            record_person_interaction(actor, npc)
 
     def _subject_keys(self, groups):
         return [ref.subject.full() for group in groups for ref in group.subjects]
@@ -130,14 +171,16 @@ class GalleryCategoryTests(EvenniaTest):
     def test_unreleased_categories_are_disabled_with_a_reason(self):
         record_species_sighting(self.actor, T_A)
         by_key = {category.key: category for category in gallery_categories(self.actor)}
-        for key in ("people", "scene"):
-            self.assertFalse(by_key[key].enabled)
-            self.assertTrue(by_key[key].reason)
-            self.assertEqual(by_key[key].count, 0)
-            self.assertEqual(category_groups(self.actor, key), ())
-        for key in ("mine", "party", "monster"):
+        self.assertFalse(by_key["scene"].enabled)
+        self.assertTrue(by_key["scene"].reason)
+        self.assertEqual(by_key["scene"].count, 0)
+        self.assertEqual(category_groups(self.actor, "scene"), ())
+        for key in ("mine", "party", "people", "monster"):
             self.assertTrue(by_key[key].enabled)
             self.assertIsNone(by_key[key].reason)
+        # people is enabled but this character has met nobody yet.
+        self.assertEqual(by_key["people"].count, 0)
+        self.assertEqual(category_groups(self.actor, "people"), ())
         # The count is listed subjects, not registered species: one sighting.
         self.assertEqual(by_key["monster"].count, 1)
         self.assertEqual(by_key["mine"].count, 1)
@@ -262,6 +305,103 @@ class GalleryCategoryTests(EvenniaTest):
             self._subject_keys(category_groups(self.actor, "party")),
             ["portrait:character:t_portrait_companion"],
         )
+
+    # -- people -------------------------------------------------------------
+
+    def test_people_groups_follow_recency(self):
+        self._publish_regions({
+            "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
+            "t_region_b": WildernessRegion("t_region_b", "測試乙地", None, ()),
+        })
+        room_a = self._terrain("t_room_a", (1, 1))
+        room_b = self._terrain("t_room_b", (2, 2))
+        npc_a = self._named_npc("t_npc_a")
+        npc_b = self._named_npc("t_npc_b")
+        npc_c = self._named_npc("t_npc_c")
+        self._meet(npc_a, room_a, "t_region_a")  # oldest
+        self._meet(npc_c, room_a, "t_region_a")
+        self._meet(npc_b, room_b, "t_region_b")  # newest
+        # Another player's character is never listed, even when recorded.
+        other = self._add_character("他者測者")
+        other.db.portrait_policy = {"mode": "named", "stable_key": "t_other_player"}
+        self._meet(other, room_b, "t_region_b")
+
+        groups = category_groups(self.actor, "people")
+        self.assertEqual(
+            [(group.key, group.label) for group in groups],
+            [
+                (f"{PLACE_REGION}:t_region_b", "測試乙地"),
+                (f"{PLACE_REGION}:t_region_a", "測試甲地"),
+            ],
+        )
+        self.assertEqual(
+            self._subject_keys(groups),
+            [
+                "portrait:character:t_npc_b",
+                "portrait:character:t_npc_c",
+                "portrait:character:t_npc_a",
+            ],
+        )
+        by_key = {category.key: category for category in gallery_categories(self.actor)}
+        self.assertEqual(
+            (by_key["people"].enabled, by_key["people"].reason, by_key["people"].count),
+            (True, None, 3),
+        )
+
+    def test_a_party_member_is_listed_only_under_party(self):
+        self._publish_regions({
+            "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
+        })
+        room = self._terrain("t_room_a", (1, 1))
+        npc = self._named_npc("t_npc_b")
+        self._meet(npc, room, "t_region_a")
+        self.assertEqual(
+            self._subject_keys(category_groups(self.actor, "people")),
+            ["portrait:character:t_npc_b"],
+        )
+        self._enlist(npc, self.actor)
+        self.assertEqual(category_groups(self.actor, "people"), ())
+        self.assertEqual(
+            self._subject_keys(category_groups(self.actor, "party")),
+            ["portrait:character:t_npc_b"],
+        )
+
+    def test_a_vanished_npc_is_not_listed(self):
+        self._publish_regions({
+            "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
+            "t_region_b": WildernessRegion("t_region_b", "測試乙地", None, ()),
+        })
+        room_a = self._terrain("t_room_a", (1, 1))
+        room_b = self._terrain("t_room_b", (2, 2))
+        npc_a = self._named_npc("t_npc_a")
+        npc_b = self._named_npc("t_npc_b")
+        self._meet(npc_a, room_a, "t_region_a")
+        self._meet(npc_b, room_b, "t_region_b")
+        npc_a.delete()
+        groups = category_groups(self.actor, "people")
+        self.assertEqual([group.key for group in groups], [f"{PLACE_REGION}:t_region_b"])
+        self.assertEqual(self._subject_keys(groups), ["portrait:character:t_npc_b"])
+        npc_b.delete()
+        self.assertEqual(category_groups(self.actor, "people"), ())
+
+    def test_possession_lists_the_owner_s_people(self):
+        self._publish_regions({
+            "t_region_a": WildernessRegion("t_region_a", "測試甲地", None, ()),
+        })
+        owner = self._add_character("測者乙")
+        companion = self._companion("附身測者", owner, stable_key="t_possessed_companion")
+        companion.account = self.account
+        companion.db.possessed_by = owner.pk
+        room = self._terrain("t_room_a", (1, 1))
+        npc = self._named_npc("t_npc_a")
+        self._meet(npc, room, "t_region_a", actor=owner)
+
+        self.assertEqual(bound_owner_of(companion), owner)
+        self.assertEqual(
+            self._subject_keys(category_groups(companion, "people")),
+            ["portrait:character:t_npc_a"],
+        )
+        self.assertEqual(category_groups(self.actor, "people"), ())
 
     # -- monster ------------------------------------------------------------
 

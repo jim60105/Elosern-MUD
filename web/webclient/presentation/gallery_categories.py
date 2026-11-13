@@ -5,7 +5,9 @@ The gallery window's closed category set, each bounded by its own source:
 - ``mine``: every character of the account that owns the rendered puppet (the
   account roster's set), the live character first and marked current;
 - ``party``: the owning character's live companions in party order;
-- ``people`` / ``scene``: disabled in this programme stage;
+- ``people``: the owning character's met named NPCs, one group per place in
+  recency order;
+- ``scene``: disabled in this programme stage;
 - ``monster``: sighted visual species grouped by the threat tier of their
   default variant, in tier-registry order, each tier carrying ``seen / total``.
 
@@ -31,10 +33,11 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.observability import log_warn
 from world.rules.account_roster import AccountRosterError, build_account_roster
 from world.rules.lore_knowledge import LoreRecordError, list_discovered
+from world.rules.met_people import met_people, place_label
 from world.rules.party import bound_owner_of, live_companions
 
 CATEGORY_KEYS = ("mine", "party", "people", "monster", "scene")
-DISABLED_REASONS = {"people": "人物分類尚未開放。", "scene": "背景分類尚未開放。"}
+DISABLED_REASONS = {"scene": "背景分類尚未開放。"}
 MAX_DISPLAY_NAME = 64
 
 
@@ -198,7 +201,40 @@ def _monster(actor: Any) -> tuple[GalleryGroup, ...]:
     return tuple(groups)
 
 
-_SOURCES = {"mine": _mine, "party": _party, "monster": _monster}
+def _people(actor: Any) -> tuple[GalleryGroup, ...]:
+    from typeclasses.npcs import NPC
+
+    owner = gallery_owner(actor)
+    party_ids = {entity.pk for entity in live_companions(owner)}
+    by_place: dict[str, list[GallerySubjectRef]] = {}
+    # ``met_people`` is newest first, so a place's first appearance is its most
+    # recent interaction: the mapping's insertion order is the group order.
+    for person in met_people(owner):
+        if person.place is None or person.npc.pk in party_ids:
+            continue
+        if not isinstance(person.npc, NPC):
+            # The record can name a player character; people never lists one.
+            continue
+        try:
+            subject = character_subject_for(person.npc)
+        except ArtSubjectError as exc:
+            log_warn(
+                "gallery_subject_invalid",
+                context={"char": person.npc.pk, "category": "people"}, exc=exc,
+            )
+            continue
+        if subject is None:
+            continue
+        by_place.setdefault(person.place, []).append(
+            GallerySubjectRef(subject, person.npc, _display_name(person.npc.key), False)
+        )
+    return tuple(
+        GalleryGroup(place, place_label(place), None, None, tuple(refs))
+        for place, refs in by_place.items()
+    )
+
+
+_SOURCES = {"mine": _mine, "party": _party, "people": _people, "monster": _monster}
 
 
 def _enabled(key: str) -> bool:
