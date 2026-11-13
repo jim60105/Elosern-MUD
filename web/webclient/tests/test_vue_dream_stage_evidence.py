@@ -187,8 +187,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # ADDED by dream-wish-stage-panel: "The keepsake card shows the current wish and stage-specific rows". The requirement ID exists
-    # only once the delta is synced at archive, which annotates this method.
+    @covers_requirement(
+        "webclient-dream-stage::the-keepsake-card-shows-the-current-wish-and-stage-specific-rows"
+    )
     def test_keepsake_card_shows_wish_and_stage_rows(self):
         _assert_cases_pass(
             "dream keepsake card and stage rows",
@@ -205,8 +206,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # ADDED by dream-wish-stage-panel: "The whole wish is read-only while conversing". The requirement ID exists
-    # only once the delta is synced at archive, which annotates this method.
+    @covers_requirement(
+        "webclient-dream-stage::the-whole-wish-is-read-only-while-conversing"
+    )
     def test_whole_wish_is_read_only_while_conversing(self):
         _assert_cases_pass(
             "dream whole-wish view",
@@ -217,8 +219,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # ADDED by dream-wish-stage-panel: "Finalize asks before giving up remaining exchanges". The requirement ID exists
-    # only once the delta is synced at archive, which annotates this method.
+    @covers_requirement(
+        "webclient-dream-stage::finalize-asks-before-giving-up-remaining-exchanges"
+    )
     def test_finalize_asks_before_giving_up_exchanges(self):
         _assert_cases_pass(
             "dream finalize confirmation",
@@ -232,8 +235,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # ADDED by dream-wish-stage-panel: "The thread choice sits above the reply bar before the first message". The requirement ID exists
-    # only once the delta is synced at archive, which annotates this method.
+    @covers_requirement(
+        "webclient-dream-stage::the-thread-choice-sits-above-the-reply-bar-before-the-first-message"
+    )
     def test_thread_choice_sits_above_reply_bar(self):
         _assert_cases_pass(
             "dream thread choice",
@@ -247,8 +251,9 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             ),
         )
 
-    # ADDED by dream-wish-stage-panel: "The edit sheet edits the wish only when finalized". The requirement ID exists
-    # only once the delta is synced at archive, which annotates this method.
+    @covers_requirement(
+        "webclient-dream-stage::the-edit-sheet-edits-the-wish-only-when-finalized"
+    )
     def test_edit_sheet_edits_wish_only_when_finalized(self):
         _assert_cases_pass(
             "dream finalized edit sheet",
