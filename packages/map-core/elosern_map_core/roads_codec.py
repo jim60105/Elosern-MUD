@@ -31,7 +31,9 @@ Artifact layout, one road per line::
 * ``fingerprint`` -- :func:`road_fingerprint` over the network itself.
 * ``nodes`` -- the settlement keys the network joins, sorted.
 * ``roads`` -- ``first`` and ``second`` settlement keys with ``first < second``,
-  sorted by that pair, and ``cells`` a flat ``[x0, y0, x1, y1, ...]`` route.
+  sorted by that pair, and ``cells`` a flat ``[x0, y0, x1, y1, ...]`` route. A
+  spur road also carries ``spur_of``, the settlement that owns it; a trunk road
+  has no such key, so a network without a spur encodes exactly as before.
 
 ``encode_road_document`` sorts and canonicalises, so identical networks encode to
 identical bytes; ``decode_road_network`` rejects anything a producer could not
@@ -44,6 +46,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from .sources import expected_document
@@ -90,6 +93,7 @@ class RoadNetwork:
     nodes: tuple[str, ...]
     roads: tuple[tuple[str, str, tuple[tuple[int, int], ...]], ...]
     cells: frozenset[tuple[int, int]]
+    spur_owners: Mapping[tuple[str, str], str] = MappingProxyType({})
 
 
 def _document(source: Mapping | str) -> Mapping:
@@ -200,16 +204,21 @@ def _flat(cells: Sequence[tuple[int, int]]) -> list[int]:
 def road_fingerprint(
     nodes: Sequence[str],
     roads: Sequence[tuple[str, str, Sequence[tuple[int, int]]]],
+    spur_owners: Mapping[tuple[str, str], str] | None = None,
 ) -> str:
     """The canonical digest of a network in the order the caller supplies.
 
     Encoding and decoding both call it over their own canonical order, so the
-    two can never drift.
+    two can never drift. A road an owner marks contributes its owner as a
+    fourth element; an unmarked road keeps the three elements it always had.
     """
+    owners = spur_owners or {}
     document = {
         "nodes": [str(node) for node in nodes],
         "roads": [
-            [str(first), str(second), _flat(cells)] for first, second, cells in roads
+            [str(first), str(second), _flat(cells)]
+            + ([str(owners[first, second])] if (first, second) in owners else [])
+            for first, second, cells in roads
         ],
     }
     canonical = json.dumps(
@@ -224,6 +233,7 @@ def encode_road_document(
     source_signature: str,
     nodes: Sequence[str],
     roads: Sequence[tuple[str, str, Sequence[tuple[int, int]]]],
+    spur_owners: Mapping[tuple[str, str], str] | None = None,
 ) -> str:
     """Encode one network as the canonical artifact text."""
     if isinstance(frame_cells, bool) or not isinstance(frame_cells, int) or frame_cells < 1:
@@ -232,6 +242,12 @@ def encode_road_document(
         raise RoadDocumentError("road source_signature is missing")
     if any(not isinstance(node, str) for node in nodes):
         raise RoadDocumentError("road nodes is not a list of settlement keys")
+    owners = dict(spur_owners or {})
+    for (first, second), owner in owners.items():
+        if not isinstance(owner, str) or owner not in (first, second):
+            raise RoadDocumentError(
+                f"road {first}--{second}: spur owner {owner!r} is not one of its ends"
+            )
     ordered_nodes = sorted(nodes)
     ordered_roads: list[tuple[str, str, Sequence[tuple[int, int]]]] = []
     for first, second, cells in roads:
@@ -244,11 +260,14 @@ def encode_road_document(
             raise RoadDocumentError("a road has no cells")
         ordered_roads.append((first, second, checked))
     ordered_roads.sort(key=lambda row: (row[0], row[1]))
-    fingerprint = road_fingerprint(ordered_nodes, ordered_roads)
-    rows = [
-        {"cells": _flat(cells), "first": str(first), "second": str(second)}
-        for first, second, cells in ordered_roads
-    ]
+    fingerprint = road_fingerprint(ordered_nodes, ordered_roads, owners)
+    rows = []
+    for first, second, cells in ordered_roads:
+        row = {"cells": _flat(cells), "first": str(first), "second": str(second)}
+        owner = owners.get((first, second))
+        if owner is not None:
+            row["spur_of"] = owner
+        rows.append(row)
     lines = [
         "{",
         f'  "algorithm_version": {ROAD_ALGORITHM_VERSION},',
@@ -331,6 +350,7 @@ def decode_road_network(source: Mapping | str) -> RoadNetwork:
     if not isinstance(entries, list):
         raise RoadDocumentError("roads is not a list")
     decoded: list[tuple[str, str, tuple[tuple[int, int], ...]]] = []
+    owners: dict[tuple[str, str], str] = {}
     for row in entries:
         if not isinstance(row, Mapping):
             raise RoadDocumentError("a road entry is not a mapping")
@@ -342,15 +362,23 @@ def decode_road_network(source: Mapping | str) -> RoadNetwork:
                 f"road endpoints {first!r} and {second!r} are not in canonical order"
             )
         decoded.append((first, second, _require_cells(row, frame)))
+        if "spur_of" in row:
+            owner = row["spur_of"]
+            if not isinstance(owner, str) or owner not in (first, second):
+                raise RoadDocumentError(
+                    f"road {first}--{second}: spur owner {owner!r} is not one of its ends"
+                )
+            owners[first, second] = owner
     if decoded != sorted(decoded, key=lambda row: (row[0], row[1])):
         raise RoadDocumentError("roads are not sorted")
-    if metadata.fingerprint != road_fingerprint(nodes, decoded):
+    if metadata.fingerprint != road_fingerprint(nodes, decoded, owners):
         raise RoadDocumentError("road fingerprint does not match its roads")
     return RoadNetwork(
         fingerprint=metadata.fingerprint,
         nodes=nodes,
         roads=tuple(decoded),
         cells=frozenset(cell for _, _, cells in decoded for cell in cells),
+        spur_owners=MappingProxyType(owners),
     )
 
 
