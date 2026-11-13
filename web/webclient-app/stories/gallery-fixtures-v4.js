@@ -349,6 +349,138 @@ export const GALLERY_V4_PEOPLE_COLLAPSED = {
   ...NO_SELECTION,
 };
 
+// ---- scenes (change gallery-landscape-page) ----------------------------------
+//
+// Synthetic 背景 panels for the landscape page and tiles. Their subject keys
+// (`scene:<archetype>`) are admitted by the validators only in the later
+// change gallery-scene-category, so these panels are NOT protocol-valid yet
+// and are deliberately exported inside one container rather than as top-level
+// panels: the fixture test validates every top-level panel and pins that each
+// of these is still refused for its subject key alone. When
+// gallery-scene-category admits scene keys, that pin fails; the panels then
+// move into the validated set (top-level exports) and the pin is removed.
+// Their shapes follow that change's design: the tile artwork is the scene
+// descriptor in effect, and a card is the exact gallery original with the
+// archetype's bundled scene image as its terminal.
+
+const SCENE_GROVE = "scene:synthetic_grove";
+const SCENE_SHORE = "scene:synthetic_shore";
+const SCENE_SIZE = { width: 1536, height: 864 };
+const SCENE_GEOMETRY = { image_size: SCENE_SIZE, face_rect: null, stage: null, aspect_ratio: "16:9" };
+
+const sceneBundled = (key, seed) => ({
+  resource_id: `bundled-scene/${key}/${digest(seed)}.webp`,
+  version: digest(seed),
+  url: `/art/bundled-scene/${key}/${digest(seed)}.webp`,
+  origin: "bundled_official",
+  geometry: { ...SCENE_GEOMETRY, aspect_ratio: null },
+});
+
+const sceneTerminal = () => ({
+  kind: "scene_image",
+  source_id: "scene.terminal:synthetic_town",
+  rank: 100,
+  resource: sceneBundled("synthetic_town", 70),
+});
+
+const sceneOriginal = (subject, index) => {
+  const imageId = GALLERY_V4_IDS[index];
+  const key = subject.slice("scene:".length);
+  return {
+    resource_id: `gallery/scene/${key}/${imageId}.webp`,
+    version: digest(index + 20),
+    url: `/art/gallery/scene/${key}/${imageId}.webp`,
+    origin: "runtime",
+    geometry: { ...SCENE_GEOMETRY },
+  };
+};
+
+// The scene descriptor of a tile: the stored card's original (when there is
+// one) ahead of the archetype's bundled image.
+const sceneTileArtwork = (subject, seed, cardIndex = null) => {
+  const key = subject.slice("scene:".length);
+  return {
+    subject_id: `gallery:${subject}`,
+    revision: digest(seed),
+    generation_subject: subject,
+    generation_state: "done",
+    attempts: [
+      ...(cardIndex === null ? [] : [{
+        type: "image", source_id: `gallery.original:${GALLERY_V4_IDS[cardIndex]}`, rank: 10, resource: sceneOriginal(subject, cardIndex),
+      }]),
+      { type: "image", source_id: `scene.bundled:${key}`, rank: 40, resource: sceneBundled(key, seed + 1) },
+    ],
+    terminal: sceneTerminal(),
+    retention_sources: [],
+  };
+};
+
+const sceneCard = (subject, index) => ({
+  image_id: GALLERY_V4_IDS[index],
+  status: "card",
+  label: "背景",
+  artwork: {
+    subject_id: `${digest(1)}:${GALLERY_V4_IDS[index]}`,
+    revision: digest(index + 10),
+    generation_subject: subject,
+    generation_state: "done",
+    attempts: [{
+      type: "image", source_id: `gallery.original:${GALLERY_V4_IDS[index]}`, rank: 10, resource: sceneOriginal(subject, index),
+    }],
+    terminal: sceneTerminal(),
+    retention_sources: [{ source_id: `gallery.original:${GALLERY_V4_IDS[index]}`, token: digest(index + 30) }],
+  },
+  is_default: true,
+  chips: [],
+  requested_fields: [],
+  binding_present: false,
+  created_at: 1700000800 - index * 100,
+});
+
+const SCENE_CAPABILITIES = {
+  supports_bindings: false, supports_field_selection: false, supports_free_text: false,
+  supports_personal_official_preferences: false, supports_face_rect: false,
+  supports_stage: false, supports_card_delete: true, max_cards: 1,
+};
+
+const sceneTile = (subject, display_name, card_count, artwork) => ({
+  subject_key: subject, kind: "scene", display_name, is_current: false, card_count, artwork,
+});
+
+const SCENE_GROUPS = [group("scene", [
+  sceneTile(SCENE_GROVE, "測試林地", 1, sceneTileArtwork(SCENE_GROVE, 80, 15)),
+  sceneTile(SCENE_SHORE, "測試海岸", 0, sceneTileArtwork(SCENE_SHORE, 82)),
+])];
+
+const SCENE_PANEL = {
+  ...HEADER,
+  categories: categories({ mine: 2, party: 2, monster: 3, scene: 2 }, { scene: true }),
+  category: "scene",
+  groups: SCENE_GROUPS,
+  official_entries: [],
+  equipment_summary: null,
+  capabilities: { ...SCENE_CAPABILITIES },
+  binding_warnings: [],
+  error_state: null,
+};
+
+export const GALLERY_V4_SCENE_PANELS = Object.freeze({
+  // 背景 with the generated scene selected: its one stored card.
+  generated: {
+    ...SCENE_PANEL,
+    selected: SCENE_GROVE,
+    description: "（示意文字）晨霧散去的林間空地，光線從枝葉縫隙落在長滿青苔的石階上。",
+    cards: [sceneCard(SCENE_GROVE, 15)],
+  },
+  // 背景 with a scene that has no stored card: the bundled image in effect.
+  bundled: {
+    ...SCENE_PANEL,
+    selected: SCENE_SHORE,
+    description: "（示意文字）退潮後的礁岸延伸到遠方，海鳥在灰藍色的天空下低低盤旋。",
+    cards: [],
+  },
+});
+
 // Story-only media remapping: the offline static server has no /art/gallery,
 // /art/official or /art/defaults route, so the committed fallback artwork is
 // substituted into the descriptors' own resources (their candidate, and the
@@ -361,7 +493,21 @@ export function galleryStoryModel(model = GALLERY_V4_MINE) {
   const images = ["woman", "elder", "man", "woman", "elder", "man"];
   // On 864x1536 fallback aspect: h=0.16 => w=0.16*1536/864 ≈ 0.2847
   const fallbackRect = { x: 0.3576, y: 0.02, w: 0.2847, h: 0.16 };
+  // A scene descriptor shows a committed bundled landscape under
+  // /art/scenes/ for every candidate and its terminal (no face rectangle).
+  const SCENE_IMAGES = { [SCENE_GROVE]: "forest_path", [SCENE_SHORE]: "coastal_path" };
+  const substituteScene = (artwork) => {
+    const key = SCENE_IMAGES[artwork.generation_subject] ?? "city_street";
+    artwork.attempts.filter((entry) => entry.type === "image").forEach((entry) => {
+      entry.resource.url = `/art/scenes/${key}.webp`;
+    });
+    if (artwork.terminal) artwork.terminal.resource.url = "/art/scenes/city_street.webp";
+  };
   const substitute = (artwork, image) => {
+    if (artwork?.generation_subject?.startsWith("scene:")) {
+      substituteScene(artwork);
+      return;
+    }
     // A monster subject shows the committed monster silhouette, never a person.
     const key = artwork?.generation_subject?.startsWith("portrait:monster:") ? "monster_anon" : image;
     const candidate = artwork?.attempts?.find((entry) => entry.type === "image");

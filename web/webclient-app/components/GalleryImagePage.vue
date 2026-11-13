@@ -5,6 +5,10 @@
 // layout — the art fills the page height at 9:16 and the facts sit beside it
 // — with the ribbon, the subject name, an optional 描述 letter, the fact
 // cells of the quest detail's condition row, and a pinned DetailFooter.
+// A scene subject (change gallery-landscape-page) takes the landscape layout
+// — the 16:9 art above, the name and description left, the facts right — and
+// says whether its image is the stored card (生成圖) or, with no card, the
+// subject's committed tile artwork (官方內建圖).
 //
 // The footer's buttons are `galleryFooter` of the selection and the subject's
 // committed capabilities, never a comparison of subject kinds. The page emits
@@ -21,7 +25,7 @@ import { computed, nextTick, ref, watch } from "vue";
 import ArtworkPreview from "./ArtworkPreview.vue";
 import DetailFooter from "./DetailFooter.vue";
 import { GALLERY_OFFICIAL_LABEL, galleryDate } from "./gallery-copy.js";
-import { galleryFooter, galleryRibbon } from "./gallery-window-model.js";
+import { bundledArtwork, galleryFooter, galleryRibbon, pageShape } from "./gallery-window-model.js";
 
 const props = defineProps({
   // The committed v4 panel.
@@ -39,18 +43,32 @@ const emit = defineEmits(["press"]);
 
 const DELETE_WARNING = "刪除後無法復原。";
 const STATUS_LINE = { pending: "生成中", failed: "生成失敗" };
+// The landscape (scene) vocabulary (change gallery-landscape-page): the page
+// says whether the image in effect is the stored card or the bundled one.
+const GENERATED_LABEL = "生成圖";
+const BUNDLED_LABEL = "官方內建圖";
+const GENERATED_NOTE = "只保留一張；刪除後回到官方內建圖。";
+const BUNDLED_NOTE = "尚未生成專屬圖片。";
 
 const capabilities = computed(() => props.panel?.capabilities ?? null);
 const type = computed(() => (props.selection?.type === "card" || props.selection?.type === "official" ? props.selection.type : "empty"));
 const row = computed(() => (type.value === "empty" ? null : props.selection.row));
 const status = computed(() => (type.value === "card" ? row.value.status : null));
 
+// Layout and labelling vocabulary follow the subject's kind; the buttons stay
+// capability-driven (galleryFooter).
+const shape = computed(() => pageShape(props.subject?.kind));
+const landscape = computed(() => shape.value === "landscape");
+const generated = computed(() => landscape.value && status.value === "card");
+const bundled = computed(() => (type.value === "empty" ? bundledArtwork(props.subject) : null));
+
 // The selection's identity: re-committing the same image keeps an armed
-// confirmation; any other image disarms it.
+// confirmation; any other image disarms it. An empty selection is keyed by
+// its subject, so another subject's bundled image mounts afresh.
 const selectionKey = computed(() => {
   if (type.value === "card") return `card:${row.value.image_id}`;
   if (type.value === "official") return `official:${row.value.identity}`;
-  return "empty";
+  return `empty:${props.subject?.subject_key ?? ""}`;
 });
 
 // ---- facts ----------------------------------------------------------------
@@ -60,8 +78,9 @@ const name = computed(() => props.subject?.display_name ?? null);
 
 const imageLabel = computed(() => {
   if (type.value === "official") return GALLERY_OFFICIAL_LABEL;
+  if (generated.value) return GENERATED_LABEL;
   if (type.value === "card") return row.value.label;
-  return "尚無圖片";
+  return bundled.value ? BUNDLED_LABEL : "尚無圖片";
 });
 
 const imageNote = computed(() => {
@@ -70,7 +89,9 @@ const imageNote = computed(() => {
     // adjust anything; the others keep official images strictly read-only.
     return capabilities.value?.supports_personal_official_preferences ? "唯讀，只能調整個人的臉框與舞台位置。" : "唯讀。";
   }
+  if (generated.value) return GENERATED_NOTE;
   if (type.value === "card" && capabilities.value?.max_cards === 1) return "只保留一張，重新生成會替換原圖。";
+  if (bundled.value) return BUNDLED_NOTE;
   return null;
 });
 
@@ -100,9 +121,13 @@ const description = computed(() => props.panel?.description ?? null);
 const art = computed(() => {
   if (type.value === "official") return { kind: "image", artwork: row.value.artwork, id: row.value.identity };
   if (status.value === "card") return { kind: "image", artwork: row.value.artwork, id: row.value.image_id };
+  if (bundled.value) return { kind: "image", artwork: bundled.value, id: props.subject.subject_key };
   return { kind: status.value ?? "empty" };
 });
-const artAlt = computed(() => (name.value ? `${name.value}・${imageLabel.value}` : imageLabel.value));
+// A card keeps its committed row label as the image's accessible name, even
+// where the 圖片 cell reads 生成圖.
+const altLabel = computed(() => (type.value === "card" ? row.value.label : imageLabel.value));
+const artAlt = computed(() => (name.value ? `${name.value}・${altLabel.value}` : altLabel.value));
 
 // ---- footer and the two-step deletion -------------------------------------
 
@@ -119,8 +144,10 @@ const armed = computed(() => (
 // Another image disarms. Runs before the patch, while the focused footer
 // button still stands: if focus was in the footer, it moves to the new
 // footer's first button instead of falling to the document.
-watch(selectionKey, () => {
+watch(selectionKey, (next, previous) => {
   armedKey.value = null;
+  // One empty page to another keeps the same footer, so focus stays.
+  if (next.startsWith("empty:") && previous.startsWith("empty:")) return;
   if (root.value?.querySelector("footer")?.contains(document.activeElement)) {
     nextTick(() => root.value?.querySelector("footer button")?.focus());
   }
@@ -184,11 +211,19 @@ function onKeydown(event) {
 </script>
 
 <template>
-  <article ref="root" class="gpage" data-testid="gallery-page" :data-selection="type" @keydown="onKeydown">
+  <article
+    ref="root"
+    class="gpage"
+    :class="`gpage--${shape}`"
+    data-testid="gallery-page"
+    :data-selection="type"
+    :data-shape="shape"
+    @keydown="onKeydown"
+  >
     <div :key="selectionKey" class="gpage__body">
       <figure
         class="gpage__art"
-        :class="[`gpage__art--${art.kind}`, { 'gpage__art--official': type === 'official' }]"
+        :class="[`gpage__art--${art.kind}`, { 'gpage__art--official': type === 'official' || bundled !== null }]"
         data-testid="gallery-page__art"
       >
         <ArtworkPreview
@@ -213,7 +248,7 @@ function onKeydown(event) {
           </svg>
           <span>{{ art.kind === "empty" ? "尚無圖片" : STATUS_LINE[art.kind] }}</span>
         </figcaption>
-        <span v-if="type === 'card' && row.is_default" class="gpage__badge gpage__badge--crown" aria-hidden="true">
+        <span v-if="type === 'card' && row.is_default && !landscape" class="gpage__badge gpage__badge--crown" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" /></svg>預設
         </span>
         <span v-if="type === 'official'" class="gpage__badge gpage__badge--lock" aria-hidden="true">
@@ -584,5 +619,71 @@ function onKeydown(event) {
   padding: var(--sp-2) var(--sp-4);
   color: var(--paper-100);
   border-left: calc(2px * var(--ui-scale)) solid var(--gold-600);
+}
+
+/* ---- landscape (scenes; change gallery-landscape-page) ---------------------
+   The 16:9 art sits above; under it the name and the description take the
+   left column ("head", "letter") and the fact cells the right one ("facts").
+   The art is capped by the body height so the whole page reads without
+   scrolling at the reference viewport; the facts keep their scroller and
+   reserved gutter only as a fallback. */
+.gpage--landscape .gpage__body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--sp-5);
+  padding: var(--sp-5) var(--sp-5) var(--sp-4) var(--sp-6);
+}
+
+.gpage--landscape .gpage__art {
+  justify-self: center;
+  width: min(100cqw, calc(48cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
+}
+
+.gpage--landscape .gpage__facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "head facts"
+    "letter facts";
+  align-content: start;
+  gap: var(--sp-3) var(--sp-6);
+}
+
+.gpage--landscape .gpage__head {
+  grid-area: head;
+  gap: var(--sp-1);
+  padding-bottom: var(--sp-3);
+}
+
+.gpage--landscape .gpage__title {
+  font-size: var(--text-2xl);
+}
+
+.gpage--landscape .gpage__letter {
+  grid-area: letter;
+  align-self: start;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+}
+
+.gpage--landscape .gpage__prose {
+  line-height: 1.8;
+}
+
+.gpage--landscape .gpage__cond {
+  grid-area: facts;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-4);
+  padding-left: var(--sp-5);
+  border-left: var(--gpage-hair) solid var(--gpage-line);
+}
+
+/* The narrow facts column breaks a note at its punctuation, never inside a
+   word such as 官方內建圖, unless a phrase cannot fit at all. */
+.gpage--landscape .gpage__cond .gpage__text {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 </style>

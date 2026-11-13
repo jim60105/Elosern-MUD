@@ -94,6 +94,23 @@ export function galleryFooter(selection, capabilities) {
   return { buttons, note };
 }
 
+// ---- the landscape page (change gallery-landscape-page) ---------------------
+
+// The image page takes the selected subject's tile shape: a scene subject's
+// page is landscape (the 16:9 art above the facts), every other kind's
+// portrait (the 9:16 art beside them).
+export function pageShape(kind) {
+  return tileShape(kind);
+}
+
+// The image an empty selection shows: for a landscape subject, its committed
+// tile artwork — the bundled image in effect while no card is stored; for
+// every other kind (or a scene without tile artwork) none, so the page says
+// 尚無圖片.
+export function bundledArtwork(subject) {
+  return subject && pageShape(subject.kind) === "landscape" ? subject.artwork ?? null : null;
+}
+
 // The page ribbon: the category label, then `・` and the group label when the
 // subject's group has one.
 export function galleryRibbon(categoryLabel, groupLabel) {

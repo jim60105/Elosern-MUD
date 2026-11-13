@@ -17,6 +17,10 @@ Test-to-requirement mapping (applied at archive):
   Escape, changed selection, confirmation emits once).
 - ``the-page-renders-committed-facts-in-cells``: "committed facts in cells"
   and "galleryRibbon" (cells, chips, conditions, description, ribbon).
+- ``scene-selections-use-the-landscape-page``:
+  "the landscape page of a scene" (a bundled scene's 官方內建圖 and 生成新圖,
+  a stored card's 生成圖 with 刪除 and 重新生成, and the description beside
+  the facts).
 """
 
 from __future__ import annotations
@@ -71,3 +75,10 @@ class GalleryImagePageEvidenceTests(unittest.TestCase):
     def test_committed_fact_cells_suite_passes(self):
         """Fact cells, chips, conditions, description and ribbon hold under Vitest."""
         _run_vitest_group("committed facts in cells", "galleryRibbon")
+
+    @covers_requirement(
+        "webclient-gallery-image-page::scene-selections-use-the-landscape-page"
+    )
+    def test_scene_landscape_page_suite_passes(self):
+        """Bundled and generated scene labels, footers and column layout hold under Vitest."""
+        _run_vitest_group("the landscape page of a scene")
