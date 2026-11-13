@@ -63,6 +63,7 @@ from world.rules.guild_offers import (
     accept_guild_offer,
     abandon_guild_quest,
 )
+from world.rules.met_people import record_person_interaction
 from world.rules.party_inventory import toggle_member_equipment, use_member_item
 from world.rules.party_scope import (
     PURPOSE_ACT,
@@ -401,6 +402,9 @@ def _resolve_target(
 
     Admission revalidates the whole selection against committed state at
     submit time; the host it returns is the only host the domain API receives.
+    A successful admission also writes the provider into the actor's
+    met-person record: the player chose to use this named NPC's service
+    (design D3). The read-only listing action never reaches this helper.
     """
     try:
         npc, _component = require_service_mutation(
@@ -408,6 +412,7 @@ def _resolve_target(
         )
     except ServiceTargetError as error:
         return None, _rejected(error)
+    record_person_interaction(actor, npc)
     return npc, None
 
 

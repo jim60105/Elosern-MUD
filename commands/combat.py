@@ -45,6 +45,7 @@ from world.rules.guild_exam_request import (
 )
 from world.rules.guild_exams import GuildExamError
 from world.rules.items import ItemUseReason
+from world.rules.met_people import record_person_interaction
 from world.rules.event_log import render_plain_text
 from world.rules.player_messages import (
     SESSION_REASON_MESSAGES,
@@ -968,6 +969,10 @@ class CmdGuildExam(Command):
         if target_rank is None:
             self.caller.msg(service_rejection_message("top_rank"))
             return
+        if reception is not None:
+            # The player chose this counter's service; the attempt is recorded
+            # before the coordinator may refuse the request (design D3).
+            record_person_interaction(self.caller, reception)
         # An omitted suffix keeps today's call exactly: only an explicit
         # selection pins the counter as the request's speaker.
         kwargs = {"requested_by": "command"}

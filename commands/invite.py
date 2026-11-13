@@ -13,6 +13,7 @@ from commands.command import Command
 
 from commands.talk import _resolve_npc
 from typeclasses.npcs import LLMNPC
+from world.rules.met_people import record_person_interaction
 from world.rules.player_messages import STALE_PERSONA_NOTE
 from world.rules.party import (
     ALREADY_COMPANION_MESSAGE,
@@ -70,6 +71,10 @@ class CmdInvite(Command):
         if party_size(self.caller) >= PARTY_MAX_COMPANIONS:
             self.caller.msg(PARTY_FULL_MESSAGE)
             return
+
+        # The deterministic gate admitted the invitation, so the attempt is
+        # recorded even when the exchange is declined or fails (design D4).
+        record_person_interaction(self.caller, npc)
 
         from web.webclient.actions.dialogue_composition import build_dialogue_client
 
