@@ -295,6 +295,42 @@ class ClientResponseTests(EvenniaTestCase):
         self.assertTrue(failure.check(LLMTransportError))
 
 
+class NullContentDiagnosticTests(EvenniaTestCase):
+    """A null content names its finish reason from a closed set."""
+
+    def _failure_message(self, choice):
+        client = make_client(reactor=Clock())
+        body = json.dumps({"choices": [choice]}).encode()
+        client.agent = StubAgent(FakeResponse(200, body))
+        d = client.get_response(
+            ChatRequestDescriptor(messages=({"role": "user", "content": "hi"},))
+        )
+        failure = await_result(d)
+        self.assertTrue(failure.check(LLMTransportError))
+        self.assertEqual(failure.value.kind, "malformed")
+        return str(failure.value)
+
+    def test_null_content_names_a_known_finish_reason(self):
+        message = self._failure_message(
+            {"message": {"content": None}, "finish_reason": "length"}
+        )
+        self.assertEqual(message, "content is null (finish_reason=length)")
+
+    def test_null_content_without_finish_reason_is_absent(self):
+        message = self._failure_message({"message": {"content": None}})
+        self.assertEqual(message, "content is null (finish_reason=absent)")
+
+    def test_unknown_finish_reason_is_never_echoed(self):
+        message = self._failure_message(
+            {"message": {"content": None}, "finish_reason": "sk-leaked-value"}
+        )
+        self.assertEqual(message, "content is null (finish_reason=other)")
+        message = self._failure_message(
+            {"message": {"content": None}, "finish_reason": ["length"]}
+        )
+        self.assertEqual(message, "content is null (finish_reason=other)")
+
+
 def send_once(profile, descriptor=None):
     """Send one request through a capturing StubAgent; return the agent.
 

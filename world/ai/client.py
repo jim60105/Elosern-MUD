@@ -74,6 +74,34 @@ def _request_headers(profile: LLMProfile) -> dict[str, list[str]]:
     return headers
 
 
+# Finish reasons safe to echo into a log line. The value is endpoint-
+# controlled, so anything outside this closed set is reported as "other".
+_KNOWN_FINISH_REASONS = frozenset(
+    {"stop", "length", "content_filter", "tool_calls", "function_call", "error"}
+)
+
+
+def _null_content_finish_reason(payload) -> str | None:
+    """Return the finish-reason label when the first choice's content is null.
+
+    ``None`` means the content is not an explicit null (present text, or an
+    envelope broken in some other way that the schema validation reports).
+    """
+    try:
+        choice = payload["choices"][0]
+        message = choice["message"]
+        if "content" not in message or message["content"] is not None:
+            return None
+        reason = choice.get("finish_reason")
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return None
+    if reason is None:
+        return "absent"
+    if isinstance(reason, str) and reason in _KNOWN_FINISH_REASONS:
+        return reason
+    return "other"
+
+
 class _RedactedChainLink(Exception):
     """Stand-in for a chain link whose text carried the api key.
 
@@ -258,6 +286,14 @@ class OpenAICompatClient(LLMClient):
             payload = json.loads(body)
         except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as exc:
             raise LLMTransportError("malformed", "response body is not valid JSON") from exc
+        null_reason = _null_content_finish_reason(payload)
+        if null_reason is not None:
+            # A null content is almost always an exhausted token budget
+            # (reasoning tokens count toward max_tokens) or a content filter;
+            # name the finish reason so the log tells the two apart.
+            raise LLMTransportError(
+                "malformed", f"content is null (finish_reason={null_reason})"
+            )
         errors = validate_chat_completion_envelope(payload)
         if errors:
             # Envelope-validation messages quote the offending instance
