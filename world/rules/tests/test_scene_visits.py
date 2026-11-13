@@ -14,6 +14,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, InstanceRoom
 from world.rules.scene_visits import (
     ENTERED_ARCHETYPES_ATTRIBUTE,
@@ -111,7 +112,9 @@ class EnteredArchetypeRecordTests(EvenniaTest):
 
     def test_a_failing_write_never_blocks_the_move(self):
         with synthetic_registries("archetypes"):
-            room = self._grid_room(BAZAAR, 1)
+            self.char1.move_to(self._grid_room(BAZAAR, 1), quiet=True)
+            recorded = self._stored()
+            room = self._instance_room(LODGE)
             with patch(
                 "world.rules.scene_visits._write_record",
                 side_effect=RuntimeError("record boom"),
@@ -119,12 +122,39 @@ class EnteredArchetypeRecordTests(EvenniaTest):
                 self.char1.move_to(room, quiet=True)
 
             self.assertEqual(self.char1.location, room)
-            self.assertIsNone(self._stored())
+            # The failed write restores the record instead of wiping it.
+            self.assertEqual(self._stored(), recorded)
+            self.assertEqual(entered_archetypes(self.char1), (BAZAAR,))
             self.assertEqual(
                 [call.args[0] for call in warn.call_args_list],
                 ["scene_entry_record_failed"],
             )
             self.assertIsInstance(warn.call_args.kwargs["exc"], RuntimeError)
+
+    def test_a_non_player_arrival_records_nothing(self):
+        npc = create_object(NPC, key="t-scene-npc", location=self.room1, home=self.room1)
+        with synthetic_registries("archetypes"):
+            npc.move_to(self._grid_room(BAZAAR, 1), quiet=True)
+            npc.move_to(self._instance_room(LODGE), quiet=True)
+
+            self.assertEqual(entered_archetypes(npc), ())
+            self.assertIsNone(self._stored(npc))
+
+    def test_a_corrupt_record_is_never_overwritten(self):
+        corrupt = {"schema_version": SCHEMA_VERSION + 1, "archetypes": []}
+        self.char1.attributes.add(ENTERED_ARCHETYPES_ATTRIBUTE, corrupt)
+        with synthetic_registries("archetypes"):
+            with patch("world.rules.scene_visits.log_warn") as warn:
+                self.assertEqual(entered_archetypes(self.char1), ())
+                room = self._grid_room(BAZAAR, 1)
+                self.char1.move_to(room, quiet=True)
+
+            self.assertEqual(self.char1.location, room)
+            self.assertEqual(self._stored(), corrupt)
+            self.assertEqual(
+                [call.args[0] for call in warn.call_args_list],
+                ["scene_entry_record_corrupt", "scene_entry_record_corrupt"],
+            )
 
     def test_read_returns_registry_order_not_stored_order(self):
         with synthetic_registries("archetypes", extra={"archetypes": _local(ZETA, ALPHA)}):
