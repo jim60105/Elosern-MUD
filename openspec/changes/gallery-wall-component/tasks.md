@@ -9,11 +9,11 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 2. Stories
 
-- [ ] 2.1 Add v4 fixtures to `stories/gallery-fixtures-v4.js`, `stories/Data/GalleryWall.stories.js` and the `Data/GalleryWall` manifest entry (design D5), plus the Node fixture-validity test. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
+- [x] 2.1 Add v4 fixtures to `stories/gallery-fixtures-v4.js`, `stories/Data/GalleryWall.stories.js` and the `Data/GalleryWall` manifest entry (design D5), plus the Node fixture-validity test. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
 
 ## Evidence
 
-- [ ] E.1 Add `Data/GalleryWall` to the pinned manifest sets in `web/webclient/tests/test_vue_showcase_data_evidence.py`, `test_vue_showcase_action_evidence.py`, `test_vue_showcase_world_evidence.py` and `test_vue_showcase_overlays_evidence.py` (each pins the manifest `required` set). Verify `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence` passes.
+- [x] E.1 Add `Data/GalleryWall` to the pinned manifest sets in `web/webclient/tests/test_vue_showcase_data_evidence.py`, `test_vue_showcase_action_evidence.py`, `test_vue_showcase_world_evidence.py` and `test_vue_showcase_overlays_evidence.py` (each pins the manifest `required` set). Verify `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence` passes.
 
 ## 3. Gates
 

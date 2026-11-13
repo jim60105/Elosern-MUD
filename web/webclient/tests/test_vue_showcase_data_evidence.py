@@ -274,6 +274,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The handbook titles tab replaced the title-codex big window
                 # (handbook-titles-tab).
                 "World/TitleCodexTab",
+                # The gallery wall, built and story-documented before the gallery
+                # window mounts it (gallery-wall-component).
+                "Data/GalleryWall",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

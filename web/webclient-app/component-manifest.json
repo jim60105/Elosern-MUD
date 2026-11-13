@@ -86,7 +86,8 @@
     "World/DetailFooter",
     "World/TileWall",
     "World/CodexDetail",
-    "World/TitleCodexTab"
+    "World/TitleCodexTab",
+    "Data/GalleryWall"
   ],
   "frozen": true
 }
