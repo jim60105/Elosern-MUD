@@ -20,13 +20,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from elosern_map_core.authoring import gate_approach_cell
 from elosern_map_core.codec import (
     document_from_data,
     parse_document,
     serialize_document,
 )
+from elosern_map_core.roads_codec import encode_road_document
 
-from tools.settlement_synthesis.budget import SizeBudget
+from tools.settlement_synthesis.budget import SizeBudget, size_budget
 from tools.settlement_synthesis.fit_lint import lint_settlement
 from tools.settlement_synthesis.generate import (
     GenerationConfig,
@@ -198,6 +200,33 @@ def _input(
     )
 
 
+def _single_cell_input(
+    ref: SettlementRef,
+    road_contacts: tuple[tuple[int, int], ...] = (),
+    *,
+    terrain: GridTerrain | None = None,
+    forced_gates: tuple[str, ...] = (),
+    blocked: frozenset[tuple[int, int]] = frozenset(),
+    roster: tuple[SettlementRef, ...] | None = None,
+) -> GenerationInput:
+    """The generator input of one village or hamlet, with its road contacts."""
+
+    window = _open_terrain() if terrain is None else terrain
+    members = (ref,) if roster is None else roster
+    return GenerationInput(
+        map_id=ref.location_id,
+        location=ref,
+        site=analyse_site(ref, window, members),
+        budget=size_budget(ref),
+        terrain=window,
+        blocked=blocked,
+        catalogue=CATALOGUE,
+        forced_gates=forced_gates,
+        config=GenerationConfig(beast_nations=frozenset({"beastland"})),
+        road_contacts=road_contacts,
+    )
+
+
 def _document(result):
     return document_from_data(
         f"content/maps/settlements/{result.map_id}.yaml", result.data
@@ -239,6 +268,73 @@ def _reachable(result) -> set[str]:
                 seen.add(neighbour)
                 stack.append(neighbour)
     return seen
+
+
+def _single_cell_geometry(result, location_cell: tuple[int, int] = LOCATION):
+    document = _document(result)
+    geometry = document.wilderness_geometry(location_cell)
+    assert geometry is not None
+    return document, geometry
+
+
+def _gate_approaches(
+    result, location_cell: tuple[int, int] = LOCATION
+) -> list[tuple[int, int]]:
+    """The exterior cell a traveller stands on to take each gate, sorted."""
+
+    _document_, geometry = _single_cell_geometry(result, location_cell)
+    return sorted(
+        gate_approach_cell(geometry, gate.return_direction)
+        for gate in geometry.gates
+    )
+
+
+def _assert_single_cell(test: unittest.TestCase, inp: GenerationInput, result) -> None:
+    """The one-cell invariants every village and hamlet document keeps."""
+
+    document, geometry = _single_cell_geometry(result, inp.location.cell)
+    test.assertTrue(geometry.single_cell_footprint)
+    test.assertEqual(geometry.hash_cell_count, 1)
+    test.assertEqual(geometry.footprint_cells, frozenset({inp.location.cell}))
+    test.assertEqual(result.footprint, frozenset({inp.location.cell}))
+
+    anchor = document.local_anchor_m
+    assert anchor is not None
+    for node_id, node in document.nodes.items():
+        test.assertEqual(
+            cell_of(world_position(inp.location.cell, anchor, node.coordinate)),
+            inp.location.cell,
+            node_id,
+        )
+
+    anchor_id = document.anchor_node.node_id
+    pairs = _road_pairs(result)
+    for slot in result.slots:
+        if slot.slot_id == anchor_id:
+            continue
+        test.assertIn((anchor_id, slot.slot_id), pairs)
+        test.assertIn((slot.slot_id, anchor_id), pairs)
+
+    # A forced gate is not derived from the roads, so the entrances are not
+    # compared against them (design D7).
+    road_contacts = None if inp.forced_gates else inp.road_contacts
+    errors = [
+        finding
+        for finding in lint_settlement(
+            document,
+            inp.location.cell,
+            inp.terrain,
+            road_contacts=road_contacts,
+        )
+        if finding.severity == "error"
+    ]
+    test.assertEqual(errors, [])
+
+    text = serialize_document(document, None)
+    reparsed = parse_document(
+        f"content/maps/settlements/{result.map_id}.yaml", text
+    )
+    test.assertEqual(serialize_document(reparsed.document, None), text)
 
 
 def _is_connected(cells: set[tuple[int, int]]) -> bool:
@@ -760,6 +856,189 @@ class RoleTests(unittest.TestCase):
         self.assertEqual(cell, (16, 15))
 
 
+class SingleCellLayoutTests(unittest.TestCase):
+    """A one-cell village or hamlet, with entrances that follow the roads."""
+
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
+    def test_through_road_gives_a_gate_per_contact(self) -> None:
+        contacts = ((14, 15), (16, 15))
+        village_input = _single_cell_input(
+            _ref("single_village", kind="village", population=400), contacts
+        )
+        hamlet_input = _single_cell_input(
+            _ref("single_hamlet", kind="hamlet", population=120), contacts
+        )
+
+        village = generate_settlement(village_input)
+        hamlet = generate_settlement(hamlet_input)
+
+        for inp, result in ((village_input, village), (hamlet_input, hamlet)):
+            _assert_single_cell(self, inp, result)
+            self.assertEqual(
+                len(result.data["wilderness_entry"]["gates"]), len(contacts)
+            )
+            self.assertEqual(_gate_approaches(result), sorted(contacts))
+            self.assertEqual(len(result.slots), inp.budget.node_count)
+
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
+    def test_spur_end_gives_one_gate(self) -> None:
+        contacts = ((14, 15),)
+        inp = _single_cell_input(
+            _ref("single_village", kind="village", population=400), contacts
+        )
+
+        result = generate_settlement(inp)
+
+        _assert_single_cell(self, inp, result)
+        self.assertEqual(len(result.data["wilderness_entry"]["gates"]), 1)
+        self.assertEqual(_gate_approaches(result), sorted(contacts))
+        self.assertEqual(len(result.slots), inp.budget.node_count)
+
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
+    def test_junction_gives_a_gate_per_contact_and_one_extra_node(self) -> None:
+        contacts = ((14, 15), (16, 15), (15, 16))
+        village_input = _single_cell_input(
+            _ref("single_village", kind="village", population=400), contacts
+        )
+        hamlet_input = _single_cell_input(
+            _ref("single_hamlet", kind="hamlet", population=120), contacts
+        )
+
+        village = generate_settlement(village_input)
+        hamlet = generate_settlement(hamlet_input)
+
+        for inp, result in ((village_input, village), (hamlet_input, hamlet)):
+            _assert_single_cell(self, inp, result)
+            self.assertEqual(
+                len(result.data["wilderness_entry"]["gates"]), len(contacts)
+            )
+            self.assertEqual(_gate_approaches(result), sorted(contacts))
+            self.assertEqual(len(result.slots), inp.budget.node_count + 1)
+
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
+    def test_no_road_hamlet_gets_one_gate_and_a_village_is_refused(self) -> None:
+        hamlet_input = _single_cell_input(
+            _ref("single_hamlet", kind="hamlet", population=120)
+        )
+        hamlet = generate_settlement(hamlet_input)
+
+        _assert_single_cell(self, hamlet_input, hamlet)
+        gates = hamlet.data["wilderness_entry"]["gates"]
+        self.assertEqual(len(gates), 1)
+        self.assertEqual(len(hamlet.slots), hamlet_input.budget.node_count)
+        approach = _gate_approaches(hamlet)[0]
+        self.assertEqual(
+            max(abs(approach[0] - LOCATION[0]), abs(approach[1] - LOCATION[1])), 1
+        )
+        self.assertTrue(hamlet_input.terrain.walkable(approach))
+        self.assertNotIn(approach, hamlet_input.blocked)
+
+        village_input = _single_cell_input(
+            _ref("single_village", kind="village", population=400)
+        )
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(village_input)
+        self.assertIn("no_road", str(caught.exception))
+
+    def test_single_cell_generation_is_deterministic(self) -> None:
+        def serialised(kind: str) -> str:
+            inp = _single_cell_input(
+                _ref(f"single_{kind}", kind=kind, population=400),
+                ((14, 15), (16, 15)),
+            )
+            result = generate_settlement(inp)
+            return serialize_document(_document(result), None)
+
+        self.assertEqual(serialised("village"), serialised("village"))
+        self.assertEqual(serialised("hamlet"), serialised("hamlet"))
+
+    def test_hamlet_with_no_open_bearing_is_refused(self) -> None:
+        neighbours = frozenset(
+            (LOCATION[0] + delta_x, LOCATION[1] + delta_y)
+            for delta_x, delta_y in OCTANT_VECTORS.values()
+        )
+        inp = _single_cell_input(
+            _ref("single_hamlet", kind="hamlet", population=120),
+            blocked=neighbours,
+        )
+
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(inp)
+
+        self.assertIn("no_gate", str(caught.exception))
+
+    def test_blocked_or_unwalkable_location_cell_is_refused(self) -> None:
+        blocked = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            ((14, 15),),
+            blocked=frozenset({LOCATION}),
+        )
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(blocked)
+        self.assertIn("location cell not walkable", str(caught.exception))
+
+        sea = frozenset(
+            (x, y) for y in range(0, 31) for x in range(0, 31) if (x, y) != LOCATION
+        )
+        flooded = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            ((14, 15),),
+            terrain=_terrain(land=sea),
+        )
+        with self.assertRaises(GenerationError) as caught:
+            generate_settlement(flooded)
+        self.assertIn("location cell not walkable", str(caught.exception))
+
+    @covers_requirement(
+        "settlement-graph-generation::villages-and-hamlets-use-a-single-cell-layout-whose-entrances-follow-the-roads"
+    )
+    def test_beast_nation_reuses_the_tribal_vocabulary(self) -> None:
+        human_input = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            ((14, 15), (16, 15)),
+        )
+        beast_input = _single_cell_input(
+            _ref("single_village", kind="village", nation="beastland", population=400),
+            ((14, 15), (16, 15)),
+        )
+
+        human = generate_settlement(human_input)
+        beast = generate_settlement(beast_input)
+
+        self.assertEqual(human.settlement_class, "human_town")
+        self.assertEqual(beast.settlement_class, "beast_town")
+        self.assertEqual(beast.morphology, "tribal_ring")
+        self.assertEqual(len(beast.slots), len(human.slots))
+        self.assertEqual(
+            len(beast.data["wilderness_entry"]["gates"]),
+            len(human.data["wilderness_entry"]["gates"]),
+        )
+        _assert_single_cell(self, beast_input, beast)
+
+    def test_forced_gates_win_over_the_roads(self) -> None:
+        contacts = ((14, 15), (16, 15))
+        inp = _single_cell_input(
+            _ref("single_village", kind="village", population=400),
+            contacts,
+            forced_gates=("s",),
+        )
+
+        result = generate_settlement(inp)
+
+        _assert_single_cell(self, inp, result)
+        self.assertEqual(len(result.data["wilderness_entry"]["gates"]), 1)
+        self.assertEqual(_gate_approaches(result), [(15, 14)])
+        self.assertEqual(len(result.slots), inp.budget.node_count)
+
+
 class CommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self._workspace_dir = tempfile.TemporaryDirectory()
@@ -951,6 +1230,180 @@ class CommandTests(unittest.TestCase):
         self.assertFalse(
             footprints["synthetic_burg"] & footprints["synthetic_edge"]
         )
+
+
+class SingleCellCommandTests(unittest.TestCase):
+    """The batch and replace rules of the two single-cell kinds."""
+
+    def setUp(self) -> None:
+        self._workspace_dir = tempfile.TemporaryDirectory()
+        self._lore_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._workspace_dir.cleanup)
+        self.addCleanup(self._lore_dir.cleanup)
+        self.root = Path(self._workspace_dir.name)
+        synthetic.write_workspace(self.root)
+        self.lore = Path(self._lore_dir.name) / "lore.json"
+        self._add_locations(
+            {
+                "synthetic_burg": ((34, 8), "town", 60_000),
+                "synthetic_village": ((34, 14), "village", 400),
+                "synthetic_hamlet": ((34, 20), "hamlet", 120),
+            }
+        )
+        # A road through the village's cell, so its two gates follow it.
+        self._write_roads(
+            [
+                (
+                    "synthetic_road_a",
+                    "synthetic_road_b",
+                    [(34, 12), (34, 13), (34, 14), (34, 15)],
+                )
+            ]
+        )
+        self.digest = synthetic.tree_digest(self.root)
+
+    def _add_locations(
+        self, rows: dict[str, tuple[tuple[int, int], str, int]]
+    ) -> None:
+        locations = synthetic.locations_data()
+        lore_rows: dict[str, dict] = {
+            "synthetic_place": {"nation": None, "population": 900_000}
+        }
+        for location_id, (cell, kind, population) in rows.items():
+            locations["locations"][location_id] = {
+                "kind": kind,
+                "display_name_zh": "合成聚落",
+                "description": "A synthetic settlement.",
+                "cell": {"cell_x": cell[0], "cell_y": cell[1]},
+                "geographic_constraint": "synthetic",
+                "scene_archetype": None,
+            }
+            lore_rows[location_id] = {"nation": "nat_a", "population": population}
+        (self.root / "content" / "maps" / "locations.yaml").write_text(
+            synthetic.yaml_text(locations), encoding="utf-8"
+        )
+        self.lore.write_text(json.dumps(lore_rows), encoding="utf-8")
+
+    def _write_roads(self, roads: list[tuple[str, str, list[tuple[int, int]]]]) -> None:
+        path = self.root / "world" / "maps" / "data" / "road_network.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            encode_road_document(
+                frame_cells=40,
+                source_signature="synthetic",
+                nodes=["synthetic_road_a", "synthetic_road_b"],
+                roads=roads,
+            ),
+            encoding="utf-8",
+        )
+
+    def _run(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "tools.settlement_synthesis",
+                *arguments,
+                "--root",
+                str(self.root),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
+    def test_batch_reaches_both_kinds_and_takes_a_kind_filter(self) -> None:
+        settlements = self.root / "content" / "maps" / "settlements"
+
+        hamlets = self._run(
+            "generate", "--missing", "--nation", "nat_a", "--kind", "hamlet",
+            "--lore", str(self.lore),
+        )
+
+        self.assertEqual(hamlets.returncode, 0, hamlets.stderr)
+        self.assertEqual(
+            [report["map_id"] for report in _reports(hamlets.stdout)],
+            ["synthetic_hamlet"],
+        )
+        self.assertTrue((settlements / "synthetic_hamlet.yaml").is_file())
+        self.assertFalse((settlements / "synthetic_village.yaml").exists())
+
+        rest = self._run(
+            "generate", "--missing", "--nation", "nat_a", "--lore", str(self.lore)
+        )
+
+        self.assertEqual(rest.returncode, 0, rest.stderr)
+        self.assertEqual(
+            [report["map_id"] for report in _reports(rest.stdout)],
+            ["synthetic_burg", "synthetic_village"],
+        )
+        for map_id in ("synthetic_burg", "synthetic_village"):
+            self.assertTrue((settlements / f"{map_id}.yaml").is_file())
+
+        village = parse_document(
+            "content/maps/settlements/synthetic_village.yaml",
+            (settlements / "synthetic_village.yaml").read_text(encoding="utf-8"),
+        ).document
+        geometry = village.wilderness_geometry((34, 14))
+        assert geometry is not None
+        self.assertTrue(geometry.single_cell_footprint)
+        self.assertEqual(geometry.footprint_cells, frozenset({(34, 14)}))
+        self.assertEqual(
+            sorted(
+                gate_approach_cell(geometry, gate.return_direction)
+                for gate in geometry.gates
+            ),
+            [(34, 13), (34, 15)],
+        )
+
+        lint = self._run("lint")
+        self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
+    def test_replace_is_refused_for_a_village(self) -> None:
+        batch = self._run(
+            "generate", "--missing", "--nation", "nat_a", "--lore", str(self.lore)
+        )
+        self.assertEqual(batch.returncode, 0, batch.stderr)
+        digest = synthetic.tree_digest(self.root)
+        bind = Path(self._lore_dir.name) / "bind.json"
+        bind.write_text(json.dumps({"bindings": {}}), encoding="utf-8")
+
+        replaced = self._run(
+            "generate", "synthetic_village", "--replace", "--bind", str(bind),
+            "--lore", str(self.lore),
+        )
+
+        self.assertEqual(replaced.returncode, 1, replaced.stderr)
+        self.assertIn("single_cell_replace: synthetic_village", replaced.stdout)
+        self.assertEqual(synthetic.tree_digest(self.root), digest)
+
+    @covers_requirement(
+        "settlement-graph-generation::the-generator-never-overwrites-and-batches-in-a-fixed-order"
+    )
+    def test_kind_is_an_argument_error_outside_a_batch(self) -> None:
+        without_batch = self._run(
+            "generate", "synthetic_village", "--kind", "village",
+            "--lore", str(self.lore),
+        )
+
+        self.assertEqual(without_batch.returncode, 2)
+        self.assertIn("--kind requires --missing", without_batch.stderr)
+        self.assertEqual(synthetic.tree_digest(self.root), self.digest)
+
+        unknown = self._run(
+            "generate", "--missing", "--nation", "nat_a", "--kind", "thorp",
+            "--lore", str(self.lore),
+        )
+
+        self.assertEqual(unknown.returncode, 2)
+        self.assertIn("invalid choice", unknown.stderr)
+        self.assertEqual(synthetic.tree_digest(self.root), self.digest)
 
 
 def _reports(text: str) -> list[dict]:

@@ -36,7 +36,7 @@ from elosern_map_core.terrain import (
     rasterize_routes,
 )
 
-from tools.settlement_synthesis.budget import size_budget
+from tools.settlement_synthesis.budget import SINGLE_CELL_KINDS, size_budget
 from tools.settlement_synthesis.generate import (
     GenerationConfig,
     GenerationInput,
@@ -368,7 +368,9 @@ def analysis_input(
     """The generator input one view yields for one roster row."""
 
     budget = size_budget(location)
-    reach = math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
+    single_cell = location.kind in SINGLE_CELL_KINDS
+    # A village or hamlet is one cell: nothing its layout reads lies further out.
+    reach = 1 if single_cell else math.ceil(math.sqrt(budget.footprint_cells) / 2) + 1
     radius = max(
         reach + 6,
         math.ceil(1.5 * budget.envelope_radius_m / 1000) + 6,
@@ -387,6 +389,7 @@ def analysis_input(
         catalogue=DEFAULT_CATALOGUE,
         forced_gates=forced_gates,
         config=GenerationConfig(),
+        road_contacts=view.road_contacts(location.cell) if single_cell else (),
     )
 
 

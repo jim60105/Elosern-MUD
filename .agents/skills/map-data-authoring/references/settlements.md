@@ -203,7 +203,11 @@ can start in need it.
 For a national settlement, generate it:
 `uv run --locked python -m tools.settlement_synthesis generate <location_id> --plan-only`,
 then without `--plan-only`; the generator never overwrites, and the prose pass is
-described in `settlement-rework-and-prose`'s documentation. The steps below are
+described in `settlement-rework-and-prose`'s documentation. A village or hamlet
+is generated with the same command, after the road network is regenerated: its
+one-cell layout takes one gate per road cell that touches the location cell, so
+an older road artifact gives it stale entrances. `--replace` is refused for the
+two kinds; delete the source and generate it again instead. The steps below are
 the hand-authored path.
 
 1. Make sure the location already exists in `locations.yaml`.

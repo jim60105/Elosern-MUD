@@ -198,7 +198,7 @@ uv run --locked python -m tools.settlement_synthesis site LOCATION_ID [--root DI
 uv run --locked python -m tools.settlement_synthesis budget LOCATION_ID [--root DIR] [--lore FILE]
 uv run --locked python -m tools.settlement_synthesis lint [MAP_ID ...] [--root DIR]
 uv run --locked python -m tools.settlement_synthesis generate LOCATION_ID [--root DIR] [--lore FILE] [--gates OCTANT[,OCTANT...]] [--plan-only]
-uv run --locked python -m tools.settlement_synthesis generate --missing --nation NATION [--root DIR] [--lore FILE] [--plan-only]
+uv run --locked python -m tools.settlement_synthesis generate --missing --nation NATION [--kind KIND] [--root DIR] [--lore FILE] [--plan-only]
 uv run --locked python -m tools.settlement_synthesis generate LOCATION_ID --replace --bind FILE [--root DIR] [--lore FILE] [--gates OCTANT[,OCTANT...]] [--plan-only]
 uv run --locked python -m tools.settlement_synthesis brief MAP_ID [--root DIR] [--lore FILE]
 uv run --locked python -m tools.settlement_synthesis prose MAP_ID FILE [--root DIR]
@@ -220,15 +220,19 @@ uv run --locked python -m tools.settlement_synthesis prose MAP_ID FILE [--root D
   1 when the location has no size budget, already has a settlement document
   (printing `exists: <relative path>`), or cannot be generated, and 2 when the
   workspace does not load. `--missing` targets the roster rows of one nation
-  that are national kinds without a settlement source, largest population
-  first, reloading the workspace before each map so later footprints see the
-  earlier ones; per-location errors do not stop the batch.
+  that have a size budget — a capital, city, town, port, village or hamlet —
+  and no settlement source, largest population first, reloading the workspace
+  before each map so later footprints see the earlier ones; per-location
+  errors do not stop the batch. `--kind KIND` narrows that batch to one of those
+  kinds, is an argument error (`exit 2`) outside `--missing`, and takes only a
+  kind that has a size budget.
 - `generate --replace` rewrites the settlement already bound to `LOCATION_ID`
   and prints the same report plus `bound`, `dropped`, `renamed_slots` and
   `index_present`. `--bind FILE` is required and `--missing` is refused. A
   missing source prints `missing: <relative path>` and exits 1; a refused
   binding prints every problem and exits 1. `--plan-only` prints the report and
-  writes nothing.
+  writes nothing. A village or hamlet is refused with
+  `single_cell_replace: <location id>` and exits 1.
 - `brief` prints one settlement's prose brief as JSON, described below, and
   exits 0. It exits 2 when the workspace does not load or the map is unknown.
 - `prose` applies a JSON object of `{"<node_id>": {"key", "desc"}}` and prints
@@ -339,6 +343,64 @@ whose water lies within reach but no walkable path reaches it) and any
 terrain-fit lint error; none of them writes a file. An existing settlement is
 never overwritten, and a run that finds one exits with `exists: <relative path>`
 and changes nothing.
+
+## Single-cell layout
+
+A `village` and a `hamlet` are one-cell settlements: `generate` branches before
+it grows a footprint and emits the location cell as a one-`#` mask with
+`single_cell_footprint: true`. The gates are therefore the map's only
+wilderness entry points, and the lint compares them with the roads that meet
+the cell.
+
+**Entrances.** An entrance is the compass bearing from the location cell to a
+neighbouring cell. They are taken, in order of precedence, from the forced
+`--gates` octants, then from one octant per road contact of the location cell
+in the committed road artifact (`world/maps/data/road_network.json`): two when
+a road passes through, one at the end of a spur or at a junction arm. A hamlet
+with no road contact takes the first bearing of the gate order whose neighbour
+cell is walkable and unblocked, and is refused with `no_gate` when none is; a
+village with no road contact is refused with
+`no_road: no road cell touches the village cell`. Entrances are then sorted
+clockwise from north.
+
+**Slots.** `R = min(400, max(60, envelope radius))` metres, and a point
+"toward octant `o` at distance `d`" is `d` times that octant's unit vector.
+`R` never exceeds 400 m, which keeps every node inside the one cell — a
+physical one-cell footprint is held to the same inside-the-mask rule as any
+other footprint. A village has `village_green` as its anchor, a
+`village_end_<octant>` gate for each entrance, a `village_end_<octant>` end
+node on the opposite octant when there is only one entrance, and
+`shrine_front` on the first octant, stepping clockwise from two steps clockwise
+of the first entrance, that no other slot uses, at `R / 2`. A hamlet has
+`crossing` as its anchor, `homestead_front` toward the second entrance (or
+toward the opposite of the only one), and a `lane_<octant>` gate for the third
+and each later entrance. The node counts are therefore `2 + max(2, entrances)`
+for a village and `max(2, entrances)` for a hamlet, never below the budget's
+minimum, and the gate count is the entrance count.
+
+**Gates and roads.** Each gate's return direction is the opposite of its
+entrance, and its destination is the matching village end, or in a hamlet the
+`crossing` for the first entrance, `homestead_front` for the second and the
+matching lane after that. The roads are a star: every non-anchor node gets one
+road from the anchor with its own octant and one back with the opposite, so no
+node has two outgoing roads in one direction. No random number is drawn, so a
+village or hamlet is byte-identical across runs. A cell whose every bearing is
+already a slot (eight road contacts in a village) is refused with
+`shrine_octant_full` rather than given a second road in one direction. A
+location cell that is blocked — by another settlement's footprint, another
+location, a harbour site or a landmark — or that is not walkable is refused with
+`location cell not walkable` before any slot is placed.
+
+**Class and labels.** A nation in the configured beast nations gives
+`beast_town` and the `tribal_ring` morphology; any other nation gives
+`human_town` and `crossroads`. The geometry is shared, because one cell has no
+room for a ring of roles: the tribal vocabulary is carried by the class, the
+morphology name and the labels (`圖騰場`, `祖靈祭壇前`, `寨口`). Those labels are
+role labels that the prose pass replaces.
+
+A `--replace` run on a village or hamlet is refused with
+`single_cell_replace: <location id>`: the layout has no node a binding could
+keep. Delete a stale single-cell source and run `generate` again instead.
 
 ## Rework with bindings
 
@@ -453,6 +515,8 @@ These qualities are reviewed by a person against this page, not tested:
   register, and does it fit the settlement's archetype and lore?
 - After a replace moves a node, does every description whose site cue changed
   still tell the truth?
+- Does a four-node village and a two-node hamlet give enough to do on arrival?
+- Do the entrances match the roads on the continent capture?
 
 ## Settlement-sensitive test modules
 
