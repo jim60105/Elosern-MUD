@@ -123,6 +123,7 @@ class RegistryTests(unittest.TestCase):
                     "letters.send",
                     "npc.persona.read",
                     "npc.persona.update",
+                    "dream.choose_thread",
                     "dream.say",
                     "dream.draft",
                     "dream.confirm",

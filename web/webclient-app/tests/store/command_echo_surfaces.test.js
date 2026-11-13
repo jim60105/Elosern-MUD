@@ -836,6 +836,21 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "dream say 合成方向",
     },
     {
+      id: "dream thread choice echoes the typed thread line",
+      ids: ["dream.choose_thread"],
+      prepare() {
+        openExploration();
+        const payload = {
+          session_id: "session:synthetic-dream",
+          revision: 1,
+          thread_id: "t_synthetic_thread",
+        };
+        store.dispatchAction("dream.choose_thread", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: "dream thread t_synthetic_thread",
+    },
+    {
       id: "dream draft echoes the typed draft line",
       ids: ["dream.draft"],
       prepare() {
