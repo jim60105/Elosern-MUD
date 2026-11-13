@@ -1894,6 +1894,9 @@ class DreamSurfaceTests(EvenniaTest):
                 with self.assertRaises(ValueError):
                     validate("finalize", payload)
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_the_thread_command_chooses_an_offered_number_and_the_new_story_word(self):
         self.enter()
         for index, label in enumerate(("合成甲故事線", "合成乙故事線")):
@@ -1924,6 +1927,9 @@ class DreamSurfaceTests(EvenniaTest):
                 self.assertEqual(released.result["code"], "dream_choose_thread")
                 self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_the_thread_command_without_argument_lists_the_choices_and_writes_nothing(self):
         self.enter()
         for index, label in enumerate(("合成列表甲", "合成列表乙")):
@@ -1948,6 +1954,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(after["revision"], before["revision"])
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_an_unknown_thread_argument_is_refused_without_the_shared_operation(self):
         self.enter()
         create_thread(
@@ -1969,6 +1978,9 @@ class DreamSurfaceTests(EvenniaTest):
                 self.assertEqual(after["revision"], before["revision"])
                 self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_the_finalize_command_closes_free_text_and_offers_editing(self):
         self.enter()
         before = service.dream_state(self.actor)
@@ -1989,6 +2001,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIn("dream confirm", rendered)
         self.assertNotIn("dream say", rendered)
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_bare_dream_shows_the_whole_wish_its_thread_and_both_moved_items(self):
         self.enter()
         thread = create_thread(
@@ -2028,6 +2043,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIn("合成歸屬故事線", rendered)
         self.assertIn("合成舊主題", rendered)
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_a_delivered_say_ends_with_the_change_summary(self):
         self.enter()
         with patch(
@@ -2056,6 +2074,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertNotIn("合成新增主題", settled_line)
         self.assertNotEqual(settled_line, edited_line)
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_the_text_draft_replaces_only_the_summary_after_finalize(self):
         self.enter()
         thread = create_thread(
@@ -2092,6 +2113,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(wish["proposal"]["requirements"], before["requirements"])
         self.assertEqual(wish["thread_id"], thread.thread_id)
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_the_change_renderer_names_every_moved_item_on_one_line(self):
         moved = {
             "summary": "formed",

@@ -735,6 +735,9 @@ class CommandDocsContractTests(unittest.TestCase):
                 f"context for {key!r} drifted from the curated manifest",
             )
 
+    @covers_requirement(
+        "dream-sleep-surface::text-dream-commands-reach-thread-choice-finalize-and-the-change-report"
+    )
     def test_dream_syntax_matches_the_usage_the_command_prints(self):
         # The documented syntax and the usage the command itself prints are one
         # contract, so the document cannot describe a form the command refuses
