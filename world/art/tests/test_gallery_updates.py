@@ -73,12 +73,20 @@ def _monster(key="t_update_goblin"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 
 
+def _scene(key="t_synth_update_scene"):
+    return ArtSubject(ArtSubjectKind.SCENE, key)
+
+
 def _new_id():
     return str(uuid.uuid4())
 
 
 def _identity(subject, image_id, extension=".png"):
-    kind_dir = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+    kind_dir = {
+        ArtSubjectKind.CHARACTER: "character",
+        ArtSubjectKind.MONSTER: "monster",
+        ArtSubjectKind.SCENE: "scene",
+    }[subject.kind]
     return f"gallery/{kind_dir}/{subject.key}/{image_id}{extension}"
 
 
@@ -693,14 +701,47 @@ class CardGeometryCapabilityGateTests(EvenniaTestCase):
         self.assertIsNone(record_for(fresh))
 
     def test_a_gallery_less_kind_keeps_its_established_refusal(self):
-        scene = ArtSubject(ArtSubjectKind.SCENE, "t_gate_scene")
-        for write in (
-            lambda: set_stage(scene, _new_id(), {"scale": 1, "x": 0, "y": 0}),
-            lambda: update_card_face_rect(scene, _new_id(), {"x": 0, "y": 0, "w": 0.4, "h": 0.3}),
+        # The preserved no-gallery machinery: a kind re-declared without a
+        # gallery keeps the writer's established, unchanged refusal.
+        subject = _monster("gate_no_gallery")
+        with _declared(
+            ArtSubjectKind.MONSTER,
+            has_gallery=False,
+            store_directory=None,
+            max_cards=None,
         ):
-            with self.assertRaises(GalleryRecordError) as refused:
-                write()
-            self.assertEqual(str(refused.exception), "this subject has no gallery record")
+            for write in (
+                lambda: set_stage(subject, _new_id(), {"scale": 1, "x": 0, "y": 0}),
+                lambda: update_card_face_rect(
+                    subject, _new_id(), {"x": 0, "y": 0, "w": 0.4, "h": 0.3}
+                ),
+            ):
+                with self.assertRaises(GalleryRecordError) as refused:
+                    write()
+                self.assertEqual(
+                    str(refused.exception), "this subject has no gallery record"
+                )
+
+    def test_a_scene_card_refuses_player_geometry_it_does_not_declare(self):
+        # ``scene-kind-gallery``: the scene kind holds cards but declares no
+        # face rectangle and no stage, so both geometry writers refuse the
+        # undeclared capability before any write.
+        subject = _scene()
+        image_id = _new_id()
+        append_card(subject, **_card_fields(subject, image_id=image_id))
+        before = _raw_cards(subject)
+        refusals = []
+        with self.assertRaises(GalleryRecordError) as rect:
+            update_card_face_rect(
+                subject, image_id, {"x": 0, "y": 0, "w": 0.4, "h": 0.3}
+            )
+        refusals.append(rect)
+        with self.assertRaises(GalleryRecordError) as stage:
+            set_stage(subject, image_id, {"scale": 0.6, "x": 0.1, "y": 0})
+        refusals.append(stage)
+        self.assertIn("declares no face rectangle support", str(refusals[0].exception))
+        self.assertIn("declares no stage support", str(refusals[1].exception))
+        self.assertEqual(_raw_cards(subject), before)
 
     @covers_requirement(
         "art-gallery-kind-capabilities::the-sole-writer-refuses-card-operations-a-kind-does-not-declare"
@@ -806,16 +847,23 @@ class SubjectKeyResolverTests(EvenniaTestCase):
     @covers_requirement(
         "art-gallery-model::one-public-read-only-seam-resolves-a-serialized-subject-key-to-subject-and-entity"
     )
-    def test_a_scene_key_never_resolves_even_under_a_character_key_collision(self):
-        # Resolution dispatches on the key's OWN kind: a scene key may
-        # legally share its text with a living character's stable key, and
-        # the scene key must still be the typed miss, never that
-        # character's subject.
+    def test_a_scene_key_resolves_its_own_subject_never_the_colliding_character(self):
+        # Resolution dispatches on the key's OWN kind: a scene key may legally
+        # share its text with a living character's stable key, and the scene
+        # key must resolve the registered scene archetype (never that
+        # character's subject). Since ``scene-kind-gallery`` the scene kind is
+        # gallery-bearing, so its typed producer is the registry re-check.
         archetype = sorted(SYNTH_ARCHETYPES)[0]
         collider = create_object(PlayerCharacter, key="resolver-collider")
         collider.db.portrait_policy = {"mode": "named", "stable_key": archetype}
+        scene_subject, scene_entity = resolve_gallery_subject_by_key(
+            f"scene:{archetype}"
+        )
+        self.assertEqual(scene_subject, ArtSubject(ArtSubjectKind.SCENE, archetype))
+        self.assertIsNone(scene_entity)
+        # An unregistered scene archetype is still the typed rejection.
         with self.assertRaises(ArtSubjectError):
-            resolve_gallery_subject_by_key(f"scene:{archetype}")
+            resolve_gallery_subject_by_key("scene:t_never_registered")
         # The same text under the character prefix still resolves the
         # character — the collision cuts only one way.
         subject, entity = resolve_gallery_subject_by_key(f"portrait:character:{archetype}")

@@ -69,9 +69,10 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         "art-gallery-kind-capabilities::gallery-enforcement-reads-the-declaration-instead-of-comparing-kinds"
     )
     def test_a_kind_declared_without_a_gallery_is_refused_at_every_write_seam(self):
-        # The scene refusal is a declaration consequence, not a kind test: a
-        # MONSTER whose declaration is patched to has_gallery=False must be
-        # refused by record creation and card validation alike, nothing stored.
+        # A gallery-less refusal is a declaration consequence, not a kind
+        # test: a MONSTER whose declaration is patched to has_gallery=False
+        # must be refused by record creation and card validation alike,
+        # nothing stored.
         no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
             ArtSubjectKind.MONSTER.value
         ].with_values(has_gallery=False, store_directory=None)
@@ -88,11 +89,6 @@ class GalleryRecordWriteTests(EvenniaTestCase):
             with self.assertRaises(GalleryRecordError):
                 append_card(subject, **fields)
         self.assertIsNone(record_for(subject))
-        # The scene kind itself is refused through the same declared path.
-        with self.assertRaises(GalleryRecordError):
-            record_for(_scene(), create=True)
-        with self.assertRaises(GalleryRecordError):
-            validate_card(_card_fields(_scene()), _scene())
 
     @covers_requirement("art-gallery-model::world-art-gallery-py-is-the-sole-writer-of-gallery-records-and-deletion-never-dangles")
     def test_deleting_a_card_unlinks_exactly_its_confined_file(self):

@@ -130,12 +130,20 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     @covers_requirement(
         "art-gallery-generation::one-validated-service-seam-requests-every-gallery-image"
     )
-    def test_a_scene_subject_is_refused_at_the_seam(self):
-        # Any well-formed scene subject is refused by kind; the key needs no
-        # registration for the seam's kind-declaration check.
-        scene = ArtSubject(ArtSubjectKind.SCENE, "t_synth_scene")
-        with self.assertRaises(ArtSubjectError):
-            request_gallery_image(scene)
+    def test_a_kind_declaring_no_gallery_is_refused_at_the_seam(self):
+        # The preserved no-gallery machinery, read through the declaration: a
+        # kind re-declared without a gallery is refused before any write.
+        from world.art import gallery_kinds
+
+        no_gallery = gallery_kinds.GALLERY_KIND_CAPABILITIES[
+            ArtSubjectKind.MONSTER.value
+        ].with_values(has_gallery=False, store_directory=None)
+        with patch.dict(
+            gallery_kinds._CAPABILITIES_BY_KIND_VALUE,
+            {ArtSubjectKind.MONSTER.value: no_gallery},
+        ):
+            with self.assertRaises(ArtSubjectError):
+                request_gallery_image(self.subject)
         self.assertEqual(self._gallery_jobs(), [])
 
     @covers_requirement(

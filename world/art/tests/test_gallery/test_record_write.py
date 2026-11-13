@@ -215,6 +215,22 @@ class GalleryRecordWriteTests(EvenniaTestCase):
         self.assertFalse(first_file.exists())
         self.assertTrue(second_file.exists())
 
+    def test_a_second_scene_card_replaces_the_first_and_deletes_its_file(self):
+        # ``scene-kind-gallery``: the scene kind declares the same one-card
+        # shape as the monster kind, in its own store directory.
+        subject = _scene()
+        first = _new_id()
+        second = _new_id()
+        first_file = self._make_file(_identity(subject, first))
+        append_card(subject, **_card_fields(subject, image_id=first))
+        second_file = self._make_file(_identity(subject, second))
+        append_card(subject, **_card_fields(subject, image_id=second))
+        cards = cards_for(subject)
+        self.assertEqual([card["image_id"] for card in cards], [second])
+        self.assertEqual(record_for(subject).db.default_image_id, second)
+        self.assertFalse(first_file.exists())
+        self.assertTrue(second_file.exists())
+
     @covers_requirement("art-gallery-model::monster-subjects-hold-at-most-one-card")
     def test_a_bound_monster_card_is_rejected_and_the_record_is_unchanged(self):
         subject = _monster("boundgoblin")

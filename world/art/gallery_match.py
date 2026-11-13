@@ -20,8 +20,9 @@ Monster subjects skip steps 1-3 entirely — no equipment snapshot is ever
 computed for them and no monster card is ever selected by a binding — so a
 monster resolves through its default card alone. An unbound card is eligible
 ONLY as the explicit default (step 4); no image the player has not chosen is
-ever displayed as a surprise. Scene subjects have no gallery and always
-resolve to ``None`` here.
+ever displayed as a surprise. A kind whose declaration grants no gallery
+always resolves to ``None`` here — a declaration consequence, never a kind
+comparison.
 
 ``resolve_display_chain`` returns steps 1-4 as ORDERED SLOTS
 (``bound`` | ``personal`` | ``default``) that name each source position and
@@ -38,7 +39,8 @@ event), the terminal fallback seam (step 7), and the truthful placeholder
 (step 8). This module exposes the official lookup and the seam
 ``fallback_for(subject)``, filling the latter from
 ``gallery-builtin-fallbacks``: the deterministic built-in resolver over the
-six committed defaults, or ``None`` (scenes) when no fallback applies.
+six committed defaults, or ``None`` when no fallback applies (a scene subject
+has no built-in portrait fallback).
 
 A personal official selection that no longer resolves — removed by an artwork
 update, refused at admission, or outside the entity's content reference —
@@ -231,8 +233,8 @@ def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayCha
     A step-4 personal selection that resolves also carries the retained
     metadata fault of the very image it resolved (the startup catalog's own
     fact, never a re-derived one), so a degraded manifest is visible while its
-    valid bytes still present. Scenes and every other gallery-less kind return
-    no slots at all.
+    valid bytes still present. A kind declaring no gallery returns no slots
+    at all.
     """
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:

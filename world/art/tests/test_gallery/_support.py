@@ -56,7 +56,11 @@ def _new_id():
     return str(uuid.uuid4())
 
 def _identity(subject, image_id, extension=".png"):
-    kind_dir = "character" if subject.kind is ArtSubjectKind.CHARACTER else "monster"
+    kind_dir = {
+        ArtSubjectKind.CHARACTER: "character",
+        ArtSubjectKind.MONSTER: "monster",
+        ArtSubjectKind.SCENE: "scene",
+    }[subject.kind]
     return f"gallery/{kind_dir}/{subject.key}/{image_id}{extension}"
 
 def _card_fields(subject, image_id=None, **overrides):

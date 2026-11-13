@@ -112,11 +112,15 @@ def _gallery_auto_generation_pending(subject) -> bool:
 
 
 #: The typed producers that re-validate a supplied/referenced subject for a
-#: registry-backed gallery kind (``gallery-monster-generation``). A kind with
+#: registry-backed gallery kind (``gallery-monster-generation`` for monster
+#: visual species, ``scene-kind-gallery`` for scene archetypes). A kind with
 #: no entry here is either entity-derived (character, resolved through
 #: ``_living_entity_for_stable_key``) or declares no gallery at all; presence
 #: in this mapping always agrees with the kind's gallery declaration.
-_GALLERY_REGISTRY_PRODUCERS = {ArtSubjectKind.MONSTER.value: monster_subject_for}
+_GALLERY_REGISTRY_PRODUCERS = {
+    ArtSubjectKind.MONSTER.value: monster_subject_for,
+    ArtSubjectKind.SCENE.value: scene_subject_for,
+}
 
 
 def _official_default_satisfies(subject, entity) -> bool:
@@ -330,12 +334,13 @@ def resolve_gallery_subject_by_key(subject_key: str) -> tuple[ArtSubject, object
     a character stable key legally equal to a scene archetype or monster
     tier can only ever resolve its own kind's subject:
 
-    * registry-backed kinds re-validate through the kind's typed producer
-      (an unregistered registry entry is the producer's typed rejection —
-      the caller's key alone is never trusted);
+    * registry-backed gallery kinds — monster visual species and (since
+      ``scene-kind-gallery``) scene archetypes — re-validate through the
+      kind's typed producer (an unregistered registry entry is the
+      producer's typed rejection — the caller's key alone is never trusted);
     * character-kind keys resolve through the module's existing stable-key
       live-entity lookup and the existing typed subject producer;
-    * every other kind (today: scene) has no subject behind a bare key and
+    * a kind with neither a registry producer nor the character resolution
       is the same typed ``ArtSubjectError`` as any unresolvable key.
 
     The entity is returned only for the character kind and is ``None`` for
@@ -438,8 +443,9 @@ def ensure_scene_asset(archetype) -> None:
 def _sync_registry_subjects() -> None:
     """Idempotently ensure every registered subject, routed by its kind's gallery declaration.
 
-    The scene kind declares no gallery and stays on the classic
-    subject-keyed ``ensure`` — the only classic-record producer left (change
+    The scene kind still produces classic subject-keyed records until
+    ``scene-asset-migration`` switches its producers, so it stays on the
+    classic ``ensure`` — the only classic-record producer left (change
     ``gallery-monster-autogen``). Every registered monster visual species
     routes through the shared automatic-ensure helper under the same gallery guard every
     character path uses, and startup never writes a classic record for it;

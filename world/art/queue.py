@@ -192,11 +192,13 @@ def enqueue_gallery_job(
     two requests for one subject MUST produce two independent jobs. The
     record carries the pending card's binding, face rectangle, and requested
     field ids verbatim (validated upstream at the service boundary) and never
-    an ``output_identity`` — its published artifact is a gallery card. Scene
-    subjects have no gallery and are refused before any write.
+    an ``output_identity`` — its published artifact is a gallery card. A kind
+    whose declaration grants no gallery is refused before any write.
     """
     if not gallery_kinds.has_gallery(subject.kind.value):
-        raise gallery_api.GalleryRecordError("scene subjects have no gallery")
+        raise gallery_api.GalleryRecordError(
+            f"subject kind {subject.kind.value!r} declares no gallery"
+        )
     digest = source_hash(description)
     with queue_lock:
         record = create_script(
