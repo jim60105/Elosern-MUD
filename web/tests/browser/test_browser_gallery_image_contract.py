@@ -40,22 +40,27 @@ from .harness import ManagedServer, ManagedServerTearDownMixin
 # the selected original is answered with invalid bytes.
 _ORIGINAL_MEDIA = re.compile(r"/art/gallery/character/\d+/[^/]+\.(png|webp|jpg|avif)$")
 
-_GALLERY = '[data-testid="gallery-panel"]'
-_DETAIL = '[data-testid="gallery-detail"]'
+# The gallery window (gallery-window-mount): the category rail, the subject
+# wall with its inline tray, and the selected image's page.
+_GALLERY = '[data-testid="gallery-window"]'
+_PAGE = f'{_GALLERY} [data-testid="gallery-page"]'
 _MARKER = '[data-testid="artwork-failure"]'
 _ALPHA = '[data-testid="artwork-alpha"]'
-_FACE_BUTTON = f"{_DETAIL} button:has-text(\"臉部框選\")"
-_MONSTER_CATEGORY = f'{_GALLERY} [data-testid="gallery-category-monster"]'
+_FACE_BUTTON = f'{_PAGE} [data-testid="gallery-page__face"]'
+# The page's committed state line of a synthetic row.
+_STATUS_LINE = {"pending": "生成中", "failed": "生成失敗"}
+# The rail tab whose accessible name starts with 魔物.
+_MONSTER_TAB_NAME = re.compile(r"^魔物")
 
 
 def _subject(subject_key: str) -> str:
-    """The committed subject button of one exact subject key."""
+    """The committed wall tile of one exact subject key."""
     return f'{_GALLERY} [data-testid="gallery-subject"][data-subject-key="{subject_key}"]'
 
 
 def _card(card_id: str) -> str:
-    """The committed card button of one exact image id."""
-    return f'{_GALLERY} [data-image-id="{card_id}"]'
+    """The committed tray tile of one exact image id."""
+    return f'{_GALLERY} [data-testid="gallery-tray-item"][data-item-id="{card_id}"]'
 
 
 def _figure(card_id: str) -> str:
@@ -212,7 +217,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
             [(row["image_id"], row["status"]) for row in panel["cards"]],
             [(SEEDED_ORIGINAL_IMAGE_ID, "card")],
         )
-        # The detail rail still presents that same exact image as the original.
+        # The image page still presents that same exact image as the original.
         page.locator(_card(SEEDED_ORIGINAL_IMAGE_ID)).first.click()
         page.wait_for_selector(_FACE_BUTTON, timeout=30000)
 
@@ -257,7 +262,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
         # failure as truthful synthetic rows with no image at all. The category
         # row and the subject list are the real selection route: each click
         # dispatches its ordinary action and the server re-publishes the panel.
-        page.locator(_MONSTER_CATEGORY).click()
+        page.locator(_GALLERY).get_by_role("tab", name=_MONSTER_TAB_NAME).click()
         monster_panel = self._wait_for_panel(page, lambda value: value["category"] == "monster")
         monsters = [
             subject for group in monster_panel["groups"] for subject in group["subjects"]
@@ -270,7 +275,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
             page, lambda value: value["selected"] == monster_key and value["cards"]
         )
         self.assertEqual(
-            page.locator(_subject(monster_key)).get_attribute("aria-pressed"), "true"
+            page.locator(_subject(monster_key)).get_attribute("aria-selected"), "true"
         )
         rows = self._cards(page)
         self.assertTrue(rows, "the monster subject published no synthetic rows")
@@ -285,10 +290,15 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
             self.assertEqual(row["artwork"]["generation_state"], row["status"])
             self.assertFalse(row["is_default"])
             self.assertEqual(row["chips"], [])
-            # The rendered row shows its committed state and no image element.
-            rendered = page.locator(_card(row["image_id"]))
-            self.assertEqual(rendered.count(), 1)
-            self.assertEqual(rendered.locator("img").count(), 0)
+        # A monster keeps one image, so it opens no tray: the page shows the
+        # selected synthetic row's committed state and no image element.
+        selected = next((row for row in rows if row["is_default"]), rows[0])
+        self.assertNotEqual(selected["status"], "card", rows)
+        self.assertEqual(page.locator(f'{_GALLERY} [data-testid="gallery-tray"]').count(), 0)
+        art = page.locator(f'{_PAGE} [data-testid="gallery-page__art"]')
+        art.wait_for(state="visible", timeout=30000)
+        self.assertIn(_STATUS_LINE[selected["status"]], art.inner_text())
+        self.assertEqual(art.locator("img").count(), 0)
 
 
 if __name__ == "__main__":

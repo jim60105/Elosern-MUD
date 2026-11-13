@@ -2,9 +2,10 @@
 // DrawerHeader is presentational (glyph, title, subtitle, one named close
 // control, emits `close` only); the drawer and overlay hosts keep their own
 // modal lifecycles; every header draws the registry glyph of the navigation
-// control that opens its surface; the gallery carries exactly one header.
+// control that opens its surface; the gallery window carries exactly one
+// header (gallery-window-mount).
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -85,7 +86,7 @@ describe("reference surface headers in the client", () => {
   it("draws each tool's own navigation glyph in the header of the surface it opens", async () => {
     await snapshot();
     const tools = [
-      ["gallery-opener", "角色肖像圖庫"],
+      ["gallery-opener", "圖庫"],
       ["nav-tool-help", "說明"],
       ["nav-settings", "設定"],
     ];
@@ -177,35 +178,44 @@ describe("reference surface headers in the client", () => {
     expect(opened).toEqual(expect.arrayContaining(["quest", "status"]));
   });
 
-  it("closes a nested gallery editor and then the gallery, each through its own owner", async () => {
+  it("closes a nested gallery editor and then the gallery window, each through its own owner", async () => {
     await snapshot();
     const opener = wrapper.get('[data-testid="gallery-opener"]');
     opener.element.focus();
     await opener.trigger("click");
-    const panel = wrapper.get('[data-testid="gallery-panel"]');
-    // The gallery body renders no title or close control of its own.
-    expect(panel.findAll("h2")).toHaveLength(0);
-    expect(panel.text()).not.toContain("角色肖像管理");
-    const generate = panel.findAll("button").find((b) => b.text() === "生成新圖");
+    // The window is a drawer-keyed window, never an overlay host body.
+    expect(store.view.hudDrawer).toBe("gallery");
+    expect(store.view.hudOverlay).toBeNull();
+    expect(wrapper.find('[data-testid="overlay-host"]').exists()).toBe(false);
+    const win = wrapper.get('[data-testid="gallery-window"]');
+    // The window body renders no title or close control of its own.
+    expect(win.findAll("h2")).toHaveLength(0);
+    expect(wrapper.findAll(".drawer-header")).toHaveLength(1);
+    const generate = win.get('[data-testid="gallery-tray-item"][data-item-id="generate"]');
     generate.element.focus();
     await generate.trigger("click");
     const editor = wrapper.getComponent(GalleryGenerateDrawer);
-    // The editor is its own drawer with its own header; the overlay's header
+    // The editor is its own drawer with its own header; the window's header
     // is not duplicated inside it.
     expect(editor.findAll(".drawer-header")).toHaveLength(1);
     expect(document.activeElement).toBe(editor.get('[data-testid="hud-drawer-close"]').element);
 
     // Escape inside the editor closes only the editor.
     await editor.get('[data-testid="hud-drawer"]').trigger("keydown", { key: "Escape" });
-    await wrapper.vm.$nextTick();
-    await wrapper.vm.$nextTick();
+    await flushPromises();
     expect(wrapper.findComponent(GalleryGenerateDrawer).exists()).toBe(false);
-    expect(wrapper.find('[data-testid="gallery-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="gallery-window"]').exists()).toBe(true);
     expect(document.activeElement).toBe(generate.element);
 
-    // The next Escape closes the gallery overlay and restores its opener.
+    // Escape in the tray returns to the owner tile; the next Escape closes
+    // the window and restores its opener.
     await generate.trigger("keydown", { key: "Escape" });
-    expect(wrapper.find('[data-testid="gallery-panel"]').exists()).toBe(false);
+    await flushPromises();
+    expect(document.activeElement?.dataset.subjectKey).toBe(GALLERY_SAMPLE.selected);
+    expect(wrapper.find('[data-testid="gallery-window"]').exists()).toBe(true);
+    document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(wrapper.find('[data-testid="gallery-window"]').exists()).toBe(false);
+    expect(store.view.hudDrawer).toBeNull();
     expect(document.activeElement).toBe(opener.element);
-  }, 20000);
-});
+  }, 20000);});

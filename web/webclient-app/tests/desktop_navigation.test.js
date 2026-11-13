@@ -5,7 +5,7 @@
 // and the tools disclose their labels in one shared tooltip on hover and
 // Tab focus. webclient-main-navigation-hotkeys: the labelled entries are
 // 隊伍 / 任務 / 地圖 with their hotkey chips, the tools 信件 / 圖鑑 / 稱號冊 /
-// 角色肖像圖庫 / 說明, and 設定 ends the bar.
+// 圖庫 / 說明, and 設定 ends the bar.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import DesktopNavigation from "../components/DesktopNavigation.vue";
@@ -60,7 +60,7 @@ async function tabTo(button) {
 describe("DesktopNavigation", () => {
   it("orders the whole bar: 隊伍, 手帳, 地圖, the tool group, then 設定", () => {
     mountNav({ galleryAvailable: true });
-    expect(names(wrapper)).toEqual(["隊伍", "手帳", "地圖", "信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明", "設定"]);
+    expect(names(wrapper)).toEqual(["隊伍", "手帳", "地圖", "信件", "圖鑑", "稱號冊", "圖庫", "說明", "設定"]);
     // 設定 stands after the tool group, outside it.
     const settings = wrapper.get('[data-testid="nav-settings"]');
     expect(wrapper.get('[data-testid="nav-tools"]').element.contains(settings.element)).toBe(false);
@@ -184,8 +184,8 @@ describe("DesktopNavigation", () => {
       // The visible tooltip replaces the delayed, hover-only native one.
       expect(button.attributes("title")).toBeUndefined();
     }
-    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["信件", "圖鑑", "稱號冊", "角色肖像圖庫", "說明"]);
-    expect(toolLabel("gallery")).toBe("角色肖像圖庫");
+    expect(NAV_TOOLS.map((tool) => tool.label)).toEqual(["信件", "圖鑑", "稱號冊", "圖庫", "說明"]);
+    expect(toolLabel("gallery")).toBe("圖庫");
     expect(toolLabel("settings")).toBe(NAV_SETTINGS.label);
     expect(toolLabel("lineage")).toBeNull();
     expect(toolLabel("map")).toBeNull();
@@ -215,10 +215,10 @@ describe("DesktopNavigation", () => {
       "gallery-opener",
       "nav-tool-help",
     ]);
-    expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("角色肖像圖庫");
+    expect(wrapper.get('[data-testid="gallery-opener"]').attributes("aria-label")).toBe("圖庫");
   });
 
-  it("emits handbook for lore and codex, overlay for gallery/help and drawer for letters", async () => {
+  it("emits handbook for lore and codex, overlay for help and drawer for letters and the gallery window", async () => {
     mountNav({ galleryAvailable: true });
     await wrapper.get('[data-testid="nav-tool-letters"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-lore"]').trigger("click");
@@ -226,8 +226,8 @@ describe("DesktopNavigation", () => {
     await wrapper.get('[data-testid="gallery-opener"]').trigger("click");
     await wrapper.get('[data-testid="nav-tool-help"]').trigger("click");
     expect(wrapper.emitted("handbook")).toEqual([["codex"], ["titles"]]);
-    expect(wrapper.emitted("overlay")).toEqual([["gallery"], ["help"]]);
-    expect(wrapper.emitted("drawer")).toEqual([["letters"]]);
+    expect(wrapper.emitted("overlay")).toEqual([["help"]]);
+    expect(wrapper.emitted("drawer")).toEqual([["letters"], ["gallery"]]);
   });
 
   it("renders identically with and without possession (the bar takes no possession input)", () => {
@@ -329,7 +329,7 @@ describe("DesktopNavigation tool tooltip", () => {
     const galleryTool = wrapper.get('[data-testid="gallery-opener"]').element.parentElement;
     galleryTool.dispatchEvent(new MouseEvent("mouseenter"));
     await wrapper.vm.$nextTick();
-    expect(wrapper.get('[data-testid="nav-tooltip"]').text()).toBe("角色肖像圖庫");
+    expect(wrapper.get('[data-testid="nav-tooltip"]').text()).toBe("圖庫");
     await wrapper.setProps({ galleryAvailable: false });
     await wrapper.setProps({ galleryAvailable: true });
     expect(wrapper.find('[data-testid="nav-tooltip"]').exists()).toBe(false);

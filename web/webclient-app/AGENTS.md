@@ -368,7 +368,8 @@ browser test, not only Storybook.
 The top bar (`DesktopNavigation.vue`; webclient-main-navigation-hotkeys,
 design §8 of the party member management design, after the prototype's
 `MainNavPrototype.vue`) is 隊伍 / 手帳 / 地圖, the `工具` icon group (信件,
-圖鑑, 稱號冊, 角色肖像圖庫 while the `gallery` panel is available, 說明) and
+圖鑑, 稱號冊, 圖庫 (the gallery window) while the `gallery` panel is
+available, 說明) and
 設定 last, divided by thin gold hairlines.
 
 - `components/nav-primary.js` is the one entry model (label, glyph, hotkey)
@@ -675,3 +676,29 @@ VitalsTrack changing-numerals story's price column).
   a new member, tab or row drops it.
 - The server republishes `party_inventory` with every trade, so the party
   window's 背包 tab and header purse never lag a purchase.
+
+## Gallery window
+
+`GalleryWindow` (gallery-window-component, mounted by gallery-window-mount;
+gallery window design D8/D9) is the only gallery surface. The 圖庫 tool
+(`nav-tools.js`, `drawer: "gallery"`, test id `gallery-opener`) opens it
+through `openHudDrawer("gallery")`; AppClient mounts it under the `gallery`
+drawer key beside `PartyWindow` and `ShopWindow`, outside `OverlayHost` and
+outside the generic `HudDrawer` branch. `gallery` is a frameless drawer name,
+so closing it never touches the router, and it is not an overlay name.
+
+- The window draws its own `HudDrawer` chrome (seal `gallery`, title 圖庫):
+  the `IconTabs` category rail, `GalleryWall` (subject tiles, the inline
+  tray of the selected subject) and `GalleryImagePage` (art, fact cells and a
+  capability-driven `DetailFooter`). Pure view-model rules live in
+  `components/gallery-window-model.js`.
+- Pass `result` and `revision` together: an editor's pending request clears
+  only when its correlated result and that result's committed revision have
+  both arrived. The window emits `close`, `character` (opens the party
+  window's 狀態 tab, which replaces the gallery drawer) and `log`.
+- The four editors teleport to the body at the modal tier; while the gallery
+  drawer is open `FullLogOverlay` lifts to `zIndex: 3100` so 查看伺服器訊息
+  opens the log above them.
+- Escape in the tray returns focus to the owner tile; Escape anywhere else
+  closes the window and restores focus to the 圖庫 tool. An unavailable panel
+  leaves the open window showing the committed reason with no control.

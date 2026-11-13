@@ -193,10 +193,13 @@ def main() -> None:
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
     is_persona_test = os.environ.get("ELOSERN_BROWSER_NPC_PERSONA") == "1"
     is_companion_lineup = os.environ.get("ELOSERN_BROWSER_COMPANION_LINEUP") == "1"
-    # The gallery-rows journey opens the version-4 gallery, whose "mine"
-    # category reads the same account roster as the companion lineup.
+    # The gallery-rows journey and every other journey that opens the
+    # version-4 gallery (ELOSERN_BROWSER_OPENS_GALLERY: the editor journeys)
+    # read its "mine" category, which reads the same account roster as the
+    # companion lineup.
     is_gallery_rows = os.environ.get("ELOSERN_BROWSER_GALLERY_ROWS") == "1"
-    parks_superuser = is_persona_test or is_companion_lineup or is_gallery_rows
+    opens_gallery = is_gallery_rows or os.environ.get("ELOSERN_BROWSER_OPENS_GALLERY") == "1"
+    parks_superuser = is_persona_test or is_companion_lineup or opens_gallery
 
     if parks_superuser:
         # For NPC persona tests, #1 is an admin superuser account so Evennia initial_setup

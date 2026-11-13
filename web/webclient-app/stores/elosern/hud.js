@@ -4,14 +4,14 @@
 //
 // H4 (webclient-hud-04-reference-drawers, design D3): the reference
 // drawer controller. `view.hudDrawer` is the single open-drawer name
-// (null | shop | quest | party | npc_persona | letters); at most one
+// (null | shop | quest | party | npc_persona | letters | gallery); at most one
 // drawer is open at a time (structural: a single value). Unknown names
 // are rejected, not coerced. The store is the single writer and owns the
 // teardown on a mode change, an epoch reset, or a transport loss.
 //
 // H5 (webclient-hud-05-overlays-and-command-line, design D7/D8): the
 // full-screen overlay controller. `view.hudOverlay` is the single
-// open-overlay name (null | map | settings | help | gallery); at most one
+// open-overlay name (null | map | settings | help); at most one
 // overlay is open at a time (structural: a single value). Unknown names are
 // rejected, not coerced. Opening an overlay closes any open reference
 // drawer (design D8: an overlay and a drawer are never open together,
@@ -42,10 +42,12 @@ export function applyHud(ctx) {
 
   // The world codex is the handbook's 圖鑑 tab (handbook-codex-tab): the retired
   // `lore` drawer name is rejected like any unknown name.
-  const HUD_DRAWER_NAMES = new Set(["shop", "quest", "party", "npc_persona", "letters"]);
+  // The gallery window (gallery-window-mount) is a drawer-keyed window like
+  // the party and shop windows, not an overlay.
+  const HUD_DRAWER_NAMES = new Set(["shop", "quest", "party", "npc_persona", "letters", "gallery"]);
   // `npc_persona` (the NPC author editor) never hosts a router frame either:
   // the verb card that opened it stays open (exploration-presence-rail).
-  const FRAMELESS_DRAWER_NAMES = new Set(["party", "quest", "shop", "npc_persona", "letters"]);
+  const FRAMELESS_DRAWER_NAMES = new Set(["party", "quest", "shop", "npc_persona", "letters", "gallery"]);
   const hudDrawer = ref(null);
   ctx.hudDrawer = hudDrawer;
 
@@ -214,7 +216,7 @@ export function applyHud(ctx) {
     return true;
   };
 
-  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help", "gallery"]);
+  const HUD_OVERLAY_NAMES = new Set(["map", "settings", "help"]);
   const hudOverlay = ref(null);
   const hudOverlayOpener = ref(null);
   ctx.hudOverlay = hudOverlay;

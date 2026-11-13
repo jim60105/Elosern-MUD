@@ -24,7 +24,7 @@ const SURFACES = [
   { icon: "settings", heading: "設定", sub: "閱讀偏好與輔助顯示" },
   { icon: "lineage", heading: "技能系譜", sub: "熟練度 ‧ 見頂 ‧ 前置" },
   { icon: "codex", heading: "稱號冊", sub: "稱號 ‧ 異名 ‧ 提名中" },
-  { icon: "gallery", heading: "角色肖像圖庫", sub: "記錄不同的你，也是旅途的一部分。" },
+  { icon: "gallery", heading: "圖庫" },
   { icon: "help", heading: "說明", sub: "分類 → 條目 → 子主題" },
 ];
 

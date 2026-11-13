@@ -1,12 +1,15 @@
 """Evidence bridge: run the Vue gallery gates as webclient-gallery-ui evidence.
 
-The 角色肖像圖庫 management surface is implemented and verified in the Vue
-layer: the gallery component suite
-(web/webclient-app/tests/components/gallery.test.js) asserts the committed
-panel rendering, destructive-intent gating, drawer dispatch contracts, and
-face-rect geometry; the application integration suite
-(web/webclient-app/tests/app_client_gallery.test.js) asserts the shared
-single-dispatch entry, its gates, and the rejection narrative; the offline
+The 圖庫 management surface is the gallery window (gallery-window-mount) and
+is verified in the Vue layer: the gallery suite
+(web/webclient-app/tests/components/gallery.test.js) asserts the window's
+editor lifecycle, the official-entry actions, the no-image page, the drawer
+dispatch contracts and face-rect geometry; the window, wall and image-page
+suites assert the committed categories, subjects, tray rows and the two-step
+deletion; the application integration suite
+(web/webclient-app/tests/app_client_gallery.test.js) asserts the mounted
+window, the shared single-dispatch entry, its gates, and the rejection
+narrative; the offline
 interactive storyboard is registered in the static Storybook showcase and
 documented by the English frame guide. ``covers_requirement`` can only attach
 to a Python ``test_*`` function, so this module executes those gates and
@@ -31,22 +34,28 @@ TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
 GALLERY_COMPONENTS = TESTS_DIR / "components" / "gallery.test.js"
 GALLERY_STAGE = TESTS_DIR / "components" / "stage_transform.test.js"
 GALLERY_APP_CLIENT = TESTS_DIR / "app_client_gallery.test.js"
+GALLERY_WINDOW = TESTS_DIR / "components" / "gallery_window.test.js"
+GALLERY_WALL = TESTS_DIR / "components" / "gallery_wall.test.js"
+GALLERY_PAGE = TESTS_DIR / "components" / "gallery_image_page.test.js"
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 FRAME_GUIDE = REPO_ROOT / "docs/design/legacy-design/elosern-redesign2/gallery-storyboard.md"
 
 # Every gallery story family registered in the frozen component manifest: the
-# five component families plus the interactive Storyboard export.
+# gallery window with its interactive Storyboard export, its wall and page, and
+# the four editors.
 GALLERY_STORY_IDS = frozenset(
     {
-        "data-gallerypanel--populated",
-        "data-gallerypanel--empty",
-        "data-gallerypanel--monster",
-        "data-gallerypanel--unavailable",
-        "data-gallerypanel--locked",
-        "data-gallerypanel--storyboard",
-        "data-gallerydetailrail--default-portrait",
-        "data-gallerydetailrail--unmatched-binding",
-        "data-gallerydetailrail--failed",
+        "overlays-gallerywindow--my-characters",
+        "overlays-gallerywindow--first-release",
+        "overlays-gallerywindow--party",
+        "overlays-gallerywindow--official-image",
+        "overlays-gallerywindow--no-images",
+        "overlays-gallerywindow--monsters",
+        "overlays-gallerywindow--storyboard",
+        "data-gallerywall--mine",
+        "data-gallerywall--tray-states",
+        "data-galleryimagepage--character-card",
+        "data-galleryimagepage--armed-delete",
         "overlays-gallerygeneratedrawer--character",
         "overlays-gallerygeneratedrawer--monster",
         "overlays-gallerygeneratedrawer--rejected",
@@ -130,61 +139,61 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         "webclient-gallery-ui::the-gallery-surface-renders-committed-categories-subjects-and-rows"
     )
     def test_panel_renders_committed_facts(self):
-        # 'renders committed rows in payload order with no filter tabs, and
-        # keeps failure text intact' pins payload row order, the absent filter
-        # tabs and the committed failure line with no image element; the
-        # 'gallery categories and subjects' cases pin one control per
-        # committed category, the single category dispatch that waits for the
-        # committed panel, the focusable disabled category announcing its
-        # committed reason, and the empty category; 'waits for subject
-        # publication rather than optimistically switching cards' pins the one
-        # select dispatch and publication-driven re-render.
+        # The window suite's 'the rail switches category through the server'
+        # cases pin one tab per committed category, the single category
+        # dispatch that keeps the committed wall until the next panel, and
+        # the focusable disabled category announcing its committed reason;
+        # 'marks the subject whose selection is in flight busy' pins the one
+        # subject dispatch and publication-driven re-render. The wall suite's
+        # 'committed groups as aspect-true subject tiles' and 'the tray under
+        # the owner's row' cases pin payload-ordered tiles and tray rows, and
+        # its 'tray tiles carry state by shape and text' case pins the
+        # committed failure tile with no image.
         _assert_vitest_passes(
-            _run_vitest_once(GALLERY_COMPONENTS), "gallery panel facts"
+            _run_vitest_once(GALLERY_WINDOW, GALLERY_WALL), "gallery committed facts"
         )
 
     @covers_requirement(
-        "webclient-gallery-ui::the-detail-rail-presents-the-selected-card-and-gates-destructive-intent"
+        "webclient-gallery-image-page::deletion-takes-two-steps",
+        "webclient-gallery-image-page::the-footer-follows-the-declared-capabilities",
+        "webclient-gallery-image-page::the-page-renders-committed-facts-in-cells",
     )
-    def test_detail_rail_gates_destructive_intent(self):
-        # 'cancels deletion, confirms once, and never invents missing binding
-        # conditions' pins the in-rail confirmation, the single confirmed
-        # dispatch, explicit condition absence, and the monster binding-
-        # affordance gate; the AppClient case 'confirms deletion through the
-        # shared entry' pins the same flow against the real store.
+    def test_image_page_gates_destructive_intent(self):
+        # The detail rail retired with gallery-window-mount; the image page
+        # presents the selected image. The page suite's 'deletion takes two
+        # steps' cases pin the armed confirmation, the cancel and Escape
+        # paths and the single confirmed press; its footer cases pin the
+        # capability-driven buttons (no binding affordance for a monster);
+        # its fact cases pin committed binding conditions and no invented
+        # ones. The AppClient case 'confirms deletion through the shared
+        # entry' pins the same flow against the real store.
         _assert_vitest_passes(
-            _run_vitest_once(GALLERY_COMPONENTS, GALLERY_APP_CLIENT),
-            "gallery detail rail destructive gating",
+            _run_vitest_once(GALLERY_PAGE, GALLERY_APP_CLIENT),
+            "gallery image page destructive gating",
         )
 
     @covers_requirement(
         "webclient-gallery-ui::official-entries-render-as-selectable-read-only-rows-with-personal-geometry-affordances"
     )
     def test_official_rows_are_selectable_read_only(self):
-        # 'renders the committed rows beside the cards and never counts them
-        # as cards' pins the separate committed list with the card grid
-        # untouched; 'selects an official row and renders only
-        # its read-only affordances' pins the preview plus 清除選取/清除個人調整
-        # with no 刪除/replace/regenerate affordance; 'dispatches the selection
-        # with only the subject key and the committed identity', 'clears the
-        # selection and the personal geometry through their own actions',
-        # 'sends only the edited face rectangle for an official identity' and
-        # 'sends only the edited stage triple for an official identity' pin
-        # every affordance dispatching its committed action with exactly the
-        # edited component; 'never dispatches an untouched official geometry
-        # save' pins that a save without an edit crosses no wire;
-        # 'suppresses the paragraph when committed official rows replace every
-        # card' and 'suppresses the paragraph while one card and official rows
-        # exist' pin that committed official rows alone drop the empty-card
-        # guidance, while 'keeps
-        # the unchanged paragraph inside the cards area without official rows',
-        # 'keeps the paragraph for a subject with no cards and no official
-        # rows' pin its unchanged text, class and cards-area location
-        # when the committed official list is empty, and 'follows a committed
-        # official-entry replacement in both directions without a dispatch'
-        # pins the reactive, dispatch-free toggle.
+        # 'previews a selected official entry with only its read-only
+        # affordances' pins the official page with 清除個人調整/臉框/舞台位置
+        # and 清除選取 or 設為預設, and no 刪除/replace/regenerate button;
+        # 'dispatches the selection with only the subject key and the
+        # committed identity', 'clears the personal geometry through its own
+        # action', 'sends only the edited face rectangle for an official
+        # identity' and 'sends only the edited stage triple for an official
+        # identity' pin every affordance dispatching its committed action
+        # with exactly the edited component; 'never dispatches an untouched
+        # official geometry save' pins that a save without an edit crosses
+        # no wire. The 'official-only artwork and the no-image page' cases
+        # pin that committed official rows alone keep the no-image page away,
+        # that an empty official list with no cards shows it with 生成新圖,
+        # and that a committed replacement toggles it without a dispatch.
+        # The wall suite pins the official run after the cards in the tray,
+        # never counted as cards.
         _assert_vitest_passes(
-            _run_vitest_once(GALLERY_COMPONENTS), "gallery official rows"
+            _run_vitest_once(GALLERY_COMPONENTS, GALLERY_WALL), "gallery official rows"
         )
 
     @covers_requirement(
@@ -279,14 +288,16 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
     )
     def test_keyboard_first_and_never_color_only(self):
         # The keyboard clause: 'traps keyboard focus and restores the opener
-        # on Escape', 'cancels without an action and restores the opener ...',
-        # and 'restores a remaining gallery control when the edited card and
-        # opener disappear' pin the shared focus trap with Escape-to-close and
-        # restoration parity. The never-color-only clause: 'marks crown,
-        # pending, and failed rows with explicit state text, not color alone'
-        # pins the 目前預設 / 生成中 / committed-failure text on those rows.
+        # on Escape', 'cancels without an action and restores the opener ...'
+        # and 'restores focus to the rail when the edited card and its opener
+        # disappear' pin the shared focus trap with Escape-to-close and
+        # restoration parity; the window suite's 'focus is rescued and Escape
+        # closes in layers' cases and the AppClient case that restores the
+        # 圖庫 tool on Escape pin the window's layers. The never-color-only
+        # clause: the wall suite's 'marks default, pending and failed tiles
+        # with text and a shape' pins the 預設 / 生成中 / 生成失敗 text.
         _assert_vitest_passes(
-            _run_vitest_once(GALLERY_COMPONENTS, GALLERY_APP_CLIENT),
+            _run_vitest_once(GALLERY_COMPONENTS, GALLERY_WINDOW, GALLERY_WALL, GALLERY_APP_CLIENT),
             "gallery keyboard-first + explicit state text",
         )
 
@@ -294,9 +305,9 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         "webclient-gallery-ui::the-gallery-has-an-offline-interactive-storyboard"
     )
     def test_offline_storyboard_and_frame_guide(self):
-        # The five component families plus the interactive Storyboard are
+        # The gallery window family plus its interactive Storyboard are
         # registered in the built offline showcase; the storyboard entry is a
-        # document story under Data/GalleryPanel. The zh-TW frame guide
+        # story under Overlays/GalleryWindow. The zh-TW frame guide
         # links the four reference images, states every journey frame with
         # its transition and recovery column, and separates the fixture
         # publication driver from live behavior.
@@ -316,9 +327,9 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             "gallery stories missing from the showcase: "
             + ", ".join(sorted(missing)),
         )
-        storyboard = entries["data-gallerypanel--storyboard"]
+        storyboard = entries["overlays-gallerywindow--storyboard"]
         self.assertEqual(storyboard["type"], "story")
-        self.assertEqual(storyboard["title"], "Data/GalleryPanel")
+        self.assertEqual(storyboard["title"], "Overlays/GalleryWindow")
 
         guide = FRAME_GUIDE.read_text(encoding="utf-8")
         for image in FRAME_GUIDE_IMAGES:

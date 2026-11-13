@@ -3,7 +3,7 @@
 // webclient-main-navigation-hotkeys, design §8 of the party member
 // management design). The labelled primary entries 隊伍, 手帳 and 地圖 (each
 // with its window hotkey drawn as a key chip), then the icon-only tool group
-// (`工具`: 信件, 圖鑑, 稱號冊, 角色肖像圖庫 when available, and 說明), then 設定
+// (`工具`: 信件, 圖鑑, 稱號冊, 圖庫 when available, and 說明), then 設定
 // at the very end, inside the 48px band. There is no home entry: the stage
 // itself is the screen the player is on, and Escape and the dock's back
 // controls return the dock to its root.

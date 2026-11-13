@@ -542,7 +542,7 @@ or by a committed action-result read model.
 
 - **WHEN** the gallery-UI change lands its five gallery components
 - **THEN** the same change's manifest append, story files, and spec entry keep the component-coverage gate green, and no gallery component is mounted in the live application before its story exists
-- **AND** `Data/GalleryPanel` includes an offline interactive storyboard for the
+- **AND** `Overlays/GalleryWindow` includes an offline interactive storyboard for the
   complete management journey, with a documented frame guide
 
 #### Scenario: A manifest edit without a story fails the gate
@@ -574,9 +574,10 @@ or by a committed action-result read model.
 
 #### Scenario: The portrait-gallery family joins through the presentation-panel route
 - **WHEN** a feature change introduces a component backed by a committed presentation panel
-- **THEN** it joins the frozen set under exactly this route, as the portrait-gallery family
-  (`Data/GalleryPanel`, `Data/GalleryDetailRail`, `Overlays/GalleryGenerateDrawer`,
-  `Overlays/GalleryBindingDrawer`, `Overlays/GalleryFaceRectModal`) did
+- **THEN** it joins the frozen set under exactly this route, as the gallery-window family
+  (`Overlays/GalleryWindow`, `Data/GalleryWall`, `Data/GalleryImagePage`,
+  `Overlays/GalleryGenerateDrawer`, `Overlays/GalleryBindingDrawer`,
+  `Overlays/GalleryFaceRectModal`) did
 
 #### Scenario: The NPC author editor route needs a main-spec-shaped action-result model
 - **WHEN** a feature change introduces a component rendered entirely from a committed

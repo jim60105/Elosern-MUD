@@ -207,12 +207,10 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/ArtworkAlpha",
                 "Core/ArtworkFailure",
                 "World/TitleBallotMenu",
-                # The gallery management surface refroze the manifest at 56:
-                # Data/GalleryPanel + Data/GalleryDetailRail joined from the
-                # gallery showcase wave, plus the three gallery overlay
-                # drawers (webclient-gallery-ui archive).
-                "Data/GalleryPanel",
-                "Data/GalleryDetailRail",
+                # The gallery management surface refroze the manifest at 56 with the
+                # three gallery overlay drawers (webclient-gallery-ui archive); its
+                # old gallery panel and detail rail stories left with
+                # gallery-window-mount, replaced by the gallery window family below.
                 "Overlays/GalleryGenerateDrawer",
                 "Overlays/GalleryBindingDrawer",
                 "Overlays/GalleryFaceRectModal",

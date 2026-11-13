@@ -22,6 +22,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
+    login_and_open,
     open_command_line,
     press_control,
     sent_action_count,
@@ -39,7 +40,9 @@ _FACE_ORIGINAL = f"{_FACE_MODAL} .gallery-face__original > img"
 _FACE_CROP = f"{_FACE_MODAL} .gallery-face__preview img"
 _FAILURE_MARKER = f'{_FACE_MODAL} [data-testid="artwork-failure"]'
 
-_FACE_BUTTON = '[data-testid="gallery-detail"] button:has-text("臉部框選")'
+# The gallery window's image page footer (gallery-window-mount).
+_GALLERY = '[data-testid="gallery-window"]'
+_FACE_BUTTON = f'{_GALLERY} [data-testid="gallery-page__face"]'
 
 
 class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -51,6 +54,9 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         runtime = create_runtime()
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
         runtime.env["ELOSERN_BROWSER_UNIFIED_IMAGES"] = "1"
+        # The journey opens the version-4 gallery, whose "mine" category
+        # reads the account roster the seed must keep (gallery-window-mount).
+        runtime.env["ELOSERN_BROWSER_OPENS_GALLERY"] = "1"
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
@@ -76,9 +82,22 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         self._media_requests.append(route.request.url)
         route.fulfill(status=200, content_type="image/png", body=b"not-an-image")
 
+    def _page_failing_original(self, ):
+        """A logged-in page whose seeded original media is already intercepted.
+
+        The routes are installed before login: the live character's roster and
+        stage portrait name the same exact original, and a load there before
+        the route existed would serve the gallery and its editors from the
+        browser cache instead of the intercepted request.
+        """
+        page = self.new_page()
+        self._fail_original_media(page)
+        login_and_open(page, self.webclient_url, self.base_url)
+        return page
+
     def _open_face_editor(self, page) -> None:
         press_control(page, '[data-testid="gallery-opener"]')
-        page.wait_for_selector('[data-testid="gallery-panel"]', timeout=30000)
+        page.wait_for_selector(_GALLERY, timeout=30000)
         page.wait_for_selector(_FACE_BUTTON, timeout=30000)
         page.locator(_FACE_BUTTON).first.click()
         page.wait_for_selector(_FACE_MODAL, timeout=30000)
@@ -92,9 +111,8 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
             SEEDED_ORIGINAL_IMAGE_ID,
         )
 
-        page = self.logged_in_page()
+        page = self._page_failing_original()
         install_outbound_recorder(page)
-        self._fail_original_media(page)
         self._open_face_editor(page)
 
         # The reached failure removed the broken original and its crop, and the
@@ -115,7 +133,7 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         # distinct original through the production writer and selects it.
         page.keyboard.press("Escape")
         page.wait_for_selector(_FACE_MODAL, state="detached", timeout=30000)
-        page.wait_for_selector('[data-testid="gallery-panel"]', timeout=30000)
+        page.wait_for_selector(_GALLERY, timeout=30000)
         open_command_line(page)
         page.keyboard.type("uieditor_transition repaired_original")
         page.keyboard.press("Enter")

@@ -88,7 +88,7 @@ const selection = computed(() => {
   return { type: "empty" };
 });
 
-// ---- the editor lifecycle (moved from GalleryPanel) -------------------------
+// ---- the editor lifecycle ----------------------------------------------------
 
 const editor = ref(null);
 const entryEditor = ref(null);
@@ -488,10 +488,22 @@ onBeforeUnmount(() => {
 }
 
 /* The wide rail would push the count to the tab's far corner; it sits at the
-   emblem's shoulder instead. */
+   emblem's shoulder instead. The rail's labels read at --text-xs, so its
+   counts never drop below that floor either. */
 .gwin__rail :deep(.icon-tabs__count) {
   top: var(--sp-2);
-  right: calc(50% - calc(36px * var(--ui-scale)));
+  right: calc(50% - calc(40px * var(--ui-scale)));
+  min-width: calc(22px * var(--ui-scale));
+  height: calc(22px * var(--ui-scale));
+  padding: 0 var(--sp-1);
+  font-size: var(--text-xs);
+}
+
+/* Every rail tab shows its label, so the shared tooltip would only repeat it
+   over the wall; it stays on a disabled tab, where it carries the reason. */
+.gwin__rail :deep(.icon-tabs__tab:not(.is-disabled):hover::after),
+.gwin__rail :deep(.icon-tabs__tab:not(.is-disabled):focus-visible::after) {
+  content: none;
 }
 
 .gwin__rail :deep(.icon-tabs__tab.is-disabled .icon-tabs__label) {

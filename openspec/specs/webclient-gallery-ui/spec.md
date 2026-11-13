@@ -11,41 +11,6 @@ documents the complete management journey.
 
 ## Requirements
 
-### Requirement: The detail rail presents the selected card and gates destructive intent
-
-The 肖像詳情 rail SHALL show the selected card's committed preview, badges,
-綁定條件 rows, 當前狀態 line, and the affordances 設為預設 / 編輯設定 / 刪除 plus
-the 生成新圖 CTA. Conditions SHALL appear only when committed warnings provide
-them; otherwise their absence SHALL be explicit. 刪除 SHALL require an in-rail
-confirmation step before dispatching `gallery.card.delete` and SHALL cancel
-without a dispatch.
-
-#### Scenario: Delete requires confirmation
-
-- **WHEN** the player activates 刪除 and cancels the confirmation
-- **THEN** no `ui_action` is dispatched and the card remains listed
-
-#### Scenario: Monster cards hide binding affordances
-
-- **WHEN** the selected subject's committed capabilities name no binding support
-- **THEN** no 編輯設定 binding affordance is rendered for its card
-
-#### Scenario: The preview uses the shared face-rect mapping
-- **WHEN** the rail renders the selected card's preview
-- **THEN** it is cover-cropped through the shared `face-rect.js` mapping
-
-#### Scenario: The rail never claims a resolved default
-- **WHEN** the rail presents the current default card
-- **THEN** the rail SHALL NOT claim the default image is currently resolved for display, because v1 supplies no such flag
-
-#### Scenario: Setting the default dispatches exactly once
-- **WHEN** the player activates 設為預設
-- **THEN** exactly one `gallery.default.set` dispatch is made
-
-#### Scenario: Monster delete/replace shape is capability-driven
-- **WHEN** a Monster-kind subject's card is shown
-- **THEN** the delete/replace shape renders truthfully from the committed capability flags, with one-card 替換 semantics
-
 ### Requirement: The generate drawer maps checkboxes to the closed catalog and dispatches one request
 
 納入生成的資料 SHALL render exactly the closed field catalog of
@@ -214,7 +179,7 @@ text and not rely on color alone.
 
 ### Requirement: The gallery has an offline interactive storyboard
 The gallery component Storybook families SHALL include an interactive storyboard
-under Data/GalleryPanel covering browse, generation, pending and failure, binding, face editing,
+under Overlays/GalleryWindow covering category switching, browse, generation, pending and failure, binding, face editing,
 stage transform editing/reset/save/rejection, default selection and delete confirmation.
 
 #### Scenario: The storyboard runs without game or AI services
@@ -358,14 +323,14 @@ The offline showcase SHALL include the new modal family registered in the frozen
 The gallery surface SHALL render the committed `official_entries` beside the
 card rows as selectable, previewable rows and, when the committed
 `supports_personal_official_preferences` flag is true, SHALL offer exactly the official-entry
-affordances 選為預設影像, 清除選取, 臉部框選, 比例調整 and 清除個人調整. Delete, replace, and
+affordances 設為預設 (清除選取 while current), 臉框, 舞台位置 and 清除個人調整, gated by the declared geometry facts. Delete, replace, and
 regenerate-overwrite affordances SHALL NOT be rendered for an official entry, and the surface SHALL
 compose no official fact locally.
 
 #### Scenario: An official row offers selection and geometry only
 
 - **WHEN** a committed official row whose `is_current` is true is selected in the surface
-- **THEN** the surface previews that committed URL, offers 清除選取 instead of 選為預設影像, and renders no 刪除, replace, or regenerate affordance
+- **THEN** the surface previews that committed URL, offers 清除選取 instead of 設為預設, and renders no 刪除, replace, or regenerate affordance
 
 #### Scenario: A geometry edit dispatches only the edited component
 
@@ -384,12 +349,12 @@ compose no official fact locally.
 
 #### Scenario: Selection and clearing dispatch the committed identity
 
-- **WHEN** the player activates 選為預設影像 or 清除選取 on an official row
+- **WHEN** the player activates 設為預設 or 清除選取 on an official row
 - **THEN** the dispatch is exactly one `gallery.official.select` or `gallery.official.clear_selection` carrying that row's committed identity
 
 #### Scenario: Geometry edits touch only the edited component
 
-- **WHEN** the player uses 臉部框選 or 比例調整 on an official row
+- **WHEN** the player uses 臉框 or 舞台位置 on an official row
 - **THEN** each dispatches one `gallery.official.geometry.set` carrying only the edited component for that committed identity, so the component the player did not touch stays exactly as the server stores it
 
 #### Scenario: Personal-geometry clearing has its own action
@@ -412,21 +377,21 @@ compose no official fact locally.
 - **THEN** its runtime generation, shared default selection and placement controls remain available according to existing capabilities, and official images are previewable with no personal selection or geometry controls
 
 #### Scenario: Official-only artwork suppresses empty-card guidance
-- **WHEN** an available committed gallery panel has three `official_entries` and zero visible card rows
-- **THEN** the three official rows remain available and no `gallery-panel__empty` paragraph is rendered inside the cards area
+- **WHEN** an available committed gallery panel has three `official_entries` and zero card rows
+- **THEN** the three official entries remain available in the tray and the page shows an official entry, not the no-image page
 - **AND** the decision uses only the committed official-entry list length, without a new payload field or client-composed official fact
 
 #### Scenario: Empty filters with official rows do not claim missing artwork
 - **WHEN** committed `official_entries` is non-empty and the selected subject has zero card rows
-- **THEN** `gallery-panel__empty` is absent and the separate official rows remain visible
+- **THEN** the no-image page is not shown and the official entries remain selectable
 
 #### Scenario: Empty-card guidance remains unchanged without official entries
 - **WHEN** the selected subject has zero card rows and committed `official_entries` is an empty list
-- **THEN** the existing paragraph remains inside the cards area with class `gallery-panel__empty`
+- **THEN** the page shows the no-image state with the 生成新圖 action
 
 #### Scenario: Committed official-entry replacement updates guidance
 - **WHEN** zero visible card rows remain and a committed panel replacement changes `official_entries` from non-empty to empty or from empty to non-empty
-- **THEN** the existing guidance appears or disappears respectively from that committed list alone, without an action dispatch or local official-entry inference
+- **THEN** the no-image state appears or disappears respectively from that committed list alone, without an action dispatch or local official-entry inference
 
 ### Requirement: Gallery previews retain exact image identity and reached failures
 Gallery card thumbnails, official rows, detail rails and binding/generation references SHALL use the common ordered load result for the exact requested image. Preview failure MAY show the subject silhouette without changing card status, selecting another original or enabling substitute editing. Reached unexpected faults SHALL remain locally accessible after preview fallback.
