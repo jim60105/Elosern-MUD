@@ -16,7 +16,7 @@ Run `pnpm run build` and the Storybook commands in `web/webclient-app`; run `pnp
 
 ## 3. Stories and bridge
 
-- [ ] 3.1 Apply design decision 6 (stories) and the bridge method of design decision 5. Verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `<prefix> web.webclient.tests.test_vue_dream_stage_evidence` pass.
+- [x] 3.1 Apply design decision 6 (stories) and the bridge method of design decision 5. Verify `pnpm run build-storybook`, `pnpm run showcase-coverage` and `<prefix> web.webclient.tests.test_vue_dream_stage_evidence` pass.
 
 ## 4. Gates
 
