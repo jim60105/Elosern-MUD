@@ -12,12 +12,12 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: A done scene reaches sessions currently showing that scene
 
-- **WHEN** a scene subject completes while connected sessions currently render that scene and neither their selected gallery nor roster portraits references it
+- **WHEN** a scene subject completes while connected sessions currently render that scene and neither their gallery wall nor their roster portraits lists it
 - **THEN** each such session receives one newer art panel update with the done URL and no gallery or roster changes, except any required mode-coherence companion panel
 
 #### Scenario: A late completion never replaces the current panel
 
-- **WHEN** a subject completes after the session moved to a different scene or the entity left and no current art, selected-gallery, or roster reference names that subject
+- **WHEN** a subject completes after the session moved to a different scene or the entity left, no current art or roster reference names that subject, and the rendered gallery lists no subject with that key
 - **THEN** no update is published, revision is unchanged, and the completed subject does not replace the currently rendered scene or portrait
 
 #### Scenario: Reconnect resolves current status from the store
@@ -37,7 +37,7 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: An off-room roster sibling refreshes without an art or gallery match
 
-- **WHEN** a completion subject appears only in an owned non-current roster character's portrait while that character is outside the current puppet's room and another gallery subject is selected
+- **WHEN** a completion subject appears only in an owned non-current roster character's portrait while that character is outside the current puppet's room, the rendered gallery shows a category that does not list it, and another gallery subject is selected
 - **THEN** the session receives one newer roster update containing its current owned rows and freshly resolved sibling portrait, with no art or gallery update
 
 #### Scenario: Unavailable art cannot suppress a selected gallery or roster match
@@ -47,7 +47,7 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: A changed selection cannot be restored by late completion
 
-- **WHEN** subject A completes after the session selected subject B and A remains on the rail but neither current art nor roster references A
+- **WHEN** subject A completes after the session selected subject B and the rendered gallery's groups no longer list A while neither current art nor roster references A
 - **THEN** no update is published, gallery remains selected on B, and no pending/card state for A replaces B's displayed gallery
 
 #### Scenario: A subject leaving art can still refresh an owned roster portrait
@@ -90,7 +90,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late completions gate on fresh references only
 
 - **WHEN** a completion notification is evaluated for staleness
-- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, a vanished entity, or a gallery subject the wall no longer lists does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
 
 #### Scenario: Completion rendering is pure presentation
 
