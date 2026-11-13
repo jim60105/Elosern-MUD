@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_tea_hut
+location_ref: hamlet_tea_hut
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 182
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往北通往蜜谷鎮，往南是鹽道城，路旁有一間供人歇腳的草棚，灶上常年溫著一壺茶，路過的人自己倒。
+    anchor_key: hamlet_tea_hut
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍的土牆上爬著藤蔓，門前擺著幾張給過路人坐的長凳，往南的鹽車常在這裡停一夜，屋裡備著給牲口的豆料。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

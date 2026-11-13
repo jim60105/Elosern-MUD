@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_sheep_yard
+location_ref: hamlet_sheep_yard
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 210
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東通往斷崖鎮，路面被羊群踩得結實，路邊的木欄圍著一片給羊群過夜的圈地，欄角堆著隔年的舊草。
+    anchor_key: hamlet_sheep_yard
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍的石牆貼著路邊，門前曬著羊毛與乾草，往西的路通往蜜谷鎮，女主人每天早晚把羊群趕到西邊的坡地。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_water_mill
+location_ref: hamlet_water_mill
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往西是一條通往麥埔村的土路，路旁的水渠引著北邊的河水，推著一座木製水磨轉動，渠邊的石頭被水沖得光滑。
+    anchor_key: hamlet_water_mill
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 200
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍旁的水磨聲整夜不停，屋前晾著剛磨好的麵粉袋，清晨的河霧會漫過門檻，屋裡的人早已習慣那股濕氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: e
+- source: homestead_front
+  destination: crossing
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: e
+    destination_node: crossing
+city_gate:

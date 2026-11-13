@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_charcoal_kiln
+location_ref: hamlet_charcoal_kiln
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 173
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往南通往斷崖鎮，路旁排著幾座覆土的老炭窯，風向不對時整條路都飄著煙味，窯口用石塊封著。
+    anchor_key: hamlet_charcoal_kiln
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 173
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍往西北通往東河城，屋前堆著捆好的木柴，坡上的樹叢被燒炭的人修剪得齊整，柴堆上蓋著防雨的草蓆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: n
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

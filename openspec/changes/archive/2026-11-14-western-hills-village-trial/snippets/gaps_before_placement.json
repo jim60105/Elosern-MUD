@@ -1,0 +1,11 @@
+[
+ {
+  "road": "town_honey_vale -- town_scarp",
+  "from": [1041, 699],
+  "to": [1277, 696],
+  "from_index": 0,
+  "to_index": 267,
+  "cells": 268,
+  "km": 273.6
+ }
+]

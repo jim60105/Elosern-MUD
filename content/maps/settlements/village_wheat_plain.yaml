@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_wheat_plain
+location_ref: village_wheat_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 316
+    y_m: 208
+    prototype_parent: anchor_room
+    key: 井畔綠地
+    desc: 村中心的綠地圍著一口石井，井水映著麥田上方的天空，傍晚時婦人提著木桶來回打水，井邊的洗衣石被磨得發亮。
+    anchor_key: village_wheat_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 532
+    y_m: 208
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口接上通往斷崖鎮的官道，路旁曬著剛收的麥束，往東走便一路爬向丘陵高處，車轍在土路上壓得很深。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 208
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口朝著蜜谷鎮的方向，路邊的麥田鋪到低地邊緣，清晨常有牛車載著麥袋進村，車伕會在井邊歇上一刻。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 316
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂立在綠地南側，鐘樓的影子越過麥田，村人在禮拜後沿著田埂散去，屋簷下的銅鐘擦得很亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:
