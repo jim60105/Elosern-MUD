@@ -47,7 +47,7 @@ from world.art.gallery_prompt import (
     validate_custom_prompt, validate_fields,
 )
 from world.art.service import request_gallery_image, resolve_gallery_subject_by_key
-from world.art.subjects import ArtSubjectError, ArtSubjectKind, monster_subject_for
+from world.art.subjects import ArtSubjectError, ArtSubjectKind, monster_subject_for, scene_subject_for
 from world.observability import log_info, log_warn
 
 AFFECTED_GALLERY_PANELS = ("gallery", "art", "roster")
@@ -67,6 +67,7 @@ REJECTION_MESSAGES = {
     "subject_ineligible": "角色資料不符合肖像生成條件。",
     "gallery_rejected": "無法更新這張肖像。",
     "entity_required": "此肖像為物種共用，不支援個人偏好設定。",
+    "official_unsupported": "此圖庫不支援官方圖片的個人設定。",
     "stage_rejected": "無法儲存比例調整。",
     "face_rect_unsupported": "此類圖片不能調整臉框。",
     "stage_unsupported": "此類圖片不能調整舞台位置。",
@@ -384,6 +385,8 @@ def _mutate(actor, action_id, payload):
             subject, entity = resolve_gallery_subject_by_key(payload["subject_key"])
         elif parsed.kind is ArtSubjectKind.MONSTER:
             subject, entity = monster_subject_for(parsed.key), None
+        elif parsed.kind is ArtSubjectKind.SCENE:
+            subject, entity = scene_subject_for(parsed.key), None
         else:
             raise ArtSubjectError("no typed producer resolves this gallery kind")
         image_id = payload.get("image_id")
@@ -544,8 +547,15 @@ def _mutate_official(actor, action_id, payload):
             subject, entity = resolve_gallery_subject_by_key(payload["subject_key"])
         elif parsed.kind is ArtSubjectKind.MONSTER:
             subject, entity = monster_subject_for(parsed.key), None
+        elif parsed.kind is ArtSubjectKind.SCENE:
+            subject, entity = scene_subject_for(parsed.key), None
         else:
             raise ArtSubjectError("no typed producer resolves this gallery kind")
+        if parsed.kind is ArtSubjectKind.SCENE:
+            # A scene archetype's image is a shared world asset: it holds no
+            # official read-only entry and no personal official preference.
+            log_warn("gallery_action", context=context)
+            return _rejected("official_unsupported")
         if action_id == "gallery.official.clear_selection":
             # Clearing touches only the subject's own record: no identity is
             # named, so no reference scope applies.
