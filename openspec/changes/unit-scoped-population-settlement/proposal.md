@@ -4,7 +4,7 @@
 
 The cost of a player action must not depend on the total world population (see `population-settlement-units` - Why). `population-settlement-units` defined independent settlement units and their cursors. The lifecycle coordinator and the three owners (`monster_activity`, `regional_population`, `monster_sites`) can still only settle the whole world at once.
 
-This change lets the coordinator settle one closed set of units from its own cursor to a target tick, and proves that settling units separately, in any order and under any partition of time, gives the same world as settling everything together. It changes no behaviour yet: the clock stage still settles the whole world. `observed-unit-advance` switches the stage over.
+This change lets the coordinator settle one closed set of units from its own cursor to a target tick, and proves that settling units separately, in any order and under any partition of time, gives the same world as settling everything together. It changes no behaviour yet: the clock stage still settles the whole world. `observed-unit-advance` switches the stage over, after `population-catch-up-entry-points` and `population-writer-guards`.
 
 This work is mandatory. No measurement decides whether it happens.
 
@@ -14,7 +14,8 @@ This work is mandatory. No measurement decides whether it happens.
 - Every owner step of a lifecycle pass accepts a scope and then considers only the groups, journeys, zones, sites, protection and timeline evidence of that scope.
 - The coordinator gains a scoped pass that starts at the scope's cursor, settles to a target tick and advances only that scope's cursors.
 - Timeline evidence is retired only when every unit it concerns has been settled past it.
-- A scoped pass refuses, by a named error, to place an individual on a cell outside its scope, and refuses a scope whose units have different cursors.
+- A scoped pass refuses, by a named error, to place an individual or create a group outside its scope.
+- A closed set whose units have different cursors (units that became linked after they diverged) is settled from its lowest cursor; zone and site steps skip a unit at every tick that unit has already passed, and group steps are already idempotent through each member's own cursor.
 - The whole-world pass is unchanged and remains the clock stage.
 
 ## Capabilities

@@ -10,13 +10,14 @@ Do not edit `world/rules/clock.py`, `world/rules/field_contact.py` or `world/map
 
 ## 2. Scope and coordinator
 
-- [ ] 2.1 Add design D1 to `world/maps/population_units.py`. Create `world/maps/tests/test_scoped_population_settlement.py` with the scenarios "Unequal cursors" and "Linked units settle together" reduced to `build_scope` / `scope_start_tick` assertions, and register the module in `.github/evennia-shards.json` beside `world.maps.tests.test_population_units`. Verify: the test prefix with `world.maps.tests.test_scoped_population_settlement` passes.
+- [ ] 2.0 In the new file `world/maps/tests/test_scoped_population_settlement.py`, write the module-level helper `build_two_zone_world(fixture)` of design D5 first (two disjoint synthetic zones, one synthetic site in the first, groups in both) and one smoke test that calls it and asserts both zones are initialized. Register the module in `.github/evennia-shards.json` beside `world.maps.tests.test_population_units`. Verify: the test prefix with `world.maps.tests.test_scoped_population_settlement` passes. If `ActivityFixture`'s registry isolation cannot hold a second zone or a site, stop and report what is missing.
+- [ ] 2.1 Add design D1 to `world/maps/population_units.py`. Create `world/maps/tests/test_scoped_population_settlement.py` with `build_scope`, `scope_start_tick` and `behind` assertions for a closed set with equal and with unequal cursors. Verify: the same test label passes.
 - [ ] 2.2 Apply design D3 (the `_run_pass` extraction, `settle_population_scope`) with `scope` accepted and passed down but not yet used by the owners. Verify: the test prefix passes for each of `world.maps.tests.test_monster_activity`, `world.maps.tests.test_regional_population_recovery`, `world.maps.tests.test_settlement_decode_reuse`, `world.maps.tests.test_settlement_outer_rollback`, `world.maps.tests.test_settlement_deferred_writes`, `world.maps.tests.test_population_maintenance_log`.
 
 ## 3. Owner filters
 
-- [ ] 3.1 Apply design D2 to `world/maps/monster_activity.py`. Add "Other units are untouched", "Cursor moves only for the scope" and "Out-of-scope destination". Verify: the new module passes.
-- [ ] 3.2 Apply design D2 to `world/maps/regional_population.py` and `world/maps/monster_sites.py`, and design D4. Add "Loss recorded ahead of one unit", "Protection of a lagging cell", "Reload between parts" and "Order and partition". Verify: the new module passes, and the test prefix passes for each of `world.maps.tests.test_monster_sites`, `world.maps.tests.test_monster_journeys`, `world.maps.tests.test_regional_population`, `world.rules.tests.test_world_escape`.
+- [ ] 3.1 Apply design D2 to `world/maps/monster_activity.py`. Add "Other units are untouched", "Cursor moves only for the scope", "Linked units settle together" and "Out-of-scope destination". Verify: the new module passes.
+- [ ] 3.2 Apply design D2 to `world/maps/regional_population.py` and `world/maps/monster_sites.py`, and design D4. Add "Loss recorded ahead of one unit", "Protection of a lagging cell", "Reload between parts", "Unequal cursors", "Units linked after diverging", "Group reaching outside the scope" and "Order and partition". Verify: the new module passes, and the test prefix passes for each of `world.maps.tests.test_monster_sites`, `world.maps.tests.test_monster_journeys`, `world.maps.tests.test_regional_population`, `world.rules.tests.test_world_escape`.
 
 ## 4. Documentation and gates
 

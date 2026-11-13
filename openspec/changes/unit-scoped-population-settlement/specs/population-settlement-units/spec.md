@@ -14,8 +14,8 @@ A scoped lifecycle pass SHALL settle only the groups, journeys, zones and sites 
 - **THEN** that unit reports 400 and every other unit reports 100
 
 #### Scenario: Unequal cursors
-- **WHEN** a scope is requested whose closed set holds units with different settled-through ticks
-- **THEN** the pass raises the named cursor-mismatch error before any write
+- **WHEN** a closed set holds one unit at 400 and one at 100 and is settled to 700
+- **THEN** both units report 700, and no zone or site step ran for the first unit at any tick up to 400
 
 ### Requirement: Separate settlement equals whole-world settlement
 Settling every closed set of units separately SHALL leave the same activity record, zone records, site records and per-individual position, gauges, reserve, posture and sleep receipt as one whole-world pass over the same interval, for any order of the sets and any partition of the interval per set.
@@ -23,6 +23,10 @@ Settling every closed set of units separately SHALL leave the same activity reco
 #### Scenario: Order and partition
 - **WHEN** a synthetic world of two disjoint units, with wandering groups, a travelling group, a zone below its lower density and a recoverable site, is settled over one interval as a whole, then unit by unit in both orders, then with one unit in two parts and the other in three
 - **THEN** all resulting state projections are equal
+
+#### Scenario: Units linked after diverging
+- **WHEN** one of two units is settled alone to 400, a group that touches both units is then created at 400, and the closed set is settled to 700; and an identical world is settled as a whole to 400, receives the same group, and is settled as a whole to 700
+- **THEN** both state projections are equal
 
 #### Scenario: Linked units settle together
 - **WHEN** a group owned by one zone stands on a cell of another zone and one of the two units is requested
@@ -44,8 +48,12 @@ A recorded presence transition SHALL be retired only when every unit of its befo
 - **THEN** the interval is still stored, and a group of the lagging unit settled through 140 does not enter the protected cell
 
 ### Requirement: A scoped pass never writes outside its scope
-A scoped pass SHALL refuse, with a named error and without partial state, any departure, arrival or birth that would place an individual on a cell outside the scope.
+A scoped pass SHALL refuse, with a named error and without partial state, any departure, arrival or birth that would place an individual on a cell outside the scope, and any group creation whose units are not all inside the scope.
 
 #### Scenario: Out-of-scope destination
 - **WHEN** a fault-injected decision inside a scoped pass selects a destination cell of a unit outside the scope
 - **THEN** the pass raises the named scope-violation error and the state projection equals its value before the pass
+
+#### Scenario: Group reaching outside the scope
+- **WHEN** a fault-injected birth inside a scoped pass creates a group whose activity area lies in a unit outside the scope
+- **THEN** the pass raises the named scope-violation error and no group, individual or registration remains
