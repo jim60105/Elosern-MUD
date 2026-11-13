@@ -163,7 +163,7 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
           group("closed", [], { label: "t_place", expanded: false, count: 7 }),
         ],
       });
-      const sections = wrapper.findAll('[role="group"]');
+      const sections = wrapper.findAll("section");
       const closed = sections.find((section) => section.text().includes("t_place"));
       expect(closed.get("h3").text()).toContain("7");
       expect(closed.findAll('[data-testid="gallery-subject"]')).toHaveLength(0);
@@ -190,6 +190,102 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       expect(tile("b").find(".gtile__count").exists()).toBe(false);
       expect(tile("a").classes()).toContain("gtile--portrait");
       expect(wrapper.get('[data-subject-key="scene:s"]').classes()).toContain("gtile--landscape");
+    });
+  });
+
+  describe("collapsible group headings are buttons", () => {
+    const head = (key) => wrapper.get(`[data-testid="gallery-group-head"][data-group-key="${key}"]`);
+    const places = (subjects = [subject("a"), subject("b")]) => [
+      group("p2", subjects, { label: "t_place_two" }),
+      group("p1", [], { label: "t_place_one", expanded: false, count: 3 }),
+    ];
+
+    it("emits expand-group once for a collapsed heading and marks both states", async () => {
+      await mountWall({ groups: places() });
+      expect(head("p1").element.tagName).toBe("BUTTON");
+      expect(head("p1").attributes("type")).toBe("button");
+      expect(head("p1").attributes("aria-expanded")).toBe("false");
+      expect(head("p2").attributes("aria-expanded")).toBe("true");
+      expect(head("p1").text().replace(/\s+/g, " ")).toContain("t_place_one");
+      expect(head("p1").attributes("aria-label")).toContain("3");
+      await head("p1").trigger("click");
+      expect(wrapper.emitted("expand-group")).toEqual([["p1"]]);
+      // The expanded place is inert.
+      await head("p2").trigger("click");
+      expect(wrapper.emitted("expand-group")).toEqual([["p1"]]);
+    });
+
+    it("keeps tier headings plain while every group is expanded", async () => {
+      await mountWall({
+        groups: [
+          group("t1", [subject("a")], { label: "t_low", seen: 1, total: 2 }),
+          group("t2", [subject("b")], { label: "t_high", seen: 1, total: 1 }),
+        ],
+      });
+      expect(wrapper.findAll("h3")).toHaveLength(2);
+      expect(wrapper.find("button").exists()).toBe(false);
+      expect(wrapper.find('[data-testid="gallery-group-head"]').exists()).toBe(false);
+    });
+
+    it("marks only the pending heading busy", async () => {
+      await mountWall({ groups: places(), pendingGroup: "p1" });
+      expect(head("p1").attributes("aria-busy")).toBe("true");
+      expect(head("p2").attributes("aria-busy")).toBeUndefined();
+    });
+
+    it("keeps the headings outside one wall listbox of named groups", async () => {
+      stubColumns(4);
+      const subjects = ["a", "b", "c", "d", "e", "f"].map((key) => subject(key));
+      await mountWall({
+        groups: [group("p0", [], { label: "t_place_zero", expanded: false, count: 2 }), ...places(subjects)],
+        selectedSubject: subjects[1].subject_key,
+        capabilities: MANY,
+      });
+      const listboxes = wrapper.findAll('[role="listbox"][aria-label="wall"]');
+      expect(listboxes).toHaveLength(1);
+      const wall = listboxes[0].element;
+      const owned = (wall.getAttribute("aria-owns") ?? "").split(" ").filter(Boolean).map((id) => document.getElementById(id));
+      const scope = [wall, ...owned];
+      expect(owned.every((el) => el.getAttribute("role") === "group")).toBe(true);
+      for (const el of wrapper.findAll('[data-testid="gallery-subject"]')) {
+        expect(scope.some((root) => root.contains(el.element))).toBe(true);
+      }
+      for (const el of wrapper.findAll('[data-testid="gallery-group-head"]')) {
+        expect(scope.some((root) => root.contains(el.element))).toBe(false);
+      }
+      // Every set of tiles is named by its place, the part after the tray too.
+      const named = scope.flatMap((root) => [root, ...root.querySelectorAll('[role="group"]')])
+        .filter((el) => el.getAttribute("role") === "group")
+        .map((el) => el.getAttribute("aria-label"));
+      expect(named.length).toBeGreaterThanOrEqual(2);
+      expect(named.every((name) => name.startsWith("t_place_two"))).toBe(true);
+      expect(wall.contains(tray().element)).toBe(false);
+    });
+
+    it("keeps focus on a heading whose section moves across the tray", async () => {
+      stubColumns(4);
+      const subjects = ["a", "b", "c", "d", "e", "f"].map((key) => subject(key));
+      await mountWall({ groups: places(subjects), selectedSubject: subjects[1].subject_key, capabilities: MANY });
+      head("p1").element.focus();
+      expect(document.activeElement).toBe(head("p1").element);
+      await wrapper.setProps({ capabilities: ONE });
+      await flushPromises();
+      await nextTick();
+      expect(tray().exists()).toBe(false);
+      expect(document.activeElement?.dataset.groupKey).toBe("p1");
+    });
+
+    it("keeps a focused tile when the last collapsed group expands", async () => {
+      await mountWall({ groups: places() });
+      tile("a").element.focus();
+      await wrapper.setProps({
+        groups: [group("p2", [subject("a"), subject("b")], { label: "t_place_two" }), group("p1", [subject("c")], { label: "t_place_one" })],
+      });
+      await flushPromises();
+      await nextTick();
+      expect(wrapper.find("button").exists()).toBe(false);
+      expect(document.activeElement?.dataset.subjectKey).toBe(subject("a").subject_key);
+      expect(wrapper.emitted("focus-lost")).toBeUndefined();
     });
   });
 

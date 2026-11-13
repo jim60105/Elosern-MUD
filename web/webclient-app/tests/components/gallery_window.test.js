@@ -15,6 +15,7 @@ import {
   GALLERY_V4_MINE_BLANK,
   GALLERY_V4_MONSTER,
   GALLERY_V4_PARTY,
+  GALLERY_V4_PEOPLE,
 } from "../../stories/gallery-fixtures-v4.js";
 
 const wrappers = [];
@@ -129,6 +130,76 @@ describe("the rail switches category through the server", () => {
     const { dispatch } = mountWindow();
     await click(tab("mine"));
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("expanding a group is one server round trip", () => {
+  const [INN, MARKET] = GALLERY_V4_PEOPLE.groups.map((group) => group.key);
+  const head = (key) => document.querySelector(`[data-testid="gallery-group-head"][data-group-key="${key}"]`);
+  // The panel a successful expansion of the market commits: the market's
+  // people listed, the inn collapsed to its count.
+  function marketExpanded() {
+    const model = structuredClone(GALLERY_V4_PEOPLE);
+    const [inn, market] = model.groups;
+    const people = inn.subjects.map((row, index) => ({ ...row, subject_key: `portrait:character:t_market_${index}` }));
+    Object.assign(market, { expanded: true, count: people.length, subjects: people });
+    Object.assign(inn, { expanded: false, count: inn.subjects.length, subjects: [] });
+    model.selected = people[0].subject_key;
+    return model;
+  }
+  const mountPeople = (props = {}) => mountWindow({ model: structuredClone(GALLERY_V4_PEOPLE), ...props });
+
+  it("sends one gallery.group.select and waits for the commit", async () => {
+    const { wrapper, dispatch } = mountPeople();
+    const inn = wallKeys();
+    await click(head(MARKET));
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.group.select", { group: MARKET });
+    expect(head(MARKET).getAttribute("aria-busy")).toBe("true");
+    expect(head(MARKET).getAttribute("aria-expanded")).toBe("false");
+    expect(wallKeys()).toEqual(inn);
+
+    const next = marketExpanded();
+    await wrapper.setProps({ model: next });
+    await flushPromises();
+    expect(wallKeys()).toEqual(next.groups[1].subjects.map((row) => row.subject_key));
+    expect(head(MARKET).getAttribute("aria-expanded")).toBe("true");
+    expect(head(MARKET).getAttribute("aria-busy")).toBeNull();
+    expect(head(INN).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("keeps the mark across a panel that still shows the place collapsed", async () => {
+    const { wrapper } = mountPeople();
+    await click(head(MARKET));
+    await wrapper.setProps({ model: structuredClone(GALLERY_V4_PEOPLE) });
+    await flushPromises();
+    expect(head(MARKET).getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("drops the mark when the request is rejected", async () => {
+    const { wrapper } = mountPeople();
+    await click(head(MARKET));
+    await wrapper.setProps({ result: { requestId: "request:1", outcome: "rejected" } });
+    await flushPromises();
+    expect(head(MARKET).getAttribute("aria-busy")).toBeNull();
+    expect(document.querySelector('[data-testid="gallery-window__feedback"]')).not.toBeNull();
+  });
+
+  it("sends nothing for the expanded place or a second press in flight", async () => {
+    const { dispatch } = mountPeople();
+    await click(head(INN));
+    expect(dispatch).not.toHaveBeenCalled();
+    const [, , harbor] = GALLERY_V4_PEOPLE.groups.map((group) => group.key);
+    await click(head(MARKET));
+    await click(head(harbor));
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.group.select", { group: MARKET });
+    expect(head(harbor).getAttribute("aria-busy")).toBeNull();
+  });
+
+  it("marks nothing when the dispatch sends nothing", async () => {
+    const { dispatch } = mountPeople({ dispatch: vi.fn(() => null) });
+    await click(head(MARKET));
+    expect(dispatch).toHaveBeenCalledOnce();
+    expect(head(MARKET).getAttribute("aria-busy")).toBeNull();
   });
 });
 

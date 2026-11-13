@@ -8,7 +8,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 2. Client
 
-- [ ] 2.1 Implement design decisions 3–4 in `GalleryWall.vue` and `GalleryWindow.vue`; add Vitest cases for the wall and window ADDED scenarios to `tests/components/gallery_wall.test.js` and `tests/components/gallery_window.test.js`; add a People story to `stories/Data/GalleryWall.stories.js` and `stories/Overlays/GalleryWindow.stories.js`. Verify `pnpm test`, `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
+- [x] 2.1 Implement design decisions 3–4 in `GalleryWall.vue` and `GalleryWindow.vue`; add Vitest cases for the wall and window ADDED scenarios to `tests/components/gallery_wall.test.js` and `tests/components/gallery_window.test.js`; add a People story to `stories/Data/GalleryWall.stories.js` and `stories/Overlays/GalleryWindow.stories.js`. Verify `pnpm test`, `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
 
 ## 3. Gates
 

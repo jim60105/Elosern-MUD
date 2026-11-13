@@ -6,6 +6,7 @@ import {
   GALLERY_V4_MINE_ROSTER,
   GALLERY_V4_MONSTER,
   GALLERY_V4_PARTY,
+  GALLERY_V4_PEOPLE,
   galleryStoryModel,
 } from "../gallery-fixtures-v4.js";
 import { atFullHd, atReference, windowViewportParameters } from "../window-viewports.js";
@@ -17,13 +18,15 @@ import { atFullHd, atReference, windowViewportParameters } from "../window-viewp
 // the prototype's column proportions so tile sizes match the window; the rail
 // and the page are empty surfaces here. Selection is local story state: a
 // subject other than the committed one is shown with an empty tray, as the
-// story server would publish it.
+// story server would publish it. Pressing a collapsed place heading marks it
+// busy and nothing commits, as while its request waits for the server.
 
 const render = (args) => ({
   setup() {
     const model = structuredClone(toRaw(args.model));
     const selectedSubject = ref(model.selected);
     const selectedImage = ref(args.selectedImage ?? null);
+    const pendingGroup = ref(args.pendingGroup ?? null);
     const committed = (key) => key === model.selected;
     function onSelectSubject(key) {
       selectedSubject.value = key;
@@ -42,6 +45,8 @@ const render = (args) => ({
           panel: model,
           ariaLabel: args.ariaLabel,
           pendingSubject: args.pendingSubject ?? null,
+          pendingGroup: pendingGroup.value,
+          "onExpand-group": (key) => (pendingGroup.value = key),
           "onSelect-subject": onSelectSubject,
           "onSelect-image": (id) => (selectedImage.value = id),
           onGenerate: () => (selectedImage.value = "generate"),
@@ -90,6 +95,14 @@ export const Mine = { ...atReference, args: { model: galleryStoryModel(GALLERY_V
 export const Party = { ...atReference, args: { model: galleryStoryModel(GALLERY_V4_PARTY), ariaLabel: "隊友" } };
 // 魔物: threat-tier headings with seen / total; one card each, so no tray.
 export const Monster = { ...atReference, args: { model: galleryStoryModel(GALLERY_V4_MONSTER), ariaLabel: "魔物" } };
+// 人物: one place expanded under a gold toggle heading, the other places
+// collapsed to their count; each heading is a button.
+export const People = { ...atReference, args: { model: galleryStoryModel(GALLERY_V4_PEOPLE), ariaLabel: "人物" } };
+// A place expansion in flight: the pressed heading sweeps until the commit.
+export const PeoplePending = {
+  ...atReference,
+  args: { model: galleryStoryModel(GALLERY_V4_PEOPLE), ariaLabel: "人物", pendingGroup: GALLERY_V4_PEOPLE.groups[1].key },
+};
 // An enabled category with no subject.
 export const Empty = { ...atReference, args: { model: galleryStoryModel(GALLERY_V4_EMPTY), ariaLabel: "隊友" } };
 // Every tray state: the default card (crown, 預設), bound, custom-face and
@@ -111,3 +124,4 @@ export const PendingSelection = {
 
 export const MineFullHd = { ...atFullHd, args: Mine.args };
 export const TrayStatesFullHd = { ...atFullHd, args: TrayStates.args };
+export const PeopleFullHd = { ...atFullHd, args: People.args };
