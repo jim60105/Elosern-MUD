@@ -260,6 +260,7 @@ class DreamPromptTests(unittest.TestCase):
             all(lines == [] for path, lines in payload["wish"].items() if path != "summary")
         )
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_the_output_schema_is_the_applier_edit_contract(self):
         self.assertEqual(
             DREAM_EXCHANGE_SCHEMA["required"], ["scene", "dialogue", "phase"]
@@ -508,6 +509,7 @@ class DreamGenerationTests(unittest.TestCase):
             result = await_result(self._generate(client))
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_valid_edits_yield_the_new_proposal_and_report(self):
         client = FakeLLMClient()
         client.add_response(
@@ -552,6 +554,7 @@ class DreamGenerationTests(unittest.TestCase):
             {"added": [{"kind": "new_character", "text": "敲鐘的女孩"}], "removed": []},
         )
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_no_edits_is_accepted_and_reports_no_change(self):
         for extra in ({}, {"edits": []}):
             with self.subTest(extra=extra):
@@ -579,6 +582,7 @@ class DreamGenerationTests(unittest.TestCase):
                     )
                 )
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_invalid_edits_retry_and_the_retried_response_is_accepted(self):
         client = FakeLLMClient()
         client.add_response(
@@ -630,6 +634,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertEqual(result.proposal["summary"], "南門的鐘聲又響了一次。")
         self.assertEqual(result.changes["summary"], "changed")
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_exhausted_edit_retries_degrade_to_none(self):
         client = FakeLLMClient()
         client.add_response(
@@ -652,6 +657,7 @@ class DreamGenerationTests(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(len(client.calls), 1)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_forbidden_marker_inside_an_edit_is_rejected(self):
         # Scene and dialogue are clean; only the text the edit would write
         # carries the shipped metadata marker.
@@ -675,6 +681,7 @@ class DreamGenerationTests(unittest.TestCase):
             )
         self.assertIsNone(result)
 
+    @covers_requirement("dream-explicit-presentation::collaborator-responses-carry-proposal-edits-validated-by-application")
     def test_legacy_requirement_list_is_refused(self):
         client = FakeLLMClient()
         client.add_response(
