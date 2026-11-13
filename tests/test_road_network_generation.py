@@ -462,6 +462,9 @@ def _spur_roads(inp: RoadInput) -> dict[str, Road]:
 class RoadSpurStageTests(unittest.TestCase):
     """Each village receives one spur to its cheapest node."""
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_one_spur_per_village(self):
         inp = _authored_input(_towns_world({"v_one": _location(SPUR_KIND, (14, 8))}))
         roads = compute_roads(inp)
@@ -474,6 +477,9 @@ class RoadSpurStageTests(unittest.TestCase):
         network = decode_road_network(generate_road_network(inp))
         self.assertEqual(network.spur_owners, {("town_e", "v_one"): "v_one"})
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_the_cheapest_node_is_chosen(self):
         size = 21
         region = np.full((size, size), 2, dtype=np.uint8)
@@ -489,6 +495,9 @@ class RoadSpurStageTests(unittest.TestCase):
         self.assertEqual(_end(spur, "v_one"), (9, 10))
         self.assertEqual(_end(spur, "node_b"), (18, 10))
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_a_cost_tie_goes_to_the_smaller_key(self):
         inp = _input(
             _open(21),
@@ -508,6 +517,9 @@ class RoadSpurStageTests(unittest.TestCase):
         trunk = next(road for road in roads if road.spur_of is None)
         return trunk, _spur_roads(inp)["v_one"]
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_a_spur_reuses_earlier_road_cells(self):
         shared = {}
         for reuse in (1.0, 0.4):
@@ -516,6 +528,9 @@ class RoadSpurStageTests(unittest.TestCase):
         self.assertGreater(shared[0.4], 1)
         self.assertGreater(shared[0.4], shared[1.0])
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_a_village_on_a_trunk_cell(self):
         inp = _input(
             _open(44),
@@ -531,6 +546,9 @@ class RoadSpurStageTests(unittest.TestCase):
         self.assertTrue(set(spur.cells) <= set(trunk.cells))
         self.assertEqual(verify_roads(inp, roads), [])
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_fixed_order_decides_village_targets(self):
         nearer_first = _input(
             _open(21),
@@ -546,6 +564,9 @@ class RoadSpurStageTests(unittest.TestCase):
         self.assertEqual(_end(_spur_roads(nearer_first)["v_b"], "v_a"), (10, 10))
         self.assertEqual(_end(_spur_roads(farther_first)["v_a"], "town_a"), (2, 10))
 
+    @covers_requirement(
+        "road-network-generation::each-village-receives-one-spur-to-its-cheapest-node"
+    )
     def test_no_settlement_document_is_needed(self):
         inp = _authored_input(
             _towns_world(
@@ -573,6 +594,9 @@ class RoadSpurStageTests(unittest.TestCase):
 class RoadSpurIndependenceTests(unittest.TestCase):
     """Stage one is independent of villages and hamlets."""
 
+    @covers_requirement(
+        "road-network-generation::stage-one-is-independent-of-villages-and-hamlets"
+    )
     def test_trunks_do_not_move(self):
         footprint = {
             "shape": ["##"],
@@ -601,6 +625,9 @@ class RoadSpurIndependenceTests(unittest.TestCase):
         self.assertEqual(len(before), 1)
         self.assertEqual(before, after)
 
+    @covers_requirement(
+        "road-network-generation::stage-one-is-independent-of-villages-and-hamlets"
+    )
     def test_no_village_keeps_the_artifact_format(self):
         inp = _input(_open(21), {"node_a": [(2, 10)], "node_b": [(18, 10)]})
         text = generate_road_network(inp)

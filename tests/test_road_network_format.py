@@ -451,6 +451,9 @@ def _spur_text(**overrides) -> str:
 class SpurRoadCodecTests(unittest.TestCase):
     """The road artifact marks spur roads."""
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
     def test_a_spur_row_round_trips(self):
         text = _spur_text()
         network = decode_road_network(text)
@@ -484,6 +487,9 @@ class SpurRoadCodecTests(unittest.TestCase):
             sum(1 for line in text.splitlines() if line.startswith("    {")), 2
         )
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
     def test_unmarked_networks_keep_their_bytes(self):
         arguments = {
             "frame_cells": 8,
@@ -497,6 +503,9 @@ class SpurRoadCodecTests(unittest.TestCase):
         self.assertNotIn("spur_of", plain)
         self.assertEqual(decode_road_network(plain).spur_owners, {})
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
     def test_an_owner_that_is_not_an_end_is_rejected(self):
         with self.assertRaises(RoadDocumentError):
             _spur_text(spur_owners={("alpha", "v_one"): "bravo"})
@@ -506,6 +515,9 @@ class SpurRoadCodecTests(unittest.TestCase):
         mutate(next(row for row in document["roads"] if "spur_of" in row))
         return document
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
     def test_a_malformed_owner_is_rejected(self):
         for name, owner in (
             ("not an end", "bravo"),
@@ -517,6 +529,9 @@ class SpurRoadCodecTests(unittest.TestCase):
                 with self.assertRaises(RoadDocumentError):
                     decode_road_network(document)
 
+    @covers_requirement(
+        "road-network-artifact::the-road-artifact-marks-spur-roads"
+    )
     def test_a_changed_owner_breaks_the_fingerprint(self):
         document = self._mutate_spur(lambda row: row.__setitem__("spur_of", "alpha"))
         with self.assertRaises(RoadDocumentError) as caught:
