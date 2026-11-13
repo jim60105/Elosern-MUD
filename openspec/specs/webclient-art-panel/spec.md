@@ -227,12 +227,12 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: A done scene reaches sessions currently showing that scene
 
-- **WHEN** a scene subject completes while connected sessions currently render that scene and neither their selected gallery nor roster portraits references it
+- **WHEN** a scene subject completes while connected sessions currently render that scene and neither their gallery wall nor their roster portraits lists it
 - **THEN** each such session receives one newer art panel update with the done URL and no gallery or roster changes, except any required mode-coherence companion panel
 
 #### Scenario: A late completion never replaces the current panel
 
-- **WHEN** a subject completes after the session moved to a different scene or the entity left and no current art, selected-gallery, or roster reference names that subject
+- **WHEN** a subject completes after the session moved to a different scene or the entity left, no current art or roster reference names that subject, and the rendered gallery lists no subject with that key
 - **THEN** no update is published, revision is unchanged, and the completed subject does not replace the currently rendered scene or portrait
 
 #### Scenario: Reconnect resolves current status from the store
@@ -252,7 +252,7 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: An off-room roster sibling refreshes without an art or gallery match
 
-- **WHEN** a completion subject appears only in an owned non-current roster character's portrait while that character is outside the current puppet's room and another gallery subject is selected
+- **WHEN** a completion subject appears only in an owned non-current roster character's portrait while that character is outside the current puppet's room, the rendered gallery shows a category that does not list it, and another gallery subject is selected
 - **THEN** the session receives one newer roster update containing its current owned rows and freshly resolved sibling portrait, with no art or gallery update
 
 #### Scenario: Unavailable art cannot suppress a selected gallery or roster match
@@ -262,7 +262,7 @@ all qualifying freshly rendered panels together in one affected-panel
 
 #### Scenario: A changed selection cannot be restored by late completion
 
-- **WHEN** subject A completes after the session selected subject B and A remains on the rail but neither current art nor roster references A
+- **WHEN** subject A completes after the session selected subject B and the rendered gallery's groups no longer list A while neither current art nor roster references A
 - **THEN** no update is published, gallery remains selected on B, and no pending/card state for A replaces B's displayed gallery
 
 #### Scenario: A subject leaving art can still refresh an owned roster portrait
@@ -293,8 +293,8 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Each available panel qualifies independently
 
 - **WHEN** freshly rendered panels are evaluated against the completed subject key
-- **THEN** art qualifies when its current scene subject or any portrait-catalog entry references that key, gallery when its rendered `selected` equals that key, and roster when any rendered character row's portrait subject key equals that key
-- **AND** gallery rail membership alone does not qualify a gallery update, and roster qualification is not limited to the current puppet or characters present in its room
+- **THEN** art qualifies when its current scene subject or any portrait-catalog entry references that key, gallery when its rendered `selected` or any subject listed in its rendered `groups` equals that key, and roster when any rendered character row's portrait subject key equals that key
+- **AND** a subject listed on the rendered gallery wall qualifies a gallery update even when it is not selected, and roster qualification is not limited to the current puppet or characters present in its room
 
 #### Scenario: Publication proceeds without art and omits unavailable panels
 
@@ -305,7 +305,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late completions gate on fresh references only
 
 - **WHEN** a completion notification is evaluated for staleness
-- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, a vanished entity, or a gallery subject the wall no longer lists does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
 
 #### Scenario: Completion rendering is pure presentation
 
@@ -337,6 +337,10 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late portrait completion cannot revive a departed target
 - **WHEN** the entity left or the session changed room before a portrait completion and no current art/gallery/roster reference qualifies
 - **THEN** no stale exploration descriptor is published and no revision is advanced for that completion
+
+#### Scenario: A listed but unselected wall subject refreshes its tile
+- **WHEN** a gallery job settles for companion B while the session's rendered gallery lists B in its groups and has companion A selected
+- **THEN** that session receives one newer update containing gallery, whose B subject row carries the newly resolved artwork and card count, and `selected` still names A
 
 ### Requirement: Art degradation never blocks gameplay or leaks rejected content
 Image generation/service or source failures SHALL degrade presentation without blocking deterministic gameplay. Expected absence SHALL use approved normal artwork fallback; unexpected reached failures SHALL remain local after fallback. Player/OOB explanations SHALL contain no traceback, filesystem root, credential or rejected prompt. Browser-only failures SHALL not imply backend telemetry.
