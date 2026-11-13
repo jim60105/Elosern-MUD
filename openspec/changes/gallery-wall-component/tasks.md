@@ -4,8 +4,8 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 1. Model and component
 
-- [ ] 1.1 Add the D2 helpers to `components/gallery-window-model.js` with unit tests in `tests/components/gallery_wall.test.js`. Verify `pnpm test -- gallery_wall` passes.
-- [ ] 1.2 Create `components/GalleryWall.vue` per design D1, D3, D4; extend the same test file with one test per ADDED scenario of `specs/webclient-gallery-wall/spec.md` and the style lint. Verify `pnpm test -- gallery_wall` passes.
+- [x] 1.1 Add the D2 helpers to `components/gallery-window-model.js` with unit tests in `tests/components/gallery_wall.test.js`. Verify `pnpm test -- gallery_wall` passes.
+- [x] 1.2 Create `components/GalleryWall.vue` per design D1, D3, D4; extend the same test file with one test per ADDED scenario of `specs/webclient-gallery-wall/spec.md` and the style lint. Verify `pnpm test -- gallery_wall` passes.
 
 ## 2. Stories
 
