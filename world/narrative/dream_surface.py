@@ -307,14 +307,24 @@ def enter_for_owner(
     if receipt.last_result:
         event_kinds = tuple(receipt.last_result.get("event_kinds", ()))
     with transaction.atomic():
+        # The recorded association is read once: it names the sleep this
+        # surface was last entered for, which is what distinguishes returning
+        # to the same dream from arriving on a later sleep.
+        old = association(owner)
         previous = _raw_associated_session(owner)
         if previous and previous.outcome != lifecycle.OUTCOME_CONFIRMED:
-            session = lifecycle.resume_saved_session(previous.session_id, owner_id(actor), tick=int(tick_to))
+            session = lifecycle.resume_saved_session(
+                previous.session_id,
+                owner_id(actor),
+                reopen_conversation=(
+                    not old or old.get("sleep_id") != receipt.sleep_id
+                ),
+                tick=int(tick_to),
+            )
         else:
             session = lifecycle.open_session_for(owner_id(actor))
         if session is None:
             session = lifecycle.open_session(owner_id(actor), tick=int(tick_to))
-        old = association(owner)
         retained = old if old and old["session_id"] == session.session_id else {}
         if "proposal" in retained:
             proposal = _stored_proposal(retained.get("proposal"))
@@ -384,6 +394,22 @@ def store_response(actor, response):
 def store_failure(actor):
     value = association(actor)
     value["failure"] = True
+    actor.db.dream_surface = value
+
+
+def store_proposal(actor, proposal, *, thread_id):
+    """Replace the working proposal with the player's own finalized form.
+
+    A player write is not a settled exchange, so the change report of the last
+    exchange is cleared: it described a collaborator edit that this form has
+    replaced. The stored proposal is canonical, exactly as a settled response
+    stores its own, and a true write clears a previous failure.
+    """
+    value = association(actor)
+    value["proposal"] = dream_proposal.normalize_proposal(proposal)
+    value["changes"] = None
+    value["thread_id"] = thread_id
+    value["failure"] = False
     actor.db.dream_surface = value
 
 
