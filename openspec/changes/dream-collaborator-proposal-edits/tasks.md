@@ -6,17 +6,17 @@ Run only the focused test labels named below — one module, one Node file or on
 
 ## 1. Model contract
 
-- [ ] 1.1 In `world/ai/dream.py` apply design decisions 1–7 (import, schema, `DreamExchange`, `_make_edits_validator`, `_edit_text`, `build_dream_prompt`, `generate_dream_exchange`). Update and extend `world/ai/tests/test_dream_presentation.py` per design decision 10 so every scenario of `specs/dream-explicit-presentation/spec.md` has a test. Verify `<prefix> world.ai.tests.test_dream_presentation world.ai.tests.test_dream_frame_contract` passes.
-- [ ] 1.2 Edit `prompts/dream.yaml` per design decision 8. Verify `<prefix> world.prompts.tests.test_loader` passes and `uv run --locked python -c "from world.prompts.loader import render_prompt; print(render_prompt('dream.system', phase='p', climax_phase='c', mode='exchange', exchange_number='1', remaining='5'))"` prints the rendered prompt containing `edits` and `str_replace` with no unresolved `{` placeholder error.
+- [x] 1.1 In `world/ai/dream.py` apply design decisions 1–7 (import, schema, `DreamExchange`, `_make_edits_validator`, `_edit_text`, `build_dream_prompt`, `generate_dream_exchange`). Update and extend `world/ai/tests/test_dream_presentation.py` per design decision 10 so every scenario of `specs/dream-explicit-presentation/spec.md` has a test. Verify `<prefix> world.ai.tests.test_dream_presentation world.ai.tests.test_dream_frame_contract` passes.
+- [x] 1.2 Edit `prompts/dream.yaml` per design decision 8. Verify `<prefix> world.prompts.tests.test_loader` passes and `uv run --locked python -c "from world.prompts.loader import render_prompt; print(render_prompt('dream.system', phase='p', climax_phase='c', mode='exchange', exchange_number='1', remaining='5'))"` prints the rendered prompt containing `edits` and `str_replace` with no unresolved `{` placeholder error.
 
 ## 2. Surface bridge and fixtures
 
-- [ ] 2.1 Apply design decision 9 in `world/narrative/dream_surface.py::store_response` and update the fixtures and the drift test named in design decision 10 (`test_dream_surface.py`, `test_dream_dispatch.py`, `web/tests/browser/seed/dream_fixture.py` if it records `requirements`). Verify `<prefix> world.narrative.tests.test_dream_surface world.narrative.tests.test_dream_dispatch` passes.
+- [x] 2.1 Apply design decision 9 in `world/narrative/dream_surface.py::store_response` and update the fixtures and the drift test named in design decision 10 (`test_dream_surface.py`, `test_dream_dispatch.py`, `web/tests/browser/seed/dream_fixture.py` if it records `requirements`). Verify `<prefix> world.narrative.tests.test_dream_surface world.narrative.tests.test_dream_dispatch` passes.
 
 ## 3. Gates
 
-- [ ] 3.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-collaborator-proposal-edits`; all pass.
-- [ ] 3.2 Run `openspec validate dream-collaborator-proposal-edits --strict`; it passes.
+- [x] 3.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-collaborator-proposal-edits`; all pass.
+- [x] 3.2 Run `openspec validate dream-collaborator-proposal-edits --strict`; it passes.
 
 ## Workflow follow-up
 
