@@ -1027,10 +1027,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(state["requirements"], [])
         self.assertIsNone(state["requirement_version"])
 
-    # The working proposal and its thread choice. The traceability ids for
-    # these delta requirements only exist after the archive sync, so the new
-    # tests stay unannotated until then.
-
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_a_player_message_never_becomes_the_proposal(self):
         self.enter()
         client = self.delivered()
@@ -1046,6 +1045,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIsNone(wish["changes"]["summary"])
         self.assertEqual(wish["changes"]["lists"]["themes"], {"added": [], "removed": []})
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_edits_accumulate_across_exchanges(self):
         self.enter()
         first = self.exchange([
@@ -1075,6 +1077,9 @@ class DreamSurfaceTests(EvenniaTest):
             "在無名港尋找失落的鐘聲。",
         )
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_the_change_report_follows_the_last_settled_exchange(self):
         self.enter()
         first = self.exchange([
@@ -1096,6 +1101,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIsNone(changes["summary"])
         self.assertEqual(changes["lists"]["themes"], {"added": [], "removed": []})
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_failed_generation_leaves_the_proposal_and_report_unchanged(self):
         self.enter()
         first = self.exchange([
@@ -1116,6 +1124,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(after["changes"], before["changes"])
         self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 1)
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_a_stale_response_applies_no_edits(self):
         self.enter()
         pending = Deferred()
@@ -1137,6 +1148,9 @@ class DreamSurfaceTests(EvenniaTest):
         )
         self.assertEqual(surface.associated_session(self.actor).completed_exchanges, 0)
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_a_draft_saved_without_a_direction_takes_the_working_proposal(self):
         self.enter()
         thread = create_thread(
@@ -1164,6 +1178,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft.direction["kind"], "thread_direction")
         self.assertEqual(draft.direction["thread_id"], thread.thread_id)
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_awakening_saves_the_working_proposal_when_no_draft_exists(self):
         self.enter()
         client = self.exchange([
@@ -1181,6 +1198,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(draft.direction["kind"], "new_story")
         self.assertIsNone(draft.direction["thread_id"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_resume_restores_the_proposal(self):
         first = self.enter()
         thread = create_thread(
@@ -1206,6 +1226,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(after["changes"], before["changes"])
         self.assertEqual(after["thread_id"], thread.thread_id)
 
+    @covers_requirement(
+        "dream-session-lifecycle::the-session-keeps-a-working-proposal-that-only-settled-exchanges-change"
+    )
     def test_resume_seeds_the_proposal_from_the_saved_draft(self):
         self.enter()
         thread = create_thread(
@@ -1235,6 +1258,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(wish["thread_id"], thread.thread_id)
         self.assertTrue(wish["thread_locked"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_choosing_an_offered_thread_precedes_the_first_message(self):
         self.enter()
         thread = create_thread(
@@ -1255,6 +1281,9 @@ class DreamSurfaceTests(EvenniaTest):
         )
         self.assertEqual(self.request_payload(client)["thread"], {"label": "選擇的鐘聲線"})
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_the_default_choice_is_a_new_story(self):
         self.enter()
         client = self.delivered()
@@ -1264,6 +1293,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
         self.assertNotIn("thread", self.request_payload(client))
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_the_choice_locks_after_the_first_accepted_message(self):
         self.enter()
         chosen = create_thread(
@@ -1288,6 +1320,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(result["code"], "thread_locked")
         self.assertEqual(surface.wish_state(self.actor)["thread_id"], chosen.thread_id)
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_the_choice_locks_even_when_the_first_generation_fails(self):
         self.enter()
         thread = create_thread(
@@ -1304,6 +1339,9 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(result["code"], "thread_locked")
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_an_unoffered_thread_is_refused(self):
         self.enter()
         create_thread(
@@ -1328,6 +1366,9 @@ class DreamSurfaceTests(EvenniaTest):
                 self.assertEqual(result["code"], "unknown_thread")
         self.assertIsNone(surface.wish_state(self.actor)["thread_id"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::thread-choice-precedes-the-first-message-and-then-locks"
+    )
     def test_a_locked_choice_survives_resume(self):
         self.enter()
         thread = create_thread(
