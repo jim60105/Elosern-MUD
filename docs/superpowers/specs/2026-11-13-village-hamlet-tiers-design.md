@@ -203,8 +203,11 @@ fails when a village has no spur.
 | 6 | Valhalla | About 50 settlements |
 | 7 onward | Service layer, with the 27 towns | Separate design |
 
-- The trial area holds the road stretch that is currently farthest from any
-  settlement, and it has both hills and valleys.
+- The trial area is the western hills around town_scarp. It has both hills and
+  valleys. It does not hold the road stretch that is farthest from any
+  settlement: that stretch (516 km) lies in `southwest_coast`, near cell
+  (1015, 339), and the farthest point around town_scarp is 234 km. The coast
+  stretch is built in wave 4.
 - Road coverage is implemented in wave 2 but applies to an area only after
   that area is built. Validation carries a list of completed areas. Wave 3 adds
   the western hills. After wave 6 the list covers every road and is removed.
@@ -246,3 +249,106 @@ Specifications and tests define logic and contain no game data.
 - The population and guild branch figures in the story settings document. The
   figure of about 200 guild branches there is a rough estimate and constrains
   nothing.
+
+## 13. OpenSpec changes
+
+Fourteen changes implement waves 1 to 6. All are proposed and validated with
+`openspec validate --strict`; none is implemented. Each lives in
+`openspec/changes/<name>/`. Wave 7 has no change yet.
+
+| # | Change | Wave | Scope |
+| ---: | --- | --- | --- |
+| 1 | `elven-village-id-cutover` | 1 | Rename the three elven village IDs to `elven_village_*` across about 36 files; no alias, no migration; spec-less |
+| 2 | `village-hamlet-kinds` | 1 | Add `village` and `hamlet` to the location kinds and `AnchorKind`; add them to the monster birth exclusion categories, the sight silhouettes and the editor kind list |
+| 3 | `single-cell-footprint-entry` | 2 | Add `wilderness_entry.single_cell_footprint`, so a one-cell mask can be a real footprint with several gates (see §14, item 1) |
+| 4 | `settlement-spacing-validation` | 2a | The `tools.settlement_spacing` command: the three spacing rules, the completed-area list, the exemption field and a CI step |
+| 5 | `road-spur-stage` | 2b | The road generator's second stage; the artifact marks spurs with `spur_of` |
+| 6 | `single-cell-size-budget` | 2c | The single-cell size tiers (village 4 nodes, hamlet 2), the road-contact cell query and an entrance-versus-road lint |
+| 7 | `single-cell-settlement-layout` | 2c | The generator's single-cell layout and `--missing --kind` |
+| 8 | `western-hills-village-trial` | 3 | The trial area around town_scarp (`western_hills_valleys`, x 1000 to 1340, y 501 to 950), 10 to 15 settlements |
+| 9 | `altoria-hills-village-placement` | 4 | The rest of the western hills, about 50 |
+| 10 | `altoria-coast-village-placement` | 4 | `southwest_coast`, about 35 |
+| 11 | `grandia-south-village-placement` | 5 | Eastern plains with y at most 1100, and `southeast_coast`, about 50 |
+| 12 | `grandia-north-village-placement` | 5 | Eastern plains with y above 1100, about 45 |
+| 13 | `valhalla-village-placement` | 6 | `northwest_highland_forest`, about 50 |
+| 14 | `road-coverage-area-removal` | after 6 | Remove the completed-area list, so road coverage applies to every road |
+
+Waves 4 and 5 are split in two, and wave 2c is split in two, so that each
+change fits a working day. Splitting the placement changes further was
+considered and rejected: the precedent `altoria-settlement-maps` built 19
+multi-cell settlements, about 170 nodes, in one change; each placement change
+here builds about 50 single-cell settlements, about 130 nodes.
+
+### 13.1 Dependencies and shared files
+
+| Change | Depends on | Shared files that can conflict |
+| --- | --- | --- |
+| 1 | none | `world/lore/anchors.py`, `content/maps/locations.yaml`, `locations-and-districts.md`, the reference context (with 2) |
+| 2 | 1 | `schema.py` (with 3 and 4) |
+| 3 | none; in practice after 2 | `schema.py`, `documents.py` (with 4, different declarations); the reference context |
+| 4 | 2 | the same as 3; `locations-and-districts.md` |
+| 5 | 2 | the reference context only |
+| 6 | 2, 3 | `tests/test_settlement_terrain_fit.py` (with 3); `workspace.py`, `__main__.py` and `settlement-synthesis.md` (with 7) |
+| 7 | 6 | as 6 |
+| 8 to 13 | 3 to 7, and each other in order | `locations.yaml`, `anchors.py`, `content/maps/settlements/`, `tools/settlement_spacing_areas.json`, `road_network.json`, `district_partition.json`, the reference context |
+| 14 | 13; 4 archived | `tools/settlement_spacing_areas.json` |
+
+`content/map-reference-context.json` lists `packages/map-core`, `world/lore`,
+`world/rules` and `world/quests` as sources, so every change that touches those
+directories regenerates it. After a rebase, rerun the command; never merge the
+file by hand.
+
+### 13.2 Parallel implementation batches
+
+| Batch | Changes | Mode |
+| ---: | --- | --- |
+| 1 | 1, then 2 | Serial; they share four files |
+| 2 | 3, 4 and 5 | Parallel; they meet only on different declarations in `schema.py` and `documents.py`, and on the reference context |
+| 3 | 6, then 7 | Serial with each other; 6 waits for 3 to merge; both run in parallel with 4 and 5 |
+| 4 | 8, 9, 10, 11, 12, 13 | Strictly serial, in this order. Each change's spurs and hamlets are the next one's input, and all write the same files |
+| 5 | 14 | Last |
+
+## 14. Resolutions where the design met the code
+
+The proposal work found twelve places where this document was ambiguous or
+disagreed with the code. These are the resolutions now in force.
+
+1. **Single-cell footprint.** The code treats a mask of exactly one `#` as a
+   concealed point entry: one gate, entered by walking toward it from the cell.
+   That cannot give the two entrances of §7, because the road would be blocked
+   at the gate. Change 3 adds an optional explicit field that marks a real
+   single-cell footprint. Documents without it behave as before.
+2. **Road before map.** §8.3 builds roads before maps, yet a road node needs a
+   settlement document. A village becomes a spur endpoint from its kind and
+   cell alone; the map's gates are derived afterwards from the road cells.
+3. **Footprints as road obstacles.** A settlement footprint is normally an
+   obstacle for roads, which contradicts a hamlet placed on a road cell. The
+   road generator skips `village` and `hamlet` footprints, so stage 1 does not
+   depend on villages and the trunk never moves because of a placement.
+4. **Byte-identical artifact.** The road source signature includes the hash of
+   `road_network.yaml`, so the spur kind is a constant in `roads.py`, not a YAML
+   field, and the artifact version does not change.
+5. **Cheapest node.** The cost includes the road-reuse discount, and one search
+   chooses both the target and the path.
+6. **75 km wording.** Both phrasings in this document mean the gap along the
+   road between adjacent settlements is at most 75 km. Reading it as the
+   distance to the nearest settlement would allow a 150 km gap. A gap that
+   crosses an area boundary is checked only after both areas are built. The
+   end cell of any road also counts as a settlement position, because a merged
+   trunk can pass in front of another town's gate.
+7. **Nation border.** In code the national border is a line, not an area.
+   A cell's nation is the `nation_key` of its terrain region. A region with no
+   nation (central mountains, northern deep forest) is outside every border.
+   Neither region holds a road cell today.
+8. **Trial area.** See §9. The trial rectangle is the one the user named, the
+   western hills around town_scarp.
+9. **Population reconciliation tests.** No existing test sums town
+   populations. The tests reconcile only the three nations, the three capitals
+   and the three elven villages, so only a comment in `ANCHOR_LORE` changes.
+10. **Habitat keys.** Ecology keys such as `village_eolas_hinterland` are not
+    location references and keep their names. The test module
+    `test_village_ciaran.py` and historical design documents are not renamed.
+11. **Splits.** Waves 2c, 4 and 5 are split as §13 shows.
+12. **Beastfolk layout.** A ring does not fit in one cell. Beastfolk settlements
+    take the tribal vocabulary and the `tribal_ring` label with the same
+    geometry as human ones.
