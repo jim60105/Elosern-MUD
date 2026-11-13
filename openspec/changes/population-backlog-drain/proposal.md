@@ -13,7 +13,7 @@ This work is mandatory. No measurement decides whether it happens.
 - A drain operation picks the closed set of units that is furthest behind and settles it forward by at most one bounded slice of game time, in its own short transaction with full rollback. It never advances the world clock and admits no field contact.
 - A global script calls the drain at a configured real-time interval. Three settings control it: enabled, interval in real seconds, slice in game seconds; each has an environment override.
 - One info event is emitted per drain run that settled something. A run with nothing to do is silent.
-- A drain failure is reported as an error event, leaves the world as it was, and does not stop later runs.
+- A drain failure is reported as an error event and leaves the world as it was. The same run then tries the next most lagging set, so one bad unit does not starve the others.
 - The main design document's clock section is amended: materialising already elapsed game time in the background is not world time passing.
 
 ## Capabilities
@@ -35,6 +35,6 @@ None.
 
 ## Batch:
 
-- depends-on: observed-unit-advance
+- depends-on: observed-unit-read-narrowing
 - conflicts: serial chain, see `settlement-decode-reuse`. `server/conf/settings.py` and `server/conf/test_settings.py` are also edited by `sqlite-wal-busy-timeout` in a different section; keep both edits.
 - parallel with: `sqlite-wal-busy-timeout`.

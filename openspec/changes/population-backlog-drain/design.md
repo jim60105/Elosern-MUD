@@ -33,10 +33,13 @@ Add to `population_units.py`:
 
 ```python
 def all_units(index: UnitIndex) -> tuple[str, ...]      # RESIDUAL_UNIT plus every unit of zones and areas, sorted
+def closed_sets(index: UnitIndex, state: MonsterActivityState, seeds: Iterable[str]) -> tuple[frozenset[str], ...]
 def lagging_sets(wilderness, now: int) -> tuple[tuple[int, frozenset[str]], ...]
 ```
 
-`lagging_sets`: `closed_sets(index, read_monster_activity(wilderness), all_units(index))`; for each set compute `scope_start_tick` (a set with unequal cursors raises `PopulationScopeCursorMismatch`); keep sets with cursor below `now`; return `(cursor, set)` pairs sorted by `(cursor, min(set))`.
+`closed_sets`: the distinct `unit_closure` results of the seeds, sorted by their smallest unit identifier.
+
+`lagging_sets`: `closed_sets(index, read_monster_activity(wilderness), all_units(index))`; the cursor of a set is the lowest `unit_cursor` of its units (a set with unequal cursors is lawful and is settled from its lowest cursor, `unit-scoped-population-settlement` D1); keep sets with cursor below `now`; return `(cursor, set)` pairs sorted by `(cursor, min(set))`.
 
 ### D2. Drain function
 
@@ -50,13 +53,13 @@ def drain_population_backlog(slice_seconds: int) -> bool:
 1. `slice_seconds` must be a positive `int`, else `ValueError`.
 2. Resolve `regional_population.live_wilderness()`; return `False` when it is `None`, not provisioned, or has no cursor record.
 3. `now = regional_population.current_population_tick()`; `pending = lagging_sets(wilderness, now)`; return `False` when empty.
-4. `start, units = pending[0]`; `target = min(now, start + slice_seconds)`; `scope = build_scope(wilderness, units)`.
-5. `registry = snapshot_population_lifecycle_surfaces(start, target, scope=scope)`.
-6. `try:` → `with held_advance_registry(), transaction.atomic():` → `settle_population_scope(wilderness, units, target, contact=False)`; `remaining = len(pending) - (1 if target >= now else 0)`; `transaction.on_commit(lambda: log_info("population_backlog_drained", context={"units": len(units), "tick_from": start, "tick_to": target, "remaining": remaining}))`.
-7. `except Exception as error:` → `restore_advance_registry(registry)`; `log_error("population_backlog_drain_failed", exc=error, context={"units": len(units), "tick_from": start, "tick_to": target})`; return `False`.
-8. Return `True`.
+4. For each `(start, units)` of `pending[:MAX_SETS_PER_RUN]` (module constant `MAX_SETS_PER_RUN = 3`), in order:
+   1. `target = min(now, start + slice_seconds)`; `scope = build_scope(wilderness, units)`; `registry = snapshot_population_lifecycle_surfaces(start, target, scope=scope)`.
+   2. `try:` → `with held_advance_registry(), transaction.atomic():` → `settle_population_scope(wilderness, units, target, contact=False)`; `remaining = len(pending) - (1 if target >= now else 0)`; `transaction.on_commit(lambda: log_info("population_backlog_drained", context={"units": len(units), "tick_from": start, "tick_to": target, "remaining": remaining}))`. On success return `True`.
+   3. `except Exception as error:` → `restore_advance_registry(registry)`; `log_error("population_backlog_drain_failed", exc=error, context={"units": len(units), "tick_from": start, "tick_to": target})`; continue with the next set.
+5. Return `False` when no set succeeded.
 
-The function does not re-raise: a repeating script must survive a bad unit. The same unit is selected again by the next run; the error event repeats once per interval, which is the intended signal.
+Steps 2 and 3 of the list above (wilderness resolution and `lagging_sets`) are inside one outer `try/except Exception` that emits the same error event with `units=0` and returns `False`, so the repeating script survives a malformed record. The function never re-raises. A failing set is tried again by the next run, after which the run moves on to the next sets; the error event repeats once per interval, which is the intended signal.
 
 ### D3. Periodic caller
 
@@ -119,7 +122,7 @@ No test starts the script's timer and no test sleeps.
 
 ## Risks / Trade-offs
 
-- [A player advances game time faster than the drain pays it off (a long sleep)] → the backlog is finite and shrinks while the player is idle; a unit entered before it is paid is caught up for the remainder only. The defaults pay 300 game seconds per real second per lagging set; both numbers are settings.
-- [One permanently failing unit blocks the drain, because it is always the most lagging] → the error event repeats every interval and names the tick range; the unit's writers refuse by `PopulationUnitNotCurrent` and an observing player gets the catch-up error event. Skipping a failing unit would hide corruption, so it is not done.
+- [A player advances game time faster than the drain pays it off (a long sleep), then travels at once into another unit] → that unit's remaining lag is paid synchronously by the movement's catch-up; the drain does not bound it. The backlog is finite and shrinks in real time while the player reads or idles. The defaults pay 300 game seconds per real second per lagging set; both numbers are settings.
+- [More than three sets fail permanently and the sets behind them are never reached] → every failure is an error event with its tick range; the failing units' writers refuse by `PopulationUnitNotCurrent` and an observing player gets the catch-up error event. Three attempts per run bound the cost of one repeat.
 - [A drain transaction delays a command that arrives during it] → one slice of one closed set; the slice setting bounds it.
 - [Saves taken at different real times hold different cursor records for the same played history] → game-visible outcomes are equal after catch-up; only the materialisation point differs. Stated in the D6 amendment.

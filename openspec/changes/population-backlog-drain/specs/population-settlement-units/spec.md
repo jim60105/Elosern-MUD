@@ -29,7 +29,7 @@ A world whose lagging units were settled by drain runs SHALL have the same activ
 - **THEN** both state projections are equal
 
 ### Requirement: A drain run is atomic and reports itself
-A drain run that settled something SHALL emit one `population_backlog_drained` info event on durable commit with the number of units, both ticks and the number of units still lagging. A run that fails SHALL restore the complete prior durable state and live caches, SHALL emit one `population_backlog_drain_failed` error event, and SHALL NOT prevent a later run.
+A drain run that settled something SHALL emit one `population_backlog_drained` info event on durable commit with the number of units, both ticks and the number of units still lagging. A set whose settlement fails SHALL keep its complete prior durable state and live caches and SHALL cause one `population_backlog_drain_failed` error event; the same run SHALL then try the next most lagging set, up to three sets per run.
 
 #### Scenario: Reported slice
 - **WHEN** a run moves one of two lagging units from 100 to 700
@@ -38,6 +38,10 @@ A drain run that settled something SHALL emit one `population_backlog_drained` i
 #### Scenario: Failed run
 - **WHEN** a fault is injected inside a run after a departure was written
 - **THEN** the unit still reports 100, its state projection in memory and after an attribute cache reset equals its prior value, one error event is emitted, and the next run without the fault moves the unit to 700
+
+#### Scenario: A failing set does not starve the next
+- **WHEN** the most lagging set fails on every attempt and a second set is also behind
+- **THEN** one run emits one error event for the first set, moves the second set by one slice and reports it
 
 ### Requirement: The periodic drain honours its switch
 The periodic caller SHALL perform one drain run per repeat while the drain is enabled and SHALL perform none while it is disabled.

@@ -6,7 +6,7 @@ Do not change the clock stage, catch-up, entry points or owners. No test may sta
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `observed-unit-advance` is merged: `uv run --locked python -c "from world.maps.population_lifecycle import settle_observed_population; from world.maps.population_units import closed_sets"` exits 0. If not, stop and report.
+- [ ] 1.1 Confirm `observed-unit-read-narrowing` is merged (and with it `observed-unit-advance`): `uv run --locked python -c "from world.maps.population_lifecycle import settle_observed_population; from world.maps.tests._settlement_projection import catch_up_world"` exits 0. If not, stop and report.
 
 ## 2. Drain
 
