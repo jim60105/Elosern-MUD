@@ -90,13 +90,25 @@ def _art_portrait_catalog_keys(payload: dict[str, Any]) -> set[str]:
 def _gallery_subject_keys(payload: dict[str, Any]) -> set[str]:
     """Return the subject keys the rendered gallery payload matches.
 
-    Per D2, gallery matches on rendered ``selected`` only (null when the
-    selected category lists no subject), never on the listed category tiles.
+    Design D6 of the gallery window (``gallery-tile-completion-refresh``): every
+    tile on the rendered wall carries its own subject's resolved default image,
+    so a completion for a subject the rendered ``groups`` LIST refreshes that
+    tile even while another subject is selected. ``selected`` remains a match of
+    its own (null when the selected category lists no subject), and the gate
+    reads only the freshly rendered payload, so a subject this wall does not
+    list -- another category's subject, a collapsed group's member -- qualifies
+    nothing.
     """
+    keys: set[str] = set()
     selected = payload.get("selected")
     if isinstance(selected, str) and selected:
-        return {selected}
-    return set()
+        keys.add(selected)
+    for group in payload.get("groups") or []:
+        if isinstance(group, dict):
+            for row in group.get("subjects") or []:
+                if isinstance(row, dict) and isinstance(row.get("subject_key"), str) and row["subject_key"]:
+                    keys.add(row["subject_key"])
+    return keys
 
 
 def _roster_subject_keys(payload: dict[str, Any]) -> set[str]:
