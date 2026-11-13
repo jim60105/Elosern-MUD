@@ -1279,3 +1279,171 @@ describe("editable requirement rows", () => {
     expect(values()).toEqual([["place", "合成西門"]]);
   });
 });
+
+describe("dream farewell", () => {
+  const ENDING = "合成的告別台詞，比一次打字更長一些。";
+  // The committed state once the departure closed the session.
+  const closedState = (overrides = {}) => state({ revision: 3, open: false, can_input: false, can_confirm: false,
+    can_finalize: false, can_choose_thread: false, can_edit: false, can_draft: false, thread_choices: [],
+    ending: ENDING, ending_phase: "未達", ...overrides });
+  function staged(value = state(), motionLevel = undefined) {
+    const store = { view: reactive({ connected: true, motionLevel, textSpeed: "normal", dispatch: { inFlight: null } }),
+      dispatchAction: vi.fn(() => "synthetic-request") };
+    return { store, wrapper: mount(DreamPanel, { props: { state: value, store }, attachTo: document.body }) };
+  }
+  const page = (wrapper) => wrapper.find("[data-testid='dream-page']");
+  const keys = (wrapper) => wrapper.find("[data-testid='dream-keys']").text();
+
+  it("replaces the controls with the farewell line", async () => {
+    const { wrapper, store } = staged(finalized({ proposal: proposal({ summary: "合成願望" }) }));
+    await openSheet(wrapper);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(true);
+    await wrapper.setProps({ state: closedState({ stage: "finalized", confirmed: true, proposal: proposal({ summary: "合成願望" }) }) });
+    await flushPromises();
+    expect(wrapper.attributes("data-state")).toBe("farewell");
+    expect(wrapper.attributes("data-leaving")).toBe("confirmed");
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(page(wrapper).text()).toBe(ENDING);
+    expect(wrapper.find("[data-testid='dream-reply-zone']").exists()).toBe(false);
+    expect(wrapper.find(".dream-keepsake").attributes("inert")).toBeDefined();
+    expect(wrapper.find(".dream-live").text()).toContain(ENDING);
+    expect(document.activeElement).toBe(page(wrapper).element);
+    // Neither a digit nor Escape acts; nothing is dispatched.
+    for (const key of ["1", "2", "3", "Escape"]) await wrapper.trigger("keydown", { key });
+    await flushPromises();
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(layer(wrapper, "dream-confirm").exists()).toBe(false);
+    expect(document.activeElement).toBe(page(wrapper).element);
+    wrapper.unmount();
+  });
+
+  it("dispatches nothing from a control and keeps Tab on the band", async () => {
+    const { wrapper, store } = staged(finalized({ proposal: proposal({ summary: "合成願望" }) }));
+    await wrapper.setProps({ state: closedState({ stage: "finalized", proposal: proposal({ summary: "合成願望" }) }) });
+    // jsdom does not enforce inert: a click still reaches the row, and the
+    // stage itself refuses to dispatch.
+    for (const name of ["main", "confirm", "draft", "awaken"]) await row(wrapper, name).trigger("click");
+    await flushPromises();
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    await wrapper.trigger("keydown", { key: "Tab" });
+    expect(document.activeElement).toBe(page(wrapper).element);
+    wrapper.unmount();
+  });
+
+  it("releases when motion leaves full during the fade, and never after unmount", async () => {
+    vi.useFakeTimers();
+    try {
+      const dropped = staged(state(), "full");
+      await dropped.wrapper.setProps({ state: closedState() });
+      await page(dropped.wrapper).trigger("click");
+      await page(dropped.wrapper).trigger("click");
+      expect(dropped.wrapper.emitted("departed")).toBeUndefined();
+      dropped.store.view.motionLevel = "reduced";
+      await nextTick();
+      expect(dropped.wrapper.emitted("departed")).toHaveLength(1);
+      dropped.wrapper.unmount();
+      const gone = staged(state(), "full").wrapper;
+      await gone.setProps({ state: closedState() });
+      await page(gone).trigger("click");
+      await page(gone).trigger("click");
+      const emitted = gone.emitted();
+      gone.unmount();
+      vi.advanceTimersByTime(10000);
+      expect(emitted.departed).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("presents the line even when the closed state still carries a failure", async () => {
+    const { wrapper } = staged();
+    await wrapper.setProps({ state: closedState({ failure: true }) });
+    expect(wrapper.attributes("data-leaving")).toBe("awaken");
+    expect(page(wrapper).text()).toBe(ENDING);
+    wrapper.unmount();
+  });
+
+  it("completes the typing, then releases at full motion when the fade ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const { wrapper } = staged(state(), "full");
+      await wrapper.setProps({ state: closedState() });
+      vi.advanceTimersByTime(50);
+      await nextTick();
+      expect(page(wrapper).text().length).toBeLessThan(ENDING.length);
+      await page(wrapper).trigger("click");
+      expect(page(wrapper).text()).toBe(ENDING);
+      expect(wrapper.emitted("departed")).toBeUndefined();
+      await page(wrapper).trigger("click");
+      const waking = wrapper.find("[data-testid='dream-waking']");
+      expect(waking.exists()).toBe(true);
+      expect(wrapper.classes()).toContain("dream-scene--departed");
+      expect(wrapper.emitted("departed")).toBeUndefined();
+      await waking.trigger("animationend", { animationName: "dream-waking" });
+      expect(wrapper.emitted("departed")).toHaveLength(1);
+      // Released once: neither a further activation nor the safety net emits again.
+      await page(wrapper).trigger("click");
+      vi.advanceTimersByTime(10000);
+      expect(wrapper.emitted("departed")).toHaveLength(1);
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases at full motion on a further activation or when the fade never ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const further = staged(state(), "full").wrapper;
+      await further.setProps({ state: closedState() });
+      await page(further).trigger("click");
+      await page(further).trigger("click");
+      expect(further.emitted("departed")).toBeUndefined();
+      await page(further).trigger("keydown", { key: "Enter" });
+      expect(further.emitted("departed")).toHaveLength(1);
+      further.unmount();
+      const stalled = staged(state(), "full").wrapper;
+      await stalled.setProps({ state: closedState({ confirmed: true }) });
+      expect(stalled.find("[data-testid='dream-wishlight']").exists()).toBe(true);
+      await page(stalled).trigger("click");
+      await page(stalled).trigger("click");
+      expect(stalled.emitted("departed")).toBeUndefined();
+      vi.advanceTimersByTime(4000);
+      expect(stalled.emitted("departed")).toHaveLength(1);
+      stalled.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  for (const motion of ["reduced", "off"]) {
+    it(`shows the line at once and releases on activation at ${motion} motion`, async () => {
+      const { wrapper } = staged(state(), motion);
+      await wrapper.setProps({ state: closedState({ confirmed: true }) });
+      expect(page(wrapper).text()).toBe(ENDING);
+      expect(wrapper.find("[data-testid='dream-wishlight']").exists()).toBe(false);
+      await page(wrapper).trigger("click");
+      expect(wrapper.find("[data-testid='dream-waking']").exists()).toBe(false);
+      expect(wrapper.emitted("departed")).toHaveLength(1);
+      wrapper.unmount();
+    });
+  }
+
+  it("names waking in the key hint once the line is shown in full", async () => {
+    const { wrapper } = staged();
+    const dreaming = keys(wrapper);
+    await wrapper.setProps({ state: closedState() });
+    expect(keys(wrapper)).not.toBe(dreaming);
+    expect(keys(wrapper)).toBe("Enter 醒來");
+    wrapper.unmount();
+  });
+
+  it("plays no farewell for a departure without ending text", async () => {
+    const { wrapper } = staged();
+    await wrapper.setProps({ state: closedState({ ending: "" }) });
+    expect(wrapper.attributes("data-leaving")).toBeUndefined();
+    expect(wrapper.attributes("data-state")).not.toBe("farewell");
+    wrapper.unmount();
+  });
+});

@@ -3,8 +3,9 @@
 // surface must show. Later stages extend this file.
 //
 // Copied from docs/design/dream-proposal-coediting/prototype-data.js without the
-// per-turn `sample` instructions and without the farewell lines: the shipped
-// panel has no suggestion field and the farewell arrives with its own stage.
+// per-turn `sample` instructions: the shipped panel has no suggestion field.
+// The farewell lines below are synthetic stand-ins of a realistic length; the
+// shipped lines are server-authored (world/narrative/dream_surface.py).
 
 export const THREADS = [
   { id: "thread-letter", label: "碼頭上留下的那封信，收信人至今沒有出現。" },
@@ -60,3 +61,10 @@ export const SCRIPT = [
     edits: [],
   },
 ];
+
+// One synthetic closing line per departure outcome, in the `ending` field.
+export const FAREWELLS = {
+  confirmed: "「合成的告別：這個願望交給我了。醒來吧，它會在前方的路上等你。」",
+  draft: "「合成的告別：願望先替你收好。下回入夢，再慢慢說給我聽。」",
+  empty: "「合成的告別：什麼也沒帶走也無妨，雲海會一直在這裡。」",
+};

@@ -94,7 +94,7 @@ export function continuationRows(panel, locked) {
   ];
 }
 
-export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRef }) {
+export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRef, dreamActive = undefined }) {
   // Client-local dismissal of the selection chrome only. It is keyed by the
   // server's control-view identity, so a new view asks again while an
   // unchanged reconnect keeps the already-shown surface settled.
@@ -105,7 +105,9 @@ export function useSleepHandoff(store, { dispatchIntent, skipDisabled, compassRe
     const value = store.view?.panels?.sleep_handoff || null;
     return value && value.available === true ? value : null;
   });
-  const dreamOpen = computed(() => !!store.view?.panels?.dream?.state?.open);
+  // The dream stage also holds through its farewell (dream-farewell-beat):
+  // the cards wait until the stage is released, not only until it closes.
+  const dreamOpen = computed(() => !!store.view?.panels?.dream?.state?.open || !!dreamActive?.value);
   const viewKey = computed(() => {
     if (!panel.value) {
       return null;

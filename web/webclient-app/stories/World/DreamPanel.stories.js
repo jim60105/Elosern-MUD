@@ -6,7 +6,8 @@
 //
 // Try it: pick the story the wish belongs to, speak (an empty Enter does
 // nothing), read her answer, 1 opens the whole wish, 2 stops speaking and hands
-// the form over, then 許下這個願望 or 醒來 closes the dream.
+// the form over, then 許下這個願望 or 醒來 closes the dream and plays her
+// farewell (stage 10): Enter shows the line in full, the next Enter wakes.
 import { h, nextTick, onMounted, reactive, ref } from "vue";
 import DreamPanel from "../../components/DreamPanel.vue";
 import {
@@ -15,7 +16,7 @@ import {
   dreamExhaustedDescriptor,
   dreamRefusedDescriptor,
 } from "../fixtures.js";
-import { OPENING, SCRIPT, THREADS } from "../fixtures/dream_wish.js";
+import { FAREWELLS, OPENING, SCRIPT, THREADS } from "../fixtures/dream_wish.js";
 
 export default { title: "World/DreamPanel", component: DreamPanel };
 
@@ -125,12 +126,13 @@ function fixture({ turns = 0, threads = THREADS, threadId = null, stage = null, 
 
 const render = (args) => ({
   setup() {
-    const { disconnected, open: openLayer, ...options } = args;
+    const { disconnected, open: openLayer, leave, ...options } = args;
     const state = reactive(fixture(options));
     const root = ref(null);
     const epoch = ref(0);
     const auto = ref(true);
     const intent = ref(null);
+    const departed = ref(false);
     const note = ref("合成伺服器：勾選自動發布時，操作意圖會在短暫延遲後套用；取消勾選可手動發布成功或失敗。");
     const store = {
       view: reactive({ connected: !disconnected, motionLevel: "full", textSpeed: "normal", dispatch: { inFlight: null } }),
@@ -158,6 +160,13 @@ const render = (args) => ({
       state.can_draft = state.open;
       // The server publishes no offered thread once the dream is closed.
       if (!state.open) state.thread_choices = [];
+    }
+    // A departure as the server commits it: the session closes and the ended
+    // state carries the closing line chosen by how the dream was left.
+    function leaveWith(action) {
+      const outcome = action === "dream.confirm" ? "confirmed" : state.drafted && state.proposal.summary.trim() ? "draft" : "empty";
+      Object.assign(state, { open: false, confirmed: outcome === "confirmed", ending: FAREWELLS[outcome],
+        ending_phase: state.track.climax_phase });
     }
     function publishSuccess() {
       if (!intent.value) { note.value = "請先提交操作意圖。"; return; }
@@ -189,9 +198,9 @@ const render = (args) => ({
           state.thread_id = threadId;
         }
         state.drafted = true;
-        if (action === "dream.confirm") Object.assign(state, { open: false, confirmed: true });
+        if (action === "dream.confirm") leaveWith(action);
       } else if (action === "dream.awaken") {
-        state.open = false;
+        leaveWith(action);
       }
       state.pending = false;
       state.failure = false;
@@ -209,6 +218,7 @@ const render = (args) => ({
     }
     function reset() {
       Object.assign(state, fixture(options));
+      departed.value = false;
       intent.value = null;
       epoch.value += 1;
       note.value = "已重新發布初始夢境。";
@@ -219,6 +229,9 @@ const render = (args) => ({
     // never receive the click.
     const rowFor = { view: "main", sheet: "main", take: "take" };
     onMounted(async () => {
+      // A farewell story publishes the departure shortly after the stage
+      // mounts, exactly as a live client receives it.
+      if (leave) setTimeout(() => { leaveWith(leave); state.revision += 1; syncStageFlags(); }, 600);
       const row = rowFor[openLayer];
       if (!row) return;
       await nextTick();
@@ -236,7 +249,15 @@ const render = (args) => ({
       h("details", [h("summary", "檢視操作意圖"), h("pre", JSON.stringify(intent.value, null, 2))]),
     ]);
     return () => h("main", { ref: root, style: "color: var(--paper-100);" }, [
-      h(DreamPanel, { key: epoch.value, state, store }, { storyTools: tools }),
+      h(DreamPanel, { key: epoch.value, state, store, onDeparted: () => {
+        departed.value = true;
+        note.value = "夢境已交還給醒來流程。";
+      } }, { storyTools: tools }),
+      // The real client unmounts the stage here and shows the waking surface.
+      departed.value && h("div", { "data-testid": "story-waking", style: "position: fixed; inset: 0; z-index: 4000; display: grid; place-content: center; gap: 16px; background: var(--ink-950); color: var(--paper-300); font-family: var(--f-sans); font-size: var(--text-md); text-align: center;" }, [
+        h("p", "（醒來後的世界）"),
+        h("button", { class: "ui-btn", onClick: () => { reset(); } }, "重新開始"),
+      ]),
     ]);
   },
 });
@@ -285,3 +306,8 @@ export const StopSpeaking = { render, args: { turns: 3, open: "take" } };
 // The player holds the form: every field and requirement row edits, the
 // thread stays fixed.
 export const OwnHand = { render, args: { turns: 3, stage: "finalized", drafted: true, open: "sheet" } };
+// The farewell of a granted wish: the line, then the wish rises to the throne
+// and the stage whitens onto the waking world.
+export const FarewellGranted = { render, args: { turns: 6, drafted: true, leave: "dream.confirm" } };
+// Leaving with the wish kept for another night.
+export const FarewellKept = { render, args: { turns: 2, drafted: true, leave: "dream.awaken" } };

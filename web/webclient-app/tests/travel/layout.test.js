@@ -46,6 +46,10 @@ describe("travel selection follows committed room identity", () => {
     const dreaming = travelSelection({ mode: "exploration", panels: { art, dream: { state: { open: true } } } });
     expect(dreaming.layout).toBe(false);
     expect(travelSelection({ mode: "exploration", panels: { art }, creation: true }).layout).toBe(false);
+    // A dream stage held for its farewell keeps the stage after the committed
+    // dream has closed (dream-farewell-beat).
+    const farewell = travelSelection({ mode: "exploration", panels: { art, dream: { state: { open: false } } }, dreamActive: true });
+    expect([farewell.mode, farewell.layout]).toEqual([true, false]);
     // An unavailable conversation panel does not hold the stage.
     expect(travelSelection({ mode: "exploration", panels: { art, dialogue: { available: false } } }).layout).toBe(true);
   });
@@ -93,6 +97,20 @@ describe("the shell remaps its slots for travel", () => {
     expect(w.find('[data-testid="party-medallions"]').exists()).toBe(false);
     expect(w.find('[data-testid="anchor-actor-left"] [data-testid="stage-actor"]').exists()).toBe(true);
     publish({ dialogue: { schema_version: DIALOGUE_PANEL_SAMPLE.schema_version, available: false, reason: { code: "dialogue_unavailable", message: "目前沒有對話" } } }, { mode: "exploration" });
+    await tick();
+    expect(store.view.travel.layout).toBe(true);
+    expect(w.find('[data-testid="party-medallions"]').exists()).toBe(true);
+  });
+
+  it("yields the travel layout while the dream stage holds its farewell", async () => {
+    const { w, store } = liveTravel({ wrappers });
+    await tick();
+    expect(store.view.travel.layout).toBe(true);
+    store.setDreamFarewellActive(true);
+    await tick();
+    expect(store.view.travel.layout).toBe(false);
+    expect(w.find('[data-testid="party-medallions"]').exists()).toBe(false);
+    store.setDreamFarewellActive(false);
     await tick();
     expect(store.view.travel.layout).toBe(true);
     expect(w.find('[data-testid="party-medallions"]').exists()).toBe(true);

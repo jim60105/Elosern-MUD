@@ -3,13 +3,14 @@
 // question and retained continuation. The browser derives no eligibility and
 // sends one action per decision.
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { effectScope, nextTick, reactive, ref } from "vue";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { useSleepHandoff } from "../composables/use-sleep-handoff.js";
 
 function sleepHandoffPanel(overrides = undefined) {
   return {
@@ -350,5 +351,31 @@ describe("AppClient sleep handoff (align-sleep-handoff-and-owner-dream)", () => 
     await rows()[0].trigger("click");
     await settle();
     expect(sender.sent.actions).toHaveLength(0);
+  });
+});
+
+describe("sleep handoff and the dream stage's farewell (dream-farewell-beat)", () => {
+  it("keeps the cards yielded while the dream stage is held after the dream closed", async () => {
+    const store = reactive({
+      view: {
+        panels: {
+          sleep_handoff: sleepHandoffPanel(),
+          dream: { state: { session_id: "synthetic-dream", open: false, ending: "合成的告別" } },
+        },
+      },
+      closeRoomCard: vi.fn(),
+    });
+    const dreamActive = ref(true);
+    const scope = effectScope();
+    const handoff = scope.run(() =>
+      useSleepHandoff(store, { dispatchIntent: vi.fn(), skipDisabled: ref(false), compassRef: ref(null), dreamActive }),
+    );
+    expect(handoff.sleepHandoffSelectionOpen.value).toBe(false);
+    expect(handoff.sleepHandoffQuestionOpen.value).toBe(false);
+    expect(handoff.sleepHandoffContinuationOpen.value).toBe(false);
+    dreamActive.value = false;
+    await nextTick();
+    expect(handoff.sleepHandoffSelectionOpen.value).toBe(true);
+    scope.stop();
   });
 });

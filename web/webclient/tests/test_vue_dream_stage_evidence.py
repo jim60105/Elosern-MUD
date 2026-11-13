@@ -24,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "web/webclient-app/tests"
 DREAM_SUITE = TESTS_DIR / "dream.test.js"
 MOTION_SUITE = TESTS_DIR / "motion_tokens.test.js"
+FAREWELL_SUITE = TESTS_DIR / "dream_farewell.test.js"
 
 
 def _run_vitest(*test_files, names=()):
@@ -43,13 +44,13 @@ def _run_vitest(*test_files, names=()):
     )
 
 
-def _assert_cases_pass(label, names, *extra_files):
-    """Every named dream case (and every case of ``extra_files``) runs and passes.
+def _assert_cases_pass(label, names, *extra_files, suites=(DREAM_SUITE,)):
+    """Every named case of ``suites`` (and every case of ``extra_files``) runs and passes.
 
     The exact-name filter plus the expected count means a renamed or deleted
     case fails this bridge instead of silently narrowing the evidence.
     """
-    result = _run_vitest(DREAM_SUITE, names=names)
+    result = _run_vitest(*suites, names=names)
     assert result.returncode == 0, f"{label} Vitest suite failed:\n{result.stdout}\n{result.stderr}"
     passed = re.search(r"Tests\s+(\d+) passed", result.stdout)
     assert passed and int(passed.group(1)) == len(names), (
@@ -313,4 +314,34 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
                 'editable requirement rows > names an unsaved row edit in the awaken check',
                 'editable requirement rows > lets unedited rows follow a republish and keeps edited ones',
             ),
+        )
+
+    @covers_requirement(
+        "webclient-dream-stage::a-live-departure-plays-a-farewell-before-the-stage-releases"
+    )
+    def test_live_departure_plays_a_farewell_before_the_stage_releases(self):
+        _assert_cases_pass(
+            "dream farewell",
+            (
+                'dream farewell > replaces the controls with the farewell line',
+                'dream farewell > dispatches nothing from a control and keeps Tab on the band',
+                'dream farewell > releases when motion leaves full during the fade, and never after unmount',
+                'dream farewell > presents the line even when the closed state still carries a failure',
+                'dream farewell > completes the typing, then releases at full motion when the fade ends',
+                'dream farewell > releases at full motion on a further activation or when the fade never ends',
+                'dream farewell > shows the line at once and releases on activation at reduced motion',
+                'dream farewell > shows the line at once and releases on activation at off motion',
+                'dream farewell > names waking in the key hint once the line is shown in full',
+                'dream farewell > plays no farewell for a departure without ending text',
+                'dream farewell hold > holds a live departure of the same session that carries an ending',
+                'dream farewell hold > does not hold a state that is already closed when first seen',
+                'dream farewell hold > does not hold a closed state of a different session',
+                'dream farewell hold > does not hold a departure without ending text',
+                'dream farewell hold > keeps the hold unchanged when the same closed state republishes',
+                'dream farewell hold > drops a held farewell on disconnect',
+                'dream farewell hold > discards a held farewell when a new open dream is committed',
+                'dream farewell hold > releases the stage on release()',
+                'dream farewell hold > raises the store flag while a farewell is held and lowers it on release',
+            ),
+            suites=(DREAM_SUITE, FAREWELL_SUITE),
         )

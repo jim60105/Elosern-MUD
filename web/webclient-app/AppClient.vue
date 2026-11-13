@@ -142,6 +142,7 @@ const {
   onSleepQuestionYes, onSleepQuestionNo, onSleepQuestionClose,
   onCompassTab, onRailTab, onPlaceTab,
   camp, campCardOpen, campBeatOpen, campOpen, closeCamp, selectMode, toggleDream, confirmCamp, continueTravel,
+  dreamStage,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The command line's release (the shell's one focus seam): the free-form
 // borrow ends, and a service row's command hand-off hands focus back to the
@@ -217,7 +218,7 @@ const landmarkArrival = computed(() => (travelLayout.value ? store.view.travel?.
 const landmarkCardOpen = computed(
   () =>
     !!landmarkArrival.value &&
-    !panel("dream")?.state?.open &&
+    !dreamStage.active.value &&
     !sleepHandoffSelectionOpen.value &&
     !sleepHandoffQuestionOpen.value &&
     !sleepHandoffContinuationOpen.value,
@@ -1716,7 +1717,16 @@ const rootStyle = computed(() => {
     <!-- The NPC author editor (npc-persona-editor-window) owns its drawer
          chrome: it binds to the target captured at 編輯人物設定 and guards a
          dirty close. -->
-    <DreamPanel v-if="panel('dream')?.state?.open" :state="panel('dream').state" :store="store" />
+    <!-- The dream stage (dream-farewell-beat): the open dream, or its closed
+         state held for the farewell until the stage releases it. A new open
+         dream that replaces a farewell mounts a fresh stage. -->
+    <DreamPanel
+      v-if="dreamStage.state.value"
+      :key="dreamStage.generation.value"
+      :state="dreamStage.state.value"
+      :store="store"
+      @departed="dreamStage.release"
+    />
     <NpcPersonaEditor
       v-if="store.view.hudDrawer === 'npc_persona' && npcPersonaEditor.open"
       :editor="npcPersonaEditor"

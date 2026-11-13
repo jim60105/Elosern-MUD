@@ -161,7 +161,12 @@ export function applyTravel(ctx) {
   }
 
   function layoutShown(rs) {
-    return travelSelection({ mode: rs.mode, panels: rs.panels || {}, creation: ctx.creation != null }).layout;
+    return travelSelection({
+      mode: rs.mode,
+      panels: rs.panels || {},
+      creation: ctx.creation != null,
+      dreamActive: ctx.dreamFarewellActive.value,
+    }).layout;
   }
 
   // The committed target the direction aims at, re-resolved now.
@@ -1077,6 +1082,7 @@ export function applyTravel(ctx) {
       mode: rs.mode,
       panels: rs.panels || {},
       creation: ctx.creation != null,
+      dreamActive: ctx.dreamFarewellActive.value,
     });
     return Object.freeze({
       ...selection,
