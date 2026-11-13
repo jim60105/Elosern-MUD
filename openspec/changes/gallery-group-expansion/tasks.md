@@ -4,7 +4,7 @@ Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settin
 
 ## 1. Server
 
-- [ ] 1.1 Implement design decisions 1–2. Verify tests for the three management-actions scenarios plus the updated registry enumeration test pass in the gallery action module and the registry test module under the prefix, decorated with their requirement IDs.
+- [x] 1.1 Implement design decisions 1–2. Verify tests for the three management-actions scenarios plus the updated registry enumeration test pass in the gallery action module and the registry test module under the prefix, decorated with their requirement IDs.
 
 ## 2. Client
 

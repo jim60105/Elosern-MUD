@@ -21,6 +21,7 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.accounts import Account
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
+from typeclasses.rooms import TerrainRoom
 from web.webclient.actions import gallery_actions as actions
 from web.webclient.actions.dispatcher import handle_ui_action, _sequence_state
 from web.webclient.actions.registry import build_production_action_registry
@@ -40,7 +41,9 @@ from world.art.official import current_catalog, load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.store import ArtAssetRecord
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.maps import wilderness_provider
 from world.rules.clock import get_world_clock
+from world.rules.met_people import PLACE_REGION, record_person_interaction
 from world.tests.synthetic_data import make_monster_species, make_monster_tier, make_monster_variant
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -179,6 +182,22 @@ def category_wire_cases():
     return cases
 
 
+def group_wire_cases():
+    """Group selection corpus: grammar-valid keys pass, anything else is malformed."""
+    cases = [
+        (f"group {key!r}", {"group": key}, True)
+        for key in ("t_low", "place:region:t_a", "a", "a.b-c_d:9", "k" * 96)
+    ]
+    cases += [
+        ("group extra field", {"group": "t_low", "category": "people"}, False),
+        ("group missing", {}, False),
+        ("group renamed", {"category": "t_low"}, False),
+    ]
+    for value in (None, 7, True, ["t_low"], "", "T_low", "t low", "t/low", "k" * 97, "p1\n", "t_\u00e4", " t_low"):
+        cases.append((f"group bad value {value!r}", {"group": value}, False))
+    return cases
+
+
 class GalleryActionWireTests(unittest.TestCase):
     @covers_requirement(
         "webclient-gallery-management-actions::seven-gallery-management-actions-are-registered-with-exact-payload-validators"
@@ -216,6 +235,30 @@ const fs = require('node:fs');
 const p = require('./web/static/webclient/js/elosern/protocol.js');
 const results = JSON.parse(fs.readFileSync(0, 'utf8')).map(([name, payload]) => {
   try { return [true, p.validateGalleryActionPayload('gallery.category.select', payload)]; }
+  catch (_) { return [false, null]; }
+});
+process.stdout.write(JSON.stringify(results));
+"""
+        wire = [[name, payload] for name, payload, _ in cases]
+        output = subprocess.run(["node", "-e", script], input=json.dumps(wire), text=True, capture_output=True, cwd=ROOT, check=True)
+        for (name, payload, expected), (accepted, echoed) in zip(cases, json.loads(output.stdout), strict=True):
+            with self.subTest(case=name):
+                self.assertEqual(accepted, expected)
+                if expected:
+                    self.assertEqual(validator(payload), payload)
+                    self.assertEqual(validator(echoed), payload)
+                else:
+                    with self.assertRaises(ValueError):
+                        validator(payload)
+
+    def test_group_selection_payload_matches_node_boundaries(self):
+        validator = build_production_action_registry().spec("gallery.group.select").validate_payload
+        cases = group_wire_cases()
+        script = """
+const fs = require('node:fs');
+const p = require('./web/static/webclient/js/elosern/protocol.js');
+const results = JSON.parse(fs.readFileSync(0, 'utf8')).map(([name, payload]) => {
+  try { return [true, p.validateGalleryActionPayload('gallery.group.select', payload)]; }
   catch (_) { return [false, null]; }
 });
 process.stdout.write(JSON.stringify(results));
@@ -924,6 +967,120 @@ class GalleryActionIntegrationTests(EvenniaTest):
                 continue
             with self.subTest(case=name), patch.object(actions, "select_gallery_category") as select:
                 result = self.dispatch("gallery.category.select", payload)
+                self.assertEqual(result["code"], "malformed_payload")
+                select.assert_not_called()
+                self.assertEqual(len(self.sent), 1)
+        self.assertIsNone(gallery_view_snapshot(self.transport, self.actor))
+
+    # -- group selection (people places) ----------------------------------
+
+    def meet_in_places(self):
+        """Two named NPCs met in two places; the later place is the most recent.
+
+        Returns the two place group keys, older first. The actor returns to
+        its ordinary room afterwards, so publication reads no terrain room.
+        """
+        places = []
+        for index, region in enumerate(("t_region_a", "t_region_b"), start=1):
+            npc = self.character(NPC, f"t_gallery_met_{index}")
+            room = create_object(TerrainRoom, key=f"t_terrain_{index}", location=None)
+            room.ndb.active_coordinates = (index, index)
+            self.actor.location = room
+            with patch.object(wilderness_provider, "region_for_coordinates", return_value=region):
+                record_person_interaction(self.actor, npc)
+            places.append(f"{PLACE_REGION}:{region}")
+        self.actor.location = self.room1
+        return places
+
+    def group_dispatch(self, group, payload=None):
+        """Dispatch one group selection, spying on the publication request."""
+        with patch.object(
+            self.coordinator, "enqueue_publication", wraps=self.coordinator.enqueue_publication
+        ) as publish:
+            result = self.dispatch("gallery.group.select", payload or {"group": group})
+        self.assertEqual(len([call for call in self.sent if "ui_action_result" in call]), 1)
+        self.assertNotIn("ui_snapshot", self.sent[0])
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
+        return result
+
+    def test_expanding_another_place_collapses_the_current_one(self):
+        older, newer = self.meet_in_places()
+        self.assertEqual(self.category_dispatch("people")["outcome"], "success")
+        panel = self.panel()
+        self.assertEqual(
+            [(group["key"], group["expanded"]) for group in panel["groups"]],
+            [(newer, True), (older, False)],
+        )
+        before = (self.art_state(), queue.pending_gallery_jobs(self.subject))
+        with patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn, \
+                patch.object(gallery_selection, "log_info") as selected:
+            result = self.group_dispatch(older)
+        self.assertEqual((result["outcome"], result["code"]), ("success", "gallery_group_selected"))
+        panel = self.panel()
+        rows = {group["key"]: group for group in panel["groups"]}
+        self.assertTrue(rows[older]["expanded"])
+        self.assertEqual(
+            [subject["subject_key"] for subject in rows[older]["subjects"]],
+            ["portrait:character:t_gallery_met_1"],
+        )
+        self.assertFalse(rows[newer]["expanded"])
+        self.assertEqual((rows[newer]["count"], rows[newer]["subjects"]), (1, []))
+        self.assertEqual(panel["selected"], "portrait:character:t_gallery_met_1")
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor).expanded, (("people", older),))
+        self.assertEqual(before, (self.art_state(), queue.pending_gallery_jobs(self.subject)))
+        info.assert_called_once_with(
+            "gallery_action", context={"group": older, "action_id": "gallery.group.select"}
+        )
+        warn.assert_not_called()
+        selected.assert_called_once_with(
+            "gallery_group_selected", context={"category": "people", "group": older}
+        )
+        # Selecting the place already expanded succeeds and changes nothing.
+        with patch.object(gallery_selection, "log_info") as selected:
+            result = self.group_dispatch(older)
+        self.assertEqual((result["outcome"], result["code"]), ("success", "gallery_group_selected"))
+        selected.assert_not_called()
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor).expanded, (("people", older),))
+
+    def test_a_tier_group_cannot_be_selected(self):
+        self.meet_in_places()
+        self.assertEqual(self.category_dispatch("monster")["outcome"], "success")
+        stored = gallery_view_snapshot(self.transport, self.actor)
+        with patch.object(actions, "log_info") as info, patch.object(actions, "log_warn") as warn:
+            result = self.group_dispatch("t_low")
+        self.assertEqual((result["outcome"], result["code"]), ("rejected", "unknown_group"))
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
+        warn.assert_called_once_with(
+            "gallery_action", context={"group": "t_low", "action_id": "gallery.group.select"}
+        )
+        info.assert_not_called()
+
+    def test_a_group_outside_the_current_paged_category_is_refused(self):
+        older, _ = self.meet_in_places()
+        # No stored view resolves to mine, which does not page by group.
+        self.assertEqual(self.group_dispatch(older)["code"], "unknown_group")
+        self.assertIsNone(gallery_view_snapshot(self.transport, self.actor))
+        self.category_dispatch("people")
+        stored = gallery_view_snapshot(self.transport, self.actor)
+        self.assertEqual(self.group_dispatch(f"{PLACE_REGION}:t_region_gone")["code"], "unknown_group")
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
+        # A session that no longer puppets the actor writes nothing.
+        stranger = create_object(PlayerCharacter, key="新角色")
+        self.transport.puppet = stranger
+        try:
+            result = gallery_selection.select_gallery_group(self.transport, self.actor, older)
+        finally:
+            self.transport.puppet = self.actor
+        self.assertEqual(result["code"], "unknown_group")
+        self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
+
+    def test_malformed_group_payloads_never_reach_the_adapter(self):
+        for name, payload, accepted in group_wire_cases():
+            if accepted:
+                continue
+            with self.subTest(case=name), patch.object(actions, "select_gallery_group") as select:
+                result = self.dispatch("gallery.group.select", payload)
                 self.assertEqual(result["code"], "malformed_payload")
                 select.assert_not_called()
                 self.assertEqual(len(self.sent), 1)
