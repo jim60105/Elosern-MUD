@@ -12,5 +12,5 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 3. Gates
 
-- [ ] 3.1 Run `pnpm test`, `pnpm run build`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-landscape-page`; all pass.
-- [ ] 3.2 Run `openspec validate gallery-landscape-page --strict`; it passes.
+- [x] 3.1 Run `pnpm test`, `pnpm run build`, `uv run --locked python -m tools.spec_traceability check` and `uv run --locked python -m tools.contract_gate --change gallery-landscape-page`; all pass.
+- [x] 3.2 Run `openspec validate gallery-landscape-page --strict`; it passes.
