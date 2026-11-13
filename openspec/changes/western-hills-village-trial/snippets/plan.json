@@ -1,0 +1,15 @@
+[
+ {"id": "village_wheat_plain", "kind": "village", "cell": [1105, 689]},
+ {"id": "village_willow_bank", "kind": "village", "cell": [1150, 715]},
+ {"id": "village_salt_hollow", "kind": "village", "cell": [1040, 605]},
+ {"id": "village_cattle_pasture", "kind": "village", "cell": [1228, 847]},
+ {"id": "hamlet_sheep_yard", "kind": "hamlet", "cell": [1168, 689]},
+ {"id": "hamlet_vale_mouth", "kind": "hamlet", "cell": [1238, 689]},
+ {"id": "hamlet_tea_hut", "kind": "hamlet", "cell": [1039, 531]},
+ {"id": "hamlet_tile_kiln", "kind": "hamlet", "cell": [1040, 655]},
+ {"id": "hamlet_stone_house", "kind": "hamlet", "cell": [1162, 943]},
+ {"id": "hamlet_charcoal_kiln", "kind": "hamlet", "cell": [1190, 887]},
+ {"id": "hamlet_wooden_fence", "kind": "hamlet", "cell": [1237, 777]},
+ {"id": "hamlet_stone_wall", "kind": "hamlet", "cell": [1276, 719]},
+ {"id": "hamlet_water_mill", "kind": "hamlet", "cell": [1093, 711]}
+]

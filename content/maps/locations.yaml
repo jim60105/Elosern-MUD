@@ -638,3 +638,134 @@ locations:
       cell_y: 1366
     geographic_constraint: North bank of the eastern border river ford
     scene_archetype:
+  village_cattle_pasture:
+    kind: village
+    display_name_zh: 牛埔村
+    description: Cattle-raising village on the open pasture of the long hill road.
+    cell:
+      cell_x: 1228
+      cell_y: 847
+    geographic_constraint: Open pasture on the hill road between the east river 
+      city and the scarp
+    scene_archetype:
+  village_salt_hollow:
+    kind: village
+    display_name_zh: 鹽坳村
+    description: Village on the salt road where it climbs the long vale south of 
+      the honey vale.
+    cell:
+      cell_x: 1040
+      cell_y: 605
+    geographic_constraint: Valley floor on the salt road between the honey vale 
+      and the southern hills
+    scene_archetype:
+  village_wheat_plain:
+    kind: village
+    display_name_zh: 麥埔村
+    description: Farming village on the open wheat flats of the western vale, on 
+      the trunk road.
+    cell:
+      cell_x: 1105
+      cell_y: 689
+    geographic_constraint: Valley floor on the trunk road east of the honey vale
+    scene_archetype:
+  village_willow_bank:
+    kind: village
+    display_name_zh: 柳岸村
+    description: Riverside village on a willow-lined reach of the hills river, 
+      below the trunk road.
+    cell:
+      cell_x: 1150
+      cell_y: 715
+    geographic_constraint: River bank on the south side of the hills river, below 
+      the trunk road
+    scene_archetype:
+  hamlet_charcoal_kiln:
+    kind: hamlet
+    display_name_zh: 炭窯
+    description: Charcoal burner's hamlet on the road between the east river city 
+      and the scarp.
+    cell:
+      cell_x: 1190
+      cell_y: 887
+    geographic_constraint: Hill road on the northern half of the western hills
+    scene_archetype:
+  hamlet_sheep_yard:
+    kind: hamlet
+    display_name_zh: 羊埔
+    description: Shepherds' hamlet on the trunk road in the middle of the vale.
+    cell:
+      cell_x: 1168
+      cell_y: 689
+    geographic_constraint: Valley floor on the trunk road midway between the honey 
+      vale and the scarp
+    scene_archetype:
+  hamlet_stone_house:
+    kind: hamlet
+    display_name_zh: 石屋
+    description: Stone farmstead hamlet where the road from the east river city 
+      enters the western hills.
+    cell:
+      cell_x: 1162
+      cell_y: 943
+    geographic_constraint: Northern entry of the hill road into the western hills
+    scene_archetype:
+  hamlet_stone_wall:
+    kind: hamlet
+    display_name_zh: 石壁
+    description: Hamlet by the stone wall of the road just north of the scarp town.
+    cell:
+      cell_x: 1276
+      cell_y: 719
+    geographic_constraint: Stone-walled stretch of the hill road north of the scarp
+    scene_archetype:
+  hamlet_tea_hut:
+    kind: hamlet
+    display_name_zh: 茶寮
+    description: Tea hut hamlet on the salt road at the southern edge of the hills.
+    cell:
+      cell_x: 1039
+      cell_y: 531
+    geographic_constraint: Salt road at the southern edge of the western hills
+    scene_archetype:
+  hamlet_tile_kiln:
+    kind: hamlet
+    display_name_zh: 瓦窯
+    description: Tile kiln hamlet on the salt road just south of the honey vale.
+    cell:
+      cell_x: 1040
+      cell_y: 655
+    geographic_constraint: Salt road on the southern approach to the honey vale 
+      ford
+    scene_archetype:
+  hamlet_vale_mouth:
+    kind: hamlet
+    display_name_zh: 谷口
+    description: Hamlet at the mouth of the vale where the trunk road turns toward 
+      the scarp.
+    cell:
+      cell_x: 1238
+      cell_y: 689
+    geographic_constraint: Eastern end of the vale on the trunk road below the 
+      scarp
+    scene_archetype:
+  hamlet_water_mill:
+    kind: hamlet
+    display_name_zh: 水磨
+    description: Water mill hamlet on the south bank of the hills river, below the 
+      trunk road.
+    cell:
+      cell_x: 1093
+      cell_y: 711
+    geographic_constraint: River bank on the south side of the hills river, below 
+      the trunk road
+    scene_archetype:
+  hamlet_wooden_fence:
+    kind: hamlet
+    display_name_zh: 木柵
+    description: Fenced farmstead on the open hill road, far north of the scarp.
+    cell:
+      cell_x: 1237
+      cell_y: 777
+    geographic_constraint: Hill road on the northern approach to the scarp
+    scene_archetype:

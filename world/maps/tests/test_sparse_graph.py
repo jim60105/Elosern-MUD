@@ -263,4 +263,21 @@ class PhysicalGeometryTests(unittest.TestCase):
                     self.assertIsNotNone(edge.road.direction_hint)
                     self.assertEqual(edge.direction, edge.road.direction_hint)
                 # Meter spacing is unequal: a path charges unequal lengths.
-                self.assertGreater(len({round(edge.length, 6) for edge in graph.edges}), 1)
+                # A one-cell hamlet has a single road pair, so its two
+                # directed edges share that pair's authored metre distance;
+                # the inequality is checked only where a second pair exists.
+                lengths = {round(edge.length, 6) for edge in graph.edges}
+                pairs = {
+                    frozenset((edge.source.node_id, edge.destination.node_id))
+                    for edge in graph.edges
+                }
+                if len(pairs) > 1:
+                    self.assertGreater(len(lengths), 1)
+                else:
+                    edge = next(iter(graph.edges))
+                    start = edge.source.coordinate
+                    end = edge.destination.coordinate
+                    self.assertEqual(
+                        lengths,
+                        {round(hypot(end[0] - start[0], end[1] - start[1]), 6)},
+                    )

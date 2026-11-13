@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_salt_hollow
+location_ref: village_salt_hollow
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 295
+    prototype_parent: anchor_room
+    key: 井邊空地
+    desc: 綠地位在坳地中央，石井旁堆著鹽袋與木桶，往東的坡地比村裡其他角落高出一截，坡上石砌的田埂一路排到稜線。
+    anchor_key: village_salt_hollow
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 490
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口順著鹽道通往蜜谷鎮，路面被鹽車壓出兩道深痕，清晨最先聽見車輪聲，押車的人會在路邊檢視鹽袋的繩結。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口通向鹽道城，路邊的坡地被雨水切出幾道淺溝，行人動身前習慣在樹下歇一會，順便替鞋底補上幾針。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 198
+    y_m: 295
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂在綠地東側的高處，鐘聲順著坳地傳開時，田裡的人會停下手邊的工作，抬頭看一眼教堂的尖頂。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:

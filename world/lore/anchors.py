@@ -161,6 +161,20 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
     "town_frost_wind": AnchorLore("valhalla", 8_000, None),
     "town_shaman_cave": AnchorLore("valhalla", 8_000, None),
     "town_east_ford_camp": AnchorLore("valhalla", 6_000, None),
+    # Altoria Kingdom villages and hamlets: western-hills-village-trial.
+    "hamlet_charcoal_kiln": AnchorLore("altoria", 150, None),
+    "hamlet_sheep_yard": AnchorLore("altoria", 180, None),
+    "hamlet_stone_house": AnchorLore("altoria", 120, None),
+    "hamlet_stone_wall": AnchorLore("altoria", 90, None),
+    "hamlet_tea_hut": AnchorLore("altoria", 80, None),
+    "hamlet_tile_kiln": AnchorLore("altoria", 220, None),
+    "hamlet_vale_mouth": AnchorLore("altoria", 160, None),
+    "hamlet_water_mill": AnchorLore("altoria", 140, None),
+    "hamlet_wooden_fence": AnchorLore("altoria", 110, None),
+    "village_cattle_pasture": AnchorLore("altoria", 700, None),
+    "village_salt_hollow": AnchorLore("altoria", 900, None),
+    "village_wheat_plain": AnchorLore("altoria", 1_200, None),
+    "village_willow_bank": AnchorLore("altoria", 500, None),
 }
 
 

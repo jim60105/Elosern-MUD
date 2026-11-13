@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_stone_house
+location_ref: hamlet_stone_house
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 167
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東南通往斷崖鎮，往西北是東河城的方向，路口堆著幾塊從坡上滾下來的石板，邊角還留著鑿痕。
+    anchor_key: hamlet_stone_house
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 167
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍整間用灰石砌成，屋頂壓著石板，往西北的車輛經過時，屋主會出來指點前面的路況，順便遞上一瓢井水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:
