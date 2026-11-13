@@ -3,6 +3,7 @@
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
 This change adds a migration: run the first Evennia test command of this change with `--noinput` and without `--keepdb`; later commands may add `--keepdb`.
+Run only the focused test labels named below — one module at a time. Never run a whole test suite for this change.
 
 ## 1. Stage in the lifecycle
 

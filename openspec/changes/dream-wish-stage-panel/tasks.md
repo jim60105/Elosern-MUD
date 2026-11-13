@@ -2,7 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
-Run pnpm commands in `web/webclient-app`.
+Run `pnpm run build` and the Storybook commands in `web/webclient-app`; run `pnpm exec vitest run <file>` from the repository root, where the Vitest config lives. Run only the focused test labels named below — one module, one Node file or one Vitest file at a time. Never run a whole test suite for this change.
 
 ## 1. Panel
 
@@ -15,7 +15,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 3. Gates
 
-- [ ] 3.1 Run `pnpm test`, `pnpm run build`, `pnpm run build-storybook` and `pnpm run showcase-coverage`; all pass. The stories are still the ones `dream-wish-stage-wire` left valid; `dream-wish-stage-stories` rewrites them next.
+- [ ] 3.1 Run `pnpm exec vitest run tests/dream.test.js` (from the repository root), then `pnpm run build`, `pnpm run build-storybook` and `pnpm run showcase-coverage`; all pass. Do not run the whole `pnpm test` suite. The stories are still the ones `dream-wish-stage-wire` left valid; `dream-wish-stage-stories` rewrites them next.
 - [ ] 3.2 Run `uv run --locked python -m tools.spec_traceability check --change dream-wish-stage-panel` and `uv run --locked python -m tools.contract_gate --change dream-wish-stage-panel`; both pass.
 - [ ] 3.3 Run `openspec validate dream-wish-stage-panel --strict`; it passes.
 

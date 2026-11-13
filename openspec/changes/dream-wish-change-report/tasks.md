@@ -2,7 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
-Run pnpm commands in `web/webclient-app`.
+Run `pnpm run build` in `web/webclient-app`; run `pnpm exec vitest run <file>` from the repository root, where the Vitest config lives. Run only the focused test labels named below — one module, one Node file or one Vitest file at a time. Never run a whole test suite for this change.
 
 ## 1. Change report
 
@@ -22,7 +22,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 5. Gates
 
-- [ ] 5.1 Run `pnpm test` and `pnpm run build`; both pass.
+- [ ] 5.1 Run `pnpm exec vitest run tests/dream.test.js` (from the repository root) and `pnpm run build`; both pass. Do not run the whole `pnpm test` suite.
 - [ ] 5.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-wish-change-report`; both pass.
 - [ ] 5.3 Run `openspec validate dream-wish-change-report --strict`; it passes.
 

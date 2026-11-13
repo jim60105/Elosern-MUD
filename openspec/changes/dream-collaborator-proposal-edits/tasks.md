@@ -2,6 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
+Run only the focused test labels named below — one module, one Node file or one Vitest file at a time. Never run a whole test suite for this change.
 
 ## 1. Model contract
 

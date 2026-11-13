@@ -2,7 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
-Run pnpm commands in `web/webclient-app`.
+Run `pnpm run build` and the Storybook commands in `web/webclient-app`. Run only the focused test labels named below — one module at a time. Never run a whole test suite for this change.
 
 ## 1. Stories
 

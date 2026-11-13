@@ -2,7 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
-Run pnpm commands in `web/webclient-app`.
+Run `pnpm run build` and the Storybook commands in `web/webclient-app`; run `pnpm exec vitest run <file>` from the repository root, where the Vitest config lives. Run only the focused test labels named below — one module, one Node file or one Vitest file at a time. Never run a whole test suite for this change.
 
 ## 1. Read model and wire
 

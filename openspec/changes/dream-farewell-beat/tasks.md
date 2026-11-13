@@ -2,7 +2,7 @@
 
 Test prefix: `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb`
 (`/tmp/mud-test.env` contains the single line `MUD_TEST_SETTINGS=1`; create it if missing).
-Run pnpm commands in `web/webclient-app`.
+Run `pnpm run build` and the Storybook commands in `web/webclient-app`; run `pnpm exec vitest run <file>` from the repository root, where the Vitest config lives. Run only the focused test labels named below — one module, one Node file or one Vitest file at a time. Never run a whole test suite for this change.
 
 ## 1. Server line
 
@@ -20,7 +20,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 4. Gates
 
-- [ ] 4.1 Run `pnpm test` and `pnpm run build`; both pass.
+- [ ] 4.1 Run `pnpm exec vitest run tests/dream_farewell.test.js tests/dream.test.js tests/app_client_sleep_handoff.test.js tests/travel/layout.test.js` (from the repository root) and `pnpm run build`; all pass. Do not run the whole `pnpm test` suite.
 - [ ] 4.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-farewell-beat`; both pass.
 - [ ] 4.3 Run `openspec validate dream-farewell-beat --strict`; it passes.
 
