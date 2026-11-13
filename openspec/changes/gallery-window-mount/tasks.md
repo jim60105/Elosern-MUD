@@ -15,8 +15,8 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 3. Browser journey and docs
 
-- [ ] 3.1 Apply decision 7; run `pnpm run build`, then `uv run --locked --env-file=/tmp/mud-test.env python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_gallery_image_contract`; it passes.
-- [ ] 3.2 Apply decision 8 to `web/webclient-app/AGENTS.md`. Verify by reading the diff.
+- [x] 3.1 Apply decision 7; run `pnpm run build`, then `uv run --locked --env-file=/tmp/mud-test.env python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_gallery_image_contract`; it passes.
+- [x] 3.2 Apply decision 8 to `web/webclient-app/AGENTS.md`. Verify by reading the diff.
 
 ## 4. Gates
 

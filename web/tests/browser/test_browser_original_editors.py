@@ -28,6 +28,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
+    login_and_open,
     open_command_line,
     outbound_messages,
     sent_action_count,
@@ -43,10 +44,10 @@ _ORIGINAL_MEDIA = re.compile(r"/art/gallery/character/\d+/[^/]+\.(png|webp|jpg|a
 # The fixed adult-size ruler the stage editor always observes behind the figure.
 _ADULT_REFERENCE_MEDIA = re.compile(r"/art/defaults/man\.webp$")
 
-_GALLERY = '[data-testid="gallery-panel"]'
-_DETAIL = '[data-testid="gallery-detail"]'
-_FACE_BUTTON = f"{_DETAIL} button:has-text(\"臉部框選\")"
-_STAGE_BUTTON = f"{_DETAIL} button:has-text(\"比例調整\")"
+# The gallery window and its image page footer (gallery-window-mount).
+_GALLERY = '[data-testid="gallery-window"]'
+_FACE_BUTTON = f'{_GALLERY} [data-testid="gallery-page__face"]'
+_STAGE_BUTTON = f'{_GALLERY} [data-testid="gallery-page__stage"]'
 # Both dialogs are addressed by their own ARIA role plus their own surface
 # class, so a selector never depends on the other dialog's markup.
 _FACE_MODAL = '[role="dialog"][aria-label="臉部框選"]'
@@ -71,8 +72,8 @@ _STAGE_RULER_MARKER = (
 
 
 def _card(card_id: str) -> str:
-    """The committed card button of one exact image id."""
-    return f'{_GALLERY} [data-image-id="{card_id}"]'
+    """The committed tray tile of one exact image id."""
+    return f'{_GALLERY} [data-testid="gallery-tray-item"][data-item-id="{card_id}"]'
 
 
 def _wait_for_actions(page, action_id: str, count: int, timeout: int = 30000) -> None:
@@ -130,6 +131,9 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         runtime = create_runtime()
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
         runtime.env["ELOSERN_BROWSER_UNIFIED_IMAGES"] = "1"
+        # The journey opens the version-4 gallery, whose "mine" category
+        # reads the account roster the seed must keep (gallery-window-mount).
+        runtime.env["ELOSERN_BROWSER_OPENS_GALLERY"] = "1"
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
@@ -169,6 +173,21 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         self._ruler_requests.append(route.request.url)
         route.fulfill(status=200, content_type="image/webp", body=b"not-an-image")
 
+    def _page_failing_original(self, *, ruler: bool = False):
+        """A logged-in page whose seeded original media is already intercepted.
+
+        The routes are installed before login: the live character's roster and
+        stage portrait name the same exact original, and a load there before
+        the route existed would serve the gallery and its editors from the
+        browser cache instead of the intercepted request.
+        """
+        page = self.new_page()
+        self._fail_original_media(page)
+        if ruler:
+            self._fail_adult_reference(page)
+        login_and_open(page, self.webclient_url, self.base_url)
+        return page
+
     def _open_gallery(self, page) -> None:
         from .browser_helpers import press_control
 
@@ -181,7 +200,7 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
     def _open_card_editor(self, page, card_id: str, button: str, modal: str) -> None:
         """Select one committed card and open its own editor dialog.
 
-        The card grid and the detail rail are the real selection/editing
+        The tray and the image page footer are the real selection/editing
         controls; the dialog is only opened through them.
         """
         page.locator(_card(card_id)).first.click()
@@ -203,9 +222,8 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             SEEDED_ORIGINAL_IMAGE_ID,
         )
 
-        page = self.logged_in_page()
+        page = self._page_failing_original()
         install_outbound_recorder(page)
-        self._fail_original_media(page)
         self._open_gallery(page)
 
         # The committed selection is the seed's exact original card: one rank-10
@@ -277,12 +295,10 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             SEEDED_ORIGINAL_IMAGE_ID,
         )
 
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
         # Only the SEEDED original's media is broken; the repaired replacement
         # this journey publishes afterwards is served for real.
-        self._fail_original_media(page)
-        self._fail_adult_reference(page)
+        page = self._page_failing_original(ruler=True)
+        install_outbound_recorder(page)
         self._open_gallery(page)
         page.wait_for_selector(_card(SEEDED_ORIGINAL_IMAGE_ID), timeout=30000)
         subject_key = store_state(page)["panels"]["gallery"]["selected"]

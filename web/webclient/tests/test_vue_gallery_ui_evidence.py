@@ -154,6 +154,10 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         )
 
     @covers_requirement(
+        # The retired detail-rail requirement keeps its annotation until the
+        # archive sync removes it; the image page requirements carry the
+        # same behaviour afterwards.
+        "webclient-gallery-ui::the-detail-rail-presents-the-selected-card-and-gates-destructive-intent",
         "webclient-gallery-image-page::deletion-takes-two-steps",
         "webclient-gallery-image-page::the-footer-follows-the-declared-capabilities",
         "webclient-gallery-image-page::the-page-renders-committed-facts-in-cells",
