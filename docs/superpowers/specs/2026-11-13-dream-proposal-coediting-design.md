@@ -1,6 +1,10 @@
 # Dream Proposal Co-Editing Design
 
-Date: 2026-11-13
+**Date:** 2026-11-13
+**Status:** designed; staged as ten OpenSpec changes under
+`openspec/changes/` (see "Delivery")
+**Prototype:** `docs/design/dream-proposal-coediting/` (Storybook
+`Design/DreamWish`)
 
 ## Problem
 
@@ -19,19 +23,89 @@ goddess. Today it does not:
 The 念頭 sheet already is a form (summary, thread, five tag lists, read-only
 experience requirements), but the player fills it alone.
 
-## Goal
+## Goals
 
 The proposal is built step by step during the conversation. The player gives
 instructions, the model edits the form, and the player hand-edits it once
 before submitting.
 
-## Out of Scope
+## Non-goals
 
 - The saved and dispatched direction format (`DIRECTION_KEYS`), requirement
   version checks, dispatch work, the six-exchange budget and sleep settlement.
 - Text-client editing of tags and requirements. The text client keeps its
   current ability to replace the summary only.
 - Real tool-call round trips with the model.
+
+## Delivery
+
+Ten OpenSpec changes, one stage each, shipped in the order below. The batch is
+a chain, not a set of independent slices: stage 5 replaces the panel wire and
+stage 6 adds the text commands, so the old browser panel is rejected by its
+own schema from stage 5 until stage 7 replaces it, and the text client cannot
+reach `finalize` until stage 6. Every stage is still committed green — tests
+run against the new wire — but the shipped browser surface catches up only at
+stage 7.
+
+| # | Change | Scope | Est. | Surface | Depends on |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `dream-proposal-edit-applier` | pure edit applier | 5.5h | server (pure module) | — |
+| 2 | `dream-collaborator-proposal-edits` | model returns edits | 7h | AI/prompt | 1 |
+| 3 | `dream-working-proposal` | session keeps the proposal, thread choice | 7.5h | server, action registry | 2 |
+| 4 | `dream-wish-stages` | conversing and finalized stages | 6h | server | 3 |
+| 5 | `dream-wish-stage-wire` | panel schema 4, `dream.finalize` | 4.5h | wire | 4 |
+| 6 | `dream-wish-text-commands` | `dream thread`, `dream finalize` | 4.5h | text client | 5 |
+| 7 | `dream-wish-stage-panel` | staged panel | 6.5h | **browser UI/UX** | 6 |
+| 8 | `dream-wish-stage-stories` | Storybook states, documents, `OPENING` | 2h | review surface, docs | 7 |
+| 9 | `dream-wish-change-report` | change line, marks, requirement rows | 8h | **browser UI/UX** | 8 |
+| 10 | `dream-farewell-beat` | farewell state | 8h | **browser UI/UX** | 9 |
+
+Total 59.5 hours. Stages 1 through 6 and 8 carry no browser behaviour change.
+
+### Frontend UI/UX surface
+
+Three changes alter what the player sees in the browser; all three edit
+`DreamPanel.vue`:
+
+- **`dream-wish-stage-panel` (7, the staged browser surface).** The keepsake
+  rows relabel by stage, the inline thread choice sits above the reply bar
+  before the first message, the whole-wish view is read-only, finalize adds a
+  confirmation whose default focus stays, the edit sheet opens only when
+  finalized, and the awaken check follows the new model. Labels, focus order,
+  the non-chained finalize, and inert controls come from "Browser Surface"
+  and "Player-Facing Wording".
+- **`dream-wish-change-report` (9, noticing the goddess's edits).** The change
+  line under the summary excerpt, its reveal timing and live-region
+  announcement, the changed-field marks in the read-only view, removed items
+  listed by name, and the requirement-row editor with its count and per-row
+  error.
+- **`dream-farewell-beat` (10, leaving).** The `farewell` panel state: the
+  closing line types into the message band, waits for the "wake" hint, the
+  stage blooms and fades, reduced motion omits the transition, every dream
+  control is inert, and a reconnect shows the waking surface. It also holds
+  the open-dream yield in `AppClient.vue` and the travel layout until the
+  farewell releases.
+
+Adjacent but not browser UX:
+
+- **`dream-wish-stage-wire` (5)** publishes the fields the panel reads and
+  touches only story fixtures, never component behaviour; the browser keeps
+  the pre-stage panel until stage 7.
+- **`dream-wish-stage-stories` (8)** is the Storybook review surface and two
+  command documents; it ships no player-visible state.
+- **`dream-wish-text-commands` (6)** changes player-facing text output in the
+  text client, not the browser.
+
+The panel work is reviewed by a person against the prototype's
+`Design/DreamWish` story; tests establish state, dispatch, focus and gating
+only.
+
+### Parallel implementation batches
+
+The ten changes form one chain: each stage depends on the stage before it, and
+they rewrite `DreamPanel.vue`, `tests/dream.test.js` and
+`world/narrative/dream_surface.py` in turn. No two may be applied at the same
+time, so the batch order is the table order.
 
 ## Decisions
 
@@ -335,5 +409,11 @@ Tests assert logic only, add no game data and assert no wall-clock time.
 
 ## Affected Specifications
 
-`dream-session-lifecycle`, `dream-authoring`, `dream-sleep-surface`,
-`webclient-dream-stage`, `dream-explicit-presentation`.
+Existing capabilities: `dream-session-lifecycle`, `dream-authoring`,
+`dream-sleep-surface`, `webclient-dream-stage`, `dream-explicit-presentation`,
+`webclient-action-dispatch`.
+
+New capability: `dream-proposal-editing` (stage 1).
+
+`webclient-dream-stage` is the only capability whose requirements are frontend
+UI/UX, and it is modified by stages 5, 7, 9 and 10.
