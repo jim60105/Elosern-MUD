@@ -36,7 +36,7 @@ Scope of this change: the trial rectangle of the western hills around `town_scar
 
 ### D1. Placement script
 
-Write the placement script in `openspec/changes/western-hills-village-trial/snippets/` (for example `place.py`), together with its candidate JSON files. Start from nothing. It is a working tool: it reads `content/maps/locations.yaml`, `world/maps/data/road_network.json` and the terrain through `elosern_map_core`, and prints candidates. It never writes a map source; the implementing agent writes approved rows.
+Write the placement script in `openspec/changes/western-hills-village-trial/snippets/` (for example `place.py`), together with its candidate JSON files. Start from nothing. A workable shape: one command that lists the road gaps over 75 km in scope, one that proposes village cells for a gap or a named off-trunk site, and one that proposes hamlet cells on the remaining gaps, each printing JSON that `place_sites.py` accepts. It is a working tool: it reads `content/maps/locations.yaml`, `world/maps/data/road_network.json` and the terrain through `elosern_map_core`, and prints candidates. It never writes a map source; the implementing agent writes approved rows.
 
 The script should rank candidates by the distribution targets of the tiers design §5, which are targets and not limits:
 
@@ -119,7 +119,7 @@ Run in this order every time step D5 says "Regenerate":
 3. `uv run --locked python -m tools.road_network --preview <scratch>/roads.png`, with `<scratch>` outside the repository
 4. `uv run --locked python -m tools.map_reference_context`
 
-If road generation fails naming a village, that village's cell is unusable or cut off: move it. If the world does not compose because an ecology zone lost its usable birth interval, that is a habitat conflict under D3.
+If road generation fails naming a village, that village's cell is unusable or cut off: move it. A one-cell footprint is not walkable wilderness, so a settlement in a one-cell-wide corridor can cut it; if `check_map_sources.py` or the composition reports an unreachable landmark or a disconnected area after the maps are written, move that settlement to a wider site. Never edit a validator. If the world does not compose because an ecology zone lost its usable birth interval, that is a habitat conflict under D3.
 
 Between the regeneration of step 2 and the one of step 4 of D5, compare the trunk rows: `git diff world/maps/data/road_network.json` must show changes only in `nodes`, `fingerprint`, `source_signature` and rows that carry `spur_of`. A changed row without `spur_of` means stage one moved; stop and report.
 
@@ -174,13 +174,13 @@ This is the trial of the tiers design. Write `openspec/changes/western-hills-vil
 3. Naming style: list every name that needed a second attempt, and the reason.
 4. Monster habitats: list every conflict found and how it was resolved.
 5. Tools: every refusal, lint finding or validation problem that looked wrong, with the command and its output.
-6. Counts: villages, hamlets, on-road and off-road, and kilometres of spur added.
+6. Counts: villages, hamlets, on-road and off-road, and the number of distinct road cells the spurs added (a village on a trunk cell has a spur record that adds none).
 
 Do not change a rule, a threshold or a tool in this change. A finding that needs one is reported in the hand-off for the user, who revises the tiers design before the next placement change starts.
 
 ## Risks / Trade-offs
 
-- [A village whose ID sorts before existing villages can move their spurs] → After every regeneration the lint reports any map whose gates no longer match (`fit_entrance_mismatch`). Fix by deleting that map's file, generating it again and redoing its prose. Prefer IDs that do not need this, but never rename an ID that an earlier change wrote.
+- [A village whose ID sorts before existing villages can move their spurs] → After every regeneration the lint reports any map whose gates no longer match (`fit_entrance_mismatch`). Fix by deleting that map's file, generating it again and redoing its prose. A hamlet of this change that a moved spur left off the road is moved back onto a road cell by editing its cell, before its map is generated; a hamlet of an earlier change is never moved, and the gap is closed with a new hamlet. Prefer IDs that do not need this, but never rename an ID that an earlier change wrote.
 - [A gap crossing the scope boundary stays over 75 km] → It is not checked until both sides are complete. The next change closes it under D2.
 - [Hundreds of new public markers crowd the world map] → Human review item; capture the continent in task 5.3. No rule changes here.
 - [Prose volume] → Each map has 2 to 5 nodes. Write the prose map by map, village maps first.

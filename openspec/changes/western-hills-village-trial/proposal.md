@@ -39,6 +39,7 @@ None. `skip_specs: true` is set.
 - depends-on: single-cell-footprint-entry
 - depends-on: settlement-spacing-validation
 - depends-on: road-spur-stage
+- depends-on: single-cell-size-budget
 - depends-on: single-cell-settlement-layout
 - next: altoria-hills-village-placement
 - conflicts: `content/maps/locations.yaml`, `world/lore/anchors.py`, `tools/settlement_spacing_areas.json`, `world/maps/data/road_network.json`, `world/maps/data/district_partition.json` and `content/map-reference-context.json` are changed by every placement change. The six placement changes are strictly serial, in the order trial, Altoria hills, Altoria coast, Grandia south, Grandia north, Valhalla. A spur or a hamlet written here is an input of the next change.
