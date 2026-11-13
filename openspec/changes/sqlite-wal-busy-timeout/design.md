@@ -34,7 +34,7 @@ Create `server/conf/sqlite_options.py`, standard library only, with exactly:
 ```python
 """SQLite connection options shared by every process (sqlite-concurrency)."""
 
-SQLITE_BUSY_TIMEOUT_SECONDS = 30
+SQLITE_BUSY_TIMEOUT_SECONDS = 10
 
 SQLITE_OPTIONS: dict[str, object] = {
     "timeout": SQLITE_BUSY_TIMEOUT_SECONDS,
@@ -64,7 +64,7 @@ from server.conf.sqlite_options import SQLITE_TEST_OPTIONS
 DATABASES["default"]["OPTIONS"] = dict(SQLITE_TEST_OPTIONS)
 ```
 
-Why `OPTIONS` and not `SQLITE3_PRAGMAS`: only `OPTIONS` reaches the Portal and the migrate command. Why `IMMEDIATE`: in write-ahead-log mode a deferred transaction that read first and writes after another process committed fails at once with a busy-snapshot error that ignores the timeout; taking the write lock at `BEGIN` makes the writer wait instead. Why 30 seconds: the same value `server/saves/snapshot.py::_BACKUP_BUSY_TIMEOUT` already uses.
+Why `OPTIONS` and not `SQLITE3_PRAGMAS`: only `OPTIONS` reaches the Portal and the migrate command. Why `IMMEDIATE`: in write-ahead-log mode a deferred transaction that read first and writes after another process committed fails at once with a busy-snapshot error that ignores the timeout; taking the write lock at `BEGIN` makes the writer wait instead. Why 10 seconds: Django database calls are synchronous on the Portal's reactor, so a Portal write that waits freezes every Portal session for the whole wait. Ten seconds outlasts any ordinary Server transaction and keeps that freeze short; the save backup keeps its own 30 second value.
 
 The two smoke settings (`server/conf/monster_population_smoke_settings.py`, `server/conf/monster_field_behaviour_smoke_settings.py`) and `tools/monster_ai_manual_reports_settings.py` star-import the settings and inherit the options. Do not edit them.
 
@@ -111,7 +111,7 @@ Write each edit in the language the file already uses.
 
 ## Risks / Trade-offs
 
-- [A reader inside `transaction.atomic()` now takes the write lock and can wait up to 30 seconds behind a long Server transaction] → Portal session reads run in autocommit; the long transaction itself is removed by the settlement changes of this batch.
+- [A Portal write, and any Portal code inside `transaction.atomic()` even when it only reads, now waits up to 10 seconds behind a Server write transaction instead of failing at once; during that wait the whole Portal reactor is frozen, and behind a transaction longer than 10 seconds it still fails with `database is locked`] → this change fixes plain reads only (the reported login traceback is a session read). It is a mitigation, not the fix; the long transaction itself is removed by the settlement changes of this batch.
 - [`synchronous=OFF` with write-ahead logging can lose or damage the last transactions on power loss] → the same risk class as today's rollback-journal mode with the same pragma; world saves are the recovery path.
 - [A network or overlay filesystem without shared-memory support cannot use write-ahead logging] → the `evennia-db` named volume is a local filesystem; `docs/development/settings-and-environment.md` states the requirement.
 

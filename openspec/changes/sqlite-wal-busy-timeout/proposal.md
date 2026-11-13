@@ -4,11 +4,11 @@
 
 While the Server process holds one long write transaction (a clock advance that settles the whole world), the separate Portal process cannot read the SQLite database: it runs in rollback-journal mode with the default 5 second busy timeout, so the Portal raises `django.db.utils.OperationalError: database is locked` (seen at `server/conf/websocket_protocol.py:39`) and the web login fails. `server/conf/settings.py` sets only `DATABASES["default"]["NAME"]`.
 
-This change is a mitigation. It removes the lock error for readers. It does not shorten the advance and does not unfreeze the Server reactor; the settlement changes of this batch do that.
+This change is a mitigation. It removes the lock error for plain reads; a Portal write still waits behind a Server write transaction and fails after the busy timeout. It does not shorten the advance and does not unfreeze the Server reactor; the settlement changes of this batch do that.
 
 ## What Changes
 
-- Every database connection of every process (Server, Portal, `evennia migrate`, `evennia collectstatic`, shells) opens the world database in write-ahead-log mode with a 30 second busy timeout and immediate write transactions, through Django's `DATABASES["default"]["OPTIONS"]`.
+- Every database connection of every process (Server, Portal, `evennia migrate`, `evennia collectstatic`, shells) opens the world database in write-ahead-log mode with a 10 second busy timeout and immediate write transactions, through Django's `DATABASES["default"]["OPTIONS"]`.
 - The test database keeps rollback-journal mode, because the parallel test runner clones the database file by file copy.
 - A world save always contains a single self-contained database file in rollback-journal mode, whatever the mode of the live database.
 - The pre-start restore tool keeps its existing `-journal`/`-wal`/`-shm` handling; this change adds the missing tests for the `-wal` and `-shm` pair.
@@ -35,5 +35,5 @@ This change is a mitigation. It removes the lock error for readers. It does not 
 ## Batch:
 
 - depends-on: none
-- parallel with: `population-maintenance-log-tally`, `settlement-decode-reuse`, `settlement-outer-rollback`, `settlement-deferred-body-writes`, `population-settlement-units`, `unit-scoped-population-settlement`, `population-catch-up-entry-points`, `observed-unit-advance`, `population-backlog-drain`.
+- parallel with: `population-maintenance-log-tally`, `settlement-decode-reuse`, `settlement-outer-rollback`, `settlement-deferred-body-writes`, `population-settlement-units`, `unit-scoped-population-settlement`, `population-catch-up-entry-points`, `population-writer-guards`, `observed-unit-advance`, `observed-unit-read-narrowing`, `population-backlog-drain`.
 - conflicts: `.github/evennia-shards.json` is edited by every change of this batch that adds a test module; resolve by keeping both entries. `server/conf/settings.py` and `server/conf/test_settings.py` are also edited by `population-backlog-drain` in a different section.
