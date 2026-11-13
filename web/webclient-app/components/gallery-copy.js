@@ -16,6 +16,14 @@ export const GALLERY_CATEGORY_LABELS = Object.freeze({
   monster: "魔物",
   scene: "背景",
 });
+// The rail glyph of each committed category key (`dock-icons.js` keys).
+export const GALLERY_CATEGORY_GLYPHS = Object.freeze({
+  mine: "emblem_race",
+  party: "party",
+  people: "emblem_nation",
+  monster: "emblem_monster",
+  scene: "emblem_region",
+});
 
 // The official-entry chrome (change official-art-personalization): client
 // vocabulary only. Every FACT — identity, URL, rectangle, and both markers —

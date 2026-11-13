@@ -275,4 +275,15 @@ describe("IconTabs (quest-drawer-ui-primitives)", () => {
     expect(tab("completed").get(".slot-icon").text()).toBe("completed");
     expect(tab("completed").find(".icon-tabs__icon svg").exists()).toBe(false);
   });
+
+  it("focuses the selected tab through focusSelected, else the roving stop", async () => {
+    mountTabs({ modelValue: "completed" });
+    await wrapper.vm.focusSelected();
+    expect(document.activeElement).toBe(tab("completed").element);
+    // A selection the tabs no longer list falls back to the roving stop.
+    await wrapper.setProps({ modelValue: "gone" });
+    await wrapper.vm.focusSelected();
+    expect(document.activeElement).toBe(tab("in_progress").element);
+    expect(document.activeElement.getAttribute("tabindex")).toBe("0");
+  });
 });

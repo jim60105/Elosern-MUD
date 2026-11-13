@@ -99,3 +99,18 @@ export function galleryFooter(selection, capabilities) {
 export function galleryRibbon(categoryLabel, groupLabel) {
   return groupLabel ? `${categoryLabel}・${groupLabel}` : categoryLabel;
 }
+
+// ---- the window (change gallery-window-component) ---------------------------
+
+// The image a newly committed subject opens on (gallery window design D4):
+// its default card, else its first card row, else its current official
+// entry, else its first official entry, else none (the empty page). Card ids
+// and official identities never collide, so one id names the selection.
+export function initialImage(cards, officialEntries) {
+  const rows = cards ?? [];
+  const entries = officialEntries ?? [];
+  const card = rows.find((row) => row.is_default) ?? rows[0];
+  if (card) return card.image_id;
+  const entry = entries.find((row) => row.is_current) ?? entries[0];
+  return entry ? entry.identity : null;
+}

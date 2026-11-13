@@ -4,8 +4,8 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 1. Window
 
-- [ ] 1.1 Create `components/GalleryWindow.vue` per design D1–D7; add `initialImage` to `gallery-window-model.js` and `GALLERY_CATEGORY_LABELS` plus the glyph map to `gallery-copy.js` if absent. Verify by 1.2.
-- [ ] 1.2 Create `tests/components/gallery_window.test.js` with one test per ADDED scenario (mount with v4 fixtures, a fake `dispatch` recording calls, simulated committed panels) and a style lint. Verify `pnpm test -- gallery_window` passes.
+- [x] 1.1 Create `components/GalleryWindow.vue` per design D1–D7; add `initialImage` to `gallery-window-model.js` and `GALLERY_CATEGORY_LABELS` plus the glyph map to `gallery-copy.js` if absent. Verify by 1.2.
+- [x] 1.2 Create `tests/components/gallery_window.test.js` with one test per ADDED scenario (mount with v4 fixtures, a fake `dispatch` recording calls, simulated committed panels) and a style lint. Verify `pnpm test -- gallery_window` passes.
 
 ## 2. Stories
 
