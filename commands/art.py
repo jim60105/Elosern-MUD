@@ -2,9 +2,10 @@
 
 Restricted to staff: ``@art status`` (list/filter records), ``@art run``
 (drain now, non-blocking), ``@art retry`` (re-enqueue failed records),
-``@art requeue <full-subject-key>`` (forced regeneration — gallery-bearing
-kinds through the validated gallery seam, scene keys through the classic
-record reset), ``@art
+``@art requeue <full-subject-key>`` (forced regeneration — every kind that
+declares a gallery, character, monster and scene alike, through the validated
+gallery seam; a kind declaring no gallery keeps the classic record reset as
+preserved machinery), ``@art
 options <kind>`` (list the live server's selectable option names), and
 ``@art health`` (forced connectivity verdict + scheduler/queue/gallery/
 output-policy dashboard). ``@art status`` additionally reports per-subject
@@ -247,6 +248,9 @@ class CmdArtRequeue(_ArtCommand):
                 return
             self.caller.msg(f"已將 {subject.full()} 重新排入佇列。")
             return
+        # No shipped kind reaches this branch any more (every one declares a
+        # gallery); it is the preserved classic reset a gallery-less
+        # declaration would still use.
         try:
             scene_subject_for(subject.key)
         except ArtSubjectError as error:

@@ -1253,8 +1253,14 @@ def describe_scene(target) -> dict:
     gallery_failed = (
         gallery_record is not None and bool(gallery_record.db.last_error_code)
     )
+    # A presentable card is the generated source, so the classic record is not
+    # read for generation state beside it: a legacy classic failure must never
+    # report the carded scene as failed.
     generation_subject, generation_state = _generation_facts(
-        subject, record, gallery_card is not None, gallery_failed
+        subject,
+        record if gallery_card is None else None,
+        gallery_card is not None,
+        gallery_failed,
     )
     return descriptors.descriptor(
         subject_id=target.identity,

@@ -439,6 +439,34 @@ class GalleryGeneratedSourceTests(_SceneFixture):
     @covers_requirement(
         "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
     )
+    def test_a_card_wins_over_a_legacy_classic_failure(self):
+        # A classic record the producers left failed must not report the carded
+        # scene as failed: the card is the generated source and the state.
+        subject = self.subject()
+        ensure(subject, SCENE_DESCRIPTION)
+        claimed = next(
+            record
+            for record in claim(ArtAssetRecord.objects.count() + 1)
+            if record.db_key == record_key(subject)
+        )
+        settle(
+            subject,
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+            generation_token=str(claimed.db.generation_token),
+        )
+        _image_id, identity = self.publish_gallery_card()
+        descriptor = describe_scene(self.target())
+        generated = self.generated_position(descriptor)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "image")
+        self.assertEqual(generated[0]["resource"]["resource_id"], identity)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_a_card_whose_file_vanished_falls_back_to_the_classic_output(self):
         classic_identity = self.publish()
         _image_id, identity = self.publish_gallery_card()
