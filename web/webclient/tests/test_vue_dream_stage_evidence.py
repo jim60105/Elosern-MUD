@@ -321,6 +321,8 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             "dream farewell",
             (
                 'dream farewell > replaces the controls with the farewell line',
+                'dream farewell > dispatches nothing from a control and keeps Tab on the band',
+                'dream farewell > releases when motion leaves full during the fade, and never after unmount',
                 'dream farewell > presents the line even when the closed state still carries a failure',
                 'dream farewell > completes the typing, then releases at full motion when the fade ends',
                 'dream farewell > releases at full motion on a further activation or when the fade never ends',

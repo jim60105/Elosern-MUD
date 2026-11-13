@@ -1524,8 +1524,8 @@ function onKeydown(event) {
 @media (prefers-reduced-motion: reduce) {
   .dream-pip--forfeit, .dream-keepsake--inked .dream-ink::after, .dream-keepsake--inked .dream-keepsake__preview { animation: none; }
   .dream-scene--full-motion.dream-scene--leaving .dream-keepsake { animation: none; opacity: 0; }
-  .dream-scene__wishlight { animation: none; opacity: 1; }
-  .dream-scene__wishlight::before, .dream-scene__wishlight::after { animation: none; }
+  /* No light snaps on without its ramp: the granted wish simply fades. */
+  .dream-scene__wishlight { display: none; }
 }
 
 @media (max-height: 800px) {
