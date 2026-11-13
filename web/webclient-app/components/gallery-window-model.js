@@ -42,3 +42,60 @@ export function trayInsertIndex(ownerIndex, columns, groupLength) {
   const perRow = Math.max(1, columns);
   return Math.min(groupLength - 1, Math.ceil((ownerIndex + 1) / perRow) * perRow - 1);
 }
+
+// ---- the image page (change gallery-image-page) -----------------------------
+
+function footerButton(key, label, tone = "plain", extra = {}) {
+  return { key, label, tone, enabled: true, testid: `gallery-page__${key}`, ...extra };
+}
+
+// The image page's footer descriptor (gallery-image-page design D2): the
+// buttons a selection offers, in order, and an optional note for the footer's
+// reason line. It reads the selection and the subject's committed
+// capabilities only — never a subject category — so the button table of the
+// window design follows from the declared facts. Null capabilities declare
+// nothing.
+export function galleryFooter(selection, capabilities) {
+  const caps = capabilities ?? {};
+  if (!selection || selection.type === "empty") {
+    return { buttons: [footerButton("generate", "生成新圖", "primary")], note: null };
+  }
+  if (selection.type === "official") {
+    if (!caps.supports_personal_official_preferences) return { buttons: [], note: null };
+    return {
+      buttons: [
+        footerButton("official-geometry-clear", "清除個人調整", "ghost"),
+        ...(caps.supports_face_rect ? [footerButton("official-face", "臉框")] : []),
+        ...(caps.supports_stage ? [footerButton("official-stage", "舞台位置")] : []),
+        selection.row.is_current
+          ? footerButton("official-clear-selection", "清除選取")
+          : footerButton("official-select", "設為預設", "primary"),
+      ],
+      note: null,
+    };
+  }
+  const row = selection.row;
+  if (row.status === "pending") return { buttons: [], note: "生成中" };
+  if (row.status === "failed") return { buttons: [footerButton("regenerate", "重新生成", "primary")], note: null };
+  const buttons = [];
+  let note = null;
+  if (caps.supports_card_delete) buttons.push(footerButton("delete", "刪除", "danger"));
+  if (caps.supports_face_rect) buttons.push(footerButton("face", "臉框"));
+  if (caps.supports_stage) buttons.push(footerButton("stage", "舞台位置"));
+  if (caps.supports_bindings) buttons.push(footerButton("binding", "綁定裝備"));
+  if (caps.max_cards === null) {
+    buttons.push(footerButton("default", "設為預設", "primary", { enabled: !row.is_default, describedByReason: true }));
+    if (row.is_default) note = "目前預設";
+  } else if (caps.max_cards === 1) {
+    buttons.push(footerButton("regenerate", "重新生成", "primary"));
+  }
+  // The destructive button stands apart from the rest of the row.
+  if (buttons[0]?.key === "delete" && buttons[1]) buttons[1] = { ...buttons[1], spacerBefore: true };
+  return { buttons, note };
+}
+
+// The page ribbon: the category label, then `・` and the group label when the
+// subject's group has one.
+export function galleryRibbon(categoryLabel, groupLabel) {
+  return groupLabel ? `${categoryLabel}・${groupLabel}` : categoryLabel;
+}

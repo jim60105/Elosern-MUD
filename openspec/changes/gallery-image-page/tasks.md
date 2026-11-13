@@ -4,7 +4,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 1. Model
 
-- [ ] 1.1 Add `galleryFooter` and `galleryRibbon` to `components/gallery-window-model.js` (create the file if `gallery-wall-component` has not landed; both changes only append functions) per design D2/D4, with unit tests covering every scenario of the two footer requirements in `tests/components/gallery_image_page.test.js`. Verify `pnpm test -- gallery_image_page` passes.
+- [x] 1.1 Add `galleryFooter` and `galleryRibbon` to `components/gallery-window-model.js` (create the file if `gallery-wall-component` has not landed; both changes only append functions) per design D2/D4, with unit tests covering every scenario of the two footer requirements in `tests/components/gallery_image_page.test.js`. Verify `pnpm test -- gallery_image_page` passes.
 
 ## 2. Component
 
