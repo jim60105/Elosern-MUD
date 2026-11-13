@@ -440,8 +440,13 @@ watch([parts, items], () => {
       // A heading whose section crossed between the runs is remounted. It is
       // found in the patched DOM: a moved section mounts its new heading
       // before (or after) the old one unmounts, so no element map can tell.
-      [...root.value.querySelectorAll("[data-group-key]")].find((el) => el.dataset.groupKey === headKey)?.focus();
-      return;
+      // A heading that is gone falls through to the owner tile or the wall's
+      // tab stop below.
+      const heading = [...(root.value?.querySelectorAll("[data-group-key]") ?? [])].find((el) => el.dataset.groupKey === headKey);
+      if (heading) {
+        heading.focus();
+        return;
+      }
     }
     if (tileKey) {
       if (tileKeys.value.includes(tileKey)) focusTile(tileKey);
@@ -456,6 +461,8 @@ watch([parts, items], () => {
     }
     if (ownerKey.value) focusTile(ownerKey.value);
     else if (previousOwner && tileKeys.value.includes(previousOwner)) focusTile(previousOwner);
+    // A vanished heading with no tray to fall back on: the wall's tab stop.
+    else if (headKey && rovingKey.value) focusTile(rovingKey.value);
   });
 }, { flush: "pre" });
 

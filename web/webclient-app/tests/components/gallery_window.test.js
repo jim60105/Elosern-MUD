@@ -195,6 +195,25 @@ describe("expanding a group is one server round trip", () => {
     expect(head(harbor).getAttribute("aria-busy")).toBeNull();
   });
 
+  it("drops the mark when its request settles, even with the place still collapsed", async () => {
+    const { wrapper } = mountPeople();
+    await click(head(MARKET));
+    await wrapper.setProps({ result: { requestId: "request:1", outcome: "success", presentationRevision: 2 }, revision: 2 });
+    await flushPromises();
+    expect(head(MARKET).getAttribute("aria-busy")).toBeNull();
+  });
+
+  it("drops the mark when a committed panel no longer lists the place", async () => {
+    const { wrapper } = mountPeople();
+    await click(head(MARKET));
+    const model = structuredClone(GALLERY_V4_PEOPLE);
+    model.groups = model.groups.filter((group) => group.key !== MARKET);
+    await wrapper.setProps({ model });
+    await flushPromises();
+    expect(head(MARKET)).toBeNull();
+    expect(document.querySelector('[data-testid="gallery-group-head"][aria-busy]')).toBeNull();
+  });
+
   it("marks nothing when the dispatch sends nothing", async () => {
     const { dispatch } = mountPeople({ dispatch: vi.fn(() => null) });
     await click(head(MARKET));

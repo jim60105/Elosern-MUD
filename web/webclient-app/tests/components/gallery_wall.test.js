@@ -275,6 +275,19 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       expect(document.activeElement?.dataset.groupKey).toBe("p1");
     });
 
+    it("moves a focused heading's focus to a tile when headings turn plain", async () => {
+      await mountWall({ groups: places(), selectedSubject: subject("a").subject_key });
+      head("p1").element.focus();
+      await wrapper.setProps({
+        groups: [group("p2", [subject("a"), subject("b")], { label: "t_place_two" }), group("p1", [subject("c")], { label: "t_place_one" })],
+      });
+      await flushPromises();
+      await nextTick();
+      expect(wrapper.find("button").exists()).toBe(false);
+      expect(wrapper.element.contains(document.activeElement)).toBe(true);
+      expect(document.activeElement?.dataset.subjectKey).toBeDefined();
+    });
+
     it("keeps a focused tile when the last collapsed group expands", async () => {
       await mountWall({ groups: places() });
       tile("a").element.focus();

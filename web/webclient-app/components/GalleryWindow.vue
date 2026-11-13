@@ -123,15 +123,7 @@ watch([cards, officialEntries], () => {
 // The pressed rail tab, marked until the next committed panel (or a rejected
 // request); the wall keeps showing committed groups meanwhile.
 const pendingCategory = ref(null);
-// The pressed place heading, marked until a committed panel expands it (or no
-// longer lists it), or until its request settles either way.
-const pendingGroup = ref(null);
-watch(() => props.model, () => {
-  pendingCategory.value = null;
-  if (pendingGroup.value !== null && !groups.value.some((group) => group.key === pendingGroup.value && !group.expanded)) {
-    pendingGroup.value = null;
-  }
-});
+watch(() => props.model, () => { pendingCategory.value = null; });
 
 watch(() => [props.result, props.revision], () => {
   const request = pending.value;
@@ -141,19 +133,26 @@ watch(() => [props.result, props.revision], () => {
     pending.value = null;
     rejected.value = true;
     if (request.category) pendingCategory.value = null;
-    if (request.group) pendingGroup.value = null;
   } else if (result.presentationRevision != null && props.revision >= result.presentationRevision) {
     const name = request.editor;
     const current = request.official ? entryEditor.value : editor.value;
     pending.value = null;
     if (request.category) pendingCategory.value = null;
-    if (request.group) pendingGroup.value = null;
     if (name && name === current) closeEditor();
   }
 });
 
 // The subject whose selection is in flight: the wall marks its tile busy.
 const pendingSubject = computed(() => pending.value?.subject ?? null);
+
+// The pressed place heading, derived from the one in-flight request so it can
+// never outlive it: marked while that request is pending and the committed
+// panel still shows the place collapsed; a panel that expands (or drops) the
+// place, a settled result and a dropped request all clear it.
+const pendingGroup = computed(() => {
+  const key = pending.value?.group ?? null;
+  return key !== null && groups.value.some((group) => group.key === key && !group.expanded) ? key : null;
+});
 
 function openEditor(name) {
   if (locked.value || pending.value || !hasSubject.value || (name !== "generate" && selectedCard.value?.status !== "card")) return;
@@ -285,8 +284,8 @@ function selectSubject(key) {
 // place, an unknown key and a second press while one is in flight send nothing.
 function expandGroup(key) {
   const group = groups.value.find((row) => row.key === key);
-  if (!group || group.expanded || pendingGroup.value !== null) return;
-  if (send("gallery.group.select", { group: key })) pendingGroup.value = key;
+  if (!group || group.expanded) return;
+  send("gallery.group.select", { group: key });
 }
 
 function selectImage(id) {
