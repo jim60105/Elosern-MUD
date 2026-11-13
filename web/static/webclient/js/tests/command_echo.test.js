@@ -277,6 +277,25 @@ test("guild.register resolves to guild register", () => {
   assert.strictEqual(Echo.commandLine("guild.register", {}, {}), "guild register");
 });
 
+test("dream.choose_thread resolves to the typed thread line", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "dream.choose_thread",
+      { session_id: "session:synthetic-dream", revision: 1, thread_id: "t_synthetic_thread" },
+      {},
+    ),
+    "dream thread t_synthetic_thread",
+  );
+  assert.strictEqual(
+    Echo.commandLine(
+      "dream.choose_thread",
+      { session_id: "session:synthetic-dream", revision: 1, thread_id: null },
+      {},
+    ),
+    "dream thread new",
+  );
+});
+
 test("guild.quest_accept resolves to guild accept <definition_key>", () => {
   assert.strictEqual(
     Echo.commandLine("guild.quest_accept", { definition_key: "gq_bandit_clear" }, {}),
@@ -665,6 +684,10 @@ const REGISTERED_MUTATION_ACTIONS = {
   // The collaborative dream surface (dream-sleep-surface): the browser panel
   // dispatches the same lifecycle the text client types, so each action keeps
   // its typed-command echo.
+  "dream.choose_thread": {
+    payload: { session_id: "session:synthetic-dream", revision: 1, thread_id: "t_synthetic_thread" },
+    display: {},
+  },
   "dream.say": {
     payload: { session_id: "session:synthetic-dream", revision: 1, message_parts: ["合成", "方向"] },
     display: {},

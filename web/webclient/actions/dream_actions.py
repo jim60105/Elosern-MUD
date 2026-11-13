@@ -5,9 +5,30 @@ from functools import partial
 from web.webclient.presentation.protocol import ProtocolValidationError
 from world.narrative.dream_session import MAX_RENDERED_INPUT_CHARS, MAX_SESSION_ID_LENGTH
 from world.narrative.authoring import MAX_SUMMARY_CHARACTERS, DIRECTION_KEYS
+from world.narrative.threads import MAX_THREAD_ID_LENGTH
+
+
+def _validate_choose_thread(payload):
+    """Exactly one bounded thread choice; ``None`` chooses a new story."""
+    if (not isinstance(payload, dict)
+            or set(payload) != {"session_id", "revision", "thread_id"}):
+        raise ProtocolValidationError("invalid dream payload fields")
+    handle = payload["session_id"]
+    revision = payload["revision"]
+    thread_id = payload["thread_id"]
+    if not isinstance(handle, str) or not 1 <= len(handle) <= MAX_SESSION_ID_LENGTH:
+        raise ProtocolValidationError("invalid dream session")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        raise ProtocolValidationError("invalid dream revision")
+    if thread_id is not None and (
+            not isinstance(thread_id, str) or not 1 <= len(thread_id) <= MAX_THREAD_ID_LENGTH):
+        raise ProtocolValidationError("invalid dream thread")
+    return {"session_id": handle, "revision": revision, "thread_id": thread_id}
 
 
 def validate(action, payload):
+    if action == "choose_thread":
+        return _validate_choose_thread(payload)
     required = {"session_id", "revision"}
     allowed = required | ({"message_parts"} if action == "say" else {"direction"} if action in {"draft", "confirm"} else set())
     if not isinstance(payload, dict) or not required <= set(payload) or set(payload) - allowed:
@@ -67,7 +88,7 @@ def adapter(action, actor, payload, session=None):
 
 def register_actions(registry):
     from web.webclient.actions.registry import ActionSpec
-    for action in ("say", "draft", "confirm", "awaken"):
+    for action in ("choose_thread", "say", "draft", "confirm", "awaken"):
         registry.register(ActionSpec(
             "dream." + action, partial(validate, action), partial(adapter, action), ("dream",),
         ))
