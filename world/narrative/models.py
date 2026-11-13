@@ -697,6 +697,9 @@ class DreamSession(models.Model):
     outstanding turn, and ``saved_input`` keeps that turn's bounded rendered
     input so a disconnect resumes it. ``state`` is ``open`` or ``ended`` and
     ``outcome`` records how a terminal choice was made (``draft``/``confirmed``).
+    ``stage`` is ``conversing`` until the owner finalizes or the sixth settled
+    exchange closes free text, and ``finalized`` afterwards: the player writes
+    the proposal only once the conversation's own editing has stopped.
     ``revision`` is a monotonic row revision for durable change ordering;
     concurrency safety rests on the unique constraints and the pending-turn
     check, not on the row lock.
@@ -710,6 +713,7 @@ class DreamSession(models.Model):
     revision = models.BigIntegerField(default=1)
     state = models.CharField(max_length=16, default="open")
     outcome = models.CharField(max_length=16, default="")
+    stage = models.CharField(max_length=16, default="conversing")
     pending_submission_id = models.CharField(max_length=64, default="")
     saved_input = models.TextField(default="")
     draft_id = models.CharField(max_length=128, default="")
