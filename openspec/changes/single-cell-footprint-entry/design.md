@@ -30,7 +30,7 @@ So the only thing missing is a way to say that a one-`#` mask is a footprint.
 **Non-Goals:**
 
 - No shipped document gains the field.
-- No change to the settlement generator, the size budget or the road generator. `single-cell-settlement-layout` and `road-spur-stage` own those.
+- No change to the settlement generator, the size budget or the road generator. `single-cell-size-budget`, `single-cell-settlement-layout` and `road-spur-stage` own those.
 - No map editor control for the field. The editor edits a parsed document in place, so the field survives its commands; setting it is a hand edit.
 - No change to any consumer listed in Context beyond the three classes.
 
