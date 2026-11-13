@@ -134,6 +134,14 @@ function onFocusin(event) {
   const key = tabKeyOf(event);
   if (key != null) focusKey.value = key;
 }
+
+// A host whose focused content vanished (a commit removed it) hands focus
+// back to the rail: the selected tab, else the roving stop.
+defineExpose({
+  focusSelected() {
+    return focusTab(hasKey(props.modelValue) ? props.modelValue : rovingKey.value);
+  },
+});
 </script>
 
 <template>

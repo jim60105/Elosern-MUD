@@ -301,6 +301,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The gallery image page, built and story-documented before the gallery
     # window mounts it (gallery-image-page).
     "Data/GalleryImagePage",
+    # The gallery window, composed and story-documented before it mounts
+    # (gallery-window-component).
+    "Overlays/GalleryWindow",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
@@ -320,6 +323,8 @@ OVERLAYS_KEYS_JOINED_AFTER_B5 = (
     # The gallery stage-transform drawer joined when the correspondence
     # stage surface landed.
     "Overlays/GalleryStageTransformModal",
+    # The gallery window joined before its mount (gallery-window-component).
+    "Overlays/GalleryWindow",
 )
 
 

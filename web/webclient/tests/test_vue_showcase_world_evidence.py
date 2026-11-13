@@ -277,6 +277,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The gallery image page, built and story-documented before the gallery
     # window mounts it (gallery-image-page).
     "Data/GalleryImagePage",
+    # The gallery window, composed and story-documented before it mounts
+    # (gallery-window-component).
+    "Overlays/GalleryWindow",
 }
 
 # The World-directory story files that sit outside the B4 family: the

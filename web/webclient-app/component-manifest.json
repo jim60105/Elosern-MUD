@@ -88,7 +88,8 @@
     "World/CodexDetail",
     "World/TitleCodexTab",
     "Data/GalleryWall",
-    "Data/GalleryImagePage"
+    "Data/GalleryImagePage",
+    "Overlays/GalleryWindow"
   ],
   "frozen": true
 }
