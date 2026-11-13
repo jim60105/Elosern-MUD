@@ -901,6 +901,10 @@ function onKeydown(event) {
 .dream-art__failure { margin: 0; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill);
   background: rgba(11, 13, 16, 0.78); color: #f3b9bc; font-size: var(--text-xs); line-height: 1.5; }
 .dream-art__control { flex: none; letter-spacing: 0.08em; }
+/* The control sits on the pale part of the painting: an ink backing keeps
+   its label legible instead of a ghost outline over near-white art. */
+.dream-art__control.ui-btn--ghost { background: rgba(11, 13, 16, 0.72); border-color: var(--band-edge-dim); color: var(--paper-100); }
+.dream-art__control.ui-btn--ghost:hover:enabled { background: rgba(11, 13, 16, 0.86); border-color: var(--band-edge); }
 /* The full view: the same displayed bitmap at full screen, above every other
    layer of the stage. */
 .dream-art-view { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
@@ -1071,7 +1075,10 @@ function onKeydown(event) {
 .dream-tags__chip button { padding: 0 var(--sp-1); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .dream-requirements { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
 .dream-requirements__list { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-size: var(--text-sm); }
-.dream-requirements__kind { margin-right: var(--sp-2); color: var(--paper-400); font-size: var(--text-xs); }
+.dream-requirements__list li { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr; align-items: baseline; gap: var(--sp-3); }
+/* The kind labels share the chip rows' label column, so the read-only rows
+   line up with the editable fields below them. */
+.dream-requirements__kind { color: var(--paper-400); font-size: var(--text-xs); }
 .dream-sheet__foot { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-6) var(--sp-5); border-top: 1px solid var(--band-edge-dim); }
 .dream-sheet__foot p { color: var(--paper-500); font-size: var(--text-xs); }
 .dream-sheet__foot div { display: flex; justify-content: flex-end; gap: var(--sp-2); }
