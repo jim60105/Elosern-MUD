@@ -44,6 +44,29 @@ before submitting.
 | Edit mechanism | Edit commands in the `str_replace` family, carried in the single JSON response |
 | Departure | A short deterministic farewell beat and a UI transition before the exit flow |
 
+## Player-Facing Wording
+
+The proposal is a wish (願望) made to the goddess. The wording keeps to what
+the scene contains: the player speaks, the goddess listens and adjusts the
+wish. Nothing in the scene writes, so no term borrows from pens or paper.
+
+| Concept | Wording |
+|---|---|
+| The proposal | 願望 |
+| Conversing stage | 訴說 |
+| Finalized stage | 斟酌 |
+| Her change line | 女神為你改了 / 女神這次沒有更動願望 |
+| Summary first written / changed | 成形 / 更動 |
+| List item added / removed | 新添 / 劃去 |
+| Read-only view | 願望全貌 |
+| Finalize | 停止訴說，親自修改 |
+| Edit form | 親自修改願望 |
+| Save draft | 把願望收著 |
+| Confirm | 許下這個願望 |
+
+The prototype under `docs/design/dream-proposal-coediting/` (Storybook
+`Design/DreamWish`) is the visual reference for this document.
+
 ## Stages
 
 The server records one stage per session.
@@ -82,7 +105,8 @@ one direction string:
   `exclusions`, `requirements`
 - `thread_id` (or none)
 - `changes`: what the last settled exchange changed. For each changed list
-  field, the items added and the items removed; for the summary, a flag only
+  field, the items added and the items removed; for the summary, whether it
+  first took shape or was changed
 
 It is the model's only memory of the collaboration. Each prompt includes the
 current proposal with line numbers. No transcript is stored.

@@ -1,0 +1,1318 @@
+<script setup>
+// DreamWishPrototype: a copy of components/DreamPanel.vue reworked for the
+// dream proposal co-editing design (docs/superpowers/specs/
+// 2026-11-13-dream-proposal-coediting-design.md). Reference only: it is not
+// imported by the app and its state contract is the PROPOSED panel shape.
+//
+// What changed against DreamPanel:
+//   - the wish (願望) is a structured proposal the goddess writes during the
+//     conversation; the player's words never become the wish by themselves
+//   - two stages: `wishing` (she holds the pen, the wish is read-only) and
+//     `penned` (the player took the pen: free text is closed, the form edits)
+//   - the keepsake card shows what she changed this turn (the change line) and
+//     opens a read-only full view; removed items are named, not just gone
+//   - the story thread is chosen inline before the first words and then locks
+//   - leaving plays a farewell beat before the surface releases
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { artworkAvailability } from "../../../web/webclient-app/lib/artwork.js";
+import { artworkFailureCategory } from "../../../web/webclient-app/lib/artwork-failure.js";
+import { displayedScene } from "../../../web/webclient-app/lib/scene-artwork.js";
+import { useArtwork } from "../../../web/webclient-app/composables/useArtwork.js";
+import { createFocusTrap } from "../../../web/webclient-app/components/focus-trap.js";
+import { useTypewriter } from "../../../web/webclient-app/composables/use-typewriter.js";
+import { effectiveCps } from "../../../web/webclient-app/lib/message_reveal.js";
+
+const props = defineProps({
+  state: { type: Object, required: true },
+  store: { type: Object, required: true },
+  // Prototype only: the layer a story opens on ("view", "take" or "sheet").
+  initialLayer: { type: String, default: "" },
+});
+const emit = defineEmits(["departed"]);
+
+const MAX_SUMMARY = 2000;
+const EXCHANGES = 6;
+const GAUGE_STEPS = 5;
+const tagFields = [
+  { key: "themes", label: "想探索的主題" },
+  { key: "atmosphere", label: "嚮往的氛圍" },
+  { key: "participants", label: "希望登場的人物", hint: "只是創作偏好，不會改變人物的實際狀態。" },
+  { key: "emphasis", label: "想多描寫的部分" },
+  { key: "exclusions", label: "不想出現的內容", exclude: true },
+];
+const SHORT_LABELS = { themes: "主題", atmosphere: "氛圍", participants: "人物", emphasis: "描寫", exclusions: "避開" };
+const REQUIREMENT_KINDS = [
+  { key: "place", label: "指定的地點" },
+  { key: "new_character", label: "需要的新角色" },
+  { key: "private_commission", label: "私人委託" },
+];
+const REQUIREMENT_LABELS = Object.fromEntries(REQUIREMENT_KINDS.map(({ key, label }) => [key, label]));
+const MAX_REQUIREMENTS = 8;
+const emptyProposal = () => ({ summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] });
+
+const stage = ref(null);
+const page = ref(null);
+const replyInput = ref(null);
+const awakenRow = ref(null);
+const sheetEl = ref(null);
+const summaryInput = ref(null);
+const confirmEl = ref(null);
+const confirmStay = ref(null);
+const rows = ref(null);
+const viewEl = ref(null);
+const viewClose = ref(null);
+const takeEl = ref(null);
+const takeStay = ref(null);
+const threadBox = ref(null);
+
+const message = ref("");
+const lastSent = ref("");
+const direction = ref("");
+const thread = ref("");
+const tags = reactive(Object.fromEntries(tagFields.map(({ key }) => [key, []])));
+const tagDrafts = reactive(Object.fromEntries(tagFields.map(({ key }) => [key, ""])));
+const threadFilter = ref("");
+const sheetOpen = ref(false);
+const viewOpen = ref(false);
+const takeOpen = ref(false);
+const threadOpen = ref(false);
+// The player's own requirement rows once they hold the pen.
+const reqs = ref([]);
+// What the card shows of her writing. It follows the server proposal, but a
+// live exchange holds it back until her line has finished revealing, so the
+// change line never competes with the words the player is reading.
+const shown = reactive({ proposal: emptyProposal(), changes: null });
+const inked = ref(false);
+// The farewell: "" while dreaming, then the outcome that is leaving.
+const leaving = ref("");
+const departed = ref(false);
+const confirmOpen = ref(false);
+const refusal = ref("");
+const toast = ref("");
+const announcement = ref("");
+const bloom = ref(false);
+const arrival = ref(false);
+// The authoritative direction, thread and preference snapshot most recently
+// copied into the local editor. A local edit that differs from it is the
+// player's own and is never overwritten by a later publication.
+const synced = reactive({ direction: "", thread: "", tags: JSON.stringify(tagFields.map(() => [])), reqs: "[]" });
+
+let rootTrap = null;
+let layerTrap = null;
+let toastTimer = null;
+
+// Mirrors the store's dispatch guard, so a control never looks usable while
+// the dispatch it would make is refused.
+const transportLocked = computed(() => {
+  const view = props.store.view;
+  return !view.connected || !!view.mutationsLocked || (view.phase != null && view.phase !== "active")
+    || !!view.dispatch.inFlight || !!view.dispatch.beatLocked;
+});
+const proposal = computed(() => props.state.proposal || emptyProposal());
+const penned = computed(() => props.state.stage === "penned");
+const savedDirection = computed(() => proposal.value.summary || "");
+const summary = computed(() => direction.value.trim());
+const summaryLength = computed(() => Array.from(direction.value.trim()).length);
+const summaryTooLong = computed(() => summaryLength.value > MAX_SUMMARY);
+const tagsSnapshot = () => JSON.stringify(tagFields.map(({ key }) => tags[key]));
+const reqsSnapshot = () => JSON.stringify(reqs.value.map((row) => [row.kind, row.text.trim()]));
+const directionDirty = computed(() => direction.value.trim() !== synced.direction.trim() || thread.value !== synced.thread
+  || tagsSnapshot() !== synced.tags || reqsSnapshot() !== synced.reqs);
+// While she holds the pen the form cannot be edited, so only unsent words can
+// be lost; once the player holds it, their own unsaved rewrite can be too.
+const dirty = computed(() => !!message.value.trim() || (penned.value && directionDirty.value));
+const atCap = computed(() => props.state.remaining === 0);
+const ordinal = computed(() => Math.max(0, Math.min(GAUGE_STEPS - 1, props.state.track.ordinal)));
+const knownThread = computed(() => props.state.thread_choices.find((choice) => choice.id === thread.value));
+const threadLabel = computed(() => !thread.value ? "一段新的故事"
+  : knownThread.value ? "延續：" + knownThread.value.label : "先前選定的故事線");
+const visibleThreads = computed(() => {
+  const needle = threadFilter.value.trim();
+  return needle ? props.state.thread_choices.filter((choice) => choice.label.includes(needle)) : props.state.thread_choices;
+});
+const provenance = computed(() => (penned.value && directionDirty.value ? "已修改・尚未收好" : ""));
+// The card: her writing while she holds the pen, the player's own afterwards.
+const cardSummary = computed(() => (penned.value ? summary.value : shown.proposal.summary.trim()));
+// Her changes: null before any exchange, [] when she wrote nothing this turn.
+const strokes = computed(() => {
+  const changes = shown.changes;
+  if (!changes) return null;
+  const out = [];
+  if (changes.summary) out.push({ key: "summary", label: "願望", rewritten: changes.summary === "formed" ? "成形" : "更動" });
+  for (const { key } of tagFields) {
+    const list = changes.lists?.[key];
+    if (list && (list.added.length || list.removed.length)) out.push({ key, label: SHORT_LABELS[key], added: list.added.length, removed: list.removed.length });
+  }
+  const rows = changes.requirements;
+  if (rows && (rows.added.length || rows.removed.length)) out.push({ key: "requirements", label: "需求", added: rows.added.length, removed: rows.removed.length });
+  return out;
+});
+const strokeText = computed(() => {
+  if (!strokes.value) return "";
+  if (!strokes.value.length) return "女神這次沒有更動願望。";
+  return "女神為你改了：" + strokes.value.map((item) => item.rewritten ? `${item.label}${item.rewritten}`
+    : `${item.label}${item.added ? `添 ${item.added}` : ""}${item.removed ? `劃去 ${item.removed}` : ""}`).join("、") + "。";
+});
+const touched = (key) => !!strokes.value?.some((item) => item.key === key);
+const addedIn = (key) => (key === "requirements" ? shown.changes?.requirements?.added : shown.changes?.lists?.[key]?.added) || [];
+const removedIn = (key) => (key === "requirements" ? shown.changes?.requirements?.removed : shown.changes?.lists?.[key]?.removed) || [];
+const isAdded = (key, value) => addedIn(key).some((item) => (key === "requirements" ? item.kind === value.kind && item.text === value.text : item === value));
+const lockedThreadGone = computed(() => !!thread.value && !knownThread.value);
+// ---- the stage's picture: the shared scene render/load path ----
+// The dream stage's artwork is the SAME canonical scene descriptor and the
+// SAME ordered-attempt lifecycle every scene surface consumes: the loading
+// core walks the descriptor's own positions, the driver observes the real
+// element it issued, reached faults stay local, and the descriptor's subject
+// identity is the resolution epoch — so a new dream session retires the
+// previous session's callbacks instead of letting a stale one settle the
+// surface. The dream descriptor authorizes no retained content (it has no
+// regeneration, and one logical place per session), so nothing is retained
+// here and no second resolution exists.
+const artwork = computed(() => props.state.scene_art ?? null);
+const availability = computed(() => artworkAvailability({
+  panel: { available: true },
+  required: true,
+  hasReference: true,
+  artwork: artwork.value,
+  viewSubjectId: artwork.value?.subject_id ?? null,
+}));
+// The ONE provisional source of this stage: the dream's own REQUIRED bundled
+// illustration, or its declared terminal when that image is unavailable. It is
+// fetched outside the ordered walk so the required dream painting stands in
+// while the preferred operator image is still loading — never a second loader,
+// and never a request for a resource the walk itself is fetching.
+const provisionalSource = computed(() => {
+  const descriptor = artwork.value;
+  if (!descriptor) return null;
+  const attempts = Array.isArray(descriptor.attempts) ? descriptor.attempts : [];
+  const bundled = attempts.find((entry) => entry?.type === "image" && entry.resource?.url
+    && String(entry.source_id ?? "").startsWith("scene.bundled:"));
+  if (bundled) return bundled.resource;
+  const terminal = descriptor.terminal;
+  return terminal?.kind === "scene_image" && terminal.resource?.url ? terminal.resource : null;
+});
+const load = useArtwork(artwork, availability, { provisionalSource });
+const display = computed(() => displayedScene({
+  retained: null,
+  selected: load.selected.value,
+  provisional: load.provisionalSelected.value,
+  available: availability.value.state,
+}));
+const artShown = computed(() => !!display.value?.url);
+const reachedFailure = computed(() => load.reachedFaults.value[0] ?? null);
+// ONE local, accessible indication: the panel's own availability failure, or
+// the first failure the resolution actually walked past. A preferred operator
+// image that cannot load stays stated even while the required bundled dream
+// stands in for it, exactly like every other scene surface.
+const artFailure = computed(() => {
+  if (load.panelUnavailable.value || availability.value.state === "failed") {
+    return artworkFailureCategory("panel_unavailable");
+  }
+  return reachedFailure.value ? artworkFailureCategory(reachedFailure.value.reason) : null;
+});
+
+// The layer that presents the picture, and the hidden probes for the
+// resources the driver is fetching right now: exactly one element per
+// resource, each reporting the real natural dimensions of the element the
+// driver issued.
+function layerFor(url, role, token) {
+  return { url, role, token };
+}
+const presented = computed(() => {
+  const shown = display.value;
+  if (!shown?.url) return null;
+  const ordered = load.attempt.value;
+  const provisional = load.provisionalAttempt.value;
+  if (ordered?.url === shown.url) return layerFor(shown.url, "attempt", ordered.token);
+  if (provisional?.url === shown.url) return layerFor(shown.url, "provisional", provisional.token);
+  return layerFor(shown.url, "content", null);
+});
+const probes = computed(() => {
+  const shown = display.value;
+  const out = [];
+  for (const [candidate, role] of [
+    [load.attempt.value, "attempt"],
+    [load.provisionalAttempt.value, "provisional"],
+  ]) {
+    if (!candidate?.url || candidate.url === shown?.url) continue;
+    out.push(layerFor(candidate.url, role, candidate.token));
+  }
+  return out;
+});
+function onLayerLoad(layer, event) {
+  if (layer.role === "attempt") load.onImageLoad(event);
+  else if (layer.role === "provisional") load.onProvisionalLoad(event);
+}
+function onLayerError(layer, event) {
+  if (layer.role === "attempt") load.onImageError(event);
+  else if (layer.role === "provisional") load.onProvisionalError(event);
+}
+// An element that ALREADY holds the bytes never fires another load: a commit
+// that re-issues a resolution for a resource whose element is on screen and
+// complete is reported to its owning driver once, and the driver's own token
+// and cursor checks make a repeated report a no-op.
+function reportCompleteLayers() {
+  const root = stage.value;
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  for (const element of root.querySelectorAll("img[data-art-role]")) {
+    if (!element.complete || !element.naturalWidth) continue;
+    const layer = [...probes.value, presented.value]
+      .find((item) => item?.url === element.getAttribute("src"));
+    if (layer) onLayerLoad(layer, { target: element });
+  }
+}
+watch([probes, presented], () => { void nextTick().then(reportCompleteLayers); }, { flush: "post" });
+
+// The full view shows exactly what the stage displays and the same reached
+// failure: there is no second resolution, and it cannot open with nothing on
+// screen.
+const artOpen = ref(false);
+const artView = ref(null);
+function openArt() {
+  if (artOpen.value || !artShown.value) return;
+  return openLayer(artOpen, artView, () => artView.value);
+}
+function closeArt() { closeLayer(artOpen); }
+watch(display, (value) => {
+  if (!value?.url && artOpen.value) closeArt();
+});
+
+const overlayOpen = computed(() => sheetOpen.value || confirmOpen.value || artOpen.value || viewOpen.value || takeOpen.value);
+
+// ---- beats: what the message band is presenting ----
+const beats = ref([]);
+const beatIndex = ref(0);
+let revealedCompleted = props.state.completed;
+function responseBeats() {
+  return [
+    props.state.scene && { kind: "narration", text: props.state.scene },
+    props.state.dialogue && { kind: "line", text: props.state.dialogue },
+  ].filter(Boolean);
+}
+const beat = computed(() => {
+  if (props.state.pending) return { kind: "echo", text: lastSent.value ? `你：「${lastSent.value}」` : "你的話語飄向王座……" };
+  if (props.state.failure) return { kind: "notice", text: "夢境一時模糊，女神沒有回應。這次不算數，再說一次吧。" };
+  return beats.value[beatIndex.value] || { kind: "narration", text: "" };
+});
+const beatUnits = computed(() => Array.from(beat.value.text));
+const typewriter = useTypewriter({
+  units: () => beatUnits.value.length,
+  cps: () => effectiveCps(props.store.view.motionLevel, props.store.view.textSpeed),
+});
+const shownText = computed(() => beatUnits.value.slice(0, typewriter.typed.value).join(""));
+const moreToRead = computed(() => typewriter.typing.value || beatIndex.value < beats.value.length - 1);
+const speaking = computed(() => beat.value.kind === "line" || props.state.pending);
+
+// Her writing reaches the card only once her words have been read out.
+let shownCompleted = props.state.completed;
+function settleShown() {
+  shownCompleted = props.state.completed;
+  const fresh = JSON.stringify(shown.changes) !== JSON.stringify(props.state.changes || null);
+  shown.proposal = JSON.parse(JSON.stringify(proposal.value));
+  shown.changes = props.state.changes ? JSON.parse(JSON.stringify(props.state.changes)) : null;
+  if (fresh && shown.changes) {
+    inked.value = false;
+    nextTick(() => { inked.value = true; });
+    announcement.value = strokeText.value;
+  }
+}
+watch(() => JSON.stringify([props.state.proposal, props.state.changes]), () => {
+  if (props.state.completed > shownCompleted) return; // a reveal is about to play; it settles when read
+  settleShown();
+});
+watch(moreToRead, (more) => { if (!more && props.state.completed > shownCompleted) settleShown(); });
+
+// Every change of the presented beat either types (a live reveal or the
+// next beat) or shows in full (echo, notice, reconnect, re-read).
+let typeNext = false;
+let presenting = false;
+watch(() => [beat.value.kind, beat.value.text], () => {
+  if (presenting) return;
+  const animate = typeNext;
+  typeNext = false;
+  if (animate) typewriter.start(0); else typewriter.complete();
+}, { flush: "sync" });
+function present(list, animate) {
+  presenting = true;
+  beats.value = list;
+  beatIndex.value = animate ? 0 : Math.max(0, list.length - 1);
+  presenting = false;
+  if (animate) typewriter.start(0); else typewriter.complete();
+}
+function advance() {
+  if (typewriter.typing.value) { typewriter.complete(); return; }
+  if (beatIndex.value < beats.value.length - 1) {
+    typeNext = true;
+    beatIndex.value += 1;
+    page.value?.scrollTo?.({ top: 0 });
+    return;
+  }
+  if (leaving.value) { depart(); return; }
+  focusHome();
+}
+function reread() {
+  if (beatIndex.value > 0) beatIndex.value -= 1;
+  // The control disappears on the first beat; keep focus on the page.
+  page.value?.focus();
+}
+
+// ---- lifecycle ----
+onMounted(() => {
+  if (props.state.completed === 0 && !props.state.scene && !props.state.dialogue) {
+    arrival.value = true;
+    present([{ kind: "narration", text: props.state.opening }], true);
+  } else {
+    present(responseBeats().length ? responseBeats() : [{ kind: "narration", text: props.state.opening }], false);
+  }
+  rootTrap = createFocusTrap(stage.value, { initialFocusEl: initialFocus(), openerEl: document.activeElement });
+  rootTrap.enter();
+  reportCompleteLayers();
+  settleShown();
+  inked.value = false;
+  if (props.initialLayer === "view") openView();
+  else if (props.initialLayer === "take") openLayer(takeOpen, takeEl, () => takeStay.value);
+  else if (props.initialLayer === "sheet") openSheet();
+});
+onUnmounted(() => {
+  layerTrap = null;
+  rootTrap?.restore();
+  rootTrap = null;
+  load.dispose();
+  clearTimeout(toastTimer);
+});
+
+function initialFocus() {
+  if (arrival.value) return page.value;
+  if (penned.value) return rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']");
+  return props.state.can_input ? replyInput.value : page.value;
+}
+function focusHome() {
+  const target = penned.value ? rows.value?.querySelector("[data-row='confirm']")
+    : props.state.can_input && !transportLocked.value ? replyInput.value : page.value;
+  target?.focus();
+}
+
+watch(() => props.state.session_id, () => { message.value = ""; lastSent.value = ""; });
+watch(() => props.state.completed, (completed) => {
+  // Only a live increase animates; a reconnect or same-count republish
+  // keeps what is on screen.
+  if (completed <= revealedCompleted) { revealedCompleted = completed; return; }
+  revealedCompleted = completed;
+  arrival.value = false;
+  present(responseBeats(), true);
+  const plate = `女神的興奮：${props.state.track.level}。`;
+  announcement.value = [props.state.scene, props.state.dialogue && `王座上的女神說：${props.state.dialogue}`, plate,
+    completed >= EXCHANGES ? "六次訴說已盡，接下來由你親自修改。" : `尚可訴說 ${EXCHANGES - completed} 次。`].filter(Boolean).join("\n");
+  if (completed >= EXCHANGES) {
+    bloom.value = true;
+    nextTick(() => rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']")?.focus());
+  }
+});
+watch(() => props.state.pending, (pending) => {
+  if (pending) {
+    announcement.value = "女神正在回應。";
+    if (document.activeElement === replyInput.value) page.value?.focus();
+  }
+});
+watch(() => props.state.failure, (failure) => {
+  if (!failure) return;
+  announcement.value = "夢境一時模糊，女神沒有回應。這次不算數。";
+  // Nothing was consumed: hand the player's words back for a retry.
+  if (!message.value.trim() && lastSent.value) message.value = lastSent.value;
+  nextTick(() => { if (props.state.can_input) replyInput.value?.focus(); });
+});
+watch(() => JSON.stringify([props.state.session_id, props.state.proposal, props.state.thread_id]), () => {
+  // The form follows her writing until the player edits a field themselves;
+  // an edited field keeps the player's version.
+  const authoritative = savedDirection.value;
+  if (!direction.value.trim() || direction.value.trim() === synced.direction.trim()) direction.value = authoritative;
+  synced.direction = authoritative;
+  const serverThread = props.state.thread_id || "";
+  if (thread.value === synced.thread) thread.value = serverThread;
+  synced.thread = serverThread;
+  const unedited = tagsSnapshot() === synced.tags;
+  const serverTags = tagFields.map(({ key }) => [...(proposal.value[key] || [])]);
+  if (unedited) tagFields.forEach(({ key }, index) => { tags[key] = serverTags[index]; });
+  synced.tags = JSON.stringify(serverTags);
+  const serverReqs = (proposal.value.requirements || []).map((row) => ({ kind: row.kind, text: row.text }));
+  if (reqsSnapshot() === synced.reqs) reqs.value = serverReqs;
+  synced.reqs = JSON.stringify(serverReqs.map((row) => [row.kind, row.text.trim()]));
+}, { immediate: true });
+
+// ---- farewell ----
+// The departure is already committed when this plays: it is presentation only.
+watch(() => props.state.open, (open) => {
+  if (open || leaving.value || !props.state.farewell) return;
+  sheetOpen.value = false; confirmOpen.value = false; viewOpen.value = false; takeOpen.value = false; threadOpen.value = false;
+  layerTrap = null;
+  leaving.value = props.state.outcome || "empty";
+  arrival.value = false;
+  present([{ kind: "line", text: props.state.farewell }], true);
+  announcement.value = `王座上的女神說：${props.state.farewell}`;
+  nextTick(() => page.value?.focus());
+});
+function depart() {
+  if (departed.value) return;
+  departed.value = true;
+  emit("departed", leaving.value);
+}
+
+// ---- actions ----
+function directionPayload() {
+  const values = Object.fromEntries(tagFields.flatMap(({ key }) => tags[key].length ? [[key, [...tags[key]]]] : []));
+  return {
+    ...values,
+    kind: thread.value ? "thread_direction" : "new_story",
+    thread_id: thread.value || null,
+    summary: summary.value,
+    requirements: reqs.value.filter((row) => row.text.trim()).map((row) => ({ kind: row.kind, text: row.text.trim() })),
+  };
+}
+function dispatch(action, extra = {}) {
+  return props.store.dispatchAction("dream." + action,
+    { session_id: props.state.session_id, revision: props.state.revision, ...extra }, null);
+}
+function say() {
+  if (transportLocked.value || !props.state.can_input || !message.value.trim()) return;
+  const units = Array.from(message.value);
+  const request = dispatch("say", { message_parts: [units.slice(0, MAX_SUMMARY).join(""), units.slice(MAX_SUMMARY).join("")] });
+  if (request) { lastSent.value = message.value.trim(); message.value = ""; }
+}
+async function confirm() {
+  if (transportLocked.value || !penned.value) return;
+  refusal.value = "";
+  if (!summary.value || summaryTooLong.value) {
+    refusal.value = summaryTooLong.value ? "願望最多 2000 字，請再精簡一些。" : "願望還是空的。填上一句想許的願，或直接醒來。";
+    if (!sheetOpen.value) await openSheet();
+    summaryInput.value?.focus();
+    return;
+  }
+  dispatch("confirm", { direction: directionPayload() });
+}
+function draft() {
+  if (transportLocked.value) return;
+  refusal.value = "";
+  if (penned.value && summaryTooLong.value) {
+    refusal.value = "願望最多 2000 字，請再精簡一些。";
+    if (!sheetOpen.value) openSheet();
+    return;
+  }
+  // While she holds the pen there is nothing of the player's to send: the
+  // server keeps the wish as she wrote it.
+  const request = dispatch("draft", penned.value ? { direction: directionPayload() } : {});
+  if (!request) return;
+  if (sheetOpen.value) closeSheet();
+  draftRevision = props.state.revision;
+}
+// Taking the pen ends her writing for good, so it asks first -- unless the
+// six exchanges are spent and there is nothing left to give up.
+function requestTake() {
+  if (transportLocked.value || penned.value || props.state.pending) return;
+  if (viewOpen.value) closeView();
+  nextTick(() => openLayer(takeOpen, takeEl, () => takeStay.value));
+}
+function take() {
+  if (transportLocked.value) return;
+  closeLayer(takeOpen);
+  dispatch("finalize");
+}
+watch(penned, (value, before) => {
+  // The pen changed hands on the server: open the form she handed over.
+  if (value && !before && !leaving.value && props.state.open && !atCap.value) nextTick(openSheet);
+});
+function chooseThread(id) {
+  if (transportLocked.value || !props.state.can_choose_thread) return;
+  threadOpen.value = false;
+  if ((props.state.thread_id || "") !== id) dispatch("choose_thread", { thread_id: id || null });
+  nextTick(() => replyInput.value?.focus());
+}
+function addReq() { if (reqs.value.length < MAX_REQUIREMENTS) reqs.value = [...reqs.value, { kind: "place", text: "" }]; }
+function removeReq(index) { reqs.value = reqs.value.filter((_, at) => at !== index); }
+let draftRevision = null;
+watch(() => props.state.revision, (revision) => {
+  if (draftRevision === null || revision <= draftRevision) return;
+  draftRevision = null;
+  if (props.state.drafted && props.state.open) showToast(penned.value ? "願望已收好。" : "願望已收好，夢仍在繼續。");
+});
+function requestAwaken() {
+  if (transportLocked.value) return;
+  if (!dirty.value) { dispatch("awaken"); return; }
+  openConfirm();
+}
+function awaken() {
+  if (transportLocked.value) return;
+  dispatch("awaken");
+}
+function showToast(text) {
+  toast.value = text;
+  announcement.value = text;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.value = ""; }, 2600);
+}
+
+// ---- layers ----
+async function openLayer(open, container, initial) {
+  const opener = document.activeElement;
+  open.value = true;
+  await nextTick();
+  // A close in the same tick leaves nothing to trap.
+  if (!open.value || !container.value) return;
+  layerTrap = createFocusTrap(container.value, { initialFocusEl: initial(), openerEl: opener });
+  layerTrap.enter();
+}
+function closeLayer(open) {
+  open.value = false;
+  const trap = layerTrap;
+  layerTrap = null;
+  nextTick(() => trap?.restore());
+}
+function openSheet() { threadFilter.value = ""; return openLayer(sheetOpen, sheetEl, () => summaryInput.value); }
+function closeSheet() { refusal.value = ""; closeLayer(sheetOpen); }
+function openConfirm() { return openLayer(confirmOpen, confirmEl, () => confirmStay.value); }
+function openView() { return openLayer(viewOpen, viewEl, () => viewClose.value); }
+function closeView() { closeLayer(viewOpen); }
+function closeTake() { closeLayer(takeOpen); }
+function openMain() { return penned.value ? openSheet() : openView(); }
+function closeConfirm() { closeLayer(confirmOpen); }
+function revertSummary() { direction.value = savedDirection.value; summaryInput.value?.focus(); }
+
+function addTag(key) {
+  const value = tagDrafts[key].trim();
+  if (value && !tags[key].includes(value)) tags[key] = [...tags[key], value];
+  tagDrafts[key] = "";
+}
+function onTagKeydown(event, key) {
+  if (event.isComposing) return;
+  if (event.key === "Enter") { event.preventDefault(); addTag(key); }
+  else if (event.key === "Backspace" && !tagDrafts[key] && tags[key].length) tags[key] = tags[key].slice(0, -1);
+}
+function removeTag(key, value) { tags[key] = tags[key].filter((item) => item !== value); }
+
+// ---- keyboard ----
+const isTextField = (el) => el && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && el.type !== "radio"));
+function onReplyKeydown(event) {
+  if (event.isComposing) return;
+  if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); say(); }
+}
+function onPageKeydown(event) {
+  if ((event.key === "Enter" || event.key === " ") && !event.repeat && event.target === page.value) {
+    event.preventDefault();
+    advance();
+  }
+}
+function onPageClick() {
+  if (globalThis.getSelection?.()?.toString()) return;
+  advance();
+}
+function onRowsKeydown(event) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  const buttons = Array.from(rows.value.querySelectorAll("button"));
+  const index = buttons.indexOf(document.activeElement);
+  if (index < 0) return;
+  event.preventDefault();
+  buttons[(index + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length].focus();
+}
+function onKeydown(event) {
+  // An IME composition (Traditional Chinese input) owns its own keys.
+  if (event.isComposing) return;
+  if (event.key === "Tab") { (layerTrap || rootTrap)?.onKeydown(event); return; }
+  event.stopPropagation();
+  if (event.key === "Escape") {
+    event.preventDefault();
+    if (leaving.value) return;
+    if (artOpen.value) closeArt();
+    else if (threadOpen.value) threadOpen.value = false;
+    else if (takeOpen.value) closeTake();
+    else if (viewOpen.value) closeView();
+    else if (confirmOpen.value) closeConfirm();
+    else if (sheetOpen.value) closeSheet();
+    else if (isTextField(event.target)) page.value?.focus();
+    else { awakenRow.value?.focus(); announcement.value = "再按 Enter 醒來，或繼續向女神訴說。"; }
+    return;
+  }
+  if (sheetOpen.value && event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); confirm(); return; }
+  if (!leaving.value && !overlayOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
+    event.preventDefault();
+    rows.value?.querySelectorAll("button")[Number(event.key) - 1]?.click();
+  }
+}
+</script>
+
+<template>
+  <section ref="stage" class="dream-scene" :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !artShown, 'dream-scene--leaving': leaving, 'dream-scene--departed': departed }"
+    role="dialog" aria-modal="true" aria-labelledby="dream-title" tabindex="-1" data-testid="dream-panel"
+    :data-state="leaving ? 'farewell' : state.pending ? 'pending' : state.failure ? 'failure' : atCap ? 'cap' : arrival ? 'arrival' : 'turn'"
+    :data-stage="state.stage" :data-leaving="leaving || null"
+    :style="{ '--dream-ordinal': ordinal }" @keydown="onKeydown">
+    <!-- The displayed picture: the live resolution of the committed descriptor,
+         rendered by the element the shared driver itself issued. -->
+    <img v-if="presented" :key="presented.url" class="dream-scene__art" data-testid="dream-scene-art"
+      :data-art-role="presented.role"
+      :data-attempt-token="presented.role === 'attempt' ? String(presented.token) : null"
+      :data-provisional-token="presented.role === 'provisional' ? String(presented.token) : null"
+      :src="presented.url" alt="雲海之上的純白王座與王座上的女神" decoding="async"
+      @load="onLayerLoad(presented, $event)" @error="onLayerError(presented, $event)" />
+    <!-- The hidden probes: the resources the driver is fetching now. They
+         report the real decoded dimensions and never paint anything. -->
+    <img v-for="probe in probes" :key="probe.url" class="dream-scene__art dream-scene__art--probe"
+      :data-art-role="probe.role" :src="probe.url" alt="" aria-hidden="true"
+      :data-attempt-token="probe.role === 'attempt' ? String(probe.token) : null"
+      :data-provisional-token="probe.role === 'provisional' ? String(probe.token) : null"
+      @load="onLayerLoad(probe, $event)" @error="onLayerError(probe, $event)" />
+    <div class="dream-scene__veil" aria-hidden="true"></div>
+    <div v-if="bloom" class="dream-scene__bloom" aria-hidden="true" @animationend="bloom = false"></div>
+    <!-- The wish rising to the throne (a granted wish only) and the white of
+         waking. Both are decoration: the departure is already committed. -->
+    <div v-if="leaving === 'confirmed'" class="dream-scene__wishlight" aria-hidden="true"></div>
+    <div v-if="departed" class="dream-scene__waking" aria-hidden="true"></div>
+    <div v-if="$slots.storyTools" class="dream-scene__story-tools"><slot name="storyTools" /></div>
+    <!-- The stage's own local status and full-view control. Both belong to the
+         presented picture, so the marker stands beside the image the player is
+         looking at and the view can never open on nothing. -->
+    <div v-if="artShown || artFailure" class="dream-art">
+      <p v-if="artFailure" class="dream-art__failure" role="status" data-testid="dream-art-failure">{{ artFailure }}</p>
+      <button v-if="artShown" type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-art__control"
+        data-testid="dream-art-control" aria-label="開啟夢境全圖" @click="openArt">全圖</button>
+    </div>
+
+    <div class="dream-scene__main" :inert="overlayOpen || undefined">
+      <header class="dream-crest">
+        <h2 id="dream-title">雲上王座之夢</h2>
+        <p>夢中無晝夜</p>
+      </header>
+
+      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': penned, 'dream-keepsake--inked': inked }"
+        aria-labelledby="dream-keepsake-title" :inert="!!leaving || undefined" @animationend="$event.animationName.includes('dream-ink-sweep') && (inked = false)">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <div class="dream-keepsake__head">
+          <h3 id="dream-keepsake-title">此刻的願望</h3>
+          <!-- Where the pen is: hers while the player speaks, theirs afterwards. -->
+          <ol class="dream-pen" :aria-label="penned ? '由你親自修改中' : '正在向女神訴說'">
+            <li :class="{ 'dream-pen__step--on': !penned, 'dream-pen__step--done': penned }">訴說</li>
+            <li :class="{ 'dream-pen__step--on': penned }">斟酌</li>
+          </ol>
+        </div>
+        <blockquote v-if="cardSummary" class="dream-keepsake__preview" :title="cardSummary">{{ cardSummary }}</blockquote>
+        <p v-else class="dream-keepsake__empty">願望尚未成形。向女神說說看，她會替你把願望理清。</p>
+        <p v-if="!penned && strokes" class="dream-ink" data-testid="dream-ink">
+          <span class="dream-ink__lead" aria-hidden="true">✎</span>
+          <template v-if="strokes.length">
+            <span class="dream-ink__label">女神為你改了</span>
+            <span v-for="item in strokes" :key="item.key" class="dream-ink__stroke">{{ item.label }}<template v-if="item.rewritten"><i>{{ item.rewritten }}</i></template><template v-else><i v-if="item.added" class="dream-ink__plus">＋{{ item.added }}</i><i v-if="item.removed" class="dream-ink__minus">−{{ item.removed }}</i></template></span>
+          </template>
+          <span v-else class="dream-ink__label dream-ink__label--quiet">女神這次沒有更動願望</span>
+        </p>
+        <p v-else-if="provenance" class="dream-ink"><span class="dream-ink__lead" aria-hidden="true">✎</span><span class="dream-ink__label">{{ provenance }}</span></p>
+        <p class="dream-keepsake__target"><span v-if="!state.can_choose_thread" class="dream-keepsake__lock" aria-hidden="true">◆</span>歸屬：{{ threadLabel }}</p>
+        <div ref="rows" class="dream-choice" role="group" aria-label="願望與醒來" @keydown="onRowsKeydown">
+          <button class="ui-btn dream-choice__row" type="button" data-row="main" :disabled="transportLocked" @click="openMain">
+            <span class="dream-choice__badge" aria-hidden="true">1</span>{{ penned ? "修改願望…" : "看看願望全貌" }}
+          </button>
+          <button v-if="penned" class="ui-btn ui-btn--primary dream-choice__row dream-choice__row--carry" type="button" data-row="confirm" :disabled="transportLocked"
+            :aria-disabled="!summary || undefined" :aria-describedby="!summary ? 'dream-confirm-reason' : undefined" @click="confirm">
+            <span class="dream-choice__badge" aria-hidden="true">2</span>許下這個願望
+            <span v-if="!summary" id="dream-confirm-reason" class="dream-choice__reason">願望還是空的</span>
+          </button>
+          <button v-else class="ui-btn dream-choice__row dream-choice__row--carry" type="button" data-row="take" :disabled="transportLocked || state.pending" @click="requestTake">
+            <span class="dream-choice__badge" aria-hidden="true">2</span>停止訴說，親自修改…
+          </button>
+          <button class="ui-btn dream-choice__row" type="button" data-row="draft" :disabled="transportLocked" @click="draft">
+            <span class="dream-choice__badge" aria-hidden="true">3</span>{{ penned ? "把願望收著" : "把願望收著，繼續作夢" }}
+          </button>
+          <button ref="awakenRow" class="ui-btn ui-btn--ghost dream-choice__row" type="button" data-row="awaken" :disabled="transportLocked" @click="requestAwaken">
+            <span class="dream-choice__badge dream-choice__badge--seal" aria-hidden="true">✕</span>醒來
+          </button>
+        </div>
+      </nav>
+
+      <div v-if="!leaving" class="dream-reply-zone">
+        <p v-if="!store.view.connected" class="dream-reply__caption" role="status">與夢的聯繫中斷了，正在重新連結……你輸入的字句都會保留。</p>
+        <p v-else-if="!penned && state.remaining === 1" class="dream-reply__caption">夢將抵達盡頭 · 最後一次訴說</p>
+        <p v-else-if="!penned && state.track.converging" class="dream-reply__caption">夢將抵達盡頭</p>
+        <!-- The story this wish belongs to: chosen before the first words,
+             fixed afterwards. Not shown at all when there is nothing to pick. -->
+        <div v-if="state.can_choose_thread && state.thread_choices.length" ref="threadBox" class="dream-belong" data-testid="dream-belong">
+          <span class="dream-belong__label">這個願望屬於</span>
+          <button class="dream-belong__pick" type="button" aria-haspopup="listbox" :aria-expanded="threadOpen" :disabled="transportLocked" @click="threadOpen = !threadOpen">
+            <span>{{ thread ? knownThread?.label || "先前選定的故事線" : "一段新的故事" }}</span><i aria-hidden="true">▾</i>
+          </button>
+          <span class="dream-belong__note">說出第一句話後，便不能再改</span>
+          <div v-if="threadOpen" class="dream-belong__list dream-glass" role="listbox" aria-label="這個願望屬於">
+            <button class="dream-belong__option" type="button" role="option" :aria-selected="!thread" @click="chooseThread('')"><i aria-hidden="true">{{ !thread ? "◆" : "◇" }}</i><span>一段新的故事</span></button>
+            <button v-for="choice in state.thread_choices" :key="choice.id" class="dream-belong__option" type="button" role="option" :aria-selected="thread === choice.id"
+              :title="choice.label" @click="chooseThread(choice.id)"><i aria-hidden="true">{{ thread === choice.id ? "◆" : "◇" }}</i><span>延續：{{ choice.label }}</span></button>
+          </div>
+        </div>
+        <div v-if="penned && !state.pending" class="dream-reply dream-glass dream-reply--ended">
+          <p>{{ atCap ? "六次訴說已盡，接下來由你親自修改，或直接許下。" : "你已停止訴說，女神靜候你許下願望。" }}</p>
+          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可訴說 ${state.remaining} 次，共 ${EXCHANGES} 次`">
+            <i v-for="n in EXCHANGES" :key="n" class="dream-pip dream-pip--spent"></i>
+          </div>
+        </div>
+        <form v-else class="dream-reply dream-glass" :class="{ 'dream-reply--failed': state.failure }" data-testid="dream-reply" @submit.prevent="say">
+          <span class="dream-reply__tag" aria-hidden="true">你</span>
+          <textarea ref="replyInput" v-model="message" class="dream-reply__input" rows="1" maxlength="4000" aria-label="對女神說的話"
+            :disabled="!state.can_input || transportLocked" :placeholder="state.pending ? '女神正在聆聽……' : state.sample ? `例：${state.sample}` : '向女神說出你的願望……'"
+            @keydown="onReplyKeydown" @input="typewriter.typing.value && typewriter.complete()" />
+          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可訴說 ${state.remaining} 次，共 ${EXCHANGES} 次`">
+            <i v-for="n in EXCHANGES" :key="n" class="dream-pip"
+              :class="{ 'dream-pip--spent': n <= state.completed, 'dream-pip--next': n === state.completed + 1 && (message.trim() || state.pending) }"></i>
+            <span class="dream-pips__count">尚餘 {{ state.remaining }}</span>
+          </div>
+          <button class="ui-btn ui-btn--primary ui-btn--sm dream-reply__send" type="submit" aria-keyshortcuts="Enter"
+            :disabled="transportLocked || !state.can_input || !message.trim()">{{ state.failure ? "再說一次" : "訴說" }}</button>
+        </form>
+      </div>
+
+      <section class="dream-window" aria-label="夢境對話">
+        <header class="dream-plate" :class="{ 'dream-plate--quiet': !speaking }">
+          <span class="dream-plate__name">王座上的女神</span>
+          <span class="dream-gauge" role="meter" aria-valuemin="0" :aria-valuemax="GAUGE_STEPS - 1" :aria-valuenow="ordinal" :aria-valuetext="`女神的興奮：${state.track.level}`">
+            <i v-for="n in GAUGE_STEPS" :key="n" class="dream-gauge__seg" :class="{ 'dream-gauge__seg--lit': n <= ordinal + 1 }"></i>
+          </span>
+          <span class="dream-plate__level">{{ state.track.level }}</span>
+          <span v-if="state.pending" class="dream-plate__breath"><i></i><i></i><i></i>正在回應</span>
+        </header>
+        <div ref="page" class="dream-page" tabindex="0" aria-describedby="dream-keys" data-testid="dream-page"
+          @keydown="onPageKeydown" @click="onPageClick">
+          <p class="dream-page__beat" :class="`dream-page__beat--${beat.kind}`">{{ shownText }}</p>
+        </div>
+        <footer class="dream-strip">
+          <button v-if="beatIndex > 0 && !state.pending && !state.failure && !leaving" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="reread">重讀</button>
+          <span id="dream-keys" class="dream-strip__keys">{{ leaving ? (moreToRead ? "Enter 繼續" : "Enter 醒來") : moreToRead && !state.pending ? "Enter 繼續" : "Esc 前往醒來" }}</span>
+          <span class="dream-strip__marker" aria-hidden="true">{{ (moreToRead && !state.pending) || leaving ? "▼" : "■" }}</span>
+        </footer>
+      </section>
+    </div>
+
+    <p v-if="toast && !leaving" class="dream-toast" role="status">{{ toast }}</p>
+    <p class="dream-live" aria-live="polite">{{ announcement }}</p>
+
+    <!-- 願望全貌: her writing, read-only. Plain text, not disabled inputs. -->
+    <template v-if="viewOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeView"></div>
+      <aside ref="viewEl" class="dream-sheet dream-sheet--view dream-glass" role="dialog" aria-modal="true" aria-labelledby="dream-view-title" data-testid="dream-view">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <header class="dream-sheet__head">
+          <div><h3 id="dream-view-title">願望全貌</h3><p>訴說期間，女神會依你的話修改願望；停止訴說之後，才由你親自修改。</p></div>
+          <button ref="viewClose" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="closeView">返回</button>
+        </header>
+        <div class="dream-sheet__body dream-scroll">
+          <section class="dream-scroll__wish" :class="{ 'dream-scroll--touched': touched('summary') }">
+            <h4>願望<em v-if="touched('summary')">✎ {{ shown.changes?.summary === "formed" ? "這次成形" : "這次更動" }}</em></h4>
+            <p v-if="shown.proposal.summary" class="dream-scroll__text">{{ shown.proposal.summary }}</p>
+            <p v-else class="dream-scroll__none">尚未成形</p>
+          </section>
+          <section class="dream-scroll__row" :class="{ 'dream-scroll--touched': touched('requirements') }">
+            <h4>這個願望需要<em v-if="touched('requirements')">✎</em></h4>
+            <div>
+              <ul v-if="shown.proposal.requirements.length" class="dream-scroll__reqs">
+                <li v-for="(row, index) in shown.proposal.requirements" :key="index" :class="{ 'dream-scroll__new': isAdded('requirements', row) }">
+                  <span>{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}<b v-if="isAdded('requirements', row)">新添</b>
+                </li>
+              </ul>
+              <p v-else class="dream-scroll__none">—</p>
+              <p v-if="removedIn('requirements').length" class="dream-scroll__gone">劃去：<s v-for="(row, index) in removedIn('requirements')" :key="index">{{ row.text }}</s></p>
+            </div>
+          </section>
+          <section v-for="field in tagFields" :key="field.key" class="dream-scroll__row" :class="{ 'dream-scroll--touched': touched(field.key), 'dream-scroll__row--exclude': field.exclude }">
+            <h4>{{ field.label }}<em v-if="touched(field.key)">✎</em></h4>
+            <div>
+              <p v-if="shown.proposal[field.key].length" class="dream-scroll__tags">
+                <span v-for="value in shown.proposal[field.key]" :key="value" :class="{ 'dream-scroll__new': isAdded(field.key, value) }">{{ value }}<b v-if="isAdded(field.key, value)">新添</b></span>
+              </p>
+              <p v-else class="dream-scroll__none">—</p>
+              <p v-if="removedIn(field.key).length" class="dream-scroll__gone">劃去：<s v-for="value in removedIn(field.key)" :key="value">{{ value }}</s></p>
+            </div>
+          </section>
+          <section class="dream-scroll__row">
+            <h4>歸屬</h4>
+            <div><p class="dream-scroll__plain">{{ threadLabel }}</p></div>
+          </section>
+        </div>
+        <footer class="dream-sheet__foot">
+          <p>想自己修改，就先停止向女神訴說。停止之後，女神不再替你修改。</p>
+          <div>
+            <button class="ui-btn" type="button" :disabled="transportLocked || state.pending" @click="requestTake">停止訴說，親自修改…</button>
+            <button class="ui-btn ui-btn--primary" type="button" @click="closeView">繼續向女神訴說</button>
+          </div>
+        </footer>
+      </aside>
+    </template>
+
+    <!-- 停止訴說: the one irreversible step of the dream. -->
+    <template v-if="takeOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeTake"></div>
+      <div ref="takeEl" class="dream-confirm dream-confirm--take dream-glass" role="alertdialog" aria-modal="true" aria-labelledby="dream-take-title" aria-describedby="dream-take-body" data-testid="dream-take">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <h3 id="dream-take-title">不再向女神訴說？</h3>
+        <div id="dream-take-body" class="dream-confirm__body">
+          <p>停止之後，女神不再替你修改，願望改由你親自修改。</p>
+          <p class="dream-confirm__cost">
+            <span class="dream-pips" aria-hidden="true"><i v-for="n in state.remaining" :key="n" class="dream-pip dream-pip--forfeit"></i></span>
+            尚餘 {{ state.remaining }} 次訴說，將不再使用。
+          </p>
+        </div>
+        <div class="dream-confirm__actions">
+          <button ref="takeStay" class="ui-btn ui-btn--primary" type="button" @click="closeTake">繼續向女神訴說</button>
+          <button class="ui-btn" type="button" :disabled="transportLocked" @click="take">由我親自修改</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- 斟酌: the same form, now the player's to write. -->
+    <template v-if="sheetOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeSheet"></div>
+      <aside ref="sheetEl" class="dream-sheet dream-glass" role="dialog" aria-modal="true" aria-labelledby="dream-sheet-title" data-testid="dream-sheet">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <header class="dream-sheet__head">
+          <div><h3 id="dream-sheet-title">親自修改願望</h3><p>許下之後，醒來的故事會朝這個願望慢慢展開。</p></div>
+          <button class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="closeSheet">返回</button>
+        </header>
+        <div class="dream-sheet__body">
+          <label class="dream-field">
+            <span class="dream-field__label">願望 <em v-if="provenance">{{ provenance }}</em></span>
+            <textarea ref="summaryInput" v-model="direction" rows="4" :disabled="transportLocked" placeholder="你想向女神許什麼願？"
+              :aria-invalid="summaryTooLong || undefined" />
+          </label>
+          <div class="dream-field__foot">
+            <button v-if="direction !== savedDirection && savedDirection" class="dream-link" type="button" @click="revertSummary">還原為訴說時的內容</button>
+            <span class="dream-field__counter" :class="{ 'dream-field__counter--over': summaryTooLong }">{{ summaryLength }} / {{ MAX_SUMMARY }}</span>
+          </div>
+          <p v-if="refusal" class="dream-field__error" role="alert">{{ refusal }}</p>
+
+          <section class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
+            <h4 id="dream-requirements-title">這個願望需要 <span class="dream-requirements__count">{{ reqs.length }} / {{ MAX_REQUIREMENTS }}</span></h4>
+            <ul v-if="reqs.length" class="dream-requirements__list">
+              <li v-for="(row, index) in reqs" :key="index" class="dream-requirements__row">
+                <select v-model="row.kind" :aria-label="`第 ${index + 1} 筆需求的種類`" :disabled="transportLocked">
+                  <option v-for="kind in REQUIREMENT_KINDS" :key="kind.key" :value="kind.key">{{ kind.label }}</option>
+                </select>
+                <input v-model="row.text" type="text" maxlength="200" :aria-label="`第 ${index + 1} 筆需求的內容`" :disabled="transportLocked" placeholder="例如：南門" />
+                <button type="button" class="dream-requirements__remove" :aria-label="`移除第 ${index + 1} 筆需求`" @click="removeReq(index)">×</button>
+              </li>
+            </ul>
+            <button v-if="reqs.length < MAX_REQUIREMENTS" class="dream-link dream-requirements__add" type="button" @click="addReq">＋ 添一筆需求</button>
+            <small class="dream-requirements__note">地點、新角色與私人委託會原樣交給醒來後的故事。改了願望，記得一併核對。</small>
+          </section>
+
+          <section class="dream-tags" aria-labelledby="dream-tags-title">
+            <h4 id="dream-tags-title">細節（皆可留空）</h4>
+            <div v-for="field in tagFields" :key="field.key" class="dream-tags__row" :class="{ 'dream-tags__row--exclude': field.exclude }">
+              <span :id="`dream-tag-${field.key}`" class="dream-tags__label">{{ field.label }}</span>
+              <div class="dream-tags__box">
+                <span v-for="value in tags[field.key]" :key="value" class="dream-tags__chip">{{ value }}<button type="button" :aria-label="`移除「${value}」`" @click="removeTag(field.key, value)">×</button></span>
+                <input v-model="tagDrafts[field.key]" type="text" :aria-labelledby="`dream-tag-${field.key}`" placeholder="輸入後按 Enter"
+                  :disabled="transportLocked" @keydown="onTagKeydown($event, field.key)" @blur="addTag(field.key)" />
+              </div>
+              <small v-if="field.hint" class="dream-tags__hint">{{ field.hint }}</small>
+            </div>
+          </section>
+
+          <!-- The thread was fixed at the first words. Only a thread that has
+               since ended may be released, and only to a new story. -->
+          <section class="dream-fixed" aria-labelledby="dream-fixed-title">
+            <h4 id="dream-fixed-title">歸屬</h4>
+            <p><span class="dream-keepsake__lock" aria-hidden="true">◆</span>{{ threadLabel }}<small>已在第一句話時定下</small></p>
+            <button v-if="lockedThreadGone" class="dream-link" type="button" @click="thread = ''">這條故事線已經結束，改為一段新的故事</button>
+          </section>
+        </div>
+        <footer class="dream-sheet__foot">
+          <p>收著：私下保存，下次入夢再接著說。許下：結束夢境，把願望交給女神。</p>
+          <div>
+            <button class="ui-btn" type="button" :disabled="transportLocked" @click="draft">把願望收著</button>
+            <button class="ui-btn ui-btn--primary" type="button" :disabled="transportLocked" @click="confirm">許下這個願望</button>
+          </div>
+        </footer>
+      </aside>
+    </template>
+
+    <template v-if="confirmOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeConfirm"></div>
+      <div ref="confirmEl" class="dream-confirm dream-glass" role="alertdialog" aria-modal="true" aria-labelledby="dream-confirm-title" aria-describedby="dream-confirm-body" data-testid="dream-confirm">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <h3 id="dream-confirm-title">就此醒來？</h3>
+        <div id="dream-confirm-body" class="dream-confirm__body">
+          <p v-if="message.trim()">尚未說出口的話會隨夢消散。</p>
+          <p v-if="penned && directionDirty">你親自修改、還沒收好的部分會隨夢消散。</p>
+          <p v-if="!state.drafted && savedDirection">目前的願望會替你收著，下次入夢再接著說。</p>
+        </div>
+        <div class="dream-confirm__actions">
+          <button ref="confirmStay" class="ui-btn" type="button" @click="closeConfirm">回到夢中</button>
+          <button class="ui-btn ui-btn--ghost" type="button" :disabled="transportLocked" @click="awaken">醒來</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- The full view of the stage's picture: the same displayed resource and
+         the same reached failure, focus-trapped, Escape closes and restores
+         focus to the control that opened it. -->
+    <aside v-if="artOpen" ref="artView" class="dream-art-view" role="dialog" aria-modal="true"
+      aria-label="夢境全圖" data-testid="dream-art-view" tabindex="-1">
+      <button class="ui-btn ui-btn--ghost dream-art-view__close" type="button" data-testid="dream-art-view-close"
+        aria-label="關閉全圖" @click="closeArt">關閉</button>
+      <img v-if="display" class="dream-art-view__image" data-testid="dream-art-view-image" :src="display.url"
+        alt="雲海之上的純白王座與王座上的女神" />
+      <p v-if="artFailure" class="dream-art-view__failure" role="status" data-testid="dream-art-view-failure">{{ artFailure }}</p>
+    </aside>
+  </section>
+</template>
+
+<style scoped>
+.dream-scene {
+  /* The excitement ordinal (0–4); the inline style binds the server value. */
+  --dream-ordinal: 0;
+  --dream-gutter: calc(40px * var(--ui-scale));
+  --dream-band-w: 66.667%;
+  --dream-glass: linear-gradient(180deg, rgba(16, 18, 22, 0.86), rgba(11, 13, 16, 0.93));
+  --dream-halo: 0 calc(10px * var(--ui-scale)) calc(36px * var(--ui-scale)) calc(-14px * var(--ui-scale)) rgba(255, 250, 238, 0.6);
+  /* The dream replaces the stage, including its bottom control strip. */
+  position: fixed; isolation: isolate; inset: var(--header-h) 0 0; z-index: var(--z-surface-modal);
+  overflow: hidden; background: #dcdcda; color: var(--paper-100); font-family: var(--f-sans);
+}
+.dream-scene:focus { box-shadow: none; outline: none; }
+.dream-scene p, .dream-scene h2, .dream-scene h3, .dream-scene h4, .dream-scene blockquote { margin: 0; }
+.dream-scene__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 68% 62%; }
+/* The probes cover the stage box too, so they really load and report their own
+   decoded size; they are invisible and never take a pointer. */
+.dream-scene__art--probe { opacity: 0; pointer-events: none; }
+/* The stage's local status and full-view control: the empty right third of the
+   art, above the message band. */
+.dream-art { position: absolute; z-index: 6; right: var(--dream-gutter); bottom: calc(var(--band-h) + var(--sp-4));
+  display: flex; align-items: center; gap: var(--sp-2); max-width: 40%; }
+.dream-art__failure { margin: 0; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill);
+  background: rgba(11, 13, 16, 0.78); color: #f3b9bc; font-size: var(--text-xs); line-height: 1.5; }
+.dream-art__control { flex: none; letter-spacing: 0.08em; }
+/* The full view: the same displayed bitmap at full screen, above every other
+   layer of the stage. */
+.dream-art-view { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--sp-2); background: var(--ink-950); outline: none; }
+.dream-art-view__image { max-width: 100%; max-height: 86vh; object-fit: contain; }
+.dream-art-view__failure { margin: 0; color: #f3b9bc; font-size: var(--text-xs); }
+.dream-art-view__close { position: absolute; top: var(--sp-4); right: var(--sp-4); }
+/* The pale fallback keeps the art's luminance so the chrome reads the same
+   without it; the rose aura deepens with the goddess's excitement. */
+.dream-scene__veil { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 46% 60% at 72% 45%, rgba(214, 120, 140, calc(var(--dream-ordinal) * 0.055)), transparent 70%);
+  mix-blend-mode: multiply; transition: background var(--motion-scene) var(--ease-standard); }
+.dream-scene--no-art .dream-scene__veil { mix-blend-mode: normal;
+  background: radial-gradient(ellipse 46% 60% at 72% 45%, rgba(214, 120, 140, calc(var(--dream-ordinal) * 0.055)), transparent 70%), linear-gradient(180deg, #e9e7e3, #cfd3d6); }
+.dream-scene--arrival::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; background: #fbfaf7;
+  animation: dream-fade-out calc(var(--motion-scene) * 2) var(--ease-standard) forwards; opacity: 0; }
+.dream-scene__bloom { position: absolute; inset: 0; z-index: 4; pointer-events: none; background: #fff8f2; opacity: 0;
+  animation: dream-bloom calc(var(--motion-flash) + var(--motion-scene)) var(--ease-standard); }
+@keyframes dream-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes dream-bloom { 0% { opacity: 0; } 20% { opacity: var(--motion-flash-peak); } 100% { opacity: 0; } }
+@keyframes dream-rise { from { opacity: 0; transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel))); } to { opacity: 1; transform: none; } }
+.dream-scene__story-tools { position: absolute; z-index: 6; top: var(--sp-3); right: var(--sp-5); max-width: 40%; padding: var(--sp-2); background: var(--panel); color: var(--paper-300); }
+.dream-scene__main { position: absolute; inset: 0; }
+
+/* Ink lacquer glass: legible over near-white art, set into the light by a
+   pale halo instead of a dark drop shadow. */
+.dream-glass { position: relative; box-sizing: border-box; background: var(--dream-glass);
+  backdrop-filter: blur(calc(12px * var(--ui-scale))) saturate(1.05);
+  border-top: 1px solid var(--band-edge); box-shadow: var(--dream-halo), inset 0 1px rgba(255, 255, 255, 0.06); }
+.dream-corners { position: absolute; inset: calc(6px * var(--ui-scale)); pointer-events: none; --c: var(--gold-500); --l: calc(14px * var(--ui-scale));
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) top left / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) top right / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) bottom left / 1px var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--l) 1px no-repeat, linear-gradient(var(--c), var(--c)) bottom right / 1px var(--l) no-repeat; }
+
+/* ---- crest ---- */
+.dream-crest { position: absolute; top: calc(20px * var(--ui-scale)); left: var(--dream-gutter); display: flex; align-items: baseline; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-8) var(--sp-2) var(--sp-4); background: linear-gradient(90deg, rgba(11, 13, 16, 0.86), rgba(11, 13, 16, 0.72) 80%, transparent);
+  border-left: 2px solid var(--gold-500); animation: dream-rise var(--motion-reveal) var(--ease-standard) both; }
+.dream-crest h2 { color: var(--gold-300); font-family: var(--f-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: 0.14em; }
+.dream-crest p { color: var(--paper-300); font-size: var(--text-xs); letter-spacing: 0.2em; }
+
+/* ---- keepsake card ---- */
+.dream-keepsake { position: absolute; top: calc(84px * var(--ui-scale)); left: var(--dream-gutter); display: grid; gap: var(--sp-3);
+  width: min(calc(440px * var(--ui-scale)), 32vw); max-height: calc(100% - var(--band-h) - 172px * var(--ui-scale)); overflow-y: auto;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4); border-radius: var(--radius-sm);
+  animation: dream-rise var(--motion-reveal) var(--ease-standard) both; transition: box-shadow var(--motion-base) var(--ease-standard); }
+.dream-keepsake--promoted { border-top-color: var(--gold-400); box-shadow: var(--dream-halo), 0 0 0 1px var(--gold-500), 0 0 calc(28px * var(--ui-scale)) var(--gold-glow); }
+.dream-keepsake__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.dream-keepsake__head h3 { color: var(--gold-300); font-family: var(--f-display); font-size: var(--text-md); font-weight: 500; letter-spacing: 0.1em; }
+.dream-keepsake__chip { padding: 0 var(--sp-2); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill); color: var(--gold-400); font-size: var(--text-xs); }
+.dream-keepsake__preview { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  padding-left: var(--sp-3); border-left: 2px solid var(--gold-500); color: var(--paper-50); font-family: var(--f-serif); font-size: var(--text-md);
+  line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dream-keepsake__empty { color: var(--paper-400); font-size: var(--text-sm); line-height: 1.6; }
+.dream-keepsake__target { color: var(--paper-400); font-size: var(--text-xs); overflow-wrap: anywhere; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.dream-choice { display: grid; gap: var(--sp-1); padding-top: var(--sp-3); border-top: 1px solid var(--band-edge-dim); }
+.dream-choice__row { justify-content: flex-start; min-height: calc(40px * var(--ui-scale)); white-space: normal; text-align: left; }
+.dream-choice__row.ui-btn:not(.ui-btn--primary) { background: transparent; border-color: transparent; }
+.dream-choice__row.ui-btn:not(.ui-btn--primary):hover:enabled, .dream-choice__row.ui-btn:not(.ui-btn--primary):focus-visible { background: var(--panel-hi); border-color: transparent; box-shadow: inset 2px 0 var(--gold-400); }
+.dream-choice__row[aria-disabled="true"] { filter: saturate(0.4) brightness(0.8); }
+.dream-choice__badge { display: inline-grid; place-items: center; flex: none; width: calc(22px * var(--ui-scale)); height: calc(22px * var(--ui-scale));
+  border: 1px solid var(--gold-500); border-radius: 50%; color: var(--gold-400); font-family: var(--f-mono); font-size: var(--text-xs); line-height: 1; }
+.ui-btn--primary .dream-choice__badge { border-color: var(--ink-950); color: var(--ink-950); }
+.dream-choice__row--carry:not(.ui-btn--primary) { color: var(--gold-300); }
+.dream-choice__row--carry:not(.ui-btn--primary) .dream-choice__badge { background: var(--gold-500); border-color: var(--gold-400); color: var(--ink-950); }
+.dream-choice__badge--seal { border-color: var(--seal-600); color: var(--seal-400); }
+.dream-choice__reason { margin-left: auto; font-size: var(--text-xs); font-weight: 400; opacity: 0.8; }
+
+/* ---- reply bar ---- */
+.dream-reply-zone { position: absolute; left: calc(24px * var(--ui-scale)); bottom: calc(var(--band-h) + 10px * var(--ui-scale));
+  display: grid; gap: var(--sp-2); width: calc(var(--dream-band-w) - 72px * var(--ui-scale)); }
+.dream-reply__caption { justify-self: end; padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-pill); background: rgba(11, 13, 16, 0.78);
+  color: var(--gold-300); font-size: var(--text-xs); letter-spacing: 0.08em; }
+.dream-reply { display: flex; align-items: center; gap: var(--sp-3); min-height: calc(56px * var(--ui-scale)); padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4); border-radius: var(--radius-sm); }
+.dream-reply--failed { border-top-color: var(--warn); }
+.dream-reply--ended p { flex: 1; color: var(--gold-300); font-family: var(--f-serif); font-size: var(--text-md); }
+.dream-reply__tag { flex: none; padding-right: var(--sp-3); border-right: 1px solid var(--band-edge-dim); color: var(--gold-400); font-family: var(--f-display); font-size: var(--text-md); }
+.dream-reply__input { flex: 1; min-width: 0; box-sizing: border-box; field-sizing: content; min-height: calc(36px * var(--ui-scale)); max-height: calc(132px * var(--ui-scale));
+  padding: var(--sp-1) 0; border: 0; background: transparent; color: var(--paper-50); font-family: var(--f-serif); font-size: var(--text-md); line-height: 1.6; resize: none; }
+.dream-reply__input:focus { outline: none; box-shadow: none; }
+.dream-reply:focus-within { box-shadow: var(--dream-halo), inset 0 0 0 1px var(--gold-500); }
+.dream-reply__input::placeholder { color: var(--paper-500); }
+.dream-reply__input:disabled { cursor: default; }
+.dream-pips { display: flex; flex: none; align-items: center; gap: calc(6px * var(--ui-scale)); }
+.dream-pip { display: block; width: calc(9px * var(--ui-scale)); height: calc(9px * var(--ui-scale)); transform: rotate(45deg); background: var(--gold-400);
+  box-shadow: 0 0 calc(6px * var(--ui-scale)) var(--gold-glow); transition: background var(--motion-reveal) var(--ease-standard), box-shadow var(--motion-reveal) var(--ease-standard); }
+.dream-pip--spent { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-700); }
+.dream-pip--next { animation: dream-pulse var(--motion-pulse) ease-in-out infinite; }
+@keyframes dream-pulse { 50% { opacity: 0.35; } }
+.dream-pips__count { margin-left: var(--sp-2); color: var(--paper-300); font-size: var(--text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- message band ---- */
+.dream-window { position: absolute; left: 0; bottom: 0; box-sizing: border-box; display: grid; grid-template-rows: auto 1fr auto; width: var(--dream-band-w); height: var(--band-h);
+  padding: var(--sp-3) calc(96px * var(--ui-scale)) var(--band-pad-bottom) var(--dream-gutter);
+  background: linear-gradient(90deg, rgba(11, 13, 16, 0.93) 0 calc(100% - 96px * var(--ui-scale)), transparent),
+    var(--band-ornament) center top / calc(30px * var(--ui-scale)) calc(11px * var(--ui-scale)) no-repeat;
+  backdrop-filter: blur(calc(12px * var(--ui-scale)));
+  mask-image: linear-gradient(90deg, #000 calc(100% - 96px * var(--ui-scale)), transparent);
+  box-shadow: inset 0 1px var(--band-edge); }
+.dream-plate { display: flex; align-items: center; gap: var(--sp-3); padding-bottom: var(--sp-2); }
+.dream-plate__name { position: relative; padding-left: calc(14px * var(--ui-scale)); color: var(--gold-300); font-family: var(--f-display); font-size: var(--text-lg);
+  transition: color var(--motion-base) var(--ease-standard); }
+.dream-plate__name::before { content: ""; position: absolute; left: 0; top: 50%; width: calc(6px * var(--ui-scale)); height: calc(6px * var(--ui-scale)); transform: translateY(-50%) rotate(45deg); background: var(--gold-400); }
+.dream-plate--quiet .dream-plate__name { color: var(--paper-500); }
+.dream-gauge { display: flex; gap: calc(4px * var(--ui-scale)); }
+.dream-gauge__seg { display: block; width: calc(26px * var(--ui-scale)); height: calc(6px * var(--ui-scale)); box-shadow: inset 0 0 0 1px var(--ink-600);
+  transition: background var(--motion-slow) var(--ease-standard), box-shadow var(--motion-slow) var(--ease-standard); }
+.dream-gauge__seg--lit { background: var(--gold-500); box-shadow: 0 0 calc(6px * var(--ui-scale)) var(--gold-glow); }
+.dream-gauge__seg--lit:nth-child(4) { background: #c98166; }
+.dream-gauge__seg--lit:nth-child(5) { background: var(--seal-400); box-shadow: 0 0 calc(8px * var(--ui-scale)) var(--seal-glow); }
+.dream-plate__level { color: var(--paper-300); font-size: var(--text-sm); }
+.dream-plate__breath { display: inline-flex; align-items: center; gap: calc(5px * var(--ui-scale)); margin-left: auto; color: var(--paper-400); font-size: var(--text-xs); }
+.dream-plate__breath i { width: calc(6px * var(--ui-scale)); height: calc(6px * var(--ui-scale)); transform: rotate(45deg); background: var(--gold-400); animation: dream-pulse var(--motion-pending) ease-in-out infinite; }
+.dream-plate__breath i:nth-child(2) { animation-delay: calc(var(--motion-pending) / 6); }
+.dream-plate__breath i:nth-child(3) { animation-delay: calc(var(--motion-pending) / 3); }
+.dream-page { margin-left: calc(-1 * var(--sp-3)); padding-left: var(--sp-3); min-height: 0; overflow-y: auto; cursor: pointer; scrollbar-width: thin; scrollbar-color: var(--ink-600) transparent; }
+.dream-page:focus { outline: none; }
+.dream-page:focus-visible { box-shadow: inset 2px 0 var(--gold-400); }
+.dream-page__beat { max-width: 42em; color: var(--paper-100); font-family: var(--f-serif); font-size: calc(var(--message-text) * var(--prose-scale) * 1.25);
+  line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dream-page__beat--line { color: var(--paper-50); }
+.dream-page__beat--narration { color: var(--paper-200); }
+.dream-page__beat--echo { color: var(--paper-400); font-size: calc(var(--message-text) * var(--prose-scale)); display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; }
+.dream-page__beat--notice { color: var(--paper-300); }
+.dream-page__beat--notice::before { content: "◇ "; color: var(--warn); }
+.dream-strip { display: flex; align-items: center; gap: var(--sp-3); height: var(--band-strip-h); max-width: 42em; color: var(--paper-500); font-size: var(--text-xs); }
+.dream-strip__keys { margin-left: auto; }
+.dream-strip__marker { color: var(--gold-400); animation: dream-pulse var(--motion-marker-bob) ease-in-out infinite; }
+
+/* ---- toast + live region ---- */
+.dream-toast { position: absolute; z-index: 7; top: calc(24px * var(--ui-scale)); left: 50%; transform: translateX(-50%); padding: var(--sp-2) var(--sp-5);
+  border: 1px solid var(--band-edge); border-radius: var(--radius-pill); background: var(--panel); color: var(--gold-300); font-size: var(--text-sm);
+  animation: dream-rise var(--motion-reveal) var(--ease-standard) both; }
+.dream-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---- sheet + confirm ---- */
+.dream-sheet__scrim { position: absolute; inset: 0; z-index: 8; background: rgba(11, 13, 16, 0.42); animation: dream-fade-in var(--motion-panel) var(--ease-standard) both; }
+@keyframes dream-fade-in { from { opacity: 0; } }
+@keyframes dream-slide { from { opacity: 0; transform: translateX(calc(-1 * var(--motion-panel-shift) * var(--motion-travel))); } }
+.dream-sheet { position: absolute; z-index: 9; top: var(--sp-6); bottom: var(--sp-6); left: calc(32px * var(--ui-scale)); display: grid; grid-template-rows: auto 1fr auto;
+  width: min(calc(720px * var(--ui-scale)), 56vw); border-radius: var(--radius-sm); animation: dream-slide var(--motion-panel) var(--ease-standard) both; }
+.dream-sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); padding: var(--sp-6) var(--sp-6) var(--sp-4); border-bottom: 1px solid var(--band-edge-dim); }
+.dream-sheet__head h3, .dream-confirm h3 { color: var(--gold-300); font-family: var(--f-display); font-size: var(--text-xl); font-weight: 500; letter-spacing: 0.1em; }
+.dream-sheet__head p { margin-top: var(--sp-1); color: var(--paper-400); font-size: var(--text-sm); }
+.dream-sheet__body { display: grid; align-content: start; gap: var(--sp-4); min-height: 0; overflow-y: auto; padding: var(--sp-5) var(--sp-6); }
+.dream-field { display: grid; gap: var(--sp-2); }
+.dream-field__label, .dream-threads legend, .dream-tags h4, .dream-requirements h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
+.dream-field__label em { margin-left: var(--sp-2); color: var(--paper-500); font-size: var(--text-xs); font-style: normal; }
+.dream-sheet textarea, .dream-sheet input[type="search"], .dream-tags__box { box-sizing: border-box; width: 100%; border: 1px solid var(--ink-600); border-radius: var(--radius-sm); background: var(--ink-900); color: var(--paper-50); }
+.dream-sheet textarea { padding: var(--sp-3); font-family: var(--f-serif); font-size: var(--text-md); line-height: 1.6; resize: vertical; }
+.dream-sheet textarea[aria-invalid="true"] { border-color: var(--seal-500); }
+.dream-field__foot { display: flex; align-items: center; gap: var(--sp-3); margin-top: calc(-1 * var(--sp-2)); color: var(--paper-500); font-size: var(--text-xs); }
+.dream-field__counter { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dream-field__counter--over { color: var(--seal-400); }
+.dream-field__error { padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--seal-500); background: rgba(124, 32, 38, 0.25); color: var(--paper-100); font-size: var(--text-sm); }
+.dream-link { padding: 0; border: 0; background: none; color: var(--gold-400); font: inherit; text-decoration: underline; cursor: pointer; }
+.dream-threads { display: grid; gap: var(--sp-2); min-width: 0; margin: 0; padding: var(--sp-4) 0 0; border: 0; border-top: 1px solid var(--band-edge-dim); }
+.dream-threads legend { float: left; width: 100%; margin-bottom: var(--sp-2); padding: 0; }
+.dream-threads__filter { padding: var(--sp-2) var(--sp-3); font: inherit; font-size: var(--text-sm); }
+.dream-threads__list { display: grid; gap: var(--sp-1); max-height: calc(5 * 46px * var(--ui-scale)); overflow-y: auto; }
+.dream-threads__option { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm); color: var(--paper-200); font-size: var(--text-sm); line-height: 1.5; cursor: pointer; }
+.dream-threads__option:has(input:checked) { background: var(--panel-hi); box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-50); }
+.dream-threads__option input { flex: none; margin-top: 0.3em; accent-color: var(--gold-400); }
+.dream-threads__option span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+.dream-threads__empty { color: var(--paper-500); font-size: var(--text-sm); }
+.dream-tags { display: grid; gap: var(--sp-3); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
+.dream-tags__row { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.dream-tags__label { color: var(--paper-200); font-size: var(--text-sm); }
+.dream-tags__hint { grid-column: 2; color: var(--paper-500); font-size: var(--text-xs); }
+.dream-tags__box { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); min-height: calc(40px * var(--ui-scale)); padding: var(--sp-1) var(--sp-2); }
+.dream-tags__box:focus-within { box-shadow: var(--focus); }
+.dream-tags__box input { flex: 1; min-width: calc(120px * var(--ui-scale)); border: 0; background: transparent; color: var(--paper-50); font: inherit; font-size: var(--text-sm); }
+.dream-tags__box input:focus { outline: none; box-shadow: none; }
+.dream-tags__chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 var(--sp-3); border: 1px solid var(--ink-600); border-radius: var(--radius-pill); background: var(--ink-780); color: var(--paper-100); font-size: var(--text-sm); }
+.dream-tags__row--exclude .dream-tags__chip { border-color: var(--seal-700); color: var(--seal-400); }
+.dream-tags__chip button { padding: 0 var(--sp-1); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.dream-requirements { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
+.dream-requirements__list { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-size: var(--text-sm); }
+.dream-requirements__kind { margin-right: var(--sp-2); color: var(--paper-400); font-size: var(--text-xs); }
+.dream-requirements__note { color: var(--paper-500); font-size: var(--text-xs); }
+.dream-requirements__note--stale { color: var(--seal-400); }
+.dream-sheet__foot { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-6) var(--sp-5); border-top: 1px solid var(--band-edge-dim); }
+.dream-sheet__foot p { color: var(--paper-500); font-size: var(--text-xs); }
+.dream-sheet__foot div { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+.dream-confirm { position: absolute; z-index: 9; top: 40%; left: 30%; transform: translate(-50%, -50%); display: grid; gap: var(--sp-4);
+  width: min(calc(440px * var(--ui-scale)), 40vw); padding: var(--sp-6); border-radius: var(--radius-sm); animation: dream-fade-in var(--motion-fast) var(--ease-standard) both; }
+.dream-confirm__body { display: grid; gap: var(--sp-1); color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
+.dream-confirm__actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+
+/* ==== co-editing additions ==== */
+/* Where the pen is. */
+.dream-pen { display: flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; color: var(--paper-500); font-size: var(--text-xs); letter-spacing: 0.12em; }
+.dream-pen li { position: relative; display: inline-flex; align-items: center; gap: calc(6px * var(--ui-scale)); }
+.dream-pen li::before { content: ""; width: calc(7px * var(--ui-scale)); height: calc(7px * var(--ui-scale)); transform: rotate(45deg); box-shadow: inset 0 0 0 1px var(--paper-700); }
+.dream-pen li + li { padding-left: calc(24px * var(--ui-scale)); }
+.dream-pen li + li::after { content: ""; position: absolute; left: 0; top: 50%; width: calc(16px * var(--ui-scale)); height: 1px; background: var(--band-edge-dim); }
+.dream-pen .dream-pen__step--on { color: var(--gold-300); }
+.dream-pen .dream-pen__step--on::before { background: var(--gold-400); box-shadow: 0 0 calc(8px * var(--ui-scale)) var(--gold-glow); }
+.dream-pen .dream-pen__step--done::before { background: var(--gold-600); box-shadow: none; }
+
+/* What she changed this turn: a gold ribbon, not a notification. */
+.dream-scene .dream-ink { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); margin: 0 calc(-1 * var(--sp-5));
+  padding: var(--sp-2) var(--sp-5); overflow: hidden; background: linear-gradient(90deg, rgba(185, 154, 96, 0.2), rgba(185, 154, 96, 0.05) 70%, transparent);
+  box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-200); font-size: var(--text-xs); line-height: 1.5; }
+.dream-ink__lead { color: var(--gold-400); }
+.dream-ink__label { color: var(--gold-300); letter-spacing: 0.08em; }
+.dream-ink__label--quiet { color: var(--paper-400); }
+.dream-ink__stroke { display: inline-flex; align-items: baseline; gap: calc(3px * var(--ui-scale)); padding: 0 var(--sp-2); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill); color: var(--paper-100); white-space: nowrap; }
+.dream-ink__stroke i { font-style: normal; color: var(--gold-300); font-variant-numeric: tabular-nums; }
+.dream-ink__stroke .dream-ink__minus { color: var(--seal-400); }
+.dream-keepsake--inked .dream-ink::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 244, 214, 0.5) 50%, transparent 70%); transform: translateX(-100%);
+  animation: dream-ink-sweep 900ms var(--ease-standard) 1 forwards; }
+.dream-keepsake--inked .dream-keepsake__preview { animation: dream-ink-settle 900ms var(--ease-standard) 1; }
+@keyframes dream-ink-sweep { to { transform: translateX(100%); } }
+@keyframes dream-ink-settle { 0% { color: var(--gold-300); border-left-color: var(--gold-300); } 100% { color: var(--paper-50); } }
+.dream-keepsake__lock { margin-right: calc(6px * var(--ui-scale)); color: var(--gold-500); font-size: 0.7em; vertical-align: 0.15em; }
+
+/* The story this wish belongs to, chosen above the reply bar. */
+.dream-belong { position: relative; justify-self: start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-4); border-radius: var(--radius-pill); background: rgba(11, 13, 16, 0.82); box-shadow: inset 0 0 0 1px var(--band-edge-dim); font-size: var(--text-xs); }
+.dream-belong__label { color: var(--gold-400); letter-spacing: 0.08em; }
+.dream-belong__pick { display: inline-flex; align-items: center; gap: var(--sp-2); max-width: calc(420px * var(--ui-scale)); padding: var(--sp-1) var(--sp-3); border: 0; border-bottom: 1px solid var(--gold-500);
+  background: transparent; color: var(--paper-50); font: inherit; font-family: var(--f-serif); font-size: var(--text-sm); cursor: pointer; }
+.dream-belong__pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dream-belong__pick i { color: var(--gold-400); font-style: normal; }
+.dream-belong__pick:hover:enabled, .dream-belong__pick:focus-visible { color: var(--gold-300); outline: none; box-shadow: 0 1px var(--gold-300); }
+.dream-belong__note { color: var(--paper-500); }
+/* The list opens beside the pill, toward the open sky, so the wish card above
+   stays readable while the player chooses. */
+.dream-belong__list { position: absolute; left: calc(100% + var(--sp-3)); bottom: 0; z-index: 2; display: grid; gap: 2px; width: min(calc(520px * var(--ui-scale)), 38vw);
+  max-height: calc(6 * 46px * var(--ui-scale)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ink-600) transparent;
+  padding: var(--sp-2); border-radius: var(--radius-sm); animation: dream-rise var(--motion-reveal) var(--ease-standard) both; }
+.dream-belong__option { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--paper-200); font: inherit; font-size: var(--text-sm); line-height: 1.5; text-align: left; cursor: pointer; }
+.dream-belong__option i { flex: none; color: var(--gold-400); font-style: normal; }
+.dream-belong__option span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.dream-belong__option:hover, .dream-belong__option:focus-visible, .dream-belong__option[aria-selected="true"] { background: var(--panel-hi); box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-50); outline: none; }
+
+/* 願望全貌: a written page, not a form. */
+.dream-sheet__body.dream-scroll { gap: 0; padding-top: var(--sp-2); }
+.dream-scroll h4 { color: var(--gold-400); font-size: var(--text-xs); font-weight: 500; letter-spacing: 0.14em; }
+.dream-scroll h4 em { margin-left: var(--sp-2); color: var(--gold-300); font-style: normal; letter-spacing: 0.04em; }
+.dream-scroll__wish { display: grid; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-5); }
+.dream-scroll__text { color: var(--paper-50); font-family: var(--f-serif); font-size: var(--text-lg); line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dream-scroll__text::first-letter { color: var(--gold-300); font-family: var(--f-display); font-size: 1.5em; }
+.dream-scroll__row { display: grid; grid-template-columns: calc(156px * var(--ui-scale)) 1fr; align-items: baseline; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) 0; border-top: 1px solid var(--band-edge-dim); }
+.dream-scroll__row > div { display: grid; gap: var(--sp-1); min-width: 0; }
+.dream-scroll--touched { margin-inline: calc(-1 * var(--sp-6)); padding-inline: var(--sp-6); background: linear-gradient(90deg, rgba(185, 154, 96, 0.13), transparent 85%); box-shadow: inset 2px 0 var(--gold-400); }
+.dream-scroll__tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); color: var(--paper-100); font-family: var(--f-serif); font-size: var(--text-md); }
+.dream-scroll__tags span { display: inline-flex; align-items: baseline; gap: var(--sp-1); }
+.dream-scroll__row--exclude .dream-scroll__tags { color: var(--seal-400); }
+.dream-scroll__reqs { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-family: var(--f-serif); font-size: var(--text-md); }
+.dream-scroll__reqs span { display: inline-block; min-width: calc(112px * var(--ui-scale)); margin-right: var(--sp-2); color: var(--paper-400); font-family: var(--f-sans); font-size: var(--text-xs); }
+.dream-scroll .dream-scroll__new { color: var(--gold-300); }
+.dream-scroll__new b { margin-left: var(--sp-1); padding: 0 var(--sp-2); border: 1px solid var(--gold-600); border-radius: var(--radius-pill); color: var(--gold-400); font-family: var(--f-sans); font-size: var(--text-xs); font-weight: 400; }
+.dream-scroll__gone { color: var(--paper-500); font-size: var(--text-xs); }
+.dream-scroll__gone s { margin-right: var(--sp-2); color: var(--seal-400); text-decoration-color: var(--seal-600); }
+.dream-scroll__none, .dream-scroll__plain { color: var(--paper-500); font-size: var(--text-sm); }
+.dream-scroll .dream-scroll__plain { color: var(--paper-200); }
+
+/* Both checks ask about the wish, so they stand beside the wish card instead
+   of covering it. */
+.dream-confirm { left: calc(var(--dream-gutter) + min(calc(440px * var(--ui-scale)), 32vw) + var(--sp-6)); transform: translateY(-50%); }
+/* 停止訴說 */
+.dream-confirm--take { width: min(calc(500px * var(--ui-scale)), 44vw); }
+.dream-confirm .dream-confirm__cost { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--warn); background: rgba(199, 154, 74, 0.1); color: var(--paper-100); }
+.dream-pip--forfeit { animation: dream-forfeit 1.8s ease-in-out infinite; }
+.dream-pip--forfeit:nth-child(2) { animation-delay: 0.12s; } .dream-pip--forfeit:nth-child(3) { animation-delay: 0.24s; }
+.dream-pip--forfeit:nth-child(4) { animation-delay: 0.36s; } .dream-pip--forfeit:nth-child(5) { animation-delay: 0.48s; }
+@keyframes dream-forfeit { 50% { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-700); } }
+
+/* 斟酌: editable requirement rows and the fixed thread. */
+.dream-requirements__count { margin-left: var(--sp-2); color: var(--paper-500); font-size: var(--text-xs); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.dream-requirements__row { display: grid; grid-template-columns: calc(168px * var(--ui-scale)) 1fr auto; gap: var(--sp-2); align-items: center; }
+.dream-requirements__row select, .dream-requirements__row input { box-sizing: border-box; width: 100%; min-height: calc(38px * var(--ui-scale)); padding: var(--sp-1) var(--sp-3); border: 1px solid var(--ink-600); border-radius: var(--radius-sm);
+  background: var(--ink-900); color: var(--paper-50); font: inherit; font-size: var(--text-sm); }
+.dream-requirements__row select:focus-visible, .dream-requirements__row input:focus-visible { outline: none; box-shadow: var(--focus); }
+.dream-requirements__remove { width: calc(34px * var(--ui-scale)); height: calc(34px * var(--ui-scale)); border: 1px solid transparent; border-radius: 50%; background: none; color: var(--paper-400); font: inherit; font-size: var(--text-md); cursor: pointer; }
+.dream-requirements__remove:hover, .dream-requirements__remove:focus-visible { border-color: var(--seal-600); color: var(--seal-400); outline: none; }
+.dream-requirements__add { justify-self: start; font-size: var(--text-sm); text-decoration: none; }
+.dream-fixed { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
+.dream-fixed h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
+.dream-fixed p { color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
+.dream-fixed small { margin-left: var(--sp-3); color: var(--paper-500); font-size: var(--text-xs); }
+
+/* ---- farewell ---- */
+.dream-scene--leaving .dream-crest, .dream-scene--leaving .dream-art { animation: none; opacity: 0; transition: opacity var(--motion-scene) var(--ease-standard); }
+.dream-scene--leaving .dream-keepsake { animation: dream-keepsake-rest 700ms var(--ease-standard) forwards; }
+/* A granted wish leaves the player's hands and rises to the throne. */
+.dream-scene[data-leaving="confirmed"] .dream-keepsake { animation: dream-keepsake-rise 1500ms cubic-bezier(0.5, 0, 0.2, 1) forwards; transform-origin: 60% 40%; }
+@keyframes dream-keepsake-rest { to { opacity: 0; transform: translateY(calc(12px * var(--motion-travel))); } }
+@keyframes dream-keepsake-rise {
+  0% { opacity: 1; transform: none; filter: none; }
+  35% { opacity: 1; transform: translate(calc(4vw * var(--motion-travel)), calc(-2vh * var(--motion-travel))) scale(0.96); filter: brightness(1.35); }
+  100% { opacity: 0; transform: translate(calc(30vw * var(--motion-travel)), calc(6vh * var(--motion-travel))) scale(0.1); filter: brightness(2.4) blur(calc(6px * var(--ui-scale))); }
+}
+/* Her last words stay crisp above the dimmed sky. */
+.dream-scene--leaving .dream-scene__main { z-index: 4; }
+/* The throne receives it. The painting is nearly white there, so the light
+   reads through a dimmed sky and a gold ring, not through brightness alone. */
+.dream-scene__wishlight { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 52% 40%, rgba(255, 238, 196, 0.95), rgba(236, 190, 104, 0.55) 5%, rgba(236, 190, 104, 0) 17%),
+    radial-gradient(circle at 52% 40%, rgba(11, 13, 16, 0) 20%, rgba(11, 13, 16, 0.62) 82%);
+  animation: dream-wishlight 1600ms var(--ease-standard) 1100ms forwards; }
+.dream-scene__wishlight::before, .dream-scene__wishlight::after { content: ""; position: absolute; left: 52%; top: 40%; width: 30vmin; aspect-ratio: 1; border-radius: 50%;
+  border: 1px solid var(--gold-300); box-shadow: 0 0 calc(22px * var(--ui-scale)) var(--gold-400), inset 0 0 calc(22px * var(--ui-scale)) var(--gold-glow);
+  opacity: 0; transform: translate(-50%, -50%) scale(0.1); animation: dream-wishring 2200ms cubic-bezier(0.2, 0.6, 0.2, 1) 1400ms forwards; }
+.dream-scene__wishlight::after { animation-delay: 1850ms; }
+@keyframes dream-wishlight { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dream-wishring { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.1); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); } }
+.dream-scene__waking { position: absolute; inset: 0; z-index: 11; background: #fbfaf7; animation: dream-fade-in calc(var(--motion-scene) * 2.4) var(--ease-standard) both; }
+.dream-scene--departed .dream-window { opacity: 0; transition: opacity var(--motion-scene) var(--ease-standard); }
+@media (prefers-reduced-motion: reduce) {
+  .dream-scene--leaving .dream-keepsake, .dream-scene[data-leaving="confirmed"] .dream-keepsake { animation: none; opacity: 0; }
+  .dream-scene__wishlight { animation: none; opacity: 1; }
+  .dream-scene__wishlight::before, .dream-scene__wishlight::after { animation: none; }
+  .dream-scene__waking { animation: none; }
+  .dream-keepsake--inked .dream-ink::after, .dream-keepsake--inked .dream-keepsake__preview, .dream-pip--forfeit { animation: none; }
+}
+
+@media (max-height: 800px) {
+  .dream-keepsake { top: calc(72px * var(--ui-scale)); gap: var(--sp-2); padding: var(--sp-4); max-height: calc(100% - var(--band-h) - 150px * var(--ui-scale)); }
+  .dream-keepsake__preview { -webkit-line-clamp: 1; line-clamp: 1; font-size: var(--text-sm); }
+  .dream-keepsake__target { -webkit-line-clamp: 1; line-clamp: 1; }
+  .dream-scene .dream-ink { padding-block: var(--sp-1); }
+  .dream-choice { padding-top: var(--sp-2); gap: 0; }
+  .dream-choice__row { min-height: calc(34px * var(--ui-scale)); padding-block: var(--sp-1); }
+  .dream-crest { top: var(--sp-3); }
+}
+</style>
