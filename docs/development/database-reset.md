@@ -66,6 +66,7 @@ uv run evennia stop
 
 ### 步驟 2：刪除現有資料庫檔案
 刪除主資料庫檔案以及 SQLite 的預寫日誌（WAL）與共享記憶體（SHM）暫存檔：
+世界資料庫平常以 write-ahead log 模式執行，`server/db/evennia.db3-wal` 與 `server/db/evennia.db3-shm` 在正常運作期間就會存在；停止伺服器後要連同主檔案一併刪除，避免舊的 sidecar 與新資料庫配對。
 ```bash
 rm -f server/db/evennia.db3 server/db/evennia.db3-shm server/db/evennia.db3-wal
 ```
