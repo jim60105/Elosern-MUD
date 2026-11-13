@@ -284,6 +284,16 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIn("鐘聲", state["dialogue"])
         self.assertEqual(state["remaining"], 5)
         self.assertEqual(state["track"]["completed"], 1)
+        # The published stage facts: one accepted exchange still converses, the
+        # thread choice is locked by it, and the settled report travels with
+        # the proposal it describes.
+        self.assertEqual(state["stage"], lifecycle.STAGE_CONVERSING)
+        self.assertEqual(state["proposal"], dream_proposal.empty_proposal())
+        self.assertIsNotNone(state["changes"])
+        self.assertIsNone(state["thread_id"])
+        self.assertFalse(state["can_choose_thread"] or state["can_edit"] or state["drafted"])
+        self.assertTrue(state["can_finalize"] and state["can_input"])
+        self.assertFalse(state["can_confirm"])
         with patch("world.ai.client.OpenAICompatClient", side_effect=AssertionError("escape called model")):
             self.assertEqual(self.request("finalize").result["outcome"], "success")
             self.assertEqual(self.request("draft").result["outcome"], "success")
@@ -313,6 +323,11 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(state["remaining"], 0)
         self.assertFalse(state["can_input"])
         self.assertTrue(state["can_confirm"] and state["can_draft"] and state["can_awaken"])
+        # The sixth settled exchange finalized the session in the same save, so
+        # the published stage offers editing and confirmation, never a choice.
+        self.assertEqual(state["stage"], lifecycle.STAGE_FINALIZED)
+        self.assertTrue(state["can_edit"] and state["drafted"])
+        self.assertFalse(state["can_finalize"] or state["can_choose_thread"])
         self.assertNotIn("dream say", render_state(state))
         refused = self.request("say", message="第七次", client=self.delivered()).result
         self.assertEqual(refused["outcome"], "rejected")
@@ -1451,6 +1466,14 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(result["code"], "dream_finalize")
         session = surface.associated_session(self.actor)
         self.assertEqual(session.stage, lifecycle.STAGE_FINALIZED)
+        state = service.dream_state(self.actor)
+        self.assertEqual(state["stage"], lifecycle.STAGE_FINALIZED)
+        self.assertEqual(state["proposal"]["summary"], "在無名港尋找鐘聲。")
+        self.assertEqual(state["changes"]["summary"], "formed")
+        self.assertTrue(state["can_edit"] and state["can_confirm"] and state["drafted"])
+        self.assertFalse(
+            state["can_input"] or state["can_finalize"] or state["can_choose_thread"]
+        )
         draft = get_draft(session.draft_id, str(self.actor.pk))
         self.assertEqual(draft.direction["summary"], "在無名港尋找鐘聲。")
         self.assertFalse(CreativeRequest.objects.exists())
@@ -1713,6 +1736,16 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(
             surface.associated_session(self.actor).stage, lifecycle.STAGE_CONVERSING
         )
+        resumed_state = service.dream_state(self.actor)
+        self.assertEqual(resumed_state["stage"], lifecycle.STAGE_CONVERSING)
+        self.assertTrue(resumed_state["can_input"] and resumed_state["can_finalize"])
+        # The thread choice stays locked by the exchange that was already
+        # accepted, and finalizing has not happened.
+        self.assertFalse(
+            resumed_state["can_choose_thread"]
+            or resumed_state["can_edit"]
+            or resumed_state["can_confirm"]
+        )
         self.assertEqual(
             surface.wish_state(self.actor)["proposal"]["summary"], "在無名港尋找鐘聲。"
         )
@@ -1827,6 +1860,23 @@ class DreamSurfaceTests(EvenniaTest):
             with self.subTest(payload=payload):
                 with self.assertRaises(ValueError):
                     validate("choose_thread", payload)
+
+    def test_finalize_payload_validation(self):
+        # Closing free text carries no content of its own: the exact pair names
+        # the session it acts on and the revision it must still match.
+        handle = {"session_id": "session:synthetic-dream", "revision": 1}
+        self.assertEqual(validate("finalize", dict(handle)), handle)
+        for payload in (
+            {"session_id": "session:synthetic-dream"},
+            {**handle, "direction": {}},
+            {**handle, "thread_id": None},
+            {"session_id": "session:synthetic-dream", "revision": True},
+            {"session_id": "", "revision": 1},
+            "finalize",
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    validate("finalize", payload)
 
 
 def _synthetic_webp():

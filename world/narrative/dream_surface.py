@@ -433,7 +433,14 @@ def reset_cache(actor):
 
 
 def dream_state(actor):
-    """Server-authored actions, count, track, prose and committed sleep identity."""
+    """Server-authored actions, count, track, stage, prose and sleep identity.
+
+    The stage is published with the flags the surface derives from it, so a
+    client never re-derives what the session already decides: free text is
+    offered only while conversing, choosing a thread only before the choice
+    locks, finalizing only while conversing with no response in flight, and
+    editing or confirmation only after the story is finalized.
+    """
     # Imported lazily: the art owner's scene resolver is the single artwork
     # seam, and keeping the import inside the read keeps this model's own
     # module-level surface as light as it was before the artwork moved.
@@ -445,19 +452,33 @@ def dream_state(actor):
     session = associated_session(actor)
     view = lifecycle.progress(session)
     opened = session.state == lifecycle.STATE_OPEN
+    conversing = session.stage == lifecycle.STAGE_CONVERSING
+    finalized = session.stage == lifecycle.STAGE_FINALIZED
+    pending = bool(session.pending_submission_id)
     ending = render_ending(view.completed) if not opened else None
     draft = get_draft(session.draft_id, owner_id(actor)) if session.draft_id else None
     confirmed = bool(draft and draft_is_confirmed(draft))
     draft_direction = draft.direction if draft else None
-    proposal = _wish_values(value, session)["proposal"]
+    wish = _wish_values(value, session)
+    proposal = wish["proposal"]
     displayed_direction = (draft_direction or {}).get("summary", proposal["summary"])
     return {
         "session_id": session.session_id, "revision": int(session.revision),
         "completed": view.completed, "remaining": view.remaining,
-        "can_input": view.free_text_allowed and not bool(session.pending_submission_id),
-        "can_confirm": opened, "can_draft": opened, "can_awaken": True,
-        "pending": bool(session.pending_submission_id), "open": opened,
+        "can_input": view.free_text_allowed and not pending,
+        "can_confirm": opened and finalized,
+        "can_finalize": opened and conversing and not pending,
+        "can_choose_thread": opened and conversing and not wish["thread_locked"] and not pending,
+        "can_edit": opened and finalized,
+        "can_draft": opened, "can_awaken": True,
+        "pending": pending, "open": opened,
+        # One stage per session, exactly as the lifecycle stores it: the
+        # published working proposal, the last settled report and the chosen
+        # thread travel with it, so the panel never reconstructs either.
+        "stage": session.stage, "proposal": proposal,
+        "changes": wish["changes"], "thread_id": wish["thread_id"],
         "confirmed": confirmed, "failure": bool(value.get("failure")),
+        "drafted": bool(session.draft_id),
         "thread_choices": offered_threads(actor) if opened else [],
         # The shown requirement rows and their identity are published once, as
         # the top-level keys below; carrying them a second time inside the
