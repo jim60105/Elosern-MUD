@@ -497,6 +497,7 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
 
     def test_looking_at_a_named_npc_records_it_on_both_surfaces(self):
         npc = self._npc(self.start)
+        self.assertEqual(self._recorded_keys(), [])
         result = _look_adapter(self.char1, {"target_id": int(npc.pk)})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(self._recorded_keys(), [NAMED_KEY])
@@ -507,6 +508,7 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
 
     def test_opening_a_conversation_records_it_on_both_surfaces(self):
         host = self._dialogue_host(self.start)
+        self.assertEqual(self._recorded_keys(), [])
         result = _talk_open_adapter(self.char1, {"npc_id": int(host.pk)})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(self._recorded_keys(), [NAMED_KEY])
@@ -517,6 +519,7 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
 
     def test_using_a_service_records_the_provider_on_both_surfaces(self):
         merchant = self._merchant(self.start)
+        self.assertEqual(self._recorded_keys(), [])
         result = _buy_adapter(
             self.char1,
             {
@@ -535,6 +538,7 @@ class MetPersonWritePointTests(EvenniaCommandTestMixin, MetPersonRecordFixture):
 
     def test_inviting_records_the_invitee_whatever_the_answer(self):
         npc = self._llm_npc(self.start)
+        self.assertEqual(self._recorded_keys(), [])
         profiles = self._degraded_profiles()
         with override_settings(LLM_PROFILES=profiles), patch(
             "web.webclient.actions.dialogue_composition.build_dialogue_client",
