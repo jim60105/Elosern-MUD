@@ -617,6 +617,16 @@ class DreamGenerationTests(unittest.TestCase):
             "dream edits do not apply: no_match at edit 0",
             client.calls[1].messages[-1]["content"],
         )
+        # The retried attempt edits the very proposal the refused one carried:
+        # a per-attempt proposal would silently lose the caller's wish.
+        self.assertEqual(
+            json.loads(client.calls[0].messages[1]["content"])["wish"],
+            json.loads(client.calls[1].messages[1]["content"])["wish"],
+        )
+        self.assertEqual(
+            json.loads(client.calls[1].messages[1]["content"])["wish"]["summary"],
+            [{"line": 1, "text": "南門的鐘聲停在半空。"}],
+        )
         # Exactly one exchange was accepted, built from the retried response.
         self.assertEqual(result.proposal["summary"], "南門的鐘聲又響了一次。")
         self.assertEqual(result.changes["summary"], "changed")
