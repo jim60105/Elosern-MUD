@@ -12,7 +12,7 @@ Do not edit `content/maps/road_network.yaml` and do not regenerate `world/maps/d
 ## 2. Generator
 
 - [ ] 2.1 Add the constants of design D1, the `spur_nodes` field of D2 and the open-cell rule of D3 to `road_input`. Add the tests "Open cells", "Stage one is independent" and the `node_kinds` refusal. Verify: `uv run --locked python -m unittest tests.test_road_network_generation` passes.
-- [ ] 2.2 Implement stage two per design D4 and `Road.spur_of`, and pass owners and nodes through `encode_roads` per D6. Add the tests "One spur per village", "The cheapest node is chosen", "A spur reuses a trunk", "Fixed order and village targets", "No settlement document needed" and "No village keeps the bytes". Verify: the same unittest command passes.
+- [ ] 2.2 Implement stage two per design D4 and `Road.spur_of`, and pass owners and nodes through `encode_roads` per D6. Add the tests "One spur per village", "The cheapest node is chosen", "A spur reuses a trunk", "A village on a trunk cell", "Fixed order and village targets", "No settlement document needed" and "No village keeps the bytes". Verify: the same unittest command passes.
 - [ ] 2.3 Apply design D5 to `_check_input` and `verify_roads`. Add the refusal tests and the hand-built invalid spur tests. Verify: the same unittest command passes, and from `packages/map-core`, `uv run --locked --extra generation python -m pytest tests -q` passes.
 
 ## 3. Adapter, documentation and gates

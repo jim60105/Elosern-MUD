@@ -81,6 +81,7 @@ for village in spur_nodes, in key order:
 
 - "Lowest walking cost" is measured on the graph as repriced by every road routed so far. One search then gives both the chosen node and the route, and they cannot disagree.
 - Ties between nodes resolve by key; ties between approach cells resolve as `_route` does today.
+- A village standing on a trunk cell still gets a spur record: it runs along the trunk to the cheapest node and adds no new road cell. This is intended. The record is what marks the village as served, and any length statistic must count distinct cells, not the sum of road lengths.
 - Problems are collected for all villages and raised once as `RoadGenerationError`.
 - `Road` gains `spur_of: str | None = None`, placed last.
 - The returned tuple stays sorted by `(first, second)`. A spur always has a village end and a trunk never does, and a village originates exactly one spur and can only be targeted by later villages, so no two roads share a pair.
@@ -136,6 +137,7 @@ All in the existing modules, on synthetic rasters of at most 64 cells a side, wi
 | One spur per village | Two towns and one village off their road: exactly one road has `spur_of`, it starts on the village cell and ends on a gate approach of a town |
 | The cheapest node is chosen | A village nearer to town A in cells but separated from it by a costly band: the spur goes to town B |
 | A spur reuses a trunk | A village beside a trunk far from both towns: the spur shares cells with the trunk, and with `reuse_factor` 1 it shares fewer |
+| A village on a trunk cell | A village on an inner cell of the trunk between two towns: its spur starts on that cell, ends on a town gate approach, and its cell set is a subset of the trunk's |
 | Fixed order and village targets | Villages `v_a` and `v_b` in a line beyond a town: with the nearer village sorting first, the farther village's spur ends on the nearer village's cell; with the farther village sorting first, its spur ends on a gate approach of the town, because an unprocessed village is not a candidate |
 | No settlement document needed | A village location with no document gets a spur |
 | Open cells | A hamlet with a point-entry document and a village with a two-cell footprint document on the straight line between two towns: the trunk passes through the hamlet cell and a village footprint cell. The test uses no `single_cell_footprint` field, so it does not depend on `single-cell-footprint-entry` |

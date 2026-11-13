@@ -88,6 +88,10 @@ After stage one, generation SHALL process village locations in identifier order 
 - **WHEN** a village lies beside a trunk far from both of its ends
 - **THEN** a reuse factor below one yields more cells shared between the spur and the trunk than a reuse factor of one
 
+#### Scenario: A village on a trunk cell
+- **WHEN** a village's cell is an inner cell of a trunk between two towns
+- **THEN** its spur starts on that cell, ends on a gate approach cell of one of the towns, and every cell of the spur is a cell of the trunk
+
 #### Scenario: Fixed order decides village targets
 - **WHEN** two villages lie in a line beyond a town and the nearer village sorts first, and then the identifiers are swapped so the farther village sorts first
 - **THEN** in the first case the farther village's spur ends on the nearer village's cell, and in the second case it ends on a gate approach cell of the town
