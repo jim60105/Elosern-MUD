@@ -31,6 +31,7 @@ from .context import PresentationContext
 from .gallery_categories import (
     DISABLED_REASONS, GalleryCategoryError, category_groups, gallery_categories,
 )
+from .gallery_selection import remembered_group
 from .protocol import (
     MAX_LIST_ITEMS, MAX_SAFE_INTEGER, ProtocolValidationError, _require_exact_fields,
     check_json_safety,
@@ -932,16 +933,47 @@ def _resolve_category(view) -> str:
     return "mine"
 
 
+def _expanded_key(view, category: str, groups) -> str | None:
+    """The one expanded group key of ``people``, or ``None`` for every other category.
+
+    The remembered place while it is still a group, else the most recent place:
+    the groups arrive newest interaction first, so the first one is the default.
+    """
+    if category != "people":
+        return None
+    keys = [group.key for group in groups]
+    if not keys:
+        return None
+    remembered = remembered_group(view, category)
+    return remembered if remembered in keys else keys[0]
+
+
+def _listed_refs(view, category: str, groups):
+    """The subject refs the panel lists for ``category`` under ``view``.
+
+    Every group's subjects reach the panel except under ``people``, where only
+    the one expanded place does; a collapsed place carries its count alone.
+    """
+    expanded = _expanded_key(view, category, groups)
+    return [
+        ref for group in groups
+        if expanded is None or group.key == expanded
+        for ref in group.subjects
+    ]
+
+
 def _resolve_view(actor, view):
     """``(category, selected ref or None, groups)`` with the stored-selection fallbacks.
 
     The remembered subject of the resolved category while it is still listed,
     else the category's current subject (the live character in ``mine``), else
-    its first listed subject, else nothing. May raise ``GalleryCategoryError``.
+    its first listed subject, else nothing. Only the refs the panel lists are
+    candidates, so a person in a collapsed place is never selected. May raise
+    ``GalleryCategoryError``.
     """
     category = _resolve_category(view)
     groups = category_groups(actor, category)
-    refs = [ref for group in groups for ref in group.subjects]
+    refs = _listed_refs(view, category, groups)
     remembered = next(
         (key for pair_category, key in getattr(view, "subjects", ()) if pair_category == category),
         None,
@@ -996,14 +1028,15 @@ def gallery_presenter(context: PresentationContext):
     except GalleryCategoryError as exc:
         log_warn("gallery_category_failed", context={"char": getattr(actor, "pk", None)}, exc=exc)
         raise PanelUnavailableError from exc
-    group_rows = [
-        {
+    expanded_key = _expanded_key(context.gallery_view, category, groups)
+    group_rows = []
+    for group in groups:
+        expanded = group.key == expanded_key if category == "people" else True
+        group_rows.append({
             "key": group.key, "label": group.label, "seen": group.seen, "total": group.total,
-            "expanded": True, "count": len(group.subjects),
-            "subjects": [_subject_row(ref) for ref in group.subjects],
-        }
-        for group in groups
-    ]
+            "expanded": expanded, "count": len(group.subjects),
+            "subjects": [_subject_row(ref) for ref in group.subjects] if expanded else [],
+        })
     # The selected category's count comes from the groups held here, so the
     # two reads of one build can never disagree.
     category_rows = [

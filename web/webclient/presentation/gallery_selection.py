@@ -30,6 +30,17 @@ class GalleryViewSelection:
     owner_id: int
     category: str
     subjects: tuple[tuple[str, str], ...]  # (category, subject_key) pairs
+    #: (category, group_key) pairs: the one group the panel expands per
+    #: category. No action writes it yet (change gallery-group-expansion).
+    expanded: tuple[tuple[str, str], ...] = ()
+
+
+def remembered_group(view, category: str) -> str | None:
+    """The group key this session remembers as expanded for ``category``."""
+    return next(
+        (key for pair_category, key in getattr(view, "expanded", ()) if pair_category == category),
+        None,
+    )
 
 
 def _owner_id(actor) -> int | None:
@@ -89,8 +100,8 @@ def _session_ready(session, actor) -> bool:
 def select_gallery_category(session, actor, category) -> dict:
     """Remember one enabled category; returns action result data without publishing.
 
-    The remembered per-category subjects are kept. Invalid input never alters
-    the stored view.
+    The remembered per-category subjects and expanded groups are kept. Invalid
+    input never alters the stored view.
     """
     from .gallery import _resolve_category
 
@@ -107,7 +118,10 @@ def select_gallery_category(session, actor, category) -> dict:
     view = gallery_view_snapshot(session, actor)
     previous = _resolve_category(view)
     session.ndb.gallery_view = GalleryViewSelection(
-        owner_id, category, view.subjects if view is not None else ()
+        owner_id,
+        category,
+        view.subjects if view is not None else (),
+        view.expanded if view is not None else (),
     )
     if previous != category:
         log_info("gallery_category_selected", context={"category": category})
@@ -119,10 +133,10 @@ def select_gallery_category(session, actor, category) -> dict:
 def select_gallery_subject(session, actor, subject_key) -> dict:
     """Remember one subject of the currently resolved category.
 
-    The subject must be listed in that category's groups; it replaces the
+    The subject must be one the panel lists for that category; it replaces the
     category's previous entry. Invalid input never alters the stored view.
     """
-    from .gallery import _resolve_view
+    from .gallery import _listed_refs, _resolve_view
 
     if not _session_ready(session, actor) or not isinstance(subject_key, str):
         return UNKNOWN_SUBJECT
@@ -134,14 +148,16 @@ def select_gallery_subject(session, actor, subject_key) -> dict:
         category, current, groups = _resolve_view(actor, view)
     except GalleryCategoryError:  # observability: ignore R2: explicit unknown_subject result reports the unresolvable owner
         return UNKNOWN_SUBJECT
-    listed = {ref.subject.full(): ref for group in groups for ref in group.subjects}
+    listed = {ref.subject.full(): ref for ref in _listed_refs(view, category, groups)}
     ref = listed.get(subject_key)
     if ref is None:
         return UNKNOWN_SUBJECT
     pairs = tuple(
         pair for pair in (view.subjects if view is not None else ()) if pair[0] != category
     ) + ((category, subject_key),)
-    session.ndb.gallery_view = GalleryViewSelection(owner_id, category, pairs)
+    session.ndb.gallery_view = GalleryViewSelection(
+        owner_id, category, pairs, view.expanded if view is not None else ()
+    )
     if current is None or current.subject.full() != subject_key:
         log_info(
             "gallery_panel_selected",

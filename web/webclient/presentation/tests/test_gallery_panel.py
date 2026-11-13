@@ -273,7 +273,7 @@ def payload_v4():
         "categories": [
             {"key": "mine", "count": 1, "enabled": True, "reason": None},
             {"key": "party", "count": 0, "enabled": True, "reason": None},
-            {"key": "people", "count": 0, "enabled": False, "reason": "測試停用"},
+            {"key": "people", "count": 0, "enabled": True, "reason": None},
             {"key": "monster", "count": 0, "enabled": True, "reason": None},
             {"key": "scene", "count": 0, "enabled": False, "reason": "測試停用"},
         ],
@@ -784,7 +784,6 @@ process.stdout.write(JSON.stringify(results));
     def test_disabled_category_is_rejected(self):
         self.assert_parity([
             ("valid", payload_v4(), True),
-            ("disabled category", v4_case(lambda p: p.update(category="people")), False),
             ("disabled scene", v4_case(lambda p: p.update(category="scene")), False),
         ])
 
@@ -810,10 +809,10 @@ process.stdout.write(JSON.stringify(results));
     def test_reason_accompanies_only_disabled_categories(self):
         self.assert_parity([
             ("enabled with reason", v4_case(lambda p: p["categories"][1].update(reason="原因")), False),
-            ("disabled without reason", v4_case(lambda p: p["categories"][2].update(reason=None)), False),
-            ("disabled empty reason", v4_case(lambda p: p["categories"][2].update(reason="")), False),
-            ("reason at cap", v4_case(lambda p: p["categories"][2].update(reason="由" * 64)), True),
-            ("reason over cap", v4_case(lambda p: p["categories"][2].update(reason="由" * 65)), False),
+            ("disabled without reason", v4_case(lambda p: p["categories"][4].update(reason=None)), False),
+            ("disabled empty reason", v4_case(lambda p: p["categories"][4].update(reason="")), False),
+            ("reason at cap", v4_case(lambda p: p["categories"][4].update(reason="由" * 64)), True),
+            ("reason over cap", v4_case(lambda p: p["categories"][4].update(reason="由" * 65)), False),
         ])
 
     @covers_requirement(
