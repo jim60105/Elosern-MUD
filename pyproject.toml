@@ -14,6 +14,7 @@ dependencies = [
     "rembg[cpu]>=2.0.75",
     "scipy==1.16.3",
     "sentencepiece>=0.2.2",
+    "twisted[tls]>=24.11.0",
 ]
 
 [tool.uv]
