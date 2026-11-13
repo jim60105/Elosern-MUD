@@ -12,11 +12,11 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 3. Stories
 
-- [ ] 3.1 Add `stories/Data/GalleryImagePage.stories.js` (character card, default card, monster card, official entry, pending, failed, empty, armed delete; both viewports) using v4 fixtures from `stories/gallery-fixtures-v4.js`, and the `Data/GalleryImagePage` manifest entry. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
+- [x] 3.1 Add `stories/Data/GalleryImagePage.stories.js` (character card, default card, monster card, official entry, pending, failed, empty, armed delete; both viewports) using v4 fixtures from `stories/gallery-fixtures-v4.js`, and the `Data/GalleryImagePage` manifest entry. Verify `pnpm run build-storybook` and `pnpm run showcase-coverage` pass.
 
 ## Evidence
 
-- [ ] E.1 Add `Data/GalleryImagePage` to the pinned manifest sets in `web/webclient/tests/test_vue_showcase_data_evidence.py`, `test_vue_showcase_action_evidence.py`, `test_vue_showcase_world_evidence.py` and `test_vue_showcase_overlays_evidence.py` (each pins the manifest `required` set). Verify `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence` passes.
+- [x] E.1 Add `Data/GalleryImagePage` to the pinned manifest sets in `web/webclient/tests/test_vue_showcase_data_evidence.py`, `test_vue_showcase_action_evidence.py`, `test_vue_showcase_world_evidence.py` and `test_vue_showcase_overlays_evidence.py` (each pins the manifest `required` set). Verify `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb web.webclient.tests.test_vue_showcase_data_evidence web.webclient.tests.test_vue_showcase_action_evidence web.webclient.tests.test_vue_showcase_world_evidence web.webclient.tests.test_vue_showcase_overlays_evidence` passes.
 
 ## 4. Gates
 

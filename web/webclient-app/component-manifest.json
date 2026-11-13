@@ -87,7 +87,8 @@
     "World/TileWall",
     "World/CodexDetail",
     "World/TitleCodexTab",
-    "Data/GalleryWall"
+    "Data/GalleryWall",
+    "Data/GalleryImagePage"
   ],
   "frozen": true
 }
