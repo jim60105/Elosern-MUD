@@ -12,7 +12,7 @@ Other places branch on the kind:
 | `world/rules/sight.py` `SUPPORTED_SETTLEMENT_KINDS` | `("capital", "city", "town", "port")`; the rulebook must hold exactly these silhouette rows | Must list the new kinds, and the rulebook needs two rows. |
 | `world/rules/sight.py` and `world/rules/wilderness_disclosure.py` `HIDDEN_ANCHOR_KINDS` | `elven_village`, `dungeon` | Unchanged: the new kinds are public. |
 | `world/maps/population_geometry.py` `INHABITED_SETTLEMENT_KINDS` | capital, city, town, port, elven village | Must list the new kinds. |
-| `tools/settlement_synthesis/budget.py` `NATIONAL_KINDS` | capital, city, town, port | Unchanged here. `single-cell-settlement-layout` owns it. |
+| `tools/settlement_synthesis/budget.py` `NATIONAL_KINDS` | capital, city, town, port | Unchanged here. `single-cell-size-budget` owns it. |
 | `content/maps/road_network.yaml` `node_kinds` | capital, city, port, town | Unchanged. `road-spur-stage` owns road behaviour. |
 
 ## Goals / Non-Goals
