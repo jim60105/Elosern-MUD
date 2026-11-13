@@ -1899,6 +1899,9 @@ class SceneGalleryActionTests(EvenniaTest):
             room_art_key=None, room_binding_invalid=False,
         ))
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
     def test_generating_a_scene_image_queues_one_job(self):
         result = self.run_action(
             "gallery.generate", {"subject_key": self.subject.full(), "fields": [], "custom_prompt": ""}
@@ -1907,6 +1910,9 @@ class SceneGalleryActionTests(EvenniaTest):
         jobs = queue.pending_gallery_jobs(self.subject)
         self.assertEqual([job["image_id"] for job in jobs], [result["data"]["image_id"]])
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
     def test_deleting_a_scene_card_returns_to_the_bundled_image(self):
         image_id = self.card()
         first = self.background()["attempts"][0]
@@ -1920,6 +1926,9 @@ class SceneGalleryActionTests(EvenniaTest):
         self.assertEqual(images[0]["source_id"], descriptors.scene_bundled_source_id(T_SCENE))
         self.assertEqual(images[0]["resource"]["url"], self.catalog.url_for(T_SCENE))
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
     def test_a_face_rectangle_on_a_scene_card_is_refused(self):
         image_id = self.card()
         before = api.cards_for(self.subject)
@@ -1930,6 +1939,9 @@ class SceneGalleryActionTests(EvenniaTest):
         self.assertEqual((result["outcome"], result["code"]), ("rejected", "face_rect_unsupported"))
         self.assertEqual(api.cards_for(self.subject), before)
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
     def test_an_unentered_scene_is_not_admitted(self):
         unentered = ArtSubject(ArtSubjectKind.SCENE, T_SCENE_UNENTERED)
         result = self.run_action(
@@ -1938,6 +1950,9 @@ class SceneGalleryActionTests(EvenniaTest):
         self.assertEqual((result["outcome"], result["code"]), ("rejected", "subject_not_admitted"))
         self.assertEqual(queue.pending_gallery_jobs(unentered), [])
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::gallery-mutations-resolve-scene-subjects-through-the-scene-producer"
+    )
     def test_official_preferences_are_refused_for_a_scene_without_a_write(self):
         self.card()
         before = [

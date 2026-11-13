@@ -874,6 +874,9 @@ process.stdout.write(JSON.stringify(results));
             ("disabled scene", v4_case(lambda p: p.update(category="scene")), False),
         ])
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_scene_payload_boundaries_match_on_both_sides(self):
         """Scene subjects, their landscape card rows and their bundled-scene terminal."""
         cases = [("scene panel", scene_payload(), True)]

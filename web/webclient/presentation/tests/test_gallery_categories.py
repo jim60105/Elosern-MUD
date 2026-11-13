@@ -484,6 +484,9 @@ class SceneCategoryTests(EvenniaTest):
         self.account.characters.add(self.char1)
         self.actor = self.char1
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-scene-category-lists-entered-archetypes"
+    )
     def test_only_entered_archetypes_are_listed_in_registry_order(self):
         record_scene_entry(self.actor, T_THIRD)
         record_scene_entry(self.actor, T_ARCH)
@@ -499,6 +502,9 @@ class SceneCategoryTests(EvenniaTest):
         by_key = {category.key: category for category in gallery_categories(self.actor)}
         self.assertEqual((by_key["scene"].count, by_key["scene"].enabled), (2, True))
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-scene-category-lists-entered-archetypes"
+    )
     def test_nothing_entered_lists_nothing(self):
         by_key = {category.key: category for category in gallery_categories(self.actor)}
         self.assertEqual(
@@ -506,12 +512,18 @@ class SceneCategoryTests(EvenniaTest):
         )
         self.assertEqual(category_groups(self.actor, "scene"), ())
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-scene-category-lists-entered-archetypes"
+    )
     def test_an_entered_scene_is_admitted_and_an_unentered_one_is_not(self):
         record_scene_entry(self.actor, T_ARCH)
         self.assertTrue(is_subject_admitted(self.actor, f"scene:{T_ARCH}"))
         self.assertEqual(category_of_subject(self.actor, f"scene:{T_ARCH}"), "scene")
         self.assertFalse(is_subject_admitted(self.actor, f"scene:{T_OTHER}"))
 
+    @covers_requirement(
+        "webclient-gallery-categories::the-scene-category-lists-entered-archetypes"
+    )
     def test_a_possessed_companion_lists_its_owners_scenes(self):
         record_scene_entry(self.actor, T_OTHER)
         companion = create_object(NPC, key="同行測者", location=self.room1)

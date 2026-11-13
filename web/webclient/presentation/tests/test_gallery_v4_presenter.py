@@ -650,6 +650,9 @@ class GallerySceneProjectionTests(EvenniaTest):
         )
         return image, identity
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_a_scene_without_a_card_shows_its_bundled_image(self):
         panel = self._scene_panel()
         self.assertEqual((panel["category"], panel["selected"]), ("scene", f"scene:{T_ARCH}"))
@@ -668,6 +671,9 @@ class GallerySceneProjectionTests(EvenniaTest):
         )
         self.assertEqual(_client_verdict(panel), "ok")
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_a_scene_card_row_is_a_landscape_original(self):
         image, identity = self._card()
         panel = self._scene_panel()
@@ -694,6 +700,9 @@ class GallerySceneProjectionTests(EvenniaTest):
         self.assertEqual(terminal["resource"]["url"], self.catalog.url_for(T_ARCH))
         self.assertEqual(_client_verdict(panel), "ok")
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_a_scene_card_without_an_admitted_bundled_image_has_no_terminal(self):
         self._card()
         partial = scene_definitions.BundledSceneCatalog({T_OTHER: _bundled_image(T_OTHER)})
@@ -704,12 +713,18 @@ class GallerySceneProjectionTests(EvenniaTest):
         self.assertIn("gallery_scene_terminal_missing", [call.args[0] for call in warn.call_args_list])
         self.assertEqual(_client_verdict(panel), "ok")
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_non_scene_subjects_carry_no_description(self):
         panel = gallery_presenter(build_presentation_context(self._session(), self.actor))
         validate_gallery(panel)
         self.assertEqual((panel["category"], panel["selected"]), ("mine", "portrait:character:t_scene_actor"))
         self.assertIsNone(panel["description"])
 
+    @covers_requirement(
+        "webclient-gallery-panel::scene-subjects-carry-the-background-in-effect-and-its-sentence"
+    )
     def test_scene_pending_and_unreadable_rows_keep_the_scene_shape(self):
         from world.art.queue import enqueue_gallery_job
 
