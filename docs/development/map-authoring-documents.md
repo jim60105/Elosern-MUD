@@ -82,7 +82,8 @@ Every coordinate is explicitly named for its domain:
 
 `locations.<id>`: `kind` (`capital`, `city`, `town`, `port`, `elven_village`,
 `dungeon`, `village`, `hamlet`), `display_name_zh`, `description`, `cell`,
-`geographic_constraint`, `scene_archetype` (nullable).
+`geographic_constraint`, `scene_archetype` (nullable), optional
+`spacing_exemption` (non-blank, at most 256 characters).
 Political/population/floor lore stays with its existing game owners.
 
 ### districts
