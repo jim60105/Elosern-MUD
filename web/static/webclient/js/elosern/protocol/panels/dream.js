@@ -2,12 +2,10 @@
 
 var artwork = require("../artwork.js");
 var core = require("../core.js");
-// Mirrors world.narrative.authoring's bounded shown-requirement contract: the
-// readable planning rows a confirmation may freeze, and the identity of the
-// persisted version they were shown at.
+// Mirrors world.narrative.authoring's bounded requirement-row contract: the
+// readable planning rows of the working proposal and of its change report.
 var MAX_REQUIREMENTS = 8;
 var MAX_REQUIREMENT_TEXT = 200;
-var MAX_REQUIREMENT_VERSION = 128;
 var REQUIREMENT_KINDS = ["place", "new_character", "private_commission"];
 // Mirrors world.narrative.dream_proposal's bounded working proposal and change
 // report: the applier refuses anything outside these shapes, so the panel that
@@ -74,16 +72,16 @@ function requireChangeReport(changes) {
 
 function validateDreamPanel(payload) {
   core.requireExactFields(payload, "dream", ["schema_version", "available", "state"], []);
-  if (payload.schema_version !== 4 || payload.available !== true) throw new Error("invalid dream panel");
+  if (payload.schema_version !== 5 || payload.available !== true) throw new Error("invalid dream panel");
   var state = payload.state;
   if (state === null) return payload;
   core.requireExactFields(state, "dream state", [
     "session_id", "revision", "completed", "remaining", "can_input", "can_confirm",
     "can_finalize", "can_choose_thread", "can_edit", "can_draft", "can_awaken",
     "pending", "open", "confirmed", "failure", "drafted",
-    "opening", "scene", "scene_art", "dialogue", "direction_parts", "thread_choices",
-    "draft_preferences", "track", "sleep", "ending", "ending_phase",
-    "requirements", "requirement_version", "stage", "proposal", "changes", "thread_id",
+    "opening", "scene", "scene_art", "dialogue", "thread_choices",
+    "track", "sleep", "ending", "ending_phase",
+    "stage", "proposal", "changes", "thread_id",
   ], []);
   if (typeof state.session_id !== "string" || !state.session_id.length || state.session_id.length > 64) throw new Error("invalid dream identity");
   core.requireInt(state.revision, "dream revision", 1, Number.MAX_SAFE_INTEGER);
@@ -125,8 +123,6 @@ function validateDreamPanel(payload) {
   // owns the exact fact shape, the source bounds and the media ceilings, so a
   // retired raw URL string fails the wire instead of being adapted.
   artwork.validateArtwork(state.scene_art);
-  if (!Array.isArray(state.direction_parts) || state.direction_parts.length > 2 ||
-      state.direction_parts.some(function (part) { return typeof part !== "string" || codePoints(part) > 2000; })) throw new Error("invalid dream direction");
   if (!Array.isArray(state.thread_choices) || state.thread_choices.length > 32) throw new Error("invalid dream thread choices");
   state.thread_choices.forEach(function (thread) {
     core.requireExactFields(thread, "dream thread choice", ["id", "label"], []);
@@ -138,13 +134,6 @@ function validateDreamPanel(payload) {
        state.thread_id.length > MAX_THREAD_ID)) throw new Error("invalid dream thread identity");
   requireProposal(state.proposal);
   requireChangeReport(state.changes);
-  if (state.draft_preferences !== null && !core.isPlainObject(state.draft_preferences)) throw new Error("invalid draft preferences");
-  requireRequirements(state.requirements, "dream requirement");
-  // A row set without an identity is a proposal the server has not persisted
-  // yet, which is a published shape: only the identity's own shape is checked.
-  if (state.requirement_version !== null &&
-      (typeof state.requirement_version !== "string" || !state.requirement_version.length ||
-       state.requirement_version.length > MAX_REQUIREMENT_VERSION)) throw new Error("invalid dream requirement version");
   core.requireExactFields(state.track, "dream track", ["version", "completed", "pleasure", "level", "ordinal", "climax_phase", "converging"], []);
   core.requireInt(state.track.version, "track version", 1, Number.MAX_SAFE_INTEGER);
   core.requireInt(state.track.completed, "track count", 0, 6);

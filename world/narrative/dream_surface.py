@@ -11,7 +11,6 @@ from evennia.utils.dbserialize import deserialize
 
 from world.narrative import dream_proposal, dream_session as lifecycle
 from world.narrative.authoring import (
-    REQUIREMENT_FIELDS,
     AuthoringError,
     draft_is_confirmed,
     get_draft,
@@ -458,10 +457,7 @@ def dream_state(actor):
     ending = render_ending(view.completed) if not opened else None
     draft = get_draft(session.draft_id, owner_id(actor)) if session.draft_id else None
     confirmed = bool(draft and draft_is_confirmed(draft))
-    draft_direction = draft.direction if draft else None
     wish = _wish_values(value, session)
-    proposal = wish["proposal"]
-    displayed_direction = (draft_direction or {}).get("summary", proposal["summary"])
     return {
         "session_id": session.session_id, "revision": int(session.revision),
         "completed": view.completed, "remaining": view.remaining,
@@ -475,18 +471,11 @@ def dream_state(actor):
         # One stage per session, exactly as the lifecycle stores it: the
         # published working proposal, the last settled report and the chosen
         # thread travel with it, so the panel never reconstructs either.
-        "stage": session.stage, "proposal": proposal,
+        "stage": session.stage, "proposal": wish["proposal"],
         "changes": wish["changes"], "thread_id": wish["thread_id"],
         "confirmed": confirmed, "failure": bool(value.get("failure")),
         "drafted": bool(session.draft_id),
         "thread_choices": offered_threads(actor) if opened else [],
-        # The shown requirement rows and their identity are published once, as
-        # the top-level keys below; carrying them a second time inside the
-        # preference projection would only grow the payload every client must
-        # validate before it can render the stage.
-        "draft_preferences": {key: item for key, item in (draft_direction or {}).items()
-                              if key not in ("summary", *REQUIREMENT_FIELDS)}
-        if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
         # The stage's artwork is the shared canonical scene descriptor of the
         # dream's own chain, resolved read-only by the art owner: this model
@@ -494,15 +483,6 @@ def dream_state(actor):
         # mutates the session, the authoring store or any art record.
         "scene_art": describe_dream_scene(scene_subject_id(actor)),
         "dialogue": value.get("dialogue", ""),
-        "direction_parts": [displayed_direction[offset:offset + 2000]
-                            for offset in range(0, len(displayed_direction), 2000)],
-        # The readable bounded experience requirements for the version being
-        # confirmed, plus the reviewable identity of the persisted shown
-        # version. A persisted draft's frozen rows win over the collaborator's
-        # latest proposal, because that is the version confirmation compares.
-        "requirements": (draft_direction or {}).get("requirements")
-        or [dict(row) for row in proposal["requirements"]],
-        "requirement_version": (draft_direction or {}).get("requirement_version"),
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
         "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",
         "ending_phase": ending.phase if ending else "",

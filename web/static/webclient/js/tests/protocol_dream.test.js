@@ -151,9 +151,7 @@ function dreamState(overrides) {
       scene: "合成場景描述",
       dialogue: "合成對話",
       scene_art: dreamDescriptor(),
-      direction_parts: ["合成方向"],
       thread_choices: [],
-      draft_preferences: null,
       stage: "conversing",
       proposal: proposal(),
       changes: null,
@@ -170,100 +168,76 @@ function dreamState(overrides) {
       sleep: { tick_from: 90, tick_to: 100, requested_seconds: 10, seconds: 10, event_kinds: [] },
       ending: "",
       ending_phase: "",
-      requirements: [],
-      requirement_version: null,
     },
     overrides || {}
   );
 }
 
 function dreamPanel(state) {
-  return { schema_version: 4, available: true, state: state === undefined ? dreamState() : state };
+  return { schema_version: 5, available: true, state: state === undefined ? dreamState() : state };
 }
 
-test("dream accepts the published requirement rows with and without an identity", () => {
-  const proposed = dreamPanel(
-    dreamState({
-      requirements: [
-        requirement("place", "合成地點"),
-        requirement("new_character", "合成角色"),
-        requirement("private_commission", "合成委託"),
-      ],
-      requirement_version: null,
-    })
-  );
-  // A proposal the store has not persisted yet is a legal published shape.
-  assert.deepEqual(Protocol.validatePanel("dream", 4, proposed), proposed);
-
-  const shown = dreamPanel(
-    dreamState({
-      requirements: [requirement("place", "合成地點")],
-      requirement_version: "t_dream_session:v1",
-    })
-  );
-  assert.deepEqual(Protocol.validatePanel("dream", 4, shown), shown);
+test("dream refuses the retired stage-3 keys and the schema-4 envelope", () => {
+  for (const [key, value] of [
+    ["direction_parts", ["合成方向"]],
+    ["draft_preferences", null],
+    ["requirements", []],
+    ["requirement_version", null],
+  ]) {
+    assert.throws(
+      () => Protocol.validatePanel("dream", 5, dreamPanel(dreamState({ [key]: value }))),
+      undefined,
+      key
+    );
+  }
+  assert.throws(() => Protocol.validatePanel("dream", 5, dreamPanel(dreamState({ requirement_rows: [] }))));
+  assert.throws(() => Protocol.validatePanel("dream", 4, { ...dreamPanel(), schema_version: 4 }));
+  assert.throws(() => Protocol.validatePanel("dream", 5, { ...dreamPanel(), schema_version: 4 }));
 });
 
-test("dream requires the requirement fields and an exact row shape", () => {
-  for (const rows of [
+test("dream checks the requirement rows of the proposal and of the report", () => {
+  const rows = [
+    requirement("place", "合成地點"),
+    requirement("new_character", "合成角色"),
+    requirement("private_commission", "合成委託"),
+  ];
+  const panel = dreamPanel(dreamState({
+    proposal: proposal({ requirements: rows }),
+    changes: changeReport({ requirements: { added: rows.slice(0, 1), removed: rows.slice(1) } }),
+  }));
+  assert.deepEqual(Protocol.validatePanel("dream", 5, panel), panel);
+  for (const bad of [
     [requirement("explode", "合成地點")],
     [requirement("place", "")],
     [requirement("place", "   ")],
     [{ kind: "place" }],
     [{ kind: "place", text: "合成地點", extra: "x" }],
     [requirement("place", "長".repeat(201))],
-    [requirement("place", "合成地點")].concat(
-      Array.from({ length: 8 }, () => requirement("place", "合成地點"))
-    ),
-    "not-a-list",
   ]) {
     assert.throws(
-      () => Protocol.validatePanel("dream", 4, dreamPanel(dreamState({ requirements: rows }))),
+      () => Protocol.validatePanel("dream", 5, dreamPanel(dreamState({ proposal: proposal({ requirements: bad }) }))),
       undefined,
-      JSON.stringify(rows)
+      JSON.stringify(bad)
+    );
+    assert.throws(
+      () => Protocol.validatePanel("dream", 5, dreamPanel(dreamState({
+        changes: changeReport({ requirements: { added: [], removed: bad } }),
+      }))),
+      undefined,
+      JSON.stringify(bad)
     );
   }
-  const missing = dreamState();
-  delete missing.requirements;
-  assert.throws(() => Protocol.validatePanel("dream", 4, dreamPanel(missing)));
-  const missingVersion = dreamState();
-  delete missingVersion.requirement_version;
-  assert.throws(() => Protocol.validatePanel("dream", 4, dreamPanel(missingVersion)));
-});
-
-test("dream bounds the shown version identity and still refuses unknown fields", () => {
-  for (const version of ["", 7, "v".repeat(129)]) {
-    assert.throws(() =>
-      Protocol.validatePanel(
-        "dream",
-        4,
-        dreamPanel(dreamState({ requirement_version: version }))
-      )
-    );
-  }
-  assert.doesNotThrow(() =>
-    Protocol.validatePanel(
-      "dream",
-      4,
-      dreamPanel(
-        dreamState({ requirements: [requirement("place", "合成地點")], requirement_version: "v".repeat(128) })
-      )
-    )
-  );
-  assert.throws(() =>
-    Protocol.validatePanel("dream", 4, dreamPanel(dreamState({ requirement_rows: [] })))
-  );
 });
 
 test("dream is in the production panel allowlist at its registered version", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.dream, 4);
+  assert.equal(Protocol.PANEL_ALLOWLIST.dream, 5);
   assert.throws(() => Protocol.validatePanel("dream", 2, dreamPanel()));
 });
 
 test("dream carries the canonical scene descriptor and refuses the retired raw URL", () => {
   const descriptor = dreamDescriptor();
   const panel = dreamPanel(dreamState({ scene_art: descriptor }));
-  assert.deepEqual(Protocol.validatePanel("dream", 4, panel), panel);
+  assert.deepEqual(Protocol.validatePanel("dream", 5, panel), panel);
   // The reachable facts a dream descriptor carries: the optional preferred
   // operator position, the required bundled illustration and the distinct
   // terminal, with no generation claim at all.
@@ -291,7 +265,7 @@ test("dream carries the canonical scene descriptor and refuses the retired raw U
       descriptor.attempts[1],
     ],
   });
-  assert.doesNotThrow(() => Protocol.validatePanel("dream", 4, dreamPanel(dreamState({ scene_art: refused }))));
+  assert.doesNotThrow(() => Protocol.validatePanel("dream", 5, dreamPanel(dreamState({ scene_art: refused }))));
 
   // The retired shapes and the unbounded/incorrect facts are all refused.
   for (const retired of [
@@ -303,7 +277,7 @@ test("dream carries the canonical scene descriptor and refuses the retired raw U
     dreamDescriptor({ attempts: [{ type: "fault", source_id: "x".repeat(257), rank: 30, reason: "source_rejected" }] }),
   ]) {
     assert.throws(() =>
-      Protocol.validatePanel("dream", 4, dreamPanel(dreamState({ scene_art: retired })))
+      Protocol.validatePanel("dream", 5, dreamPanel(dreamState({ scene_art: retired })))
     );
   }
 });
@@ -317,7 +291,7 @@ test("dream accepts a conversing wish and a finalized one", () => {
       thread_choices: [{ id: "t_synthetic_thread", label: "合成已知故事" }],
     })
   );
-  assert.deepEqual(Protocol.validatePanel("dream", 4, conversing), conversing);
+  assert.deepEqual(Protocol.validatePanel("dream", 5, conversing), conversing);
 
   // Finalized: the report of the last settled exchange, editing and
   // confirmation offered, free text, thread choice and finalizing not.
@@ -333,7 +307,7 @@ test("dream accepts a conversing wish and a finalized one", () => {
       changes: changeReport(),
     })
   );
-  assert.deepEqual(Protocol.validatePanel("dream", 4, finalized), finalized);
+  assert.deepEqual(Protocol.validatePanel("dream", 5, finalized), finalized);
 });
 
 test("dream refuses every rule the wish stage wire states", () => {
@@ -419,7 +393,7 @@ test("dream refuses every rule the wish stage wire states", () => {
 
   for (const [label, state] of cases) {
     assert.throws(
-      () => Protocol.validatePanel("dream", 4, dreamPanel(state)),
+      () => Protocol.validatePanel("dream", 5, dreamPanel(state)),
       undefined,
       label
     );

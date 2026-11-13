@@ -266,3 +266,51 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
                 'finalized edit sheet > cannot be reached while conversing',
             ),
         )
+
+    @covers_requirement(
+        "webclient-dream-stage::the-keepsake-card-reports-what-the-last-exchange-changed"
+    )
+    def test_keepsake_card_reports_last_exchange_changes(self):
+        _assert_cases_pass(
+            "dream keepsake change line",
+            (
+                'keepsake change line > names the changed fields with their added and removed counts',
+                'keepsake change line > states that nothing changed in words different from a changed turn',
+                'keepsake change line > renders no change line without a report',
+                'keepsake change line > holds the wish and its line until the last beat has been read in full',
+                'keepsake change line > announces a settled line once and not again on a republish of the same report',
+                'keepsake change line > shows the committed report at once on mount',
+                'keepsake change line > shows no change line once finalized',
+                'keepsake change line > announces no change line when the exchange finalizes the session',
+                'keepsake change line > settles a held wish when the player speaks again before reading it',
+            ),
+        )
+
+    @covers_requirement(
+        "webclient-dream-stage::the-whole-wish-view-marks-changes-and-names-removed-items"
+    )
+    def test_whole_wish_marks_changes_and_names_removed_items(self):
+        _assert_cases_pass(
+            "dream whole-wish change marks",
+            (
+                'whole-wish change marks > marks the changed field, the added item and names the removed one under it',
+                'whole-wish change marks > names a removed requirement row under the requirement section',
+                'whole-wish change marks > leaves untouched fields unmarked',
+                'whole-wish change marks > marks a formed summary differently from a changed one',
+            ),
+        )
+
+    @covers_requirement(
+        "webclient-dream-stage::requirement-rows-are-editable-when-finalized"
+    )
+    def test_requirement_rows_are_editable_when_finalized(self):
+        _assert_cases_pass(
+            "dream editable requirement rows",
+            (
+                'editable requirement rows > adds, edits and removes rows and drafts exactly the remaining rows in order',
+                'editable requirement rows > counts eight of eight and offers no add control at the limit',
+                'editable requirement rows > blocks draft and confirm on a blank row, marks it and keeps every other value',
+                'editable requirement rows > names an unsaved row edit in the awaken check',
+                'editable requirement rows > lets unedited rows follow a republish and keeps edited ones',
+            ),
+        )

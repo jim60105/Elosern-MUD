@@ -56,7 +56,7 @@ _JS_ACCEPTS = """
 const fs = require('node:fs');
 const protocol = require('./web/static/webclient/js/elosern/protocol.js');
 const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
-try { protocol.validatePanel('dream', 4, payload); process.stdout.write('ok'); }
+try { protocol.validatePanel('dream', 5, payload); process.stdout.write('ok'); }
 catch (error) { process.stdout.write('no:' + error.message); }
 """
 
@@ -205,11 +205,11 @@ class DreamArtworkWireTest(EvenniaTest):
     @covers_requirement(
         "webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork"
     )
-    def test_the_dream_panel_ships_the_canonical_descriptor_at_schema_four(self):
+    def test_the_dream_panel_ships_the_canonical_descriptor_at_schema_five(self):
         self.entered(self.actor)
         payload = self.render()
         self.assertEqual(payload["schema_version"], DREAM_SCHEMA_VERSION)
-        self.assertEqual(DREAM_SCHEMA_VERSION, 4)
+        self.assertEqual(DREAM_SCHEMA_VERSION, 5)
         descriptor = payload["state"]["scene_art"]
         # The published descriptor IS valid under the canonical validator: the
         # server read model and the active wire validator agree on one shape.
@@ -346,13 +346,9 @@ class DreamArtworkWireTest(EvenniaTest):
 
         open_payload = self.render()
         self.assertLessEqual(json_byte_size(open_payload), MAX_CANONICAL_JSON_BYTES)
-        # The panel sits at the envelope: less room is left than one more
-        # bounded list item costs, so raising either aggregate budget far
-        # enough to admit another item overflows the ceiling.
-        self.assertLessEqual(
-            MAX_CANONICAL_JSON_BYTES - json_byte_size(open_payload),
-            len(json.dumps(_filler_item(0), ensure_ascii=False).encode("utf-8")) + 1,
-        )
+        # Schema 5 publishes the wish once (inside the proposal), so the
+        # largest legal panel now leaves headroom under the ceiling; the
+        # aggregate budgets themselves stay the applier's own bounds.
         verdict, stderr = _accepted_by_client(open_payload)
         self.assertEqual(verdict, "ok", stderr)
 

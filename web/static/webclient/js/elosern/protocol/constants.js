@@ -574,7 +574,7 @@ var PANEL_ALLOWLIST = {
   lore_codex: LORE_CODEX_SCHEMA_VERSION,
   quest_log: 2,
   combat_beats: 1,
-  dream: 4,
+  dream: 5,
   skill_use: 2,
   sleep_handoff: SLEEP_HANDOFF_SCHEMA_VERSION,
   travel_log: TRAVEL_LOG_SCHEMA_VERSION,
