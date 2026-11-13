@@ -4,7 +4,6 @@ import { nextTick, reactive } from "vue";
 import DreamPanel from "../components/DreamPanel.vue";
 import Protocol from "../../static/webclient/js/elosern/protocol.js";
 import CommandEcho from "../../static/webclient/js/elosern/command_echo.js";
-import { Storyboard } from "../stories/World/DreamPanel.stories.js";
 import {
   dreamBundledDescriptor,
   dreamDescriptor,
@@ -13,6 +12,11 @@ import {
 } from "../stories/fixtures.js";
 import { observeError, observeLoad } from "./support/scene_layers.js";
 
+const LISTS = { themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [] };
+function proposal(overrides = {}) {
+  return { summary: "", ...LISTS, requirements: [], ...overrides };
+}
+// A valid schema-4 dream state: conversing, nothing said yet, an empty wish.
 function state(overrides = {}) {
   return { session_id: "synthetic-dream", revision: 2, completed: 0, remaining: 6,
     can_input: true, can_confirm: false, can_finalize: true, can_choose_thread: true,
@@ -21,67 +25,94 @@ function state(overrides = {}) {
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
     // The shared canonical scene descriptor of the dream's own source chain.
     scene_art: dreamDescriptor(),
+    // Schema-3 keys the wire still carries; the panel never reads them.
     direction_parts: [], thread_choices: [], draft_preferences: null,
     requirements: [], requirement_version: null,
-    // The published stage facts: this component predates the staged panel, so
-    // the fixture only has to stay a valid schema-4 payload.
     stage: "conversing", drafted: false, thread_id: null, changes: null,
-    proposal: { summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] },
+    proposal: proposal(),
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
     sleep: { tick_from: 17, tick_to: 17, requested_seconds: 0, seconds: 0, event_kinds: [] },
     ending: "", ending_phase: "", ...overrides };
 }
+// The same session once free text has closed: the form is the player's.
+function finalized(overrides = {}) {
+  return state({ stage: "finalized", can_input: false, can_finalize: false, can_choose_thread: false,
+    can_edit: true, can_confirm: true, ...overrides });
+}
+const capped = (overrides = {}) => finalized({ completed: 6, remaining: 0,
+  track: { ...state().track, completed: 6, ordinal: 4, level: "極限" }, ...overrides });
 function fixture(value = state(), options = {}) {
   const store = { view: reactive({ connected: true, dispatch: { inFlight: null } }), dispatchAction: vi.fn(() => "synthetic-request") };
   return { store, wrapper: mount(DreamPanel, { props: { state: value, store }, ...options }) };
 }
+const THREADS = [{ id: "synthetic-a", label: "合成甲" }, { id: "synthetic-b", label: "合成乙" }];
+const REQUIREMENTS = [
+  { kind: "place", text: "合成南門" },
+  { kind: "new_character", text: "合成女孩" },
+  { kind: "private_commission", text: "合成委託" },
+];
+const SESSION = { session_id: "synthetic-dream", revision: 2 };
 const row = (wrapper, name) => wrapper.find(`[data-row='${name}']`);
+const rowNames = (wrapper) => wrapper.findAll(".dream-choice button").map((button) => button.attributes("data-row"));
 const reply = (wrapper) => wrapper.find("[data-testid='dream-reply'] textarea");
+const layer = (wrapper, id) => wrapper.find(`[data-testid='${id}']`);
+const sheetButtons = (wrapper) => layer(wrapper, "dream-sheet").findAll(".dream-sheet__foot button");
+const statements = (wrapper) => layer(wrapper, "dream-confirm").findAll("[data-statement]").map((item) => item.attributes("data-statement"));
 // One settled frame: the driver's provisional retirement and the resolution
 // that follows it are watcher-driven, so a state change needs a real tick.
 async function frames() {
   await new Promise((resolve) => setTimeout(resolve, 60));
   await nextTick();
 }
-async function openSheet(wrapper) {
-  await row(wrapper, "edit").trigger("click");
+async function activate(wrapper, name) {
+  await row(wrapper, name).trigger("click");
   await flushPromises();
-  return wrapper.find("[data-testid='dream-sheet']");
+}
+async function openSheet(wrapper) {
+  await activate(wrapper, "main");
+  return layer(wrapper, "dream-sheet");
+}
+async function escape(wrapper) {
+  await wrapper.trigger("keydown", { key: "Escape" });
+  await flushPromises();
 }
 
 describe("server-authored dream surface", () => {
   it("stages the dream with core button chrome, one decisive action, and a keepsake card", async () => {
-    const { wrapper } = fixture();
+    const { wrapper } = fixture(state({ thread_choices: THREADS }));
     expect(wrapper.attributes("role")).toBe("dialog");
-    for (const button of wrapper.findAll("button")) expect(button.classes()).toContain("ui-btn");
-    // While the conversation is open, speaking is the decisive action.
+    expect(wrapper.attributes("aria-modal")).toBe("true");
+    expect(wrapper.find(".dream-keepsake").exists()).toBe(true);
+    expect(wrapper.find("[data-testid='dream-reply']").exists()).toBe(true);
+    expect(wrapper.find(".dream-window [data-testid='dream-page']").exists()).toBe(true);
+    expect(rowNames(wrapper)).toEqual(["main", "take", "draft", "awaken"]);
+    // Every button outside the thread choice's inline controls is a core button.
+    for (const button of wrapper.findAll("button")) {
+      if (!button.element.closest("[data-testid='dream-belong']")) expect(button.classes()).toContain("ui-btn");
+    }
+    // While conversing, speaking is the one decisive action.
     expect(wrapper.findAll(".ui-btn--primary")).toHaveLength(1);
-    expect(wrapper.find(".ui-btn--primary").text()).toBe("訴說");
-    expect(row(wrapper, "confirm").text()).toContain("帶著這個念頭醒來");
-    expect(row(wrapper, "awaken").text()).toContain("醒來");
+    expect(wrapper.find(".ui-btn--primary").classes()).toContain("dream-reply__send");
     expect(wrapper.text()).not.toContain("JSON");
     expect(wrapper.find("details").exists()).toBe(false);
-    expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(wrapper.attributes("data-stage")).toBe("conversing");
     // Both tracks have a visual form with a textual value.
     expect(wrapper.findAll(".dream-pip")).toHaveLength(6);
-    expect(wrapper.find(".dream-pips").attributes("aria-valuetext")).toBe("尚可交談 6 次，共 6 次");
+    expect(wrapper.find(".dream-pips").attributes("aria-valuetext")).toMatch(/6\D+6/);
     expect(wrapper.findAll(".dream-gauge__seg")).toHaveLength(5);
-    expect(wrapper.find(".dream-gauge").attributes("aria-valuetext")).toBe("女神的興奮：平靜");
+    expect(wrapper.find(".dream-gauge").attributes("aria-valuetext")).toContain("平靜");
     wrapper.unmount();
-    const storyboard = mount(Storyboard.render({}), { attachTo: document.body });
-    const publishCap = storyboard.findAll("button").find((button) => button.text() === "發布第六次上限");
-    expect(publishCap.classes()).toContain("ui-btn");
-    await publishCap.trigger("click");
-    const panel = storyboard.findComponent(DreamPanel);
-    expect(panel.props("state").remaining).toBe(0);
-    expect(panel.find("form").exists()).toBe(false);
-    expect(panel.find(".dream-reply--ended").text()).toContain("六次交談已盡");
-    expect(panel.props("state").sleep).toMatchObject({ tick_from: 100, tick_to: 100 });
-    expect(panel.find(".dream-choice").findAll("button")).toHaveLength(4);
-    // At the cap the carry-out row becomes the single decisive action.
-    expect(panel.findAll(".ui-btn--primary")).toHaveLength(1);
-    expect(panel.find(".ui-btn--primary").attributes("data-row")).toBe("confirm");
-    storyboard.unmount();
+    // Once finalized the free-text form gives way to the end bar and the
+    // confirm row is the one decisive action.
+    const cap = fixture(capped({ proposal: proposal({ summary: "合成願望" }) })).wrapper;
+    expect(cap.attributes("data-stage")).toBe("finalized");
+    expect(cap.find("form").exists()).toBe(false);
+    expect(cap.find(".dream-reply--ended").exists()).toBe(true);
+    expect(rowNames(cap)).toEqual(["main", "confirm", "draft", "awaken"]);
+    expect(cap.findAll(".ui-btn--primary")).toHaveLength(1);
+    expect(cap.find(".ui-btn--primary").attributes("data-row")).toBe("confirm");
+    for (const button of cap.findAll("button")) expect(button.classes()).toContain("ui-btn");
   });
   it("types the opening on arrival and shows a rejoined exchange in full", async () => {
     const arrival = fixture(state({ scene: "", dialogue: "" })).wrapper;
@@ -111,35 +142,6 @@ describe("server-authored dream surface", () => {
     await reply(wrapper).trigger("keydown", { key: "Enter", isComposing: true });
     expect(store.dispatchAction).not.toHaveBeenCalled();
   });
-  it("labels the 念頭 provenance and activates rows by digit outside text fields", async () => {
-    const { wrapper } = fixture(state({ direction_parts: ["合成方向"] }));
-    expect(wrapper.find(".dream-keepsake__chip").text()).toBe("取自你剛才的話");
-    expect(wrapper.find(".dream-keepsake__target").text()).toBe("歸屬：一段新的故事");
-    // A digit typed into the reply field is text, never a shortcut.
-    await reply(wrapper).trigger("keydown", { key: "1" });
-    expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
-    await wrapper.trigger("keydown", { key: "1" });
-    await flushPromises();
-    const sheet = wrapper.find("[data-testid='dream-sheet']");
-    expect(sheet.exists()).toBe(true);
-    await sheet.find("textarea").setValue("合成改寫");
-    expect(wrapper.find(".dream-keepsake__chip").text()).toBe("已改寫・未記下");
-    wrapper.unmount();
-    const drafted = fixture(state({ direction_parts: ["合成方向"], draft_preferences: { kind: "new_story", thread_id: null } })).wrapper;
-    expect(drafted.find(".dream-keepsake__chip").text()).toBe("已記下");
-  });
-  it("filters a long thread list and keeps an orphaned saved thread selectable", async () => {
-    const threads = Array.from({ length: 12 }, (_, index) => ({ id: `synthetic-thread-${index}`, label: index === 3 ? "合成港灣委託" : `合成故事 ${index}` }));
-    const { wrapper } = fixture(state({ thread_choices: threads }));
-    const sheet = await openSheet(wrapper);
-    await sheet.find("input[type='search']").setValue("港灣");
-    expect(sheet.findAll(".dream-threads__option").map((option) => option.text())).toEqual(["一段新的故事", "合成港灣委託"]);
-    wrapper.unmount();
-    const orphan = fixture(state({ direction_parts: ["合成方向"], draft_preferences: { kind: "thread_direction", thread_id: "synthetic-gone" } })).wrapper;
-    const orphanSheet = await openSheet(orphan);
-    expect(orphanSheet.find("input[type='radio']:checked").element.value).toBe("synthetic-gone");
-    expect(orphanSheet.text()).toContain("先前選定的故事線（已不在清單中）");
-  });
   it("reveals a response only on a live exchange increase", async () => {
     const { wrapper } = fixture(state({ scene: "", dialogue: "" }));
     const page = () => wrapper.find("[data-testid='dream-page']");
@@ -156,13 +158,23 @@ describe("server-authored dream surface", () => {
       track: { ...state().track, completed: 1, ordinal: 1, level: "微興奮" } }) });
     expect(page().text()).toBe("新的台詞");
   });
-  it("keeps confirm/draft/awakening usable at cap, during generation and after failure", async () => {
-    for (const values of [{ completed: 6, remaining: 0, track: { ...state().track, completed: 6 } }, { pending: true }, { failure: true }]) {
-      const { wrapper, store } = fixture(state({ ...values, can_input: false, direction_parts: ["合成方向"] }));
-      if (values.pending) expect(reply(wrapper).attributes("disabled")).toBeDefined();
-      for (const name of ["edit", "confirm", "draft", "awaken"]) expect(row(wrapper, name).attributes("disabled")).toBeUndefined();
+  it("keeps draft and awakening usable at cap, during generation and after failure", async () => {
+    const cases = [
+      capped({ proposal: proposal({ summary: "合成願望" }) }),
+      state({ pending: true, can_input: false, can_finalize: false, can_choose_thread: false }),
+      state({ failure: true }),
+    ];
+    for (const value of cases) {
+      const { wrapper, store } = fixture(value);
+      if (value.pending) expect(reply(wrapper).attributes("disabled")).toBeDefined();
+      const second = value.stage === "finalized" ? "confirm" : "take";
+      for (const name of ["main", second, "draft", "awaken"]) {
+        // Only finalizing waits for the goddess's response.
+        if (value.pending && name === "take") expect(row(wrapper, name).attributes("disabled")).toBeDefined();
+        else expect(row(wrapper, name).attributes("disabled")).toBeUndefined();
+      }
       await row(wrapper, "awaken").trigger("click");
-      expect(store.dispatchAction).toHaveBeenCalledWith("dream.awaken", { session_id: "synthetic-dream", revision: 2 }, null);
+      expect(store.dispatchAction).toHaveBeenCalledWith("dream.awaken", SESSION, null);
       wrapper.unmount();
     }
   });
@@ -185,76 +197,100 @@ describe("server-authored dream surface", () => {
     await reply(wrapper).setValue("尚未送出的話");
     await row(wrapper, "awaken").trigger("click");
     await flushPromises();
-    const dialog = wrapper.find("[data-testid='dream-confirm']");
+    const dialog = layer(wrapper, "dream-confirm");
     expect(dialog.attributes("role")).toBe("alertdialog");
-    expect(dialog.text()).toContain("尚未說出口的話會隨夢消散");
-    expect(document.activeElement.textContent).toBe("回到夢中");
+    expect(statements(wrapper)).toEqual(["unsent"]);
+    const [stay] = dialog.findAll(".dream-confirm__actions button");
+    expect(document.activeElement).toBe(stay.element);
     expect(store.dispatchAction).not.toHaveBeenCalled();
     await wrapper.trigger("keydown", { key: "Escape" });
-    expect(wrapper.find("[data-testid='dream-confirm']").exists()).toBe(false);
+    expect(layer(wrapper, "dream-confirm").exists()).toBe(false);
     await row(wrapper, "awaken").trigger("click");
     await flushPromises();
-    await wrapper.find("[data-testid='dream-confirm']").findAll("button")[1].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.awaken", { session_id: "synthetic-dream", revision: 2 }, null);
+    await layer(wrapper, "dream-confirm").findAll(".dream-confirm__actions button")[0].trigger("click");
+    expect(layer(wrapper, "dream-confirm").exists()).toBe(false);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    await row(wrapper, "awaken").trigger("click");
+    await flushPromises();
+    await layer(wrapper, "dream-confirm").findAll(".dream-confirm__actions button")[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.awaken", SESSION, null);
     wrapper.unmount();
   });
-  it("refuses an empty carry-out locally and opens the 念頭 sheet", async () => {
-    const { wrapper, store } = fixture();
+  it("refuses an empty confirm locally and opens the edit sheet on the summary", async () => {
+    const { wrapper, store } = fixture(finalized(), { attachTo: document.body });
+    // Unavailable but still focusable, with a visible reason.
     expect(row(wrapper, "confirm").attributes("aria-disabled")).toBe("true");
+    expect(row(wrapper, "confirm").attributes("disabled")).toBeUndefined();
+    expect(wrapper.find(`#${row(wrapper, "confirm").attributes("aria-describedby")}`).exists()).toBe(true);
     await row(wrapper, "confirm").trigger("click");
     await flushPromises();
     expect(store.dispatchAction).not.toHaveBeenCalled();
-    expect(wrapper.find("[data-testid='dream-sheet'] [role='alert']").text()).toContain("念頭還是空的");
+    const sheet = layer(wrapper, "dream-sheet");
+    expect(sheet.find("[role='alert']").exists()).toBe(true);
+    expect(document.activeElement).toBe(sheet.find("textarea").element);
+    wrapper.unmount();
   });
   it("blocks an over-length summary instead of truncating it", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: ["長".repeat(2000), "長"] }));
+    const { wrapper, store } = fixture(finalized({ proposal: proposal({ summary: "合成願望" }) }));
     const sheet = await openSheet(wrapper);
+    await sheet.find("textarea").setValue("長".repeat(2001));
     expect(sheet.find("textarea").element.value).toBe("長".repeat(2001));
     expect(sheet.find(".dream-field__counter--over").exists()).toBe(true);
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
+    expect(sheet.find("textarea").attributes("aria-invalid")).toBe("true");
+    await sheetButtons(wrapper)[1].trigger("click");
     expect(store.dispatchAction).not.toHaveBeenCalled();
-    expect(sheet.find("[role='alert']").text()).toContain("2000");
+    expect(sheet.find("[role='alert']").exists()).toBe(true);
+    await sheetButtons(wrapper)[0].trigger("click");
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    expect(sheet.find("textarea").element.value).toBe("長".repeat(2001));
   });
-  it("uses the latest server revision after reconnect and retains explicit direction for draft/confirm", async () => {
-    const { wrapper, store } = fixture();
+  it("sends the latest committed revision from the finalized sheet", async () => {
+    const { wrapper, store } = fixture(finalized());
     const sheet = await openSheet(wrapper);
-    await sheet.find("textarea").setValue("合成新方向");
-    await wrapper.setProps({ state: state({ revision: 7, remaining: 4, completed: 2 }) });
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 7, direction: { kind: "new_story", thread_id: null, summary: "合成新方向", requirements: [], requirement_version: null } }, null);
+    await sheet.find("textarea").setValue("合成新願望");
+    await wrapper.setProps({ state: finalized({ revision: 7, remaining: 4, completed: 2 }) });
+    await sheetButtons(wrapper)[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 7,
+      direction: { kind: "new_story", thread_id: null, summary: "合成新願望", requirements: [] } }, null);
   });
   it("edits preference chips and saves a draft that keeps the dream open", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: ["合成方向"] }));
+    const { wrapper, store } = fixture(finalized({ proposal: proposal({ summary: "合成願望" }) }));
     const sheet = await openSheet(wrapper);
     const themes = sheet.findAll(".dream-tags__box input")[0];
-    await themes.setValue("重逢");
+    await themes.setValue("  重逢 ");
     await themes.trigger("keydown", { key: "Enter" });
     await themes.setValue("重逢");
     await themes.trigger("keydown", { key: "Enter" });
     expect(sheet.findAll(".dream-tags__chip")).toHaveLength(1);
     await themes.setValue("信任");
     await themes.trigger("keydown", { key: "Enter" });
+    expect(sheet.findAll(".dream-tags__chip")).toHaveLength(2);
     await themes.trigger("keydown", { key: "Backspace" });
-    expect(sheet.findAll(".dream-tags__chip").map((chip) => chip.text())).toEqual(["重逢×"]);
+    expect(sheet.findAll(".dream-tags__chip")).toHaveLength(1);
     // Escape closes the sheet and keeps its edits.
-    await wrapper.trigger("keydown", { key: "Escape" });
-    expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
-    await row(wrapper, "edit").trigger("click");
-    await flushPromises();
+    await escape(wrapper);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    await openSheet(wrapper);
     expect(wrapper.findAll(".dream-tags__chip")).toHaveLength(1);
-    await wrapper.findAll(".dream-sheet__foot button")[0].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", { session_id: "synthetic-dream", revision: 2,
-      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"], requirements: [], requirement_version: null } }, null);
+    await sheetButtons(wrapper)[0].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", { ...SESSION,
+      direction: { kind: "new_story", thread_id: null, summary: "合成願望", themes: ["重逢"], requirements: [] } }, null);
     await flushPromises();
-    expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
-    // The toast waits for the committed draft; a refusal republishes none.
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='dream-panel']").exists()).toBe(true);
+    // The toast waits for the committed draft.
     expect(wrapper.find(".dream-toast").exists()).toBe(false);
-    await wrapper.setProps({ state: state({ revision: 3, direction_parts: ["合成方向"], draft_preferences: { kind: "new_story", thread_id: null, themes: ["重逢"] } }) });
-    expect(wrapper.find(".dream-toast").text()).toBe("念頭已記下，夢仍在繼續。");
+    await wrapper.setProps({ state: finalized({ revision: 3, drafted: true, proposal: proposal({ summary: "合成願望", themes: ["重逢"] }) }) });
+    expect(wrapper.find(".dream-toast").attributes("role")).toBe("status");
   });
   it("mirrors the strict panel schema and truthful command echoes", () => {
     const payload = { schema_version: 4, available: true, state: state() };
     expect(Protocol.validatePanel("dream", 4, payload)).toEqual(payload);
+    // The finalized fixtures are legal schema-4 payloads too.
+    for (const value of [finalized(), capped(), finalized({ thread_choices: THREADS, thread_id: "synthetic-a" })]) {
+      expect(Protocol.validatePanel("dream", 4, { ...payload, state: value }).state).toEqual(value);
+    }
     expect(Protocol.validatePanel("dream", 4, { ...payload, state: null }).state).toBeNull();
     expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ remaining: 0 }) })).toThrow();
     expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ pending: true }) })).toThrow();
@@ -391,39 +427,36 @@ describe("server-authored dream surface", () => {
     expect(wrapper.find("[data-testid='dream-art-failure']").text()).toBe("此圖片的來源未通過檢查。");
     wrapper.unmount();
   });
-  it("rehydrates a same-session external draft change without clearing unsent chat", async () => {
-    const { wrapper, store } = fixture();
+  it("rehydrates a same-session external proposal change without clearing unsent chat", async () => {
+    const { wrapper } = fixture(state({ thread_choices: THREADS }));
     await reply(wrapper).setValue("尚未送出的交流");
     await wrapper.setProps({ state: state({
-      revision: 8, direction_parts: ["伺服器保存的故事方向"], thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
-      draft_preferences: { kind: "thread_direction", thread_id: "synthetic-thread", themes: ["鐘聲"], exclusions: ["暴力"] },
+      revision: 8, thread_choices: THREADS, thread_id: "synthetic-a", can_choose_thread: false,
+      proposal: proposal({ summary: "伺服器保存的願望", themes: ["鐘聲"], exclusions: ["暴力"] }),
     }) });
     expect(reply(wrapper).element.value).toBe("尚未送出的交流");
-    expect(wrapper.find(".dream-keepsake__target").text()).toBe("歸屬：延續：合成已知故事");
-    const sheet = await openSheet(wrapper);
-    expect(sheet.find("input[type='radio']:checked").element.value).toBe("synthetic-thread");
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
-      session_id: "synthetic-dream", revision: 8,
-      direction: { kind: "thread_direction", thread_id: "synthetic-thread", summary: "伺服器保存的故事方向", themes: ["鐘聲"], exclusions: ["暴力"], requirements: [], requirement_version: null },
-    }, null);
+    expect(wrapper.find("[data-testid='dream-thread-line']").text()).toContain("合成甲");
+    expect(wrapper.find(".dream-keepsake__preview").text()).toBe("伺服器保存的願望");
+    await activate(wrapper, "main");
+    const view = layer(wrapper, "dream-view");
+    for (const text of ["伺服器保存的願望", "鐘聲", "暴力", "合成甲"]) expect(view.text()).toContain(text);
   });
-  it("keeps an unsent direction edit when an exchange republishes the authored direction", async () => {
-    const { wrapper } = fixture();
+  it("keeps an edited summary when the finalized proposal republishes", async () => {
+    const { wrapper } = fixture(finalized({ proposal: proposal({ summary: "原本的願望" }) }));
     await openSheet(wrapper);
-    const editor = () => wrapper.find("[data-testid='dream-sheet'] textarea");
-    // An untouched editor follows the authoritative direction the server
-    // republishes after every accepted exchange.
-    await wrapper.setProps({ state: state({ revision: 4, direction_parts: ["交換後提出的方向"] }) });
-    expect(editor().element.value).toBe("交換後提出的方向");
+    const editor = () => layer(wrapper, "dream-sheet").find("textarea");
+    expect(editor().element.value).toBe("原本的願望");
+    // An untouched field follows the republished proposal.
+    await wrapper.setProps({ state: finalized({ revision: 4, proposal: proposal({ summary: "伺服器的願望" }) }) });
+    expect(editor().element.value).toBe("伺服器的願望");
     // A field the player has typed into keeps their own text instead.
-    await editor().setValue("我還在寫的方向");
-    await wrapper.setProps({ state: state({ revision: 5, direction_parts: ["交換後提出的方向", "再一次"] }) });
-    expect(editor().element.value).toBe("我還在寫的方向");
-    // Clearing the field restores the follow-the-server behaviour.
+    await editor().setValue("我還在寫的願望");
+    await wrapper.setProps({ state: finalized({ revision: 5, proposal: proposal({ summary: "再一次的願望" }) }) });
+    expect(editor().element.value).toBe("我還在寫的願望");
+    // Clearing the field restores following the server.
     await editor().setValue("");
-    await wrapper.setProps({ state: state({ revision: 6, direction_parts: ["後來的方向"] }) });
-    expect(editor().element.value).toBe("後來的方向");
+    await wrapper.setProps({ state: finalized({ revision: 6, proposal: proposal({ summary: "後來的願望" }) }) });
+    expect(editor().element.value).toBe("後來的願望");
   });
 });
 
@@ -434,15 +467,29 @@ describe("dream stage review coverage", () => {
     { connected: true, mutationsLocked: true, dispatch: { inFlight: null } },
     { connected: true, phase: "reconnecting", dispatch: { inFlight: null } },
   ];
-  it("loads saved draft preferences on mount as already saved", async () => {
-    const saved = state({ direction_parts: ["合成方向"], draft_preferences: { kind: "new_story", thread_id: null, themes: ["重逢"] } });
+  it("loads a saved finalized proposal on mount as unedited values", async () => {
+    const saved = finalized({ drafted: true, proposal: proposal({ summary: "合成願望", themes: ["重逢"] }) });
     const { wrapper, store } = fixture(saved);
-    expect(wrapper.find(".dream-keepsake__chip").text()).toBe("已記下");
+    // Nothing is marked as an unsaved edit.
+    expect(wrapper.find(".dream-ink").exists()).toBe(false);
     await row(wrapper, "awaken").trigger("click");
-    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.awaken", { session_id: "synthetic-dream", revision: 2 }, null);
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.awaken", SESSION, null);
     await row(wrapper, "confirm").trigger("click");
-    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 2,
-      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"], requirements: [], requirement_version: null } }, null);
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", { ...SESSION,
+      direction: { kind: "new_story", thread_id: null, summary: "合成願望", themes: ["重逢"], requirements: [] } }, null);
+  });
+  it("loads an unchanged proposal as unedited when the session becomes finalized", async () => {
+    const wish = proposal({ summary: "合成願望", atmosphere: ["溫柔"] });
+    const { wrapper, store } = fixture(state({ completed: 2, remaining: 4, proposal: wish }));
+    await wrapper.setProps({ state: finalized({ revision: 3, completed: 2, remaining: 4, proposal: wish }) });
+    await flushPromises();
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(true);
+    await escape(wrapper);
+    await row(wrapper, "awaken").trigger("click");
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.awaken", { ...SESSION, revision: 3 }, null);
+    await row(wrapper, "confirm").trigger("click");
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", { ...SESSION, revision: 3,
+      direction: { kind: "new_story", thread_id: null, summary: "合成願望", atmosphere: ["溫柔"], requirements: [] } }, null);
   });
   it("types a live reveal at full motion and completes, then advances, on activation", async () => {
     vi.useFakeTimers();
@@ -487,219 +534,498 @@ describe("dream stage review coverage", () => {
       track: { ...state().track, completed: 1, ordinal: 1, level: "微興奮" } }) });
     expect(live()).toContain("合成場景");
     expect(live()).toContain("女神的興奮：微興奮。");
-    expect(live()).toContain("尚可交談 5 次。");
     await wrapper.setProps({ state: state({ revision: 5, completed: 1, remaining: 5, failure: true, track: { ...state().track, completed: 1 } }) });
     expect(live()).toContain("夢境一時模糊");
+  });
+  it("keeps the next pip marked while a response is pending", async () => {
+    const { wrapper } = fixture(state({ completed: 2, remaining: 4, track: { ...state().track, completed: 2 } }));
+    await reply(wrapper).setValue("合成");
+    const marked = () => wrapper.findAll(".dream-pip").findIndex((pip) => pip.classes().includes("dream-pip--next"));
+    expect(marked()).toBe(2);
+    await wrapper.find("form").trigger("submit");
+    await wrapper.setProps({ state: state({ revision: 3, completed: 2, remaining: 4, pending: true, can_input: false,
+      can_finalize: false, can_choose_thread: false, track: { ...state().track, completed: 2 } }) });
+    expect(reply(wrapper).element.value).toBe("");
+    expect(marked()).toBe(2);
+    expect(wrapper.findAll(".dream-pip--spent")).toHaveLength(2);
   });
   it("disables every dream action while the transport is locked and keeps typed text", async () => {
     for (const view of lockedViews) {
       const store = { view: reactive(view), dispatchAction: vi.fn() };
-      const wrapper = mount(DreamPanel, { props: { state: state({ direction_parts: ["合成方向"] }), store } });
-      for (const name of ["edit", "confirm", "draft", "awaken"]) expect(row(wrapper, name).attributes("disabled")).toBeDefined();
+      const wrapper = mount(DreamPanel, { props: { state: state({ thread_choices: THREADS }), store } });
+      for (const name of ["main", "take", "draft", "awaken"]) expect(row(wrapper, name).attributes("disabled")).toBeDefined();
       expect(reply(wrapper).attributes("disabled")).toBeDefined();
-      if (!view.connected) expect(wrapper.find(".dream-reply__caption").text()).toContain("與夢的聯繫中斷了");
+      expect(wrapper.find("[data-testid='dream-belong'] [aria-haspopup='listbox']").attributes("disabled")).toBeDefined();
+      if (!view.connected) expect(wrapper.find(".dream-reply__caption[role='status']").exists()).toBe(true);
       wrapper.unmount();
+      const closed = mount(DreamPanel, { props: { state: finalized({ proposal: proposal({ summary: "合成願望" }) }), store } });
+      for (const name of ["main", "confirm", "draft", "awaken"]) expect(row(closed, name).attributes("disabled")).toBeDefined();
+      closed.unmount();
     }
   });
-  it("captions the converging and final exchange and focuses the carry-out row on a live sixth exchange", async () => {
+  it("captions the converging and final exchange and focuses the confirm row on a live sixth exchange", async () => {
     const converging = { ...state().track, completed: 4, ordinal: 3, level: "高度", converging: true };
-    const { wrapper } = fixture(state({ completed: 4, remaining: 2, track: converging, direction_parts: ["合成方向"] }), { attachTo: document.body });
-    expect(wrapper.find(".dream-reply__caption").text()).toBe("夢將抵達盡頭");
-    await wrapper.setProps({ state: state({ revision: 3, completed: 5, remaining: 1, track: { ...converging, completed: 5 }, direction_parts: ["合成方向"] }) });
-    expect(wrapper.find(".dream-reply__caption").text()).toBe("夢將抵達盡頭 · 最後一次交談");
-    await wrapper.setProps({ state: state({ revision: 4, completed: 6, remaining: 0, can_input: false, track: { ...converging, completed: 6, ordinal: 4, level: "極限" }, direction_parts: ["合成方向"] }) });
+    const wish = proposal({ summary: "合成願望" });
+    const { wrapper } = fixture(state({ completed: 4, remaining: 2, track: converging, proposal: wish }), { attachTo: document.body });
+    const caption = () => wrapper.find(".dream-reply__caption");
+    expect(caption().exists()).toBe(true);
+    const first = caption().text();
+    await wrapper.setProps({ state: state({ revision: 3, completed: 5, remaining: 1, track: { ...converging, completed: 5 }, proposal: wish }) });
+    // The last exchange extends the caption.
+    expect(caption().text().startsWith(first)).toBe(true);
+    expect(caption().text().length).toBeGreaterThan(first.length);
+    await wrapper.setProps({ state: capped({ revision: 4, track: { ...converging, completed: 6, ordinal: 4, level: "極限" }, proposal: wish }) });
     await flushPromises();
     expect(document.activeElement).toBe(row(wrapper, "confirm").element);
-    expect(row(wrapper, "draft").text()).toContain("記下念頭");
-    expect(row(wrapper, "draft").text()).not.toContain("繼續作夢");
+    // The sixth exchange finalizes without opening the sheet by itself, and a
+    // finalized session never shows the converging caption.
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(caption().exists()).toBe(false);
     wrapper.unmount();
   });
-  it("names the dialog, shows the empty invitation, orders rows and maps digits 2 and 3", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: [] }));
+  it("focuses the first row on a live sixth exchange without a summary", async () => {
+    const { wrapper } = fixture(state({ completed: 5, remaining: 1 }), { attachTo: document.body });
+    await wrapper.setProps({ state: capped({ revision: 3 }) });
+    await flushPromises();
+    expect(document.activeElement).toBe(row(wrapper, "main").element);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it("names the dialog by its visible title and shows the empty invitation", () => {
+    const { wrapper } = fixture();
     expect(wrapper.find(`#${wrapper.attributes("aria-labelledby")}`).text()).toBe("雲上王座之夢");
-    expect(wrapper.find(".dream-keepsake__empty").text()).toBe("念頭尚未成形。和女神談談，或親手寫下。");
-    expect(wrapper.findAll(".dream-choice button").map((button) => button.attributes("data-row"))).toEqual(["edit", "confirm", "draft", "awaken"]);
-    await wrapper.trigger("keydown", { key: "1", ctrlKey: true });
-    expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
-    await wrapper.setProps({ state: state({ revision: 3, direction_parts: ["合成方向"] }) });
-    await wrapper.trigger("keydown", { key: "3" });
-    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.draft", expect.objectContaining({ revision: 3 }), null);
-    await wrapper.trigger("keydown", { key: "2" });
-    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", expect.objectContaining({ revision: 3 }), null);
+    expect(wrapper.find(".dream-keepsake__empty").exists()).toBe(true);
+    expect(wrapper.find(".dream-keepsake__preview").exists()).toBe(false);
+    expect(wrapper.find("[data-testid='dream-stage-indicator']").findAll("li")).toHaveLength(2);
   });
   it("leaves a text field on Escape, focuses the summary on an empty confirm, and makes the stage inert under the sheet", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: [] }), { attachTo: document.body });
+    const { wrapper, store } = fixture(state(), { attachTo: document.body });
     reply(wrapper).element.focus();
     await reply(wrapper).trigger("keydown", { key: "Escape" });
     expect(document.activeElement).toBe(wrapper.find("[data-testid='dream-page']").element);
+    await wrapper.setProps({ state: finalized({ revision: 3, completed: 6, remaining: 0 }) });
     await row(wrapper, "confirm").trigger("click");
     await flushPromises();
-    const sheet = wrapper.find("[data-testid='dream-sheet']");
+    const sheet = layer(wrapper, "dream-sheet");
     expect(document.activeElement).toBe(sheet.find("textarea").element);
     expect(wrapper.find(".dream-scene__main").attributes("inert")).toBeDefined();
     expect(sheet.find(".dream-field__counter").text()).toBe("0 / 2000");
     expect(store.dispatchAction).not.toHaveBeenCalled();
     wrapper.unmount();
   });
-  it("protects an unsaved 念頭 edit and refuses an over-length draft", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: ["合成方向"] }));
+  it("protects an unsaved edit of the finalized wish and refuses an over-length draft", async () => {
+    const { wrapper, store } = fixture(finalized({ drafted: true, proposal: proposal({ summary: "合成願望" }) }));
     let sheet = await openSheet(wrapper);
     await sheet.find("textarea").setValue("合成改寫");
-    expect(sheet.find(".dream-link").text()).toBe("還原為剛才的話");
-    await wrapper.trigger("keydown", { key: "Escape" });
+    // A revert control appears once the summary differs from the server's.
+    expect(sheet.find(".dream-field__foot .dream-link").exists()).toBe(true);
+    expect(wrapper.find(".dream-ink").exists()).toBe(true);
+    await escape(wrapper);
     await row(wrapper, "awaken").trigger("click");
     await flushPromises();
-    expect(wrapper.find("[data-testid='dream-confirm']").text()).toContain("尚未記下的改寫會隨夢消散");
+    expect(statements(wrapper)).toEqual(["edits"]);
     expect(store.dispatchAction).not.toHaveBeenCalled();
-    await wrapper.trigger("keydown", { key: "Escape" });
+    await escape(wrapper);
     sheet = await openSheet(wrapper);
     await sheet.find("textarea").setValue("長".repeat(2001));
-    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
+    await sheetButtons(wrapper)[0].trigger("click");
     expect(store.dispatchAction).not.toHaveBeenCalled();
-    expect(sheet.find("[role='alert']").text()).toContain("2000");
+    expect(sheet.find("[role='alert']").exists()).toBe(true);
   });
-  it("keeps edited thread and chips across a republish and new reply text across a failure", async () => {
-    const threads = [{ id: "synthetic-a", label: "合成甲" }, { id: "synthetic-b", label: "合成乙" }];
-    const { wrapper } = fixture(state({ direction_parts: ["合成方向"], thread_choices: threads }));
+  it("keeps edited chips across a republish and new reply text across a failure", async () => {
+    const { wrapper } = fixture(finalized({ proposal: proposal({ summary: "合成願望" }) }));
     const sheet = await openSheet(wrapper);
-    await sheet.findAll("input[type='radio']")[1].setValue(true);
     const themes = sheet.findAll(".dream-tags__box input")[0];
     await themes.setValue("合成主題");
     await themes.trigger("keydown", { key: "Enter" });
-    await wrapper.setProps({ state: state({ revision: 5, direction_parts: ["合成方向"], thread_choices: threads,
-      draft_preferences: { kind: "thread_direction", thread_id: "synthetic-b", themes: ["伺服器主題"] } }) });
-    expect(sheet.find("input[type='radio']:checked").element.value).toBe("synthetic-a");
+    await wrapper.setProps({ state: finalized({ revision: 5, proposal: proposal({ summary: "合成願望", themes: ["伺服器主題"] }) }) });
     expect(sheet.findAll(".dream-tags__chip").map((chip) => chip.text())).toEqual(["合成主題×"]);
-    await wrapper.trigger("keydown", { key: "Escape" });
-    await reply(wrapper).setValue("先送出的話");
-    await wrapper.find("form").trigger("submit");
-    await reply(wrapper).setValue("新打的字");
-    await wrapper.setProps({ state: state({ revision: 6, failure: true, direction_parts: ["合成方向"], thread_choices: threads }) });
-    expect(reply(wrapper).element.value).toBe("新打的字");
+    wrapper.unmount();
+    const talking = fixture().wrapper;
+    await reply(talking).setValue("先送出的話");
+    await talking.find("form").trigger("submit");
+    await reply(talking).setValue("新打的字");
+    await talking.setProps({ state: state({ revision: 6, failure: true }) });
+    expect(reply(talking).element.value).toBe("新打的字");
+  });
+  it("lets unedited lists follow a republished finalized proposal", async () => {
+    const { wrapper } = fixture(finalized({ proposal: proposal({ summary: "合成願望", themes: ["重逢"] }) }));
+    const sheet = await openSheet(wrapper);
+    await wrapper.setProps({ state: finalized({ revision: 3, proposal: proposal({ summary: "合成願望", themes: ["重逢", "信任"], exclusions: ["暴力"] }) }) });
+    expect(sheet.findAll(".dream-tags__chip").map((chip) => chip.text())).toEqual(["重逢×", "信任×", "暴力×"]);
+  });
+  it("names what the awaken check would lose and that the wish is kept", async () => {
+    // While conversing an unedited form never asks.
+    const quiet = fixture(state({ proposal: proposal({ summary: "合成願望" }) }));
+    await row(quiet.wrapper, "awaken").trigger("click");
+    expect(quiet.store.dispatchAction).toHaveBeenCalledWith("dream.awaken", SESSION, null);
+    quiet.wrapper.unmount();
+    // Unsent words with a wish that has no saved draft yet.
+    const { wrapper, store } = fixture(state({ proposal: proposal({ summary: "合成願望" }) }));
+    await reply(wrapper).setValue("尚未送出的話");
+    await row(wrapper, "awaken").trigger("click");
+    await flushPromises();
+    expect(statements(wrapper)).toEqual(["unsent", "kept"]);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    wrapper.unmount();
+    // A saved draft is not announced as kept again.
+    const drafted = fixture(state({ drafted: true, proposal: proposal({ summary: "合成願望" }) }));
+    await reply(drafted.wrapper).setValue("尚未送出的話");
+    await row(drafted.wrapper, "awaken").trigger("click");
+    await flushPromises();
+    expect(statements(drafted.wrapper)).toEqual(["unsent"]);
   });
 });
 
-const REQUIREMENTS = [
-  { kind: "place", text: "合成南門" },
-  { kind: "new_character", text: "合成女孩" },
-  { kind: "private_commission", text: "合成委託" },
-];
-const SHOWN = state({
-  direction_parts: ["合成方向"],
-  requirements: REQUIREMENTS,
-  requirement_version: "t_dream_session:v1",
+describe("staged keepsake rows", () => {
+  it("opens the read-only view, asks before finalizing and drafts without content while conversing", async () => {
+    const { wrapper, store } = fixture(state({ proposal: proposal({ summary: "合成願望" }) }), { attachTo: document.body });
+    await activate(wrapper, "main");
+    expect(layer(wrapper, "dream-view").exists()).toBe(true);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    await escape(wrapper);
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    await activate(wrapper, "take");
+    expect(layer(wrapper, "dream-take").exists()).toBe(true);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    await escape(wrapper);
+    await activate(wrapper, "draft");
+    expect(store.dispatchAction).toHaveBeenCalledTimes(1);
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", SESSION, null);
+    wrapper.unmount();
+  });
+  it("opens the edit sheet, drafts and confirms the form when finalized", async () => {
+    const wish = proposal({ summary: "合成願望", themes: ["重逢"] });
+    const { wrapper, store } = fixture(finalized({ proposal: wish }));
+    await activate(wrapper, "main");
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(true);
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    await escape(wrapper);
+    const direction = { kind: "new_story", thread_id: null, summary: "合成願望", themes: ["重逢"], requirements: [] };
+    await activate(wrapper, "draft");
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.draft", { ...SESSION, direction }, null);
+    await activate(wrapper, "confirm");
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", { ...SESSION, direction }, null);
+  });
+  it("holds the finalize row while a response is pending", () => {
+    const { wrapper } = fixture(state({ pending: true, can_input: false, can_finalize: false, can_choose_thread: false }));
+    expect(row(wrapper, "take").attributes("disabled")).toBeDefined();
+    expect(row(wrapper, "draft").attributes("disabled")).toBeUndefined();
+    expect(row(wrapper, "awaken").attributes("disabled")).toBeUndefined();
+  });
+  it("activates rows by digit only outside text fields and without modifiers", async () => {
+    const { wrapper, store } = fixture(state(), { attachTo: document.body });
+    await wrapper.trigger("keydown", { key: "1", ctrlKey: true });
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    await reply(wrapper).trigger("keydown", { key: "1" });
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    await wrapper.trigger("keydown", { key: "1" });
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(true);
+    await escape(wrapper);
+    await wrapper.trigger("keydown", { key: "3" });
+    expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.draft", SESSION, null);
+    await wrapper.trigger("keydown", { key: "2" });
+    await flushPromises();
+    expect(layer(wrapper, "dream-take").exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it("marks the thread line locked and names the new, chosen or vanished thread", () => {
+    const open = fixture(state({ thread_choices: THREADS })).wrapper;
+    expect(open.find("[data-testid='dream-thread-lock']").exists()).toBe(false);
+    open.unmount();
+    const lines = ["", "synthetic-a", "synthetic-gone"].map((threadId) => {
+      const { wrapper } = fixture(state({ completed: 1, remaining: 5, can_choose_thread: false, thread_choices: THREADS,
+        thread_id: threadId || null, track: { ...state().track, completed: 1 } }));
+      expect(wrapper.find("[data-testid='dream-thread-lock']").exists()).toBe(true);
+      const text = wrapper.find("[data-testid='dream-thread-line']").text();
+      wrapper.unmount();
+      return text;
+    });
+    expect(lines[1]).toContain("合成甲");
+    for (const text of [lines[0], lines[2]]) {
+      expect(text).not.toContain("合成甲");
+      expect(text).not.toContain("合成乙");
+    }
+    expect(new Set(lines).size).toBe(3);
+  });
+  it("shows the draft toast only once a newer committed state reports a saved draft", async () => {
+    const { wrapper } = fixture(state({ proposal: proposal({ summary: "合成願望" }) }));
+    await activate(wrapper, "draft");
+    expect(wrapper.find(".dream-toast").exists()).toBe(false);
+    // A refused draft republishes a newer state without a saved draft.
+    await wrapper.setProps({ state: state({ revision: 3, proposal: proposal({ summary: "合成願望" }) }) });
+    expect(wrapper.find(".dream-toast").exists()).toBe(false);
+    await activate(wrapper, "draft");
+    await wrapper.setProps({ state: state({ revision: 4, drafted: true, proposal: proposal({ summary: "合成願望" }) }) });
+    expect(wrapper.find(".dream-toast").attributes("role")).toBe("status");
+    expect(wrapper.find(".dream-live").text()).toBe(wrapper.find(".dream-toast").text());
+  });
+});
+
+describe("whole-wish view", () => {
+  const WISH = proposal({ summary: "合成願望", themes: ["重逢"], exclusions: ["暴力"], requirements: REQUIREMENTS });
+  it("renders every proposal field as plain text with placeholders and no form fields", async () => {
+    const { wrapper } = fixture(state({ proposal: WISH }), { attachTo: document.body });
+    await activate(wrapper, "main");
+    const view = layer(wrapper, "dream-view");
+    expect(view.attributes("role")).toBe("dialog");
+    expect(view.attributes("aria-modal")).toBe("true");
+    for (const text of ["合成願望", "重逢", "暴力", "合成南門", "合成女孩", "合成委託"]) expect(view.text()).toContain(text);
+    expect(view.findAll("input, textarea, select")).toHaveLength(0);
+    // Atmosphere, participants and emphasis are empty.
+    expect(view.findAll(".dream-scroll__none")).toHaveLength(3);
+    expect(wrapper.find(".dream-scene__main").attributes("inert")).toBeDefined();
+    expect(view.element.contains(document.activeElement)).toBe(true);
+    wrapper.unmount();
+    const empty = fixture(state(), { attachTo: document.body }).wrapper;
+    await activate(empty, "main");
+    // The summary, the requirement rows and the five lists all show placeholders.
+    expect(layer(empty, "dream-view").findAll(".dream-scroll__none")).toHaveLength(7);
+    empty.unmount();
+  });
+  it("closes the view and opens the finalize confirmation from its finalize control", async () => {
+    const { wrapper, store } = fixture(state({ proposal: WISH }), { attachTo: document.body });
+    await activate(wrapper, "main");
+    await layer(wrapper, "dream-view").find("[data-testid='dream-view-take']").trigger("click");
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    expect(layer(wrapper, "dream-take").exists()).toBe(true);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it("follows a republished proposal while open", async () => {
+    const { wrapper } = fixture(state({ proposal: WISH }));
+    await activate(wrapper, "main");
+    await wrapper.setProps({ state: state({ revision: 3, proposal: proposal({ summary: "新的願望", atmosphere: ["溫柔"] }) }) });
+    const view = layer(wrapper, "dream-view");
+    expect(view.text()).toContain("新的願望");
+    expect(view.text()).toContain("溫柔");
+    expect(view.text()).not.toContain("合成南門");
+  });
+});
+
+describe("finalize confirmation", () => {
+  const midway = () => state({ completed: 3, remaining: 3, track: { ...state().track, completed: 3, ordinal: 2, level: "中等" } });
+  const stay = (wrapper) => layer(wrapper, "dream-take").find(".dream-confirm__actions button");
+  it("names the exchanges given up and rests focus on staying", async () => {
+    const { wrapper, store } = fixture(midway(), { attachTo: document.body });
+    await activate(wrapper, "take");
+    const take = layer(wrapper, "dream-take");
+    expect(take.attributes("role")).toBe("alertdialog");
+    expect(take.find(".dream-confirm__cost").attributes("data-remaining")).toBe("3");
+    expect(take.find(".dream-confirm__cost").text()).toContain("3");
+    expect(document.activeElement).toBe(stay(wrapper).element);
+    await stay(wrapper).trigger("click");
+    await flushPromises();
+    expect(layer(wrapper, "dream-take").exists()).toBe(false);
+    await activate(wrapper, "take");
+    await escape(wrapper);
+    expect(layer(wrapper, "dream-take").exists()).toBe(false);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it("cannot finalize and submit from a repeated key", async () => {
+    const { wrapper, store } = fixture(midway(), { attachTo: document.body });
+    await wrapper.trigger("keydown", { key: "2" });
+    await flushPromises();
+    expect(document.activeElement).toBe(stay(wrapper).element);
+    await stay(wrapper).trigger("keydown", { key: "2" });
+    await flushPromises();
+    expect(document.activeElement).toBe(stay(wrapper).element);
+    await stay(wrapper).trigger("click");
+    await flushPromises();
+    expect(layer(wrapper, "dream-take").exists()).toBe(false);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it("dispatches exactly one finalize from its explicit control", async () => {
+    const { wrapper, store } = fixture(midway());
+    await activate(wrapper, "take");
+    await layer(wrapper, "dream-take").find("[data-testid='dream-take-finalize']").trigger("click");
+    await flushPromises();
+    expect(store.dispatchAction).toHaveBeenCalledTimes(1);
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.finalize", SESSION, null);
+    expect(layer(wrapper, "dream-take").exists()).toBe(false);
+  });
+  it("opens the edit sheet when the session becomes finalized before the cap", async () => {
+    const { wrapper } = fixture(midway(), { attachTo: document.body });
+    await wrapper.setProps({ state: finalized({ revision: 3, completed: 3, remaining: 3, track: midway().track }) });
+    await flushPromises();
+    const sheet = layer(wrapper, "dream-sheet");
+    expect(sheet.exists()).toBe(true);
+    expect(document.activeElement).toBe(sheet.find("textarea").element);
+    expect(wrapper.find("form").exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("thread choice", () => {
+  const choosing = () => state({ thread_choices: THREADS });
+  const pick = (wrapper) => wrapper.find("[data-testid='dream-belong'] [aria-haspopup='listbox']");
+  const options = (wrapper) => wrapper.findAll("[data-testid='dream-belong'] [role='option']");
+  it("dispatches a newly chosen thread and returns focus to the reply field", async () => {
+    const { wrapper, store } = fixture(choosing(), { attachTo: document.body });
+    expect(pick(wrapper).attributes("aria-expanded")).toBe("false");
+    await pick(wrapper).trigger("click");
+    await flushPromises();
+    expect(pick(wrapper).attributes("aria-expanded")).toBe("true");
+    expect(options(wrapper)).toHaveLength(3);
+    // The new story is preselected and focused first.
+    expect(options(wrapper)[0].attributes("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(options(wrapper)[0].element);
+    await options(wrapper)[0].trigger("keydown", { key: "ArrowDown" });
+    expect(document.activeElement).toBe(options(wrapper)[1].element);
+    // Digits do not reach the keepsake rows while the list is open.
+    await options(wrapper)[1].trigger("keydown", { key: "1" });
+    await flushPromises();
+    expect(layer(wrapper, "dream-view").exists()).toBe(false);
+    expect(options(wrapper)).toHaveLength(3);
+    // Escape closes the list without choosing and returns to the picker.
+    await wrapper.trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    expect(options(wrapper)).toHaveLength(0);
+    expect(document.activeElement).toBe(pick(wrapper).element);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    await pick(wrapper).trigger("click");
+    await flushPromises();
+    await options(wrapper)[2].trigger("click");
+    await flushPromises();
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.choose_thread", { ...SESSION, thread_id: "synthetic-b" }, null);
+    expect(options(wrapper)).toHaveLength(0);
+    expect(document.activeElement).toBe(reply(wrapper).element);
+    wrapper.unmount();
+  });
+  it("dispatches nothing when the chosen option is reselected", async () => {
+    const { wrapper, store } = fixture(choosing());
+    await pick(wrapper).trigger("click");
+    await flushPromises();
+    await options(wrapper)[0].trigger("click");
+    wrapper.unmount();
+    const chosen = fixture(state({ thread_choices: THREADS, thread_id: "synthetic-a" }));
+    await pick(chosen.wrapper).trigger("click");
+    await flushPromises();
+    expect(options(chosen.wrapper)[1].attributes("aria-selected")).toBe("true");
+    await options(chosen.wrapper)[1].trigger("click");
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    expect(chosen.store.dispatchAction).not.toHaveBeenCalled();
+  });
+  it("closes the list only when focus really moves elsewhere", async () => {
+    const { wrapper, store } = fixture(choosing(), { attachTo: document.body });
+    await pick(wrapper).trigger("click");
+    await flushPromises();
+    // A pointer press that moves no focus keeps the list open for its click.
+    await options(wrapper)[1].trigger("focusout", { relatedTarget: null });
+    expect(options(wrapper)).toHaveLength(3);
+    await options(wrapper)[1].trigger("focusout", { relatedTarget: options(wrapper)[2].element });
+    expect(options(wrapper)).toHaveLength(3);
+    await options(wrapper)[1].trigger("focusout", { relatedTarget: row(wrapper, "awaken").element });
+    expect(options(wrapper)).toHaveLength(0);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it("sends only the message when the player speaks without choosing", async () => {
+    const { wrapper, store } = fixture(choosing());
+    await reply(wrapper).setValue("合成");
+    await reply(wrapper).trigger("keydown", { key: "Enter" });
+    expect(store.dispatchAction).toHaveBeenCalledTimes(1);
+    expect(store.dispatchAction.mock.calls[0][0]).toBe("dream.say");
+  });
+  it("is absent with nothing offered or once choosing is locked", () => {
+    for (const value of [state(), state({ thread_choices: THREADS, can_choose_thread: false })]) {
+      const { wrapper } = fixture(value);
+      expect(wrapper.find("[data-testid='dream-belong']").exists()).toBe(false);
+      wrapper.unmount();
+    }
+    const { wrapper } = fixture(choosing());
+    expect(wrapper.find("[data-testid='dream-belong']").exists()).toBe(true);
+  });
+});
+
+describe("finalized edit sheet", () => {
+  it("sends the same payload shape from both sheet controls", async () => {
+    const wish = proposal({ summary: "合成願望", themes: ["重逢"], exclusions: ["暴力"], requirements: REQUIREMENTS });
+    const { wrapper, store } = fixture(finalized({ thread_choices: THREADS, thread_id: "synthetic-a", proposal: wish }));
+    await openSheet(wrapper);
+    await sheetButtons(wrapper)[1].trigger("click");
+    await sheetButtons(wrapper)[0].trigger("click");
+    const direction = { kind: "thread_direction", thread_id: "synthetic-a", summary: "合成願望",
+      themes: ["重逢"], exclusions: ["暴力"], requirements: REQUIREMENTS };
+    expect(store.dispatchAction.mock.calls).toEqual([
+      ["dream.confirm", { ...SESSION, direction }, null],
+      ["dream.draft", { ...SESSION, direction }, null],
+    ]);
+  });
+  it("shows the chosen thread as fixed text with no control that changes it", async () => {
+    const { wrapper } = fixture(finalized({ thread_choices: THREADS, thread_id: "synthetic-a", proposal: proposal({ summary: "合成願望" }) }));
+    const sheet = await openSheet(wrapper);
+    expect(sheet.find("[data-testid='dream-thread-fixed']").text()).toContain("合成甲");
+    expect(sheet.findAll("input[type='radio'], select, [role='option'], [role='listbox']")).toHaveLength(0);
+    expect(sheet.find("[data-testid='dream-thread-release']").exists()).toBe(false);
+  });
+  it("releases an ended thread to a new story", async () => {
+    const { wrapper, store } = fixture(finalized({ thread_choices: THREADS, thread_id: "synthetic-gone", proposal: proposal({ summary: "合成願望" }) }));
+    const sheet = await openSheet(wrapper);
+    await sheet.find("[data-testid='dream-thread-release']").trigger("click");
+    expect(sheet.find("[data-testid='dream-thread-release']").exists()).toBe(false);
+    await sheetButtons(wrapper)[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { ...SESSION,
+      direction: { kind: "new_story", thread_id: null, summary: "合成願望", requirements: [] } }, null);
+  });
+  it("cannot be reached while conversing", async () => {
+    const { wrapper, store } = fixture(state({ proposal: proposal({ summary: "合成願望" }) }));
+    expect(row(wrapper, "confirm").exists()).toBe(false);
+    await activate(wrapper, "main");
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    await escape(wrapper);
+    await wrapper.trigger("keydown", { key: "Enter", ctrlKey: true });
+    await activate(wrapper, "take");
+    await escape(wrapper);
+    expect(layer(wrapper, "dream-sheet").exists()).toBe(false);
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+  });
 });
 
 describe("shown experience requirements", () => {
-  it("renders the readable requirements and their reviewed version in the sheet", async () => {
-    const { wrapper } = fixture(SHOWN);
+  const labelled = (list) => list.findAll("li").map((item) => [item.find("span").text(), item.text()]);
+  it("lists the rows with readable kind labels in the view and the sheet and sends exactly those rows", async () => {
+    const wish = proposal({ summary: "合成願望", requirements: REQUIREMENTS });
+    const talking = fixture(state({ proposal: wish })).wrapper;
+    await activate(talking, "main");
+    const viewRows = labelled(layer(talking, "dream-view").find("[data-testid='dream-view-requirements']"));
+    talking.unmount();
+    const { wrapper, store } = fixture(finalized({ proposal: wish }));
     const sheet = await openSheet(wrapper);
-    const section = sheet.find("[data-testid='dream-requirements']");
-    expect(section.text()).toContain("這個方向的可執行需求");
-    expect(section.findAll("li").map((row) => row.text())).toEqual([
-      "指定的地點合成南門",
-      "需要的新角色合成女孩",
-      "私人委託合成委託",
-    ]);
-    expect(section.find(".dream-requirements__note").text()).toBe("已檢視的版本，確認時會一併寫入。");
-    expect(section.find(".dream-requirements__note--stale").exists()).toBe(false);
+    const sheetRows = labelled(sheet.find("[data-testid='dream-requirements']"));
+    for (const rows of [viewRows, sheetRows]) {
+      expect(rows).toHaveLength(3);
+      rows.forEach(([label, text], index) => {
+        expect(label.length).toBeGreaterThan(0);
+        expect(label).not.toBe(REQUIREMENTS[index].kind);
+        expect(text).toBe(label + REQUIREMENTS[index].text);
+      });
+      expect(new Set(rows.map(([label]) => label)).size).toBe(3);
+    }
+    expect(sheetRows).toEqual(viewRows);
+    expect(sheet.findAll("[data-testid='dream-requirements'] input, [data-testid='dream-requirements'] select")).toHaveLength(0);
+    await sheetButtons(wrapper)[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { ...SESSION,
+      direction: { kind: "new_story", thread_id: null, summary: "合成願望", requirements: REQUIREMENTS } }, null);
     wrapper.unmount();
-    // A version-less proposal is displayed, and marked as not yet reviewed.
-    const { wrapper: proposed } = fixture(state({ direction_parts: ["合成方向"], requirements: REQUIREMENTS }));
-    const proposedSheet = await openSheet(proposed);
-    const proposedSection = proposedSheet.find("[data-testid='dream-requirements']");
-    expect(proposedSection.find(".dream-requirements__note--stale").text()).toBe("尚未檢視：記下念頭後才會連同版本一起保存。");
-    proposed.unmount();
-    // Without shown rows the section is absent entirely.
-    const { wrapper: plain } = fixture(state({ direction_parts: ["合成方向"], requirements: [] }));
-    const plainSheet = await openSheet(plain);
-    expect(plainSheet.find("[data-testid='dream-requirements']").exists()).toBe(false);
+    // Without rows the sheet has no requirement section at all.
+    const plain = fixture(finalized({ proposal: proposal({ summary: "合成願望" }) })).wrapper;
+    expect((await openSheet(plain)).find("[data-testid='dream-requirements']").exists()).toBe(false);
   });
-  it("sends the exact shown rows and version from both sheet buttons", async () => {
-    const { wrapper, store } = fixture(SHOWN);
-    const sheet = await openSheet(wrapper);
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
-      session_id: "synthetic-dream",
-      revision: 2,
-      direction: {
-        kind: "new_story",
-        thread_id: null,
-        summary: "合成方向",
-        requirements: REQUIREMENTS,
-        requirement_version: "t_dream_session:v1",
-      },
-    }, null);
-    store.dispatchAction.mockClear();
-    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
-      session_id: "synthetic-dream",
-      revision: 2,
-      direction: {
-        kind: "new_story",
-        thread_id: null,
-        summary: "合成方向",
-        requirements: REQUIREMENTS,
-        requirement_version: "t_dream_session:v1",
-      },
-    }, null);
-  });
-  it("refuses to confirm a summary the shown rows were never displayed for", async () => {
-    const { wrapper, store } = fixture(SHOWN);
-    const sheet = await openSheet(wrapper);
-    await sheet.find("textarea").setValue("合成改寫");
-    expect(sheet.find(".dream-requirements__note--stale").text()).toBe("已改寫：這些是上一個版本的需求，請先記下念頭再確認。");
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).not.toHaveBeenCalled();
-    expect(sheet.find("[role='alert']").text()).toContain("還沒重新檢視");
-    // 記下 still re-versions the edited summary together with the shown rows.
-    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
-      session_id: "synthetic-dream",
-      revision: 2,
-      direction: {
-        kind: "new_story",
-        thread_id: null,
-        summary: "合成改寫",
-        requirements: REQUIREMENTS,
-        requirement_version: "t_dream_session:v1",
-      },
-    }, null);
-  });
-  it("refuses a confirmation while the shown rows carry no persisted version", async () => {
-    const { wrapper, store } = fixture(state({ direction_parts: ["合成方向"], requirements: REQUIREMENTS }));
-    const sheet = await openSheet(wrapper);
-    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).not.toHaveBeenCalled();
-    expect(sheet.find("[role='alert']").text()).toContain("還沒重新檢視");
-    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
-      session_id: "synthetic-dream",
-      revision: 2,
-      direction: {
-        kind: "new_story",
-        thread_id: null,
-        summary: "合成方向",
-        requirements: REQUIREMENTS,
-        requirement_version: null,
-      },
-    }, null);
-    wrapper.unmount();
-    // An edited summary with no shown rows keeps today's one-step confirmation.
-    const { wrapper: plain, store: plainStore } = fixture();
-    const plainSheet = await openSheet(plain);
-    await plainSheet.find("textarea").setValue("合成新方向");
-    await plainSheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(plainStore.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
-      session_id: "synthetic-dream",
-      revision: 2,
-      direction: {
-        kind: "new_story",
-        thread_id: null,
-        summary: "合成新方向",
-        requirements: [],
-        requirement_version: null,
-      },
-    }, null);
+  it("shows republished rows without clearing unsent words", async () => {
+    const { wrapper } = fixture(state({ proposal: proposal({ summary: "合成願望", requirements: REQUIREMENTS }) }));
+    await reply(wrapper).setValue("尚未送出的話");
+    await wrapper.setProps({ state: state({ revision: 3, proposal: proposal({ summary: "合成願望", requirements: [{ kind: "place", text: "合成北門" }] }) }) });
+    expect(reply(wrapper).element.value).toBe("尚未送出的話");
+    await activate(wrapper, "main");
+    const list = layer(wrapper, "dream-view").find("[data-testid='dream-view-requirements']");
+    expect(list.findAll("li")).toHaveLength(1);
+    expect(list.text()).toContain("合成北門");
   });
 });

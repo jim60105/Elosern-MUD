@@ -69,11 +69,19 @@ Exchanges and ordinary draft saves SHALL add no time/restoration; draft save SHA
 
 ### Requirement: Public dream surface includes the approved presentation and deterministic escape
 
-Both browser and text surfaces SHALL expose remaining exchanges, free text only below six, explicit confirm/draft choices and awakening on all failure states. Public entry SHALL include the approved explicit presentation capability rather than publishing a sanitized/incomplete session. Command documentation and contracts SHALL match the introduced syntax and availability.
+Both browser and text surfaces SHALL expose remaining exchanges, free text only while conversing below six, finalize while conversing, confirmation once finalized, and draft preservation and awakening on all failure states. Public entry SHALL include the approved explicit presentation capability rather than publishing a sanitized/incomplete session. Command documentation and contracts SHALL match the introduced syntax and availability.
 
 #### Scenario: Six reached on either client
 - **WHEN** the session completes its sixth exchange on browser or text client
 - **THEN** free text closes and confirm/draft/awaken choices remain usable offline
+
+#### Scenario: Before the cap on either client
+- **WHEN** a conversing session has exchanges remaining on browser or text client
+- **THEN** free text, finalize, draft preservation and awakening are offered and confirmation is not
+
+#### Scenario: Finalized before the cap on either client
+- **WHEN** the player finalizes with exchanges remaining on browser or text client
+- **THEN** free text is no longer offered and confirm/draft/awaken choices are usable offline
 
 ### Requirement: Confirmed dream handoff returns to playable waking surfaces
 Confirmation SHALL close dream interaction and acknowledge receipt distinct from arrangement. The same accepted sleep SHALL safely complete before ordinary owner actions are authorized. Dispatch and generation SHALL add no time or sleep settlement. Physical interruption SHALL expose status, lawful handoff and deterministic recovery without requiring generation; ordinary play SHALL remain available after wake while generation waits or fails.

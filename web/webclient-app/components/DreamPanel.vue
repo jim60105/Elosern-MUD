@@ -1,21 +1,22 @@
 <script setup>
 // DreamPanel: the collaborative dream of the cloud throne, staged as an AVG
 // scene rather than a form. The artwork is the subject: a keepsake card (the
-// 念頭 the player would carry out right now, plus the exits) sits in the
-// art's empty sky, a reply bar docks to the top of a 2/3-width message band,
-// and the band's right third stays open onto the goddess.
+// wish she is shaping, the stage and the exits) sits in the art's empty sky, a
+// reply bar docks to the top of a 2/3-width message band, and the band's
+// right third stays open onto the goddess.
 //
-// Flow (every state is derived from the server-authored panel plus a few
-// local refs; committed state is never gated by presentation):
-//   arrival  — first mount with no exchange yet: the opening types as narration
-//   turn     — the player may reply (`can_input`)
-//   pending  — the goddess is answering: the player's words are echoed
-//   reveal   — a live `completed` increase: scene narration, then her line
-//   failure  — generation failed, nothing consumed: the reply bar is refilled
-//   cap      — six exchanges spent: the reply bar becomes an end bar
-// The 念頭 sheet (draft / confirm) and the awaken check are modal layers on
-// top. Escape never awakens by itself: it closes the top layer, or moves
-// focus to the 醒來 row.
+// The wish (願望) is a structured proposal the goddess edits while the player
+// speaks; the player's words never become the wish by themselves. The server
+// records one stage per session:
+//   conversing — free text is open and the wish is read-only: row 1 opens the
+//                whole wish as plain text, row 2 asks before finalizing, and
+//                the story thread is chosen inline before the first message
+//   finalized  — free text is closed for good (finalize, or the sixth
+//                exchange): row 1 opens the edit sheet and row 2 confirms
+// Within a stage every state is derived from the server-authored panel plus a
+// few local refs (arrival, turn, pending, reveal, failure, cap); committed
+// state is never gated by presentation. Escape never awakens by itself: it
+// closes the top layer, or moves focus to the 醒來 row.
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { artworkAvailability } from "../lib/artwork.js";
 import { artworkFailureCategory } from "../lib/artwork-failure.js";
@@ -37,14 +38,14 @@ const tagFields = [
   { key: "emphasis", label: "想多描寫的部分" },
   { key: "exclusions", label: "不想出現的內容", exclude: true },
 ];
-// The shown experience requirements are server-authored planning data: the
-// sheet renders their readable meaning and echoes the exact rows and version
-// identity back, so a confirmation can only freeze what was displayed.
+// The experience requirements are server-authored rows: the panel shows their
+// readable meaning and sends exactly the rows it shows.
 const REQUIREMENT_LABELS = {
   place: "指定的地點",
   new_character: "需要的新角色",
   private_commission: "私人委託",
 };
+const emptyProposal = () => ({ summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] });
 
 const stage = ref(null);
 const page = ref(null);
@@ -55,6 +56,12 @@ const summaryInput = ref(null);
 const confirmEl = ref(null);
 const confirmStay = ref(null);
 const rows = ref(null);
+const viewEl = ref(null);
+const viewClose = ref(null);
+const takeEl = ref(null);
+const takeStay = ref(null);
+const threadBox = ref(null);
+const threadPick = ref(null);
 
 const message = ref("");
 const lastSent = ref("");
@@ -62,17 +69,19 @@ const direction = ref("");
 const thread = ref("");
 const tags = reactive(Object.fromEntries(tagFields.map(({ key }) => [key, []])));
 const tagDrafts = reactive(Object.fromEntries(tagFields.map(({ key }) => [key, ""])));
-const threadFilter = ref("");
 const sheetOpen = ref(false);
+const viewOpen = ref(false);
+const takeOpen = ref(false);
+const threadOpen = ref(false);
 const confirmOpen = ref(false);
 const refusal = ref("");
 const toast = ref("");
 const announcement = ref("");
 const bloom = ref(false);
 const arrival = ref(false);
-// The authoritative direction, thread and preference snapshot most recently
-// copied into the local editor. A local edit that differs from it is the
-// player's own and is never overwritten by a later publication.
+// The authoritative summary, thread and list snapshot most recently copied
+// into the local form. A local edit that differs from it is the player's own
+// and is never overwritten by a later publication.
 const synced = reactive({ direction: "", thread: "", tags: JSON.stringify(tagFields.map(() => [])) });
 
 let rootTrap = null;
@@ -86,43 +95,27 @@ const transportLocked = computed(() => {
   return !view.connected || !!view.mutationsLocked || (view.phase != null && view.phase !== "active")
     || !!view.dispatch.inFlight || !!view.dispatch.beatLocked;
 });
-const savedDirection = computed(() => (props.state.direction_parts || []).join(""));
+const proposal = computed(() => props.state.proposal || emptyProposal());
+const finalized = computed(() => props.state.stage === "finalized");
+const savedDirection = computed(() => proposal.value.summary || "");
 const summary = computed(() => direction.value.trim());
 const summaryLength = computed(() => Array.from(direction.value.trim()).length);
 const summaryTooLong = computed(() => summaryLength.value > MAX_SUMMARY);
 const tagsSnapshot = () => JSON.stringify(tagFields.map(({ key }) => tags[key]));
 const directionDirty = computed(() => direction.value.trim() !== synced.direction.trim() || thread.value !== synced.thread
   || tagsSnapshot() !== synced.tags);
-const dirty = computed(() => !!message.value.trim() || directionDirty.value);
-const shownRequirements = computed(() => (Array.isArray(props.state.requirements) ? props.state.requirements : []));
-const shownVersion = computed(() => props.state.requirement_version || null);
-const summaryReviewed = computed(() => summary.value === synced.direction.trim());
-// Requirements belong to the version they were published with. An edited
-// summary is a direction they were never shown for, and rows without a
-// persisted version were never reviewed at all, so confirmation waits for a
-// fresh 記下 (which re-versions them) instead of freezing them silently.
-const requirementsStale = computed(() => shownRequirements.value.length > 0
-  && (!shownVersion.value || !summaryReviewed.value));
-const requirementNote = computed(() => {
-  if (!shownRequirements.value.length) return "";
-  if (!shownVersion.value) return "尚未檢視：記下念頭後才會連同版本一起保存。";
-  if (!summaryReviewed.value) return "已改寫：這些是上一個版本的需求，請先記下念頭再確認。";
-  return "已檢視的版本，確認時會一併寫入。";
-});
+// While conversing the form cannot be edited, so only unsent words can be
+// lost; once finalized, the player's own unsaved rewrite can be too.
+const dirty = computed(() => !!message.value.trim() || (finalized.value && directionDirty.value));
 const atCap = computed(() => props.state.remaining === 0);
 const ordinal = computed(() => Math.max(0, Math.min(GAUGE_STEPS - 1, props.state.track.ordinal)));
 const knownThread = computed(() => props.state.thread_choices.find((choice) => choice.id === thread.value));
 const threadLabel = computed(() => !thread.value ? "一段新的故事"
   : knownThread.value ? "延續：" + knownThread.value.label : "先前選定的故事線");
-const visibleThreads = computed(() => {
-  const needle = threadFilter.value.trim();
-  return needle ? props.state.thread_choices.filter((choice) => choice.label.includes(needle)) : props.state.thread_choices;
-});
-const provenance = computed(() => {
-  if (!summary.value) return "";
-  if (directionDirty.value) return "已改寫・未記下";
-  return props.state.draft_preferences ? "已記下" : "取自你剛才的話";
-});
+const provenance = computed(() => (finalized.value && directionDirty.value ? "已修改・尚未收好" : ""));
+// The card: her wording while conversing, the player's own form once finalized.
+const cardSummary = computed(() => (finalized.value ? summary.value : proposal.value.summary.trim()));
+const lockedThreadGone = computed(() => !!thread.value && !knownThread.value);
 // ---- the stage's picture: the shared scene render/load path ----
 // The dream stage's artwork is the SAME canonical scene descriptor and the
 // SAME ordered-attempt lifecycle every scene surface consumes: the loading
@@ -242,7 +235,7 @@ watch(display, (value) => {
   if (!value?.url && artOpen.value) closeArt();
 });
 
-const overlayOpen = computed(() => sheetOpen.value || confirmOpen.value || artOpen.value);
+const overlayOpen = computed(() => sheetOpen.value || confirmOpen.value || artOpen.value || viewOpen.value || takeOpen.value);
 
 // ---- beats: what the message band is presenting ----
 const beats = ref([]);
@@ -323,11 +316,11 @@ onUnmounted(() => {
 
 function initialFocus() {
   if (arrival.value) return page.value;
-  if (atCap.value) return rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='edit']");
+  if (finalized.value) return rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']");
   return props.state.can_input ? replyInput.value : page.value;
 }
 function focusHome() {
-  const target = atCap.value ? rows.value?.querySelector("[data-row='confirm']")
+  const target = finalized.value ? rows.value?.querySelector("[data-row='confirm']")
     : props.state.can_input && !transportLocked.value ? replyInput.value : page.value;
   target?.focus();
 }
@@ -342,10 +335,10 @@ watch(() => props.state.completed, (completed) => {
   present(responseBeats(), true);
   const plate = `女神的興奮：${props.state.track.level}。`;
   announcement.value = [props.state.scene, props.state.dialogue && `王座上的女神說：${props.state.dialogue}`, plate,
-    completed >= EXCHANGES ? "六次交談已盡。" : `尚可交談 ${EXCHANGES - completed} 次。`].filter(Boolean).join("\n");
+    completed >= EXCHANGES ? "六次訴說已盡，接下來由你親自修改。" : `尚可訴說 ${EXCHANGES - completed} 次。`].filter(Boolean).join("\n");
   if (completed >= EXCHANGES) {
     bloom.value = true;
-    nextTick(() => rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='edit']")?.focus());
+    nextTick(() => rows.value?.querySelector(summary.value ? "[data-row='confirm']" : "[data-row='main']")?.focus());
   }
 });
 watch(() => props.state.pending, (pending) => {
@@ -361,18 +354,17 @@ watch(() => props.state.failure, (failure) => {
   if (!message.value.trim() && lastSent.value) message.value = lastSent.value;
   nextTick(() => { if (props.state.can_input) replyInput.value?.focus(); });
 });
-watch(() => JSON.stringify([props.state.session_id, props.state.draft_preferences, props.state.direction_parts]), () => {
+watch(() => JSON.stringify([props.state.session_id, props.state.proposal, props.state.thread_id]), () => {
+  // The form follows her writing until the player edits a field themselves;
+  // an edited field keeps the player's version.
   const authoritative = savedDirection.value;
-  // `dream say` republishes the authored direction on every exchange, so a
-  // field the player has not edited follows it; an edited one keeps theirs.
   if (!direction.value.trim() || direction.value.trim() === synced.direction.trim()) direction.value = authoritative;
   synced.direction = authoritative;
-  const draft = props.state.draft_preferences || {};
-  const serverThread = draft.thread_id || "";
+  const serverThread = props.state.thread_id || "";
   if (thread.value === synced.thread) thread.value = serverThread;
   synced.thread = serverThread;
   const unedited = tagsSnapshot() === synced.tags;
-  const serverTags = tagFields.map(({ key }) => Array.isArray(draft[key]) ? [...draft[key]] : []);
+  const serverTags = tagFields.map(({ key }) => [...(proposal.value[key] || [])]);
   if (unedited) tagFields.forEach(({ key }, index) => { tags[key] = serverTags[index]; });
   synced.tags = JSON.stringify(serverTags);
 }, { immediate: true });
@@ -380,14 +372,13 @@ watch(() => JSON.stringify([props.state.session_id, props.state.draft_preference
 // ---- actions ----
 function directionPayload() {
   const values = Object.fromEntries(tagFields.flatMap(({ key }) => tags[key].length ? [[key, [...tags[key]]]] : []));
-  if (!summary.value && !thread.value && !Object.keys(values).length) return "";
   return {
     ...values,
     kind: thread.value ? "thread_direction" : "new_story",
     thread_id: thread.value || null,
     summary: summary.value,
-    requirements: shownRequirements.value.map((row) => ({ kind: row.kind, text: row.text })),
-    requirement_version: shownVersion.value,
+    // Requirement rows are shown read-only: the form sends exactly those rows.
+    requirements: proposal.value.requirements.map((row) => ({ kind: row.kind, text: row.text })),
   };
 }
 function dispatch(action, extra = {}) {
@@ -401,16 +392,10 @@ function say() {
   if (request) { lastSent.value = message.value.trim(); message.value = ""; }
 }
 async function confirm() {
-  if (transportLocked.value) return;
+  if (transportLocked.value || !finalized.value) return;
   refusal.value = "";
   if (!summary.value || summaryTooLong.value) {
-    refusal.value = summaryTooLong.value ? "念頭最多 2000 字，請再精簡一些。" : "念頭還是空的。寫下一句想帶走的話，或直接醒來。";
-    if (!sheetOpen.value) await openSheet();
-    summaryInput.value?.focus();
-    return;
-  }
-  if (requirementsStale.value) {
-    refusal.value = "這個版本的可執行需求還沒重新檢視：先「記下念頭」，再帶著新的版本醒來。";
+    refusal.value = summaryTooLong.value ? "願望最多 2000 字，請再精簡一些。" : "願望還是空的。填上一句想許的願，或直接醒來。";
     if (!sheetOpen.value) await openSheet();
     summaryInput.value?.focus();
     return;
@@ -420,23 +405,74 @@ async function confirm() {
 function draft() {
   if (transportLocked.value) return;
   refusal.value = "";
-  if (summaryTooLong.value) {
-    refusal.value = "念頭最多 2000 字，請再精簡一些。";
+  if (finalized.value && summaryTooLong.value) {
+    refusal.value = "願望最多 2000 字，請再精簡一些。";
     if (!sheetOpen.value) openSheet();
     return;
   }
-  const request = dispatch("draft", { direction: directionPayload() });
+  // While conversing there is nothing of the player's to send: the server
+  // keeps the wish as she worded it.
+  const request = dispatch("draft", finalized.value ? { direction: directionPayload() } : {});
   if (!request) return;
   if (sheetOpen.value) closeSheet();
-  // The toast confirms what the server committed: it waits for the newer
-  // revision to carry a saved draft, and a refused draft shows nothing.
   draftRevision = props.state.revision;
+}
+// Finalizing ends the conversation for good, so it always asks first; the
+// sixth exchange finalizes on the server without asking, as nothing is left
+// to give up.
+function requestTake() {
+  if (transportLocked.value || finalized.value || props.state.pending || !props.state.can_finalize) return;
+  if (viewOpen.value) closeView();
+  nextTick(() => openLayer(takeOpen, takeEl, () => takeStay.value));
+}
+function take() {
+  if (transportLocked.value) return;
+  closeLayer(takeOpen);
+  dispatch("finalize");
+}
+watch(finalized, (value, before) => {
+  // Finalized on the server before the cap: open the form for the player.
+  if (value && !before && props.state.open && !atCap.value) nextTick(openSheet);
+});
+function chooseThread(id) {
+  if (transportLocked.value || !props.state.can_choose_thread) return;
+  threadOpen.value = false;
+  if ((props.state.thread_id || "") !== id) dispatch("choose_thread", { thread_id: id || null });
+  nextTick(() => replyInput.value?.focus());
+}
+// The thread list is a small listbox: opening it focuses the chosen option,
+// the arrow keys walk the options, and Escape or focus moving elsewhere in
+// the stage closes it without choosing.
+const threadOptions = () => Array.from(threadBox.value?.querySelectorAll("[role='option']") || []);
+async function toggleThreads() {
+  if (threadOpen.value) { closeThreads(); return; }
+  threadOpen.value = true;
+  await nextTick();
+  (threadOptions().find((option) => option.getAttribute("aria-selected") === "true") || threadOptions()[0])?.focus();
+}
+function closeThreads(refocus = true) {
+  threadOpen.value = false;
+  if (refocus) nextTick(() => threadPick.value?.focus());
+}
+function onThreadsKeydown(event) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  const options = threadOptions();
+  const index = options.indexOf(document.activeElement);
+  if (index < 0) return;
+  event.preventDefault();
+  options[(index + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length].focus();
+}
+function onThreadsFocusout(event) {
+  // A pointer press on an option may not move focus at all (relatedTarget is
+  // null), so only a real move outside the choice closes the list.
+  const next = event.relatedTarget;
+  if (threadOpen.value && next && !threadBox.value?.contains(next)) closeThreads(false);
 }
 let draftRevision = null;
 watch(() => props.state.revision, (revision) => {
   if (draftRevision === null || revision <= draftRevision) return;
   draftRevision = null;
-  if (props.state.draft_preferences) showToast("念頭已記下，夢仍在繼續。");
+  if (props.state.drafted && props.state.open) showToast(finalized.value ? "願望已收好。" : "願望已收好，夢仍在繼續。");
 });
 function requestAwaken() {
   if (transportLocked.value) return;
@@ -470,9 +506,13 @@ function closeLayer(open) {
   layerTrap = null;
   nextTick(() => trap?.restore());
 }
-function openSheet() { threadFilter.value = ""; return openLayer(sheetOpen, sheetEl, () => summaryInput.value); }
+function openSheet() { return openLayer(sheetOpen, sheetEl, () => summaryInput.value); }
 function closeSheet() { refusal.value = ""; closeLayer(sheetOpen); }
 function openConfirm() { return openLayer(confirmOpen, confirmEl, () => confirmStay.value); }
+function openView() { return openLayer(viewOpen, viewEl, () => viewClose.value); }
+function closeView() { closeLayer(viewOpen); }
+function closeTake() { closeLayer(takeOpen); }
+function openMain() { return finalized.value ? openSheet() : openView(); }
 function closeConfirm() { closeLayer(confirmOpen); }
 function revertSummary() { direction.value = savedDirection.value; summaryInput.value?.focus(); }
 
@@ -520,14 +560,18 @@ function onKeydown(event) {
   if (event.key === "Escape") {
     event.preventDefault();
     if (artOpen.value) closeArt();
+    else if (threadOpen.value) closeThreads();
+    else if (takeOpen.value) closeTake();
+    else if (viewOpen.value) closeView();
     else if (confirmOpen.value) closeConfirm();
     else if (sheetOpen.value) closeSheet();
     else if (isTextField(event.target)) page.value?.focus();
-    else { awakenRow.value?.focus(); announcement.value = "再按 Enter 醒來，或繼續交談。"; }
+    else { awakenRow.value?.focus(); announcement.value = "再按 Enter 醒來，或繼續向女神訴說。"; }
     return;
   }
   if (sheetOpen.value && event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); confirm(); return; }
-  if (!overlayOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
+  // An open thread list owns the keys until it closes.
+  if (!overlayOpen.value && !threadOpen.value && !isTextField(event.target) && !event.ctrlKey && !event.metaKey && !event.altKey && /^[123]$/.test(event.key)) {
     event.preventDefault();
     rows.value?.querySelectorAll("button")[Number(event.key) - 1]?.click();
   }
@@ -538,6 +582,7 @@ function onKeydown(event) {
   <section ref="stage" class="dream-scene" :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !artShown }"
     role="dialog" aria-modal="true" aria-labelledby="dream-title" tabindex="-1" data-testid="dream-panel"
     :data-state="state.pending ? 'pending' : state.failure ? 'failure' : atCap ? 'cap' : arrival ? 'arrival' : 'turn'"
+    :data-stage="state.stage"
     :style="{ '--dream-ordinal': ordinal }" @keydown="onKeydown">
     <!-- The displayed picture: the live resolution of the committed descriptor,
          rendered by the element the shared driver itself issued. -->
@@ -572,26 +617,34 @@ function onKeydown(event) {
         <p>夢中無晝夜</p>
       </header>
 
-      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': atCap }" aria-labelledby="dream-keepsake-title">
+      <nav class="dream-keepsake dream-glass" :class="{ 'dream-keepsake--promoted': finalized }" aria-labelledby="dream-keepsake-title">
         <span class="dream-corners" aria-hidden="true"></span>
         <div class="dream-keepsake__head">
-          <h3 id="dream-keepsake-title">此刻的念頭</h3>
-          <span v-if="provenance" class="dream-keepsake__chip">{{ provenance }}</span>
+          <h3 id="dream-keepsake-title">此刻的願望</h3>
+          <!-- The stage: speaking to her first, then weighing the wish oneself. -->
+          <ol class="dream-pen" data-testid="dream-stage-indicator" :aria-label="finalized ? '由你親自修改中' : '正在向女神訴說'">
+            <li :class="{ 'dream-pen__step--on': !finalized, 'dream-pen__step--done': finalized }">訴說</li>
+            <li :class="{ 'dream-pen__step--on': finalized }">斟酌</li>
+          </ol>
         </div>
-        <blockquote v-if="summary" class="dream-keepsake__preview" :title="summary">{{ summary }}</blockquote>
-        <p v-else class="dream-keepsake__empty">念頭尚未成形。和女神談談，或親手寫下。</p>
-        <p class="dream-keepsake__target">歸屬：{{ threadLabel }}</p>
-        <div ref="rows" class="dream-choice" role="group" aria-label="念頭與醒來" @keydown="onRowsKeydown">
-          <button class="ui-btn dream-choice__row" type="button" data-row="edit" :disabled="transportLocked" @click="openSheet">
-            <span class="dream-choice__badge" aria-hidden="true">1</span>{{ summary ? "改寫念頭…" : "寫下念頭…" }}
+        <blockquote v-if="cardSummary" class="dream-keepsake__preview" :title="cardSummary">{{ cardSummary }}</blockquote>
+        <p v-else class="dream-keepsake__empty">願望尚未成形。向女神說說看，她會替你把願望理清。</p>
+        <p v-if="provenance" class="dream-ink"><span class="dream-ink__lead" aria-hidden="true">✎</span><span class="dream-ink__label">{{ provenance }}</span></p>
+        <p class="dream-keepsake__target" data-testid="dream-thread-line"><span v-if="!state.can_choose_thread" class="dream-keepsake__lock" data-testid="dream-thread-lock" aria-hidden="true">◆</span>歸屬：{{ threadLabel }}</p>
+        <div ref="rows" class="dream-choice" role="group" aria-label="願望與醒來" @keydown="onRowsKeydown">
+          <button class="ui-btn dream-choice__row" type="button" data-row="main" :disabled="transportLocked" @click="openMain">
+            <span class="dream-choice__badge" aria-hidden="true">1</span>{{ finalized ? "修改願望…" : "看看願望全貌" }}
           </button>
-          <button class="ui-btn dream-choice__row dream-choice__row--carry" :class="{ 'ui-btn--primary': atCap }" type="button" data-row="confirm" :disabled="transportLocked"
+          <button v-if="finalized" class="ui-btn ui-btn--primary dream-choice__row dream-choice__row--carry" type="button" data-row="confirm" :disabled="transportLocked"
             :aria-disabled="!summary || undefined" :aria-describedby="!summary ? 'dream-confirm-reason' : undefined" @click="confirm">
-            <span class="dream-choice__badge" aria-hidden="true">2</span>帶著這個念頭醒來
-            <span v-if="!summary" id="dream-confirm-reason" class="dream-choice__reason">尚無念頭</span>
+            <span class="dream-choice__badge" aria-hidden="true">2</span>許下這個願望
+            <span v-if="!summary" id="dream-confirm-reason" class="dream-choice__reason">願望還是空的</span>
+          </button>
+          <button v-else class="ui-btn dream-choice__row dream-choice__row--carry" type="button" data-row="take" :disabled="transportLocked || state.pending || !state.can_finalize" @click="requestTake">
+            <span class="dream-choice__badge" aria-hidden="true">2</span>停止訴說，親自修改…
           </button>
           <button class="ui-btn dream-choice__row" type="button" data-row="draft" :disabled="transportLocked" @click="draft">
-            <span class="dream-choice__badge" aria-hidden="true">3</span>{{ atCap ? "記下念頭" : "記下念頭，繼續作夢" }}
+            <span class="dream-choice__badge" aria-hidden="true">3</span>{{ finalized ? "把願望收著" : "把願望收著，繼續作夢" }}
           </button>
           <button ref="awakenRow" class="ui-btn ui-btn--ghost dream-choice__row" type="button" data-row="awaken" :disabled="transportLocked" @click="requestAwaken">
             <span class="dream-choice__badge dream-choice__badge--seal" aria-hidden="true">✕</span>醒來
@@ -600,21 +653,36 @@ function onKeydown(event) {
       </nav>
 
       <div class="dream-reply-zone">
-        <p v-if="!store.view.connected" class="dream-reply__caption" role="status">與夢的聯繫中斷了，正在重新連結……你寫下的字句都會保留。</p>
-        <p v-else-if="!atCap && state.remaining === 1" class="dream-reply__caption">夢將抵達盡頭 · 最後一次交談</p>
-        <p v-else-if="!atCap && state.track.converging" class="dream-reply__caption">夢將抵達盡頭</p>
-        <div v-if="atCap && !state.pending" class="dream-reply dream-glass dream-reply--ended">
-          <p>六次交談已盡，女神靜候你的決定。</p>
-          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可交談 ${state.remaining} 次，共 ${EXCHANGES} 次`">
+        <p v-if="!store.view.connected" class="dream-reply__caption" role="status">與夢的聯繫中斷了，正在重新連結……你輸入的字句都會保留。</p>
+        <p v-else-if="!finalized && state.remaining === 1" class="dream-reply__caption">夢將抵達盡頭 · 最後一次訴說</p>
+        <p v-else-if="!finalized && state.track.converging" class="dream-reply__caption">夢將抵達盡頭</p>
+        <!-- The story this wish belongs to: chosen before the first words,
+             fixed afterwards. Not shown at all when there is nothing to pick. -->
+        <div v-if="state.can_choose_thread && state.thread_choices.length" ref="threadBox" class="dream-belong" data-testid="dream-belong"
+          @keydown="onThreadsKeydown" @focusout="onThreadsFocusout">
+          <span class="dream-belong__label">這個願望屬於</span>
+          <button ref="threadPick" class="dream-belong__pick" type="button" aria-haspopup="listbox" aria-describedby="dream-belong-note" :aria-expanded="threadOpen" :disabled="transportLocked" @click="toggleThreads">
+            <span>{{ thread ? knownThread?.label || "先前選定的故事線" : "一段新的故事" }}</span><i aria-hidden="true">▾</i>
+          </button>
+          <span id="dream-belong-note" class="dream-belong__note">說出第一句話後，便不能再改</span>
+          <div v-if="threadOpen" class="dream-belong__list dream-glass" role="listbox" aria-label="這個願望屬於">
+            <button class="dream-belong__option" type="button" role="option" :aria-selected="!thread" @click="chooseThread('')"><i aria-hidden="true">{{ !thread ? "◆" : "◇" }}</i><span>一段新的故事</span></button>
+            <button v-for="choice in state.thread_choices" :key="choice.id" class="dream-belong__option" type="button" role="option" :aria-selected="thread === choice.id"
+              :title="choice.label" @click="chooseThread(choice.id)"><i aria-hidden="true">{{ thread === choice.id ? "◆" : "◇" }}</i><span>延續：{{ choice.label }}</span></button>
+          </div>
+        </div>
+        <div v-if="finalized && !state.pending" class="dream-reply dream-glass dream-reply--ended">
+          <p>{{ atCap ? "六次訴說已盡，接下來由你親自修改，或直接許下。" : "你已停止訴說，女神靜候你許下願望。" }}</p>
+          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可訴說 ${state.remaining} 次，共 ${EXCHANGES} 次`">
             <i v-for="n in EXCHANGES" :key="n" class="dream-pip dream-pip--spent"></i>
           </div>
         </div>
         <form v-else class="dream-reply dream-glass" :class="{ 'dream-reply--failed': state.failure }" data-testid="dream-reply" @submit.prevent="say">
           <span class="dream-reply__tag" aria-hidden="true">你</span>
           <textarea ref="replyInput" v-model="message" class="dream-reply__input" rows="1" maxlength="4000" aria-label="對女神說的話"
-            :disabled="!state.can_input || transportLocked" :placeholder="state.pending ? '女神正在回應……' : '對女神說些什麼……'"
+            :disabled="!state.can_input || transportLocked" :placeholder="state.pending ? '女神正在聆聽……' : '向女神說出你的願望……'"
             @keydown="onReplyKeydown" @input="typewriter.typing.value && typewriter.complete()" />
-          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可交談 ${state.remaining} 次，共 ${EXCHANGES} 次`">
+          <div class="dream-pips" role="meter" aria-valuemin="0" :aria-valuemax="EXCHANGES" :aria-valuenow="state.remaining" :aria-valuetext="`尚可訴說 ${state.remaining} 次，共 ${EXCHANGES} 次`">
             <i v-for="n in EXCHANGES" :key="n" class="dream-pip"
               :class="{ 'dream-pip--spent': n <= state.completed, 'dream-pip--next': n === state.completed + 1 && (message.trim() || state.pending) }"></i>
             <span class="dream-pips__count">尚餘 {{ state.remaining }}</span>
@@ -648,48 +716,104 @@ function onKeydown(event) {
     <p v-if="toast" class="dream-toast" role="status">{{ toast }}</p>
     <p class="dream-live" aria-live="polite">{{ announcement }}</p>
 
+    <!-- 願望全貌: her writing, read-only. Plain text, not disabled inputs. -->
+    <template v-if="viewOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeView"></div>
+      <aside ref="viewEl" class="dream-sheet dream-sheet--view dream-glass" role="dialog" aria-modal="true" aria-labelledby="dream-view-title" data-testid="dream-view">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <header class="dream-sheet__head">
+          <div><h3 id="dream-view-title">願望全貌</h3><p>訴說期間，女神會依你的話修改願望；停止訴說之後，才由你親自修改。</p></div>
+          <button ref="viewClose" class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="closeView">返回</button>
+        </header>
+        <div class="dream-sheet__body dream-scroll">
+          <section class="dream-scroll__wish">
+            <h4>願望</h4>
+            <p v-if="proposal.summary" class="dream-scroll__text">{{ proposal.summary }}</p>
+            <p v-else class="dream-scroll__none">尚未成形</p>
+          </section>
+          <section class="dream-scroll__row">
+            <h4>這個願望需要</h4>
+            <div>
+              <ul v-if="proposal.requirements.length" class="dream-scroll__requirements" data-testid="dream-view-requirements">
+                <li v-for="(row, index) in proposal.requirements" :key="index"><span>{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}</li>
+              </ul>
+              <p v-else class="dream-scroll__none">—</p>
+            </div>
+          </section>
+          <section v-for="field in tagFields" :key="field.key" class="dream-scroll__row" :class="{ 'dream-scroll__row--exclude': field.exclude }">
+            <h4>{{ field.label }}</h4>
+            <div>
+              <p v-if="proposal[field.key].length" class="dream-scroll__tags">
+                <span v-for="value in proposal[field.key]" :key="value">{{ value }}</span>
+              </p>
+              <p v-else class="dream-scroll__none">—</p>
+            </div>
+          </section>
+          <section class="dream-scroll__row">
+            <h4>歸屬</h4>
+            <div><p class="dream-scroll__plain">{{ threadLabel }}</p></div>
+          </section>
+        </div>
+        <footer class="dream-sheet__foot">
+          <p>想自己修改，就先停止向女神訴說。停止之後，女神不再替你修改。</p>
+          <div>
+            <button class="ui-btn" type="button" data-testid="dream-view-take" :disabled="transportLocked || state.pending || !state.can_finalize" @click="requestTake">停止訴說，親自修改…</button>
+            <button class="ui-btn ui-btn--primary" type="button" @click="closeView">繼續向女神訴說</button>
+          </div>
+        </footer>
+      </aside>
+    </template>
+
+    <!-- 停止訴說: the one irreversible step of the dream. -->
+    <template v-if="takeOpen">
+      <div class="dream-sheet__scrim" aria-hidden="true" @click="closeTake"></div>
+      <div ref="takeEl" class="dream-confirm dream-confirm--take dream-glass" role="alertdialog" aria-modal="true" aria-labelledby="dream-take-title" aria-describedby="dream-take-body" data-testid="dream-take">
+        <span class="dream-corners" aria-hidden="true"></span>
+        <h3 id="dream-take-title">不再向女神訴說？</h3>
+        <div id="dream-take-body" class="dream-confirm__body">
+          <p>停止之後，女神不再替你修改，願望改由你親自修改。</p>
+          <p class="dream-confirm__cost" :data-remaining="state.remaining">
+            <span class="dream-pips" aria-hidden="true"><i v-for="n in state.remaining" :key="n" class="dream-pip dream-pip--forfeit"></i></span>
+            尚餘 {{ state.remaining }} 次訴說，將不再使用。
+          </p>
+        </div>
+        <div class="dream-confirm__actions">
+          <button ref="takeStay" class="ui-btn ui-btn--primary" type="button" @click="closeTake">繼續向女神訴說</button>
+          <button class="ui-btn" type="button" data-testid="dream-take-finalize" :disabled="transportLocked" @click="take">由我親自修改</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- 斟酌: the same form, now the player's to write. -->
     <template v-if="sheetOpen">
       <div class="dream-sheet__scrim" aria-hidden="true" @click="closeSheet"></div>
       <aside ref="sheetEl" class="dream-sheet dream-glass" role="dialog" aria-modal="true" aria-labelledby="dream-sheet-title" data-testid="dream-sheet">
         <span class="dream-corners" aria-hidden="true"></span>
         <header class="dream-sheet__head">
-          <div><h3 id="dream-sheet-title">整理念頭</h3><p>醒來後，故事會朝這個方向慢慢展開。</p></div>
+          <div><h3 id="dream-sheet-title">親自修改願望</h3><p>許下之後，醒來的故事會朝這個願望慢慢展開。</p></div>
           <button class="ui-btn ui-btn--ghost ui-btn--sm" type="button" @click="closeSheet">返回</button>
         </header>
         <div class="dream-sheet__body">
           <label class="dream-field">
-            <span class="dream-field__label">想帶走的念頭 <em v-if="provenance">{{ provenance }}</em></span>
-            <textarea ref="summaryInput" v-model="direction" rows="4" :disabled="transportLocked" placeholder="寫下你希望故事接下來的走向。"
+            <span class="dream-field__label">願望 <em v-if="provenance">{{ provenance }}</em></span>
+            <textarea ref="summaryInput" v-model="direction" rows="4" :disabled="transportLocked" placeholder="你想向女神許什麼願？"
               :aria-invalid="summaryTooLong || undefined" />
           </label>
           <div class="dream-field__foot">
-            <button v-if="direction !== savedDirection && savedDirection" class="dream-link" type="button" @click="revertSummary">還原為剛才的話</button>
+            <button v-if="direction !== savedDirection && savedDirection" class="dream-link" type="button" @click="revertSummary">還原為訴說時的內容</button>
             <span class="dream-field__counter" :class="{ 'dream-field__counter--over': summaryTooLong }">{{ summaryLength }} / {{ MAX_SUMMARY }}</span>
           </div>
           <p v-if="refusal" class="dream-field__error" role="alert">{{ refusal }}</p>
 
-          <section v-if="shownRequirements.length" class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
-            <h4 id="dream-requirements-title">這個方向的可執行需求</h4>
+          <!-- The rows are shown as she worded them and sent back unchanged. -->
+          <section v-if="proposal.requirements.length" class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
+            <h4 id="dream-requirements-title">這個願望需要</h4>
             <ul class="dream-requirements__list">
-              <li v-for="(row, index) in shownRequirements" :key="index">
+              <li v-for="(row, index) in proposal.requirements" :key="index">
                 <span class="dream-requirements__kind">{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}
               </li>
             </ul>
-            <small class="dream-requirements__note" :class="{ 'dream-requirements__note--stale': requirementsStale }">{{ requirementNote }}</small>
           </section>
-
-          <fieldset class="dream-threads">
-            <legend>這個念頭屬於……</legend>
-            <input v-if="state.thread_choices.length > 8" v-model="threadFilter" class="dream-threads__filter" type="search" placeholder="搜尋故事線" aria-label="搜尋故事線" />
-            <div class="dream-threads__list">
-              <label class="dream-threads__option"><input v-model="thread" type="radio" name="dream-thread" value="" :disabled="transportLocked" /><span>一段新的故事</span></label>
-              <label v-if="thread && !knownThread" class="dream-threads__option"><input v-model="thread" type="radio" name="dream-thread" :value="thread" /><span>先前選定的故事線（已不在清單中）</span></label>
-              <label v-for="choice in visibleThreads" :key="choice.id" class="dream-threads__option" :title="choice.label">
-                <input v-model="thread" type="radio" name="dream-thread" :value="choice.id" :disabled="transportLocked" /><span>{{ choice.label }}</span>
-              </label>
-              <p v-if="threadFilter && !visibleThreads.length" class="dream-threads__empty">沒有相符的故事線</p>
-            </div>
-          </fieldset>
 
           <section class="dream-tags" aria-labelledby="dream-tags-title">
             <h4 id="dream-tags-title">細節（皆可留空）</h4>
@@ -703,12 +827,20 @@ function onKeydown(event) {
               <small v-if="field.hint" class="dream-tags__hint">{{ field.hint }}</small>
             </div>
           </section>
+
+          <!-- The thread was fixed at the first words. Only a thread that has
+               since ended may be released, and only to a new story. -->
+          <section class="dream-fixed" aria-labelledby="dream-fixed-title" data-testid="dream-thread-fixed">
+            <h4 id="dream-fixed-title">歸屬</h4>
+            <p><span class="dream-keepsake__lock" aria-hidden="true">◆</span>{{ threadLabel }}<small>已在第一句話時定下</small></p>
+            <button v-if="lockedThreadGone" class="dream-link" type="button" data-testid="dream-thread-release" @click="thread = ''">這條故事線已經結束，改為一段新的故事</button>
+          </section>
         </div>
         <footer class="dream-sheet__foot">
-          <p>記下：私下保存，夢仍繼續。帶著醒來：結束夢境，故事將朝此展開。</p>
+          <p>收著：私下保存，下次入夢再接著說。許下：結束夢境，把願望交給女神。</p>
           <div>
-            <button class="ui-btn" type="button" :disabled="transportLocked" @click="draft">記下念頭</button>
-            <button class="ui-btn ui-btn--primary" type="button" :disabled="transportLocked" @click="confirm">帶著這個念頭醒來</button>
+            <button class="ui-btn" type="button" :disabled="transportLocked" @click="draft">把願望收著</button>
+            <button class="ui-btn ui-btn--primary" type="button" :disabled="transportLocked" @click="confirm">許下這個願望</button>
           </div>
         </footer>
       </aside>
@@ -719,10 +851,10 @@ function onKeydown(event) {
       <div ref="confirmEl" class="dream-confirm dream-glass" role="alertdialog" aria-modal="true" aria-labelledby="dream-confirm-title" aria-describedby="dream-confirm-body" data-testid="dream-confirm">
         <span class="dream-corners" aria-hidden="true"></span>
         <h3 id="dream-confirm-title">就此醒來？</h3>
-        <div id="dream-confirm-body">
-          <p v-if="message.trim()">尚未說出口的話會隨夢消散。</p>
-          <p v-if="directionDirty">尚未記下的改寫會隨夢消散。</p>
-          <p v-if="!state.draft_preferences && savedDirection">你最後說的話會自動留作念頭草稿。</p>
+        <div id="dream-confirm-body" class="dream-confirm__body">
+          <p v-if="message.trim()" data-statement="unsent">尚未說出口的話會隨夢消散。</p>
+          <p v-if="finalized && directionDirty" data-statement="edits">你親自修改、還沒收好的部分會隨夢消散。</p>
+          <p v-if="!state.drafted && savedDirection" data-statement="kept">目前的願望會替你收著，下次入夢再接著說。</p>
         </div>
         <div class="dream-confirm__actions">
           <button ref="confirmStay" class="ui-btn" type="button" @click="closeConfirm">回到夢中</button>
@@ -770,6 +902,10 @@ function onKeydown(event) {
 .dream-art__failure { margin: 0; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill);
   background: rgba(11, 13, 16, 0.78); color: #f3b9bc; font-size: var(--text-xs); line-height: 1.5; }
 .dream-art__control { flex: none; letter-spacing: 0.08em; }
+/* The control sits on the pale part of the painting: an ink backing keeps
+   its label legible instead of a ghost outline over near-white art. */
+.dream-art__control.ui-btn--ghost { background: rgba(11, 13, 16, 0.72); border-color: var(--band-edge-dim); color: var(--paper-100); }
+.dream-art__control.ui-btn--ghost:hover:enabled { background: rgba(11, 13, 16, 0.86); border-color: var(--band-edge); }
 /* The full view: the same displayed bitmap at full screen, above every other
    layer of the stage. */
 .dream-art-view { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
@@ -821,7 +957,6 @@ function onKeydown(event) {
 .dream-keepsake--promoted { border-top-color: var(--gold-400); box-shadow: var(--dream-halo), 0 0 0 1px var(--gold-500), 0 0 calc(28px * var(--ui-scale)) var(--gold-glow); }
 .dream-keepsake__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .dream-keepsake__head h3 { color: var(--gold-300); font-family: var(--f-display); font-size: var(--text-md); font-weight: 500; letter-spacing: 0.1em; }
-.dream-keepsake__chip { padding: 0 var(--sp-2); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill); color: var(--gold-400); font-size: var(--text-xs); }
 .dream-keepsake__preview { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
   padding-left: var(--sp-3); border-left: 2px solid var(--gold-500); color: var(--paper-50); font-family: var(--f-serif); font-size: var(--text-md);
   line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -918,9 +1053,9 @@ function onKeydown(event) {
 .dream-sheet__head p { margin-top: var(--sp-1); color: var(--paper-400); font-size: var(--text-sm); }
 .dream-sheet__body { display: grid; align-content: start; gap: var(--sp-4); min-height: 0; overflow-y: auto; padding: var(--sp-5) var(--sp-6); }
 .dream-field { display: grid; gap: var(--sp-2); }
-.dream-field__label, .dream-threads legend, .dream-tags h4, .dream-requirements h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
+.dream-field__label, .dream-tags h4, .dream-requirements h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
 .dream-field__label em { margin-left: var(--sp-2); color: var(--paper-500); font-size: var(--text-xs); font-style: normal; }
-.dream-sheet textarea, .dream-sheet input[type="search"], .dream-tags__box { box-sizing: border-box; width: 100%; border: 1px solid var(--ink-600); border-radius: var(--radius-sm); background: var(--ink-900); color: var(--paper-50); }
+.dream-sheet textarea, .dream-tags__box { box-sizing: border-box; width: 100%; border: 1px solid var(--ink-600); border-radius: var(--radius-sm); background: var(--ink-900); color: var(--paper-50); }
 .dream-sheet textarea { padding: var(--sp-3); font-family: var(--f-serif); font-size: var(--text-md); line-height: 1.6; resize: vertical; }
 .dream-sheet textarea[aria-invalid="true"] { border-color: var(--seal-500); }
 .dream-field__foot { display: flex; align-items: center; gap: var(--sp-3); margin-top: calc(-1 * var(--sp-2)); color: var(--paper-500); font-size: var(--text-xs); }
@@ -928,15 +1063,6 @@ function onKeydown(event) {
 .dream-field__counter--over { color: var(--seal-400); }
 .dream-field__error { padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--seal-500); background: rgba(124, 32, 38, 0.25); color: var(--paper-100); font-size: var(--text-sm); }
 .dream-link { padding: 0; border: 0; background: none; color: var(--gold-400); font: inherit; text-decoration: underline; cursor: pointer; }
-.dream-threads { display: grid; gap: var(--sp-2); min-width: 0; margin: 0; padding: var(--sp-4) 0 0; border: 0; border-top: 1px solid var(--band-edge-dim); }
-.dream-threads legend { float: left; width: 100%; margin-bottom: var(--sp-2); padding: 0; }
-.dream-threads__filter { padding: var(--sp-2) var(--sp-3); font: inherit; font-size: var(--text-sm); }
-.dream-threads__list { display: grid; gap: var(--sp-1); max-height: calc(5 * 46px * var(--ui-scale)); overflow-y: auto; }
-.dream-threads__option { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm); color: var(--paper-200); font-size: var(--text-sm); line-height: 1.5; cursor: pointer; }
-.dream-threads__option:has(input:checked) { background: var(--panel-hi); box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-50); }
-.dream-threads__option input { flex: none; margin-top: 0.3em; accent-color: var(--gold-400); }
-.dream-threads__option span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
-.dream-threads__empty { color: var(--paper-500); font-size: var(--text-sm); }
 .dream-tags { display: grid; gap: var(--sp-3); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
 .dream-tags__row { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr; align-items: center; gap: var(--sp-1) var(--sp-3); }
 .dream-tags__label { color: var(--paper-200); font-size: var(--text-sm); }
@@ -950,20 +1076,101 @@ function onKeydown(event) {
 .dream-tags__chip button { padding: 0 var(--sp-1); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .dream-requirements { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
 .dream-requirements__list { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-size: var(--text-sm); }
-.dream-requirements__kind { margin-right: var(--sp-2); color: var(--paper-400); font-size: var(--text-xs); }
-.dream-requirements__note { color: var(--paper-500); font-size: var(--text-xs); }
-.dream-requirements__note--stale { color: var(--seal-400); }
+.dream-requirements__list li { display: grid; grid-template-columns: calc(150px * var(--ui-scale)) 1fr; align-items: baseline; gap: var(--sp-3); }
+/* The kind labels share the chip rows' label column, so the read-only rows
+   line up with the editable fields below them. */
+.dream-requirements__kind { color: var(--paper-400); font-size: var(--text-xs); }
 .dream-sheet__foot { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-6) var(--sp-5); border-top: 1px solid var(--band-edge-dim); }
 .dream-sheet__foot p { color: var(--paper-500); font-size: var(--text-xs); }
 .dream-sheet__foot div { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .dream-confirm { position: absolute; z-index: 9; top: 40%; left: 30%; transform: translate(-50%, -50%); display: grid; gap: var(--sp-4);
   width: min(calc(440px * var(--ui-scale)), 40vw); padding: var(--sp-6); border-radius: var(--radius-sm); animation: dream-fade-in var(--motion-fast) var(--ease-standard) both; }
-.dream-confirm #dream-confirm-body { display: grid; gap: var(--sp-1); color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
+.dream-confirm__body { display: grid; gap: var(--sp-1); color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
 .dream-confirm__actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+
+/* ==== co-editing additions ==== */
+/* Where the pen is. */
+.dream-pen { display: flex; align-items: center; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; color: var(--paper-500); font-size: var(--text-xs); letter-spacing: 0.12em; }
+.dream-pen li { position: relative; display: inline-flex; align-items: center; gap: calc(6px * var(--ui-scale)); }
+.dream-pen li::before { content: ""; width: calc(7px * var(--ui-scale)); height: calc(7px * var(--ui-scale)); transform: rotate(45deg); box-shadow: inset 0 0 0 1px var(--paper-700); }
+.dream-pen li + li { padding-left: calc(24px * var(--ui-scale)); }
+.dream-pen li + li::after { content: ""; position: absolute; left: 0; top: 50%; width: calc(16px * var(--ui-scale)); height: 1px; background: var(--band-edge-dim); }
+.dream-pen .dream-pen__step--on { color: var(--gold-300); }
+.dream-pen .dream-pen__step--on::before { background: var(--gold-400); box-shadow: 0 0 calc(8px * var(--ui-scale)) var(--gold-glow); }
+.dream-pen .dream-pen__step--done::before { background: var(--gold-600); box-shadow: none; }
+
+/* The unsaved-edit note: a gold ribbon, not a notification. */
+.dream-scene .dream-ink { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); margin: 0 calc(-1 * var(--sp-5));
+  padding: var(--sp-2) var(--sp-5); overflow: hidden; background: linear-gradient(90deg, rgba(185, 154, 96, 0.2), rgba(185, 154, 96, 0.05) 70%, transparent);
+  box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-200); font-size: var(--text-xs); line-height: 1.5; }
+.dream-ink__lead { color: var(--gold-400); }
+.dream-ink__label { color: var(--gold-300); letter-spacing: 0.08em; }
+.dream-keepsake__lock { margin-right: calc(6px * var(--ui-scale)); color: var(--gold-500); font-size: 0.7em; vertical-align: 0.15em; }
+
+/* The story this wish belongs to, chosen above the reply bar. */
+.dream-belong { position: relative; justify-self: start; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-4); border-radius: var(--radius-pill); background: rgba(11, 13, 16, 0.82); box-shadow: inset 0 0 0 1px var(--band-edge-dim); font-size: var(--text-xs); }
+.dream-belong__label { color: var(--gold-400); letter-spacing: 0.08em; }
+.dream-belong__pick { display: inline-flex; align-items: center; gap: var(--sp-2); max-width: calc(420px * var(--ui-scale)); padding: var(--sp-1) var(--sp-3); border: 0; border-bottom: 1px solid var(--gold-500);
+  background: transparent; color: var(--paper-50); font: inherit; font-family: var(--f-serif); font-size: var(--text-sm); cursor: pointer; }
+.dream-belong__pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dream-belong__pick i { color: var(--gold-400); font-style: normal; }
+.dream-belong__pick:hover:enabled, .dream-belong__pick:focus-visible { color: var(--gold-300); outline: none; box-shadow: 0 1px var(--gold-300); }
+.dream-belong__note { color: var(--paper-500); }
+/* The list opens beside the pill, toward the open sky, so the wish card above
+   stays readable while the player chooses. */
+.dream-belong__list { position: absolute; left: calc(100% + var(--sp-3)); bottom: 0; z-index: 2; display: grid; gap: 2px; width: min(calc(520px * var(--ui-scale)), 38vw);
+  max-height: calc(6 * 46px * var(--ui-scale)); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ink-600) transparent;
+  padding: var(--sp-2); border-radius: var(--radius-sm); animation: dream-rise var(--motion-reveal) var(--ease-standard) both; }
+.dream-belong__option { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: var(--paper-200); font: inherit; font-size: var(--text-sm); line-height: 1.5; text-align: left; cursor: pointer; }
+.dream-belong__option i { flex: none; color: var(--gold-400); font-style: normal; }
+.dream-belong__option span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+.dream-belong__option:hover, .dream-belong__option:focus-visible, .dream-belong__option[aria-selected="true"] { background: var(--panel-hi); box-shadow: inset 2px 0 var(--gold-400); color: var(--paper-50); outline: none; }
+
+/* 願望全貌: a written page, not a form. */
+.dream-sheet__body.dream-scroll { gap: 0; padding-top: var(--sp-2); }
+.dream-scroll h4 { color: var(--gold-400); font-size: var(--text-xs); font-weight: 500; letter-spacing: 0.14em; }
+.dream-scroll__wish { display: grid; gap: var(--sp-2); padding: var(--sp-4) 0 var(--sp-5); }
+.dream-scroll__text { color: var(--paper-50); font-family: var(--f-serif); font-size: var(--text-lg); line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dream-scroll__text::first-letter { color: var(--gold-300); font-family: var(--f-display); font-size: 1.5em; }
+.dream-scroll__row { display: grid; grid-template-columns: calc(156px * var(--ui-scale)) 1fr; align-items: baseline; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) 0; border-top: 1px solid var(--band-edge-dim); }
+.dream-scroll__row > div { display: grid; gap: var(--sp-1); min-width: 0; }
+.dream-scroll__tags { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); color: var(--paper-100); font-family: var(--f-serif); font-size: var(--text-md); }
+.dream-scroll__tags span { display: inline-flex; align-items: baseline; gap: var(--sp-1); }
+.dream-scroll__row--exclude .dream-scroll__tags { color: var(--seal-400); }
+.dream-scroll__requirements { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-family: var(--f-serif); font-size: var(--text-md); }
+.dream-scroll__requirements span { display: inline-block; min-width: calc(112px * var(--ui-scale)); margin-right: var(--sp-2); color: var(--paper-400); font-family: var(--f-sans); font-size: var(--text-xs); }
+.dream-scroll__none, .dream-scroll__plain { color: var(--paper-500); font-size: var(--text-sm); }
+.dream-scroll .dream-scroll__plain { color: var(--paper-200); }
+
+/* Both checks ask about the wish, so they stand beside the wish card instead
+   of covering it. */
+.dream-confirm { left: calc(var(--dream-gutter) + min(calc(440px * var(--ui-scale)), 32vw) + var(--sp-6)); transform: translateY(-50%); }
+/* 停止訴說 */
+.dream-confirm--take { width: min(calc(500px * var(--ui-scale)), 44vw); }
+.dream-confirm .dream-confirm__cost { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--warn); background: rgba(199, 154, 74, 0.1); color: var(--paper-100); }
+/* The pips that would go unused breathe in a wave, at the motion level's pace. */
+.dream-pip--forfeit { animation: dream-forfeit var(--motion-marker-bob) ease-in-out infinite; }
+.dream-pip--forfeit:nth-child(2) { animation-delay: calc(var(--motion-stagger) * 3); } .dream-pip--forfeit:nth-child(3) { animation-delay: calc(var(--motion-stagger) * 6); }
+.dream-pip--forfeit:nth-child(4) { animation-delay: calc(var(--motion-stagger) * 9); } .dream-pip--forfeit:nth-child(5) { animation-delay: calc(var(--motion-stagger) * 12); }
+@keyframes dream-forfeit { 50% { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-700); } }
+
+/* 斟酌: the fixed thread. */
+.dream-fixed { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
+.dream-fixed h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
+.dream-fixed p { color: var(--paper-200); font-size: var(--text-sm); line-height: 1.6; }
+.dream-fixed small { margin-left: var(--sp-3); color: var(--paper-500); font-size: var(--text-xs); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dream-pip--forfeit { animation: none; }
+}
 
 @media (max-height: 800px) {
   .dream-keepsake { top: calc(72px * var(--ui-scale)); gap: var(--sp-2); padding: var(--sp-4); max-height: calc(100% - var(--band-h) - 150px * var(--ui-scale)); }
   .dream-keepsake__preview { -webkit-line-clamp: 1; line-clamp: 1; font-size: var(--text-sm); }
+  .dream-keepsake__target { -webkit-line-clamp: 1; line-clamp: 1; }
+  .dream-scene .dream-ink { padding-block: var(--sp-1); }
   .dream-choice { padding-top: var(--sp-2); gap: 0; }
   .dream-choice__row { min-height: calc(34px * var(--ui-scale)); padding-block: var(--sp-1); }
   .dream-crest { top: var(--sp-3); }
