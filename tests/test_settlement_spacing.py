@@ -54,7 +54,7 @@ def _place(
     *,
     name: str | None = None,
     exemption: str | None = None,
-    nation: str | None = "altoria",
+    nation: str | None = "nation_one",
     population: object = _UNSET,
     has_lore: bool = True,
 ) -> Place:
@@ -90,7 +90,7 @@ def _input(
         roads=tuple(roads),
         region_of=region_of if region_of is not None else (lambda cell: PLAIN),
         region_nation=(
-            region_nation if region_nation is not None else {PLAIN: "altoria"}
+            region_nation if region_nation is not None else {PLAIN: "nation_one"}
         ),
         forbidden_regions=frozenset(forbidden),
         areas=tuple(areas),
@@ -435,7 +435,7 @@ class IdentityTests(unittest.TestCase):
                 has_lore=False,
             ),
             _place("hamlet_void", "hamlet", (220, 100)),
-            _place("village_wrongnation", "village", (280, 100), nation="valhalla"),
+            _place("village_wrongnation", "village", (280, 100), nation="nation_two"),
             _place("village_lowpop", "village", (340, 100), population=100),
             _place("village_nopop", "village", (400, 100), population=None),
             _place("hamlet_forbidden", "hamlet", (460, 100)),
@@ -448,9 +448,9 @@ class IdentityTests(unittest.TestCase):
                 roads=[good_road, *village_roads],
                 region_of=region_of,
                 region_nation={
-                    PLAIN: "altoria",
+                    PLAIN: "nation_one",
                     "region_void": None,
-                    "region_forest": "altoria",
+                    "region_forest": "nation_one",
                 },
                 forbidden={"region_forest"},
             ),
@@ -515,7 +515,7 @@ class CommandTests(unittest.TestCase):
 
         continent = fixtures.continent_data()
         for region in continent["regions"].values():
-            region["nation_key"] = "altoria"
+            region["nation_key"] = "nation_one"
         locations = fixtures.locations_data()
         locations["locations"]["hamlet_test"] = {
             "kind": "hamlet",
@@ -536,8 +536,8 @@ class CommandTests(unittest.TestCase):
         (root / "lore.json").write_text(
             json.dumps(
                 {
-                    "demo_location": {"nation": "altoria", "population": 1000000},
-                    "hamlet_test": {"nation": "altoria", "population": 120},
+                    "demo_location": {"nation": "nation_one", "population": 1000000},
+                    "hamlet_test": {"nation": "nation_one", "population": 120},
                 }
             ),
             encoding="utf-8",
