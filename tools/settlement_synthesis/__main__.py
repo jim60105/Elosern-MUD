@@ -25,7 +25,7 @@ from elosern_map_core.codec import (
 from elosern_map_core.diagnostics import AuthoringError
 
 from tools.settlement_synthesis.budget import (
-    NATIONAL_KINDS,
+    BUDGET_KINDS,
     SINGLE_CELL_KINDS,
     BudgetError,
     size_budget,
@@ -374,12 +374,16 @@ def _generate_one(
     replace: bool = False,
     bindings: tuple[tuple[str, str], ...] = (),
 ) -> int:
-    if location.kind not in NATIONAL_KINDS:
+    if location.kind not in BUDGET_KINDS:
         print(
             f"settlement_synthesis: {location.location_id}: kind "
             f"{location.kind!r} has no size budget",
             file=sys.stderr,
         )
+        return 1
+
+    if replace and location.kind in SINGLE_CELL_KINDS:
+        print(f"single_cell_replace: {location.location_id}")
         return 1
 
     if replace:
@@ -509,6 +513,12 @@ def _generate(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 2
+    elif args.kind is not None:
+        print(
+            "settlement_synthesis: --kind requires --missing",
+            file=sys.stderr,
+        )
+        return 2
     elif args.location is None:
         print("settlement_synthesis: a LOCATION_ID is required", file=sys.stderr)
         return 2
@@ -545,7 +555,8 @@ def _generate(args: argparse.Namespace) -> int:
         ref
         for ref in view.roster
         if ref.nation == args.nation
-        and ref.kind in NATIONAL_KINDS
+        and ref.kind in BUDGET_KINDS
+        and (args.kind is None or ref.kind == args.kind)
         and _existing_document(view, ref.location_id) is None
     ]
     targets.sort(key=lambda ref: (-(ref.population or 0), ref.location_id))
@@ -652,12 +663,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--missing",
         action="store_true",
         help=(
-            "generate every national settlement of --nation that has no "
+            "generate every settlement of --nation with a size budget that has no "
             "settlement source yet"
         ),
     )
     generate.add_argument(
         "--nation", default=None, help="nation key for --missing"
+    )
+    generate.add_argument(
+        "--kind",
+        default=None,
+        choices=BUDGET_KINDS,
+        help="narrow --missing to one location kind",
     )
     generate.add_argument(
         "--replace",
