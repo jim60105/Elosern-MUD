@@ -25,7 +25,7 @@ _DOCUMENT = """
 version: 1
 kind: settlement
 id: t_reload
-location_ref: village_eolas
+location_ref: elven_village_eolas
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -39,7 +39,7 @@ nodes:
     prototype_parent: anchor_room
     key: 廣場
     desc: 合成廣場。
-    anchor_key: village_eolas
+    anchor_key: elven_village_eolas
     typeclass:
     scene_archetype: city_street
   gate:
@@ -204,8 +204,8 @@ class SettlementReloadTests(EvenniaTestCase):
 
         self._sync(_DOCUMENT)
         snapshot = map_data.current()
-        self.assertNotEqual("t_reload", "village_eolas")
-        entry = WILDERNESS_ENTRY_REGISTRY["village_eolas"]
+        self.assertNotEqual("t_reload", "elven_village_eolas")
+        entry = WILDERNESS_ENTRY_REGISTRY["elven_village_eolas"]
         self.assertEqual(entry.gate_for("n").destination.map_id, "t_reload")
 
         # Explicitly declare the synthetic map: its id intentionally differs

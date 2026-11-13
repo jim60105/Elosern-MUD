@@ -40,7 +40,7 @@ Canonical Sources:
 
 - Both `ciaran_elenis_home` and `ciaran_teliel_home` are registered as `PlaceKind.HOME` with `profession="attendant"`. They provide conversational dialogue only and sell no goods or services.
 - Neither host charges coin, sells items, or grants free mechanical rewards (items, tuition, techniques, or attributes).
-- All referenced locations strictly resolve against `places_ciaran.py` and `village_ciaran.py`:
+- All referenced locations strictly resolve against `places_ciaran.py` and `content/maps/settlements/elven_village_ciaran.yaml`:
   - `長老古樹下`
   - `村中廣場`
   - `共食棚`

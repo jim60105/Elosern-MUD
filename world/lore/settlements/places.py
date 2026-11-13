@@ -458,7 +458,7 @@ PLACE_REGISTRY: dict[str, PlaceDefinition] = {
         ),
         PlaceDefinition(
             key="ciaran_silverfeather",
-            settlement_key="village_ciaran",
+            settlement_key="elven_village_ciaran",
             kind=PlaceKind.COURIER_STATION,
             room=interior_room_ref("ciaran_silverfeather", "ciaran_silverfeather"),
             letter_service=True,

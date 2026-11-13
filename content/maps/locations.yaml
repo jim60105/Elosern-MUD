@@ -62,7 +62,7 @@ locations:
     geographic_constraint: Northern deep forest under nominal Valhalla 
       jurisdiction
     scene_archetype:
-  village_ciaran:
+  elven_village_ciaran:
     kind: elven_village
     display_name_zh: 暗影谷村
     description: Ciaran village underground on the western side of the neutral 
@@ -73,7 +73,7 @@ locations:
     geographic_constraint: Underground settlement on the western flank of the 
       central mountains
     scene_archetype:
-  village_eolas:
+  elven_village_eolas:
     kind: elven_village
     display_name_zh: 幽月谷村
     description: Hidden Eolas village in a northern valley of the neutral 
@@ -83,7 +83,7 @@ locations:
       cell_y: 2150
     geographic_constraint: Hidden northern mountain valley near deep forest
     scene_archetype:
-  village_fionnen:
+  elven_village_fionnen:
     kind: elven_village
     display_name_zh: 翠綠森林村
     description: Fionnen village on the eastern side of the neutral central 

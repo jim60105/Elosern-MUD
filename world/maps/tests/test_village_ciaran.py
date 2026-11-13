@@ -20,7 +20,7 @@ from world.tests.geography_fixture import publish_shipped_geography
 
 publish_shipped_geography()
 
-MAP_ID = "village_ciaran"
+MAP_ID = "elven_village_ciaran"
 
 # The village reads as a concealed forest settlement, not a town: none of the
 # keys or descriptions may name wall, gate, guard, marketplace or any signed

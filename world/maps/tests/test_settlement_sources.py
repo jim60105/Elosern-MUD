@@ -38,7 +38,7 @@ _THIRD = """
 version: 1
 kind: settlement
 id: t_third
-location_ref: village_eolas
+location_ref: elven_village_eolas
 options:
   map_visual_range: 2
   map_mode: nodes
@@ -52,7 +52,7 @@ nodes:
     prototype_parent: anchor_room
     key: 廣場
     desc: 合成廣場。
-    anchor_key: village_eolas
+    anchor_key: elven_village_eolas
     typeclass:
     scene_archetype: city_street
   path:
@@ -140,23 +140,23 @@ class ThirdSettlementTests(unittest.TestCase):
         self.assertEqual(sorted(snapshot.settlements), ["t_third"])
         # Reverse navigation comes from location_ref alone: the document id and
         # the location id are different, and no Python row names either.
-        self.assertEqual(sorted(snapshot.anchor_placements), ["village_eolas"])
-        self.assertEqual(sorted(snapshot.local_frame_anchors), ["village_eolas"])
+        self.assertEqual(sorted(snapshot.anchor_placements), ["elven_village_eolas"])
+        self.assertEqual(sorted(snapshot.local_frame_anchors), ["elven_village_eolas"])
         self.assertEqual(sorted(snapshot.city_gates), ["t_third"])
         # Entry rows are keyed by the anchor identity the gate exits persist,
         # which is the document's location_ref (never its own id).
-        self.assertEqual(sorted(snapshot.wilderness_entries), ["village_eolas"])
+        self.assertEqual(sorted(snapshot.wilderness_entries), ["elven_village_eolas"])
         self.assertEqual(
-            snapshot.anchor_placements["village_eolas"].node.map_id, "t_third"
+            snapshot.anchor_placements["elven_village_eolas"].node.map_id, "t_third"
         )
         self.assertEqual(
-            snapshot.anchor_placements["village_eolas"].node.object_id, "plaza"
+            snapshot.anchor_placements["elven_village_eolas"].node.object_id, "plaza"
         )
         self.assertEqual(
-            snapshot.local_frame_anchors["village_eolas"].local_anchor_m, (20, 30)
+            snapshot.local_frame_anchors["elven_village_eolas"].local_anchor_m, (20, 30)
         )
-        entry = snapshot.wilderness_entries["village_eolas"]
-        self.assertEqual(entry.anchor_key, "village_eolas")
+        entry = snapshot.wilderness_entries["elven_village_eolas"]
+        self.assertEqual(entry.anchor_key, "elven_village_eolas")
         self.assertEqual(entry.gate_for("n").destination.map_id, "t_third")
         # The exact lookup a gate exit performs (``db.anchor_key`` holds the
         # entry's own anchor identity) resolves the entry.
@@ -226,7 +226,7 @@ class SettlementGraphFidelityTests(unittest.TestCase):
         # The derived frame (location cell plus the anchor node) is untouched
         # by a non-anchor node move.
         self.assertEqual(
-            snapshot.local_frame_anchors["village_eolas"].local_anchor_m, (20, 30)
+            snapshot.local_frame_anchors["elven_village_eolas"].local_anchor_m, (20, 30)
         )
 
 
@@ -276,7 +276,7 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
             [
                 _document(
                     _THIRD.replace(
-                        "location_ref: village_eolas", "location_ref: t_absent"
+                        "location_ref: elven_village_eolas", "location_ref: t_absent"
                     )
                 )
             ],
@@ -286,13 +286,13 @@ class SettlementCandidateRejectionTests(unittest.TestCase):
     def test_a_missing_anchor_node_is_refused(self):
         no_anchor = _THIRD.replace(
             "prototype_parent: anchor_room", "prototype_parent: grid_room"
-        ).replace("    anchor_key: village_eolas", "    anchor_key:")
+        ).replace("    anchor_key: elven_village_eolas", "    anchor_key:")
         self._rejected([_document(no_anchor)], "anchor_room node")
 
     def test_a_removed_duplicate_authority_is_refused(self):
         binding = _THIRD.replace(
-            "location_ref: village_eolas",
-            "location_ref: village_eolas\n"
+            "location_ref: elven_village_eolas",
+            "location_ref: elven_village_eolas\n"
             "binding:\n"
             "  anchor_cell:\n"
             "    cell_x: 1410\n"
@@ -371,7 +371,7 @@ class SettlementPublicationIsolationTests(unittest.TestCase):
                     [
                         _document(
                             _THIRD.replace(
-                                "location_ref: village_eolas",
+                                "location_ref: elven_village_eolas",
                                 "location_ref: t_absent",
                             )
                         )

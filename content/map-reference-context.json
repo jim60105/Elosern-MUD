@@ -152,7 +152,7 @@
     ],
     "settlements": [
       "capital_altoria",
-      "village_ciaran"
+      "elven_village_ciaran"
     ],
     "shops": [
       "altoria_alchemist",
@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "8313133457345ab76b47ee80e06258f9869e1a61bd7d9ded95d8c18c6d575dd1",
+  "fingerprint": "c058344ed49d42494b3605debd9efc90833e1296ed50dc9de1dd22e43503be3c",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16067,7 +16067,7 @@
     "world/lore/__init__.py": "7fb8ceb1f6bd963e0f574afdfa86b79e34c57d7d30cfc56ad6330d2f536bf28b",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
-    "world/lore/anchors.py": "0cf084637bb61f1569b69f3aa5dbe397fc11611e3c85e31d251b8f77a40558ba",
+    "world/lore/anchors.py": "3a4f70deaeb22102ed018d2e1faadd7fd5ce02479972076d8389d6aebd4aa085",
     "world/lore/bestiary_documentation.py": "004694a0d21709fdf088b50f9bff46251bbc9f49a23d7b50208f459dd779703b",
     "world/lore/church/__init__.py": "49eca094998f4e49bae0354201121d22e895b386b737144af356e0acdf454694",
     "world/lore/church/places.py": "65d5e913b93cb203373da101c8c500a1fedc3e9abb2a299bf367b8279091f8f3",
@@ -16120,7 +16120,7 @@
     "world/lore/player_presets/data_story_cards.py": "1063276947f4cd14f8196a0dfea55b3bfc9654f0aa924f1b42e7731a50362489",
     "world/lore/player_presets/validation.py": "00632b7182757820f6cfef2317f9d2b67f59238c187b333b44c0dbc8b7287251",
     "world/lore/player_presets/vocab.py": "a9563a1af1e464e4f018de4a1b1158cae7aeed2573ca42a13244893d2f1bfc71",
-    "world/lore/races.py": "ae7ab74a05e110a222f5694b4e9108ecdddc123e9854004f9f4e3b55746fa8dc",
+    "world/lore/races.py": "2813a9519a7950394d0b976910d61ba1d3debe725f56c276f688272e0955e752",
     "world/lore/registry_index.py": "3d087f6ef42b1ebf3d0ce16ce695674269d4c07525b8b6d31df16970de9b33ee",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
     "world/lore/scene_archetypes.py": "737c650a1a5223defef655520242cc162301181b63f1f783e451def3f19b4388",
@@ -16129,12 +16129,12 @@
     "world/lore/settlements/_prose_lang.py": "7cf3638af425039e2568341c9f4159385225b07c5b6fb688bb73eda0aeb66692",
     "world/lore/settlements/assortments.py": "4eb6bc1d2393e93dfe92370c3c3b24a032986b9a46cf29733d6bb73cc3026ece",
     "world/lore/settlements/capability_declarations.py": "190fc2ce62a335fe7906968e0e10f86ce9fedadf5873476b3b1742fd552c5861",
-    "world/lore/settlements/places.py": "14f6086188f92d303d0dafe5e253dc670974bc8ce7e25c0b987bf4d22de8bf9b",
+    "world/lore/settlements/places.py": "dfb9be75fe067a59190423529b58bc5e2490ac0e89589367c629162a1c02fe94",
     "world/lore/settlements/places_altoria_lower.py": "e1502c9c0d8346c2c69b52d75a877f30d5e6d66a9f1f13a228f97595c6cb03b2",
     "world/lore/settlements/places_altoria_middle.py": "51cefb1e5f27a72c3e63fd7b4d9f71ea55494583d0dea057e455446c8b069662",
     "world/lore/settlements/places_altoria_upper.py": "278fb7af1e89be3df25543547fbd3fad3f59ffd36830304af1a9b67627a540eb",
-    "world/lore/settlements/places_ciaran.py": "9e3d4a12c7d485e6f0bc5d3f6b481f3fa0e7e06a74db4d9f92749b59406c27ae",
-    "world/lore/settlements/settlements.py": "85435f4ef4613c4faba5405f748fb2833b64059d696d5a199e77613434b98da9",
+    "world/lore/settlements/places_ciaran.py": "c076e49271811a95d306856ae43b76f62f2fe1c8b23df97059726673e3b5adc8",
+    "world/lore/settlements/settlements.py": "427774e5c5b3a4662d70850b54a9e41f0222136cb7ddba4c70cc82453856ebe0",
     "world/lore/settlements/shops.py": "940f04d7c6db2dbcef7e3a14cd2716cde8b753dcd0e73aafffb9b8433854ab1d",
     "world/lore/sex.py": "41636022009a201f954611dbea378438a0469ca166eff54034a87489c5c2cda4",
     "world/lore/sexual_vocab.py": "a67052bc4741ea037f4209977c618486b5870c439a0d84c1e8575f06146d922b",
@@ -16373,7 +16373,7 @@
     "world/rules/rulebook/combat_modifiers.yaml": "8d79781657c43e12d2aaabb4899f57b72110905e72fafb876ce7725e9937b685",
     "world/rules/rulebook/commerce/altoria.yaml": "9e35ac5f6387314550f1087bbd181b559e31f46934c14480331bb708751b7065",
     "world/rules/rulebook/commerce/ciaran.yaml": "8d6045b117f1190e682b957e4e495745a53d8248f5666e68ee86656882ac262c",
-    "world/rules/rulebook/commerce/scales.yaml": "4b9f08d435abf5357f823dd2e134bc7c0717fc4789cbe681d821bd2cea3fae98",
+    "world/rules/rulebook/commerce/scales.yaml": "d4dc7f6b12e2b77225a8f90715e3beb3e193f331ed567fe78c0ce5f0857c99f4",
     "world/rules/rulebook/cross_lineage_unlock.yaml": "ba8592ff747c2497e4bc5ae6f0caafc592c843043fa25ca9cdd19e319eee6ba3",
     "world/rules/rulebook/defeat_aftermath.yaml": "10d969d9ca9320effade9978df535bcc7867be5445331ff156e5631592ee853a",
     "world/rules/rulebook/equipment_effects.yaml": "802dd0d04ace492c96398f9e956a1e809fcb426f0a2edb59b8734c366c45303c",

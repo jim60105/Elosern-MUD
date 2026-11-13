@@ -70,8 +70,8 @@ SETTLEMENT_REGISTRY: dict[str, SettlementDefinition] = {
         key="capital_altoria",
         archetype=SettlementArchetype.CAPITAL,
     ),
-    "village_ciaran": SettlementDefinition(
-        key="village_ciaran",
+    "elven_village_ciaran": SettlementDefinition(
+        key="elven_village_ciaran",
         archetype=SettlementArchetype.ELVEN_VILLAGE,
     ),
 }

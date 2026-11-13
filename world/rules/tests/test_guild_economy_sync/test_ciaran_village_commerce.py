@@ -72,7 +72,7 @@ class TradePathNoArchetypeBranchTests(unittest.TestCase):
             "SettlementArchetype",
             "archetype",
             "elven_" + "village",
-            f"village_{_village_subrace_key()}",
+            "elven_" + f"village_{_village_subrace_key()}",
         )
         for relative in sources:
             source = (root / relative).read_text(encoding="utf-8")

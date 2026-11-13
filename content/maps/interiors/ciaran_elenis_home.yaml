@@ -14,7 +14,7 @@ rooms:
     art_key: ciaran_elenis_home
 connections: []
 exterior:
-  settlement: village_ciaran
+  settlement: elven_village_ciaran
   node: elder_tree
   room: ciaran_elenis_home
   doorway_key: 艾莉妮斯的家

@@ -10,7 +10,7 @@ version: 1
 kind: locations
 id: locations
 locations:
-  village_ciaran:                       # stable id; never rename
+  elven_village_ciaran:                       # stable id; never rename
     kind: elven_village                 # capital | city | town | port | elven_village | dungeon
     display_name_zh: 暗影谷村
     description: Ciaran village underground on the western side of the neutral
@@ -42,7 +42,7 @@ Rules and joins:
 - Deleting a location is refused while a settlement binds it, a district
   landmark names it, or the reference index lists incoming references to
   `location:<id>`. Qualified IDs are written `domain:map:object`, and an
-  empty part is left out: `location:village_ciaran`,
+  empty part is left out: `location:elven_village_ciaran`,
   `settlement_node:capital_altoria:central_plaza`,
   `wilderness_cell:1250,2420`.
 
@@ -50,7 +50,7 @@ Rules and joins:
 
 `kind` is a closed list: `capital`, `city`, `town`, `port`, `elven_village`,
 `dungeon`. Use the matching ID prefix (`capital_`, `city_`, `town_`,
-`port_`, `village_`, `dungeon_`).
+`port_`, `elven_village_`, `dungeon_`).
 
 | Kind | Use it for |
 | --- | --- |

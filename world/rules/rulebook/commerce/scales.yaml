@@ -5,4 +5,4 @@
 # overrides are absolute and never scaled.
 price_scales:
   capital_altoria: 100
-  village_ciaran: 100
+  elven_village_ciaran: 100

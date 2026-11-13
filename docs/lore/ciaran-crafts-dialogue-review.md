@@ -108,7 +108,7 @@ All three hosts maintain their canonical place assortment bindings without alter
 
 | Proper Noun | Type | Canonical Registry Source |
 |---|---|---|
-| 暗影谷村 | Settlement | `world/lore/settlements/places_ciaran.py` (`village_ciaran`) |
+| 暗影谷村 | Settlement | `world/lore/settlements/places_ciaran.py` (`elven_village_ciaran`) |
 | 中央山脈 | Region | `tmp/story_settings/world_info.md` §地理結構 |
 | 海莉爾‧斯塔爾法爾 | NPC Host | `world/lore/npc_profiles/ciaran_homes_a.py` (`ciaran_hailiel`) |
 | 海莉爾的家 | Place | `world/lore/settlements/places_ciaran.py` (`ciaran_hailiel_home`) |

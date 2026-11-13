@@ -163,7 +163,7 @@ def _ciaran(current: str) -> dict:
 
     def node_id(key: str) -> str:
         _label, x, y = _CIARAN[key]
-        return f"grid:village_ciaran:{x}:{y}"
+        return f"grid:elven_village_ciaran:{x}:{y}"
 
     links: dict[str, list[tuple[str, str]]] = {}
     for a, b, octant in _CIARAN_ROADS:
@@ -561,13 +561,13 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), level)
                 inject_update(page, {"local_map": _ciaran("village_plaza")})
                 page.wait_for_selector(
-                    '.local-map [data-node="grid:village_ciaran:220:305"][data-visibility="current"]'
+                    '.local-map [data-node="grid:elven_village_ciaran:220:305"][data-visibility="current"]'
                 )
                 same = page.evaluate(
                     _ISLAND_COMMIT, [snapshot_envelope("", 0, {"local_map": _ciaran("old_tree_north")})]
                 )
                 self.assertTrue(same["accepted"])
-                self.assertEqual(same["current"], "grid:village_ciaran:200:465")
+                self.assertEqual(same["current"], "grid:elven_village_ciaran:200:465")
                 self.assertEqual(same["scale"], "格距 60 m")
                 self.assertEqual(same["seen"]["copies"], 0, same)
                 if level == "full":
@@ -584,7 +584,7 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
                     _ISLAND_COMMIT, [snapshot_envelope("", 0, {"local_map": _ciaran("elder_tree")})]
                 )
                 self.assertTrue(ladder["accepted"])
-                self.assertEqual(ladder["current"], "grid:village_ciaran:165:650")
+                self.assertEqual(ladder["current"], "grid:elven_village_ciaran:165:650")
                 self.assertEqual(ladder["scale"], "格距 100 m")
                 # A scale change never runs the equal-scale FLIP.
                 self.assertEqual(ladder["seen"]["fieldPan"], 0, ladder)

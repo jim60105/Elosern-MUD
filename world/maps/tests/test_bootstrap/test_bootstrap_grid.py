@@ -279,7 +279,7 @@ class WildernessBootstrapTests(_WildernessBootstrapCase):
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
         from world.maps.wilderness_provider import WILDERNESS_NAME as NAME
 
-        village = WILDERNESS_ENTRY_REGISTRY["village_ciaran"]
+        village = WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"]
         self.assertTrue(village.is_point_shape)
         self.assertEqual(village.footprint_cells, frozenset())
         # The anchor cell itself is walkable ground; the point entry is not a
@@ -548,7 +548,7 @@ class WildernessGateHealingTests(_WildernessBootstrapCase):
         entrance_room = GridRoom.objects.filter_xyz(
             xyz=(
                 *settlement_node_xyz(
-                    WILDERNESS_ENTRY_REGISTRY["village_ciaran"].gate_for("n").destination
+                    WILDERNESS_ENTRY_REGISTRY["elven_village_ciaran"].gate_for("n").destination
                 ),
             )
         ).first()
