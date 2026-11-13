@@ -20,5 +20,5 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 4. Gates
 
-- [ ] 4.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate --change gallery-window-mount`, and the frozen-contract test `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb tests.test_webclient_frozen_contract`; all pass.
-- [ ] 4.2 Run `openspec validate gallery-window-mount --strict`; it passes.
+- [x] 4.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate --change gallery-window-mount`, and the frozen-contract test `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb tests.test_webclient_frozen_contract`; all pass.
+- [x] 4.2 Run `openspec validate gallery-window-mount --strict`; it passes.
