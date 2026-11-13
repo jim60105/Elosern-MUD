@@ -1398,9 +1398,10 @@ def _single_cell_entrances(inp: GenerationInput) -> tuple[str, ...]:
             if inp.terrain.walkable(neighbour) and neighbour not in inp.blocked:
                 entrances.add(octant)
                 break
-    if not entrances:
+    ordered = tuple(octant for octant in _ENTRANCE_ORDER if octant in entrances)
+    if not ordered:
         raise GenerationError(f"{inp.map_id}: no_gate")
-    return tuple(octant for octant in _ENTRANCE_ORDER if octant in entrances)
+    return ordered
 
 
 def _shrine_octant(inp: GenerationInput, entrances: tuple[str, ...]) -> str:
@@ -1559,6 +1560,10 @@ def _single_cell_document_data(
 def _generate_single_cell(inp: GenerationInput) -> GenerationResult:
     """Generate the one-cell layout of a village or hamlet."""
 
+    centre = inp.location.cell
+    if centre in inp.blocked or not inp.terrain.walkable(centre):
+        raise GenerationError(f"{inp.map_id}: location cell not walkable")
+
     settlement_class = _settlement_class(inp)
     morphology = "tribal_ring" if settlement_class == "beast_town" else "crossroads"
     entrances = _single_cell_entrances(inp)
@@ -1594,7 +1599,7 @@ def _generate_single_cell(inp: GenerationInput) -> GenerationResult:
         map_id=inp.map_id,
         settlement_class=settlement_class,
         morphology=morphology,
-        footprint=frozenset({inp.location.cell}),
+        footprint=frozenset({centre}),
         slots=tuple(slots),
         data=data,
         warnings=(),
