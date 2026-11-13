@@ -278,8 +278,36 @@ def _check_slot_ids(catalogue: tuple[RoleEntry, ...]) -> None:
 _check_slot_ids(DEFAULT_CATALOGUE)
 
 
+#: The role labels of a single-cell village or hamlet, keyed by kind and
+#: settlement class. They are role labels the prose pass replaces, and no test
+#: reads them. ``{octant}`` is filled from the generator's ``OCTANT_ZH``.
+SINGLE_CELL_LABELS = {
+    ("village", "human_town"): {
+        "anchor": "村中綠地",
+        "role": "教堂前",
+        "end": "{octant}村口",
+    },
+    ("village", "beast_town"): {
+        "anchor": "圖騰場",
+        "role": "祖靈祭壇前",
+        "end": "{octant}寨口",
+    },
+    ("hamlet", "human_town"): {
+        "anchor": "岔路口",
+        "role": "農舍前",
+        "end": "{octant}小徑",
+    },
+    ("hamlet", "beast_town"): {
+        "anchor": "圖騰柱下",
+        "role": "火塘邊",
+        "end": "{octant}小徑",
+    },
+}
+
+
 __all__ = [
     "DEFAULT_CATALOGUE",
     "PLACEMENTS",
     "RoleEntry",
+    "SINGLE_CELL_LABELS",
 ]

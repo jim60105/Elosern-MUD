@@ -27,7 +27,7 @@ from typing import Any
 from elosern_map_core.codec import document_from_data
 from elosern_map_core.diagnostics import AuthoringError
 
-from tools.settlement_synthesis.budget import SizeBudget
+from tools.settlement_synthesis.budget import SINGLE_CELL_KINDS, SizeBudget
 from tools.settlement_synthesis.fit_lint import (
     CROSSING_WORDS,
     lint_settlement,
@@ -38,10 +38,11 @@ from tools.settlement_synthesis.geometry import (
     OCTANT_VECTORS,
     OCTANTS,
     OPPOSITE,
+    bearing,
     cell_of,
     point_to_cell_distance,
 )
-from tools.settlement_synthesis.roles import RoleEntry
+from tools.settlement_synthesis.roles import SINGLE_CELL_LABELS, RoleEntry
 from tools.settlement_synthesis.site import (
     PointFeature,
     SettlementRef,
@@ -56,6 +57,9 @@ OCTANT_WORDS = {"n": "north", "ne": "northeast", "e": "east", "se": "southeast",
                 "s": "south", "sw": "southwest", "w": "west", "nw": "northwest"}
 OCTANT_ZH = {"n": "北", "ne": "東北", "e": "東", "se": "東南", "s": "南", "sw": "西南", "w": "西", "nw": "西北"}
 FALLBACK_BEARINGS = ("s", "n", "e", "w", "se", "sw", "ne", "nw")
+
+#: The order a single-cell settlement sorts its entrances in, clockwise from north.
+_ENTRANCE_ORDER = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
 
 #: The eight 4-neighbour offsets, in the design's BFS order.
 _STEPS = ((1, 0), (0, 1), (-1, 0), (0, -1))
@@ -92,12 +96,13 @@ class GenerationInput:
     catalogue: tuple[RoleEntry, ...]
     forced_gates: tuple[str, ...] = ()   # octants, highest priority first
     config: GenerationConfig = GenerationConfig()
+    road_contacts: tuple[Cell, ...] = ()  # the road cells of a village or hamlet's cell
 
 
 @dataclass(frozen=True)
 class Slot:
     slot_id: str
-    role: str          # "anchor" | "gate" | "crossing" | "approach" | "filler" | catalogue slot_id
+    role: str          # "anchor" | "gate" | "crossing" | "approach" | "filler" | "end" | "role" | catalogue slot_id
     key_zh: str
     rel_m: tuple[float, float]   # metres relative to the location cell centre (east, north)
 
@@ -191,12 +196,17 @@ def _settlement_class(inp: GenerationInput) -> str:
         return "human_capital"
     if location.kind == "port":
         return "port"
-    if location.kind in ("city", "town"):
+    if location.kind in ("city", "town", *SINGLE_CELL_KINDS):
         return "human_town"
     raise GenerationError(f"{inp.map_id}: kind {location.kind!r} has no settlement class")
 
 
 def _morphology(inp: GenerationInput, reach: int) -> tuple[str, Any]:
+    settlement_class = _settlement_class(inp)
+    if inp.location.kind in SINGLE_CELL_KINDS:
+        if settlement_class == "beast_town":
+            return "tribal_ring", None
+        return "crossroads", None
     centre = inp.location.cell
     river = next(
         (
@@ -221,7 +231,6 @@ def _morphology(inp: GenerationInput, reach: int) -> tuple[str, Any]:
             None,
         )
 
-    settlement_class = _settlement_class(inp)
     if settlement_class in ("beast_capital", "beast_town"):
         return "tribal_ring", river
     if settlement_class == "port":
@@ -1253,6 +1262,22 @@ def _assign_directions(
 # -- document data (D8) -----------------------------------------------------------
 
 
+def _document_fields(inp: GenerationInput) -> dict[str, Any]:
+    """The fields every settlement document carries, whatever its layout."""
+
+    return {
+        "version": 1,
+        "kind": "settlement",
+        "id": inp.map_id,
+        "location_ref": inp.location.location_id,
+        "options": {"map_visual_range": 2, "map_mode": "nodes"},
+        "exit_prototype": {
+            "prototype_parent": "xyz_exit",
+            "typeclass": "typeclasses.exits.CostedXYZExit",
+        },
+    }
+
+
 def _node_coordinates(slots: list[Slot], margin: int) -> list[tuple[int, int]]:
     """The emitted integer coordinate of every slot, collisions repaired."""
 
@@ -1322,15 +1347,7 @@ def _document_data(
     ]
 
     return {
-        "version": 1,
-        "kind": "settlement",
-        "id": inp.map_id,
-        "location_ref": inp.location.location_id,
-        "options": {"map_visual_range": 2, "map_mode": "nodes"},
-        "exit_prototype": {
-            "prototype_parent": "xyz_exit",
-            "typeclass": "typeclasses.exits.CostedXYZExit",
-        },
+        **_document_fields(inp),
         "nodes": nodes,
         "roads": road_rows,
         "wilderness_entry": {
@@ -1345,11 +1362,253 @@ def _document_data(
     }
 
 
+# -- the single-cell layout (village and hamlet, D3 to D7) -------------------------
+
+
+def _toward(octant: str, distance: float) -> tuple[float, float]:
+    """The local metre point ``distance`` from the cell centre toward one octant."""
+
+    unit_x, unit_y = _octant_unit(octant)
+    return (unit_x * distance, unit_y * distance)
+
+
+def _single_cell_entrances(inp: GenerationInput) -> tuple[str, ...]:
+    """The entrance octants of one village or hamlet, clockwise from north."""
+
+    entrances: set[str] = set()
+    if inp.forced_gates:
+        entrances.update(inp.forced_gates)
+    elif inp.road_contacts:
+        centre = inp.location.cell
+        for contact in inp.road_contacts:
+            octant = bearing(contact[0] - centre[0], contact[1] - centre[1])
+            if octant is not None:
+                entrances.add(octant)
+    elif inp.location.kind == "village":
+        raise GenerationError(
+            f"{inp.map_id}: no_road: no road cell touches the village cell"
+        )
+    else:
+        for octant in _gate_bearings(inp):
+            delta_x, delta_y = OCTANT_VECTORS[octant]
+            neighbour = (
+                inp.location.cell[0] + delta_x,
+                inp.location.cell[1] + delta_y,
+            )
+            if inp.terrain.walkable(neighbour) and neighbour not in inp.blocked:
+                entrances.add(octant)
+                break
+    if not entrances:
+        raise GenerationError(f"{inp.map_id}: no_gate")
+    return tuple(octant for octant in _ENTRANCE_ORDER if octant in entrances)
+
+
+def _shrine_octant(inp: GenerationInput, entrances: tuple[str, ...]) -> str:
+    """The first free octant clockwise from two steps clockwise of the first entrance."""
+
+    used = set(entrances)
+    if len(entrances) == 1:
+        used.add(OPPOSITE[entrances[0]])
+    start = OCTANTS.index(entrances[0])
+    for step in range(8):
+        octant = OCTANTS[(start - 2 - step) % 8]
+        if octant not in used:
+            return octant
+    raise GenerationError(
+        f"{inp.map_id}: shrine_octant_full: every bearing from the cell is used"
+    )
+
+
+def _single_cell_layout(
+    inp: GenerationInput, entrances: tuple[str, ...]
+) -> tuple[list[tuple[Slot, str | None]], list[tuple[str, str]]]:
+    """The slots of one village or hamlet, with their octants, and its gates.
+
+    Every slot but the anchor stands on its own octant, so the star of roads
+    back to the anchor never gives one node two roads in one direction.
+    """
+
+    labels = SINGLE_CELL_LABELS[(inp.location.kind, _settlement_class(inp))]
+    radius = min(400, max(60, inp.budget.envelope_radius_m))
+
+    def label(name: str, octant: str) -> str:
+        return labels[name].format(octant=OCTANT_ZH[octant])
+
+    placed: list[tuple[Slot, str | None]] = []
+    gates: list[tuple[str, str]] = []
+    if inp.location.kind == "village":
+        placed.append(
+            (Slot("village_green", "anchor", labels["anchor"], (0.0, 0.0)), None)
+        )
+        for octant in entrances:
+            slot_id = f"village_end_{OCTANT_WORDS[octant]}"
+            placed.append(
+                (
+                    Slot(slot_id, "gate", label("end", octant), _toward(octant, radius)),
+                    octant,
+                )
+            )
+            gates.append((OPPOSITE[octant], slot_id))
+        if len(entrances) == 1:
+            opposite = OPPOSITE[entrances[0]]
+            placed.append(
+                (
+                    Slot(
+                        f"village_end_{OCTANT_WORDS[opposite]}",
+                        "end",
+                        label("end", opposite),
+                        _toward(opposite, radius),
+                    ),
+                    opposite,
+                )
+            )
+        shrine = _shrine_octant(inp, entrances)
+        placed.append(
+            (
+                Slot(
+                    "shrine_front",
+                    "role",
+                    labels["role"],
+                    _toward(shrine, radius / 2),
+                ),
+                shrine,
+            )
+        )
+        return placed, gates
+
+    placed.append((Slot("crossing", "anchor", labels["anchor"], (0.0, 0.0)), None))
+    second = entrances[1] if len(entrances) > 1 else OPPOSITE[entrances[0]]
+    placed.append(
+        (
+            Slot(
+                "homestead_front",
+                "role",
+                labels["role"],
+                _toward(second, radius),
+            ),
+            second,
+        )
+    )
+    gates.append((OPPOSITE[entrances[0]], "crossing"))
+    if len(entrances) > 1:
+        gates.append((OPPOSITE[entrances[1]], "homestead_front"))
+    for octant in entrances[2:]:
+        slot_id = f"lane_{OCTANT_WORDS[octant]}"
+        placed.append(
+            (
+                Slot(slot_id, "gate", label("end", octant), _toward(octant, radius)),
+                octant,
+            )
+        )
+        gates.append((OPPOSITE[octant], slot_id))
+    return placed, gates
+
+
+def _single_cell_document_data(
+    inp: GenerationInput,
+    slots: list[Slot],
+    roads: list[tuple[int, int, int]],
+    gates: list[tuple[str, str]],
+    coordinates: list[tuple[int, int]],
+) -> dict[str, Any]:
+    """The document of one village or hamlet: one mask cell, one gate per contact."""
+
+    nodes: dict[str, dict[str, Any]] = {}
+    for slot, (x, y) in zip(slots, coordinates):
+        anchor = slot.role == "anchor"
+        nodes[slot.slot_id] = {
+            "x_m": x,
+            "y_m": y,
+            "prototype_parent": "anchor_room" if anchor else "grid_room",
+            "key": slot.key_zh,
+            "desc": "",
+            "anchor_key": inp.location.location_id if anchor else None,
+            "typeclass": None,
+            "scene_archetype": "city_street",
+        }
+
+    road_rows = [
+        {
+            "source": slots[source].slot_id,
+            "destination": slots[destination].slot_id,
+            "direction": OCTANTS[octant],
+        }
+        for source, destination, octant in roads
+    ]
+
+    return {
+        **_document_fields(inp),
+        "nodes": nodes,
+        "roads": road_rows,
+        "wilderness_entry": {
+            "shape": ["#"],
+            "offset": {"dx": 0, "dy": 0},
+            "single_cell_footprint": True,
+            "gates": [
+                {
+                    "return_direction": return_direction,
+                    "destination_node": destination,
+                }
+                for return_direction, destination in gates
+            ],
+        },
+        "city_gate": None,
+    }
+
+
+def _generate_single_cell(inp: GenerationInput) -> GenerationResult:
+    """Generate the one-cell layout of a village or hamlet."""
+
+    settlement_class = _settlement_class(inp)
+    morphology = "tribal_ring" if settlement_class == "beast_town" else "crossroads"
+    entrances = _single_cell_entrances(inp)
+    placed, gates = _single_cell_layout(inp, entrances)
+    slots = [slot for slot, _octant in placed]
+    coordinates = _node_coordinates(slots, inp.config.margin_m)
+    roads: list[tuple[int, int, int]] = []
+    for index, (_slot, octant) in enumerate(placed):
+        if octant is None:
+            continue
+        roads.append((0, index, OCTANTS.index(octant)))
+        roads.append((index, 0, OCTANTS.index(OPPOSITE[octant])))
+    data = _single_cell_document_data(inp, slots, roads, gates, coordinates)
+
+    relative_path = f"content/maps/settlements/{inp.map_id}.yaml"
+    try:
+        document = document_from_data(relative_path, data)
+    except AuthoringError as error:
+        raise GenerationError(f"{inp.map_id}: invalid_document: {error}") from error
+    findings = lint_settlement(
+        document,
+        inp.location.cell,
+        inp.terrain,
+        road_contacts=None if inp.forced_gates else inp.road_contacts,
+    )
+    errors = sorted(
+        {finding.code for finding in findings if finding.severity == "error"}
+    )
+    if errors:
+        raise GenerationError(f"{inp.map_id}: lint_error: {', '.join(errors)}")
+
+    return GenerationResult(
+        map_id=inp.map_id,
+        settlement_class=settlement_class,
+        morphology=morphology,
+        footprint=frozenset({inp.location.cell}),
+        slots=tuple(slots),
+        data=data,
+        warnings=(),
+    )
+
+
 # -- the generator ----------------------------------------------------------------
 
 
 def generate_settlement(inp: GenerationInput) -> GenerationResult:
     """Generate one settlement's coarse street graph and document data."""
+
+    if inp.location.kind in SINGLE_CELL_KINDS:
+        return _generate_single_cell(inp)
 
     rng = random.Random(seed_for(inp.map_id))
     settlement_class = _settlement_class(inp)
