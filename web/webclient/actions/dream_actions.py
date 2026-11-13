@@ -88,7 +88,9 @@ def adapter(action, actor, payload, session=None):
 
 def register_actions(registry):
     from web.webclient.actions.registry import ActionSpec
-    for action in ("choose_thread", "say", "draft", "confirm", "awaken"):
+    # ``finalize`` needs no content of its own, so the shared exact-key check
+    # already validates it as session_id plus revision.
+    for action in ("choose_thread", "say", "finalize", "draft", "confirm", "awaken"):
         registry.register(ActionSpec(
             "dream." + action, partial(validate, action), partial(adapter, action), ("dream",),
         ))

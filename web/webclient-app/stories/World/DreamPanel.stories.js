@@ -12,7 +12,8 @@ export default { title: "World/DreamPanel", component: DreamPanel };
 function fixture(overrides = {}) {
   return {
     session_id: "synthetic-storyboard-dream", revision: 1, completed: 0, remaining: 6,
-    can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
+    can_input: true, can_confirm: false, can_finalize: true, can_choose_thread: true,
+    can_edit: false, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
     opening: "雲海之上矗立著一座純白的王座。王座上的女神面容模糊，卻像一直在等你。積水漫過你的腳踝，湧如泉水的液面映著王座。你可以在這裡商談故事方向，也可以隨時醒來。",
     scene: "", dialogue: "",
@@ -22,6 +23,11 @@ function fixture(overrides = {}) {
     scene_art: dreamDescriptor(),
     direction_parts: [], draft_preferences: null,
     requirements: [], requirement_version: null,
+    // The published stage facts. This storyboard documents the panel that
+    // predates the staged surface, so each frame only has to stay a valid
+    // schema-4 payload: conversing offers the conversation, the cap finalizes.
+    stage: "conversing", drafted: false, thread_id: null, changes: null,
+    proposal: { summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] },
     thread_choices: [{ id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" }],
     track: { version: 1, completed: 0, pleasure: 0, ordinal: 0, level: "平靜", climax_phase: "未達", converging: false },
     sleep: { tick_from: 100, tick_to: 100, seconds: 0, requested_seconds: 0, event_kinds: [] },
@@ -42,12 +48,24 @@ const render = (args) => ({
         note.value = "已收到操作意圖，請選擇成功或拒絕發布。";
         if (action === "dream.say") {
           state.pending = true;
-          state.can_input = false;
           state.revision += 1;
+          syncStageFlags();
         }
         return "synthetic-storyboard-request";
       },
     };
+    // Every fabricated frame stays a legal schema-4 payload: the stage decides
+    // which flags a surface may offer, so each synthetic transition re-derives
+    // the set instead of leaving a stale one behind.
+    function syncStageFlags() {
+      const conversing = state.stage === "conversing";
+      state.can_input = state.open && conversing && state.remaining > 0 && !state.pending;
+      state.can_finalize = state.open && conversing && !state.pending;
+      state.can_choose_thread = state.open && conversing && !state.pending;
+      state.can_edit = state.open && state.stage === "finalized";
+      state.can_confirm = state.open && state.stage === "finalized";
+      state.can_draft = state.open;
+    }
     function publishSuccess() {
       if (!intent.value) { note.value = "請先提交操作意圖。"; return; }
       const { action, payload } = intent.value;
@@ -71,29 +89,30 @@ const render = (args) => ({
       if (action === "dream.confirm" || action === "dream.awaken") {
         state.open = false;
         state.confirmed = action === "dream.confirm";
-        state.can_confirm = false;
-        state.can_draft = false;
         state.ending = "合成結尾：夢境淡去，你醒了。";
       }
       state.pending = false;
       state.failure = false;
-      state.can_input = state.open && state.remaining > 0;
       state.revision += 1;
+      syncStageFlags();
       note.value = "已發布合成成功結果；睡眠結果仍為 100 → 100。";
       intent.value = null;
     }
     function publishFailure() {
       state.pending = false;
       state.failure = true;
-      state.can_input = state.open && state.remaining > 0;
       state.revision += 1;
+      syncStageFlags();
       note.value = "已發布合成拒絕／生成失敗，交流次數不變，仍可儲存草稿或醒來。";
       intent.value = null;
     }
     function publishCap() {
-      Object.assign(state, { completed: 6, remaining: 0, can_input: false, pending: false });
+      Object.assign(state, {
+        completed: 6, remaining: 0, pending: false, stage: "finalized", drafted: true,
+      });
       Object.assign(state.track, { completed: 6, pleasure: 100, ordinal: 4, level: "極限", converging: true });
       state.revision += 1;
+      syncStageFlags();
       intent.value = null;
       note.value = "已發布合成六次上限，自由文字關閉，離開操作仍可使用。";
     }
@@ -130,9 +149,11 @@ export const Storyboard = { render };
 export const Conversing = { render, args: conversing };
 export const Converging = { render, args: { ...conversing, completed: 5, remaining: 1,
   track: { version: 1, completed: 5, pleasure: 86, ordinal: 3, level: "高度", climax_phase: "接近", converging: true } } };
-export const Pending = { render, args: { ...conversing, pending: true, can_input: false } };
+export const Pending = { render, args: { ...conversing, pending: true, can_input: false,
+  can_finalize: false, can_choose_thread: false } };
 export const Failed = { render, args: { ...conversing, failure: true } };
-export const Drafted = { render, args: { ...conversing, direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
+export const Drafted = { render, args: { ...conversing, drafted: true,
+  direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
   draft_preferences: { kind: "thread_direction", thread_id: thread.id, themes: ["重逢", "信任"], atmosphere: ["靜謐"], exclusions: ["暴力"] } } };
 const requirements = [
   { kind: "place", text: "北境的雪原" },
@@ -143,6 +164,7 @@ export const RequirementsProposed = { render, args: { ...conversing, requirement
 export const RequirementsShown = { render, args: { ...conversing, requirements,
   requirement_version: "synthetic-storyboard-dream:v2" } };
 export const AtCap = { render, args: { ...conversing, completed: 6, remaining: 0, can_input: false,
+  stage: "finalized", can_confirm: true, can_finalize: false, can_choose_thread: false, can_edit: true,
   direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
   dialogue: "「……帶著它醒來吧。」",
   track: { version: 1, completed: 6, pleasure: 100, ordinal: 4, level: "極限", climax_phase: "餘韻", converging: true } } };

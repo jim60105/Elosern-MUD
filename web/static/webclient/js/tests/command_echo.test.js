@@ -296,6 +296,19 @@ test("dream.choose_thread resolves to the typed thread line", () => {
   );
 });
 
+test("dream.finalize resolves to the typed finalize line", () => {
+  // Closing the conversation carries no content, so the line names only the
+  // typed command the text client adds for the same act.
+  assert.strictEqual(
+    Echo.commandLine(
+      "dream.finalize",
+      { session_id: "session:synthetic-dream", revision: 1 },
+      {},
+    ),
+    "dream finalize",
+  );
+});
+
 test("guild.quest_accept resolves to guild accept <definition_key>", () => {
   assert.strictEqual(
     Echo.commandLine("guild.quest_accept", { definition_key: "gq_bandit_clear" }, {}),
@@ -686,6 +699,10 @@ const REGISTERED_MUTATION_ACTIONS = {
   // its typed-command echo.
   "dream.choose_thread": {
     payload: { session_id: "session:synthetic-dream", revision: 1, thread_id: "t_synthetic_thread" },
+    display: {},
+  },
+  "dream.finalize": {
+    payload: { session_id: "session:synthetic-dream", revision: 1 },
     display: {},
   },
   "dream.say": {

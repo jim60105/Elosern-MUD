@@ -11,7 +11,11 @@ from web.webclient.presentation.registry import PanelUnavailableError
 # shared artwork validator (and the client's own mirror of it) accepts, so the
 # dream stage resolves and renders its artwork exactly like every other scene
 # surface. No old-shape field survives: a raw URL string fails the wire.
-DREAM_SCHEMA_VERSION = 3
+# v4 publishes the two-stage wish: the session stage, the working proposal, the
+# last settled change report, the chosen thread and the flags a surface offers
+# per stage. The stage-3 keys stay until the change-report stage removes them,
+# so this version is additive on the server and a strict superset on the wire.
+DREAM_SCHEMA_VERSION = 4
 
 
 def dream_presenter(context):

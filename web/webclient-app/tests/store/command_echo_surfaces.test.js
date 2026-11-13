@@ -851,6 +851,17 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "dream thread t_synthetic_thread",
     },
     {
+      id: "dream finalize echoes the typed finalize line",
+      ids: ["dream.finalize"],
+      prepare() {
+        openExploration();
+        const payload = { session_id: "session:synthetic-dream", revision: 1 };
+        store.dispatchAction("dream.finalize", payload);
+        expect(sender.sent.actions[0].payload).toEqual(payload);
+      },
+      expected: "dream finalize",
+    },
+    {
       id: "dream draft echoes the typed draft line",
       ids: ["dream.draft"],
       prepare() {

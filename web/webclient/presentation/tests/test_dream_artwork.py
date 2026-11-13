@@ -1,4 +1,4 @@
-"""Dream panel wire v3: the canonical scene descriptor and its actor binding.
+"""Dream panel wire v4: the canonical scene descriptor and its actor binding.
 
 Change ``unified-dream-rendering``. The dream stage's artwork is the SAME
 canonical scene descriptor every other scene surface carries, so the panel's
@@ -9,9 +9,18 @@ the presenter's published payload validates under the canonical validator, the
 descriptor's field set is exactly the shared vocabulary, the descriptor is bound
 to THIS actor's own logical dream subject, and the retired raw-URL shapes are
 refused instead of adapted.
+
+v4 publishes the two-stage wish with its working proposal and last change
+report, so this module also proves the aggregate envelope: the largest legal
+state the applier's budgets admit, carried with every per-field bound at its
+own ceiling, still fits the protocol's canonical JSON limit and is accepted by
+the shipped client validator.
 """
 
+import json
+import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -32,9 +41,105 @@ from web.webclient.presentation.registry import (
     build_production_registry,
 )
 from world.art import descriptors
+from world.narrative import dream_proposal
+from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
+from world.narrative.threads import create_thread
 
 _UNSET = object()
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+# The shipped client validator decides acceptance for every payload below: the
+# envelope proof is only complete if the client can render what the server
+# publishes (same bridge as web/webclient/presentation/tests/test_area_map).
+_JS_ACCEPTS = """
+const fs = require('node:fs');
+const protocol = require('./web/static/webclient/js/elosern/protocol.js');
+const payload = JSON.parse(fs.readFileSync(0, 'utf8'));
+try { protocol.validatePanel('dream', 4, payload); process.stdout.write('ok'); }
+catch (error) { process.stdout.write('no:' + error.message); }
+"""
+
+
+def _accepted_by_client(payload):
+    """('ok' | 'no:<reason>', stderr) for one dream panel payload."""
+    result = subprocess.run(
+        ["node", "-e", _JS_ACCEPTS],
+        input=json.dumps(payload, ensure_ascii=False),
+        text=True,
+        capture_output=True,
+        cwd=REPO_ROOT,
+        check=False,
+        timeout=120,
+    )
+    return result.stdout.strip(), result.stderr.strip()
+
+
+def _canonical_bytes(value):
+    """The applier's own canonical JSON measure of a proposal or report."""
+    return len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+
+def _filler_item(index):
+    """One bounded, distinct list item at the item bound (worst-case bytes)."""
+    prefix = f"{index:02d}："
+    return prefix + "念" * (dream_proposal.MAX_ITEM_CHARACTERS - len(prefix))
+
+
+def _bounded_proposal():
+    """The working proposal closest under ``MAX_PROPOSAL_BYTES``."""
+    proposal = dream_proposal.empty_proposal()
+    proposal["summary"] = "夢" * dream_proposal.MAX_SUMMARY_CHARACTERS
+    proposal["requirements"] = [
+        {
+            "kind": dream_proposal.REQUIREMENT_KINDS[index % len(dream_proposal.REQUIREMENT_KINDS)],
+            "text": f"{index:02d}：" + "約" * (dream_proposal.MAX_REQUIREMENT_TEXT - 3),
+        }
+        for index in range(dream_proposal.MAX_REQUIREMENTS)
+    ]
+    for field in dream_proposal.LIST_FIELDS:
+        index = 0
+        while len(proposal[field]) < dream_proposal.MAX_LIST_ITEMS:
+            candidate = {**proposal, field: [*proposal[field], _filler_item(index)]}
+            try:
+                dream_proposal.normalize_proposal(candidate)
+            except dream_proposal.ProposalEditError:
+                break
+            proposal = candidate
+            index += 1
+    return dream_proposal.normalize_proposal(proposal)
+
+
+def _bounded_report():
+    """The change report closest under ``MAX_CHANGES_BYTES``."""
+    report = {
+        "summary": "changed",
+        "lists": {
+            field: {"added": [], "removed": []} for field in dream_proposal.LIST_FIELDS
+        },
+        "requirements": {"added": [], "removed": []},
+    }
+    index = 0
+    for field in dream_proposal.LIST_FIELDS:
+        for half in ("added", "removed"):
+            while len(report["lists"][field][half]) < dream_proposal.MAX_LIST_ITEMS:
+                candidate = {
+                    "summary": report["summary"],
+                    "lists": {
+                        name: {part: list(entry[part]) for part in ("added", "removed")}
+                        for name, entry in report["lists"].items()
+                    },
+                    "requirements": {
+                        part: [dict(row) for row in report["requirements"][part]]
+                        for part in ("added", "removed")
+                    },
+                }
+                candidate["lists"][field][half].append(_filler_item(index))
+                if _canonical_bytes(candidate) > dream_proposal.MAX_CHANGES_BYTES:
+                    break
+                report = candidate
+                index += 1
+    return report
 
 
 class DreamArtworkWireTest(EvenniaTest):
@@ -100,11 +205,11 @@ class DreamArtworkWireTest(EvenniaTest):
     @covers_requirement(
         "webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork"
     )
-    def test_the_dream_panel_ships_the_canonical_descriptor_at_schema_three(self):
+    def test_the_dream_panel_ships_the_canonical_descriptor_at_schema_four(self):
         self.entered(self.actor)
         payload = self.render()
         self.assertEqual(payload["schema_version"], DREAM_SCHEMA_VERSION)
-        self.assertEqual(DREAM_SCHEMA_VERSION, 3)
+        self.assertEqual(DREAM_SCHEMA_VERSION, 4)
         descriptor = payload["state"]["scene_art"]
         # The published descriptor IS valid under the canonical validator: the
         # server read model and the active wire validator agree on one shape.
@@ -200,6 +305,74 @@ class DreamArtworkWireTest(EvenniaTest):
         with patch("server.dream_service.dream_state", return_value=malformed):
             with self.assertRaises(ProtocolValidationError):
                 dream_presenter(self.context())
+
+    def publish_largest_wish(self):
+        """Write the largest legal wish and every offered thread label."""
+        value = surface.association(self.actor)
+        value["proposal"] = _bounded_proposal()
+        value["changes"] = _bounded_report()
+        value["scene"] = "雲" * 2048
+        value["dialogue"] = "夢" * 2048
+        self.actor.db.dream_surface = value
+        for index in range(32):
+            create_thread(
+                thread_id=f"synthetic-envelope-thread-{index}",
+                origin=f"synthetic-envelope-origin-{index}",
+                participants=[str(self.actor.pk)],
+                # The offered label ceiling, in the widest UTF-8 encoding.
+                factual_summary=f"{index:02d}：" + "線" * 157,
+            )
+
+    @covers_requirement(
+        "webclient-dream-stage::the-dream-is-a-full-stage-avg-scene-over-its-official-artwork"
+    )
+    def test_the_largest_legal_wish_fits_the_envelope(self):
+        # The aggregate proposal and report budgets are only useful if the
+        # largest panel they admit still travels: one byte more in either
+        # budget widens this payload past the protocol ceiling.
+        self.entered(self.actor)
+        self.publish_largest_wish()
+        state = self.render()["state"]
+        self.assertLessEqual(
+            _canonical_bytes(state["proposal"]), dream_proposal.MAX_PROPOSAL_BYTES
+        )
+        self.assertLessEqual(
+            _canonical_bytes(state["changes"]), dream_proposal.MAX_CHANGES_BYTES
+        )
+        self.assertEqual(len(state["thread_choices"]), 32)
+        self.assertEqual(len(state["scene"]), 2048)
+        self.assertEqual(len(state["dialogue"]), 2048)
+        self.assertEqual(state["stage"], lifecycle.STAGE_CONVERSING)
+
+        open_payload = self.render()
+        self.assertLessEqual(json_byte_size(open_payload), MAX_CANONICAL_JSON_BYTES)
+        # The panel sits at the envelope: less room is left than one more
+        # bounded list item costs, so raising either aggregate budget far
+        # enough to admit another item overflows the ceiling.
+        self.assertLessEqual(
+            MAX_CANONICAL_JSON_BYTES - json_byte_size(open_payload),
+            len(json.dumps(_filler_item(0), ensure_ascii=False).encode("utf-8")) + 1,
+        )
+        verdict, stderr = _accepted_by_client(open_payload)
+        self.assertEqual(verdict, "ok", stderr)
+
+        # The same budgets with the conversation closed: the ending replaces the
+        # thread choices, and that state still fits and validates.
+        session = surface.associated_session(self.actor)
+        session.completed_exchanges = lifecycle.MAX_EXCHANGES
+        session.stage = lifecycle.STAGE_FINALIZED
+        session.state = lifecycle.STATE_ENDED
+        session.save(
+            update_fields=["completed_exchanges", "stage", "state", "updated_at"]
+        )
+        closed_payload = self.render()
+        closed_state = closed_payload["state"]
+        self.assertEqual(closed_state["stage"], lifecycle.STAGE_FINALIZED)
+        self.assertIn("醒了", closed_state["ending"])
+        self.assertEqual(closed_state["thread_choices"], [])
+        self.assertLessEqual(json_byte_size(closed_payload), MAX_CANONICAL_JSON_BYTES)
+        verdict, stderr = _accepted_by_client(closed_payload)
+        self.assertEqual(verdict, "ok", stderr)
 
     def test_an_anonymous_context_is_unavailable(self):
         with self.assertRaises(PanelUnavailableError):
