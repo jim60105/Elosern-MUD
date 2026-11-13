@@ -21,6 +21,7 @@ from evennia.utils.test_resources import EvenniaTest
 
 from elosern_map_core.documents import QualifiedRef
 from elosern_map_core.sparse import SparseNode, SparseSettlementGraph
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import InstanceRoom, TerrainRoom
@@ -170,6 +171,9 @@ class MetPersonRecordTests(EvenniaTest):
         npc.db.portrait_policy = {"mode": "generic"}
         return npc
 
+    @covers_requirement(
+        "met-person-record::each-character-owns-one-met-person-record-keyed-by-portrait-stable-key"
+    )
     def test_a_named_npc_is_recorded_once(self):
         npc = self._npc(self.start)
         self._set_tick(10)
@@ -191,12 +195,18 @@ class MetPersonRecordTests(EvenniaTest):
         self.assertEqual(set(stored["entries"]), {NAMED_KEY})
         self.assertEqual((stored["seq"], stored["entries"][NAMED_KEY]["tick"]), (2, 25))
 
+    @covers_requirement(
+        "met-person-record::each-character-owns-one-met-person-record-keyed-by-portrait-stable-key"
+    )
     def test_a_generic_npc_is_not_recorded(self):
         npc = self._generic_npc(self.start)
         record_person_interaction(self.char1, npc)
         self.assertIsNone(self.char1.attributes.get(MET_PEOPLE_ATTRIBUTE))
         self.assertEqual(met_people(self.char1), ())
 
+    @covers_requirement(
+        "met-person-record::each-character-owns-one-met-person-record-keyed-by-portrait-stable-key"
+    )
     def test_records_belong_to_their_character(self):
         other = create_object(PlayerCharacter, key="t_other_char", location=self.start)
         other.account = self.char1.account
@@ -206,6 +216,9 @@ class MetPersonRecordTests(EvenniaTest):
         self.assertEqual(met_people(other), ())
         self.assertIsNone(other.attributes.get(MET_PEOPLE_ATTRIBUTE))
 
+    @covers_requirement(
+        "met-person-record::the-place-is-the-settlement-else-the-wilderness-region"
+    )
     def test_moving_inside_a_settlement_keeps_the_place(self):
         npc = self._npc(self.start)
         self._set_tick(10)
@@ -218,6 +231,9 @@ class MetPersonRecordTests(EvenniaTest):
         self.assertEqual(person.place, f"{PLACE_SETTLEMENT}:{Z_MAP_KEY}")
         self.assertEqual((person.tick, person.seq), (40, 2))
 
+    @covers_requirement(
+        "met-person-record::the-place-is-the-settlement-else-the-wilderness-region"
+    )
     def test_a_wilderness_interaction_records_the_region(self):
         terrain = create_object(TerrainRoom, key="t_terrain", location=None)
         terrain.ndb.active_coordinates = (7, 9)
@@ -230,6 +246,9 @@ class MetPersonRecordTests(EvenniaTest):
 
         self.assertEqual(met_people(self.char1)[0].place, f"{PLACE_REGION}:{REGION_KEY}")
 
+    @covers_requirement(
+        "met-person-record::the-place-is-the-settlement-else-the-wilderness-region"
+    )
     def test_an_unknown_place_keeps_the_stored_place(self):
         npc = self._npc(self.start)
         self._set_tick(10)
@@ -248,6 +267,9 @@ class MetPersonRecordTests(EvenniaTest):
         self.assertIsNone(self.char1.attributes.get(MET_PEOPLE_ATTRIBUTE))
         self.assertEqual(met_people(self.char1), ())
 
+    @covers_requirement(
+        "met-person-record::possessed-interactions-are-recorded-for-the-owning-character"
+    )
     def test_the_owner_receives_a_possessed_interaction(self):
         companion = create_object(NPC, key="t_companion", location=self.start)
         join_party(companion, self.char1)
@@ -272,6 +294,9 @@ class MetPersonRecordTests(EvenniaTest):
         self.assertIsNone(self.char2.attributes.get(MET_PEOPLE_ATTRIBUTE))
         self.assertIsNone(companion.attributes.get(MET_PEOPLE_ATTRIBUTE))
 
+    @covers_requirement(
+        "met-person-record::vanished-npcs-are-skipped-on-read-and-dropped-on-write"
+    )
     def test_a_deleted_npc_disappears_from_reads_and_the_next_write(self):
         npc = self._npc(self.start)
         record_person_interaction(self.char1, npc)
@@ -286,6 +311,9 @@ class MetPersonRecordTests(EvenniaTest):
         stored = self.char1.attributes.get(MET_PEOPLE_ATTRIBUTE)
         self.assertEqual(set(stored["entries"]), {OTHER_NAMED_KEY})
 
+    @covers_requirement(
+        "met-person-record::vanished-npcs-are-skipped-on-read-and-dropped-on-write"
+    )
     def test_an_npc_that_loses_its_named_policy_is_dropped(self):
         npc = self._npc(self.start)
         record_person_interaction(self.char1, npc)
@@ -300,6 +328,9 @@ class MetPersonRecordTests(EvenniaTest):
         stored = self.char1.attributes.get(MET_PEOPLE_ATTRIBUTE)
         self.assertEqual(set(stored["entries"]), {OTHER_NAMED_KEY})
 
+    @covers_requirement(
+        "met-person-record::the-place-is-the-settlement-else-the-wilderness-region"
+    )
     def test_an_instance_room_resolves_one_level_through_its_origin(self):
         instance = create_object(InstanceRoom, key="t_instance", location=None)
         self.assertIsNone(interaction_place(instance))
