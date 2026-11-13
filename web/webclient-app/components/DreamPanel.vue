@@ -1142,9 +1142,10 @@ function onKeydown(event) {
 /* 停止訴說 */
 .dream-confirm--take { width: min(calc(500px * var(--ui-scale)), 44vw); }
 .dream-confirm .dream-confirm__cost { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-left: 2px solid var(--warn); background: rgba(199, 154, 74, 0.1); color: var(--paper-100); }
-.dream-pip--forfeit { animation: dream-forfeit 1.8s ease-in-out infinite; }
-.dream-pip--forfeit:nth-child(2) { animation-delay: 0.12s; } .dream-pip--forfeit:nth-child(3) { animation-delay: 0.24s; }
-.dream-pip--forfeit:nth-child(4) { animation-delay: 0.36s; } .dream-pip--forfeit:nth-child(5) { animation-delay: 0.48s; }
+/* The pips that would go unused breathe in a wave, at the motion level's pace. */
+.dream-pip--forfeit { animation: dream-forfeit var(--motion-marker-bob) ease-in-out infinite; }
+.dream-pip--forfeit:nth-child(2) { animation-delay: calc(var(--motion-stagger) * 3); } .dream-pip--forfeit:nth-child(3) { animation-delay: calc(var(--motion-stagger) * 6); }
+.dream-pip--forfeit:nth-child(4) { animation-delay: calc(var(--motion-stagger) * 9); } .dream-pip--forfeit:nth-child(5) { animation-delay: calc(var(--motion-stagger) * 12); }
 @keyframes dream-forfeit { 50% { background: transparent; box-shadow: inset 0 0 0 1px var(--paper-700); } }
 
 /* 斟酌: the fixed thread. */
