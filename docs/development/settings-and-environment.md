@@ -204,7 +204,7 @@ profile 欄位保持未設定（`None`，不會存 0）。無效值讓每個 Eve
 | `LLM_REASONING_STYLE` | `LLM_PROFILES[*].reasoning_style` | 選擇 | `openrouter` | 閉集合 `openrouter/vllm/off`（不分大小寫） |
 | `LLM_MAX_COMPLETION_TOKENS` | `LLM_PROFILES[*].max_completion_tokens` | 可省略整數 | 省略 | 正整數；空白＝省略 |
 | `LLM_MAX_TOKENS` | `LLM_PROFILES[*].max_tokens` | 整數 | `250`（`title_nomination` 640、`scenario_director` 8192、`story_director` 1536、`dialogue_summary` 與 `correspondence` 1024、`dream` 3072） | 正整數；未設定時各層保留自己的程式碼預設值 |
-| `LLM_TIMEOUT_SECONDS` | `LLM_PROFILES[*].timeout_seconds` | 整數 | `60` | 正整數 |
+| `LLM_TIMEOUT_SECONDS` | `LLM_PROFILES[*].timeout_seconds` | 整數 | `60`（`dream` 180、`scenario_director` 與 `story_director` 300） | 正整數；未設定時各層保留自己的程式碼預設值 |
 | `LLM_MAX_RETRIES` | `LLM_PROFILES[*].max_retries` | 整數 | `2` | 非負整數 |
 | `LLM_SUPPORTS_RESPONSE_FORMAT` | `LLM_PROFILES[*].supports_response_format` | 布林字 | `False` | 布林字彙表 |
 | `LLM_ENABLED` | `LLM_PROFILES[*].enabled` | 布林字 | `True` | 布林字彙表；False 的層直接走降級路徑、不發請求 |

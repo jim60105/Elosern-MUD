@@ -43,6 +43,16 @@ DREAM_MAX_TOKENS = 3072
 # 600 code points (story-director-beats) plus its small JSON envelope; 1,536
 # leaves headroom at a conservative 2 tokens per code point.
 STORY_DIRECTOR_MAX_TOKENS = 1536
+# The one-minute default only fits the short-output layers. A layer whose own
+# output budget runs into the thousands of tokens — a complete occupant-card
+# quest blueprint (8,192), the dream collaborator's prose plus counterpart
+# dialogue (3,072), a reasoning-enabled beat proposal — cannot finish inside
+# it, and the guardrail degrades a timed-out call instead of retrying it. These
+# budgets stay finite so a genuinely hung endpoint still releases the
+# single-flight dispatch pump.
+DREAM_TIMEOUT_SECONDS = 180
+SCENARIO_DIRECTOR_TIMEOUT_SECONDS = 300
+STORY_DIRECTOR_TIMEOUT_SECONDS = 300
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_MAX_RETRIES = 2
 DEFAULT_HEADERS: Mapping[str, tuple[str, ...]] = MappingProxyType(
@@ -275,7 +285,9 @@ def default_profiles(
     ``defaults``. ``supports_response_format`` defaults false because design §7.5 only
     requests structured output when the endpoint declares support.
     ``title_nomination``, ``scenario_director`` and ``story_director`` carry
-    their own larger output budgets.
+    their own larger output budgets; the long-output ``dream``,
+    ``scenario_director`` and ``story_director`` layers also carry a wall-clock
+    budget wide enough for those budgets to finish.
     """
     profiles = {
         layer: {
@@ -307,14 +319,17 @@ def default_profiles(
     profiles["dream"] = {
         **profiles["dream"],
         "max_tokens": DREAM_MAX_TOKENS,
+        "timeout_seconds": DREAM_TIMEOUT_SECONDS,
     }
     profiles["scenario_director"] = {
         **profiles["scenario_director"],
         "max_tokens": SCENARIO_DIRECTOR_MAX_TOKENS,
+        "timeout_seconds": SCENARIO_DIRECTOR_TIMEOUT_SECONDS,
     }
     profiles["story_director"] = {
         **profiles["story_director"],
         "max_tokens": STORY_DIRECTOR_MAX_TOKENS,
+        "timeout_seconds": STORY_DIRECTOR_TIMEOUT_SECONDS,
     }
     if defaults is not None:
         for layer, overrides in defaults.items():

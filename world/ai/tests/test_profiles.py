@@ -375,6 +375,15 @@ class RegistryTests(unittest.TestCase):
             else:
                 self.assertFalse(profiles[layer].supports_response_format)
                 self.assertEqual(profiles[layer].max_tokens, 250)
+            # The wall clock must cover the layer's own output budget: the
+            # long-output layers keep their wider default instead of the
+            # short-layer minute.
+            if layer in ("scenario_director", "story_director"):
+                self.assertEqual(profiles[layer].timeout_seconds, 300)
+            elif layer == "dream":
+                self.assertEqual(profiles[layer].timeout_seconds, 180)
+            else:
+                self.assertEqual(profiles[layer].timeout_seconds, 60)
 
     @covers_requirement("llm-profiles::default-profiles-are-injected-not-environment-read")
     def test_injected_defaults_merge_over_code_defaults(self):

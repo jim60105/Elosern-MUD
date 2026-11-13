@@ -43,7 +43,7 @@ flowchart LR
 | :--- | :---: | :---: | :--- |
 | `BASE_URL` | URL 字串 | `http://127.0.0.1:11434` | OpenAI 相容 API 根位址（Compose 容器內預設為指向宿主機閘道器）。 |
 | `PATH` | 字串 | `/v1/chat/completions` | Chat Completions 端點路徑。 |
-| `TIMEOUT_SECONDS` | 整數 | `60` | 單次 HTTP 請求的牆鐘截止秒數（正整數）。 |
+| `TIMEOUT_SECONDS` | 整數 | 視層級而定 | 單次 HTTP 請求的牆鐘截止秒數（正整數；一般層 60，`dream` 180，`scenario_director` 與 `story_director` 300）。逾時會直接走降級、不重試，因此啟用思考推理時應同步調高此值。 |
 | `API_KEY` | 字串 | 空（未設定） | 認證 Bearer Token。非空時自動附帶 `Authorization: Bearer <KEY>`。 |
 | `APP_TITLE` | 字串 | 空（未設定） | OpenRouter 統計用識別標頭（`X-Title`）。 |
 | `APP_URL` | 字串 | 空（未設定） | OpenRouter 統計用來源網址（`HTTP-Referer`）。 |

@@ -179,6 +179,8 @@ LLM_KNOBS: tuple[LlmKnob, ...] = (
             "dialogue_summary": 1024,
             "correspondence": 1024,
             "dream": 3072,
+            "scenario_director": 8192,
+            "story_director": 1536,
         },
     ),
     LlmKnob(
@@ -188,6 +190,13 @@ LLM_KNOBS: tuple[LlmKnob, ...] = (
         60,
         minimum=0,
         rule="expected a positive integer",
+        # The short-layer minute cannot cover the long-output layers' own token
+        # budgets; mirrors world/ai/profiles.default_profiles.
+        layer_defaults={
+            "dream": 180,
+            "scenario_director": 300,
+            "story_director": 300,
+        },
     ),
     LlmKnob(
         "max_retries",

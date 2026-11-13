@@ -26,6 +26,7 @@ from server.conf.llm_knobs import (
 )
 
 from tools.spec_traceability import covers_requirement
+from world.ai.profiles import build_profiles, default_profiles
 
 REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -173,6 +174,17 @@ class KnobTableTests(unittest.TestCase):
         self.assertEqual(len(set(fields)), 23)
         self.assertEqual(frozenset(f"LLM_{s}" for s in suffixes), DOCUMENTED_GLOBAL_NAMES)
 
+    def test_layer_defaults_mirror_the_profile_registry(self):
+        """The inert default table and the profile defaults never disagree."""
+        profiles = build_profiles(default_profiles())
+        for layer in LAYER_NAMES:
+            for knob in LLM_KNOBS:
+                with self.subTest(layer=layer, field=knob.field):
+                    self.assertEqual(
+                        getattr(profiles[layer], knob.field),
+                        knob.layer_default(layer),
+                    )
+
 
 class DefaultBootTests(_LlmSubprocessTests):
     @covers_requirement(
@@ -192,6 +204,9 @@ class DefaultBootTests(_LlmSubprocessTests):
             ("narrator", "reasoning_enabled"),
             ("narrator", "api_key"),
             ("title_nomination", "max_tokens"),
+            ("dream", "timeout_seconds"),
+            ("scenario_director", "timeout_seconds"),
+            ("story_director", "timeout_seconds"),
         ]
         printed = self._fields(wanted)
         self.assertEqual(printed[("narrator", "base_url")], repr("http://127.0.0.1:11434"))
@@ -207,6 +222,11 @@ class DefaultBootTests(_LlmSubprocessTests):
         self.assertEqual(printed[("narrator", "reasoning_enabled")], "'<ABSENT>'")
         self.assertEqual(printed[("narrator", "api_key")], "'<ABSENT>'")
         self.assertEqual(printed[("title_nomination", "max_tokens")], "640")
+        # Each long-output layer keeps its own wall clock instead of the
+        # short-layer minute, so a reasoning call is not cut off mid-generation.
+        self.assertEqual(printed[("dream", "timeout_seconds")], "180")
+        self.assertEqual(printed[("scenario_director", "timeout_seconds")], "300")
+        self.assertEqual(printed[("story_director", "timeout_seconds")], "300")
 
     @covers_requirement(
         "settings-environment-overrides::environment-inventory-and-configuration-guide-are-version-controlled-and-exact"
@@ -419,6 +439,22 @@ class PrecedenceTests(_LlmSubprocessTests):
         self.assertEqual(printed[("dialogue_summary", "max_tokens")], "400")
         self.assertEqual(printed[("title_nomination", "max_tokens")], "640")
         self.assertEqual(printed[("narrator", "max_tokens")], "250")
+
+    @covers_requirement(
+        "settings-environment-overrides::llm-profile-knobs-accept-global-and-per-layer-environment-overrides"
+    )
+    def test_per_layer_timeout_override_preserves_other_layers(self):
+        printed = self._fields(
+            [
+                ("story_director", "timeout_seconds"),
+                ("scenario_director", "timeout_seconds"),
+                ("narrator", "timeout_seconds"),
+            ],
+            LLM_STORY_DIRECTOR_TIMEOUT_SECONDS="45",
+        )
+        self.assertEqual(printed[("story_director", "timeout_seconds")], "45")
+        self.assertEqual(printed[("scenario_director", "timeout_seconds")], "300")
+        self.assertEqual(printed[("narrator", "timeout_seconds")], "60")
 
 
 class TestSettingsSanitizationTests(_LlmSubprocessTests):
