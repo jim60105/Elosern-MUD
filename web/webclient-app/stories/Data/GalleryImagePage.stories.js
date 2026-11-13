@@ -124,7 +124,14 @@ const noImage = { model: galleryStoryModel(GALLERY_V4_MINE_BLANK), pick: () => (
 
 // 刪除 pressed once: the alert warning, 確認刪除 and 取消 (focused).
 async function armDelete({ canvasElement }) {
-  canvasElement.querySelector('[data-testid="gallery-page__delete"]')?.click();
+  for (let frame = 0; frame < 60; frame += 1) {
+    const button = canvasElement.querySelector('[data-testid="gallery-page__delete"]');
+    if (button) {
+      button.click();
+      return;
+    }
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
 }
 
 export const CharacterCard = { ...atReference, args: characterCard };

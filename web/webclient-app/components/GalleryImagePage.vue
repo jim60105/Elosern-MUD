@@ -65,7 +65,11 @@ const imageLabel = computed(() => {
 });
 
 const imageNote = computed(() => {
-  if (type.value === "official") return "唯讀，只能調整個人的臉框與舞台位置。";
+  if (type.value === "official") {
+    // Only a subject whose personal official preferences are declared can
+    // adjust anything; the others keep official images strictly read-only.
+    return capabilities.value?.supports_personal_official_preferences ? "唯讀，只能調整個人的臉框與舞台位置。" : "唯讀。";
+  }
   if (type.value === "card" && capabilities.value?.max_cards === 1) return "只保留一張，重新生成會替換原圖。";
   return null;
 });
@@ -102,6 +106,7 @@ const artAlt = computed(() => (name.value ? `${name.value}・${imageLabel.value}
 
 // ---- footer and the two-step deletion -------------------------------------
 
+const root = ref(null);
 const footerRef = ref(null);
 const armedKey = ref(null);
 const base = computed(() => galleryFooter(props.selection, capabilities.value));
@@ -111,8 +116,19 @@ const armed = computed(() => (
   && base.value.buttons.some((button) => button.key === "delete")
 ));
 
+// Another image disarms. Runs before the patch, while the focused footer
+// button still stands: if focus was in the footer, it moves to the new
+// footer's first button instead of falling to the document.
 watch(selectionKey, () => {
   armedKey.value = null;
+  if (root.value?.querySelector("footer")?.contains(document.activeElement)) {
+    nextTick(() => root.value?.querySelector("footer button")?.focus());
+  }
+});
+
+// A busy host disarms, so the page never comes back already armed.
+watch(() => props.disabled, (busy) => {
+  if (busy) armedKey.value = null;
 });
 
 const footer = computed(() => {
@@ -168,7 +184,7 @@ function onKeydown(event) {
 </script>
 
 <template>
-  <article class="gpage" data-testid="gallery-page" :data-selection="type" @keydown="onKeydown">
+  <article ref="root" class="gpage" data-testid="gallery-page" :data-selection="type" @keydown="onKeydown">
     <div :key="selectionKey" class="gpage__body">
       <figure
         class="gpage__art"

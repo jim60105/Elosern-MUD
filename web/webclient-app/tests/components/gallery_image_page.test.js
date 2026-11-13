@@ -262,6 +262,25 @@ describe("GalleryImagePage (webclient-gallery-image-page)", () => {
       expect(wrapper.emitted("press")).toBeUndefined();
     });
 
+    it("moves focus to the new footer when another image is selected while armed", async () => {
+      await mountPage();
+      await button("delete").trigger("click");
+      await flushPromises();
+      expect(document.activeElement).toBe(button("cancel").element);
+      await wrapper.setProps({ selection: { type: "card", row: card("c2") } });
+      await flushPromises();
+      expect(document.activeElement).toBe(button("delete").element);
+    });
+
+    it("disarms when the host turns busy, so it never returns armed", async () => {
+      await mountPage();
+      await button("delete").trigger("click");
+      await wrapper.setProps({ disabled: true });
+      await wrapper.setProps({ disabled: false });
+      expect(buttonLabels()[0]).toBe("刪除");
+      expect(wrapper.emitted("press")).toBeUndefined();
+    });
+
     it("blocks every press, a second delete included, while the host is busy", async () => {
       await mountPage();
       await button("delete").trigger("click");
@@ -373,6 +392,8 @@ describe("GalleryImagePage (webclient-gallery-image-page)", () => {
       await mountPage({ selection: { type: "official", row: official("o/a.webp") } });
       expect(cell("image").find(".gpage__line").text()).toBe("官方圖片");
       expect(cell("image").text()).toContain("唯讀，只能調整個人的臉框與舞台位置。");
+      await wrapper.setProps({ panel: panel({ capabilities: caps({ supports_personal_official_preferences: false }) }) });
+      expect(cell("image").find(".gpage__text").text()).toBe("唯讀。");
     });
 
     it("says 尚無圖片 for a subject without any image", async () => {
