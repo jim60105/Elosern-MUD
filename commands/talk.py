@@ -33,7 +33,6 @@ from world.rules.dialogue import (
     escape_evennia_greeting,
     is_dialogue_host,
     misunderstood_line_for,
-    open_or_refresh_dialogue,
     live_dialogue_session,
     select_authored_topic,
     resolve_greeting,
@@ -49,6 +48,7 @@ from world.rules.guild import (
     dialogue_turn_in,
     reportable_quest_summary,
 )
+from world.rules.met_people import record_person_interaction
 from world.rules.npc_schedules import interaction_reason
 
 _MISSING_TARGET = "你想跟誰說話？請指定一個目標（talk <npc>）。"
@@ -232,6 +232,11 @@ class CmdsTalk(Command):
             except DialogueContextError:  # observability: ignore R2: the fixed player-facing refusal IS the command answer
                 self.caller.msg(POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK])
                 return
+
+        # The player named this NPC for a talk, so the interaction is recorded
+        # once the presence, schedule and possession gates pass (design D2).
+        # Later keyword and host refusals do not undo the chosen target.
+        record_person_interaction(self.caller, npc)
 
         if keyword:
             kw_parts = keyword.split(maxsplit=1)

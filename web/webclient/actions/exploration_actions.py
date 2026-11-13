@@ -50,6 +50,7 @@ from world.rules.dialogue import (
 from world.rules.dialogue_context import DialogueContextError
 from world.lore.scenes import Speech
 from world.rules.map_knowledge import KnowledgeError, decode_node
+from world.rules.met_people import record_person_interaction
 from world.rules.npc_intents import (
     STALE_CONTEXT_NOTE,
     apply_npc_intent,
@@ -997,6 +998,10 @@ def _talk_scripted_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     reason = interaction_reason(npc, "talk")
     if reason is not None:
         return _rejected("schedule_blocked", reason)
+    # The player named this NPC for a talk, so the interaction is recorded once
+    # the presence and schedule gates pass (design D2). Later topic, possession
+    # and host refusals do not undo the player's chosen target.
+    record_person_interaction(actor, npc)
 
     topic_id = payload.get("topic_id")
     if possessed:
@@ -1127,6 +1132,7 @@ def _talk_open_adapter(actor: Any, payload: dict[str, Any], session: Any = None)
         line = greeting.text
         speech = escape_evennia_greeting(greeting.text) if greeting.is_override else greeting.text
         message = f"{npc.key}說：{speech}"
+    record_person_interaction(actor, npc)
     open_or_refresh_dialogue(actor, npc, line, context=context)
     actor.msg(message)
     return _success("dialogue_opened", message, AFFECTED_FULL)
@@ -1238,6 +1244,8 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
     reason = interaction_reason(npc, "talk")
     if reason is not None:
         return _rejected("schedule_blocked", reason)
+    # A present, eligible freeform host the player chose to address.
+    record_person_interaction(actor, npc)
     from web.webclient.actions.dialogue_composition import build_dialogue_client
 
     client = build_dialogue_client()
@@ -1309,6 +1317,9 @@ def _party_invite_adapter(actor: Any, payload: dict[str, Any], session: Any = No
         from world.rules.party import PARTY_FULL_MESSAGE
 
         return _rejected("party_full", PARTY_FULL_MESSAGE)
+    # The deterministic gate admitted the invitation, so the attempt is
+    # recorded even when the exchange is declined or fails (design D4).
+    record_person_interaction(actor, npc)
     from web.webclient.actions.dialogue_composition import build_dialogue_client
 
     client = build_dialogue_client()
