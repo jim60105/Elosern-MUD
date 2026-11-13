@@ -115,7 +115,9 @@ class WildernessEntryPoint:
 
     @property
     def hash_cell_count(self) -> int:
-        """Number of ``#`` cells in the mask (1 marks the point-shape variant)."""
+        """Number of ``#`` cells in the mask (1 marks the point-shape variant
+        unless ``single_cell_footprint`` makes that cell a footprint)."""
+
         return sum(line.count("#") for line in self.shape)
 
     @property
