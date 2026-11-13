@@ -20,9 +20,9 @@ Run `pnpm run build` and the Storybook commands in `web/webclient-app`; run `pnp
 
 ## 4. Gates
 
-- [ ] 4.1 Run `pnpm exec vitest run tests/dream_farewell.test.js tests/dream.test.js tests/app_client_sleep_handoff.test.js tests/travel/layout.test.js` (from the repository root) and `pnpm run build`; all pass. Do not run the whole `pnpm test` suite.
-- [ ] 4.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-farewell-beat`; both pass.
-- [ ] 4.3 Run `openspec validate dream-farewell-beat --strict`; it passes.
+- [x] 4.1 Run `pnpm exec vitest run tests/dream_farewell.test.js tests/dream.test.js tests/app_client_sleep_handoff.test.js tests/travel/layout.test.js` (from the repository root) and `pnpm run build`; all pass. Do not run the whole `pnpm test` suite.
+- [x] 4.2 Run `uv run --locked python -m tools.test_data_lint check` and `uv run --locked python -m tools.contract_gate --change dream-farewell-beat`; both pass.
+- [x] 4.3 Run `openspec validate dream-farewell-beat --strict`; it passes.
 
 ## Workflow follow-up
 
