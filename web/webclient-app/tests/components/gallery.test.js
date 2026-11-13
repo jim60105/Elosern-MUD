@@ -26,6 +26,8 @@ import {
   GALLERY_V4_MINE_BLANK as GALLERY_EMPTY,
   GALLERY_V4_MONSTER as GALLERY_MONSTER,
   GALLERY_V4_PARTY,
+  GALLERY_V4_SCENE,
+  GALLERY_V4_SCENE_BUNDLED,
 } from "../../stories/gallery-fixtures-v4.js";
 
 const PENDING_INDEX = GALLERY_SAMPLE.cards.findIndex((row) => row.status === "pending");
@@ -476,5 +478,30 @@ describe("official-only artwork and the no-image page", () => {
     expect(pageSelection()).toBe("official");
     expect(officialTrayItems()).toHaveLength(OFFICIAL_ROWS.length);
     expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+// Change gallery-scene-category: the generate drawer of a scene shows the
+// background in effect as its reference and sends no field or free text.
+describe("the generate drawer of a scene", () => {
+  it("references the stored card, else the subject's bundled tile artwork, and submits empty facts", async () => {
+    const generated = mountSurface(GalleryGenerateDrawer, { model: GALLERY_V4_SCENE, preview: GALLERY_V4_SCENE.cards[0] });
+    const scene = generated.get('[data-testid="gallery-generate__scene"]');
+    expect(scene.get("img").attributes("src")).toBe(GALLERY_V4_SCENE.cards[0].artwork.attempts[0].resource.url);
+    expect(generated.find(".gallery-editor-reference").exists()).toBe(false);
+    expect(generated.find("textarea").exists()).toBe(false);
+    await button(generated, "開始生成").trigger("click");
+    expect(generated.emitted("submit")).toEqual([[{ fields: [], custom_prompt: "" }]]);
+
+    const bundled = mountSurface(GalleryGenerateDrawer, { model: GALLERY_V4_SCENE_BUNDLED, preview: null });
+    const tile = GALLERY_V4_SCENE_BUNDLED.groups[0].subjects.find((row) => row.subject_key === GALLERY_V4_SCENE_BUNDLED.selected);
+    const image = bundled.get('[data-testid="gallery-generate__scene"] img');
+    expect(image.attributes("src")).toBe(tile.artwork.attempts[0].resource.url);
+  });
+
+  it("keeps the portrait reference for every other kind", () => {
+    const wrapper = mountSurface(GalleryGenerateDrawer, { model: GALLERY_SAMPLE, preview: null });
+    expect(wrapper.find('[data-testid="gallery-generate__scene"]').exists()).toBe(false);
+    expect(wrapper.find(".gallery-editor-reference").exists()).toBe(true);
   });
 });
