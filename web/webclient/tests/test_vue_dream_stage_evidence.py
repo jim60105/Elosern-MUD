@@ -70,7 +70,10 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
             (
                 'server-authored dream surface > stages the dream with core button chrome, one decisive action, and a keepsake card',
                 'server-authored dream surface > renders the server-resolved scene artwork, degrading on a failed load',
-                'dream stage review coverage > names the dialog, shows the empty invitation, orders rows and maps digits 2 and 3',
+                'server-authored dream surface > shows the bundled dream when the preferred image is absent and the reached fact when every illustration is missing',
+                'server-authored dream surface > recomputes a changed descriptor revision and ignores the retired callback',
+                'server-authored dream surface > mirrors the strict panel schema and truthful command echoes',
+                'dream stage review coverage > names the dialog by its visible title and shows the empty invitation',
             ),
         )
 
@@ -84,6 +87,7 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
                 'server-authored dream surface > stages the dream with core button chrome, one decisive action, and a keepsake card',
                 'server-authored dream surface > reveals a response only on a live exchange increase',
                 'dream stage review coverage > lights the gauge to the ordinal and marks the next pip while composing',
+                'dream stage review coverage > keeps the next pip marked while a response is pending',
             ),
         )
 
@@ -109,42 +113,14 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
         _assert_cases_pass(
             "dream reply bar",
             (
+                'server-authored dream surface > stages the dream with core button chrome, one decisive action, and a keepsake card',
                 'server-authored dream surface > submits exact bounded Unicode message parts on Enter but not Shift+Enter',
                 'server-authored dream surface > ignores Enter while an IME composition is in progress',
-                'server-authored dream surface > keeps confirm/draft/awakening usable at cap, during generation and after failure',
+                'server-authored dream surface > keeps draft and awakening usable at cap, during generation and after failure',
                 'server-authored dream surface > hands the sent words back for a retry after a failed generation',
                 'dream stage review coverage > disables every dream action while the transport is locked and keeps typed text',
-                'dream stage review coverage > captions the converging and final exchange and focuses the carry-out row on a live sixth exchange',
-                'dream stage review coverage > keeps edited thread and chips across a republish and new reply text across a failure',
-            ),
-        )
-
-    @covers_requirement(
-        "webclient-dream-stage::the-keepsake-card-shows-the-念頭-that-would-be-carried-out-and-offers-distinct-exits"
-    )
-    def test_keepsake_card_and_distinct_exits(self):
-        _assert_cases_pass(
-            "dream keepsake card and exits",
-            (
-                'server-authored dream surface > stages the dream with core button chrome, one decisive action, and a keepsake card',
-                'server-authored dream surface > labels the 念頭 provenance and activates rows by digit outside text fields',
-                'server-authored dream surface > keeps confirm/draft/awakening usable at cap, during generation and after failure',
-                'dream stage review coverage > captions the converging and final exchange and focuses the carry-out row on a live sixth exchange',
-                'dream stage review coverage > names the dialog, shows the empty invitation, orders rows and maps digits 2 and 3',
-            ),
-        )
-
-    @covers_requirement(
-        "webclient-dream-stage::the-念頭-sheet-edits-the-direction-in-one-flat-modal-layer"
-    )
-    def test_direction_sheet_flat_modal_layer(self):
-        _assert_cases_pass(
-            "dream 念頭 sheet",
-            (
-                'server-authored dream surface > filters a long thread list and keeps an orphaned saved thread selectable',
-                'server-authored dream surface > uses the latest server revision after reconnect and retains explicit direction for draft/confirm',
-                'server-authored dream surface > edits preference chips and saves a draft that keeps the dream open',
-                'dream stage review coverage > leaves a text field on Escape, focuses the summary on an empty confirm, and makes the stage inert under the sheet',
+                'dream stage review coverage > captions the converging and final exchange and focuses the confirm row on a live sixth exchange',
+                'dream stage review coverage > keeps edited chips across a republish and new reply text across a failure',
             ),
         )
 
@@ -153,12 +129,12 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
     )
     def test_direction_confirmation_validated_locally(self):
         _assert_cases_pass(
-            "dream local direction validation",
+            "dream local wish validation",
             (
-                'server-authored dream surface > refuses an empty carry-out locally and opens the 念頭 sheet',
+                'server-authored dream surface > refuses an empty confirm locally and opens the edit sheet on the summary',
                 'server-authored dream surface > blocks an over-length summary instead of truncating it',
                 'dream stage review coverage > leaves a text field on Escape, focuses the summary on an empty confirm, and makes the stage inert under the sheet',
-                'dream stage review coverage > protects an unsaved 念頭 edit and refuses an over-length draft',
+                'dream stage review coverage > protects an unsaved edit of the finalized wish and refuses an over-length draft',
             ),
         )
 
@@ -169,11 +145,16 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
         _assert_cases_pass(
             "dream Escape and awaken check",
             (
-                'server-authored dream surface > keeps confirm/draft/awakening usable at cap, during generation and after failure',
+                'server-authored dream surface > keeps draft and awakening usable at cap, during generation and after failure',
                 'server-authored dream surface > never awakens on Escape and confirms before discarding unsent words',
                 'server-authored dream surface > edits preference chips and saves a draft that keeps the dream open',
+                'dream stage review coverage > loads a saved finalized proposal on mount as unedited values',
                 'dream stage review coverage > leaves a text field on Escape, focuses the summary on an empty confirm, and makes the stage inert under the sheet',
-                'dream stage review coverage > protects an unsaved 念頭 edit and refuses an over-length draft',
+                'dream stage review coverage > protects an unsaved edit of the finalized wish and refuses an over-length draft',
+                'dream stage review coverage > names what the awaken check would lose and that the wish is kept',
+                'staged keepsake rows > opens the read-only view, asks before finalizing and drafts without content while conversing',
+                'finalize confirmation > names the exchanges given up and rests focus on staying',
+                'thread choice > dispatches a newly chosen thread and returns focus to the reply field',
             ),
         )
 
@@ -182,11 +163,101 @@ class VueDreamStageEvidenceTest(unittest.TestCase):
     )
     def test_republished_drafts_rehydrate_without_overwriting_edits(self):
         _assert_cases_pass(
-            "dream draft rehydration",
+            "dream proposal rehydration",
             (
-                'server-authored dream surface > rehydrates a same-session external draft change without clearing unsent chat',
-                'server-authored dream surface > keeps an unsent direction edit when an exchange republishes the authored direction',
-                'dream stage review coverage > loads saved draft preferences on mount as already saved',
-                'dream stage review coverage > keeps edited thread and chips across a republish and new reply text across a failure',
+                'server-authored dream surface > rehydrates a same-session external proposal change without clearing unsent chat',
+                'server-authored dream surface > keeps an edited summary when the finalized proposal republishes',
+                'dream stage review coverage > loads a saved finalized proposal on mount as unedited values',
+                'dream stage review coverage > loads an unchanged proposal as unedited when the session becomes finalized',
+                'dream stage review coverage > keeps edited chips across a republish and new reply text across a failure',
+                'dream stage review coverage > lets unedited lists follow a republished finalized proposal',
+            ),
+        )
+
+    @covers_requirement(
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements"
+    )
+    def test_confirmation_displays_frozen_experience_requirements(self):
+        _assert_cases_pass(
+            "dream experience requirements",
+            (
+                'shown experience requirements > lists the rows with readable kind labels in the view and the sheet and sends exactly those rows',
+                'shown experience requirements > shows republished rows without clearing unsent words',
+                'finalized edit sheet > sends the same payload shape from both sheet controls',
+            ),
+        )
+
+    # ADDED by dream-wish-stage-panel: "The keepsake card shows the current wish and stage-specific rows". The requirement ID exists
+    # only once the delta is synced at archive, which annotates this method.
+    def test_keepsake_card_shows_wish_and_stage_rows(self):
+        _assert_cases_pass(
+            "dream keepsake card and stage rows",
+            (
+                'server-authored dream surface > stages the dream with core button chrome, one decisive action, and a keepsake card',
+                'staged keepsake rows > opens the read-only view, asks before finalizing and drafts without content while conversing',
+                'staged keepsake rows > opens the edit sheet, drafts and confirms the form when finalized',
+                'staged keepsake rows > holds the finalize row while a response is pending',
+                'staged keepsake rows > activates rows by digit only outside text fields and without modifiers',
+                'staged keepsake rows > marks the thread line locked and names the new, chosen or vanished thread',
+                'staged keepsake rows > shows the draft toast only once a newer committed state reports a saved draft',
+                'dream stage review coverage > captions the converging and final exchange and focuses the confirm row on a live sixth exchange',
+                'dream stage review coverage > focuses the first row on a live sixth exchange without a summary',
+            ),
+        )
+
+    # ADDED by dream-wish-stage-panel: "The whole wish is read-only while conversing". The requirement ID exists
+    # only once the delta is synced at archive, which annotates this method.
+    def test_whole_wish_is_read_only_while_conversing(self):
+        _assert_cases_pass(
+            "dream whole-wish view",
+            (
+                'whole-wish view > renders every proposal field as plain text with placeholders and no form fields',
+                'whole-wish view > closes the view and opens the finalize confirmation from its finalize control',
+                'whole-wish view > follows a republished proposal while open',
+            ),
+        )
+
+    # ADDED by dream-wish-stage-panel: "Finalize asks before giving up remaining exchanges". The requirement ID exists
+    # only once the delta is synced at archive, which annotates this method.
+    def test_finalize_asks_before_giving_up_exchanges(self):
+        _assert_cases_pass(
+            "dream finalize confirmation",
+            (
+                'finalize confirmation > names the exchanges given up and rests focus on staying',
+                'finalize confirmation > cannot finalize and submit from a repeated key',
+                'finalize confirmation > dispatches exactly one finalize from its explicit control',
+                'finalize confirmation > opens the edit sheet when the session becomes finalized before the cap',
+                'dream stage review coverage > captions the converging and final exchange and focuses the confirm row on a live sixth exchange',
+                'dream stage review coverage > focuses the first row on a live sixth exchange without a summary',
+            ),
+        )
+
+    # ADDED by dream-wish-stage-panel: "The thread choice sits above the reply bar before the first message". The requirement ID exists
+    # only once the delta is synced at archive, which annotates this method.
+    def test_thread_choice_sits_above_reply_bar(self):
+        _assert_cases_pass(
+            "dream thread choice",
+            (
+                'thread choice > dispatches a newly chosen thread and returns focus to the reply field',
+                'thread choice > dispatches nothing when the chosen option is reselected',
+                'thread choice > closes the list only when focus really moves elsewhere',
+                'thread choice > sends only the message when the player speaks without choosing',
+                'thread choice > is absent with nothing offered or once choosing is locked',
+                'dream stage review coverage > disables every dream action while the transport is locked and keeps typed text',
+            ),
+        )
+
+    # ADDED by dream-wish-stage-panel: "The edit sheet edits the wish only when finalized". The requirement ID exists
+    # only once the delta is synced at archive, which annotates this method.
+    def test_edit_sheet_edits_wish_only_when_finalized(self):
+        _assert_cases_pass(
+            "dream finalized edit sheet",
+            (
+                'server-authored dream surface > edits preference chips and saves a draft that keeps the dream open',
+                'server-authored dream surface > sends the latest committed revision from the finalized sheet',
+                'finalized edit sheet > sends the same payload shape from both sheet controls',
+                'finalized edit sheet > shows the chosen thread as fixed text with no control that changes it',
+                'finalized edit sheet > releases an ended thread to a new story',
+                'finalized edit sheet > cannot be reached while conversing',
             ),
         )
