@@ -386,7 +386,10 @@ road from the anchor with its own octant and one back with the opposite, so no
 node has two outgoing roads in one direction. No random number is drawn, so a
 village or hamlet is byte-identical across runs. A cell whose every bearing is
 already a slot (eight road contacts in a village) is refused with
-`shrine_octant_full` rather than given a second road in one direction.
+`shrine_octant_full` rather than given a second road in one direction. A
+location cell that is blocked — by another settlement's footprint, another
+location, a harbour site or a landmark — or that is not walkable is refused with
+`location cell not walkable` before any slot is placed.
 
 **Class and labels.** A nation in the configured beast nations gives
 `beast_town` and the `tribal_ring` morphology; any other nation gives
