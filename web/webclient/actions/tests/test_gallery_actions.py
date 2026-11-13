@@ -1004,6 +1004,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(publish.call_args.kwargs["affected_panels"], ("gallery", "art", "roster"))
         return result
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::group-selection-expands-one-place-and-writes-only-presentation-state"
+    )
     def test_expanding_another_place_collapses_the_current_one(self):
         older, newer = self.meet_in_places()
         self.assertEqual(self.category_dispatch("people")["outcome"], "success")
@@ -1043,6 +1046,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         selected.assert_not_called()
         self.assertEqual(gallery_view_snapshot(self.transport, self.actor).expanded, (("people", older),))
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::group-selection-expands-one-place-and-writes-only-presentation-state"
+    )
     def test_a_tier_group_cannot_be_selected(self):
         self.meet_in_places()
         self.assertEqual(self.category_dispatch("monster")["outcome"], "success")
@@ -1056,6 +1062,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         )
         info.assert_not_called()
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::group-selection-expands-one-place-and-writes-only-presentation-state"
+    )
     def test_a_group_outside_the_current_paged_category_is_refused(self):
         older, _ = self.meet_in_places()
         # No stored view resolves to mine, which does not page by group.
@@ -1075,6 +1084,9 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(result["code"], "unknown_group")
         self.assertEqual(gallery_view_snapshot(self.transport, self.actor), stored)
 
+    @covers_requirement(
+        "webclient-gallery-management-actions::group-selection-expands-one-place-and-writes-only-presentation-state"
+    )
     def test_malformed_group_payloads_never_reach_the_adapter(self):
         for name, payload, accepted in group_wire_cases():
             if accepted:

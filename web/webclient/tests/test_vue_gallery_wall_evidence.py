@@ -15,6 +15,10 @@ Test-to-requirement mapping (applied at archive):
   "tray tiles carry state by shape and text" (預設, 生成中, 生成失敗).
 - ``the-wall-and-the-tray-are-two-roving-listboxes``:
   "two roving listboxes" (focus versus selection, Enter, Escape, focus loss).
+- ``collapsible-group-headings-are-buttons``:
+  "collapsible group headings are buttons" (a collapsed heading is a button
+  with ``aria-expanded`` emitting ``expand-group`` once, the expanded one
+  inert, and tier headings plain while every group is expanded).
 """
 
 from __future__ import annotations
@@ -68,3 +72,10 @@ class GalleryWallEvidenceTests(unittest.TestCase):
     def test_two_roving_listboxes_suite_passes(self):
         """Roving focus, activation, Escape and focus loss hold under Vitest."""
         _run_vitest_group("two roving listboxes")
+
+    @covers_requirement(
+        "webclient-gallery-wall::collapsible-group-headings-are-buttons"
+    )
+    def test_collapsible_group_headings_suite_passes(self):
+        """Collapsed place headings are buttons; tier headings stay plain under Vitest."""
+        _run_vitest_group("collapsible group headings are buttons")

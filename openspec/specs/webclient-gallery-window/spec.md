@@ -61,3 +61,10 @@ The 圖庫 tool SHALL open the gallery window as a drawer-keyed window outside t
 #### Scenario: An unavailable panel locks the open window
 - **WHEN** the window is open and a committed revision makes the `gallery` panel unavailable
 - **THEN** the window shows the committed reason and no gallery action can be sent
+
+### Requirement: Expanding a group is one server round trip
+An `expand-group` from the wall SHALL send exactly one `gallery.group.select` with that key through the gated dispatch entry; the wall SHALL keep the committed expansion until the next committed panel, marking the pressed heading busy meanwhile.
+
+#### Scenario: The press waits for the commit
+- **WHEN** the player expands collapsed place P1
+- **THEN** one `gallery.group.select` with P1 is sent, P1's heading carries `aria-busy="true"`, and P1's subjects appear only when a panel with P1 expanded commits
