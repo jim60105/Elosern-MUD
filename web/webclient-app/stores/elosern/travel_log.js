@@ -100,7 +100,12 @@ export function applyTravelLog(ctx) {
   ctx.appendTravelRefusal = function appendTravelRefusal(requestId, message) {
     const rs = ctx.reducer.getCommittedState();
     if (rs.activeEpoch == null || typeof requestId !== "string" || !requestId) return false;
-    const shown = travelSelection({ mode: rs.mode, panels: rs.panels || {}, creation: ctx.creation != null }).layout;
+    const shown = travelSelection({
+      mode: rs.mode,
+      panels: rs.panels || {},
+      creation: ctx.creation != null,
+      dreamActive: ctx.dreamFarewellActive.value,
+    }).layout;
     if (!shown) return false;
     if (keyOf(rs) !== session) retire(keyOf(rs));
     const id = `refusal:${keyOf(rs)}:${requestId}`;

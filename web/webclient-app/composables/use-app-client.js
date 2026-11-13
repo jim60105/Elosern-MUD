@@ -23,6 +23,7 @@ import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
 import { useShopTrade } from "./use-shop-trade.js";
+import { useDreamFarewell } from "./use-dream-farewell.js";
 
 export function useAppClient(store, shellRef, sceneBackdropRef) {
   // The single dispatch seam (webclient-action-feedback): every surface's
@@ -40,7 +41,12 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
   // The exit compass's template ref (bound by AppClient's `ref="compassRef"`).
   const compassRef = ref(null);
   const compass = useExitCompass(store, { panel, compassRef });
+  // The dream stage and its farewell hold (dream-farewell-beat): created
+  // before the sleep handoff so every surface that yields to the dream reads
+  // the same hold.
+  const dreamStage = useDreamFarewell(store);
   return {
+    dreamStage,
     dispatchIntent,
     panel,
     panelAvailable,
@@ -86,6 +92,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       dispatchIntent,
       skipDisabled: restWait.skipDisabled,
       compassRef,
+      dreamActive: dreamStage.active,
     }),
     // The camp card and its campfire beat (wilderness-camping).
     ...useCamp(store, { compassRef }),

@@ -122,6 +122,11 @@ export const useElosernStore = defineStore("elosern", () => {
   // mode; shape: {view, confirmDescriptor, pendingActivate,
   // pendingActivateKey, pendingSaveRequestId, returnStage, panelSig}.
   ctx.creation = null;
+  // The dream stage held for its farewell (dream-farewell-beat): client-local,
+  // set by composables/use-dream-farewell.js. The committed dream panel has
+  // already closed, so the travel projection reads this to keep yielding the
+  // stage until the farewell releases it.
+  ctx.dreamFarewellActive = ref(false);
 
   // Set while the store drives a router stack mutation, so a focus emit that
   // re-enters the store never nests a second mutation.
@@ -414,6 +419,14 @@ export const useElosernStore = defineStore("elosern", () => {
     setTextSpeed: ctx.setTextSpeed,
     setAutoAdvance: ctx.setAutoAdvance,
     setTravelPace: ctx.setTravelPace,
+    // The dream stage's farewell hold (dream-farewell-beat): the view is a
+    // projection rebuilt on publish, so a change republishes it once.
+    setDreamFarewellActive: (value) => {
+      const next = value === true;
+      if (ctx.dreamFarewellActive.value === next) return;
+      ctx.dreamFarewellActive.value = next;
+      ctx.publishView();
+    },
     setTravelStopAtNight: ctx.setTravelStopAtNight,
   };
 });

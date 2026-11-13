@@ -19,14 +19,15 @@ export function travelRoom(art) {
  * prose, click or cached scene can select it. `layout` additionally requires
  * that no conversation, dream or creation surface owns the stage, so dialogue
  * and the other surfaces keep their own layouts and travel returns when they
- * end.
+ * end. `dreamActive` is the client-local dream stage (dream-farewell-beat):
+ * a farewell still holds the stage after the committed dream has closed.
  */
-export function travelSelection({ mode, panels = {}, creation = false }) {
+export function travelSelection({ mode, panels = {}, creation = false, dreamActive = false }) {
   const room = travelRoom(panels.art);
   const inWilderness = mode === "exploration" && !!room && room.subject_id.startsWith("wilderness:");
   const dialogue = panels.dialogue;
   const conversing = !!dialogue && dialogue.available === true && dialogue.kind === "dialogue";
-  const dreaming = panels.dream?.state?.open === true;
+  const dreaming = panels.dream?.state?.open === true || dreamActive === true;
   return Object.freeze({
     mode: inWilderness,
     layout: inWilderness && !conversing && !dreaming && !creation,
