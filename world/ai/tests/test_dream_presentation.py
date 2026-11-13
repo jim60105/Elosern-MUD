@@ -260,7 +260,6 @@ class DreamPromptTests(unittest.TestCase):
             all(lines == [] for path, lines in payload["wish"].items() if path != "summary")
         )
 
-    @covers_requirement("dream-explicit-presentation::collaborator-has-separate-spoiler-filtered-capability-access")
     def test_the_output_schema_is_the_applier_edit_contract(self):
         self.assertEqual(
             DREAM_EXCHANGE_SCHEMA["required"], ["scene", "dialogue", "phase"]
