@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "32637310ac3d4cafa8e8d6cc125cac22ae36b187b5f4d1ac5a89464b02a904a0",
+  "fingerprint": "ca8e3453c4001d9a09f696d27f1e5a9f1c3189fd9e9c021b2f67c8a06f37afc5",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16048,7 +16048,7 @@
     "packages/map-core/elosern_map_core/authoring.py": "5255b4bb1cd29cf39137cb8ed0551a344b535b2954c0865ff6965a4279ace33c",
     "packages/map-core/elosern_map_core/codec.py": "432eb131d27b408d0a1e967f2818be1f464729981b0067d10b871dabe8e8ad93",
     "packages/map-core/elosern_map_core/diagnostics.py": "dfec5c3f7c2cc9becf393d337bf806d82aefa4f5911e969764983c1ddbc36ba5",
-    "packages/map-core/elosern_map_core/documents.py": "95faf2f9bde565b363aa783df303684dfe073b7395ff66a2a90caf990ad0c61c",
+    "packages/map-core/elosern_map_core/documents.py": "64d1689c2b366ba0ec23814a18253c3f16d99eae6e83a65edd052b36922f6044",
     "packages/map-core/elosern_map_core/elevation.py": "4a39b109f5673e8119ba413554da15f507473413dad250cb335fcaecde2189e0",
     "packages/map-core/elosern_map_core/elevation_codec.py": "cac73e00dd59c56073f7aae3de37aa847257f1c0e78dd1ba7354eec2b6a799ac",
     "packages/map-core/elosern_map_core/geometry.py": "4ee8e4d4591476716b3225d74fd8f37c73848227a03c600e2a99706428bfadac",
@@ -16059,7 +16059,7 @@
     "packages/map-core/elosern_map_core/references.py": "64d5a263d1c9148979cf9af2806a2a5644ce81ba1757f0e41ad108c496dff513",
     "packages/map-core/elosern_map_core/roads.py": "e1997c3b98edb60946f3e576ff9568b8ace79bdcffb97327e519872319d7deaf",
     "packages/map-core/elosern_map_core/roads_codec.py": "926ce65e830ef5e718a673349fd726368b7b88d925a1105571939e7ade72cf71",
-    "packages/map-core/elosern_map_core/schema.py": "7b018b03745fe60bbb31f697a8f32455d1ca0ff7c3c946cdcd7432b91c5e7fdd",
+    "packages/map-core/elosern_map_core/schema.py": "e75298c974c4ea4c40b4445c10c9899ddd9134d8b151fa3a47660330c42223aa",
     "packages/map-core/elosern_map_core/sources.py": "28bf407d12598d5c3933ac674f6b0ca4ad68792109f2880dbc10bcf27cd944de",
     "packages/map-core/elosern_map_core/sparse.py": "7ef86b108afd37af4cc79e604632aefd61195a4de7a32262b915cd0ebd7f2f3a",
     "packages/map-core/elosern_map_core/terrain.py": "f5a098da48ec7fc3a55a9ef132ff289929f0a89653a2e9a2b7bd7e8024e610d8",
