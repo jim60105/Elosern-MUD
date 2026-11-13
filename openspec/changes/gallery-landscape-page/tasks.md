@@ -4,7 +4,7 @@ Run pnpm commands in `web/webclient-app`.
 
 ## 1. Page and wall
 
-- [ ] 1.1 Apply design decisions 1–3 in `components/GalleryImagePage.vue` and `components/gallery-window-model.js`; add Vitest cases for the three image-page scenarios to `tests/components/gallery_image_page.test.js` and the wall scenario to `tests/components/gallery_wall.test.js`. Verify `pnpm test -- gallery_image_page gallery_wall` passes.
+- [x] 1.1 Apply design decisions 1–3 in `components/GalleryImagePage.vue` and `components/gallery-window-model.js`; add Vitest cases for the three image-page scenarios to `tests/components/gallery_image_page.test.js` and the wall scenario to `tests/components/gallery_wall.test.js`. Verify `pnpm test -- gallery_image_page gallery_wall` passes.
 
 ## 2. Stories
 

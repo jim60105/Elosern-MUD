@@ -427,6 +427,100 @@ describe("GalleryImagePage (webclient-gallery-image-page)", () => {
       expect(cell("image").exists()).toBe(true);
     });
   });
+
+  // Change gallery-landscape-page: a scene subject's page.
+  describe("the landscape page of a scene", () => {
+    const SCENE_CAPS = caps({ supports_card_delete: true, max_cards: 1 });
+    const tileArtwork = {
+      subject_id: "scene-tile",
+      revision: "r",
+      generation_subject: "scene:s1",
+      generation_state: "done",
+      attempts: [{ type: "image", source_id: "s", rank: 40, resource: { resource_id: "b", version: "v", url: "/art/t_bundled.webp", origin: "bundled_official", geometry: null } }],
+      terminal: null,
+      retention_sources: [],
+    };
+    const scene = (changes = {}) => ({
+      subject_key: "scene:s1", kind: "scene", display_name: "scene-name", is_current: false, card_count: 0, artwork: tileArtwork, ...changes,
+    });
+    const page = () => wrapper.get('[data-testid="gallery-page"]');
+    const art = () => wrapper.get('[data-testid="gallery-page__art"]');
+
+    it("shows a bundled scene's tile artwork as 官方內建圖 and offers only 生成新圖", async () => {
+      await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene(), selection: { type: "empty" } });
+      expect(page().classes()).toContain("gpage--landscape");
+      expect(page().attributes("data-shape")).toBe("landscape");
+      const img = art().get("img");
+      expect(img.attributes("src")).toBe("/art/t_bundled.webp");
+      expect(img.attributes("alt")).toBe("scene-name・官方內建圖");
+      expect(cell("image").find(".gpage__line").text()).toBe("官方內建圖");
+      expect(cell("image").find(".gpage__text").text()).toBe("尚未生成專屬圖片。");
+      expect(cell("time").exists()).toBe(false);
+      expect(buttonLabels()).toEqual(["生成新圖"]);
+    });
+
+    it("labels a stored scene card 生成圖 and offers 刪除 and 重新生成", async () => {
+      const row = card("c1", {
+        label: "row-label",
+        created_at: 1_699_990_000,
+        artwork: { ...tileArtwork, attempts: [{ ...tileArtwork.attempts[0], resource: { ...tileArtwork.attempts[0].resource, url: "/art/t_card.webp" } }] },
+      });
+      await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene({ card_count: 1 }), selection: { type: "card", row } });
+      expect(page().classes()).toContain("gpage--landscape");
+      expect(cell("image").find(".gpage__line").text()).toBe("生成圖");
+      expect(cell("image").find(".gpage__text").text()).toBe("只保留一張；刪除後回到官方內建圖。");
+      expect(art().get("img").attributes("src")).toBe("/art/t_card.webp");
+      // The committed row label stays the image's accessible name.
+      expect(art().get("img").attributes("alt")).toBe("scene-name・row-label");
+      expect(cell("status").exists()).toBe(false);
+      expect(buttonLabels()).toEqual(["刪除", "重新生成"]);
+    });
+
+    it("puts the description in the left column under the art and the facts in the right one", async () => {
+      await mountPage({
+        panel: panel({ capabilities: SCENE_CAPS, description: "scene-prose" }), subject: scene(), selection: { type: "empty" },
+      });
+      const body = wrapper.get(".gpage__body");
+      const facts = wrapper.get('[data-testid="gallery-page__facts"]');
+      // The art comes first, then the facts grid holding the head, the letter
+      // and the fact cells.
+      expect(body.element.firstElementChild).toBe(art().element);
+      expect(facts.get('[data-testid="gallery-page__letter"]').text()).toContain("scene-prose");
+      expect(facts.find(".gpage__cond [data-cell=\"image\"]").exists()).toBe(true);
+      // The landscape rules put the head and the letter in the left areas
+      // and the cells in the right one.
+      const css = readFileSync(join(process.cwd(), "web/webclient-app/components/GalleryImagePage.vue"), "utf8");
+      const rule = (selector) => css.match(new RegExp(`${selector.replace(/[.]/g, "\\.")}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+      expect(rule(".gpage--landscape .gpage__facts")).toMatch(/grid-template-areas:\s*"head facts"\s*"letter facts"/);
+      expect(rule(".gpage--landscape .gpage__head")).toMatch(/grid-area:\s*head/);
+      expect(rule(".gpage--landscape .gpage__letter")).toMatch(/grid-area:\s*letter/);
+      expect(rule(".gpage--landscape .gpage__cond")).toMatch(/grid-area:\s*facts/);
+      expect(rule(".gpage--landscape .gpage__art")).toMatch(/aspect-ratio:\s*16 \/ 9/);
+    });
+
+    it("keeps a portrait subject without images on the 尚無圖片 page even with tile artwork", async () => {
+      await mountPage({ subject: { ...subjectRow, artwork: tileArtwork }, selection: { type: "empty" } });
+      expect(wrapper.get('[data-testid="gallery-page"]').classes()).toContain("gpage--portrait");
+      expect(art().find("img").exists()).toBe(false);
+      expect(cell("image").find(".gpage__line").text()).toBe("尚無圖片");
+    });
+
+    it("says 尚無圖片 for a scene without tile artwork", async () => {
+      await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene({ artwork: null }), selection: { type: "empty" } });
+      expect(art().find("img").exists()).toBe(false);
+      expect(cell("image").find(".gpage__line").text()).toBe("尚無圖片");
+      expect(buttonLabels()).toEqual(["生成新圖"]);
+    });
+
+    it("mounts another scene's bundled image afresh", async () => {
+      await mountPage({ panel: panel({ capabilities: SCENE_CAPS }), subject: scene(), selection: { type: "empty" } });
+      const before = art().element;
+      await wrapper.setProps({ subject: scene({ subject_key: "scene:s2", display_name: "other" }) });
+      await flushPromises();
+      expect(art().element).not.toBe(before);
+      expect(art().get("img").attributes("alt")).toBe("other・官方內建圖");
+    });
+  });
 });
 
 // Every length in the page's own styles is token-driven: any literal pixel

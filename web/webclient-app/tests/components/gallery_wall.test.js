@@ -17,6 +17,7 @@ import {
   trayOpen,
   wallTiles,
 } from "../../components/gallery-window-model.js";
+import { GALLERY_V4_SCENE_PANELS } from "../../stories/gallery-fixtures-v4.js";
 
 const subject = (key, changes = {}) => ({
   subject_key: `portrait:character:${key}`,
@@ -355,6 +356,27 @@ describe("GalleryWall (webclient-gallery-wall)", () => {
       });
       expect(tray().exists()).toBe(false);
       expect(tile("a").attributes("aria-expanded")).toBeUndefined();
+    });
+
+    // Change gallery-landscape-page. The scene fixture is not yet
+    // protocol-valid (scene subject keys arrive with gallery-scene-category),
+    // so it is mounted as committed props without validation.
+    it("draws a scene category's tiles landscape and opens no tray for its one-card subject", async () => {
+      const scene = GALLERY_V4_SCENE_PANELS.generated;
+      expect(scene.capabilities.max_cards).toBe(1);
+      await mountWall({
+        groups: structuredClone(scene.groups),
+        selectedSubject: scene.selected,
+        cards: structuredClone(scene.cards),
+        capabilities: { ...scene.capabilities },
+        panel: scene,
+      });
+      expect(tiles()).toHaveLength(2);
+      expect(tiles().every((el) => el.classes().includes("gtile--landscape"))).toBe(true);
+      expect(tray().exists()).toBe(false);
+      const owner = wrapper.get(`[data-subject-key="${scene.selected}"]`);
+      expect(owner.attributes("aria-selected")).toBe("true");
+      expect(owner.element.hasAttribute("aria-expanded")).toBe(false);
     });
 
     it("lists the cards, then 生成新圖, then the official run", async () => {
