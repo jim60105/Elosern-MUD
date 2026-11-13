@@ -343,7 +343,11 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
             # One stage, one rule: manual editing is allowed exactly when free
             # text is closed. Every refusal below writes nothing.
             wish = surface.wish_state(actor)
-            supplied = direction if isinstance(direction, dict) else direction.strip()
+            supplied = (
+                direction
+                if isinstance(direction, dict)
+                else (direction or "").strip()
+            )
             finalized = current.stage != lifecycle.STAGE_CONVERSING
             if finalized and action in {"say", "finalize"}:
                 return _refuse(boundary, "dream_finalized", "你已停止訴說，願望改由你親自修改。")
@@ -398,7 +402,10 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                 passthrough = {}
                 form_thread = wish["thread_id"]
                 proposal = wish["proposal"]
-                if finalized and supplied and isinstance(direction, dict):
+                # Only the actions that take content can carry a form: a
+                # departure leaves both the proposal and the draft alone.
+                form = finalized and supplied and action in {"draft", "confirm"}
+                if form and isinstance(direction, dict):
                     check_json_safety(direction)
                     if (set(direction) - DIRECTION_KEYS or not isinstance(direction.get("summary", ""), str)
                             or len(direction.get("summary", "")) > MAX_SUMMARY_CHARACTERS):
@@ -440,7 +447,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                         key: direction[key] for key in ("effects", "revisions")
                         if key in direction
                     }
-                elif finalized and supplied:
+                elif form:
                     if len(supplied) > MAX_SUMMARY_CHARACTERS:
                         return _result("rejected", "direction_too_large", "故事方向摘要上限為 2000 字。")
                     # A typed form rewrites the summary the player can read and
@@ -450,7 +457,7 @@ def act(actor, action, *, session_id, revision, message="", direction="", thread
                 # without a formed wish must leave the dream exactly as it was.
                 if action == "confirm" and not str(proposal["summary"]).strip():
                     return _refuse(boundary, "empty_direction", "請先讓願望成形，再許下願望。")
-                if finalized and supplied:
+                if form:
                     surface.store_proposal(actor, proposal, thread_id=form_thread)
                 payload = {**surface.working_direction(actor), **passthrough}
                 if action == "draft":

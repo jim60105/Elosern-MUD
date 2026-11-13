@@ -1632,6 +1632,32 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(final.direction["summary"], "醒來前留下的鐘聲。")
         self.assertEqual(int(final.revision), int(conversing.revision))
 
+    def test_a_finalized_awakening_ignores_supplied_content(self):
+        # A departure is not a manual edit: content a caller sends with it
+        # changes neither the working proposal nor the draft the finalize saved.
+        self.enter()
+        client = self.exchange([
+            {"command": "create", "path": "summary", "file_text": "女神寫下的方向。"},
+        ])
+        self.assertEqual(
+            self.request("say", message="鐘聲", client=client).result["outcome"], "success"
+        )
+        self.assertEqual(self.request("finalize").result["outcome"], "success")
+        before = surface.wish_state(self.actor)
+        session = surface.associated_session(self.actor)
+        draft_before = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(
+            self.request(
+                "awaken",
+                direction={"kind": "new_story", "summary": "離去時偷渡的願望。"},
+            ).result["outcome"],
+            "success",
+        )
+        self.assertEqual(surface.wish_state(self.actor), before)
+        draft_after = get_draft(session.draft_id, str(self.actor.pk))
+        self.assertEqual(draft_after.direction, draft_before.direction)
+        self.assertEqual(int(draft_after.revision), int(draft_before.revision))
+
     def test_a_later_sleep_returns_to_conversing(self):
         first = self.enter()
         client = self.exchange([
