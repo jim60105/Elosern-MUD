@@ -277,7 +277,8 @@ function onKeydown(event) {
 
 /* Portrait: the art column is as tall as the page body at 9:16, capped so the
    facts column always keeps a readable width. The body is a size container
-   so the art can size from its height without a layout cycle. */
+   so the art can size from its height without a layout cycle. The entry
+   uses --motion-base, which reduced and off motion set to zero. */
 .gpage__body {
   container-type: size;
   display: grid;
@@ -287,7 +288,7 @@ function onKeydown(event) {
   min-height: 0;
   box-sizing: border-box;
   padding: var(--sp-5) var(--sp-4) var(--sp-5) var(--sp-6);
-  animation: gpage-in var(--motion-reveal) var(--ease-enter);
+  animation: gpage-in var(--motion-base) var(--ease-enter);
 }
 
 @keyframes gpage-in {
@@ -525,6 +526,12 @@ function onKeydown(event) {
   width: 1.1em;
   height: 1.1em;
   color: var(--gold-400);
+}
+
+/* The exact instant breaks between its date and its time, never inside a
+   word. */
+.gpage__text time {
+  word-break: keep-all;
 }
 
 .gpage__line[data-status="failed"] {

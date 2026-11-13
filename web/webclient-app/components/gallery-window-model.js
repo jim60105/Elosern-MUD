@@ -64,7 +64,7 @@ export function galleryFooter(selection, capabilities) {
     if (!caps.supports_personal_official_preferences) return { buttons: [], note: null };
     return {
       buttons: [
-        footerButton("official-geometry-clear", "清除個人調整", "ghost"),
+        footerButton("official-geometry-clear", "清除個人調整"),
         ...(caps.supports_face_rect ? [footerButton("official-face", "臉框")] : []),
         ...(caps.supports_stage ? [footerButton("official-stage", "舞台位置")] : []),
         selection.row.is_current
