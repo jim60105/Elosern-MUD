@@ -18,7 +18,9 @@ the descriptor.
 
 ``describe_scene`` owns the SCENE source policy with the same discipline: one
 read-only walk of the authored per-room operator override, the scene
-archetype's own generated artwork, the optional operator scene default, the
+archetype's own generated artwork (its scene gallery default card, else the
+classic ``done`` record until ``scene-classic-fallback-removal``), the
+optional operator scene default, the
 required bundled type illustration and the distinct declared terminal image,
 projected as the canonical descriptor with each position's own stable source
 id and rank, every reached fault at its position, the retained startup facts of
@@ -59,8 +61,10 @@ from world.art.gallery import (
     DEFAULT_FACE_RECT,
     GalleryRecordError,
     OfficialPreferences,
+    cards_for as gallery_cards_for,
     default_face_rect,
     official_preferences_for,
+    record_for as gallery_record_for,
     validate_face_rect,
     validate_stage,
     identity_stage,
@@ -71,6 +75,7 @@ from world.art.gallery_match import (
     fallback_for,
     official_default_slot,
     resolve_display_chain,
+    validated_card_identity,
 )
 from world.art.paths import resolved_under_store_root
 from world.art.queue import pending_gallery_jobs, record_key
@@ -887,18 +892,75 @@ def _scene_generated_resource(
     )
 
 
+def _scene_gallery_card(subject: ArtSubject) -> dict | None:
+    """The scene gallery's default card, in its validated stored form.
+
+    The scene kind holds at most one card and every append installs it as the
+    default, so the record's ``default_image_id`` names the only card that can
+    be the generated position's source. ``None`` covers the legal no-card
+    states: no gallery record, a record whose default was cleared (deletion),
+    and a default the record no longer holds. Presentability of the stored
+    bytes is deliberately NOT decided here — ``_scene_gallery_resource`` owns
+    that check, so this one helper is the only place the chain (and, later,
+    ``scene-asset-migration``'s deletion of the classic branch) reads a scene
+    card.
+    """
+    record = gallery_record_for(subject)
+    if record is None:
+        return None
+    default_id = record.db.default_image_id
+    if not isinstance(default_id, str) or not default_id:
+        return None
+    for card in gallery_cards_for(subject):
+        if card["image_id"] == default_id:
+            return card
+    return None
+
+
+def _scene_gallery_resource(subject: ArtSubject, card: dict) -> dict | None:
+    """One scene card's stored original as a canonical runtime resource.
+
+    ``None`` when the card's stored identity cannot be presented (the shared
+    gallery identity checks: subject prefix, closed extension set, store-root
+    confinement, file existence), so the chain can fall back to the classic
+    record exactly as it did before the scene kind became gallery-bearing. The
+    version is the identity's immutable digest — a card is never rewritten in
+    place, so a replacement is a new identity — and the geometry is the
+    scene's own empty one: a landscape carries no face rectangle, no stage
+    placement and no portrait aspect ratio.
+    """
+    identity = validated_card_identity(subject, card)
+    if identity is None:
+        return None
+    return descriptors.resource(
+        identity,
+        descriptors.identity_version(identity),
+        media_url_for(identity),
+        descriptors.ORIGIN_RUNTIME,
+        geometry_payload=descriptors.geometry(),
+    )
+
+
 def _scene_retained_output_identity(
     subject: ArtSubject, record: ArtAssetRecord | None
 ) -> str | None:
     """The applicable preserved output identity that authorizes scene retention.
 
-    The record's CURRENT output when the store still holds it, else its
-    PRESERVED prior output (a regeneration preserves the prior valid output
-    across the requeue and a later failed attempt), so the authorization stays
-    stable across a pending or failed regeneration and disappears the moment
-    neither output can be presented. ``None`` when no output is readable —
-    retention is never authorized by an unrelated healthy file.
+    The scene gallery's default card first — its identity is immutable, so a
+    regeneration that is still in flight never revokes the pixels already on
+    screen — else the classic record's CURRENT output when the store still
+    holds it, else its PRESERVED prior output (a classic regeneration
+    preserves the prior valid output across the requeue and a later failed
+    attempt). The authorization therefore stays stable across a pending or
+    failed regeneration and disappears the moment no output can be presented.
+    ``None`` when nothing is readable — retention is never authorized by an
+    unrelated healthy file.
     """
+    card = _scene_gallery_card(subject)
+    if card is not None:
+        identity = validated_card_identity(subject, card)
+        if identity is not None:
+            return identity
     if record is None:
         return None
     for identity in (record.db.output_identity, record.db.prior_output_identity):
@@ -1011,6 +1073,14 @@ def describe_scene(target) -> dict:
     listed twice: the required position already covers that exact resource, so
     the terminal position carries nothing and the terminal is never retried.
 
+    The generated position reads the archetype's scene gallery default card
+    first and falls back to its classic ``done`` record only when no card can
+    be presented (``scene-kind-gallery``); the chain's order is unchanged and
+    the classic branch disappears with ``scene-classic-fallback-removal``.
+    Generation state stays the subject's recorded truth: an in-flight gallery
+    job is pending, a recorded gallery error or classic failure is failed, a
+    stored card or classic ``done`` record is done.
+
     The walk is a pure read: nothing here creates a record, enqueues a job,
     repairs geometry, touches a file or contacts the network, and a frozen
     :class:`~world.rules.art_view.SceneTarget` is its whole input.
@@ -1079,9 +1149,27 @@ def describe_scene(target) -> dict:
                 )
             )
 
-    # (2) The scene archetype's own generated artwork.
+    # (2) The scene archetype's own generated artwork: the scene gallery's
+    # default card (change ``scene-kind-gallery``) precedes the classic
+    # ``done`` record the producers still write. A presentable card is the
+    # generated source outright — the classic output is not attempted beside
+    # it — while the classic branch stays the fallback until
+    # ``scene-classic-fallback-removal`` deletes it.
     generated_source = descriptors.scene_generated_source_id(subject.full())
-    if record is not None and record.db.status == ArtAssetStatus.DONE:
+    gallery_card = _scene_gallery_card(subject)
+    gallery_record = gallery_record_for(subject)
+    gallery_resource = (
+        _scene_gallery_resource(subject, gallery_card)
+        if gallery_card is not None
+        else None
+    )
+    if gallery_resource is not None:
+        attempts.append(
+            descriptors.image_attempt(
+                generated_source, descriptors.SCENE_RANK_GENERATED, gallery_resource
+            )
+        )
+    elif record is not None and record.db.status == ArtAssetStatus.DONE:
         resource, fault = _scene_generated_resource(subject, record)
         if fault is not None:
             attempts.append(
@@ -1162,7 +1250,12 @@ def describe_scene(target) -> dict:
                 terminal_resource,
             )
 
-    generation_subject, generation_state = _generation_facts(subject, record, False, False)
+    gallery_failed = (
+        gallery_record is not None and bool(gallery_record.db.last_error_code)
+    )
+    generation_subject, generation_state = _generation_facts(
+        subject, record, gallery_card is not None, gallery_failed
+    )
     return descriptors.descriptor(
         subject_id=target.identity,
         generation_subject=generation_subject,
