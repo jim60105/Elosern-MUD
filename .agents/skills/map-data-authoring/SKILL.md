@@ -306,10 +306,10 @@ These are short recipes. Each reference file has the details.
   1. Pick its cell with `place_sites.py` (see *Placing sites* below), so it is
      walkable, off the water and on the right bank or shore.
   2. Add it to `locations.yaml` with a `kind` of `capital`, `city`, `town`,
-     `port`, `elven_village` or `dungeon`. A national settlement uses `city`
-     (inland, about 25,000 people or more), `town` (smaller) or `port` (its
-     role is a sea harbour, whatever its size). Write the ID with the matching
-     prefix, such as `port_white_sail` or `town_scarp`.
+     `port`, `village`, `hamlet`, `elven_village` or `dungeon`. A national
+     settlement uses `city` (inland, about 25,000 people or more), `town`
+     (smaller) or `port` (its role is a sea harbour, whatever its size). Write
+     the ID with the matching prefix, such as `port_white_sail` or `town_scarp`.
   3. Add its `ANCHOR_LORE` row in `world/lore/anchors.py` (nation and
      population). Every lore row must join a location and the reverse, so the
      two change together. This is Python lore: do it only when the user asked
