@@ -12,7 +12,8 @@ export default { title: "World/DreamPanel", component: DreamPanel };
 function fixture(overrides = {}) {
   return {
     session_id: "synthetic-storyboard-dream", revision: 1, completed: 0, remaining: 6,
-    can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
+    can_input: true, can_confirm: false, can_finalize: true, can_choose_thread: true,
+    can_edit: false, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
     opening: "雲海之上矗立著一座純白的王座。王座上的女神面容模糊，卻像一直在等你。積水漫過你的腳踝，湧如泉水的液面映著王座。你可以在這裡商談故事方向，也可以隨時醒來。",
     scene: "", dialogue: "",
@@ -22,6 +23,11 @@ function fixture(overrides = {}) {
     scene_art: dreamDescriptor(),
     direction_parts: [], draft_preferences: null,
     requirements: [], requirement_version: null,
+    // The published stage facts. This storyboard documents the panel that
+    // predates the staged surface, so each frame only has to stay a valid
+    // schema-4 payload: conversing offers the conversation, the cap finalizes.
+    stage: "conversing", drafted: false, thread_id: null, changes: null,
+    proposal: { summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] },
     thread_choices: [{ id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" }],
     track: { version: 1, completed: 0, pleasure: 0, ordinal: 0, level: "平靜", climax_phase: "未達", converging: false },
     sleep: { tick_from: 100, tick_to: 100, seconds: 0, requested_seconds: 0, event_kinds: [] },
@@ -91,7 +97,11 @@ const render = (args) => ({
       intent.value = null;
     }
     function publishCap() {
-      Object.assign(state, { completed: 6, remaining: 0, can_input: false, pending: false });
+      Object.assign(state, {
+        completed: 6, remaining: 0, can_input: false, pending: false,
+        stage: "finalized", can_confirm: true, can_finalize: false,
+        can_choose_thread: false, can_edit: true, drafted: true,
+      });
       Object.assign(state.track, { completed: 6, pleasure: 100, ordinal: 4, level: "極限", converging: true });
       state.revision += 1;
       intent.value = null;
@@ -143,6 +153,7 @@ export const RequirementsProposed = { render, args: { ...conversing, requirement
 export const RequirementsShown = { render, args: { ...conversing, requirements,
   requirement_version: "synthetic-storyboard-dream:v2" } };
 export const AtCap = { render, args: { ...conversing, completed: 6, remaining: 0, can_input: false,
+  stage: "finalized", can_confirm: true, can_finalize: false, can_choose_thread: false, can_edit: true,
   direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
   dialogue: "「……帶著它醒來吧。」",
   track: { version: 1, completed: 6, pleasure: 100, ordinal: 4, level: "極限", climax_phase: "餘韻", converging: true } } };

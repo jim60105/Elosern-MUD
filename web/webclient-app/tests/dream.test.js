@@ -15,13 +15,18 @@ import { observeError, observeLoad } from "./support/scene_layers.js";
 
 function state(overrides = {}) {
   return { session_id: "synthetic-dream", revision: 2, completed: 0, remaining: 6,
-    can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
+    can_input: true, can_confirm: false, can_finalize: true, can_choose_thread: true,
+    can_edit: false, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
     // The shared canonical scene descriptor of the dream's own source chain.
     scene_art: dreamDescriptor(),
     direction_parts: [], thread_choices: [], draft_preferences: null,
     requirements: [], requirement_version: null,
+    // The published stage facts: this component predates the staged panel, so
+    // the fixture only has to stay a valid schema-4 payload.
+    stage: "conversing", drafted: false, thread_id: null, changes: null,
+    proposal: { summary: "", themes: [], atmosphere: [], participants: [], emphasis: [], exclusions: [], requirements: [] },
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
     sleep: { tick_from: 17, tick_to: 17, requested_seconds: 0, seconds: 0, event_kinds: [] },
     ending: "", ending_phase: "", ...overrides };
@@ -248,11 +253,11 @@ describe("server-authored dream surface", () => {
     expect(wrapper.find(".dream-toast").text()).toBe("念頭已記下，夢仍在繼續。");
   });
   it("mirrors the strict panel schema and truthful command echoes", () => {
-    const payload = { schema_version: 3, available: true, state: state() };
-    expect(Protocol.validatePanel("dream", 3, payload)).toEqual(payload);
-    expect(Protocol.validatePanel("dream", 3, { ...payload, state: null }).state).toBeNull();
-    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ remaining: 0 }) })).toThrow();
-    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ pending: true }) })).toThrow();
+    const payload = { schema_version: 4, available: true, state: state() };
+    expect(Protocol.validatePanel("dream", 4, payload)).toEqual(payload);
+    expect(Protocol.validatePanel("dream", 4, { ...payload, state: null }).state).toBeNull();
+    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ remaining: 0 }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ pending: true }) })).toThrow();
     // The retired raw-URL shape is refused, not adapted: the state's artwork is
     // the canonical scene descriptor or nothing at all.
     for (const retired of [
@@ -261,13 +266,13 @@ describe("server-authored dream surface", () => {
       null,
       { ...dreamDescriptor(), attempts: [{ type: "image", source_id: "scene.operator:dream_throne", rank: 30, resource: { resource_id: "x", version: "y", url: "/art/x", origin: "official", geometry: null } }] },
     ]) {
-      expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ scene_art: retired }) }))
+      expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ scene_art: retired }) }))
         .toThrow();
     }
-    expect(Protocol.validatePanel("dream", 3, { ...payload, state: state({
+    expect(Protocol.validatePanel("dream", 4, { ...payload, state: state({
       thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
     }) }).state.thread_choices[0].label).toBe("合成已知故事");
-    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 4, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
     expect(CommandEcho.commandLine("explore.wait", { sleep: true })).toBe("sleep");
     expect(CommandEcho.commandLine("explore.sleep_party", {})).toBe("sleep all");
     expect(CommandEcho.commandLine("explore.sleep_continue", {})).toBe("sleep continue");
