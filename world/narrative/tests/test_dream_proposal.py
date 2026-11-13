@@ -302,6 +302,21 @@ class TestFieldNormalization(unittest.TestCase):
 
         self.assertEqual(result["themes"], [])
 
+    def test_insert_of_empty_text_adds_no_item(self):
+        proposal = {"themes": ["tide"]}
+        edits = [
+            {
+                "command": "insert",
+                "path": "themes",
+                "insert_line": 1,
+                "insert_text": "",
+            }
+        ]
+
+        self.assertEqual(
+            dream_proposal.apply_edits(proposal, edits)["themes"], ["tide"]
+        )
+
     def test_requirement_rows_parse_and_render(self):
         edits = [
             _create(
@@ -658,6 +673,15 @@ class TestProposalHelpers(unittest.TestCase):
         with self.assertRaises(ProposalEditError) as caught:
             dream_proposal.normalize_proposal(oversized)
         self.assertEqual(caught.exception.code, "proposal_too_large")
+        self.assertIsNone(caught.exception.index)
+
+        crowded = dream_proposal.empty_proposal()
+        crowded["requirements"] = [
+            {"kind": "place", "text": f"stop {index}"} for index in range(9)
+        ]
+        with self.assertRaises(ProposalEditError) as caught:
+            dream_proposal.normalize_proposal(crowded)
+        self.assertEqual(caught.exception.code, "too_many_requirements")
         self.assertIsNone(caught.exception.index)
 
     def test_is_empty(self):
