@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南接上大路，遠遠能望見駿原鎮的炊煙。路邊的地勢緩緩升起，草叢間露出灰白的石脊。
+    desc: 岔路口往東南接上大路，大路北折，遠遠能望見駿原鎮的炊煙。路邊的地勢緩緩升起，草叢間露出灰白的石脊。
     anchor_key: hamlet_ridge_plain
     typeclass:
     scene_archetype: city_street

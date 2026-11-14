@@ -1783,11 +1783,11 @@ locations:
   village_three_roads:
     kind: village
     display_name_zh: 三路村
-    description: Village where the spice road, the twin currents road and the bay road meet on the open plain.
+    description: Village where the spice road, the twin currents road and the bay road share one stretch of the plain highway.
     cell:
       cell_x: 2049
       cell_y: 644
-    geographic_constraint: Three-road junction on the plain west of the twin currents
+    geographic_constraint: Three-road meeting on the shared trunk west of the twin currents
     scene_archetype:
   village_pasture_road:
     kind: village
@@ -1819,11 +1819,11 @@ locations:
   village_millet_plain:
     kind: village
     display_name_zh: 粟原村
-    description: Millet-farming village on the open plain west of the orange blossom, on the spice road.
+    description: Millet-farming village on the open plain east of the orange blossom, on the spice road.
     cell:
       cell_x: 1863
       cell_y: 518
-    geographic_constraint: Open millet plain west of the orange blossom on the spice road
+    geographic_constraint: Open millet plain east of the orange blossom on the spice road
     scene_archetype:
   village_open_plain:
     kind: village
@@ -1837,11 +1837,11 @@ locations:
   village_orange_grove:
     kind: village
     display_name_zh: 橙林村
-    description: Village among orange groves on the plain south-east of the orange blossom, on the spice road.
+    description: Village among orange groves on the plain north-west of the orange blossom, on the silver ridge road.
     cell:
       cell_x: 1759
       cell_y: 564
-    geographic_constraint: Orange groves south-east of the orange blossom on the spice road
+    geographic_constraint: Orange groves north-west of the orange blossom on the silver ridge road
     scene_archetype:
   village_west_plain:
     kind: village
@@ -1855,29 +1855,29 @@ locations:
   village_west_bend:
     kind: village
     display_name_zh: 西灣村
-    description: Village on the western bend of the imperial east branch, off the roads west of the twin currents.
+    description: Village on a bend of the imperial east branch, off the roads east of the twin currents.
     cell:
       cell_x: 2095
       cell_y: 669
-    geographic_constraint: Western bend of the imperial east branch, off the roads west of the twin currents
+    geographic_constraint: Bend of the imperial east branch, off the roads east of the twin currents
     scene_archetype:
   village_mill_flat:
     kind: village
     display_name_zh: 磨坊村
-    description: Mill village on a flat of the imperial river, south of the twin currents.
+    description: Mill village on a flat of the imperial river, north of the twin currents.
     cell:
       cell_x: 2055
       cell_y: 764
-    geographic_constraint: Mill flat on the imperial river south of the twin currents
+    geographic_constraint: Mill flat on the imperial river north of the twin currents
     scene_archetype:
   village_river_plain:
     kind: village
     display_name_zh: 河原村
-    description: Farming village on the river plain of the imperial river, west of the star glow city.
+    description: Farming village on the river plain of the imperial river, east of the star glow city.
     cell:
       cell_x: 2040
       cell_y: 919
-    geographic_constraint: River plain of the imperial river west of the star glow city
+    geographic_constraint: River plain of the imperial river east of the star glow city
     scene_archetype:
   hamlet_bay_flat:
     kind: hamlet
@@ -1954,11 +1954,11 @@ locations:
   hamlet_river_shoal:
     kind: hamlet
     display_name_zh: 河灘
-    description: Hamlet on a river shoal east of the twin currents.
+    description: Hamlet on a river shoal north-west of the twin currents.
     cell:
       cell_x: 2028
       cell_y: 761
-    geographic_constraint: River shoal east of the twin currents
+    geographic_constraint: River shoal north-west of the twin currents
     scene_archetype:
   hamlet_rice_yard:
     kind: hamlet
@@ -2008,11 +2008,11 @@ locations:
   hamlet_star_field:
     kind: hamlet
     display_name_zh: 星野
-    description: Hamlet on the open field east of the star glow city.
+    description: Hamlet on the open field west of the star glow city.
     cell:
       cell_x: 1980
       cell_y: 956
-    geographic_constraint: Open field east of the star glow city
+    geographic_constraint: Open field west of the star glow city
     scene_archetype:
   hamlet_pepper_field:
     kind: hamlet
@@ -2035,11 +2035,11 @@ locations:
   hamlet_grass_field:
     kind: hamlet
     display_name_zh: 草野
-    description: Hamlet on the grassy field east of the steed plain.
+    description: Hamlet on the grassy field west of the steed plain.
     cell:
       cell_x: 1632
       cell_y: 829
-    geographic_constraint: Grassy field east of the steed plain
+    geographic_constraint: Grassy field west of the steed plain
     scene_archetype:
   hamlet_grain_yard:
     kind: hamlet

@@ -23,7 +23,7 @@ nodes:
     y_m: 376
     prototype_parent: grid_room
     key: 東北村口
-    desc: 東北村口往香道城的路，鹽車一輛接一輛，把路面磨得發白。車輪碾過碎鹽，晴天裡閃著細細的光。
+    desc: 東北村口往雙流城的路，鹽車一輛接一輛，把路面磨得發白。車輪碾過碎鹽，晴天裡閃著細細的光。
     anchor_key:
     typeclass:
     scene_archetype: city_street

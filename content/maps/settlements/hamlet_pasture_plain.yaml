@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南接上牧道，繞過草原通往東牧鎮。路旁的水槽裡積著雨水，牛群經過時總要停下來飲上一陣。
+    desc: 岔路口往東南接上牧道，牧道繞過草原，北面通往東牧鎮。路旁的水槽裡積著雨水，牛群經過時總要停下來飲上一陣。
     anchor_key: hamlet_pasture_plain
     typeclass:
     scene_archetype: city_street

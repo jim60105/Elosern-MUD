@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南接上牧道，遠處是駿原鎮的草場。路邊的地裡種著耐旱的雜糧，葉片上蒙著一層薄薄的灰土。
+    desc: 岔路口往東南接上牧道，牧道北折，遠處是駿原鎮的草場。路邊的地裡種著耐旱的雜糧，葉片上蒙著一層薄薄的灰土。
     anchor_key: hamlet_west_field
     typeclass:
     scene_archetype: city_street

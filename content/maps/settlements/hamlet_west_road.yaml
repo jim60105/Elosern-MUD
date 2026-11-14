@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東接上草原長路，往西可折向雙流城。路旁立著一根舊路標，木頭被風吹得歪向一邊。
+    desc: 岔路口往東接上草原長路，村西的小路折向雙流城。路旁立著一根舊路標，木頭被風吹得歪向一邊。
     anchor_key: hamlet_west_road
     typeclass:
     scene_archetype: city_street

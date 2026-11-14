@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南接往雙流城的官道，路邊是低窪的濕地。雨後常積著水，水面上浮著一層細碎的草葉。
+    desc: 岔路口往東南接上官道，官道沿河北折，通往雙流城。路邊是低窪的濕地，雨後常積著水，水面上浮著一層細碎的草葉。
     anchor_key: hamlet_river_shore
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 176
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前的西北小路通往香道城，屋簷下晾著編到一半的草鞋。院裡有一方小菜圃，圃邊的泥還帶著濕氣。
+    desc: 農舍前的西北小路接上商道，商道西南折往香道城。屋簷下晾著編到一半的草鞋，院裡有一方小菜圃。
     anchor_key:
     typeclass:
     scene_archetype: city_street

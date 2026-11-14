@@ -112,29 +112,86 @@ Ground rules:
   `road_network --check` and `map_reference_context --check` both report
   `is up to date`, exit 0. Enabling the areas surfaced no remaining road gap
   and the three spur hamlets of task 3.1 were already in place.
-- [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 
-  Result: not run. The run budget ended before the sweep; no label was run
-  against this tree and no residual-pin rewrite was made.
-- [ ] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
+  Result: every label of the list was run against this tree, grouped only
+  where the guard's 100-test cap required it: `world.lore.tests.test_anchors
+  test_settlements test_anchor_placement` 48 OK and `test_map_district_content
+  test_nations test_sync test_wilderness_entry` 39 OK;
+  `world.maps.tests.test_altoria_capital test_city_movement_cost
+  test_city_walkthrough test_city_wilderness_roundtrip
+  test_editor_final_yaml_adoption test_geography_source test_limbo_room
+  test_movement_roundtrip` 70 OK (303.5 s), `test_runtime_adoption
+  test_settlement_reload test_sparse_graph test_static_map_references
+  test_village_ciaran` 46 OK, `test_wilderness_destination
+  test_wilderness_geography_contract test_wilderness_population
+  test_wilderness_provider` 75 OK, `test_population_geometry` 28 OK;
+  `web.webclient.actions.tests.test_exploration_actions.test_move_and_look
+  test_node_ids` 43 OK, `test_travel_actions
+  web.webclient.presentation.tests.test_area_map` 70 OK (skipped=1),
+  `test_exploration_panel.test_presenter
+  test_exploration_panel.test_wilderness_and_npc_titles
+  test_local_map.test_gate_capacity` 50 OK, `test_local_map
+  .test_gateway_resolution test_grid_gateways test_grid_helpers` 43 OK,
+  `test_local_map.test_per_gate_footprint test_presenter test_wilderness`
+  43 OK, `test_map_quest_destinations test_world_map` 28 OK;
+  `typeclasses.tests.test_exit_movement_cost test_exits test_map_discovery`
+  48 OK, `test_npc_dialogue
+  commands.tests.test_localized.test_xyz_grid_and_help
+  world.quests.tests.test_room_observation` 94 OK;
+  `world.rules.tests.test_movement_settlement test_party_time_settlement
+  test_travel_plan` 77 OK (skipped=1), `test_guild_config.test_price_scaling
+  test_guild_config.test_service_host_roster test_map_knowledge_integration`
+  70 OK, `test_movement test_party_follow test_party_follow_possession` 77 OK,
+  `test_sight` 45 OK;
+  `world.quests.tests.test_compile_offline test_definitions
+  test_scene_builder_offline test_story_effects` 74 OK,
+  `test_compile_blueprint test_compile_registration test_encounter_activation`
+  93 OK, `test_encounter_dispatch test_generated_dialogue_scenes
+  test_package_proposal test_quests_observability` 76 OK,
+  `test_scene_smoke test_story_dialogue
+  world.rules.tests.test_dialogue_refresh_lifecycle` 24 OK. That is 1,307
+  evennia tests across 23 commands, every one green.
 
-  Result: not captured. The capture frontend and environment were built
-  (`pnpm --dir tools/map-editor/frontend install --frozen-lockfile --offline`
-  and `run build:capture`; `uv sync --locked --project tools/map-editor
-  --group capture`; `playwright install chromium`), and the road previews are
-  at `/tmp/grandia-south/roads_villages.png`, `roads_hamlets.png`,
-  `roads_maps.png`; no image was rendered or read.
-- [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-south-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+  `tests.test_map_core_contract` under the plain `unittest` runner: `Ran 4
+  tests`, one error, the documented `ImproperlyConfigured: Requested setting
+  CHANNEL_LOG_NUM_TAIL_LINES, but settings are not configured` raised while
+  importing `evennia.contrib.grid.wilderness` - the runner/settings shape,
+  not a data finding. No residual-pin rewrite was needed.
+- [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
-  Result: partially delivered. `test_data_lint check` → `scanned=1619
-  flagged=121 universe=4362+37 quantity-pins=8 violations=0`, exit 0;
-  `tools.contract_gate` → `contract gate passed: reference-context,
-  traceability, observability, test-data, manifests, contracts`, exit 0;
-  `openspec validate grandia-south-village-placement --strict` → `Change
-  'grandia-south-village-placement' is valid`, exit 0. The second D9 timing
-  line was not recorded. Fifty-one settlements were added: 17 villages
-  (14 on a trunk, 3 off-trunk river sites) and 34 hamlets (28 on a road or a
-  spur, 6 off every road). No spacing exemption is used and no hamlet stands
+  Result: five images rendered and read. Continent:
+  `/tmp/grandia-south/continent.webp` (`--hide partition`). Settlements:
+  `/tmp/grandia-south/village_reed_ford.webp`,
+  `/tmp/grandia-south/village_west_bend.webp`,
+  `/tmp/grandia-south/hamlet_bay_flat.webp`,
+  `/tmp/grandia-south/hamlet_river_mouth.webp`. Entrances:
+  `village_reed_ford` has an east and a west entrance on the shared coast
+  stretch of `city_twin_currents--port_east_bay` and
+  `port_east_bay--port_golden_sheaf`; the east entrance meets the highway
+  toward East Bay and the west one the road toward Twin Currents.
+  `village_west_bend` has one east entrance at the end of its spur
+  `village_pasture_road--village_west_bend`. `hamlet_bay_flat` has an east
+  and a west entrance on `city_twin_currents--port_east_bay`, east toward
+  East Bay and west toward Twin Currents. `hamlet_river_mouth` touches no
+  road; its single north entrance faces the wilderness track toward Golden
+  Sheaf. The last road preview is `/tmp/grandia-south/roads_final.png`;
+  earlier runs left `roads_villages.png`, `roads_hamlets.png` and
+  `roads_maps.png`. The capture reported one advisory diagnostic about
+  `city_imperial_ferry`'s footprint offset, which belongs to an earlier
+  change.
+- [x] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-south-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+
+  Result: `test_data_lint check` -> `scanned=1619 flagged=121 universe=4362+37
+  quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` -> `contract
+  gate passed: reference-context, traceability, observability, test-data,
+  manifests, contracts`, exit 0; `openspec validate
+  grandia-south-village-placement --strict` -> `Change
+  'grandia-south-village-placement' is valid`, exit 0. First timing line:
+  `Ran 46 tests in 354.518s`, `OK`. Second timing line: `Ran 46 tests in
+  345.207s`, `OK`. Fifty-one settlements were added: 17 villages (14 on a
+  trunk, 3 off-trunk river sites) and 34 hamlets (28 on a road or a spur,
+  6 off every road). No spacing exemption is used and no hamlet stands
   on the earlier side of a boundary; the new area does not adjoin a completed
   area by land.
 

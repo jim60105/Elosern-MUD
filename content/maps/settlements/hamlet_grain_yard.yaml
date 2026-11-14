@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 岔路口
-    desc: 岔路口往東南接上平原大道，遠處通往星輝城。路面平直，車轍在日頭下乾得發硬，走起來沙沙作響。
+    desc: 岔路口往東南接上平原大道，大道東北折，通往星輝城。路面平直，車轍在日頭下乾得發硬，走起來沙沙作響。
     anchor_key: hamlet_grain_yard
     typeclass:
     scene_archetype: city_street
