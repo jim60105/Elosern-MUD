@@ -1,10 +1,7 @@
 """Letter-only text counterpart to the server-authorized browser surface."""
 
-import time
-
 from commands.command import Command
 from world.narrative import player_correspondence as letters
-from world.observability import log_info
 
 
 class CmdLetters(Command):
@@ -17,12 +14,6 @@ class CmdLetters(Command):
     aliases = ["letters"]
     locks = "cmd:all()"
     help_category = "一般"
-
-    def at_pre_cmd(self):
-        """Log the bounded arguments like every other command."""
-        self._observability_started = time.perf_counter()
-        log_info("cmd_in", context={"char": self.caller.pk, "cmd": self.key,
-                                    "args": self.args or ""})
 
     def func(self):
         args = (self.args or "").lstrip()

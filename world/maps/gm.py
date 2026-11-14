@@ -13,6 +13,25 @@ from world.rules.surfaces import (
 )
 
 
+def _catch_up_entity_location(entity) -> None:
+    """Catch the settlement unit around one entity up before an operator write."""
+    from world.maps.population_lifecycle import ensure_locations_current
+    from world.rules.movement_edges import (
+        LocationRefError,
+        MovementEdgeError,
+        location_ref,
+    )
+
+    try:
+        location = location_ref(entity)
+    except (
+        LocationRefError,
+        MovementEdgeError,
+    ):  # observability: ignore R2: an unrepresentable position has no unit to catch up
+        return
+    ensure_locations_current([location])
+
+
 def teleport(target, room):
     entity = resolve_target(target, {"characters", "monsters"})
     destination = resolve_target(room, {"rooms"})
@@ -51,6 +70,14 @@ def spawn_monster(species, variant, room):
     # (it may sit inside an automatic birth buffer). Any other room keeps the
     # ordinary move.
     target = wilderness_registration_target(destination)
+    if target is not None:
+        from world.maps.population_lifecycle import ensure_locations_current
+        from world.rules.movement_edges import LocationRef
+
+        wilderness, coordinates = target
+        ensure_locations_current(
+            [LocationRef.wilderness(wilderness.db_key, *coordinates)]
+        )
     surfaces = snapshot_population_surfaces(target[0]) if target is not None else {}
     try:
         with transaction.atomic():
@@ -84,6 +111,9 @@ def delete_entity(target):
     from world.rules.combat_session.records import read_session
 
     entity = resolve_target(target, {"monsters"})
+    # The catch-up can move this individual, so every fact read below must
+    # describe the settled position.
+    _catch_up_entity_location(entity)
     pk = entity.pk
     location = entity.location
     # Capture the complete pre-removal presence before deletion destroys the

@@ -620,6 +620,34 @@ def _destination_locator(
     return None
 
 
+def _movement_passage(
+    source_ref: LocationRef | None,
+    scope: TraversalScope | None,
+    destination: Any | None,
+    wilderness_coordinates: tuple[int, int] | None,
+    destination_coordinates: tuple[int, int] | None,
+) -> list[LocationRef]:
+    """The locators one movement edge announces: where it leaves and lands.
+
+    A committed player-driven edge records exactly its source and destination
+    (``_build_traversal_scope``), so no intermediate cell exists: a wilderness
+    step moves one cell and an authored exit moves room to room or cell to
+    gate. A relocation without a committed scope still announces the positions
+    it can represent.
+    """
+    if scope is not None:
+        return [scope.source, scope.destination]
+    passage: list[LocationRef] = []
+    if source_ref is not None:
+        passage.append(source_ref)
+    destination_ref = _destination_locator(
+        destination, wilderness_coordinates, destination_coordinates
+    )
+    if destination_ref is not None and destination_ref != source_ref:
+        passage.append(destination_ref)
+    return passage
+
+
 def _committed_traversal_seconds(
     traversing_object: Any, cost_key: str | None, window_seconds: int | None
 ) -> int:
@@ -930,10 +958,30 @@ def settle_movement(
         cost_key=cost_key,
         window_seconds=window_seconds,
     )
+    # The passage's units must be current before this edge's own settlement
+    # snapshots and settles anything: one step can enter a unit that lagged
+    # behind the world. The announcement covers the rest of the settlement, so
+    # anything the action itself reaches observes the destination too.
+    passage = _movement_passage(
+        source_ref,
+        scope,
+        destination,
+        wilderness_coordinates,
+        destination_coordinates,
+    )
+    from world.maps.population_lifecycle import ensure_locations_current
+    from world.maps.population_units import announced_observation
+
+    ensure_locations_current(passage)
     # Every panel push, checkpoint fact and settlement callback of this
     # traversal shares one causal publication group, so each watcher receives
     # one final publication for the commit (webclient-publication-settlements).
-    with publication_group(), settlement_scope(traversing_object), traversal_scope(scope):
+    with (
+        announced_observation(passage),
+        publication_group(),
+        settlement_scope(traversing_object),
+        traversal_scope(scope),
+    ):
         snapshot = _snapshot_movement_state(
             traversing_object,
             source_location,

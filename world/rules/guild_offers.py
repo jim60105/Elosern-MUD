@@ -319,8 +319,11 @@ def accept_guild_offer(
     branch_key = guild_staff.branch_key
     if not isinstance(branch_key, str) or not branch_key:
         raise BoardAccessError("GuildStaff host has no branch_key")
-    from world.quests.runtime import accept_quest
+    from world.quests.runtime import accept_quest, ensure_quest_site_current
 
+    # The acceptance reads a bound clear-out's site population, so the site's
+    # unit is caught up before this block's transaction rather than inside it.
+    ensure_quest_site_current(definition_key)
     quest_log_snapshot = attribute_snapshot(actor, "quest_log")
     relations_snapshot = attribute_snapshot(staff, "relations_data")
     try:

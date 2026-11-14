@@ -704,10 +704,47 @@ def _stage_zero_site_clear_out(definition: QuestDefinition) -> QuestObjective | 
     return objective if objective.site_key is not None else None
 
 
+def _ensure_site_current(objective: QuestObjective) -> bool:
+    """Catch the settlement unit of one clear-out's site up to the world tick.
+
+    The site owner's binding-source read answers from the site's own committed
+    state, so the unit that state lives in must be current before the read.
+    Runs before the enclosing writer's transaction and snapshot.
+    """
+    from world.maps import population_units, regional_population
+    from world.maps.population_lifecycle import ensure_population_current
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None:
+        return False
+    index = population_units.current_unit_index()
+    return ensure_population_current(
+        wilderness, {population_units.site_unit(index, objective.site_key)}
+    )
+
+
+def ensure_quest_site_current(definition_key: str) -> bool:
+    """Catch up the site a stage-zero clear-out of ``definition_key`` reads.
+
+    Public for a caller that opens its own transaction around
+    :func:`accept_quest`: that caller catches up before its block instead of
+    nesting this catch-up inside it. A definition that is unknown or not a
+    bound site clear-out settles nothing.
+    """
+    definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
+    if definition is None:
+        return False
+    objective = _stage_zero_site_clear_out(definition)
+    if objective is None:
+        return False
+    return _ensure_site_current(objective)
+
+
 def _site_clear_out_read(objective: QuestObjective) -> Any:
     """The site owner's binding-source read for this clear-out's site."""
     from world.maps.monster_sites import site_living_members
 
+    _ensure_site_current(objective)
     return site_living_members(objective.site_key)
 
 
@@ -893,10 +930,12 @@ def accept_quest(
     # otherwise leave divergent: the writer restores the actor's quest log only
     # for failures inside its own block, and a rollback of this outer block
     # removes the row while the cached attribute keeps it.
+    # The site read is the one population read this acceptance decides on, and
+    # it catches its unit up; it therefore runs before this transaction opens.
+    site_plan = _site_clear_out_plan(definition)
     quest_log_snapshot = snapshot_quest_log(actor)
     try:
         with transaction.atomic():
-            site_plan = _site_clear_out_plan(definition)
             if site_plan is not None:
                 site_objective, site_read = site_plan
                 refusal = _site_clear_out_refusal(site_objective, site_read)
