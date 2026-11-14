@@ -65,6 +65,7 @@ _PANEL_MODULES = (
     ("skill_use", "skill_use.py"),
     ("sleep_handoff", "sleep_handoff.py"),
     ("travel_log", "travel_log.py"),
+    ("rite", "rite.py"),
 )
 
 
@@ -88,8 +89,47 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         self.assertEqual(self._js_allowlist_value(protocol_client_source(), "quest_log"), 2)
 
     @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
+    )
+    def test_rite_bounds_match_the_browser_mirror(self):
+        # The browser mirror repeats every ``RITE_*`` numeral; a drift would let
+        # one side accept a panel the other rejects.
+        js_source = protocol_client_source()
+        for constant in (
+            "RITE_MAX_BYTES",
+            "RITE_MAX_DISTRICT_KEY",
+            "RITE_MAX_DISTRICT_NAME",
+            "RITE_MAX_LANDMARK_NAME",
+            "RITE_MAX_GUARDIAN_NAME",
+            "RITE_MAX_GUARDIAN_FORM",
+            "RITE_MAX_OPTIONS",
+            "RITE_MAX_OPTION_LABEL",
+            "RITE_MAX_PERFORMERS",
+            "RITE_MAX_PERFORMER_NAME",
+            "RITE_MAX_SEEN",
+            "RITE_MAX_DELIVERY_ID",
+            "RITE_MAX_SCENE_ID",
+            "RITE_MAX_SCENE_REVISION",
+            "RITE_MAX_DELIVERY_NAME",
+            "RITE_MAX_LINES",
+            "RITE_MAX_LINE_TEXT",
+        ):
+            match = re.search(
+                rf"^ {{0,2}}var {constant}\s*=\s*([0-9]+)\s*;",
+                js_source,
+                re.MULTILINE,
+            )
+            self.assertIsNotNone(match, constant)
+            self.assertEqual(
+                self._module_value("rite.py", constant),
+                int(match.group(1)),
+                constant,
+            )
+
+    @covers_requirement(
         "webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only",
         "webclient-oob-protocol::every-panel-payload-has-an-exact-availability-discriminator",
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
     )
     def test_panel_schema_versions_are_equal_everywhere(self):
         registry_source = _PY_REGISTRY.read_text(encoding="utf-8")
@@ -652,10 +692,10 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         module_source = (REPO_ROOT / "web/webclient/presentation" / module_name).read_text(
             encoding="utf-8"
         )
-        match = re.search(rf"^{constant}\s*=\s*([0-9]+)", module_source, re.MULTILINE)
+        match = re.search(rf"^{constant}\s*=\s*([0-9_]+)", module_source, re.MULTILINE)
         if match is None:
             return None
-        return int(match.group(1))
+        return int(match.group(1).replace("_", ""))
 
     @staticmethod
     def _js_allowlist_entries(js_source):

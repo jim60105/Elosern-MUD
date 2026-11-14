@@ -78,6 +78,7 @@ var dream = require("./panels/dream.js");
 var skillUse = require("./panels/skill_use.js");
 var sleepHandoff = require("./panels/sleep_handoff.js");
 var travelLog = require("./panels/travel_log.js");
+var rite = require("./panels/rite.js");
 var mapPanels = require("./panels/map_panels.js");
 var mapParts = require("./map_parts.js");
 var MAP_PANEL_SCHEMAS = mapPanels.MAP_PANEL_SCHEMAS;
@@ -110,6 +111,7 @@ var PANEL_VALIDATORS = {
   skill_use: skillUse.validateSkillUsePanel,
   sleep_handoff: sleepHandoff.validateSleepHandoffPanel,
   travel_log: travelLog.validateTravelLogPanel,
+  rite: rite.validateRitePanel,
 };
 
 
