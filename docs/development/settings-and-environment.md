@@ -98,6 +98,14 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_SCHEDULER_INTERVAL_SECONDS` | `ART_SCHEDULER_INTERVAL_SECONDS` | 整數 | `30` | 正整數；排空間隔（於 Script 建立時讀取） |
 | `ART_SCHEDULER_LIMIT` | `ART_SCHEDULER_LIMIT` | 整數 | `4` | 正整數；每 tick 排空的待處理筆數 |
 
+### 人口落後排空控制
+
+| 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
+| --- | --- | --- | --- | --- |
+| `POPULATION_DRAIN_ENABLED` | `POPULATION_DRAIN_ENABLED` | 布林 | `True` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時 PopulationDrainScript 永不排空；落後的單位仍會在需要它的下一個動作前同步追趕 |
+| `POPULATION_DRAIN_INTERVAL_SECONDS` | `POPULATION_DRAIN_INTERVAL_SECONDS` | 整數 | `2` | 正整數；排空重複間隔的真實秒數（於 Script 建立時讀取） |
+| `POPULATION_DRAIN_SLICE_SECONDS` | `POPULATION_DRAIN_SLICE_SECONDS` | 整數 | `600` | 正整數；每次排空推進的遊戲秒數（等於 `monster_activity.RESTING_DECISION_INTERVAL`，故休息中的單位每次約走一個決策） |
+
 ### Webclient 載入旗標
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
