@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_sand_islet
+location_ref: village_sand_islet
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 260
+    y_m: 180
+    prototype_parent: anchor_room
+    key: 沙洲井台
+    desc: 村中的石井鑿在沙洲的硬地上，井欄綁著防風的繩，井水帶著河底沙石的味道。
+    anchor_key: village_sand_islet
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 420
+    y_m: 180
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口的路往西渡營方向去，岸邊的木棧道被水氣泡得發黑，船夫在此卸下渡客。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 180
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口沿著南岸往下游開，沙地上插著測水位的木樁，汛期一來整條路都會浸水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 260
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地舖著白色河石，南邊的水勢平緩，傍晚可見到成群的鷺鳥落灘。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+city_gate:

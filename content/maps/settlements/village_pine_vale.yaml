@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_pine_vale
+location_ref: village_pine_vale
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 222
+    y_m: 186
+    prototype_parent: anchor_room
+    key: 松蔭井台
+    desc: 村中央的井台被老松環著，井水帶著松脂的氣味，孩子們把松果堆在井欄邊。
+    anchor_key: village_pine_vale
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 395
+    y_m: 186
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口的路往東河城去，兩旁松林夾道，路面落滿針葉，車輪走過聲音很輕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 308
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口的道路穿過谷地往遺跡鎮方向，坡上鬆散的碎石沿路滾落，路肩築著矮石牆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 222
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地舖著木屑，南邊的視野越過谷口，可以望見王都方向的炊煙。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

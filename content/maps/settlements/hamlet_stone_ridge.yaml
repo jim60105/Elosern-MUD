@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_stone_ridge
+location_ref: hamlet_stone_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 165
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 石稜路口
+    desc: 路口橫在石稜上，路面窄得只容一車，兩側是裸露的岩層，往下望可見遠處的邊界河。
+    anchor_key: hamlet_stone_ridge
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 165
+    prototype_parent: grid_room
+    key: 稜上農舍
+    desc: 農舍前的空地以石塊圍成矮圈，往西北的路通往界橋城，屋後的稜線一路朝向邊界河。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

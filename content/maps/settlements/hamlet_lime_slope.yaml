@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_lime_slope
+location_ref: hamlet_lime_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 212
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 石灰坡路口
+    desc: 路口的坡面露出灰白的石灰岩，路面被燒窯的煙薰得發亮，風一吹便有細白的粉塵貼地跑。
+    anchor_key: hamlet_lime_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 窯工農舍
+    desc: 農舍前曬著劈好的柴，往西的路通往西風鎮，屋後的坡上一窯一窯排著燒灰的坑口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

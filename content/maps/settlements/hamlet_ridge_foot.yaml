@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_ridge_foot
+location_ref: hamlet_ridge_foot
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 174
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 嶺腳路口
+    desc: 路口就在嶺腳，路面由碎石轉為硬土，路旁立著指往兩處的舊木牌，字跡被風砂磨得模糊。
+    anchor_key: hamlet_ridge_foot
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 174
+    prototype_parent: grid_room
+    key: 嶺腳農舍
+    desc: 農舍前的空地曬著草料，往西北的路通往葡萄鎮，屋後的山壁一路陡起，影子蓋住半個院子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

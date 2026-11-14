@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_charcoal_ridge
+location_ref: village_charcoal_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 198
+    y_m: 198
+    prototype_parent: anchor_room
+    key: 火膛空地
+    desc: 村中的空地立著一座石砌火膛，井水混著炭灰的味道，孩子們在膛邊撿拾未燒透的碎炭。
+    anchor_key: village_charcoal_ridge
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 296
+    y_m: 296
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口的路往合流城去，沿路堆著一袋袋紮好的木炭，車轍一路壓進山坳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口朝著白帆港的低地敞開，坡上的林木被砍成炭材，斷樁上還留著去年的刀痕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 247
+    y_m: 149
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地打掃得極乾淨，炭煙在屋簷下盤旋，東南方的坡面透出燒窯後的灰白。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_well_slope
+location_ref: hamlet_well_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 203
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 坡井路口
+    desc: 路口順著坡勢挖出一口淺井，井邊砌著石臺，旅人在此歇腳取水，井繩在欄上繞了好幾圈。
+    anchor_key: hamlet_well_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 井坡農舍
+    desc: 農舍前的空地曬著衣布，往西的路通往聖潔王都，屋後的坡地乾燥而多石。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

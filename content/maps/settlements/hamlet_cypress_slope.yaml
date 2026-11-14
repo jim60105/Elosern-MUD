@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_cypress_slope
+location_ref: hamlet_cypress_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 169
+    y_m: 169
+    prototype_parent: anchor_room
+    key: 柏坡路口
+    desc: 路口順著柏樹坡展開，路肩堆著伐下的柏木，車轍沿著坡道下滑，煞車的木楔就擱在路邊。
+    anchor_key: hamlet_cypress_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 鋸木農舍
+    desc: 農舍前架著鋸木的長凳，往西南的路通往西礦港，屋後的柏樹排成一片深綠，樹脂的氣味很重。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

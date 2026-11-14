@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_stone_enclosure
+location_ref: village_stone_enclosure
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 208
+    y_m: 208
+    prototype_parent: anchor_room
+    key: 石圍井台
+    desc: 村中的井台被石牆圍住一半，牆縫裡長著耐旱的草，婦人在井邊洗滌並交換消息。
+    anchor_key: village_stone_enclosure
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 316
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口的石砌門洞通往葡萄鎮，門楣上的石塊被風砂磨圓，牆外就是乾燥的緩坡。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 316
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口朝著互市城的方向，牆外的路面鋪滿碎石，走遠仍能看見村牆的輪廓。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 154
+    y_m: 154
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地與村牆連成一體，西南方是一片開闊的旱地，禮拜時鐘聲在牆間迴響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

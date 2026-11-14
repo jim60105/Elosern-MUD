@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_lime_post
+location_ref: hamlet_lime_post
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 182
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 換騾路口
+    desc: 路口有一座供騾隊歇腳的棚子，石灰袋靠在棚柱邊，路面泛著白粉，車伕在棚下重新綁緊貨繩。
+    anchor_key: hamlet_lime_post
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 182
+    prototype_parent: grid_room
+    key: 驛旁農舍
+    desc: 農舍前的空地是換騾的場地，往西北的路通往葡萄鎮，屋後的坡上就是採石的白崖。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_tea_ridge
+location_ref: village_tea_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 227
+    y_m: 227
+    prototype_parent: anchor_room
+    key: 茶嶺井台
+    desc: 村中的井台旁架著炒茶的石灶，井水用來洗茶篩，空氣裡瀰漫著烘焙茶葉的香氣。
+    anchor_key: village_tea_ridge
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 354
+    y_m: 354
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口的路沿著稜線往合流城去，兩側是一畦畦茶園，採茶人的竹簍排在路邊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口順著鹽路下到鹽津城，坡上的茶樹一路排到谷底，路肩曬著剛揉過的茶葉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 291
+    y_m: 163
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 小教堂前的庭地掃得乾淨，東南方的谷地飄著薄霧，春茶季時庭前會臨時架起茶棚。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_deer_slope
+location_ref: hamlet_deer_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 161
+    y_m: 161
+    prototype_parent: anchor_room
+    key: 鹿坡路口
+    desc: 路口的坡地草短，鹿群常在黃昏從坡上下來，路口留著新踏的蹄痕，路旁的矮叢被啃得齊整。
+    anchor_key: hamlet_deer_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 鞣皮農舍
+    desc: 農舍前曬著鞣過的鹿皮，往西南的路通往葡萄鎮，屋後的坡上有一道鹿群踩出的小徑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

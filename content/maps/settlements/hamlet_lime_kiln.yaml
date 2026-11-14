@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_lime_kiln
+location_ref: hamlet_lime_kiln
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 185
+    y_m: 185
+    prototype_parent: anchor_room
+    key: 灰窯路口
+    desc: 路口的石灰窯冒著白煙，路面鋪著燒過的碎石，踩上去沙沙作響，路旁的柴束堆得比人還高。
+    anchor_key: hamlet_lime_kiln
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 灰工農舍
+    desc: 農舍前的空地堆著石灰與柴束，往西南的路通往丘河鎮，屋牆被煙燻成灰白，門檻積著細粉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

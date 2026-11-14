@@ -641,7 +641,8 @@ locations:
   village_cattle_pasture:
     kind: village
     display_name_zh: 牛埔村
-    description: Cattle-raising village on the open pasture of the long hill road.
+    description: Cattle-raising village on the open pasture of the long hill 
+      road.
     cell:
       cell_x: 1228
       cell_y: 847
@@ -651,7 +652,7 @@ locations:
   village_salt_hollow:
     kind: village
     display_name_zh: 鹽坳村
-    description: Village on the salt road where it climbs the long vale south of 
+    description: Village on the salt road where it climbs the long vale south of
       the honey vale.
     cell:
       cell_x: 1040
@@ -662,7 +663,7 @@ locations:
   village_wheat_plain:
     kind: village
     display_name_zh: 麥埔村
-    description: Farming village on the open wheat flats of the western vale, on 
+    description: Farming village on the open wheat flats of the western vale, on
       the trunk road.
     cell:
       cell_x: 1105
@@ -677,14 +678,14 @@ locations:
     cell:
       cell_x: 1150
       cell_y: 715
-    geographic_constraint: River bank on the south side of the hills river, below 
-      the trunk road
+    geographic_constraint: River bank on the south side of the hills river, 
+      below the trunk road
     scene_archetype:
   hamlet_charcoal_kiln:
     kind: hamlet
     display_name_zh: 炭窯
-    description: Charcoal burner's hamlet on the road between the east river city 
-      and the scarp.
+    description: Charcoal burner's hamlet on the road between the east river 
+      city and the scarp.
     cell:
       cell_x: 1190
       cell_y: 887
@@ -697,8 +698,8 @@ locations:
     cell:
       cell_x: 1168
       cell_y: 689
-    geographic_constraint: Valley floor on the trunk road midway between the honey 
-      vale and the scarp
+    geographic_constraint: Valley floor on the trunk road midway between the 
+      honey vale and the scarp
     scene_archetype:
   hamlet_stone_house:
     kind: hamlet
@@ -708,21 +709,25 @@ locations:
     cell:
       cell_x: 1162
       cell_y: 943
-    geographic_constraint: Northern entry of the hill road into the western hills
+    geographic_constraint: Northern entry of the hill road into the western 
+      hills
     scene_archetype:
   hamlet_stone_wall:
     kind: hamlet
     display_name_zh: 石壁
-    description: Hamlet by the stone wall of the road just north of the scarp town.
+    description: Hamlet by the stone wall of the road just north of the scarp 
+      town.
     cell:
       cell_x: 1276
       cell_y: 719
-    geographic_constraint: Stone-walled stretch of the hill road north of the scarp
+    geographic_constraint: Stone-walled stretch of the hill road north of the 
+      scarp
     scene_archetype:
   hamlet_tea_hut:
     kind: hamlet
     display_name_zh: 茶寮
-    description: Tea hut hamlet on the salt road at the southern edge of the hills.
+    description: Tea hut hamlet on the salt road at the southern edge of the 
+      hills.
     cell:
       cell_x: 1039
       cell_y: 531
@@ -741,8 +746,8 @@ locations:
   hamlet_vale_mouth:
     kind: hamlet
     display_name_zh: 谷口
-    description: Hamlet at the mouth of the vale where the trunk road turns toward 
-      the scarp.
+    description: Hamlet at the mouth of the vale where the trunk road turns 
+      toward the scarp.
     cell:
       cell_x: 1238
       cell_y: 689
@@ -752,13 +757,13 @@ locations:
   hamlet_water_mill:
     kind: hamlet
     display_name_zh: 水磨
-    description: Water mill hamlet on the south bank of the hills river, below the 
-      trunk road.
+    description: Water mill hamlet on the south bank of the hills river, below 
+      the trunk road.
     cell:
       cell_x: 1093
       cell_y: 711
-    geographic_constraint: River bank on the south side of the hills river, below 
-      the trunk road
+    geographic_constraint: River bank on the south side of the hills river, 
+      below the trunk road
     scene_archetype:
   hamlet_wooden_fence:
     kind: hamlet
@@ -768,4 +773,568 @@ locations:
       cell_x: 1237
       cell_y: 777
     geographic_constraint: Hill road on the northern approach to the scarp
+    scene_archetype:
+  village_stone_slope:
+    kind: village
+    display_name_zh: 石坡村
+    description: Village on a stone terrace above the capital river bend, on the
+      road south from the confluence.
+    cell:
+      cell_x: 600
+      cell_y: 747
+    geographic_constraint: Stone terrace above the capital river bend, on the 
+      road from the confluence to the salt ferry
+    scene_archetype:
+  village_pine_vale:
+    kind: village
+    display_name_zh: 松谷村
+    description: Village in a pine-lined vale north of the capital, on the road 
+      to the ruins gate.
+    cell:
+      cell_x: 798
+      cell_y: 1051
+    geographic_constraint: Pine vale on the ruins road north of the capital city
+    scene_archetype:
+  village_tea_ridge:
+    kind: village
+    display_name_zh: 茶嶺村
+    description: Tea-growing village on the ridge of the hill road between the 
+      confluence and the salt ferry.
+    cell:
+      cell_x: 567
+      cell_y: 688
+    geographic_constraint: Tea ridge on the hill road above the capital river 
+      south of the confluence
+    scene_archetype:
+  village_wheat_hollow:
+    kind: village
+    display_name_zh: 麥坳村
+    description: Wheat-growing village in a broad hollow of the ruins road, 
+      halfway to the ruins gate.
+    cell:
+      cell_x: 734
+      cell_y: 1054
+    geographic_constraint: Wheat hollow on the trunk road between the capital 
+      and the ruins gate
+    scene_archetype:
+  village_willow_creek:
+    kind: village
+    display_name_zh: 柳溪村
+    description: Willow-lined village on the north bank of the hills river, 
+      where the ore road runs down to the western port.
+    cell:
+      cell_x: 350
+      cell_y: 865
+    geographic_constraint: North bank terrace of the hills river on the ore road
+      west of the ore hills
+    scene_archetype:
+  village_stone_enclosure:
+    kind: village
+    display_name_zh: 石圍村
+    description: Walled farmstead village where the two roads from the border 
+      bridge divide.
+    cell:
+      cell_x: 855
+      cell_y: 1307
+    geographic_constraint: Dry upland where the roads from the border bridge 
+      divide
+    scene_archetype:
+  village_stone_pit:
+    kind: village
+    display_name_zh: 石坑村
+    description: Quarry village in the dry northern hills, on the road up to the
+      ruins gate.
+    cell:
+      cell_x: 683
+      cell_y: 1088
+    geographic_constraint: Quarry hollow on the ruins road in the dry northern 
+      hills
+    scene_archetype:
+  village_maple_hollow:
+    kind: village
+    display_name_zh: 楓坳村
+    description: Village in a maple hollow on the upland stretch of the salt 
+      ferry road.
+    cell:
+      cell_x: 532
+      cell_y: 638
+    geographic_constraint: Maple hollow on the upland salt ferry road above the 
+      capital river
+    scene_archetype:
+  village_horse_ridge:
+    kind: village
+    display_name_zh: 馬嶺村
+    description: Horse-breeding village on the high ridge between the border 
+      bridge roads.
+    cell:
+      cell_x: 904
+      cell_y: 1258
+    geographic_constraint: High ridge pasture between the roads from the border 
+      bridge
+    scene_archetype:
+  village_sheep_fold:
+    kind: village
+    display_name_zh: 羊寨村
+    description: Stockaded sheep-farming village on the high ground of the ruins
+      road.
+    cell:
+      cell_x: 628
+      cell_y: 1112
+    geographic_constraint: High pasture of the ruins road, west of the dry 
+      northern hills
+    scene_archetype:
+  village_cattle_ridge:
+    kind: village
+    display_name_zh: 牛嶺村
+    description: Cattle-raising village on the ridge east of the capital, on the
+      vineyard road.
+    cell:
+      cell_x: 953
+      cell_y: 1118
+    geographic_constraint: Ridge pasture on the vineyard road east of the 
+      capital city
+    scene_archetype:
+  village_charcoal_ridge:
+    kind: village
+    display_name_zh: 炭嶺村
+    description: Charcoal-burning village at the southern end of the salt ferry 
+      road, above the capital river.
+    cell:
+      cell_x: 455
+      cell_y: 540
+    geographic_constraint: Charcoal upland at the southern end of the salt ferry
+      road above the capital river
+    scene_archetype:
+  village_well_hollow:
+    kind: village
+    display_name_zh: 井坳村
+    description: Village around a deep well east of the capital, on the vineyard
+      road.
+    cell:
+      cell_x: 910
+      cell_y: 1075
+    geographic_constraint: Well hollow on the vineyard road east of the capital 
+      city
+    scene_archetype:
+  village_river_islet:
+    kind: village
+    display_name_zh: 河洲村
+    description: Village on a gravel islet reach of the capital river, below the
+      confluence.
+    cell:
+      cell_x: 627
+      cell_y: 851
+    geographic_constraint: Gravel bar in the capital river below the confluence,
+      off the trunk road
+    scene_archetype:
+  village_sand_islet:
+    kind: village
+    display_name_zh: 沙洲村
+    description: Village on a sand bar of the border river, downstream of the 
+      western crossing.
+    cell:
+      cell_x: 392
+      cell_y: 1336
+    geographic_constraint: Sand bar on the south bank of the border river 
+      downstream of the western crossing
+    scene_archetype:
+  village_maple_bank:
+    kind: village
+    display_name_zh: 楓岸村
+    description: Maple-banked village on the upper capital river, upstream of 
+      the east river city.
+    cell:
+      cell_x: 1102
+      cell_y: 1071
+    geographic_constraint: Maple bank of the upper capital river upstream of the
+      east river city
+    scene_archetype:
+  village_sand_bank:
+    kind: village
+    display_name_zh: 沙岸村
+    description: Village on the sandy south bank of the border river, downstream
+      of the eastern crossing.
+    cell:
+      cell_x: 1082
+      cell_y: 1356
+    geographic_constraint: Sandy south bank of the border river downstream of 
+      the eastern crossing
+    scene_archetype:
+  hamlet_stone_post:
+    kind: hamlet
+    display_name_zh: 石鋪
+    description: Stone staging post on the road from the confluence to the honey
+      vale.
+    cell:
+      cell_x: 663
+      cell_y: 788
+    geographic_constraint: Staging post on the confluence-honey vale road
+    scene_archetype:
+  hamlet_brick_kiln:
+    kind: hamlet
+    display_name_zh: 磚窯
+    description: Brick kiln hamlet on the road east of the confluence.
+    cell:
+      cell_x: 712
+      cell_y: 741
+    geographic_constraint: Clay pit and kiln beside the road east of the 
+      confluence
+    scene_archetype:
+  hamlet_copper_ore:
+    kind: hamlet
+    display_name_zh: 銅礦
+    description: Copper-mining hamlet in the ore hills above the western port 
+      road.
+    cell:
+      cell_x: 346
+      cell_y: 932
+    geographic_constraint: Copper seam in the ore hills above the western port 
+      road
+    scene_archetype:
+  hamlet_stone_well:
+    kind: hamlet
+    display_name_zh: 石井
+    description: Wellside hamlet on the road between the capital and the 
+      confluence.
+    cell:
+      cell_x: 813
+      cell_y: 988
+    geographic_constraint: Stone well on the capital-confluence road
+    scene_archetype:
+  hamlet_pine_hollow:
+    kind: hamlet
+    display_name_zh: 松坳
+    description: Pine hollow hamlet on the road from the confluence to the honey
+      vale.
+    cell:
+      cell_x: 770
+      cell_y: 714
+    geographic_constraint: Pine hollow on the road from the confluence to the 
+      honey vale
+    scene_archetype:
+  hamlet_hemp_slope:
+    kind: hamlet
+    display_name_zh: 麻坡
+    description: Hemp-growing hamlet on the slope above the capital river road.
+    cell:
+      cell_x: 763
+      cell_y: 938
+    geographic_constraint: Hemp slope above the capital-confluence road
+    scene_archetype:
+  hamlet_maple_slope:
+    kind: hamlet
+    display_name_zh: 楓坡
+    description: Maple slope hamlet on the road to the honey vale.
+    cell:
+      cell_x: 839
+      cell_y: 714
+    geographic_constraint: Maple slope on the honey vale road
+    scene_archetype:
+  hamlet_deer_slope:
+    kind: hamlet
+    display_name_zh: 鹿坡
+    description: Deer-hunting hamlet on the hill road below the eastern border 
+      crossing.
+    cell:
+      cell_x: 1101
+      cell_y: 1313
+    geographic_constraint: Deer slope on the road between the eastern crossing 
+      and the vineyard town
+    scene_archetype:
+  hamlet_lime_kiln:
+    kind: hamlet
+    display_name_zh: 灰窯
+    description: Lime kiln hamlet on the road from the ore city to the ruins 
+      gate.
+    cell:
+      cell_x: 374
+      cell_y: 1040
+    geographic_constraint: Limestone kiln beside the ore city-ruins gate road
+    scene_archetype:
+  hamlet_stone_palisade:
+    kind: hamlet
+    display_name_zh: 石寨
+    description: Palisaded farmstead on the long road between the ruins gate and
+      the western crossing.
+    cell:
+      cell_x: 487
+      cell_y: 1186
+    geographic_constraint: Stone palisade on the ruins gate-western crossing 
+      road
+    scene_archetype:
+  hamlet_tea_slope:
+    kind: hamlet
+    display_name_zh: 茶坡
+    description: Tea slope hamlet above the ore road in the western hills.
+    cell:
+      cell_x: 311
+      cell_y: 825
+    geographic_constraint: Tea slope above the ore road in the western hills
+    scene_archetype:
+  hamlet_stone_farm:
+    kind: hamlet
+    display_name_zh: 石莊
+    description: Stone farmstead on the road between the capital and the 
+      confluence.
+    cell:
+      cell_x: 713
+      cell_y: 890
+    geographic_constraint: Stone farmstead on the capital-confluence road
+    scene_archetype:
+  hamlet_hemp_hollow:
+    kind: hamlet
+    display_name_zh: 麻坳
+    description: Hemp hollow hamlet on the road to the honey vale.
+    cell:
+      cell_x: 906
+      cell_y: 709
+    geographic_constraint: Hemp hollow on the honey vale road
+    scene_archetype:
+  hamlet_lime_slope:
+    kind: hamlet
+    display_name_zh: 灰坡
+    description: Lime-burning hamlet on the upland road between the ore city and
+      the western shore.
+    cell:
+      cell_x: 260
+      cell_y: 1000
+    geographic_constraint: Lime slope on the upland road to the western shore
+    scene_archetype:
+  hamlet_willow_pond:
+    kind: hamlet
+    display_name_zh: 柳塘
+    description: Willow pond hamlet on the road east of the capital.
+    cell:
+      cell_x: 929
+      cell_y: 1039
+    geographic_constraint: Willow pond beside the capital-east river road
+    scene_archetype:
+  hamlet_deer_ridge:
+    kind: hamlet
+    display_name_zh: 鹿嶺
+    description: Deer ridge hamlet on the road between the eastern crossing and 
+      the vineyard town.
+    cell:
+      cell_x: 1057
+      cell_y: 1266
+    geographic_constraint: Deer ridge on the eastern crossing-vineyard road
+    scene_archetype:
+  hamlet_sea_plain:
+    kind: hamlet
+    display_name_zh: 海埔
+    description: Salt-rimed plain hamlet on the coast road between the hills 
+      river mouth and the western fishing town.
+    cell:
+      cell_x: 155
+      cell_y: 899
+    geographic_constraint: Coastal plain on the road between the hills river 
+      mouth and the western shore
+    scene_archetype:
+  hamlet_charcoal_slope:
+    kind: hamlet
+    display_name_zh: 炭坡
+    description: Charcoal slope hamlet on the road between the ore city and the 
+      ruins gate.
+    cell:
+      cell_x: 416
+      cell_y: 1079
+    geographic_constraint: Charcoal slope on the ore city-ruins gate road
+    scene_archetype:
+  hamlet_ridge_foot:
+    kind: hamlet
+    display_name_zh: 嶺腳
+    description: Hamlet at the foot of the ridge on the hill road from the east 
+      river city.
+    cell:
+      cell_x: 1084
+      cell_y: 1027
+    geographic_constraint: Foot of the ridge on the hill road below the scarp
+    scene_archetype:
+  hamlet_stone_hollow:
+    kind: hamlet
+    display_name_zh: 石坳
+    description: Stone hollow hamlet on the long road between the ruins gate and
+      the western crossing.
+    cell:
+      cell_x: 478
+      cell_y: 1240
+    geographic_constraint: Stone hollow on the ruins gate-western crossing road
+    scene_archetype:
+  hamlet_cypress_slope:
+    kind: hamlet
+    display_name_zh: 柏坡
+    description: Cypress slope hamlet on the ore road above the western port.
+    cell:
+      cell_x: 271
+      cell_y: 785
+    geographic_constraint: Cypress slope above the western ore road
+    scene_archetype:
+  hamlet_wheat_post:
+    kind: hamlet
+    display_name_zh: 麥鋪
+    description: Wheat staging post on the road from the confluence to the 
+      capital.
+    cell:
+      cell_x: 663
+      cell_y: 840
+    geographic_constraint: Staging post on the confluence-capital road
+    scene_archetype:
+  hamlet_honey_pond:
+    kind: hamlet
+    display_name_zh: 蜜塘
+    description: Beekeeping hamlet at a pond below the honey vale.
+    cell:
+      cell_x: 975
+      cell_y: 709
+    geographic_constraint: Pond below the honey vale ford
+    scene_archetype:
+  hamlet_sand_plain:
+    kind: hamlet
+    display_name_zh: 沙埔
+    description: Sandy plain hamlet on the road between the ore city and the 
+      western shore.
+    cell:
+      cell_x: 191
+      cell_y: 1000
+    geographic_constraint: Sandy plain on the road to the western shore
+    scene_archetype:
+  hamlet_well_slope:
+    kind: hamlet
+    display_name_zh: 井坡
+    description: Well slope hamlet on the road east of the capital.
+    cell:
+      cell_x: 993
+      cell_y: 1050
+    geographic_constraint: Well slope on the capital-east river road
+    scene_archetype:
+  hamlet_brick_slope:
+    kind: hamlet
+    display_name_zh: 磚坡
+    description: Brick clay slope hamlet on the road between the eastern 
+      crossing and the vineyard town.
+    cell:
+      cell_x: 1034
+      cell_y: 1210
+    geographic_constraint: Brick clay slope on the eastern crossing-vineyard 
+      road
+    scene_archetype:
+  hamlet_charcoal_hollow:
+    kind: hamlet
+    display_name_zh: 炭坳
+    description: Charcoal hollow hamlet on the salt ferry road above the capital
+      river.
+    cell:
+      cell_x: 496
+      cell_y: 588
+    geographic_constraint: Charcoal hollow on the salt ferry road above the 
+      capital river
+    scene_archetype:
+  hamlet_sea_end:
+    kind: hamlet
+    display_name_zh: 海尾
+    description: Hamlet on the flats at the western end of the coast road, below
+      the fishing town.
+    cell:
+      cell_x: 149
+      cell_y: 956
+    geographic_constraint: Flats at the western end of the coast road below the 
+      western fishing town
+    scene_archetype:
+  hamlet_stone_gate:
+    kind: hamlet
+    display_name_zh: 石門
+    description: Stone gate hamlet on the road east of the ruins gate.
+    cell:
+      cell_x: 458
+      cell_y: 1118
+    geographic_constraint: Stone outcrop on the ruins gate road
+    scene_archetype:
+  hamlet_lime_post:
+    kind: hamlet
+    display_name_zh: 灰鋪
+    description: Lime staging post on the hill road below the scarp.
+    cell:
+      cell_x: 1124
+      cell_y: 985
+    geographic_constraint: Lime staging post on the hill road below the scarp
+    scene_archetype:
+  hamlet_cypress_hollow:
+    kind: hamlet
+    display_name_zh: 柏坳
+    description: Cypress hollow hamlet on the road between the western crossing 
+      and the ruins gate.
+    cell:
+      cell_x: 463
+      cell_y: 1291
+    geographic_constraint: Cypress hollow near the western border crossing
+    scene_archetype:
+  hamlet_ore_post:
+    kind: hamlet
+    display_name_zh: 礦鋪
+    description: Ore staging post on the road down from the western ore port.
+    cell:
+      cell_x: 231
+      cell_y: 745
+    geographic_constraint: Ore staging post on the road from the western ore 
+      port
+    scene_archetype:
+  hamlet_wheat_ridge:
+    kind: hamlet
+    display_name_zh: 麥嶺
+    description: Wheat ridge hamlet on the ruins road east of the capital.
+    cell:
+      cell_x: 569
+      cell_y: 1128
+    geographic_constraint: Wheat ridge on the ruins road east of the capital 
+      city
+    scene_archetype:
+  hamlet_stone_ridge:
+    kind: hamlet
+    display_name_zh: 石嶺
+    description: Stone ridge hamlet on the road between the eastern crossing and
+      the vineyard town.
+    cell:
+      cell_x: 953
+      cell_y: 1209
+    geographic_constraint: Stone ridge on the eastern crossing-vineyard road
+    scene_archetype:
+  hamlet_willow_shallows:
+    kind: hamlet
+    display_name_zh: 柳灘
+    description: Willow shallows hamlet on the hills river below the confluence.
+    cell:
+      cell_x: 627
+      cell_y: 791
+    geographic_constraint: Willow shallows on the hills river below the 
+      confluence
+    scene_archetype:
+  hamlet_water_pond:
+    kind: hamlet
+    display_name_zh: 水塘
+    description: Riverside farmstead at an irrigation pond below the capital 
+      city.
+    cell:
+      cell_x: 837
+      cell_y: 1036
+    geographic_constraint: Irrigation pond on the capital river below the 
+      capital city
+    scene_archetype:
+  hamlet_creek_mouth:
+    kind: hamlet
+    display_name_zh: 溪口
+    description: Hamlet at the mouth of the hills river, below the hill port.
+    cell:
+      cell_x: 177
+      cell_y: 846
+    geographic_constraint: Mouth of the hills river below the hill port
+    scene_archetype:
+  hamlet_ridge_end:
+    kind: hamlet
+    display_name_zh: 嶺尾
+    description: Hamlet at the end of the ridge road above the border valley.
+    cell:
+      cell_x: 1115
+      cell_y: 1331
+    geographic_constraint: End of the ridge road on the spur below the eastern 
+      crossing
     scene_archetype:

@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_deer_ridge
+location_ref: hamlet_deer_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 189
+    prototype_parent: anchor_room
+    key: 獵路口
+    desc: 路口旁立著獵人剝皮的木架，路面散落著鹿蹄印，清晨的霧裡常傳來鹿鳴與狗吠。
+    anchor_key: hamlet_deer_ridge
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 獵戶農舍
+    desc: 農舍前的空地掛著風乾的鹿肉，南邊的稜線上是成群的鹿徑，屋角堆著弓箭與皮索。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:
