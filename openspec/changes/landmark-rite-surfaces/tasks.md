@@ -21,8 +21,8 @@ Do not edit `AppClient.vue`, `AppShell.vue`, any store, or anything under `docs/
 
 ## 4. Stories and guide
 
-- [ ] 4.1 Create `stories/World/LandmarkRite.stories.js` per design D6 and add the manifest entry. Verify: `pnpm run build-storybook` succeeds and `pnpm run showcase-coverage` exits 0.
-- [ ] 4.2 With Storybook running (`pnpm exec storybook dev -p 6006 --no-open`, or the instance already on port 6006), open the stories `World/LandmarkRite` `ArrivalCard`, `PanelCompanion` and `Backdrop` in a throwaway headless browser at 1451x790 and at 2560x1440 and compare each with the matching `Design/LandmarkRites` story. Verify: no text below 16px, no clipped button or row, and the layout matches the approved prototype except for the differences design D3 to D5 name; attach the six screenshots' paths to the hand-off.
+- [x] 4.1 Create `stories/World/LandmarkRite.stories.js` per design D6 and add the manifest entry. Verify: `pnpm run build-storybook` succeeds and `pnpm run showcase-coverage` exits 0.
+- [x] 4.2 With Storybook running (`pnpm exec storybook dev -p 6006 --no-open`, or the instance already on port 6006), open the stories `World/LandmarkRite` `ArrivalCard`, `PanelCompanion` and `Backdrop` in a throwaway headless browser at 1451x790 and at 2560x1440 and compare each with the matching `Design/LandmarkRites` story. Verify: no text below 16px, no clipped button or row, and the layout matches the approved prototype except for the differences design D3 to D5 name; attach the six screenshots' paths to the hand-off.
 - [ ] 4.3 Add the paragraph of design D8 to `web/webclient-app/AGENTS.md`. Verify: `grep -c RiteArrivalCard web/webclient-app/AGENTS.md` prints at least 1.
 
 ## 5. Gates
