@@ -22,6 +22,8 @@ from evennia.utils.utils import delay
 from world.maps.map_data import SETTLEMENT_GRAPHS, settlement_graph
 from world.maps.xymap_graph import graph_from_xymap
 
+from commands.command import PopulationCatchUpMixin
+
 PathData = namedtuple("PathData", ("target", "graph", "directions", "legs", "task"))
 
 
@@ -39,7 +41,7 @@ def _route_graph(z_map_key):
     return graph_from_xymap(get_xyzgrid().get_map(z_map_key))
 
 
-class CmdGoto(_CmdGoto):
+class CmdGoto(PopulationCatchUpMixin, _CmdGoto):
     """前往此區域中指定名稱的地點（最短路徑）
 
     用法：
@@ -241,7 +243,7 @@ class CmdGoto(_CmdGoto):
             return None
 
 
-class CmdMap(_CmdMap):
+class CmdMap(PopulationCatchUpMixin, _CmdMap):
     """顯示一個區域的地圖
 
     用法：

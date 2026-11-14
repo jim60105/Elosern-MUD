@@ -1555,8 +1555,13 @@ def _select_authored_topic(
     escort_effect = False
     escort_actors: tuple[Any, ...] = ()
     if requested_effect is not None:
+        from world.quests.runtime import ensure_quest_site_current
         from world.quests.transitions import snapshot_quest_log
 
+        # A site clear-out effect reads its site's population inside the
+        # acceptance, so the site's unit is caught up before this selection's
+        # transaction opens rather than inside it.
+        ensure_quest_site_current(requested_effect.reference)
         quest_snapshot = snapshot_quest_log(owner)
         escort_effect = _is_escort_effect(requested_effect.reference)
         if escort_effect:

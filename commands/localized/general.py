@@ -46,6 +46,8 @@ from world.rules.party_inventory import (
 from world.rules.party_scope import PartyScopeError, resolve_member_token
 from world.rules.quest_delivery import item_display_name
 
+from commands.command import PopulationCatchUpMixin
+
 
 class NumberedTargetCommand(_NumberedTargetCommand):
     """Numbered-target parse that also accepts the zh-tw classifier 「個」.
@@ -178,7 +180,7 @@ def _transfer_with_plan(
     return list(objs)
 
 
-class CmdLook(_CmdLook):
+class CmdLook(PopulationCatchUpMixin, _CmdLook):
     """查看目前位置或對象
 
     用法：
@@ -232,7 +234,7 @@ class CmdLook(_CmdLook):
         self.caller.msg("\n".join(service_report_lines(target, services)))
 
 
-class CmdSay(_CmdSay):
+class CmdSay(PopulationCatchUpMixin, _CmdSay):
     """以角色身分說話
 
     用法：
@@ -258,7 +260,7 @@ class CmdSay(_CmdSay):
         caller.at_say(speech, msg_self=True)
 
 
-class CmdPose(_CmdPose):
+class CmdPose(PopulationCatchUpMixin, _CmdPose):
     """做一個動作
 
     用法：
@@ -293,7 +295,7 @@ class CmdPose(_CmdPose):
             )
 
 
-class CmdGet(_CmdGet, NumberedTargetCommand):
+class CmdGet(PopulationCatchUpMixin, _CmdGet, NumberedTargetCommand):
     """撿起物品
 
     用法：
@@ -355,7 +357,7 @@ class CmdGet(_CmdGet, NumberedTargetCommand):
         )
 
 
-class CmdDrop(_CmdDrop, NumberedTargetCommand):
+class CmdDrop(PopulationCatchUpMixin, _CmdDrop, NumberedTargetCommand):
     """丟下物品
 
     用法：
@@ -446,7 +448,7 @@ class CmdDrop(_CmdDrop, NumberedTargetCommand):
         )
 
 
-class CmdGive(_CmdGive, NumberedTargetCommand):
+class CmdGive(PopulationCatchUpMixin, _CmdGive, NumberedTargetCommand):
     """把物品交給別人
 
     用法：
@@ -654,7 +656,7 @@ class CmdGive(_CmdGive, NumberedTargetCommand):
         return True
 
 
-class CmdHome(_CmdHome):
+class CmdHome(PopulationCatchUpMixin, _CmdHome):
     """回到角色的重生點
 
     用法：
@@ -680,7 +682,7 @@ class CmdHome(_CmdHome):
             caller.move_to(home, move_type="teleport")
 
 
-class CmdWhisper(_CmdWhisper):
+class CmdWhisper(PopulationCatchUpMixin, _CmdWhisper):
     """對另一個人悄聲說話
 
     用法：
@@ -713,7 +715,7 @@ class CmdWhisper(_CmdWhisper):
         caller.at_say(speech, msg_self=msg_self, receivers=receivers, whisper=True)
 
 
-class CmdNick(_CmdNick):
+class CmdNick(PopulationCatchUpMixin, _CmdNick):
     """建立個人暱稱
 
     用法：
@@ -889,7 +891,7 @@ class CmdNick(_CmdNick):
         caller.msg(string)
 
 
-class CmdSetDesc(_CmdSetDesc):
+class CmdSetDesc(PopulationCatchUpMixin, _CmdSetDesc):
     """設定你自己的描述
 
     用法：

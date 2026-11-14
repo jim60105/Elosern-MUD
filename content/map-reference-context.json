@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "2ad0c561d087d68f67e1cf66b1d6c76458b1e685dfec9d86061ed882e498ba8e",
+  "fingerprint": "be43c99c6ab77bfb85238266b3d2f36061b95807df5c637c64feaa90ec046d9f",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16270,7 +16270,7 @@
     "world/rules/defeat_aftermath/validation_digest.py": "40c95da8c58c2fd5f89fb20be78e47636b032ea1ead195d994701f061af8861c",
     "world/rules/defeat_aftermath/validation_violation.py": "f622b457d1bea7c69663c2722802cc59a4a3cf5c5b03d0760a8e4a2ce6750889",
     "world/rules/defeat_aftermath/violation.py": "cb468eeb5a89f0edafbb8507ce83ec5aa253fb73832f7e6894fd8884a3135511",
-    "world/rules/dialogue.py": "e4bde885388686bc35a6df7e3b3dcf8f224ab185421f18e47a030bbbccc0842f",
+    "world/rules/dialogue.py": "dd3281a4c07eb9c4ebdf40b3295ffa72fcdf85b6d58ddeafe4ce30b91d97ff1f",
     "world/rules/dialogue_availability.py": "5c64e95c15255d321976a55b59a8171ce01b4992b5d6089f826fee190a90445f",
     "world/rules/dialogue_conditions.py": "260e955af780e30ba5b6c638f5d9be9e021718d4697dc4ce285d7ef69d7b954f",
     "world/rules/dialogue_context.py": "99e9d76496d40fd7e32a2169a0fdd75306b22b9b1f49ed56e6374f0ab0a01aec",

@@ -2885,6 +2885,15 @@ whole record has settled through the current tick, so a catch-up of a current
 world never resolves a closed set, decodes the activity record or writes
 anything.
 
+A catch-up that would write refuses an enclosing transaction:
+`population_units.PopulationCatchUpNested` (reason
+`population_catch_up_nested`) is raised when the set is behind and the
+connection is already inside an atomic block, so a future nested entry point
+fails loudly instead of leaving live caches ahead of a rolled-back block. The
+refusal is on by default; the test settings disable it because every test case
+runs inside the harness's own outer transaction that no game owner opened, and
+the refusal's own test re-enables it with `override_settings`.
+
 `ensure_locations_current(locations)` seeds the units around each locator
 (`population_units.units_around`) and `ensure_observed_population_current()`
 seeds the observed units below; both resolve the live wilderness themselves.
@@ -2940,10 +2949,11 @@ the outer one's marker.
   settled state rather than reverting a committed settlement.
 - The quest site-target read (`world/quests/runtime.py::_site_clear_out_read`)
   catches the site's unit up first; `accept_quest` performs that read before it
-  opens its own transaction, and the two callers that open a transaction around
-  `accept_quest` (`guild_offers.accept_guild_offer`,
-  `npc_intents._apply_offer_quest`) call `ensure_quest_site_current` before
-  their block instead.
+  opens its own transaction, and every caller that opens a transaction around
+  the acceptance calls `ensure_quest_site_current` before its block instead:
+  `guild_offers.accept_guild_offer`, `npc_intents._apply_offer_quest`, and the
+  dialogue story effect (`world/rules/dialogue.py`, before the selection's
+  transaction opens).
 
 **The rule for new code.** Any new code that writes population state for a
 cell, or reads it to decide something, calls `ensure_locations_current` before

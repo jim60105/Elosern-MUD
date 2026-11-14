@@ -43,6 +43,9 @@ POPULATION_UNIT_CURSORS_ATTRIBUTE = "population_unit_cursors"
 #: The named refusal of a scoped pass that would write outside its scope.
 POPULATION_SCOPE_VIOLATION = "population_scope_violation"
 
+#: The named refusal of a catch-up that would settle inside another transaction.
+POPULATION_CATCH_UP_NESTED = "population_catch_up_nested"
+
 _ZONE = "zone"
 _AREA = "area"
 
@@ -426,6 +429,16 @@ def unit_closure(
 
 class PopulationScopeViolation(regional_population.RegionalPopulationError):
     """A scoped pass would write outside the units it may settle."""
+
+
+class PopulationCatchUpNested(regional_population.RegionalPopulationError):
+    """A catch-up that would settle units was reached inside another transaction.
+
+    Its write would be a savepoint of that transaction: a later rollback of the
+    enclosing block reverts the durable rows while every live cache keeps the
+    settled values. Entry points call the catch-up before their own transaction,
+    so reaching this refusal means a caller is nested and must be fixed.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -925,9 +938,11 @@ def all_units_current(cursors: UnitCursors, tick: int) -> bool:
 
 __all__ = [
     "OBSERVATION_RADIUS",
+    "POPULATION_CATCH_UP_NESTED",
     "POPULATION_UNIT_CURSORS_ATTRIBUTE",
     "POPULATION_SCOPE_VIOLATION",
     "RESIDUAL_UNIT",
+    "PopulationCatchUpNested",
     "PopulationScope",
     "PopulationScopeViolation",
     "UnitCursors",

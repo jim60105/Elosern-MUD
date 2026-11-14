@@ -429,6 +429,16 @@ def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
     start = population_units.scope_start_tick(wilderness, scope)
     if start >= now:
         return False
+    if _refuse_nested_catch_up():
+        from django.db import transaction as _transaction
+
+        connection = _transaction.get_connection()
+        if connection.in_atomic_block:
+            raise population_units.PopulationCatchUpNested(
+                f"{population_units.POPULATION_CATCH_UP_NESTED}: a catch-up that "
+                f"would settle {sorted(scope.units)} from {start} to {now} was "
+                "reached inside an enclosing transaction"
+            )
     # Nothing writes between the scope build above and the pass's own scope
     # build, so both derive the same closed set and the same start tick.
     registry = snapshot_population_lifecycle_surfaces(start, now)
@@ -449,6 +459,18 @@ def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
         restore_advance_registry(registry, (wilderness,))
         raise
     return True
+
+
+def _refuse_nested_catch_up() -> bool:
+    """Whether a writing catch-up refuses an enclosing transaction.
+
+    Fail closed in production. The test harness wraps every case in one outer
+    atomic block that no game owner opened, so the test settings disable the
+    refusal and the refusal's own test re-enables it explicitly.
+    """
+    from django.conf import settings
+
+    return bool(getattr(settings, "POPULATION_CATCH_UP_REFUSES_NESTED", True))
 
 
 def ensure_locations_current(locations: Iterable[Any]) -> bool:

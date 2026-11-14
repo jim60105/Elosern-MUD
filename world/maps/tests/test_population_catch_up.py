@@ -17,12 +17,18 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from django.db import transaction
+from django.test import override_settings
+
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 from evennia.utils.create import create_object
+
+from commands.localized.general import CmdLook
 
 from typeclasses.characters import PlayerCharacter
 
 from world.maps import (
+    gm as map_gm,
     population_lifecycle,
     population_units,
     regional_population,
@@ -33,6 +39,7 @@ from world.maps.population_lifecycle import (
 )
 from world.maps.tests._settlement_projection import settlement_projection
 from world.maps.tests.test_scoped_population_settlement import (
+    ORDINARY,
     ScopedSettlementFixture,
     WANDER_A,
     WANDER_B,
@@ -41,11 +48,15 @@ from world.maps.tests.test_scoped_population_settlement import (
 )
 from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import WorldClock, get_world_clock
+from world.rules import gm as rules_gm
 from world.rules.movement_edges import LocationRef, resolve_direction_edge
+from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS
 
 START = 100
 #: The tick a lagging unit has not settled: the world tick the test sets.
 LAG_TICK = 700
+
+SPECIES = next(iter(SYNTH_MONSTER_VARIANTS.values())).species_key
 
 #: One zone-A cell more than the sight radius away from every zone-B cell.
 WEST_OF_ZONE_A = (505, 703)
@@ -287,6 +298,74 @@ class CommandCatchUpTests(CatchUpFixture):
         self.assertEqual(
             [call.args[0] for call in boundary.call_args_list], ["cmd_in"]
         )
+
+
+class CommandSeamTests(CatchUpFixture):
+    """A localized command inherits the same seam as the repository base."""
+
+    def test_a_localized_command_settles_the_units_around_the_player(self):
+        self._build_scenario()
+        player = place_player(self, EAST_OF_ZONE_A)
+        self.lag()
+        command = CmdLook()
+        command.caller = player
+        with (
+            patch.object(population_lifecycle, "log_info"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            command.at_pre_cmd()
+        self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
+
+
+class OperatorCatchUpTests(CatchUpFixture):
+    """The operator and quest entry points catch their target up first."""
+
+    def test_a_gm_placement_settles_the_target_cell(self):
+        self._build_scenario()
+        enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
+        room = self.char1.location
+        self.lag()
+        map_gm.spawn_monster(SPECIES, ORDINARY, f"#{room.pk}")
+        self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
+
+    def test_a_gm_removal_settles_the_removed_entity(self):
+        self._build_scenario()
+        enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
+        removed = self._monster(EAST_OF_ZONE_A, home_zone=ZONE_B)
+        self.lag()
+        map_gm.delete_entity(f"#{removed.pk}")
+        self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
+
+    def test_a_gm_hit_point_edit_settles_the_target(self):
+        self._build_scenario()
+        enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
+        monster = self._monster(EAST_OF_ZONE_A, home_zone=ZONE_B)
+        self.lag()
+        rules_gm.set_gauge(f"#{monster.pk}", "hp", 1)
+        self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
+
+
+class CatchUpBoundaryTests(CatchUpFixture):
+    """A catch-up never starts inside a pass and refuses another transaction."""
+
+    def test_a_catch_up_inside_a_running_pass_writes_nothing(self):
+        self._build_scenario()
+        self.lag()
+        cursors = self.cursor_record()
+        with population_units.running_pass():
+            settled = self.catch_up(WANDER_B)
+        self.assertFalse(settled)
+        self.assertEqual(self.cursor_record(), cursors)
+
+    @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
+    def test_a_writing_catch_up_refuses_an_enclosing_transaction(self):
+        self._build_scenario()
+        self.lag()
+        cursors = self.cursor_record()
+        with self.assertRaises(population_units.PopulationCatchUpNested):
+            with transaction.atomic():
+                self.catch_up(WANDER_B)
+        self.assertEqual(self.cursor_record(), cursors)
 
 
 class MovementCatchUpTests(CatchUpFixture):
