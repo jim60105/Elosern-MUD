@@ -2,14 +2,14 @@
 
 ## 1. Shared instrument-panel chrome
 
-- [ ] 1.1 Create `web/webclient-app/components/instrument-panel.css` with exactly the design D1 content. Verify: `node --test web/static/webclient/js/tests/ui_contract.test.js` passes (every read without a fallback is a defined token).
+- [x] 1.1 Create `web/webclient-app/components/instrument-panel.css` with exactly the design D1 content. Verify: `node --test web/static/webclient/js/tests/ui_contract.test.js` passes (every read without a fallback is a defined token).
 
 ## 2. The place card as an instrument panel
 
-- [ ] 2.1 In `web/webclient-app/components/PlaceCard.vue`, import the stylesheet, add `instrument-panel` to the root's static class and rewrite the header comment (design D2). Verify: `git diff` of the template touches only the root `class` attribute.
-- [ ] 2.2 Replace the `<style>` block of `PlaceCard.vue` with the design D3 block. Verify: `grep -nE "border: var|border-radius: var\(--radius\)|var\(--shadow\)|-1 \* var\(--motion-shift-lg" web/webclient-app/components/PlaceCard.vue` prints nothing.
-- [ ] 2.3 Delete the `.place-card` and `.place-card__time` rules and their comment sentence from the `@media (max-height: 820px)` block of `web/webclient-app/styles/app-shell.css` (design D4). Verify: `grep -n "place-card" web/webclient-app/styles/app-shell.css` prints nothing.
-- [ ] 2.4 Add the three design D5 tests to `web/webclient-app/tests/place_card.test.js`. Verify: `pnpm vitest run web/webclient-app/tests/place_card.test.js web/webclient-app/tests/app_client_room_actions.test.js web/webclient-app/tests/preserved_contract.test.js` passes.
+- [x] 2.1 In `web/webclient-app/components/PlaceCard.vue`, import the stylesheet, add `instrument-panel` to the root's static class and rewrite the header comment (design D2). Verify: `git diff` of the template touches only the root `class` attribute.
+- [x] 2.2 Replace the `<style>` block of `PlaceCard.vue` with the design D3 block. Verify: `grep -nE "border: var|border-radius: var\(--radius\)|var\(--shadow\)|-1 \* var\(--motion-shift-lg" web/webclient-app/components/PlaceCard.vue` prints nothing.
+- [x] 2.3 Delete the `.place-card` and `.place-card__time` rules and their comment sentence from the `@media (max-height: 820px)` block of `web/webclient-app/styles/app-shell.css` (design D4). Verify: `grep -n "place-card" web/webclient-app/styles/app-shell.css` prints nothing.
+- [x] 2.4 Add the three design D5 tests to `web/webclient-app/tests/place_card.test.js`. Verify: `pnpm vitest run web/webclient-app/tests/place_card.test.js web/webclient-app/tests/app_client_room_actions.test.js web/webclient-app/tests/preserved_contract.test.js` passes.
 
 ## 3. Stories
 

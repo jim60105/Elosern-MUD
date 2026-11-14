@@ -137,4 +137,79 @@ describe("PlaceCard", () => {
       expect(heading.element.contains(wrapper.get('[data-testid="place-card-look"]').element)).toBe(false);
     });
   });
+
+  // place-card-instrument-panel (design D5): the card wears the shared
+  // instrument-panel chrome, its actions have no chrome, and a new location
+  // enters from the column's anchored (right) edge.
+  describe("instrument panel (place-card-instrument-panel)", () => {
+    const placeCardSource = () => readFileSync(join(APP_ROOT, "components/PlaceCard.vue"), "utf8");
+    const panelSource = () => readFileSync(join(APP_ROOT, "components/instrument-panel.css"), "utf8");
+
+    it("wears the shared instrument panel chrome instead of the island box", () => {
+      wrapper = mount(PlaceCard, { props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" } });
+      expect(wrapper.classes()).toEqual(expect.arrayContaining(["place-card", "instrument-panel"]));
+
+      const source = placeCardSource();
+      expect(source).toContain('import "./instrument-panel.css";');
+      const card = rule(source, ".place-card");
+      expect(card).not.toBe("");
+      for (const property of ["padding", "background", "backdrop-filter", "border", "border-radius", "box-shadow"]) {
+        expect(card).not.toContain(property);
+      }
+
+      const panel = panelSource();
+      const ground = rule(panel, ".instrument-panel::before");
+      expect(ground).toContain("background: var(--panel);");
+      expect(ground).toContain("backdrop-filter: blur(calc(9px * var(--ui-scale)));");
+      expect(ground).toContain("mask-image:");
+      expect(ground).toContain("pointer-events: none;");
+      const fitting = rule(panel, ".instrument-panel::after");
+      expect(fitting).toContain("var(--band-ornament) right 0 top 0");
+      expect(fitting).toContain("right calc(14px * var(--ui-scale))");
+      expect(fitting).toContain("pointer-events: none;");
+      expect(rule(panel, ".instrument-panel")).toContain("calc(var(--instrument-pad-right, 26px) * var(--ui-scale))");
+      expect(panel).not.toContain("border:");
+      expect(panel).not.toContain("border-radius");
+      expect(panel).not.toContain("box-shadow");
+
+      const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+      expect(shellCss).not.toMatch(/\.place-card\b/);
+    });
+
+    it("sets the room actions without chrome and marks only the active one", () => {
+      wrapper = mount(PlaceCard, { props: { locationLabel: "石板廣場", timeLabel: "t", actionsEnabled: true } });
+      const source = placeCardSource();
+      const action = rule(source, ".place-card__action");
+      for (const declaration of [
+        "border: 0;",
+        "background: none;",
+        "height: calc(30px * var(--ui-scale));",
+        "min-width: calc(30px * var(--ui-scale));",
+        "opacity: 0.86;",
+      ]) {
+        expect(action).toContain(declaration);
+      }
+      const tick = rule(source, ".place-card__action::after");
+      expect(tick).toContain("opacity: 0;");
+      expect(tick).toContain("background: var(--gold-500);");
+      expect(source).toContain(
+        ".place-card__action:hover::after,\n.place-card__action:focus-visible::after {\n  opacity: 1;",
+      );
+      expect(wrapper.get('[data-testid="place-card-wait"]').text()).toBe("休息");
+    });
+
+    it("slides a new location in from the right", () => {
+      const enter = rule(placeCardSource(), ".place-card-enter-from");
+      expect(enter).toContain("transform: translateX(calc(var(--motion-shift-lg) * var(--motion-travel)));");
+      expect(enter).not.toContain("-1 *");
+    });
+  });
 });
+
+// The text of the first rule that opens with `selector {` at the start of a
+// line, up to the next `}` (built like hud_frame.test.js's extractRule).
+function rule(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`(?:^|\\n)${escaped}\\s*\\{[^}]*\\}`).exec(source);
+  return match ? match[0] : "";
+}

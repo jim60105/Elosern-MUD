@@ -1,0 +1,66 @@
+/* The instrument panel chrome (place-card-instrument-panel), after
+   docs/development/hud-instrument-panels.md and the approved prototype
+   docs/design/map-column-instrument-panels/instrument-panel.css, for a panel
+   in the top-right `map` column: anchored on the top and right edges, so the
+   lozenge sits at the top-right corner, the crown runs left along the top,
+   the spine runs down the right side, and the ink ground feathers out to the
+   left and towards the bottom.
+
+   Each panel of the column carries its own copy: they share a column, not a
+   subject. A panel tunes the chrome through custom properties, each with a
+   fallback here:
+   --instrument-pad-right  content padding that clears the spine (a px length,
+                           multiplied by the chrome factor);
+   --instrument-solid      where the ink starts to thin, measured from the
+                           right (a percentage or a length);
+   --instrument-clear      where the ink is fully gone (default: the left
+                           edge).
+   The ground never extends past the box: the `map` anchor scrolls vertically
+   and clips horizontally, so an overhang would end in a hard edge. */
+.instrument-panel {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  min-width: 0;
+  /* 12px on top clears the lozenge and the crown; 6px at the bottom keeps the
+     column's three panels no taller than the three cards they replace (the
+     last 12px of ink feather out under it). */
+  padding:
+    calc(12px * var(--ui-scale))
+    calc(var(--instrument-pad-right, 26px) * var(--ui-scale))
+    calc(6px * var(--ui-scale))
+    calc(10px * var(--ui-scale));
+}
+.instrument-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--panel);
+  backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-backdrop-filter: blur(calc(9px * var(--ui-scale)));
+  -webkit-mask-image:
+    linear-gradient(270deg, #000 0%, #000 var(--instrument-solid, 52%), rgba(0, 0, 0, 0.55) calc((var(--instrument-solid, 52%) + var(--instrument-clear, 100%)) / 2), transparent var(--instrument-clear, 100%)),
+    linear-gradient(180deg, #000 0%, #000 calc(100% - 12px * var(--ui-scale)), transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(270deg, #000 0%, #000 var(--instrument-solid, 52%), rgba(0, 0, 0, 0.55) calc((var(--instrument-solid, 52%) + var(--instrument-clear, 100%)) / 2), transparent var(--instrument-clear, 100%)),
+    linear-gradient(180deg, #000 0%, #000 calc(100% - 12px * var(--ui-scale)), transparent 100%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+/* The brass fitting. The spine stands 14px in from the right edge, under the
+   lozenge's centre (the lozenge is 30px wide). */
+.instrument-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    var(--band-ornament) right 0 top 0 / calc(30px * var(--ui-scale)) calc(11px * var(--ui-scale)) no-repeat,
+    linear-gradient(270deg, var(--band-edge), var(--band-edge-dim) 45%, transparent)
+      right calc(30px * var(--ui-scale)) top calc(5px * var(--ui-scale)) / calc(72% - 30px * var(--ui-scale)) 1px no-repeat,
+    linear-gradient(180deg, var(--band-edge), var(--band-edge-dim) 60%, transparent)
+      right calc(14px * var(--ui-scale)) top calc(11px * var(--ui-scale)) / 1px calc(100% - 11px * var(--ui-scale)) no-repeat;
+  pointer-events: none;
+}
