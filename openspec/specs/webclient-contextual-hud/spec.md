@@ -478,7 +478,7 @@ the recessed state itself still applies.
 - **THEN** the stage stays recessed until the last open surface closes
 
 ### Requirement: The HUD island stack renders as bounded floating islands, not column cards
-The surfaces placed in the stage's island anchors SHALL render as floating HUD islands: a translucent panel fill, a backdrop blur, a hairline border, the shared corner radius, and the shared drop shadow, each island a separate box separated by the anchor's gap — never a single boxed column card and never an opaque `<aside>` stacked in a layout column. No reference panel and no portrait anchor content SHALL be placed in either island anchor.
+The surfaces in the stage's island anchors SHALL render as separate floating HUD surfaces apart by the anchor's gap, each wearing the island chrome (translucent fill, backdrop blur, hairline border, shared radius and shadow) or the borderless instrument-panel chrome its own requirement names, never one boxed column card or an opaque `<aside>` stacked in a layout column. No reference panel and no portrait anchor content SHALL be placed in either island anchor.
 
 #### Scenario: The vitals anchor is one dock
 - **WHEN** the shell renders the stage box's lower left
@@ -506,7 +506,7 @@ The surfaces placed in the stage's island anchors SHALL render as floating HUD i
 
 #### Scenario: Island chrome comes from the shared tokens
 - **WHEN** an island renders
-- **THEN** its fill, border, radius, shadow, and transitions resolve from the shared design tokens rather than from per-component literals
+- **THEN** its fill, blur, border or brass fitting, radius, shadow, and transitions resolve from the shared design tokens rather than from per-component literals
 
 #### Scenario: The map anchor stacks its islands in order
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel, a non-empty `objectives` panel, and title-ballot candidates, and later in combat mode
@@ -3295,3 +3295,34 @@ The help overlay SHALL carry the rule explanations the party and shop windows om
 #### Scenario: The lineage legend is in help
 - **WHEN** the help overlay's party section renders
 - **THEN** it explains the three node diamond states and 可解鎖 with shape and text, never colour alone
+
+### Requirement: The map column holds its instrument geometry and fades hidden overflow
+The `map` anchor SHALL be as wide as the right column minus 28px × S and never narrower than 282px × S, SHALL stack its surfaces 10px × S apart, and SHALL paint nothing itself. An over-tall stack SHALL scroll inside the anchor without a visible scrollbar, fading the top or bottom edge only while content lies beyond that edge. Every stage offset taken from the column's left edge SHALL derive from that same width.
+
+#### Scenario: The column never narrows below the minimap panel
+- **WHEN** the shell renders in exploration at 1280x720, at 1451x790 and at 2560x1440
+- **THEN** the `map` anchor's rendered width is 282px at 1280x720 (where the right column less 28px would give 250px), the right column less 28px at 1451x790, and the right column less 28px × 1.4 at 2560x1440, each within 1px, and its right edge stays 16px × S from the stage's right edge
+
+#### Scenario: Neighbours offset from the same width
+- **WHEN** the presence rail's anchor renders at any of those viewports
+- **THEN** its right edge stands 24px × S left of the `map` anchor's left edge (±1px), so a widened column never reaches under the rail
+
+#### Scenario: The anchor paints nothing and keeps its gap
+- **WHEN** the anchor holds two or more surfaces
+- **THEN** the anchor's own computed background is transparent with no border and no box shadow, and consecutive surfaces are 10px × S apart (±1px)
+
+#### Scenario: An over-tall column scrolls without a scrollbar
+- **WHEN** the anchor's content is taller than its bounded height
+- **THEN** the anchor still scrolls vertically and every surface stays reachable by scrolling, while the anchor's scrollbar takes no width (its offset width equals its client width) and is not drawn
+
+#### Scenario: Only an edge with content beyond it fades
+- **WHEN** the over-tall anchor is scrolled to its top, then to a middle position, then to its bottom
+- **THEN** at the top only the bottom edge is masked, in the middle both edges are masked, and at the bottom only the top edge is masked; each masked edge fades over 32px × S
+
+#### Scenario: A column that fits is not masked
+- **WHEN** the anchor's content fits inside its bounded height, as the populated column does at 1451x790 and at 2560x1440
+- **THEN** no edge of the anchor is masked
+
+#### Scenario: Content changes update the fade without a scroll
+- **WHEN** a surface mounts into or unmounts from the anchor, or a surface changes height, with no scroll event
+- **THEN** the masked edges are recomputed for the new content height, so a column that starts to overflow gains its bottom fade and a column that comes to fit loses every fade

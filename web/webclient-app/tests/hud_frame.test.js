@@ -404,7 +404,7 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     // only; person focus inerts the map anchor and the command region.
     const css = styleBlock("components/HudFrame.vue");
     const anchor = extractRule(css, '.elosern-stage [data-anchor="presence"]');
-    expect(anchor).toMatch(/right: calc\(var\(--right-column/);
+    expect(anchor).toMatch(/right: calc\(var\(--map-column-w\)/);
     expect(anchor).toMatch(/bottom: calc\(var\(--band-h\)/);
     expect(anchor).toMatch(/z-index: 4/);
     expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="exploration"\]\) \[data-anchor="presence"\]\s*\{\s*display: none;/);
@@ -423,6 +423,61 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(frame.get('[data-anchor="map"]').attributes("inert")).toBeDefined();
     expect(frame.get('[data-anchor="band-command"]').attributes("inert")).toBeDefined();
     frame.unmount();
+  });
+
+  it("reads the map column width from one token in both geometry copies and every neighbour", () => {
+    // map-column-instrument-geometry design D1-D5: `--map-column-w` states
+    // the column width once; both `map` anchor copies read it with a 10px
+    // gap, the column hides its scrollbar and masks only an edge with
+    // content beyond it, and the presence rail and the scene placeholder
+    // offset from the same width.
+    const tokensCss = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
+    const appShellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    const frameCss = styleBlock("components/HudFrame.vue");
+    expect(tokensCss).toContain(
+      "--map-column-w: max(calc(var(--right-column) - 28px * var(--ui-scale)), calc(282px * var(--ui-scale)));",
+    );
+    const frame = extractRule(frameCss, '.elosern-stage [data-anchor="map"]');
+    const shell = extractRule(appShellCss, '.elosern-root .elosern-stage [data-anchor="map"]');
+    for (const rule of [frame, shell]) {
+      expect(rule, "the map anchor rule exists").not.toBe("");
+      expect(rule).toContain("width: var(--map-column-w);");
+      expect(rule).toContain("gap: calc(10px * var(--ui-scale));");
+      expect(rule).not.toContain("--right-column");
+    }
+    expect(frame).toContain("scrollbar-width: none;");
+    expect(appShellCss).not.toMatch(/\[data-anchor="map"\][^{]*\{[^}]*scrollbar/);
+    expect(frameCss).toContain('.elosern-stage [data-anchor="map"]::-webkit-scrollbar {\n  display: none;\n}');
+    const mask =
+      "linear-gradient(180deg, transparent 0, #000 var(--map-fade-top, 0px), #000 calc(100% - var(--map-fade-bottom, 0px)), transparent 100%);";
+    const masked = extractRule(
+      frameCss,
+      '.elosern-stage [data-anchor="map"][data-more-above],\n.elosern-stage [data-anchor="map"][data-more-below]',
+    );
+    expect(masked).toContain(`-webkit-mask-image: ${mask}`);
+    expect(masked).toContain(`\n  mask-image: ${mask}`);
+    // Each edge's own rule sets its fade depth (the grouped mask rule above
+    // shares the selector text, so match the standalone rules whole).
+    expect(frameCss).toContain(
+      '}\n.elosern-stage [data-anchor="map"][data-more-above] {\n  --map-fade-top: calc(32px * var(--ui-scale));\n}',
+    );
+    expect(frameCss).toContain(
+      '}\n.elosern-stage [data-anchor="map"][data-more-below] {\n  --map-fade-bottom: calc(32px * var(--ui-scale));\n}',
+    );
+    const neighbour = "right: calc(var(--map-column-w) + 40px * var(--ui-scale));";
+    expect(extractRule(frameCss, '.elosern-stage [data-anchor="presence"]')).toContain(neighbour);
+    expect(extractRule(appShellCss, ".elosern-root .scene-backdrop .scene-backdrop__placeholder")).toContain(neighbour);
+
+    // jsdom lays nothing out, so every measurement is 0: no edge is masked.
+    const stage = mount(HudFrame, {
+      props: { mode: "exploration" },
+      slots: { map: () => h("div", { class: "map-probe" }) },
+    });
+    const anchor = stage.get('[data-anchor="map"]');
+    expect(anchor.find(".map-probe").exists()).toBe(true);
+    expect(anchor.attributes("data-more-above")).toBeUndefined();
+    expect(anchor.attributes("data-more-below")).toBeUndefined();
+    stage.unmount();
   });
 
   it("tracks commandLineExpanded on [data-anchor='command-line'] and hides the collapsed anchor in stage CSS", async () => {

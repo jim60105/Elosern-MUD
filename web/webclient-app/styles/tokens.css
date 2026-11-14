@@ -350,6 +350,13 @@
     --stage-inset-y: calc(16px * var(--ui-scale));
     --left-column: clamp(220px * var(--ui-scale), 20vw, 330px * var(--ui-scale));
     --right-column: clamp(230px * var(--ui-scale), 22vw, 360px * var(--ui-scale));
+    /* The right-hand `map` column's width (map-column-instrument-geometry):
+       the right column less its 28px gutter, never narrower than the
+       minimap instrument panel needs (a 240px canvas, 22px of spine
+       clearance and a 20px feather). HudFrame.vue's and app-shell.css's
+       `map` anchor rules and every offset taken from the column's left
+       edge read this one token. */
+    --map-column-w: max(calc(var(--right-column) - 28px * var(--ui-scale)), calc(282px * var(--ui-scale)));
     /* The lower-left vitals dock's width (vitals-bar-redesign design D1): a
        quarter of the viewport, wide enough for the three thin lines to read
        as a long instrument and for the readout to spread out in one row. A
