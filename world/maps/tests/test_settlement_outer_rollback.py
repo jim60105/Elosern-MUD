@@ -23,6 +23,8 @@ from django.test.utils import CaptureQueriesContext
 
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
+from tools.spec_traceability import covers_requirement
+
 from world.maps import population_lifecycle, regional_population
 from world.maps import monster_activity as activity_owner
 from world.maps.monster_activity import (
@@ -108,20 +110,32 @@ class OuterRollbackFlagTests(unittest.TestCase):
         surfaces._OUTER_ROLLBACK = False
         self.addCleanup(setattr, surfaces, "_OUTER_ROLLBACK", False)
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_no_owner_is_active_by_default(self):
         self.assertFalse(surfaces.outer_rollback_active())
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_an_owner_holds_the_rollback_inside_its_scope_only(self):
         with surfaces.outer_rollback_owner():
             self.assertTrue(surfaces.outer_rollback_active())
         self.assertFalse(surfaces.outer_rollback_active())
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_a_suspension_takes_the_protection_back_then_resumes_the_owner(self):
         with surfaces.outer_rollback_owner():
             with surfaces.suspended_outer_rollback():
                 self.assertFalse(surfaces.outer_rollback_active())
             self.assertTrue(surfaces.outer_rollback_active())
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_either_scope_restores_the_previous_value_on_an_exception(self):
         with self.assertRaises(ZeroDivisionError):
             with surfaces.outer_rollback_owner():
@@ -179,6 +193,9 @@ class SavepointBoundTests(ActivityFixture):
         self.assertEqual(len(settled), groups, "every group really decided")
         return len(opened)
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_savepoints_do_not_grow_with_the_population(self):
         one = self._lifecycle_savepoints(1, owned=True)
         four = self._lifecycle_savepoints(4, owned=True)
@@ -205,6 +222,9 @@ class DepartureFaultTests(ActivityFixture):
             for body in bodies
         }
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_fault_after_a_partial_departure(self):
         self._register_lifecycle()
         seed = self._departure_seed(
@@ -253,9 +273,67 @@ class DepartureFaultTests(ActivityFixture):
         self.assertEqual(settlement_projection(self.wilderness), before)
 
 
+class DirectDepartureFaultTests(ActivityFixture):
+    """A departure committed outside an advance keeps its own protection."""
+
+    @covers_requirement(
+        "world-clock::operations-that-recover-and-continue-keep-their-own-protection"
+    )
+    def test_a_direct_departure_failure_restores_before_the_error_reaches_the_caller(
+        self,
+    ):
+        seed = self._departure_seed(
+            tick=160,
+            activity=SOLO_ACTIVITY,
+            cell=(505, 705),
+            members=1,
+            wilderness_only=True,
+        )
+        self._reset_activity(tick=100)
+        # The source cell must own a materialized room: the departure detaches
+        # the body from it, so its membership is a surface of this write.
+        enter_wilderness(self.char1, coordinates=(505, 705), name=WILDERNESS_NAME)
+        room = (self.wilderness.db.rooms or {}).get((505, 705))
+        self.assertIsNotNone(room, "the source cell materialized")
+        group_id, bodies = self._group(
+            cell=(505, 705), seed=seed, tick=100, activity=SOLO_ACTIVITY, members=1
+        )
+        body = bodies[0]
+        plan = activity_owner.plan_group_decision(self.wilderness, group_id, tick=160)
+        self.assertIsNotNone(plan.edge, "the decision is a lawful departure")
+        self.assertIn(body, room.contents, "the body starts at the source")
+        before = settlement_projection(self.wilderness)
+        physical = (
+            read_optional_fatigue_state(body),
+            read_sleep_receipt(body),
+        )
+        # The fault lands after the departure wrote its record and timeline
+        # entry, and no advance owns any rollback around this caller.
+        self.assertFalse(surfaces.outer_rollback_active())
+        with patch.object(
+            activity_owner,
+            "_emit_decided",
+            side_effect=RuntimeError("injected post-write departure fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                activity_owner.commit_group_decision(self.wilderness, plan)
+
+        self.assertEqual(settlement_projection(self.wilderness), before)
+        self.assertIn(body, room.contents, "the source room still holds the body")
+        self.assertEqual(
+            (read_optional_fatigue_state(body), read_sleep_receipt(body)), physical
+        )
+        # The same values survive dropping every live cache.
+        _drop_attribute_caches(self.wilderness, body)
+        self.assertEqual(settlement_projection(self.wilderness), before)
+
+
 class FatigueFaultTests(ActivityFixture):
     """A fault mid-physiology restores both members in cache and on reload."""
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_fault_during_a_fatigue_write(self):
         self._register_lifecycle()
         self._reset_activity(tick=100)
@@ -331,6 +409,9 @@ class DifferentialSettlementTests(ScenarioSettlementFixture):
                 clock.advance(part, AdvanceSource.COMMAND, ())
         return settlement_projection(self.wilderness)
 
+    @covers_requirement(
+        "world-clock::lifecycle-operations-inside-an-advance-rely-on-the-advance-rollback"
+    )
     def test_results_are_unchanged(self):
         projections = {
             (parts, owned): self._advance(parts, owned=owned)
@@ -382,6 +463,9 @@ class FailedContactInsidePassTests(_ContactBase):
         self.destination.contents_cache.add(self.player)
         return enemy, receipt_before, state_before
 
+    @covers_requirement(
+        "world-clock::operations-that-recover-and-continue-keep-their-own-protection"
+    )
     def test_the_contact_block_runs_with_its_own_protection(self):
         enemy, receipt_before, state_before = self._sleeping_party_at_the_contact()
         group_id = activity_owner.group_of_member(
@@ -447,6 +531,9 @@ class FailedContactInsidePassTests(_ContactBase):
             sequence_before,
         )
 
+    @covers_requirement(
+        "world-clock::operations-that-recover-and-continue-keep-their-own-protection"
+    )
     def test_an_unrecovered_contact_failure_fails_the_advance(self):
         _enemy, receipt_before, state_before = self._sleeping_party_at_the_contact()
         activity_before = state_to_dict(read_monster_activity(self.wilderness))
