@@ -32,6 +32,7 @@ _BODY_TARGETS = (
     "world.rules.npc_roster_validation.validate_npc_roster",
     "world.maps.runtime.adopt",
     "world.maps.runtime.synchronize",
+    "world.lore.rites.load_published",
     "world.maps.static_references.validate_static_references",
     "world.lore.sync.sync_all",
     "world.maps.bootstrap.sync_wilderness",
@@ -134,6 +135,7 @@ class StartupStepEventTests(_StubbedStartup):
             self._steps(info),
             [
                 "map_world_adoption",
+                "landmark_rites_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -165,6 +167,7 @@ class StartupStepEventTests(_StubbedStartup):
             self._steps(info),
             [
                 "map_world_adoption",
+                "landmark_rites_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",
@@ -199,6 +202,7 @@ class StartupStepEventTests(_StubbedStartup):
             "guild_exam_restriction_validation",
             preceding=(
                 "map_world_adoption",
+                "landmark_rites_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
             ),
@@ -212,6 +216,7 @@ class StartupStepEventTests(_StubbedStartup):
             "starting_companion_validation",
             preceding=(
                 "map_world_adoption",
+                "landmark_rites_adoption",
                 "world_clock_init",
                 "equipment_rulebook_validation",
                 "guild_exam_restriction_validation",

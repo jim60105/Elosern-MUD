@@ -798,6 +798,7 @@
         "world.lore.tests.test_registry_index_contract",
         "world.lore.tests.test_registry_refs",
         "world.lore.tests.test_rite_content",
+        "world.lore.tests.test_rite_content_document",
         "world.lore.tests.test_room_prose_language",
         "world.lore.tests.test_saintess_vessel_grant",
         "world.lore.tests.test_scene_archetypes",

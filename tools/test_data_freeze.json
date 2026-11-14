@@ -149,6 +149,10 @@
       "reason": "authored registry index coverage and shipped reference integrity contract"
     },
     {
+      "path": "world/lore/tests/test_rite_content_document.py",
+      "reason": "the shipped rite document validates against the shipped districts"
+    },
+    {
       "path": "world/lore/tests/test_room_prose_language.py",
       "reason": "authored room prose language contract"
     },

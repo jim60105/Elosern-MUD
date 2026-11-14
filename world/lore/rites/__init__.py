@@ -20,6 +20,7 @@ __all__ = [
     "current",
     "install",
     "installed",
+    "load_published",
     "uninstall",
 ]
 
@@ -58,6 +59,33 @@ def install(snapshot: RiteSnapshot) -> RiteSnapshot:
         raise TypeError("install() requires a RiteSnapshot")
     _INSTALLED = snapshot
     return snapshot
+
+
+def load_published(
+    path: Path | None = None, *, district_keys: frozenset[str] | None = None
+) -> RiteSnapshot:
+    """Load the shipped document against the published districts and install it.
+
+    ``path`` defaults to :data:`CONTENT_PATH`; ``district_keys`` defaults to the
+    districts of the published map world, which must already be installed when
+    ``district_keys`` is omitted; an uninstalled world raises
+    :class:`world.lore.map_districts.DistrictNotLoaded`, not
+    :class:`world.lore.rites.loader.RiteContentError`. Every failure
+    propagates: a rejected or unreadable document installs nothing and a
+    previously installed snapshot stays current. Each call re-reads the
+    document and replaces the installed snapshot; startup calls it once per
+    process, after the map world is adopted, so a snapshot installed against an
+    earlier district world becomes stale rather than invalid.
+    """
+
+    from world.lore.rites.loader import load_rites
+
+    source = CONTENT_PATH if path is None else Path(path)
+    if district_keys is None:
+        from world.lore.map_districts import current as published_districts
+
+        district_keys = frozenset(published_districts().districts)
+    return install(load_rites(source, district_keys=district_keys))
 
 
 def uninstall() -> None:
