@@ -25,12 +25,11 @@ Ground rules:
   listed; the area file is exactly the Before content.
 - [x] 1.2 Record the first timing line of design D9. Verify: the line is saved for the hand-off.
 
-  Result: the first `world.maps.tests.test_bootstrap` run raced the first
-  village edit and reported `Ran 2 tests in 0.000s` with two
-  `stale_partition` import errors, exactly the race the previous placement
-  change recorded. A clean measurement on a stable tree was then taken and is
-  the honest first line: see task 4.2. The second line is in task 5.4; neither
-  cost ever blocks (D9).
+  Result: first line `Ran 2 tests in 0.000s`, with two `stale_partition`
+  import errors — the run raced the first village edit, the same race the
+  previous placement change recorded, so only the error shape is
+  representative and the cost line is not. The second line, on the finished
+  tree, is `Ran 46 tests in 348.860s`, `OK`. Neither cost blocks (D9).
 - [x] 1.3 Write the placement script per design D1 and list the road gaps over 75 km inside this change's scope. Verify: the list is saved under `snippets/` and names each gap's road, end cells and length.
 
   Result: `snippets/place.py` (adapted from the Grandia north script: region
@@ -176,7 +175,7 @@ Ground rules:
   `roads_villages.png` and `roads_hamlets.png`. The continent capture shows
   the new markers crowding the northwest as the design's risk note predicted:
   that crowding is the human review item, not a data defect.
-- [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate valhalla-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+- [x] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate valhalla-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
   Gates: `test_data_lint check` -> `scanned=1625 flagged=121 universe=4590+37
   quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` -> `contract
@@ -188,7 +187,9 @@ Ground rules:
   Counts: 52 settlements — 17 villages and 35 hamlets. No spacing exemption is
   used anywhere in this change, and no hamlet uses the boundary exception of
   D2: every new cell reports `"region": "northwest_highland_forest"` with
-  `"scope": "in"`. Both D9 timing lines are recorded in the final hand-off.
+  `"scope": "in"`. Both D9 timing lines: `Ran 2 tests in 0.000s` at the start
+  (raced the first edit, so the cost is not representative) and `Ran 46 tests
+  in 348.860s`, `OK`, at the end.
 
 ## Workflow follow-up
 
