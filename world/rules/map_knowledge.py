@@ -469,6 +469,16 @@ def _derive_node_id(location: Any) -> str | None:
     return encode_room(int(location.id))
 
 
+def node_id_for(location: Any) -> str | None:
+    """Return the canonical node ID for a location, or ``None`` when unrepresentable.
+
+    The public read behind :func:`_derive_node_id`, so a consumer that resolves
+    a location's canonical node (the landmark rite settlement) never reaches
+    into the private helper.
+    """
+    return _derive_node_id(location)
+
+
 def record_ground_observation(
     character: Any,
     cell: tuple[int, int],
