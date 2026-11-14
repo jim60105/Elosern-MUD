@@ -29,6 +29,13 @@ For every road, the validation SHALL treat as settlement positions the road's tw
 - **WHEN** an over-long gap has cells in two different terrain regions
 - **THEN** the road is reported
 
+### Requirement: The spacing command reports by exit status and writes nothing
+The command SHALL print one line per problem with its code and subject, and SHALL exit 0 with no problem, 1 with any problem, and 2 when the sources, the road artifact or the lore override do not load. It SHALL write no file.
+
+#### Scenario: Synthetic workspace runs
+- **WHEN** the command runs on a clean synthetic workspace, then after a hamlet is moved too close to a town, then with a corrupt road artifact
+- **THEN** the exit statuses are 0, 1 and 2, and the workspace file digests are identical before and after every run
+
 ## REMOVED Requirements
 
 ### Requirement: Road coverage applies only inside completed areas

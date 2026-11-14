@@ -1,7 +1,7 @@
 """Mechanism tests for the settlement spacing validation.
 
-Every scenario drives synthetic inputs: synthetic places, roads, areas and
-thresholds, plus one temporary synthetic workspace for the command. No test
+Every scenario drives synthetic inputs: synthetic places, roads and thresholds,
+plus one temporary synthetic workspace for the command. No test
 reads the shipped map data, so a placement decision never breaks this module.
 """
 
@@ -20,12 +20,10 @@ from pathlib import Path
 from elosern_map_core.roads_codec import encode_road_document
 
 from tools.settlement_spacing import (
-    Area,
     Place,
     SpacingConfig,
     SpacingInput,
     check_spacing,
-    load_areas,
     main,
 )
 from tools.spec_traceability import covers_requirement
@@ -79,7 +77,6 @@ def _input(
     places: tuple[Place, ...] | list[Place] = (),
     *,
     roads: tuple[ROAD, ...] | list[ROAD] = (),
-    areas: tuple[Area, ...] | list[Area] = (),
     region_of=None,
     region_nation: dict[str, str | None] | None = None,
     forbidden: frozenset[str] | set[str] = frozenset(),
@@ -94,7 +91,6 @@ def _input(
             region_nation if region_nation is not None else {PLAIN: "nation_one"}
         ),
         forbidden_regions=frozenset(forbidden),
-        areas=tuple(areas),
     )
 
 
@@ -271,9 +267,6 @@ class ExemptionTests(unittest.TestCase):
 class RoadCoverageTests(unittest.TestCase):
     """Road coverage bounds the gap between consecutive road settlements."""
 
-    def setUp(self):
-        self.everywhere = Area("all_plain", PLAIN, None)
-
     @covers_requirement(
         "settlement-spacing::"
         "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
@@ -284,9 +277,7 @@ class RoadCoverageTests(unittest.TestCase):
             ("node_a", "node_c", _straight((0, 10), 6, (1, 0))),
         ]
 
-        problems = check_spacing(
-            _input(roads=roads, areas=[self.everywhere]), TIGHT
-        )
+        problems = check_spacing(_input(roads=roads), TIGHT)
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_c")])
         message = problems[0].message
@@ -302,9 +293,7 @@ class RoadCoverageTests(unittest.TestCase):
         road = ("node_a", "node_c", _straight((0, 10), 6, (1, 0)))
         hamlet = _place("hamlet_on_road", "hamlet", (2, 10))
 
-        problems = check_spacing(
-            _input([hamlet], roads=[road], areas=[self.everywhere]), TIGHT
-        )
+        problems = check_spacing(_input([hamlet], roads=[road]), TIGHT)
 
         self.assertEqual(problems, ())
 
@@ -316,9 +305,7 @@ class RoadCoverageTests(unittest.TestCase):
         road = ("node_a", "node_c", _straight((0, 10), 6, (1, 0)))
         spur = ("node_d", "node_e", ((2, 11), (2, 10)))
 
-        problems = check_spacing(
-            _input(roads=[road, spur], areas=[self.everywhere]), TIGHT
-        )
+        problems = check_spacing(_input(roads=[road, spur]), TIGHT)
 
         self.assertEqual(problems, ())
 
@@ -331,9 +318,7 @@ class RoadCoverageTests(unittest.TestCase):
         beside = _place("hamlet_beside", "hamlet", (2, 11))
         elven = _place("elven_village_on_road", "elven_village", (3, 10), nation=None)
 
-        problems = check_spacing(
-            _input([beside, elven], roads=[road], areas=[self.everywhere]), TIGHT
-        )
+        problems = check_spacing(_input([beside, elven], roads=[road]), TIGHT)
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_c")])
 
@@ -348,125 +333,28 @@ class RoadCoverageTests(unittest.TestCase):
         diagonal_length = 4 * math.sqrt(2.0)
         self.assertGreater(diagonal_length, TIGHT.road_gap_max_km)
         problems = check_spacing(
-            _input(roads=[straight_road, diagonal_road], areas=[self.everywhere]),
-            TIGHT,
+            _input(roads=[straight_road, diagonal_road]), TIGHT
         )
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_c")])
 
-
-class CompletedAreaTests(unittest.TestCase):
-    """Road coverage applies only inside completed areas."""
-
     @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
+        "settlement-spacing::"
+        "road-coverage-bounds-the-gap-between-consecutive-road-settlements"
     )
-    def test_inside_a_crossing_and_outside_an_area(self):
-        area = Area("west_box", PLAIN, (0, 0, 100, 100))
-        roads = [
-            ("node_a", "node_b", _straight((10, 0), 16, (1, 0))),
-            ("node_a", "node_c", _straight((90, 1), 21, (1, 0))),
-            ("node_a", "node_d", _straight((0, 200), 20, (1, 0))),
-        ]
+    def test_a_gap_across_regions_is_checked(self):
+        road = ("node_a", "node_b", _straight((0, 0), 6, (1, 0)))
 
-        problems = check_spacing(_input(roads=roads, areas=[area]), TIGHT)
+        def region_of(cell):
+            return "region_west" if cell[0] < 3 else "region_east"
+
+        problems = check_spacing(_input(roads=[road], region_of=region_of), TIGHT)
 
         self.assertEqual(_pairs(problems), [("road_gap", "node_a--node_b")])
-
-    @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
-    )
-    def test_a_rectangle_narrows_its_region(self):
-        area = Area("narrow", PLAIN, (0, 0, 50, 50))
-        road = ("node_a", "node_b", _straight((0, 80), 20, (1, 0)))
-
-        self.assertEqual(
-            check_spacing(_input(roads=[road], areas=[area]), TIGHT), ()
-        )
-
-    @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
-    )
-    def test_an_empty_area_list_checks_no_gap_but_keeps_the_other_rules(self):
-        road = ("node_a", "node_b", _straight((0, 0), 20, (1, 0)))
-        town = _place("town_mid", "town", (0, 40))
-        hamlet = _place("hamlet_near", "hamlet", (0, 45))
-
-        problems = check_spacing(_input([town, hamlet], roads=[road]), TIGHT)
-
-        self.assertEqual(_pairs(problems), [("hamlet_spacing", "hamlet_near")])
-
-
-class AreaFileTests(unittest.TestCase):
-    """An area file loads cleanly or fails naming the entry that is wrong."""
-
-    def _load(self, document) -> tuple[Area, ...]:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "areas.json"
-            path.write_text(json.dumps(document), encoding="utf-8")
-            return load_areas(path)
-
-    @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
-    )
-    def test_a_valid_list_keeps_its_bounds(self):
-        areas = self._load(
-            {
-                "areas": [
-                    {"id": "west", "region": PLAIN, "bounds": [0, 0, 4, 4]},
-                    {"id": "east", "region": PLAIN},
-                ]
-            }
-        )
-
-        self.assertEqual(
-            areas,
-            (
-                Area("west", PLAIN, (0, 0, 4, 4)),
-                Area("east", PLAIN, None),
-            ),
-        )
-
-    @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
-    )
-    def test_invalid_files_fail_naming_the_entry(self):
-        cases = [
-            ({"areas": [], "extra": 1}, "extra"),
-            ({"areas": {}}, "areas"),
-            ({"areas": [{"id": "west", "region": PLAIN, "colour": "red"}]}, "colour"),
-            (
-                {
-                    "areas": [
-                        {"id": "west", "region": PLAIN},
-                        {"id": "west", "region": PLAIN},
-                    ]
-                },
-                "areas[1]",
-            ),
-            ({"areas": [{"id": "west", "region": PLAIN, "bounds": [0, 0, 4]}]}, "four"),
-            (
-                {"areas": [{"id": "west", "region": PLAIN, "bounds": [5, 0, 4, 4]}]},
-                "ordered",
-            ),
-            (
-                {
-                    "areas": [
-                        {"id": "west", "region": PLAIN, "bounds": [0, 0, 4, True]}
-                    ]
-                },
-                "four",
-            ),
-            ({"areas": [{"id": "  ", "region": PLAIN}]}, "no id"),
-            ({"areas": [{"region": PLAIN}]}, "no id"),
-            ({"areas": [{"id": "west"}]}, "no region"),
-            ({"areas": ["west"]}, "not an object"),
-        ]
-        for document, expected in cases:
-            with self.subTest(document=document):
-                with self.assertRaises(ValueError) as captured:
-                    self._load(document)
-                self.assertIn(expected, str(captured.exception))
+        message = problems[0].message
+        self.assertIn("(0, 0)", message)
+        self.assertIn("(5, 0)", message)
+        self.assertIn("5.0 km", message)
 
 
 class IdentityTests(unittest.TestCase):
@@ -580,7 +468,7 @@ class CommandTests(unittest.TestCase):
         return status, out.getvalue(), err.getvalue()
 
     def _write_workspace(self, root: Path) -> dict[str, str]:
-        """A synthetic checkout plus its lore override, roads and area list."""
+        """A synthetic checkout plus its lore override and roads."""
 
         continent = fixtures.continent_data()
         for region in continent["regions"].values():
@@ -620,12 +508,10 @@ class CommandTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        (root / "areas.json").write_text('{"areas": []}', encoding="utf-8")
         return {
             "--root": str(root),
             "--lore": str(root / "lore.json"),
             "--roads": str(root / "roads.json"),
-            "--areas": str(root / "areas.json"),
         }
 
     def _move_hamlet(self, root: Path, cell_y: int) -> None:
@@ -668,25 +554,6 @@ class CommandTests(unittest.TestCase):
             self.assertEqual(out, "")
             self.assertIn("roads.json", err)
             self.assertEqual(self._digests(root), before)
-
-    @covers_requirement(
-        "settlement-spacing::road-coverage-applies-only-inside-completed-areas"
-    )
-    def test_an_undeclared_area_region_fails_by_exit_status(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            arguments = self._write_workspace(root)
-            argv = [item for pair in arguments.items() for item in pair]
-            (root / "areas.json").write_text(
-                json.dumps({"areas": [{"id": "ghost", "region": "region_nowhere"}]}),
-                encoding="utf-8",
-            )
-
-            status, out, err = self._run(argv)
-
-            self.assertEqual((status, out), (2, ""))
-            self.assertIn("ghost", err)
-            self.assertIn("region_nowhere", err)
 
 
 if __name__ == "__main__":

@@ -100,10 +100,9 @@ between cell centres:
 
 Elven villages and dungeons take no part, and no pair among the four larger
 kinds is checked. Along an official road, consecutive settlements are at most
-75 km apart by road length, and a road's own end cells count as settlements; a
-hamlet or village that is not on that road does not shorten the distance. That
-rule is checked only inside a completed area, and the completed-area list
-(`tools/settlement_spacing_areas.json`) is empty for now.
+75 km apart by road length; the road's ends and every cell on it that ends
+another road count as settlements, and a hamlet or village that is not on that
+road does not shorten the distance. That rule applies to every road.
 
 A site whose design requires it carries an optional `spacing_exemption` with a
 non-blank English reason. A marked village or hamlet is skipped by the two

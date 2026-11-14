@@ -2,9 +2,8 @@
 
 The placement script that chose the village and hamlet sites is a throwaway
 tool with no tests, so this module is the tested gate that runs in continuous
-integration instead. It reads the authored sources, the frozen road artifact,
-the lore join and the list of completed areas, and reports three families of
-problem:
+integration instead. It reads the authored sources, the frozen road artifact
+and the lore join, and reports three families of problem:
 
 * minimum spacing, measured in a straight line between cell centres, by kind;
 * the road gap between consecutive settlements along one road;
@@ -16,20 +15,18 @@ The command exits 0 when it finds no problem, 1 when it finds any, and 2 when
 one of its inputs does not load::
 
     uv run --locked python -m tools.settlement_spacing [--root DIR]
-        [--lore FILE] [--roads FILE] [--areas FILE]
+        [--lore FILE] [--roads FILE]
 """
 
 from __future__ import annotations
 
 import argparse
 import itertools
-import json
 import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from elosern_map_core import discover_source_documents, load_authoring_world
 from elosern_map_core.authoring import terrain_definition
@@ -41,10 +38,8 @@ from tools.settlement_synthesis.workspace import WorkspaceError, load_lore
 
 Cell = tuple[int, int]
 
-#: The repository root the shipped sources and the area list are read from.
+#: The repository root the shipped sources are read from.
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-#: The completed-area list, relative to the repository root.
-AREAS_PATH = Path("tools") / "settlement_spacing_areas.json"
 #: The frozen road artifact, relative to the workspace root.
 ROADS_PATH = Path("world") / "maps" / "data" / "road_network.json"
 COMMAND = "uv run --locked python -m tools.settlement_spacing"
@@ -60,10 +55,6 @@ ID_PREFIXES = {"village": "village_", "hamlet": "hamlet_"}
 DIAGONAL_STEP = math.sqrt(2.0)
 #: A gap within this distance of the maximum is still at the maximum.
 EPSILON = 1e-9
-#: The one key the area document may carry.
-_AREA_DOCUMENT_KEYS = frozenset({"areas"})
-#: The optional keys one area entry may carry.
-_AREA_ENTRY_KEYS = frozenset({"id", "region", "bounds"})
 
 
 @dataclass(frozen=True)
@@ -97,15 +88,6 @@ class Place:
 
 
 @dataclass(frozen=True)
-class Area:
-    """One completed area: a terrain region, optionally narrowed to a rectangle."""
-
-    area_id: str
-    region: str
-    bounds: tuple[int, int, int, int] | None
-
-
-@dataclass(frozen=True)
 class SpacingInput:
     """Everything the check reads, as explicit values."""
 
@@ -114,7 +96,6 @@ class SpacingInput:
     region_of: Callable[[Cell], str]
     region_nation: Mapping[str, str | None]
     forbidden_regions: frozenset[str]
-    areas: tuple[Area, ...]
 
 
 @dataclass(frozen=True)
@@ -331,29 +312,11 @@ def _settlement_positions(
     return sorted(positions)
 
 
-def _cell_in_area(
-    areas: Sequence[Area], region_of: Callable[[Cell], str], cell: Cell
-) -> bool:
-    """Whether a cell lies in some completed area."""
-
-    for area in areas:
-        if region_of(cell) != area.region:
-            continue
-        if area.bounds is None:
-            return True
-        x_min, y_min, x_max, y_max = area.bounds
-        if x_min <= cell[0] <= x_max and y_min <= cell[1] <= y_max:
-            return True
-    return False
-
-
 def _road_gap_problems(
     inp: SpacingInput, config: SpacingConfig
 ) -> list[Problem]:
     """The gap along the road between consecutive settlement positions."""
 
-    if not inp.areas:
-        return []
     # A road end is a settlement position on every road that passes it: the
     # reuse factor merges roads, so a trunk can run through the gate approach
     # of a town it does not end at.
@@ -373,10 +336,6 @@ def _road_gap_problems(
             )
             if length <= config.road_gap_max_km + EPSILON:
                 continue
-            if not all(
-                _cell_in_area(inp.areas, inp.region_of, cell) for cell in gap
-            ):
-                continue
             problems.append(
                 Problem(
                     "road_gap",
@@ -386,72 +345,6 @@ def _road_gap_problems(
                 )
             )
     return problems
-
-
-def _reject(label: str, detail: str) -> ValueError:
-    """A rejected input value, naming the file and entry that carries it."""
-
-    return ValueError(f"{label}: {detail}")
-
-
-def _bounds(row: Mapping[str, Any], label: str) -> tuple[int, int, int, int] | None:
-    """The validated inclusive rectangle of one area entry, or ``None``."""
-
-    value = row.get("bounds")
-    if value is None:
-        return None
-    if (
-        not isinstance(value, list)
-        or len(value) != 4
-        or not all(
-            isinstance(item, int) and not isinstance(item, bool) for item in value
-        )
-    ):
-        raise _reject(label, "bounds is not four integers")
-    x_min, y_min, x_max, y_max = value
-    if x_min > x_max or y_min > y_max:
-        raise _reject(label, "bounds is not an ordered rectangle")
-    return (x_min, y_min, x_max, y_max)
-
-
-def load_areas(path: Path) -> tuple[Area, ...]:
-    """The completed-area list of one JSON file, rejecting malformed entries."""
-
-    path = Path(path)
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise _reject(f"{path}", str(error)) from error
-    if not isinstance(document, dict):
-        raise _reject(f"{path}", "the document is not an object")
-    unknown = set(document) - _AREA_DOCUMENT_KEYS
-    if unknown:
-        raise _reject(f"{path}", f"unknown keys {sorted(unknown)}")
-    rows = document.get("areas")
-    if not isinstance(rows, list):
-        raise _reject(f"{path}", "'areas' is not a list")
-    areas: list[Area] = []
-    seen: set[str] = set()
-    for index, row in enumerate(rows):
-        label = f"{path}: areas[{index}]"
-        if not isinstance(row, dict):
-            raise _reject(label, "the entry is not an object")
-        unknown = set(row) - _AREA_ENTRY_KEYS
-        if unknown:
-            raise _reject(label, f"unknown keys {sorted(unknown)}")
-        area_id = row.get("id")
-        region = row.get("region")
-        if not isinstance(area_id, str) or not area_id.strip():
-            raise _reject(label, "the entry declares no id")
-        if not isinstance(region, str) or not region.strip():
-            raise _reject(label, f"the entry {area_id!r} declares no region")
-        if area_id in seen:
-            raise _reject(label, f"the entry {area_id!r} repeats an identifier")
-        seen.add(area_id)
-        areas.append(
-            Area(area_id, region, _bounds(row, f"{label} {area_id!r}"))
-        )
-    return tuple(areas)
 
 
 def _place(
@@ -475,29 +368,21 @@ def _place(
 
 
 def build_input(
-    root: Path, lore: Path | None, roads: Path, areas: Path
+    root: Path, lore: Path | None, roads: Path
 ) -> SpacingInput:
-    """The explicit check input of one checkout, its artifact and its area list."""
+    """The explicit check input of one checkout and its artifact."""
 
     world = load_authoring_world(discover_source_documents(Path(root)))
     definition = terrain_definition(world.continent)
     try:
         network = decode_road_network(Path(roads).read_text(encoding="utf-8"))
     except ValueError as error:
-        raise _reject(f"{roads}", str(error)) from error
+        raise ValueError(f"{roads}: {error}") from error
     rows = load_lore(lore)
-    completed = load_areas(Path(areas))
     region_nation = {
         region.region_id: region.nation_key
         for region in world.continent.regions.values()
     }
-    for area in completed:
-        if area.region not in region_nation:
-            raise _reject(
-                f"{areas}",
-                f"the area {area.area_id!r} names the undeclared region "
-                f"{area.region!r}",
-            )
     return SpacingInput(
         places=tuple(
             _place(declaration, rows)
@@ -511,7 +396,6 @@ def build_input(
             if world.road_network is not None
             else frozenset()
         ),
-        areas=completed,
     )
 
 
@@ -537,18 +421,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="the frozen road artifact; defaults to the artifact under --root",
     )
-    parser.add_argument(
-        "--areas",
-        type=Path,
-        default=None,
-        help="the completed-area list; defaults to the repository's own list",
-    )
     args = parser.parse_args(argv)
     root = Path(args.root)
     roads = args.roads if args.roads is not None else root / ROADS_PATH
-    areas = args.areas if args.areas is not None else REPOSITORY_ROOT / AREAS_PATH
     try:
-        inp = build_input(root, args.lore, roads, areas)
+        inp = build_input(root, args.lore, roads)
     except (OSError, ValueError, WorkspaceError) as error:
         print(f"{COMMAND}: the inputs do not load: {error}", file=sys.stderr)
         return 2
@@ -560,8 +437,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 __all__ = [
-    "AREAS_PATH",
-    "Area",
     "COMMAND",
     "NATIONAL_KINDS",
     "Place",
@@ -574,7 +449,6 @@ __all__ = [
     "SpacingInput",
     "build_input",
     "check_spacing",
-    "load_areas",
     "main",
 ]
 
