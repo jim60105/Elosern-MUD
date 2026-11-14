@@ -433,15 +433,40 @@ def _require_argument_int(value: object, what: str, minimum: int = 0) -> int:
     return value
 
 
+#: The last validated per-zone state map and the stored value object it came
+#: from. Every write, in-place mutation and rollback restore replaces that
+#: object, so its identity proves the decode is still current. Callers always
+#: receive their own copy, so a whole-value write from a read map never
+#: mutates this one.
+_DECODED_ZONE_MAP: tuple[Any, dict[str, dict]] | None = None
+
+
 def _state_map(wilderness: Any) -> dict[str, dict]:
     """The durable per-zone state map, copied out for a whole-value write.
+
+    An unchanged stored value is validated once and copied out again from that
+    decode.
+    """
+    global _DECODED_ZONE_MAP
+    stored = wilderness.attributes.get(REGIONAL_POPULATION_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
+    decoded = _DECODED_ZONE_MAP
+    if decoded is not None and decoded[0] is raw:
+        return {key: dict(value) for key, value in decoded[1].items()}
+    states = _zone_map_from_raw(wilderness.db.regional_population)
+    if stored is not None:
+        _DECODED_ZONE_MAP = (raw, states)
+    return {key: dict(value) for key, value in states.items()}
+
+
+def _zone_map_from_raw(raw: object) -> dict[str, dict]:
+    """Validate one stored per-zone state map.
 
     An absent Attribute is the only empty state. A present value that is not a
     mapping of zone keys to mappings is malformed and refuses: it is never
     normalized into "nothing was initialized", which would let a later
     initialization overwrite saved owner state.
     """
-    raw = wilderness.db.regional_population
     if raw is None:
         return {}
     if not isinstance(raw, Mapping):
@@ -631,17 +656,48 @@ def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
     return _zone_state_from_record(zone_key, record, read_population_seed(wilderness))
 
 
+#: The last decoded zone states, together with the two stored value objects
+#: they were validated against: a changed seed can invalidate a record that
+#: did not itself change, so both identities must still hold.
+_DECODED_ZONE_STATES: tuple[Any, Any, dict[str, ZonePopulationState]] | None = None
+
+
 def zone_states(wilderness: Any) -> dict[str, ZonePopulationState]:
-    """Every initialized zone's validated state from one decode, in key order."""
+    """Every initialized zone's validated state from one decode, in key order.
+
+    The validated answer is reused while both stored values it was read from
+    -- the zone map and the world seed a record is validated against -- are
+    unchanged.
+    """
+    global _DECODED_ZONE_STATES
     _require_wilderness(wilderness)
+    stored_zones = wilderness.attributes.get(
+        REGIONAL_POPULATION_ATTRIBUTE, return_obj=True
+    )
+    stored_seed = wilderness.attributes.get(POPULATION_SEED_ATTRIBUTE, return_obj=True)
+    if stored_zones is not None and stored_seed is not None:
+        decoded = _DECODED_ZONE_STATES
+        if (
+            decoded is not None
+            and decoded[0] is stored_zones.db_value
+            and decoded[1] is stored_seed.db_value
+        ):
+            return dict(decoded[2])
     states = _state_map(wilderness)
     if not states:
         return {}
     world_seed = read_population_seed(wilderness)
-    return {
+    validated = {
         key: _zone_state_from_record(key, states[key], world_seed)
         for key in sorted(states)
     }
+    if stored_zones is not None and stored_seed is not None:
+        _DECODED_ZONE_STATES = (
+            stored_zones.db_value,
+            stored_seed.db_value,
+            validated,
+        )
+    return dict(validated)
 
 
 def due_recovery_zone_keys(wilderness: Any, *, tick: int) -> tuple[str, ...]:
@@ -1170,16 +1226,37 @@ def _protection_from_dict(value: object, index: int) -> PopulationProtection:
     return PopulationProtection(engagement_id, PopulationPosition(*cell), start_tick, end_tick)
 
 
+#: The last decoded timeline and the stored value object it came from. Every
+#: write, in-place mutation and rollback restore replaces that object, so its
+#: identity proves the decode is still current. The timeline is a frozen
+#: dataclass over tuples, so the shared value is read-only.
+_DECODED_TIMELINE: tuple[Any, PopulationTimeline] | None = None
+
+
 def read_population_timeline(wilderness: Any) -> PopulationTimeline:
     """The durable chronological presence evidence of this world.
 
     A missing or malformed timeline is the named owner-state refusal: it is
     never reconstructed from older records, and no implicit empty timeline is
     substituted for saved owner state. The explicit seed initialization is the
-    only creator of the empty value.
+    only creator of the empty value. An unchanged stored value is decoded once
+    and answered again from that decode.
     """
+    global _DECODED_TIMELINE
     _require_wilderness(wilderness)
-    raw = wilderness.db.population_timeline
+    stored = wilderness.attributes.get(POPULATION_TIMELINE_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
+    decoded = _DECODED_TIMELINE
+    if decoded is not None and decoded[0] is raw:
+        return decoded[1]
+    timeline = _timeline_from_raw(wilderness.db.population_timeline)
+    if stored is not None:
+        _DECODED_TIMELINE = (raw, timeline)
+    return timeline
+
+
+def _timeline_from_raw(raw: object) -> PopulationTimeline:
+    """Decode one stored timeline value, refusing a missing or malformed one."""
     if not isinstance(raw, Mapping):
         raise MalformedPopulationState(
             f"{MALFORMED_STATE}: {POPULATION_TIMELINE_ATTRIBUTE!r} is missing or not a mapping"

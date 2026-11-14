@@ -13,6 +13,8 @@ import contextlib
 from types import MappingProxyType
 from unittest.mock import patch
 
+from django.db import transaction
+
 from typeclasses.monsters import Monster
 
 from world.lore.monster_placement import (
@@ -30,10 +32,16 @@ from world.maps import (
 )
 from world.maps.population_lifecycle import settle_population_lifecycle
 from world.maps.regional_population import (
+    POPULATION_SEED_ATTRIBUTE,
     PopulationTransition,
+    MalformedPopulationState,
     initialize_zone,
     presence_of,
+    read_population_timeline,
     record_population_transition,
+    restore_population_surfaces,
+    snapshot_population_surfaces,
+    zone_states,
 )
 from world.maps.tests._settlement_projection import settlement_projection
 from world.maps.tests.test_monster_activity import (
@@ -63,6 +71,102 @@ REPLENISHMENT = 5
 SITE_RECOVERY_TICKS = 40
 #: One identity no living row carries: the site's already-defeated member.
 DEFEATED_ID = 999999
+
+ZONE_RECORD = {
+    "initialized": True,
+    "seed": SEED,
+    "generation_sequence": 0,
+    "recovery_due_tick": None,
+    "settled_through_tick": 0,
+}
+
+
+def _timeline_record(settled_through_tick: int) -> dict:
+    """One complete stored timeline value at one settled tick."""
+    return {
+        "settled_through_tick": settled_through_tick,
+        "transitions": [],
+        "protection": [],
+    }
+
+
+class DecodeReuseTests(ActivityFixture):
+    """A stored population record is decoded once per stored value."""
+
+    def setUp(self):
+        super().setUp()
+        self.wilderness.db.regional_population = {ZONE_KEY: dict(ZONE_RECORD)}
+        self.wilderness.db.population_timeline = _timeline_record(0)
+
+    @staticmethod
+    def _decoding(name: str):
+        """Count the decode calls of one private decode function."""
+        return patch.object(
+            regional_population, name, wraps=getattr(regional_population, name)
+        )
+
+    def test_repeated_reads_decode_each_record_once(self):
+        with (
+            self._decoding("_timeline_from_raw") as timeline_decode,
+            self._decoding("_zone_map_from_raw") as zone_decode,
+        ):
+            timelines = [read_population_timeline(self.wilderness) for _ in range(5)]
+            zones = [zone_states(self.wilderness) for _ in range(5)]
+        self.assertEqual(timeline_decode.call_count, 1)
+        self.assertEqual(zone_decode.call_count, 1)
+        self.assertIs(timelines[0], timelines[-1])
+        for timeline in timelines[1:]:
+            self.assertEqual(timeline, timelines[0])
+        for zone_map in zones[1:]:
+            self.assertEqual(zone_map, zones[0])
+        self.assertEqual(zones[0][ZONE_KEY].settled_through_tick, 0)
+
+    def test_a_read_follows_every_kind_of_timeline_write(self):
+        first = read_population_timeline(self.wilderness)
+        self.assertIs(read_population_timeline(self.wilderness), first)
+        # One whole-value write replaces the stored value object.
+        self.wilderness.db.population_timeline = _timeline_record(5)
+        self.assertEqual(
+            read_population_timeline(self.wilderness).settled_through_tick, 5
+        )
+        # One in-place mutation of the stored value does too.
+        self.wilderness.db.population_timeline["settled_through_tick"] = 9
+        self.assertEqual(
+            read_population_timeline(self.wilderness).settled_through_tick, 9
+        )
+        # A rolled-back write is restored through the owner's own surface
+        # contract, and the read follows the restored value again.
+        snapshot = snapshot_population_surfaces(self.wilderness)
+        with self.assertRaises(ZeroDivisionError):
+            with transaction.atomic():
+                self.wilderness.db.population_timeline = _timeline_record(99)
+                self.assertEqual(
+                    read_population_timeline(self.wilderness).settled_through_tick, 99
+                )
+                raise ZeroDivisionError
+        restore_population_surfaces(snapshot)
+        self.assertEqual(
+            read_population_timeline(self.wilderness).settled_through_tick, 9
+        )
+
+    def test_a_zone_read_follows_every_kind_of_record_and_seed_write(self):
+        self.assertEqual(
+            zone_states(self.wilderness)[ZONE_KEY].settled_through_tick, 0
+        )
+        self.wilderness.db.regional_population = {
+            ZONE_KEY: {**ZONE_RECORD, "settled_through_tick": 4}
+        }
+        self.assertEqual(
+            zone_states(self.wilderness)[ZONE_KEY].settled_through_tick, 4
+        )
+        self.wilderness.db.regional_population[ZONE_KEY]["generation_sequence"] = 2
+        self.assertEqual(
+            zone_states(self.wilderness)[ZONE_KEY].generation_sequence, 2
+        )
+        # The seed every record is validated against is part of those facts.
+        self.wilderness.attributes.add(POPULATION_SEED_ATTRIBUTE, SEED + 1)
+        with self.assertRaises(MalformedPopulationState):
+            zone_states(self.wilderness)
 
 
 class ScenarioSettlementFixture(ActivityFixture):
