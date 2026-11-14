@@ -33,7 +33,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.db import transaction
+
 from world.maps import monster_activity, monster_sites, regional_population
+from world.observability import log_info
+from world.observability.tally import maintenance_tally, suspended_maintenance_tally
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot, register_event_source
 
 #: The existing stage kind this coordinator installs itself under.
@@ -105,7 +109,10 @@ def _settle_population_at(
         from world.rules.field_contact import settle_population_contact_at
 
         # A failed contact restores its participants and the advance goes on.
-        with monster_activity.unbatched_state_writes():
+        with (
+            monster_activity.unbatched_state_writes(),
+            suspended_maintenance_tally(),
+        ):
             events.extend(
                 settle_population_contact_at(wilderness, tick, int(contact_tick))
             )
@@ -172,29 +179,41 @@ def settle_population_lifecycle(
         return []
     events: list[ScheduledEvent] = []
     tick = start_tick
-    with (
-        monster_activity.batched_state_writes(wilderness),
-        regional_population.reused_living_presence(),
-    ):
-        while tick <= end_tick:
-            events.extend(
-                _settle_population_at(wilderness, tick, contact_tick=end_tick)
+    with maintenance_tally() as counts:
+        with (
+            monster_activity.batched_state_writes(wilderness),
+            regional_population.reused_living_presence(),
+        ):
+            while tick <= end_tick:
+                events.extend(
+                    _settle_population_at(wilderness, tick, contact_tick=end_tick)
+                )
+                following = _next_population_boundary(wilderness, tick, end_tick)
+                if following is None or following <= tick:
+                    break
+                tick = following
+            # Progress is the interval endpoint whether or not a boundary fell
+            # there: equal elapsed time must leave equal settlement progress and
+            # equal protection retirement.
+            monster_activity.settle_idle_physiology(wilderness, end_tick)
+            regional_population.settle_timeline_through(
+                wilderness,
+                end_tick,
+                retain=monster_sites.retained_loss_ids(wilderness),
             )
-            following = _next_population_boundary(wilderness, tick, end_tick)
-            if following is None or following <= tick:
-                break
-            tick = following
-        # Progress is the interval endpoint whether or not a boundary fell
-        # there: equal elapsed time must leave equal settlement progress and
-        # equal protection retirement.
-        monster_activity.settle_idle_physiology(wilderness, end_tick)
-        regional_population.settle_timeline_through(
-            wilderness,
-            end_tick,
-            retain=monster_sites.retained_loss_ids(wilderness),
-        )
-        monster_activity.retire_room_protection(wilderness, end_tick)
-        monster_activity.retire_settled_decision_receipts(wilderness, end_tick)
+            monster_activity.retire_room_protection(wilderness, end_tick)
+            monster_activity.retire_settled_decision_receipts(wilderness, end_tick)
+        if counts:
+            context = {
+                "tick_from": int(start_tick),
+                "tick_to": int(end_tick),
+                **dict(sorted(counts.items())),
+            }
+            transaction.on_commit(
+                lambda context=context: log_info(
+                    "population_maintenance_settled", context=context
+                )
+            )
     return events
 
 

@@ -29,7 +29,8 @@ from typing import Any, Iterable, Iterator, Mapping, Sequence
 from django.db import transaction
 
 from world.maps.published import SourceMemo
-from world.observability import log_info, log_warn
+from world.observability import log_debug, log_info, log_warn
+from world.observability.tally import note_maintenance
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.movement_edges import (
     LocationRef,
@@ -1639,9 +1640,18 @@ def _emit_decided(plan: ActivityDecision) -> None:
         "tick": plan.tick,
         "reason": plan.reason,
     }
-    transaction.on_commit(
-        lambda context=context: log_info("monster_activity_decided", context=context)
-    )
+    if note_maintenance("monster_activity_decided"):
+        transaction.on_commit(
+            lambda context=context: log_debug(
+                "monster_activity_decided", context=context
+            )
+        )
+    else:
+        transaction.on_commit(
+            lambda context=context: log_info(
+                "monster_activity_decided", context=context
+            )
+        )
 
 
 def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -> None:
@@ -2159,9 +2169,16 @@ def _begin_group_journey(
             "journey": journey_id,
             "tick": depart_tick,
         }
-        transaction.on_commit(
-            lambda context=context: log_info("monster_departed", context=context)
-        )
+        if not emit_escape and note_maintenance("monster_departed"):
+            transaction.on_commit(
+                lambda context=context: log_debug(
+                    "monster_departed", context=context
+                )
+            )
+        else:
+            transaction.on_commit(
+                lambda context=context: log_info("monster_departed", context=context)
+            )
         if emit_escape:
             transaction.on_commit(
                 lambda context=context: log_info(
@@ -2946,9 +2963,16 @@ def _arrive(
             "destination": encode_location_ref(destination),
             "tick": tick,
         }
-        transaction.on_commit(
-            lambda context=context: log_info("monster_arrived", context=context)
-        )
+        if note_maintenance("monster_arrived"):
+            transaction.on_commit(
+                lambda context=context: log_debug(
+                    "monster_arrived", context=context
+                )
+            )
+        else:
+            transaction.on_commit(
+                lambda context=context: log_info("monster_arrived", context=context)
+            )
         log_events.append(ScheduledEvent("monster_arrived", tick, dict(context)))
 
 
@@ -3066,11 +3090,18 @@ def _settle_due_journeys(wilderness: Any, tick: int) -> list[ScheduledEvent]:
                 "tick": tick,
                 "retry_tick": tick + interval,
             }
-            transaction.on_commit(
-                lambda context=context: log_info(
-                    "monster_arrival_deferred", context=context
+            if note_maintenance("monster_arrival_deferred"):
+                transaction.on_commit(
+                    lambda context=context: log_debug(
+                        "monster_arrival_deferred", context=context
+                    )
                 )
-            )
+            else:
+                transaction.on_commit(
+                    lambda context=context: log_info(
+                        "monster_arrival_deferred", context=context
+                    )
+                )
             events.append(
                 ScheduledEvent("monster_arrival_deferred", tick, dict(context))
             )
