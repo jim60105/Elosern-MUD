@@ -306,14 +306,12 @@ def _refusal_identity(actor: Any) -> tuple[Any, str]:
     This runs on the failure path only, once the refusal code is already
     determined: an unreadable owner, site or room must never replace it.
     """
+    owner: Any = None
     try:
         owner = record_owner_for(actor)
-    except RiteRefused:  # observability: ignore R2: a body with no resolvable owner has no district either; the acting body identifies the refusal
-        return actor, ""
-    try:
         site = rite_site_for(owner)
-    except Exception:  # observability: ignore R2: a diagnostic re-read must never mask the refusal it annotates; an unreadable site or room degrades to no district
-        return owner, ""
+    except Exception:  # observability: ignore R2: a diagnostic re-read must never mask the refusal it annotates; an unreadable owner, site or room degrades to the acting body and no district
+        return (actor if owner is None else owner), ""
     return owner, "" if site is None else site.district_key
 
 

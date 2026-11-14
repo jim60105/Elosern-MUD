@@ -147,7 +147,15 @@ class RiteSettlementFixture(EvenniaTest):
             entity.sexual.exposure.value,
         )
 
-    def refused(self, code: str, call: Any, *, actor: Any = None) -> RiteRefused:
+    def refused(
+        self,
+        code: str,
+        call: Any,
+        *,
+        actor: Any = None,
+        char: Any = None,
+        district: Any = None,
+    ) -> RiteRefused:
         """Assert one refusal wrote nothing and logged exactly one refused event."""
         actor = self.player if actor is None else actor
         tick_before = get_world_clock().tick
@@ -164,7 +172,12 @@ class RiteSettlementFixture(EvenniaTest):
         self.assertEqual(self.sexual_state(actor), state_before)
         self.assertEqual(info.call_count, 1)
         self.assertEqual(info.call_args.args[0], "landmark_rite_refused")
-        self.assertEqual(info.call_args.kwargs["context"]["reason"], code)
+        context = info.call_args.kwargs["context"]
+        self.assertEqual(context["reason"], code)
+        if char is not None:
+            self.assertEqual(context["char"], char)
+        if district is not None:
+            self.assertEqual(context["district"], district)
         return refusal
 
 
@@ -259,7 +272,8 @@ class RiteCommitTests(RiteSettlementFixture):
 
     def test_a_companion_body_settles_its_own_sexual_state(self):
         player_state = self.sexual_state(self.player)
-        result = self.perform(self.player, "shared", member_id=self.companion.id)
+        with patch("world.rules.landmark_rites.log_info") as info:
+            result = self.perform(self.player, "shared", member_id=self.companion.id)
         self.assertEqual(self.sexual_state(self.player), player_state)
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.companion.sexual.shame.value, SHARED_SHAME)
@@ -270,6 +284,10 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(
             self.record()["completed"][DISTRICT_KEY]["options"]["shared"]["count"], 1
         )
+        context = info.call_args.kwargs["context"]
+        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        self.assertEqual(context["char"], self.player.pk)
+        self.assertEqual(context["body"], self.companion.pk)
 
     def test_a_companion_rite_writes_no_sexual_state_to_the_owner(self):
         # The owner sits in afterglow, the one state ordinary time settlement
@@ -309,17 +327,24 @@ class RiteCommitTests(RiteSettlementFixture):
 
     def test_a_possessed_companion_delivers_the_watch_scene(self):
         enter_possession(self.player, self.companion)
-        result = self.perform(self.companion, "shared")
+        with patch("world.rules.landmark_rites.log_info") as info:
+            result = self.perform(self.companion, "shared")
         self.assertEqual(result.plan.perspective, "watch")
         self.assertIs(result.scene, SHARED.watch_scene)
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
         self.assertIn(DISTRICT_KEY, self.record()["completed"])
         self.assertFalse(self.companion.attributes.has(RECORD_ATTR))
+        context = info.call_args.kwargs["context"]
+        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        self.assertEqual(context["char"], self.player.pk)
+        self.assertEqual(context["body"], self.companion.pk)
         self.refused(
             "rite_no_watch_scene",
             lambda: self.perform(self.companion, "solo"),
             actor=self.companion,
+            char=self.player.pk,
+            district=DISTRICT_KEY,
         )
 
 
@@ -363,6 +388,19 @@ class RiteRefusalTests(RiteSettlementFixture):
     def test_an_unavailable_body_is_refused(self):
         with patch("world.rules.fatigue.sleep_blocks_actions", return_value=True):
             self.refused("rite_unavailable", lambda: self.perform(self.player, "solo"))
+
+    def test_a_body_away_from_its_owner_is_refused(self):
+        # There is no remote rite: the record owner and the acting body must
+        # stand in the same place.
+        enter_possession(self.player, self.companion)
+        self.companion.location = self.end
+        self.refused(
+            "rite_unavailable",
+            lambda: self.perform(self.companion, "shared"),
+            actor=self.companion,
+            char=self.player.pk,
+            district=DISTRICT_KEY,
+        )
 
     def test_an_unsafe_place_is_refused(self):
         with (
