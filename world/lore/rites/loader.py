@@ -58,7 +58,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any
 
 import yaml
@@ -187,8 +186,8 @@ def _check_fields(
     field_path: str,
     problems: list[RiteDiagnostic],
     required: tuple[str, ...] | None = None,
-) -> tuple[list[str], list[str]]:
-    """Report unknown and missing keys of one mapping; return both name lists."""
+) -> list[str]:
+    """Report unknown and missing keys of one mapping; return the missing names."""
 
     unknown = [key for key in node if key not in allowed]
     for key in unknown:
@@ -207,7 +206,15 @@ def _check_fields(
             _DOCUMENT_SHAPE,
             f"missing field {field!r}",
         )
-    return unknown, absent
+    return absent
+
+
+def _file_error(message: str) -> RiteContentError:
+    """One whole-document rejection raised by the file reader."""
+
+    return RiteContentError(
+        (RiteDiagnostic(field_path="", code=_DOCUMENT_SHAPE, message=message),)
+    )
 
 
 def _parse_yaml(text: str, problems: list[RiteDiagnostic]) -> Any:
@@ -247,7 +254,7 @@ def _line(node: Any, field_path: str, problems: list[RiteDiagnostic]) -> SceneLi
         )
         return None
 
-    _, absent = _check_fields(node, _LINE_FIELDS[kind], field_path, problems)
+    absent = _check_fields(node, _LINE_FIELDS[kind], field_path, problems)
     speaker = node.get("speaker")
     if "speaker" in _LINE_FIELDS[kind] and "speaker" not in absent:
         if not isinstance(speaker, str) or speaker not in _SPEAKERS:
@@ -279,7 +286,7 @@ def _scene(
         _fault(problems, field_path, _DOCUMENT_SHAPE, "a scene must be a mapping")
         return None
 
-    _, absent = _check_fields(node, _SCENE_FIELDS, field_path, problems)
+    absent = _check_fields(node, _SCENE_FIELDS, field_path, problems)
 
     if "scene_id" not in absent:
         scene_id = node["scene_id"]
@@ -351,7 +358,7 @@ def _option(
         _fault(problems, field_path, _DOCUMENT_SHAPE, "an option must be a mapping")
         return None
 
-    _, absent = _check_fields(
+    absent = _check_fields(
         node, _OPTION_FIELDS, field_path, problems, required=_REQUIRED_OPTION_FIELDS
     )
     if "watch" not in node:
@@ -439,7 +446,7 @@ def _archetype(
         _fault(problems, field_path, _DOCUMENT_SHAPE, "an archetype must be a mapping")
         return None
 
-    _, absent = _check_fields(node, _ARCHETYPE_FIELDS, field_path, problems)
+    absent = _check_fields(node, _ARCHETYPE_FIELDS, field_path, problems)
 
     if "guardian_name_zh" not in absent:
         if not _is_text(node["guardian_name_zh"], 1, MAX_GUARDIAN_NAME_CODE_POINTS):
@@ -624,10 +631,7 @@ def parse_rites_document(text: str, *, district_keys: frozenset[str]) -> RiteSna
     if problems:
         raise RiteContentError(tuple(problems))
 
-    return RiteSnapshot(
-        archetypes=MappingProxyType(archetypes),
-        districts=MappingProxyType(assignment),
-    )
+    return RiteSnapshot(archetypes=archetypes, districts=assignment)
 
 
 def load_rites(path: Path, *, district_keys: frozenset[str]) -> RiteSnapshot:
@@ -638,35 +642,11 @@ def load_rites(path: Path, *, district_keys: frozenset[str]) -> RiteSnapshot:
         with source.open("rb") as handle:
             raw = handle.read(MAX_RITES_FILE_BYTES + 1)
     except OSError as exc:
-        raise RiteContentError(
-            (
-                RiteDiagnostic(
-                    field_path="",
-                    code=_DOCUMENT_SHAPE,
-                    message=f"cannot read {source.name!r}: {exc}",
-                ),
-            )
-        ) from exc
+        raise _file_error(f"cannot read {source.name!r}: {exc}") from exc
     if len(raw) > MAX_RITES_FILE_BYTES:
-        raise RiteContentError(
-            (
-                RiteDiagnostic(
-                    field_path="",
-                    code=_DOCUMENT_SHAPE,
-                    message=f"{source.name!r} exceeds {MAX_RITES_FILE_BYTES} bytes",
-                ),
-            )
-        )
+        raise _file_error(f"{source.name!r} exceeds {MAX_RITES_FILE_BYTES} bytes")
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
-        raise RiteContentError(
-            (
-                RiteDiagnostic(
-                    field_path="",
-                    code=_DOCUMENT_SHAPE,
-                    message=f"{source.name!r} is not valid UTF-8: {exc}",
-                ),
-            )
-        ) from exc
+        raise _file_error(f"{source.name!r} is not valid UTF-8: {exc}") from exc
     return parse_rites_document(text, district_keys=district_keys)
