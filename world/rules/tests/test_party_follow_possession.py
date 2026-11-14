@@ -682,6 +682,29 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
             list(script.db.unused_rooms or []),
         )
 
+    def _make_population_current(self) -> None:
+        """Write the cursor record at the world tick the gate traversal reached.
+
+        The gate traversal charges game time outside the command seam, so
+        nothing has settled the units to the new tick. A catch-up would then
+        settle world state between this test's own bookkeeping snapshot and the
+        movement it measures; writing the record at that tick keeps the world
+        it measures exactly the world it captured.
+        """
+        from world.maps import population_units
+        from world.rules.clock import read_world_clock
+
+        script = self._script()
+        tick = 0 if read_world_clock() is None else read_world_clock().tick
+        stored = population_units.read_unit_cursors(script)
+        population_units.write_unit_cursors(
+            script,
+            population_units.UnitCursors(
+                tick,
+                {unit: max(value, tick) for unit, value in stored.units.items()},
+            ),
+        )
+
     @covers_requirement(
         "movement-settlement-atomicity::a-failed-movement-compensates-the-persisted-"
         "relocation-and-reconciles-every-evennia-cache-surface"
@@ -691,6 +714,7 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
 
         self.gate.at_traverse(self.npc, self.east_gate)
         source_room = self.npc.location
+        self._make_population_current()
         current = self._script().itemcoordinates[self.npc]
         bookkeeping = self._bookkeeping()
         before = get_world_clock().tick
@@ -788,6 +812,7 @@ class PossessedWildernessSettlementTests(PossessedFollowTestCase):
         self.gate.at_traverse(self.npc, self.east_gate)
         target = (ENTRY_XY[0] + 2, ENTRY_XY[1])
         target_room = self._script()._create_room(target, self.npc)
+        self._make_population_current()
         bookkeeping = self._bookkeeping()
         possession_before = deepcopy(self.char1.db.possession)
         import world.rules.party as party_module
