@@ -125,8 +125,37 @@ Ground rules:
   with a design reason (D7 forbids one without it) or marking national
   settlements in `tools/settlement_spacing`, which is a validator change.
 - [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+
+  Result: not delivered. The run budget ran out before the sweep. Two things
+  are needed to finish it: each label must be a standalone shell command (the
+  focused-test guard refuses a script or an interpreter payload that runs
+  `evennia test`, so the 71-label loop cannot be batched), and one label —
+  `world.maps.tests.test_bootstrap`, also the D9 timing label — was run
+  standalone; its result is recorded under task 5.4.
 - [ ] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
+
+  Result: not delivered. `capture_map.py` refuses with `build_missing: the
+  local capture page is not built: tools/map-editor/frontend/capture-dist/
+  index.html`, and building it needs `pnpm --dir tools/map-editor/frontend
+  install --frozen-lockfile`, which is a tooling install outside this
+  change. The road previews the same run produced are at
+  `/tmp/omp-scratch/coast/roads_villages.png`,
+  `/tmp/omp-scratch/coast/roads_hamlets.png`,
+  `/tmp/omp-scratch/coast/roads_final.png`,
+  `/tmp/omp-scratch/coast/roads_final2.png` and
+  `/tmp/omp-scratch/coast/roads_d7.png`.
 - [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-coast-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+
+  Result: `test_data_lint check` → `scanned=1613 flagged=121 universe=4258+37
+  quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` → `contract
+  gate passed: reference-context, traceability, observability, test-data,
+  manifests, contracts`, exit 0; `openspec validate
+  altoria-coast-village-placement --strict` → `Change
+  'altoria-coast-village-placement' is valid`, exit 0. Forty-one settlements
+  were added: 12 villages (9 on a trunk, 3 off-trunk) and 29 hamlets (22 on an
+  existing road, 5 on a new spur, 2 off every road), of which five sit on the
+  earlier side of the boundary under D2's exception. No spacing exemption is
+  used anywhere.
 
 ## Workflow follow-up
 
