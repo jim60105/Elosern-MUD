@@ -49,10 +49,12 @@ Internal state also holds `seenKey` (the district key the group last saw availab
 
 Wrap `ctx.centredCardOpen` as `camp.js` does, adding `phase !== "closed"`.
 
+`ctx.settleRite(rs)` runs in `stores/elosern/view.js` `publishView` directly after `ctx.settleCamp(rs)`, and `buildView` publishes `rite: ctx.riteView(rs)` beside `camp`, as the camp group is wired. A state with a null `activeEpoch` (before the first snapshot of a transport) has no session.
+
 On every committed state (the hook `camp.js` uses for adoption):
 
 1. `panel` = the committed `rite` panel when it is available, else `null`.
-2. `panel === null`, or the committed mode is not `exploration`: reset to `{phase: "closed", revisit: false, pending: null, delivery: null, playing: false}`; when `panel === null` also clear `seenKey`.
+2. `panel === null`, or the committed mode is not `exploration`: reset to `{phase: "closed", revisit: false, pending: null, delivery: null, playing: false}`; when `panel === null` also clear `seenKey`. When the panel is available but the mode is not `exploration` and the session is not yet `hydrated`, set `seenKey` to its district key: a session that begins in dialogue or combat on a landmark is a reconnect too, and its return to exploration opens nothing. Steps 3 and 5 do not run.
 3. Otherwise, when `panel.district.key !== seenKey`: set `seenKey`; if `hydrated` and `phase === "closed"`, set `phase = "card"`, `revisit = false`. The first snapshot of a session never opens the card: a reconnect on a landmark shows the return entry.
 4. Set `hydrated = true`.
 5. Adopt a pending result exactly as `camp.js` matches one: a success outcome whose `data.delivery` is an object -> `delivery = data.delivery`, `playing = true`, `pending = null`; any other outcome -> `pending = null` (the recognized-result handler already writes the server's message to the log).
