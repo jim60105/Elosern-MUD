@@ -56,7 +56,7 @@ describe("ObjectiveTracker integration & stage recession (webclient-align-09-obj
     const w = mountShellWithTracker({ mode: "exploration" });
     const tracker = w.find('[data-anchor="map"] [data-testid="objective-tracker"]');
     expect(tracker.exists()).toBe(true);
-    expect(tracker.get('[data-testid="objective-tracker__more"]').text()).toBe("+2");
+    expect(tracker.get('[data-testid="objective-tracker__more"]').text()).toBe("2");
   });
 
   it("keeps the objective line mounted in combat, where the stage CSS hides it", () => {

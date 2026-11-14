@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import ObjectiveTracker from "../../components/ObjectiveTracker.vue";
@@ -25,10 +27,34 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     return wrapper;
   }
 
-  it("renders the 目標 label and a +N count for further rows", () => {
+  function counted(quest_id, objective_quantity, stage_progress) {
+    return {
+      quest_id,
+      display_name: "計數任務",
+      objective_line: "收集藥草",
+      stage_index: 1,
+      stage_total: 1,
+      stage_progress,
+      objective_quantity,
+      reward_copper: null,
+      deadline_line: null,
+    };
+  }
+
+  it("names the region 目標 without a visible label and counts further rows with a glyph", () => {
     const w = mountTracker();
-    expect(w.get(".obj__label").text()).toBe("目標");
-    expect(w.get('[data-testid="objective-tracker__more"]').text()).toBe("+2");
+    const root = w.get('[data-testid="objective-tracker"]');
+    expect(w.find(".obj__label").exists()).toBe(false);
+    expect(root.text()).not.toContain("目標");
+    expect(root.attributes("aria-label")).toBe("目標");
+    expect(root.attributes("role")).toBe("region");
+    expect(root.classes()).toEqual(expect.arrayContaining(["obj", "instrument-panel"]));
+    const more = w.get('[data-testid="objective-tracker__more"]');
+    expect(more.text()).toBe("2");
+    expect(more.attributes("aria-label")).toBe("另有 2 項追蹤目標");
+    expect(more.attributes("title")).toBe("另有 2 項追蹤目標");
+    expect(more.find("svg").exists()).toBe(true);
+    expect(more.text()).not.toContain("+");
     expect(w.find('[data-testid="objective-tracker__count"]').exists()).toBe(false);
 
     const single = mountTracker({ rows: [OBJECTIVES_PANEL_SAMPLE.rows[0]] });
@@ -58,7 +84,7 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     expect(text.classes()).toContain("txt");
   });
 
-  it("renders a completion checkmark when stage_progress >= objective_quantity and empty box otherwise", () => {
+  it("fills the lozenge with a check and names it 已達成 once reached, else an open 進行中 lozenge", () => {
     const rows = [
       {
         quest_id: "q_done",
@@ -86,12 +112,15 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     const w = mountTracker({ rows });
     const doneBox = w.get('[data-testid="objective-tracker__box--q_done"]');
     expect(doneBox.classes()).toContain("done");
-    expect(doneBox.find("svg").exists()).toBe(true);
+    expect(doneBox.attributes("aria-label")).toBe("已達成");
+    expect(doneBox.find(".bx__check").exists()).toBe(true);
 
     const pending = mountTracker({ rows: [rows[1]] });
     const notDoneBox = pending.get('[data-testid="objective-tracker__box--q_not_done"]');
     expect(notDoneBox.classes()).not.toContain("done");
-    expect(notDoneBox.find("svg").exists()).toBe(false);
+    expect(notDoneBox.attributes("aria-label")).toBe("進行中");
+    expect(notDoneBox.find("svg .bx__lozenge").exists()).toBe(true);
+    expect(notDoneBox.find(".bx__check").exists()).toBe(false);
   });
 
   it("handles the .pr slot matrix: progress numeral vs reward copper vs empty", () => {
@@ -104,7 +133,7 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
         stage_total: 1,
         stage_progress: 2,
         objective_quantity: 5,
-        reward_copper: 100, // quantity > 1 takes precedence: displays 2/5
+        reward_copper: 100, // quantity > 1 takes precedence: displays 2 / 5
         deadline_line: null,
       },
       {
@@ -135,7 +164,8 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     const multi = mountTracker({ rows: [rows[0]] });
     const progressEl = multi.find('[data-testid="objective-tracker__progress--q_multi"]');
     expect(progressEl.exists()).toBe(true);
-    expect(progressEl.text()).toBe("2/5");
+    expect(progressEl.get("b").text()).toBe("2");
+    expect(progressEl.get("i").text()).toBe("/ 5");
     expect(multi.find('[data-testid="objective-tracker__reward--q_multi"]').exists()).toBe(false);
 
     const reward = mountTracker({ rows: [rows[1]] });
@@ -147,6 +177,67 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
     const none = mountTracker({ rows: [rows[2]] });
     expect(none.find('[data-testid="objective-tracker__progress--q_single_no_reward"]').exists()).toBe(false);
     expect(none.find('[data-testid="objective-tracker__reward--q_single_no_reward"]').exists()).toBe(false);
+  });
+
+  it("draws one tick per unit up to twelve, reached ticks first", () => {
+    const w = mountTracker({ rows: [counted("q_ticks", 5, 2)] });
+    const ticks = w.findAll('[data-testid="objective-tracker__tick"]');
+    expect(ticks).toHaveLength(5);
+    expect(ticks.map((t) => t.classes().includes("obj__tick--on"))).toEqual([true, true, false, false, false]);
+    expect(w.get('[data-testid="objective-tracker__ticks"]').attributes("aria-hidden")).toBe("true");
+    expect(w.find('[data-testid="objective-tracker__stroke"]').exists()).toBe(false);
+
+    const over = mountTracker({ rows: [counted("q_over", 12, 15)] });
+    const overTicks = over.findAll('[data-testid="objective-tracker__tick"]');
+    expect(overTicks).toHaveLength(12);
+    expect(overTicks.every((t) => t.classes().includes("obj__tick--on"))).toBe(true);
+
+    const reached = mountTracker({ rows: [counted("q_reached", 5, 5)] });
+    expect(reached.get('[data-testid="objective-tracker"]').classes()).toContain("obj--done");
+  });
+
+  it("draws one stroke above twelve units, filled to the ratio", () => {
+    const thirteen = mountTracker({ rows: [counted("q_thirteen", 13, 5)] });
+    expect(thirteen.find('[data-testid="objective-tracker__tick"]').exists()).toBe(false);
+    expect(thirteen.find('[data-testid="objective-tracker__stroke"]').exists()).toBe(true);
+
+    const w = mountTracker({ rows: [counted("q_long_count", 30, 12)] });
+    expect(w.find('[data-testid="objective-tracker__tick"]').exists()).toBe(false);
+    const stroke = w.get('[data-testid="objective-tracker__stroke"]');
+    expect(stroke.attributes("aria-hidden")).toBe("true");
+    expect(w.get('[data-testid="objective-tracker__stroke-fill"]').attributes("style")).toContain("width: 40%");
+
+    const negative = mountTracker({ rows: [counted("q_negative", 30, -3)] });
+    expect(negative.get('[data-testid="objective-tracker__stroke-fill"]').attributes("style")).toContain("width: 0%");
+
+    const notANumber = mountTracker({ rows: [counted("q_nan", 30, Number.NaN)] });
+    expect(notANumber.get('[data-testid="objective-tracker__stroke-fill"]').attributes("style")).toContain("width: 0%");
+  });
+
+  it("draws no quantity marks for a single-count objective", () => {
+    const missing = counted("q_missing", 5, 0);
+    delete missing.objective_quantity;
+    for (const row of [counted("q_one", 1, 0), missing, counted("q_string", "5", 5)]) {
+      const w = mountTracker({ rows: [row] });
+      expect(w.find('[data-testid="objective-tracker__ticks"]').exists()).toBe(false);
+      expect(w.find('[data-testid="objective-tracker__stroke"]').exists()).toBe(false);
+    }
+    const stringy = mountTracker({ rows: [counted("q_string", "5", 5)] });
+    expect(stringy.get('[data-testid="objective-tracker__box--q_string"]').classes()).not.toContain("done");
+  });
+
+  it("wears the shared instrument-panel chrome and paints no box of its own", () => {
+    const source = readFileSync(
+      join(process.cwd(), "web/webclient-app/components/ObjectiveTracker.vue"),
+      "utf-8",
+    );
+    expect(source).toContain('import "./instrument-panel.css";');
+    const style = source.slice(source.indexOf("<style"));
+    const rule = style.match(/\n\.obj \{([\s\S]*?)\}/);
+    expect(rule).not.toBeNull();
+    // Property declarations, not substrings: `box-sizing: border-box` is allowed.
+    const forbidden = /(^|[;{\s])(height|padding[\w-]*|background[\w-]*|border[\w-]*|box-shadow|backdrop-filter)\s*:/;
+    expect(rule[1]).not.toMatch(forbidden);
   });
 
   it("renders no deadline line on the stage", () => {

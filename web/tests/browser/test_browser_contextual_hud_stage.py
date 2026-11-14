@@ -1322,10 +1322,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-objective-tracker-island-presents-the-committed-objectives-only"
     )
     def test_objective_line_shows_only_in_exploration(self):
-        """webclient-avg-stage-hud-anchors (design D2): the objective line is
-        one row under the minimap in the `map` anchor, shows the first tracked
-        row plus `+N`, and is display:none in combat and dialogue while the
-        same `objectives` panel stays committed."""
+        """webclient-avg-stage-hud-anchors (design D2;
+        objective-tracker-instrument-panel D5): the objective line keeps one
+        text row under the minimap panel in the `map` anchor, shows the first
+        tracked row with its `n / m` readout plus the further-rows glyph count,
+        and is display:none in combat and dialogue while the same `objectives`
+        panel stays committed."""
         objectives = {
             "schema_version": 1,
             "available": True,
@@ -1365,7 +1367,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
           const el = document.querySelector('[data-testid="objective-tracker"]');
           if (!el) return { mounted: false };
           const map = document.querySelector('[data-anchor="map"]');
-          const minimap = document.querySelector('[data-testid="local-map"]');
+          const minimap = document.querySelector('[data-testid="local-map-panel"]');
           const r = el.getBoundingClientRect();
           const m = minimap && minimap.getBoundingClientRect();
           return {
@@ -1373,9 +1375,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             visible: el.offsetParent !== null && r.height > 0,
             inMap: !!(map && map.contains(el)),
             belowMinimap: !!(m && m.height > 0 && r.top >= m.bottom),
-            height: r.height,
             text: el.textContent.replace(/\\s+/g, " ").trim(),
+            textHeight: (() => {
+              const t = el.querySelector('[data-testid="objective-tracker__text--q_1042"]');
+              return t ? t.getBoundingClientRect().height : null;
+            })(),
             more: (el.querySelector('[data-testid="objective-tracker__more"]') || {}).textContent,
+            moreLabel: (el.querySelector('[data-testid="objective-tracker__more"]') || { getAttribute: () => null })
+              .getAttribute('aria-label'),
+            reached: (el.querySelector('[data-testid="objective-tracker__progress--q_1042"] b') || {}).textContent,
+            quantity: (el.querySelector('[data-testid="objective-tracker__progress--q_1042"] i') || {}).textContent,
           };
         }"""
         page = self.logged_in_page((1451, 790))
@@ -1386,10 +1395,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(state["visible"], "the objective line shows in exploration")
         self.assertTrue(state["inMap"], "the objective line lives in the map anchor")
         self.assertTrue(state["belowMinimap"], "the objective line sits under the minimap")
-        self.assertLessEqual(state["height"], 34, "the objective line is one row tall")
-        self.assertEqual((state["more"] or "").strip(), "+1")
+        scale = ui_scale((1451, 790))
+        self.assertIsNotNone(state["textHeight"], "the objective text renders")
+        self.assertLessEqual(
+            state["textHeight"], 1.3 * 17 * scale + 2, "the objective line keeps one text row"
+        )
+        self.assertEqual((state["more"] or "").strip(), "1")
+        self.assertEqual(state["moreLabel"], "另有 1 項追蹤目標")
         self.assertIn("抵達霧骨渡口", state["text"])
-        self.assertIn("1/3", state["text"])
+        self.assertEqual(state["reached"], "1")
+        self.assertEqual(state["quantity"], "/ 3")
         self.assertNotIn("與灰婆婆議價過河", state["text"], "later rows stay in the quest drawer")
         self.assertNotIn("剩餘 2 日", state["text"], "deadlines stay in the quest drawer")
 

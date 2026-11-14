@@ -339,6 +339,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `npc-persona-editor` + `npc-persona-editor-<suffix>` and `npc-persona-field-<suffix>` (the correlated editor, budgets, notices, conflict and discard controls, named field controls; targeted by `test_browser_npc_persona_editor.py`) | npc-persona-editor-window | REMAP-TO-TESTID |
 | `topbar`, `topbar-clock`, `topbar-location` | H1 | REMAP-TO-TESTID |
 | `narrative-feed`, `narrative-fulllog-control` | H1 | REMAP-TO-TESTID |
+| `objective-tracker__<suffix>` (the tracked-objectives island's hooks, completing the island row above: the first row's box and text cells and its progress or reward readout carry the quest id, the further-rows count is that row's existing hook, and objective-tracker-instrument-panel adds the quantity marks — the ticks container, one tick per unit, the tapered stroke and its fill; the quest-id cells have rendered since webclient-align-09 and enter this frozen list with objective-tracker-instrument-panel, whose family token covers the island row's earlier more-count entry so no hook is frozen twice) | objective-tracker-instrument-panel | REMAP-TO-TESTID |
 | `text-console`, `text-console-input`, `text-console-log` (the dependency-free fallback console) | H1 | REMAP-TO-TESTID |
 | `scene-backdrop` + `scene-backdrop-<suffix>` (`scene-backdrop-image`, `scene-backdrop-label`, `scene-backdrop-alt`, `scene-backdrop-placeholder`) | H1 | REMAP-TO-TESTID |
 | `anchor-<name>` (prefix `anchor`: `anchor-hud-left`, `anchor-hud-right`, `anchor-feed`, `anchor-dock`) | H1 | REMAP-TO-TESTID |
