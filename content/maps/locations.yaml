@@ -1350,11 +1350,11 @@ locations:
   village_cogongrass_flat:
     kind: village
     display_name_zh: 白茅村
-    description: Village in the cogongrass plain behind the northern dunes.
+    description: Village in the cogongrass plain behind the southern dunes.
     cell:
       cell_x: 458
       cell_y: 119
-    geographic_constraint: Cogongrass plain behind the northern shore dunes
+    geographic_constraint: Cogongrass plain behind the southern shore dunes
     scene_archetype:
   village_creek_flat:
     kind: village
@@ -1408,7 +1408,7 @@ locations:
     cell:
       cell_x: 392
       cell_y: 202
-    geographic_constraint: Sand spit on the north-west shore inside the coastal road
+    geographic_constraint: Sand spit on the south-west shore inside the coastal road
     scene_archetype:
   village_stone_hill:
     kind: village
@@ -1435,7 +1435,7 @@ locations:
     cell:
       cell_x: 361
       cell_y: 253
-    geographic_constraint: Tidal flat inland of the north-west shore
+    geographic_constraint: Tidal flat inland of the south-west shore
     scene_archetype:
   village_upper_vale:
     kind: village
@@ -1476,11 +1476,11 @@ locations:
   hamlet_dry_plain:
     kind: hamlet
     display_name_zh: 旱原
-    description: Hamlet on the dry plain of the north coast road.
+    description: Hamlet on the dry plain of the south coast road.
     cell:
       cell_x: 652
       cell_y: 148
-    geographic_constraint: Dry plain on the north coast road
+    geographic_constraint: Dry plain on the south coast road
     scene_archetype:
   hamlet_earthen_ridge:
     kind: hamlet
@@ -1494,11 +1494,11 @@ locations:
   hamlet_grass_flat:
     kind: hamlet
     display_name_zh: 草埔
-    description: Hamlet on a grass flat of the north plain.
+    description: Hamlet on a grass flat of the coastal plain.
     cell:
       cell_x: 519
       cell_y: 241
-    geographic_constraint: Grass flat on the north plain
+    geographic_constraint: Grass flat on the coastal plain
     scene_archetype:
   hamlet_grass_ridge:
     kind: hamlet
@@ -1530,11 +1530,11 @@ locations:
   hamlet_mountain_foot:
     kind: hamlet
     display_name_zh: 山麓
-    description: Hamlet at the foot of the eastern hills, north of the upper vale.
+    description: Hamlet at the foot of the eastern hills, south of the upper vale.
     cell:
       cell_x: 1212
       cell_y: 398
-    geographic_constraint: Foot of the eastern hills north of the south vale
+    geographic_constraint: Foot of the eastern hills south of the south vale
     scene_archetype:
   hamlet_plateau_top:
     kind: hamlet
@@ -1606,7 +1606,7 @@ locations:
     cell:
       cell_x: 342
       cell_y: 308
-    geographic_constraint: Shell mound on the north-west shore
+    geographic_constraint: Shell mound on the south-west shore
     scene_archetype:
   hamlet_shoal_head:
     kind: hamlet
@@ -1665,11 +1665,11 @@ locations:
   hamlet_tide_sound:
     kind: hamlet
     display_name_zh: 潮音
-    description: Hamlet on the north shore plain, between the tide port and the cogongrass flats.
+    description: Hamlet on the south shore plain, between the tide port and the cogongrass flats.
     cell:
       cell_x: 527
       cell_y: 108
-    geographic_constraint: North shore plain between the tide port and the cogongrass flats
+    geographic_constraint: South shore plain between the tide port and the cogongrass flats
     scene_archetype:
   hamlet_ridge_waist:
     kind: hamlet
@@ -1701,11 +1701,11 @@ locations:
   hamlet_ridge_edge:
     kind: hamlet
     display_name_zh: 嶺邊
-    description: Hamlet on the edge of a ridge south of the salt city.
+    description: Hamlet on the edge of a ridge north of the salt city.
     cell:
       cell_x: 1024
       cell_y: 420
-    geographic_constraint: Ridge edge on the hill road south of the salt city
+    geographic_constraint: Ridge edge on the hill road north of the salt city
     scene_archetype:
   hamlet_hillside:
     kind: hamlet
@@ -1719,7 +1719,7 @@ locations:
   hamlet_city_foot:
     kind: hamlet
     display_name_zh: 城下
-    description: Gate settlement below the walls of the salt ferry city, on the road toward the west ore port.
+    description: Gate settlement below the walls of the salt ferry city, on the road along its landward wall.
     cell:
       cell_x: 406
       cell_y: 499

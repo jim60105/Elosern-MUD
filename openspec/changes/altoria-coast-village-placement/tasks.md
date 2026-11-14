@@ -102,49 +102,73 @@ Ground rules:
 
 ## 5. Validation and hand-off
 
-- [ ] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
+- [x] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
 
-  Result: the area entry is in place; `check_map_sources.py` exits 0 and
-  `settlement_synthesis lint` prints `fit: 0 errors, 0 warnings`. Enabling the
-  area surfaced three road gaps that cross the boundary into the earlier
-  `western_hills_valleys` area — the case design D2 names. Five boundary
-  hamlets close two of them: `hamlet_ridge_edge` (1024, 420) and
-  `hamlet_hillside` (1028, 477) split `city_salt_road--town_honey_vale`
-  (175.9 km into 58.7 / 58.6 / 58.6); `hamlet_ridge_waist` (351, 544),
-  `hamlet_mid_vale` (302, 593) and `hamlet_flat_meadow` (249, 646) sit on the
-  earlier side of the boundary under the D2 exception and split
-  `city_salt_ferry--port_west_ore` (288.2 km into 72.3 / 69.3 / 74.9 / 71.5).
-  The third gap, `city_confluence--town_olive_ferry` (455, 540) to
-  (454, 448), stays at 138.9 km: it is not closable by any legal site. A
-  split of a 138.9 km gap into two gaps of at most 75 km must fall between
-  397.0 and 408.1 km along the road, and of the eleven cells in that window
-  three lie 1.0 to 2.2 km from `city_salt_ferry` (hamlet minimum 15 km) and
-  the other eight lie inside a monster habitat (D3 rule 4). The road runs
-  past the city without touching its cell, so the city's own position never
-  splits the gap. `spacing` therefore reports `1 problems` until a decision
-  outside this change's file list is taken: either a `spacing_exemption`
-  with a design reason (D7 forbids one without it) or marking national
-  settlements in `tools/settlement_spacing`, which is a validator change.
+  Result: all four hold. `tools.settlement_spacing` prints `spacing: 0
+  problems` with the `southwest_coast` area entry in place; `check_map_sources.py`
+  exits 0; `settlement_synthesis lint` prints `fit: 0 errors, 0 warnings`;
+  `road_network --check` and `map_reference_context --check` exit 0. Enabling
+  the area surfaced three gaps crossing into the earlier
+  `western_hills_valleys` area, the case design D2 names. Boundary hamlets
+  close two: `hamlet_ridge_edge` (1024, 420) and `hamlet_hillside` (1028, 477)
+  split `city_salt_road--town_honey_vale` (175.9 km into 58.7 / 58.6 / 58.6);
+  `hamlet_ridge_waist` (351, 544), `hamlet_mid_vale` (302, 593) and
+  `hamlet_flat_meadow` (249, 646) stand on the earlier side under the D2
+  exception and split `city_salt_ferry--port_west_ore` (288.2 km into 72.3 /
+  69.3 / 74.9 / 71.5). The third, `city_confluence--town_olive_ferry`
+  (455, 540) to (454, 448) at 138.9 km, has no site that satisfies the
+  spacing rule: a split into two gaps of at most 75 km must fall between
+  397.0 and 408.1 km along the road, where six cells lie 1.0 to 3.2 km from
+  `city_salt_ferry` and five lie inside a monster habitat, and the road passes
+  the city without touching its cell. It is closed by the single settlement
+  the user accepted under design §4's exemption mechanism: `hamlet_city_foot`
+  at (406, 499), the gate settlement of `city_salt_ferry`, exempted with the
+  reason "Gate settlement of city_salt_ferry; it necessarily stands within the
+  15 km hamlet minimum of the city whose gate it serves." No other exemption
+  exists, no habitat was edited and no validator was changed.
 - [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 
-  Result: not delivered. The run budget ran out before the sweep. Two things
-  are needed to finish it: each label must be a standalone shell command (the
-  focused-test guard refuses a script or an interpreter payload that runs
-  `evennia test`, so the 71-label loop cannot be batched), and one label —
-  `world.maps.tests.test_bootstrap`, also the D9 timing label — was run
-  standalone; its result is recorded under task 5.4.
-- [ ] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
+  Result: partly delivered. Green so far, one command per group of labels:
+  `world.lore.tests.test_anchors test_settlements test_anchor_placement` (48
+  tests, OK), `world.maps.tests.test_altoria_capital test_city_movement_cost
+  test_city_walkthrough test_city_wilderness_roundtrip
+  test_editor_final_yaml_adoption test_geography_source test_limbo_room
+  test_movement_roundtrip` (70 tests, OK), `world.maps.tests.test_runtime_adoption
+  test_settlement_reload test_sparse_graph test_static_map_references
+  test_village_ciaran` (46 tests, OK) and `world.maps.tests.test_bootstrap`
+  (46 tests, OK, also the D9 timing label). Not run: the remaining `web.
+  webclient`, `typeclasses`, `commands`, `world.quests` and `world.rules`
+  labels — the guard caps one command at 100 discovered tests, so those need
+  several more standalone groups, and the run budget ended first. The twelve
+  data-independent red labels keep the baseline evidence recorded by
+  `altoria-hills-village-placement` (`SettlementNotLoaded` registry-before-
+  publish in fixtures and at import, `no such table: django_content_type` on
+  the quest-registration rollback, `_anchor_key`/`anchor_locator` import-time
+  lookups), and `tests.test_map_core_contract` keeps its known
+  `CHANNEL_LOG_NUM_TAIL_LINES` runner error. No residual-pin rewrite was
+  needed. This box stays unticked because the sweep is not complete.
+- [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
-  Result: not delivered. `capture_map.py` refuses with `build_missing: the
-  local capture page is not built: tools/map-editor/frontend/capture-dist/
-  index.html`, and building it needs `pnpm --dir tools/map-editor/frontend
-  install --frozen-lockfile`, which is a tooling install outside this
-  change. The road previews the same run produced are at
-  `/tmp/omp-scratch/coast/roads_villages.png`,
-  `/tmp/omp-scratch/coast/roads_hamlets.png`,
-  `/tmp/omp-scratch/coast/roads_final.png`,
-  `/tmp/omp-scratch/coast/roads_final2.png` and
-  `/tmp/omp-scratch/coast/roads_d7.png`.
+  Result: six images, all read. The capture page was built in the worktree
+  with `pnpm --dir tools/map-editor/frontend install --frozen-lockfile
+  --offline` and `run build:capture`, and the capture environment with
+  `uv sync --locked --project tools/map-editor --group capture` plus
+  `playwright install chromium`. Images: `/tmp/omp-scratch/coast/continent.webp`
+  (`--hide partition`), `village_three_forks.webp`, `village_sand_bar.webp`,
+  `hamlet_shoal_head.webp`, `hamlet_reed_islet.webp`, `hamlet_city_foot.webp`.
+  Entrances: `village_three_forks` has a west and an east entrance on the
+  three-road junction, west toward `city_salt_ferry` and east toward
+  `town_olive_ferry`; `village_sand_bar` has one south entrance at the end of
+  its spur from `village_cogongrass_flat`; `hamlet_shoal_head` has a west and
+  an east entrance on `city_salt_road--port_south_tide`; `hamlet_reed_islet`
+  has one south-west entrance and touches no road, its gate facing the capital
+  river; `hamlet_city_foot` has a west and an east entrance on
+  `city_confluence--town_olive_ferry` beside the salt ferry gate. The last road
+  preview is `/tmp/omp-scratch/coast/roads_exempt.png`; earlier runs left
+  `roads_villages.png`, `roads_hamlets.png`, `roads_final.png`,
+  `roads_final2.png` and `roads_d7.png` beside it. The capture reported one
+  advisory diagnostic about `city_imperial_ferry`'s footprint offset, which
+  belongs to an earlier change.
 - [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-coast-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
   Result: `test_data_lint check` → `scanned=1613 flagged=121 universe=4258+37
@@ -153,11 +177,13 @@ Ground rules:
   manifests, contracts`, exit 0; `openspec validate
   altoria-coast-village-placement --strict` → `Change
   'altoria-coast-village-placement' is valid`, exit 0. Second timing line:
-  `Ran 46 tests in 337.103s`, `OK`. Forty-two settlements were added: 12
-  villages (9 on a trunk, 3 off-trunk) and 30 hamlets (27 on an existing road
-  or a new spur, 3 off every road or on a spur end), of which five sit on the
-  earlier side of the boundary under D2's exception. No spacing exemption is
-  used anywhere.
+  `Ran 46 tests in 337.103s`, `OK`. Forty-three settlements were added: 12
+  villages (9 on a trunk, 3 off-trunk) and 31 hamlets (27 on an existing road
+  or a new spur, 3 off every road or at a spur end, 1 exempted gate
+  settlement), of which five hamlets stand on the earlier side of the boundary
+  under D2's exception. Exactly one spacing exemption is used: `hamlet_city_foot`
+  at (406, 499), "Gate settlement of city_salt_ferry; it necessarily stands
+  within the 15 km hamlet minimum of the city whose gate it serves."
 
 ## Workflow follow-up
 
