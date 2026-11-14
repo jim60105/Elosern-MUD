@@ -6,6 +6,7 @@ session (or terminates it diagnostically) at startup (fix-combat-
 settlement-recovery D1/D2, guild-economy D-6).
 """
 
+import contextlib
 import time
 from collections.abc import Mapping
 from contextvars import ContextVar
@@ -488,6 +489,85 @@ def _continue_or_settle(
     )
 
 
+def _population_cell_location(record: CombatSessionRecord) -> Any | None:
+    """The stable wilderness locator of one session's own population cell."""
+    if record.population_cell is None:
+        return None
+    from world.maps import regional_population
+    from world.rules.movement_edges import LocationRef
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or wilderness.db_key != record.population_cell.get(
+        "wilderness"
+    ):
+        return None
+    cell = regional_population.coordinate_pair(
+        (record.population_cell.get("x"), record.population_cell.get("y"))
+    )
+    if cell is None:
+        return None
+    return LocationRef.wilderness(wilderness.db_key, *cell)
+
+
+def _catch_up_population_cell(record: CombatSessionRecord) -> None:
+    """Catch one settlement's own population cell up before it writes there.
+
+    ``record_population_protection`` writes durable population state for the
+    session's cell, and every population writer refuses a unit behind the world
+    tick by name. A party that stands in the cell has it settled by the command
+    pre-hook and by every advance, so this answers after one cursor read; a
+    party the arrival contact or a retirement already moved away from the cell
+    is caught up here, before the settlement opens its transaction, exactly
+    like every other catch-up entry point.
+    """
+    location = _population_cell_location(record)
+    if location is None:
+        return
+    from world.maps import (
+        population_lifecycle,
+        population_units,
+        regional_population,
+    )
+
+    wilderness = regional_population.live_wilderness()
+    if not regional_population.population_provisioned(wilderness):
+        return
+    unit = population_units.unit_of_location(
+        population_units.current_unit_index(), location
+    )
+    if unit is None:
+        return
+    cursors = population_units.read_unit_cursors(wilderness)
+    if (
+        population_units.unit_cursor(cursors, unit)
+        >= regional_population.current_population_tick()
+    ):
+        return
+    population_lifecycle.ensure_locations_current([location])
+
+
+@contextlib.contextmanager
+def _announced_population_cell(record: CombatSessionRecord):
+    """Announce the session's own cell for the settlement's clock advances.
+
+    ``settle_session`` advances the clock for the terminal combat time and for
+    a defeat aftermath. A party that stands on its battlefield has that unit
+    observed by its own position; one the arrival contact or a retirement
+    already moved away has not, and the advance would leave the fight cell's
+    unit behind the tick the protection write requires. Announcing the cell for
+    the body makes the observed pass settle it inside the same advance, so the
+    later write is lawful without a catch-up of its own.
+    """
+    location = _population_cell_location(record)
+    if location is None:
+        yield
+        return
+    from world.maps import population_units
+
+    with population_units.announced_observation([location]):
+        yield
+
+
 def _record_terminal_population_protection(record: CombatSessionRecord) -> None:
     """Copy one mapped session's exact cell and closed interval before clearing.
 
@@ -775,6 +855,10 @@ def settle_session(
             SessionReason.MALFORMED_SESSION,
             "the combat session carries no engagement identity",
         )
+    # The settlement writes this session's cell's protection evidence inside
+    # the transaction below; a cell whose settlement unit is behind the world
+    # tick is caught up first, before that transaction opens.
+    _catch_up_population_cell(record)
     engagement_id = record.engagement_id
     encounter_source_id = build_encounter_source_id(
         engagement_id,
@@ -790,6 +874,7 @@ def settle_session(
     if record.settled_tick is not None:
         # A committed terminal receipt that reloaded before its session cleared
         # still owns its lawful protected interval: retain it idempotently.
+        _catch_up_population_cell(record)
         with transaction.atomic():
             _record_terminal_population_protection(record)
             _record_terminal_room_protection(record)
@@ -842,7 +927,7 @@ def settle_session(
     started = time.monotonic()
     aftermath = None
     try:
-        with transaction.atomic():
+        with transaction.atomic(), _announced_population_cell(record):
             if record.mode == "guild_exam":
                 from world.rules.guild_exams import (
                     ExamReason,

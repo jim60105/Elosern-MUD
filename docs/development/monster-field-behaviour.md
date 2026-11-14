@@ -462,6 +462,14 @@ unobserved cells. The owner remains `world/maps/monster_activity.py` (strict
 `world/maps/population_lifecycle.py`. There is no second scheduler and no
 monster action ever calls `WorldClock.advance`.
 
+`observed-unit-advance` changed when that computation happens, not its
+outcomes: a clock advance now settles only the party's observed settlement
+units, and every other unit keeps its own settled-through tick until an
+observation, an entry point needs it, or the background drain reaches it. An
+unobserved group still decides and travels on game time with the same outcome
+whenever its unit is settled; see "Observed-only advance" in
+[Regional Monster Population](regional-monster-population.md).
+
 ### Decision contract
 
 `ActivityDecision(group_id, tick, expected_sequence, edge, reason)` is the

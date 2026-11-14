@@ -39,6 +39,26 @@ def settlement_projection(wilderness: Any) -> dict[str, Any]:
     }
 
 
+def catch_up_world(wilderness: Any) -> None:
+    """Catch every unit up to the current tick (test helper).
+
+    A clock advance settles only the observed units, so a test that advances
+    and then asserts the state of a group no player observes calls this first:
+    each unit of the authored geometry, and the residual unit, is caught up
+    through the same entry point a command uses.
+    """
+    from world.maps import population_lifecycle, population_units
+
+    index = population_units.current_unit_index()
+    units = (
+        {population_units.RESIDUAL_UNIT}
+        | set(index.unit_of_zone.values())
+        | set(index.unit_of_area.values())
+    )
+    for unit in sorted(units):
+        population_lifecycle.ensure_population_current(wilderness, {unit})
+
+
 def _labels(wilderness: Any) -> dict[int, str]:
     """One stable label per referenced persistent ID, without any raw ID."""
     state = monster_activity.read_monster_activity(wilderness)

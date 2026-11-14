@@ -25,6 +25,14 @@ The user requested completing the next specification rather than entering implem
 | Insufficient mental reserve | Retreat fails when no legal destination can be completed using the reserve available after the attempt round. No partial movement. |
 | Re-engagement | Allowed for either side. No grace period, last-opponent blacklist, artificial safe destination, or immunity flag. |
 
+> **Amended 2026-11-14 (change observed-unit-advance).** The "Simulation" rule is unchanged in
+> outcome and narrower in when the work happens. Unobserved groups still decide and travel on game
+> time with outcomes independent of the player's position and of when they are computed; the
+> computation is deferred per settlement unit until the unit is observed, an entry point needs it,
+> or the background drain reaches it. An unobserved group's unit is settled to the advanced time
+> during the advance or later, with the same outcome whenever it is settled. There is still no
+> wall-clock simulation and no proximity freeze of outcomes.
+
 ## 2. Current integration boundaries
 
 `WorldClock.advance` and `advance_bounded` already provide player-driven time, durable settlement, registered event sources, and snapshot compensation. `register_event_source` accepts a pure upcoming-boundary query, allowing interruptible waits to stop at an interactive event. `world/rules/mental_time.py` combines these boundaries with fatigue and sleep boundaries.
@@ -103,6 +111,15 @@ Active combat participants do not wander. Other groups cannot begin a route into
 Waiting after the priced route completes does not charge that route again. Settle the wait under the creature's applicable ordinary posture/activity policy, preserving its original journey identity and actual elapsed progress.
 
 Deferred combat-time settlement must carry the relevant historical encounter-protection intervals and each flee/departure occurrence time. Closing the session before clock catch-up must not permit creatures to wander retroactively into its battlefield during earlier combat rounds. A legitimate escaped individual's own protection ends at its departure time.
+
+> **Amended 2026-11-14 (change observed-unit-advance).** The ordering above is unchanged; the pass
+> that applies it is scoped. A clock advance settles the party and the observed settlement units
+> through the advance's end tick, and an observed unit that is behind the advance's start is settled
+> from its own settled-through tick inside that same advance. Every other unit keeps its records,
+> individuals and settled-through tick until an observation, an entry point needs it, or the
+> background drain reaches it. An unobserved group's unit is settled to the advanced time during the
+> advance or later, with the same outcome whenever it is settled, because settlement units never read
+> each other's state. The authored field contact is still admitted at the advance's end tick only.
 
 ### 5.3 Interactive boundaries
 

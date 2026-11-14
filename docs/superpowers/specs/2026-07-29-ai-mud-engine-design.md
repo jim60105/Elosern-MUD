@@ -724,6 +724,12 @@ finite merchant stock at configured daily boundaries; shop-hours settlement emit
 stores no redundant boolean. Their relative order in the table above is load-bearing: a caravan due at
 opening replenishes stock before the shop accepts a trade.
 
+> **Amended 2026-11-14 (change observed-unit-advance).** A clock advance settles the party and the
+> observed population units through the advance's end tick; every other unit keeps its own
+> settled-through tick until an observation, an entry point needs it, or the background drain
+> reaches it. Decision D4 (player-driven clock) is unchanged: no world time passes without a player
+> action.
+
 ---
 
 ## 7. Generative Layer

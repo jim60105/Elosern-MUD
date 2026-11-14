@@ -117,7 +117,7 @@ def _registration():
 
     registration = clock_module._EVENT_SOURCES[population_lifecycle.STAGE_KIND]
     return (
-        registration.settle is population_lifecycle.settle_population_lifecycle
+        registration.settle is population_lifecycle.settle_observed_population
         and registration.next_boundary
         is population_lifecycle.next_population_lifecycle_boundary
     )

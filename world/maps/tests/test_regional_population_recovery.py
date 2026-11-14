@@ -29,6 +29,7 @@ from evennia.utils.test_resources import EvenniaTest
 from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 import world.lore.monster_activity as lore_activity
+import world.lore.monster_placement as lore_placement
 from world.lore.monster_activity import (
     ActivityArea,
     AggressionCondition,
@@ -57,6 +58,7 @@ from world.maps.regional_population import (
     record_population_transition,
     zone_state,
 )
+from world.maps.tests._settlement_projection import catch_up_world
 from world.maps.wilderness_provider import (
     WILDERNESS_NAME,
     ElosernWildernessMapProvider,
@@ -205,6 +207,15 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
                 MappingProxyType({zone.key: zone}),
             )
         )
+        # The settlement-unit index resolves the published authored registry, so
+        # the fixture zone is published there too: one authored row, one unit.
+        self.enterContext(
+            patch.object(
+                lore_placement,
+                "ECOLOGY_ZONE_REGISTRY",
+                MappingProxyType({zone.key: zone}),
+            )
+        )
         self.enterContext(
             patch.object(
                 regional_population,
@@ -287,6 +298,10 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
     def _advance_parts(self, parts: tuple[int, ...]) -> None:
         for seconds in parts:
             self.clock.advance(seconds, AdvanceSource.SKIP, [])
+            # The clock stage settles only the observed units; no party stands
+            # in this synthetic zone, so each part is caught up everywhere
+            # before the next one. The partition keeps its own interval.
+            catch_up_world(self.wilderness)
 
     # -- delayed episode ----------------------------------------------------
 

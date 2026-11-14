@@ -932,6 +932,11 @@ class ChokepointLifecycleTests(ActivityFixture):
     )
     def test_forced_sleep_receipt_rolls_back_with_a_late_source_fault(self):
         self._register_lifecycle()
+        # The clock stage settles the units a player observes; the fixture's
+        # zone is that unit here, so the party stands inside it.
+        from world.maps.tests.test_population_catch_up import place_player
+
+        place_player(self, (505, 705))
         clock = get_world_clock()
         clock.tick = 100
         group_id, bodies = self._group(
@@ -1188,6 +1193,11 @@ class ChronologicalSettlementTests(ActivityFixture):
 
     def test_a_birth_and_departure_in_one_advance_roll_back_completely(self):
         self._register_lifecycle()
+        # The clock stage settles the units a player observes; the fixture's
+        # zone is that unit here, so the party stands inside it.
+        from world.maps.tests.test_population_catch_up import place_player
+
+        place_player(self, (505, 705))
         clock = get_world_clock()
         clock.tick = 100
         created: dict = {}

@@ -1056,7 +1056,7 @@ def _db_safe_attribute_snapshot(obj: Any, key: str) -> tuple[bool, Any]:
 
 
 def snapshot_monster_site_surfaces(
-    start_tick: int, end_tick: int
+    start_tick: int, end_tick: int, *, scope: Any | None = None
 ) -> dict[int, SurfaceSnapshot]:
     """Snapshot the durable surfaces this stage may write (pure read).
 
@@ -1065,6 +1065,11 @@ def snapshot_monster_site_surfaces(
     settlement's own discovery query finds, so a rolled-back advance restores
     the in-memory values Evennia's non-transaction-aware caches would otherwise
     keep serving.
+
+    ``scope`` narrows the member discovery to that pass's sites: a scoped pass
+    settles no site of another unit, so its rollback contract needs none of
+    their individuals. The wilderness record itself is still one whole-value
+    surface, because every site's state lives in it.
     """
     wilderness = _wilderness()
     if wilderness is None:
@@ -1081,7 +1086,15 @@ def snapshot_monster_site_surfaces(
             }
         )
     }
-    for site in MONSTER_SITE_REGISTRY.values():
+    if scope is None:
+        sites = MONSTER_SITE_REGISTRY.values()
+    else:
+        sites = (
+            MONSTER_SITE_REGISTRY[key]
+            for key in sorted(scope.site_keys)
+            if key in MONSTER_SITE_REGISTRY
+        )
+    for site in sites:
         for member in _members(wilderness, site):
             entry = registry.get(id(member))
             if entry is None:
