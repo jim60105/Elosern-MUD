@@ -494,9 +494,9 @@ class FailedContactInsidePassTests(_ContactBase):
             )
             return events
 
-        def decisions_probe(wilderness, tick):
+        def decisions_probe(wilderness, tick, *, scope=None):
             observed["decisions"].append(surfaces.outer_rollback_active())
-            return real_decisions(wilderness, tick)
+            return real_decisions(wilderness, tick, scope=scope)
 
         clock = get_world_clock()
         clock.tick = 0

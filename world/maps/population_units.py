@@ -18,9 +18,10 @@ provisioning and the lifecycle pass; no owner decision reads it yet.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Iterator
 
 from world.lore import monster_activity as lore_activity
 from world.lore import monster_placement as lore_placement
@@ -33,6 +34,9 @@ RESIDUAL_UNIT = "~residual"
 
 #: The wilderness Attribute recording each unit's settled-through tick.
 POPULATION_UNIT_CURSORS_ATTRIBUTE = "population_unit_cursors"
+
+#: The named refusal of a scoped pass that would write outside its scope.
+POPULATION_SCOPE_VIOLATION = "population_scope_violation"
 
 _ZONE = "zone"
 _AREA = "area"
@@ -348,7 +352,10 @@ def group_units(index: UnitIndex, group: Any, journey: Any | None) -> frozenset[
             unit = unit_of_location(index, location)
             if unit is not None:
                 units.add(unit)
-    for locator in monster_activity.group_area(group):
+    # A group whose own decision cannot move it contributes no area unit: the
+    # owner answers a lawful scheduled stay for every one of those bindings, so
+    # it can never reach a cell outside the units its own record names.
+    for locator in monster_activity.movable_area(group) or ():
         unit = unit_of_location(index, decode_location_ref(locator))
         if unit is not None:
             units.add(unit)
@@ -362,30 +369,312 @@ def group_units(index: UnitIndex, group: Any, journey: Any | None) -> frozenset[
     return frozenset(units)
 
 
-def unit_closure(
-    index: UnitIndex, state: Any, seeds: Iterable[str]
-) -> frozenset[str]:
-    """Every unit reachable from ``seeds`` through groups that touch two.
+def group_units_map(index: UnitIndex, state: Any) -> dict[str, frozenset[str]]:
+    """Every group's units, computed exactly once for one settlement record.
 
-    Each group is visited in sorted identifier order; the answer does not depend
-    on the order, because the closure is the least fixed point of the rule.
+    Public because the scoped pass needs the same answers twice -- once for the
+    closure and once for the groups it may settle -- and the cost note on
+    :func:`unit_closure` forbids computing them twice.
     """
+    return {
+        group_id: group_units(
+            index, state.groups[group_id], state.journeys.get(state.groups[group_id].journey_id)
+        )
+        for group_id in state.groups
+    }
+
+
+def _closure_over(
+    units_of: Mapping[str, frozenset[str]], seeds: Iterable[str]
+) -> frozenset[str]:
+    """The least fixed point of the closure rule over already computed units."""
     closure = set(seeds)
-    groups = [state.groups[group_id] for group_id in sorted(state.groups)]
+    group_ids = sorted(units_of)
     changed = True
     while changed:
         changed = False
-        for group in groups:
-            units = group_units(
-                index, group, state.journeys.get(group.journey_id)
-            )
-            if not closure.intersection(units):
+        for group_id in group_ids:
+            units = units_of[group_id]
+            if not units or not closure.intersection(units):
                 continue
             added = units - closure
             if added:
                 closure.update(added)
                 changed = True
     return frozenset(closure)
+
+
+def unit_closure(
+    index: UnitIndex, state: Any, seeds: Iterable[str]
+) -> frozenset[str]:
+    """Every unit reachable from ``seeds`` through groups that touch two.
+
+    Each group's units are computed exactly once, before the fixed point starts,
+    so the iterations only intersect sets. The answer never depends on the
+    visit order, because the closure is the least fixed point of the rule. A
+    scope build must not compute the same answers a second time: use
+    :func:`group_units_map` and derive both the closure and the settled groups
+    from it.
+    """
+    return _closure_over(group_units_map(index, state), seeds)
+
+
+class PopulationScopeViolation(regional_population.RegionalPopulationError):
+    """A scoped pass would write outside the units it may settle."""
+
+
+@dataclass(frozen=True, slots=True)
+class PopulationScope:
+    """The closed set of settlement units one scoped pass may settle."""
+
+    units: frozenset[str]
+    group_ids: frozenset[str]
+    #: The initialized zones of the scope, sorted; ``behind`` narrows them.
+    zone_keys: tuple[str, ...]
+    site_keys: frozenset[str]
+    #: Unit id -> the cursor the unit reported when the scope was built.
+    start_ticks: Mapping[str, int]
+    #: Zone key -> its unit, and site key -> its unit, resolved once.
+    zone_units: Mapping[str, str]
+    site_units: Mapping[str, str]
+
+    def behind(self, tick: int, *, inclusive: bool = False) -> "PopulationScope":
+        """This scope's zones and sites of the units that have not passed ``tick``.
+
+        A unit whose cursor is ``tick`` has already committed that tick's zone
+        note and site step, so both are skipped there. The pass's own first tick
+        is the one exception (``inclusive``): a whole-world pass always settles
+        its interval start, and a unit whose cursor is that start has not
+        committed it yet. Every zone and site step is a no-op when it runs again
+        on a tick whose work is already committed, which is what makes skipping
+        a passed tick and re-running an inclusive one equally safe.
+        """
+        if inclusive:
+            active = {
+                unit for unit, start in self.start_ticks.items() if start <= tick
+            }
+        else:
+            active = {
+                unit for unit, start in self.start_ticks.items() if start < tick
+            }
+        return PopulationScope(
+            self.units,
+            self.group_ids,
+            tuple(
+                key for key in self.zone_keys if self.zone_units.get(key) in active
+            ),
+            frozenset(
+                key for key in self.site_keys if self.site_units.get(key) in active
+            ),
+            self.start_ticks,
+            self.zone_units,
+            self.site_units,
+        )
+
+    def zone_in_step(self, zone_key: str, tick: int, *, inclusive: bool = False) -> bool:
+        """Whether this scope's pass notes one zone at ``tick``."""
+        unit = self.zone_units.get(zone_key)
+        if unit is None:
+            return False
+        start = self.start_ticks.get(unit)
+        return start is not None and (start <= tick if inclusive else start < tick)
+
+    def covers(self, location: Any | None) -> bool:
+        """Whether one locator lies inside the scope; no locator is covered."""
+        if location is None:
+            return True
+        return unit_of_location(current_unit_index(), location) in self.units
+
+    def covers_cell(self, cell: tuple[int, int]) -> bool:
+        """Whether one wilderness cell lies inside the scope."""
+        index = current_unit_index()
+        return index.unit_of_cell(
+            regional_population.cell_region(cell), cell
+        ) in self.units
+
+
+def build_scope(
+    wilderness: Any, seeds: Iterable[str], *, cursors: UnitCursors | None = None
+) -> PopulationScope:
+    """The closed set of units reached from ``seeds`` and everything inside it.
+
+    One activity-record read, one group-units computation and -- unless the
+    caller already read it -- one cursor read for the whole pass; the answer is
+    kept for the pass in :func:`scoped`. The per-unit record is read first, so a
+    missing or malformed one refuses before any settlement work. A seed that
+    names no unit of the authored geometry is dropped rather than recorded: a
+    settlement must never persist a cursor for a unit the world does not have.
+    """
+    from world.maps import monster_activity
+    from world.maps import monster_sites
+
+    record = read_unit_cursors(wilderness) if cursors is None else cursors
+    index = current_unit_index()
+    state = monster_activity.read_monster_activity(wilderness)
+    units_of = group_units_map(index, state)
+    known = (
+        set(index.unit_of_zone.values())
+        | set(index.unit_of_area.values())
+        | {RESIDUAL_UNIT}
+    )
+    units = _closure_over(units_of, [seed for seed in seeds if seed in known])
+    zone_keys = tuple(
+        key
+        for key in regional_population.initialized_zone_keys(wilderness)
+        if index.unit_of_zone.get(key) in units
+    )
+    # The owner's own binding decides which sites the pass settles, so the scope
+    # names its sites from that one registry.
+    site_keys = tuple(
+        key
+        for key in monster_sites.MONSTER_SITE_REGISTRY
+        if site_unit(index, key) in units
+    )
+    return PopulationScope(
+        units,
+        frozenset(
+            group_id
+            for group_id, group_set in units_of.items()
+            if group_set and group_set <= units
+        ),
+        zone_keys,
+        frozenset(site_keys),
+        MappingProxyType({unit: unit_cursor(record, unit) for unit in units}),
+        MappingProxyType(
+            {key: index.unit_of_zone[key] for key in zone_keys if key in index.unit_of_zone}
+        ),
+        MappingProxyType({key: site_unit(index, key) for key in site_keys}),
+    )
+
+
+def scope_start_tick(wilderness: Any, scope: PopulationScope) -> int:
+    """The lowest cursor of one scope: the tick its pass starts from.
+
+    Units of one closed set normally share one cursor; they differ only when a
+    group linked them after they diverged (an escape into another unit, an
+    explicit registration). That state is lawful, and the pass settles it by
+    skipping the zone and site steps each unit has already passed.
+    """
+    if not scope.start_ticks:
+        raise ValueError("a settlement scope names no settlement unit")
+    return min(scope.start_ticks.values())
+
+
+def concerned_units(index: UnitIndex, transition: Any) -> frozenset[str]:
+    """Every unit one recorded presence transition concerns.
+
+    The units of its before and after positions, of each non-empty home zone, and
+    of each non-empty site marker. The site marker is part of the answer even
+    though the requirement names positions and home zones: a site's clear
+    decision reads its own members' committed loss evidence, so retiring that
+    evidence before the site's unit has passed it would lose a fact a decision
+    still needs. An empty answer is the residual unit.
+    """
+    units: set[str] = set()
+    for presence in (transition.before, transition.after):
+        position = presence.position
+        if position is not None:
+            cell = (position.x, position.y)
+            units.add(
+                index.unit_of_cell(regional_population.cell_region(cell), cell)
+            )
+        if presence.home_zone:
+            unit = index.unit_of_zone.get(presence.home_zone)
+            if unit is not None:
+                units.add(unit)
+        if presence.site_key:
+            units.add(site_unit(index, presence.site_key))
+    return frozenset(units) if units else frozenset({RESIDUAL_UNIT})
+
+
+#: The scope of the settlement pass currently running, if any.
+_ACTIVE_SCOPE: PopulationScope | None = None
+
+#: The groups the running scoped pass may settle, including the ones it creates.
+_ACTIVE_GROUPS: set[str] | None = None
+
+
+def active_scope() -> PopulationScope | None:
+    """The scope of the settlement pass currently running, or ``None``."""
+    return _ACTIVE_SCOPE
+
+
+def settling_group_ids(scope: PopulationScope | None) -> set[str] | None:
+    """The groups ``scope`` may settle now; ``None`` settles every group.
+
+    A group born inside the pass (an explicit site birth or an ordinary wave) is
+    inside the scope by construction, because the writer refuses any group whose
+    units it may not settle. It is therefore added to the running scope as it is
+    created: a scope built before the pass cannot name a group that did not exist
+    yet, and a group this pass created must still decide and pay its physiology
+    within it.
+    """
+    if scope is None:
+        return None
+    live = _ACTIVE_GROUPS
+    if live is None:
+        return set(scope.group_ids)
+    return live
+
+
+def note_created_group(group_id: str) -> None:
+    """Record one group the running scoped pass created; a no-op outside one."""
+    groups = _ACTIVE_GROUPS
+    if groups is not None:
+        groups.add(group_id)
+
+
+@contextmanager
+def scoped(scope: PopulationScope | None) -> Iterator[None]:
+    """Run the enclosed work as the settlement pass of ``scope``.
+
+    A nested scope replaces the outer one for the duration of the block and the
+    previous scope is restored on every exit path, so a failed pass can never
+    leave a scope behind for a later caller.
+    """
+    global _ACTIVE_SCOPE, _ACTIVE_GROUPS
+    previous = _ACTIVE_SCOPE
+    previous_groups = _ACTIVE_GROUPS
+    _ACTIVE_SCOPE = scope
+    _ACTIVE_GROUPS = None if scope is None else set(scope.group_ids)
+    try:
+        yield
+    finally:
+        _ACTIVE_SCOPE = previous
+        _ACTIVE_GROUPS = previous_groups
+
+
+def require_in_active_scope(location: Any | None) -> None:
+    """Refuse a write to ``location`` that a running scoped pass does not cover."""
+    scope = _ACTIVE_SCOPE
+    if scope is None or scope.covers(location):
+        return
+    raise PopulationScopeViolation(
+        f"{POPULATION_SCOPE_VIOLATION}: {location!r} lies outside the settled units"
+    )
+
+
+def require_units_in_active_scope(units: Iterable[str]) -> None:
+    """Refuse a write touching a unit a running scoped pass does not cover."""
+    scope = _ACTIVE_SCOPE
+    if scope is None:
+        return
+    outside = frozenset(units) - scope.units
+    if outside:
+        raise PopulationScopeViolation(
+            f"{POPULATION_SCOPE_VIOLATION}: units {sorted(outside)} lie outside "
+            "the settled units"
+        )
+
+
+def require_cell_in_active_scope(cell: tuple[int, int]) -> None:
+    """Refuse a write to ``cell`` that a running scoped pass does not cover."""
+    scope = _ACTIVE_SCOPE
+    if scope is None or scope.covers_cell(cell):
+        return
+    raise PopulationScopeViolation(
+        f"{POPULATION_SCOPE_VIOLATION}: cell {cell!r} lies outside the settled units"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -513,15 +802,28 @@ def advance_unit_cursors(
 
 __all__ = [
     "POPULATION_UNIT_CURSORS_ATTRIBUTE",
+    "POPULATION_SCOPE_VIOLATION",
     "RESIDUAL_UNIT",
+    "PopulationScope",
+    "PopulationScopeViolation",
     "UnitCursors",
     "UnitIndex",
+    "active_scope",
     "advance_unit_cursors",
+    "build_scope",
     "build_unit_index",
+    "concerned_units",
     "current_unit_index",
     "group_units",
+    "group_units_map",
     "initialize_unit_cursors",
+    "note_created_group",
     "read_unit_cursors",
+    "require_in_active_scope",
+    "require_units_in_active_scope",
+    "scope_start_tick",
+    "scoped",
+    "settling_group_ids",
     "site_area_links",
     "site_unit",
     "unit_closure",

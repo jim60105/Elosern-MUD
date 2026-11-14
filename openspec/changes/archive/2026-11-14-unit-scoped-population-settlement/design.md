@@ -143,6 +143,30 @@ the units of `before.position`, `after.position` (through `index.unit_of_cell(re
 
 With `scope=None` the function is unchanged.
 
+### D4a. Zone progress marker and the interval start
+
+A zone's `settled_through_tick` is raised to `max(old, tick)` by every note, and
+a whole-world pass notes every initialized zone at every merged boundary while a
+scoped pass notes only its own zones at its own boundaries. The marker therefore
+records the boundary the pass itself reached, not how far the unit is settled:
+two different partitions of the same interval can leave different markers, and
+no decision reads it (the activity owner, the site owner, the forecast and every
+birth rule read `recovery_due_tick`, `generation_sequence` and the per-unit
+cursor instead). The equality requirement states that exception explicitly and
+keeps every decision-bearing field inside the claim; "Zone progress marker"
+asserts the marker's meaning, its monotonicity and its irrelevance to a
+settlement's outcome. A test that compares the whole projection must let every
+unit's last visited boundary coincide, which the synthetic scenario does by
+placing one bounded future loss per zone on the interval endpoint.
+
+The interval start is the one tick a unit at its own cursor still settles:
+`behind(tick, inclusive=True)` at the pass's first tick, strict `<` afterwards.
+A whole-world pass always settles its interval start, and its omission drops an
+uninitialized site's first population, a recovery already due at the start, and
+the start's zone note. Consequently `settle_population_scope` settles an
+interval that starts and ends at the scope's cursor instead of returning early
+(D3's `end_tick <= start`), because a whole-world pass settles that tick too.
+
 ### D5. Tests
 
 New `world/maps/tests/test_scoped_population_settlement.py` on `ActivityFixture`, with a module-level helper `build_two_zone_world(fixture)` that later changes import: a synthetic world of two disjoint zones in one region (declare them the way the fixture declares its own zone; if the fixture has a single zone, add the second with `dataclasses.replace(zone, key=..., rectangles=...)` inside the test's registry isolation) and one synthetic site inside the first zone.

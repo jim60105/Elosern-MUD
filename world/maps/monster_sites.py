@@ -514,6 +514,11 @@ def _populate(
     same complete group).
     """
     created: list[Monster] = []
+    # A running scoped pass may only birth onto a cell it may settle; the check
+    # precedes the first created row.
+    from world.maps import population_units
+
+    population_units.require_cell_in_active_scope(site.coordinates)
     rows = site_occurrence_groups(site, seed=seed, sequence=sequence)
     composition = ENCOUNTER_COMPOSITION_REGISTRY[site.composition_key]
     for variant_key, count in rows:
@@ -807,7 +812,9 @@ def _birth_cell_protected(wilderness: Any, site: MonsterSite, tick: int) -> bool
     return site.coordinates in protected_cells(wilderness, at_tick=tick)
 
 
-def retained_loss_ids(wilderness: Any | None = None) -> frozenset[int]:
+def retained_loss_ids(
+    wilderness: Any | None = None, *, scope: Any | None = None
+) -> frozenset[int]:
     """Owned IDs whose committed loss a deferred site clear still needs.
 
     A populated site whose members are all lost cannot be declared clear while
@@ -816,6 +823,10 @@ def retained_loss_ids(wilderness: Any | None = None) -> frozenset[int]:
     later clear, so the coordinator must not consume them yet. IDs are
     retained only for a populated site with no living member and a session
     reference, and are otherwise consumed normally.
+
+    ``scope`` answers for the sites of that scope only. The measure itself still
+    reads the whole world (one presence read and one session read per boundary,
+    exactly like the whole-world pass); this change narrows neither.
     """
     wilderness = _wilderness() if wilderness is None else wilderness
     if wilderness is None:
@@ -826,6 +837,8 @@ def retained_loss_ids(wilderness: Any | None = None) -> frozenset[int]:
     presence = presence_at(wilderness)
     retained: set[int] = set()
     for key, site in MONSTER_SITE_REGISTRY.items():
+        if scope is not None and key not in scope.site_keys:
+            continue
         record = states.get(key)
         if record is None or _saved_state(record) != SITE_STATE_POPULATED:
             continue
@@ -850,7 +863,9 @@ def retained_loss_ids(wilderness: Any | None = None) -> frozenset[int]:
     return frozenset(retained)
 
 
-def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
+def next_site_boundary(
+    start_tick: int, end_tick: int, *, scope: Any | None = None
+) -> int | None:
     """The earliest site lifecycle boundary up to ``end_tick`` (pure read).
 
     An uninitialized site's first creation boundary is the interval start, a
@@ -859,6 +874,8 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
     is the committed loss occurrence of its last own member. A site whose state
     cannot be interpreted contributes no boundary here; the settlement answers
     with the population owner's named malformed-state refusal instead.
+
+    ``scope`` answers for the sites of that scope only.
     """
     wilderness = _wilderness()
     if wilderness is None:
@@ -870,6 +887,8 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
     candidates: list[int] = []
     presence: Mapping[object, Any] | None = None
     for key, site in MONSTER_SITE_REGISTRY.items():
+        if scope is not None and key not in scope.site_keys:
+            continue
         record = states.get(key)
         if record is None:
             uninitialized = True
@@ -900,7 +919,9 @@ def next_site_boundary(start_tick: int, end_tick: int) -> int | None:
     return min(later) if later else None
 
 
-def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
+def settle_monster_sites_at(
+    tick: int, *, scope: Any | None = None
+) -> list[ScheduledEvent]:
     """Settle every authored site decision at one chronological boundary.
 
     The site-owner operation the merged population coordinator calls at each
@@ -917,6 +938,9 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
     raises the population owner's named malformed-state refusal before any
     write. No wilderness script means no world to settle, and the pass returns
     silently. Sites settle in stable key order.
+
+    ``scope`` settles the sites of that scope only: another unit's site is never
+    read, populated, cleared or recovered here.
     """
     wilderness = _wilderness()
     if wilderness is None:
@@ -928,6 +952,8 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
     # adds other individuals and never changes what this read answers.
     presence: Mapping[object, Any] | None = None
     for key in sorted(MONSTER_SITE_REGISTRY):
+        if scope is not None and key not in scope.site_keys:
+            continue
         site = MONSTER_SITE_REGISTRY[key]
         record = states.get(key)
         if record is None:

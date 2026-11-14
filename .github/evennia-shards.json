@@ -1187,7 +1187,8 @@
         "world.maps.tests.test_retention_reclamation",
         "world.maps.tests.test_room_art_metadata",
         "world.maps.tests.test_population_zone_pass",
-        "world.maps.tests.test_population_units"
+        "world.maps.tests.test_population_units",
+        "world.maps.tests.test_scoped_population_settlement"
       ]
     },
     {

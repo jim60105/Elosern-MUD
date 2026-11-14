@@ -2555,19 +2555,31 @@ It is the set a caller may settle without reading state another unit owns.
 
 ### Cost and refusal boundary
 
-Information for `unit-scoped-population-settlement`, which first puts the
-closure on the advance path. As written, `unit_closure` recomputes
-`group_units` for every group on every fixed-point iteration and decodes every
-locator of each group's area, so its cost grows with the world's population:
-that is the quantity the chain exists to remove, and no production caller uses
-it yet. A scoped pass must compute it once per advance over the groups whose
-units it can reach, and keep that result for the whole pass. It must also
-decide whether a refusal may escape: `group_units` propagates
-`MonsterActivityStateInvalid`, `MonsterActivityRegistryError` and
-`MovementEdgeError`, while `monster_activity._resolved_area_keys` deliberately
-answers `None` for the last two because an unresolvable area is a lawful
-scheduled stay. Refusing a player action over one unresolvable area would be a
-behaviour change, so the boundary belongs to that change's design.
+`unit-scoped-population-settlement` put the closure on the pass, so its cost is
+now load-bearing. `unit_closure` computes each group's units exactly once, before
+the fixed point starts, and the iterations then only intersect sets:
+`group_units_map` is the one place a group's area is decoded, and
+`build_scope` derives both the closure and the settled group set from that one
+map. A scoped pass therefore pays one group scan and one area decode per group
+per pass -- a constant number of whole-world reads, not one per boundary -- and
+keeps the answer for the whole pass in the scope object. It cannot be smaller
+without a durable group-to-unit index: a seed alone never says which distant
+group's area covers it, so the scan is the honest cost of the closure, and
+`observed-unit-read-narrowing` is the change that narrows it.
+
+The refusal boundary is decided the same way the owner decides it. A group whose
+area cannot be resolved never departs: `plan_group_decision` answers a scheduled
+stay for an unpublished binding, a `stationary` policy, and an area
+`_resolved_area_keys` cannot resolve (`MonsterActivityRegistryError`,
+`MovementEdgeError`). `monster_activity.movable_area` is the single reader of
+that answer for geometry: it returns the group's cells, or `None` for every one
+of those lawful stays, and `group_units` then contributes no area unit. That is
+complete, not merely convenient -- a group that cannot resolve its area cannot
+move, so it can only ever occupy the cells its own record names -- and it keeps
+`create_group` from refusing a staged `stationary` group inside a scoped pass.
+A declared area the registry does not carry still refuses by name when that
+group's own decision is planned, which is exactly where the whole-world pass
+refuses it too.
 
 ## The cursor record
 
@@ -2575,12 +2587,170 @@ behaviour change, so the boundary belongs to that change's design.
 `default` (a non-negative integer) and `units` (unit identifier to
 non-negative integer). Fresh provisioning writes it at the provisioning tick;
 `settle_population_lifecycle` raises the default, and every listed unit with it,
-to the pass endpoint at the end of its body. A record that cannot change is not
+to the pass endpoint at the end of its body; a scoped pass
+(`settle_population_scope`) raises only the units of its closed set and leaves
+the default alone. A record that cannot change is not
 rewritten, a cursor never decreases, and an absent, extra-keyed or ill-typed
 record refuses by name with the population owner's `malformed_state`. There is
 no migration: a pre-change development world is re-provisioned as
 `docs/development/database-reset.md` describes. `snapshot_population_surfaces`
 owns the record, so a rolled-back advance restores it.
+
+## The scope of a scoped pass
+
+`population_units.PopulationScope` names one closed set of settlement units and
+everything inside it: the units, the groups it may settle, its initialized zones
+in sorted order, its authored sites, and every unit's cursor when the scope was
+built. `build_scope(wilderness, seeds)` reads the per-unit record first (so a
+malformed one refuses before any work), computes each group's units once, takes
+the closure of the seeds over them, and derives the four sets and the start
+ticks from that one answer. `scope_start_tick` is the lowest cursor of the set.
+
+`settle_population_scope(wilderness, seeds, end_tick)` settles the closed set
+from that cursor to `end_tick` and advances only its units' cursors; an interval
+that ended before the cursor settles nothing, and an interval that starts and
+ends at it settles that tick exactly as a whole-world pass does. `_run_pass` is
+the one body both entry points share, so the whole-world stage stays the
+clock's: nothing in this change puts the scoped pass on a production path.
+
+`behind(tick)` narrows the scope's zones and sites to the units that have not
+already settled `tick` (a unit whose cursor is `tick` has settled it, so its
+zone note and site step are skipped there). The pass's own first tick is the one
+exception (`behind(tick, inclusive=True)`): a whole-world pass always settles its
+interval start, and a unit whose cursor is that start has not settled it yet.
+Leaving that tick out would drop an uninitialized site's first population, a
+recovery already due at the start, and the start's zone note -- each of which
+the whole-world pass performs. Skipping a later `tick` a unit has passed is
+sound because every zone and site step is a no-op when it runs again at a tick
+whose work is already committed.
+
+`units`, `group_ids` and `start_ticks` are never narrowed by `behind`: they say
+which records the pass may write, not which ticks it visits. A group created
+inside the pass -- an explicit site birth or an ordinary wave -- is inside the
+scope by construction, because `create_group` refuses any group whose units the
+running scope does not cover. `build_scope` cannot name a group that did not
+exist yet, so the running pass records each created group in its live group set
+(`settling_group_ids`) and settles it from the moment it exists.
+
+The authored field contact is not scoped. It contacts whoever stands near the
+present party, so it is a whole-world write that stays with the whole-world
+pass; `settle_population_scope` accepts the `contact` flag for signature
+symmetry and never runs it. The equality contract below therefore holds for
+intervals in which no authored contact fires.
+
+## The owner filters
+
+Every owner step a pass calls accepts a keyword-only `scope` and, with `None`,
+behaves exactly as before:
+
+- `settle_monster_activity_at` settles only its scope's due journeys, and
+  `next_monster_activity_boundary` answers only their boundaries.
+- `settle_group_decisions_at`, `settle_idle_physiology` and
+  `next_monster_activity_boundary` skip every group outside the scope, so no
+  decision is ever planned for another unit's group.
+- `retire_room_protection` does nothing unless the scope holds the residual unit
+  (every authored room is residual); `retire_settled_decision_receipts` adds one
+  condition to its existing rules -- the receipt's group must be inside the
+  scope, or the group must have vanished while the scope holds the residual
+  unit -- and never relaxes the replay window.
+- `due_recovery_zone_keys` answers only the scope's zones;
+  `settle_monster_sites_at`, `next_site_boundary` and `retained_loss_ids` only
+  the scope's sites.
+
+Four writer classes refuse an out-of-scope placement by name: a departure
+(`_begin_group_journey`) and an arrival (`_arrive`) check the destination
+locator before their first write; a group creation (`create_group`) checks the
+new group's units before storing it; and a birth checks its cell before the
+first created row (`_populate` for a site, `_commit_planned_wave` for a wave).
+Writers a scoped pass never reaches (a GM placement, a combat withdrawal, an
+exam construction) run outside the scope window, so their guards are no-ops and
+their behaviour is unchanged.
+
+`settle_population_scope` reads the per-unit record once and hands it to the
+scope build and to every boundary, so a pass pays one decode. A seed that names
+no unit of the authored geometry is dropped instead of recorded: a settlement
+must never persist a cursor for a unit the world does not have. The scope names
+its sites from the owner's own registry (the binding `settle_monster_sites_at`
+iterates), so the two can never disagree about which sites the pass settles.
+The boundary query asks `zone_in_step`, a dictionary lookup against the zones
+and their cursors resolved at build time, so per-boundary work does not re-resolve
+the scope's zones and sites. The authored field contact is refused by name
+rather than accepted and ignored: it is a whole-world write, and an interval must
+not leave its contact boundary unsettled behind an advanced cursor.
+
+## Evidence retirement by concerned units
+
+`population_units.concerned_units(index, transition)` names the units one
+recorded presence transition concerns: the candidates of its before and after
+positions, of each non-empty home zone, and of each non-empty site marker. The
+site marker is part of the answer because a site's clear decision reads its own
+members' committed loss evidence; retiring that evidence before the site's unit
+has passed it would lose a fact a decision still needs. An empty answer is the
+residual unit.
+
+A scoped pass retires a transition only when it occurred at or before `tick`,
+its individual is not retained for a deferred site clear, and every concerned
+unit is settled to at least the occurrence tick. A unit of the scope counts as
+settled to `tick`; every other unit counts as its own cursor, so evidence shared
+with a lagging unit is kept until that unit's own pass reaches it. A closed
+protection interval is retired only when its end is before `tick` and the unit of
+its cell is inside the scope. The per-unit record is read once per pass and
+handed to every boundary; the whole-world path keeps its early return on
+`settled_through_tick` untouched.
+
+## A closed set with unequal cursors
+
+Units of one closed set normally share one cursor. They differ only when a group
+linked them after they diverged -- an escape into another unit, an explicit
+registration -- and that state is lawful. The pass starts from the lowest cursor
+and settles the whole set to the endpoint: the behind rule skips the zone and
+site steps each unit has already passed, while group steps stay idempotent
+through each member's own cursor and the journey due tick. The result equals a
+whole-world pass over the same interval, which is what
+`test_scoped_population_settlement` proves.
+
+## Progress markers
+
+A zone's `settled_through_tick` records how far the last pass that noted it
+reached, not how far its unit is settled: a whole-world pass notes every zone at
+every merged boundary, a scoped pass notes only its own zones at its own
+boundaries, so two partitions of one interval can leave different markers. No
+decision reads it -- the activity owner, the site owner, the forecast and every
+birth rule read the recovery due tick, the generation sequence and the per-unit
+cursor instead -- and the equality requirement states that exception while
+keeping every decision-bearing field in the claim. The marker still never
+decreases (`max(old, tick)`).
+
+`settlement_projection` compares zone records exactly only when every pass visits
+the same last tick, so the scoped test world places one bounded future loss per
+zone on the interval endpoint: the whole-world pass and every unit's pass then
+share that last boundary and the differential test asserts the full projection.
+The endpoint loss is one of the categories the coordinator merges anyway.
+
+The timeline marker is the pass endpoint in both paths (a scoped pass may leave a
+lagging other unit's evidence stored while the marker has passed it); that
+over-claim costs only retained evidence, because the scoped retirement never
+consults the marker and a later whole-world pass that early-returns keeps
+evidence it would otherwise drop.
+
+## The named scope refusal
+
+`population_units.PopulationScopeViolation` (reason
+`population_scope_violation`) is the one refusal a scoped pass answers for a
+write outside its units. The three tripwires -- a departure, an arrival, and a
+group creation -- can only fire when the settled reach a pass computed is no
+longer complete: `group_units` reads exactly the area a decision reads, so a
+consistent record never produces the state. The refusal is therefore the guard
+on the assumption the whole change rests on, and the test injects the fault by
+making the closure's reader disagree with the owner's area check.
+
+`without partial state` describes the refused operation: the owner's own
+snapshot restores the physiology, record and registration of the failed
+departure or birth, exactly as it does for any refused owner operation, and a
+failed wave rolls back inside its own transaction. A direct caller of
+`settle_population_scope` owns no pass-wide rollback -- the whole-world entry
+point has the same boundary today -- so earlier, lawful boundaries of the same
+pass stay committed.
 
 ## Why the units are independent
 
@@ -2630,3 +2800,47 @@ single-token environment file (`/tmp/mud-test.env` containing
 uv run --locked --env-file=/tmp/mud-test.env evennia test \
   --settings test_settings.py --keepdb world.maps.tests.test_population_units
 ```
+
+`world/maps/tests/test_scoped_population_settlement.py` carries the scoped-pass
+coverage on one synthetic two-zone world: two disjoint, adjacent zones in one
+published region, a site in the first, and every seam the settlement reads
+replaced (`build_two_zone_world`).
+
+- `TwoZoneWorldTests` -- both zones are initialized, the site record exists, and
+  one wilderness step crosses from one unit into the other.
+- `ScopeObjectTests` -- the closed set, its groups, zones and sites; `behind`
+  with equal and with unequal cursors, including the pass-start exception; the
+  active scope, its named refusal and its restoration; and the concerned units of
+  a recorded loss. An unknown seed never reaches the cursor record.
+- `ScopeCursorTests` -- a scoped pass raises only its own unit's cursor, an
+  interval that ended before the cursor settles nothing, and an interval that
+  starts and ends at the cursor settles that tick; with unequal cursors the
+  zone note and site step of the ahead unit are observed absent at every tick up
+  to its cursor, and a scoped pass refuses the whole-world field contact.
+- `ZoneMarkerTests` -- a zone's marker is the last boundary its own pass noted,
+  the other zone's marker is untouched, the marker never decreases, and a
+  deliberately lowered marker changes no activity, site, per-individual or
+  timeline outcome.
+- `DifferentialSettlementTests` -- the whole-world pass against unit by unit in
+  both orders and against a five-part partition, the linked-after-diverging
+  scenario, linked units settling together, a reload between two parts, and a
+  journey the scenario really records; a partial departure, which derives a new
+  travelling group id the pass must adopt, settles every journey it began inside
+  the interval. The whole projection (activity, timeline,
+  zone and site records, and per-individual position, gauges, reserve, posture
+  and sleep receipt) is compared.
+- `OtherUnitTests` -- settling one zone leaves the other's zone record, groups,
+  bodies and cursor unchanged, and plans no decision for its groups.
+- `SharedEvidenceTests` -- a loss shared by two units survives one unit's pass and
+  is retired by the lagging unit's, and a closed protection interval in a lagging
+  cell keeps that cell free of births.
+- `ScopeRefusalTests` -- an out-of-scope destination and a group reaching outside
+  the scope both raise the named refusal; the first leaves the projection equal
+  to its pre-pass value, the second leaves no group, individual or registration
+  behind.
+
+This change's four ADDED requirements have no canonical identifiers before the
+archive sync, so the module carries no `covers_requirement` annotation. The
+hand-off from each test to its delta requirement and scenario is recorded in the
+change's apply report; `tools.spec_traceability list` prints the identifiers the
+archive assigns.
