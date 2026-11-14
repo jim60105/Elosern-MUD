@@ -82,6 +82,13 @@ for _llm_name in llm_env_names():
 from server.conf.settings import *  # noqa: E402,F401,F403
 
 
+# Evennia's xyzgrid loader creates the map cache directory with a
+# check-then-create, so the parallel workers of one Evennia test run race on
+# the very first grid load and one of them fails with "File exists". Creating
+# it here, idempotently, removes that race before any worker loads a grid.
+os.makedirs(CACHE_DIR, exist_ok=True)
+
+
 # Every test run through the Evennia test runner (the MUD_TEST_SETTINGS=1
 # gate above) sits on the translation air-gapped track: the pin below
 # overrides the documented code default (True), so an inherited shell value

@@ -705,6 +705,16 @@ class ExposureConsumerAllowlistTests(unittest.TestCase):
             # allowed-key table lists it; neither reads live sexual state.
             Path("world/lore/dialogue/codec.py"),
             Path("world/lore/dialogue/conditions.py"),
+            # Declaration-vocabulary exemption: the landmark rite document
+            # loader declares the ``shame``/``exposure`` step fields of an
+            # authored option; it validates authored data and never reads
+            # ``entity.sexual``.
+            Path("world/lore/rites/loader.py"),
+            # The landmark rite settlement applies the option's authored
+            # shame and exposure steps to the stored state, exactly like
+            # ``world/rules/sexual_transitions.py``: it is the canonical
+            # writer, never a reader of the effective overlay.
+            Path("world/rules/landmark_rites.py"),
         }
     )
     # Modules that must consume exposure through the effective overlay.
