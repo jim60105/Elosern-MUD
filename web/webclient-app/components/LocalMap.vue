@@ -518,7 +518,7 @@ function onIslandClick(event) {
 }
 
 /* An island with no coordinate figure on the current layer states nothing
-   and paints no box, while reserving its single line height so the card height
+   and paints no box, while reserving its single line height so the island height
    does not change with the layer (design D2). */
 .local-map__detail--empty {
   visibility: hidden;
