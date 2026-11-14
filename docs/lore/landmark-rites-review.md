@@ -1,19 +1,19 @@
-# Editorial review: 地標儀式文本（landmark-rite-content）
+# Editorial review: 地標儀式文本（landmark-rite-content 與 landmark-rite-content-completion）
 
 ## 1. 審查結論與範疇
 
-本文件記錄 `world/lore/rites/content/landmark_rites.yaml` 全數十個場景的逐項審查，審查日期為 2026-11-14。範圍涵蓋本次交運的五個原型（`spring`、`statue`、`megalith`、`tower`、`tree`）、每個原型兩個選項的 `self` 場景，以及一百二十個行政區的原型指派。
+本文件記錄 `world/lore/rites/content/landmark_rites.yaml` 全數十個原型、二十個場景的逐項審查，審查日期為 2026-11-14。第一次交運（`landmark-rite-content`）撰寫 `spring`、`statue`、`megalith`、`tower`、`tree`；第二次交運（`landmark-rite-content-completion`）補上 `grave`、`mine`、`gate`、`cliff`、`plaza`，並把剩下七十六個行政區的暫定指派改成最終指派。範圍涵蓋每個原型兩個選項的 `self` 場景，以及一百二十個行政區的原型指派。
 
 本審查為人工判斷的紀錄。聲調、用字、敘事節拍與情節品質由人閱讀判定，專案內沒有任何測試斷言這些內容；`world.lore.tests.test_rite_content_document` 只證明本文件能通過嚴格載入器，`world.lore.tests.test_rite_content` 只證明載入與安裝機制。場景行號以各場景 `lines` 序列的第一行起算。
 
-審查同時確認了本次交運刻意留給後續變更的部分。每個選項的 `watch` 皆為 `null`（`landmark-rite-watch-perspectives` 另行撰寫）、每個原型只有兩個選項（第三選項屬 `landmark-rite-third-option`）。本變更唯一的程式碼是啟動時載入這份文件的 `load_published` 與其啟動步驟，沒有規則、面板、指令或照明程式碼，也沒有任何寫入圖鑑或探索紀錄的程式碼。
+審查同時確認了刻意留給後續變更的部分。每個選項的 `watch` 皆為 `null`（`landmark-rite-watch-perspectives` 另行撰寫）、每個原型只有兩個選項（第三選項屬 `landmark-rite-third-option`）。這兩次內容變更都沒有程式碼；文件由啟動時的 `load_published` 載入，沒有規則、面板、指令或照明程式碼，也沒有任何寫入圖鑑或探索紀錄的程式碼。
 
 ## 2. 權威參考來源對照
 
 - `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §6.1、§6.2：文件形狀與欄位界線，`self` 場景一至三十二行、至少一行旁白、說話者限 `actor` 與 `host`。
-- 同文件 §6.3：十個原型的代表地標與儀式調性；本次只交運表中前五列。
+- 同文件 §6.3：十個原型的代表地標與儀式調性，二十個場景與一百二十個指派全部依此核對。
 - 同文件 §11：成人內容與撰寫規則第一至第八條，本文件逐條核對。
-- `tmp/story_settings/world_info.md`：世界觀。伊洛瑟恩為日式劍與魔法奇幻，基調輕鬆冒險；光明教會以肉體交融為崇神之禮，聖所以性服務為修道之途；精靈族對性與裸露沒有羞恥概念，其他種族出於敬畏視而不見。
+- `docs/lore/overview.md` 與 `docs/lore/skill-trees/light.md`：世界觀。伊洛瑟恩為日式劍與魔法奇幻，基調輕鬆冒險；光明教會以肉體奉獻為崇神之禮，修女奉獻肉身施予光，聖女的高潮本身是公開的祝福；精靈全族皆為女性，對性與裸露沒有羞恥概念。
 - `content/maps/districts.yaml`：行政區與地標名稱的唯一來源，每個行政區皆帶 `district_name_zh` 與 `landmark_name_zh`。
 - `world/lore/sexual_vocab.py` 與既有對話文本：私處、花蒂、乳房、腰腹、大腿、頸項、臀部等身體部位用語沿用既有詞彙表與已審查文本，不另造新詞。
 
@@ -28,6 +28,11 @@
 | `megalith` | 石陣的低鳴 | 石縫間共鳴的低音，沒有形體，只在石頭被觸碰時應答。 |
 | `tower` | 塔頂的風 | 繞塔而行的風聲，只在最高一層的窗口凝成說話的形狀。 |
 | `tree` | 樹心的低語 | 從年輪深處傳出的女聲，只在樹皮被貼住時呼吸。 |
+| `grave` | 塚下的女聲 | 從石冢縫隙透出的女聲，只在有人靠近碑石時應答。 |
+| `mine` | 坑底的迴響 | 礦坑深處回來的聲音，只在有人出聲時應答。 |
+| `gate` | 門洞裡的影 | 門洞裡比四周更深的一道影，只在有人開口求過時凝成聲音。 |
+| `cliff` | 瀑後的歌聲 | 風與水霧裡傳出的女聲，只在有人靠近崖邊時應答。 |
+| `plaza` | 廣場上的目光 | 四周的注視聚成的一道聲音，只在有人走進那圈石板時開口。 |
 
 | 原型 | 選項 | `label_zh` | `seconds` | `shame` | `exposure` |
 | --- | --- | --- | --- | --- | --- |
@@ -41,8 +46,20 @@
 | `tower` | `bell` | 敲響風鐘 | 240 | 1 | 1 |
 | `tree` | `embrace` | 抱住樹身 | 300 | 0 | 0 |
 | `tree` | `rest` | 靠在根上 | 180 | 0 | 1 |
+| `grave` | `inscribe` | 描過碑文 | 240 | 2 | 0 |
+| `grave` | `lie` | 躺進空壙 | 300 | 2 | 0 |
+| `mine` | `shout` | 朝坑底喊 | 180 | 1 | 0 |
+| `mine` | `crawl` | 爬進窄道 | 300 | 1 | 0 |
+| `gate` | `knock` | 叩響石門 | 240 | 1 | 0 |
+| `gate` | `trade` | 留下過路禮 | 300 | 2 | 1 |
+| `cliff` | `bathe` | 走進瀑下 | 300 | 1 | 1 |
+| `cliff` | `lean` | 站上崖緣 | 360 | 2 | 2 |
+| `plaza` | `stand` | 站到中央 | 300 | 2 | 2 |
+| `plaza` | `circle` | 繞行一圈 | 360 | 2 | 2 |
 
-數值彼此一致。身處石龕、石階與樹身等閉鎖空間的選項 `exposure` 為 0；敞向天空、海面或荒原者較高，`tower.climb` 的窗口毫無遮蔽，`exposure` 定為 2。`tree.rest` 躺臥在林地落葉上、樹冠在最後讓開，因此比站立的 `tree.embrace` 高一級。建立在被注視之上的 `statue` 兩個選項、建立在被水吞沒之上的 `spring.wade`，以及把身體交給風與高度的 `tower.climb`，`shame` 皆為 2；以觸碰、共振與根系為主的選項維持 0 或 1。
+`exposure` 衡量的是場景讓身體露出多少。隔著衣料、只有看不見的手觸碰者為 0；衣料被風掀開或貼住身體、露出大腿與臀部輪廓者為 1；在開闊處或眾人眼前露出大片身體者為 2。`grave` 的兩個選項都沒有掀開衣物，`mine` 的兩個選項都在狹窄坑道裡隔著布料完成，因此皆為 0；`gate.trade` 的裙襬被掀到腰後、`cliff.bathe` 的濕衣貼住全身，定為 1；`cliff.lean` 的裙襬整片掀開、`plaza` 的兩個選項都在廣場注視下進行，定為 2。前一版的 `tower.climb` 窗口毫無遮蔽，同樣是 2，`tree.rest` 躺臥落葉而樹冠最後讓開，比站立的 `tree.embrace` 高一級。
+
+`shame` 依場景把身體交給誰而定。交給石面、共振、風鐘或根系而沒有被真正看見者為 0 或 1；交給水、天空、眾人的目光、死者的名字，或把痕跡留給門檻收下者為 2。`grave` 的兩個選項、`gate.trade`、`cliff.lean` 與 `plaza` 的兩個選項因此都是 2。這條判準同時解釋前一版的 `spring.wade`、`statue` 兩個選項與 `tower.climb`。
 
 ## 4. 逐原型審查（每個選項一列）
 
@@ -93,38 +110,145 @@
 | `embrace` | 環住樹身、樹皮貼住乳房與腰腹，根部纏上大腿與臀部 | 6、7（樹脂流成指著西邊的細線） | 6（樹枝托離地面，熱潮落在根上） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
 | `rest` | 躺進落葉凹地，根鬚繞住大腿與腰腹，細根繞住花蒂 | 6、7（樹冠讓開，露出通往西邊的乾河床） | 6（背在落葉裡拱起，樹根跟著收緊） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
 
+### `grave`（塚下的女聲）
+
+場景 `rite.grave.inscribe.self` 以墓碑為物件，指節沿刻痕描過名字，石面回溫，碑後的土裡伸出手，顫動時碑面透出一條往北的凹道。場景 `rite.grave.lie.self` 的空壙是挖開又填平的另一個物件，躺進土裡讓土從下方頂上來，顫動時壙底的碎石排出一個名字。前者讀一塊立著的石，後者躺進一片空著的土，物件互動與資訊來源都不同。
+
+| 選項 | 物件互動 | 資訊節拍（行） | 高潮節拍（行） | §11 |
+| --- | --- | --- | --- | --- |
+| `inscribe` | 指節嵌進刻痕描過碑文，碑後的土伸出看不見的手隔著裙布貼住私處 | 3、6、7（最後一筆亮起，碑面透出往北的凹道） | 6（額頭抵著石面，熱意衝上頸項） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+| `lie` | 躺進空壙，土從下方隔著衣料頂住臀部與大腿 | 6、7（壙底碎石排出名字與埋藏方向） | 6（抓緊坑邊的草，土面陷下一寸） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+
+### `mine`（坑底的迴響）
+
+場景 `rite.mine.shout.self` 伏在坑口喊第二句，回音從石壁彈回來，坑底的氣流升上來，顫動時坑底亮起火星指向側道。場景 `rite.mine.crawl.self` 側身擠進窄道，石壁在腰後收緊，心跳在石壁間回來三次，顫動時石縫透光照見往下的石階。前者以聲音換答案，後者以身體的擠壓換通道。
+
+| 選項 | 物件互動 | 資訊節拍（行） | 高潮節拍（行） | §11 |
+| --- | --- | --- | --- | --- |
+| `shout` | 伏在坑口喊話，坑底升起的氣流鑽進裙底 | 3、4、6、7（回音多答一句，火星標出側道） | 6（撐住石緣，腰腹跟著回音震動） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+| `crawl` | 側身擠進窄道，石壁貼住臀部與腰腹 | 3、6、7（心跳回來三次，石縫透光照見石階） | 6（手肘撐著往前，熱潮湧出） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+
+### `gate`（門洞裡的影）
+
+場景 `rite.gate.knock.self` 叩門三下並把名字說給門聽，門後把名字念回來，門楣壓下看不見的重量，顫動時門軸鬆開半寸露出往下的石階。場景 `rite.gate.trade.self` 跨上門檻石留下痕跡，淺窪裡的手托住身體，顫動時石面吸走濕痕並亮出通道。前者以名字換放行，後者以痕跡換放行。
+
+| 選項 | 物件互動 | 資訊節拍（行） | 高潮節拍（行） | §11 |
+| --- | --- | --- | --- | --- |
+| `knock` | 抬手叩門三下，門楣壓下的重量滑到腰腹 | 3、4、6、7（門把名字念回來，門軸鬆開露出石階） | 6（按著門板，熱意衝上頸項） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+| `trade` | 跨上發亮的門檻石，淺窪裡的手托住臀部與私處 | 6、7（石面吸走濕痕，門後亮出一條路） | 6（膝蓋抵著石檻，熱潮落在窪裡） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+
+### `cliff`（瀑後的歌聲）
+
+場景 `rite.cliff.bathe.self` 走進潭裡站到瀑下，水柱砸在肩上、水流鑽進裙下，顫動時水簾讓開一道縫露出後方的石洞與往上鑿出的路。場景 `rite.cliff.lean.self` 站上崖緣，風掀開裙襬並貼住身體，顫動時谷底的雲被吹開露出一條獸徑。前者把身體交給落下的水，後者把身體交給崖口的風。
+
+| 選項 | 物件互動 | 資訊節拍（行） | 高潮節拍（行） | §11 |
+| --- | --- | --- | --- | --- |
+| `bathe` | 走進潭裡讓瀑柱砸在肩上，水流鑽進裙下 | 6、7（水簾讓開，露出石洞與往上鑿出的路） | 6（仰起頭，水壓把身體往下按，熱潮逆流衝上） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+| `lean` | 站上崖緣，風從背後推上來並貼住身體 | 6、7（谷底雲被吹開，露出一條獸徑） | 6（張開手臂保持平衡，身體在崖口晃了一下） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+
+### `plaza`（廣場上的目光）
+
+場景 `rite.plaza.stand.self` 走到廣場中央站定，四周的視線壓下來，顫動時腳邊石板浮起一段刻著舊名的刻痕。場景 `rite.plaza.circle.self` 沿著深色石板繞行一圈，視線依序落在臉、背脊與腰臀，顫動時接縫間的刻痕逐段亮起，連成一條往東側巷子的線。前者換到一個名字，後者換到一條路線。
+
+| 選項 | 物件互動 | 資訊節拍（行） | 高潮節拍（行） | §11 |
+| --- | --- | --- | --- | --- |
+| `stand` | 走到廣場中央站定，四周的注視貼住身體 | 3、6、7（石板浮起刻著舊名的刻痕） | 6（膝蓋發軟，熱潮在眾目之下湧出） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+| `circle` | 沿深色石板繞行一圈，目光依序掃過臉、背脊與腰臀 | 6、7（刻痕逐段亮起，連成往東側巷子的線） | 6（撐著走完最後一邊，熱潮落在接縫間） | 1✓ 2✓ 3✓ 4✓ 5✓ 6✓ 7✓ 8✓ |
+
 ## 5. §11 逐條檢核
 
-1. **監護者不是男性。** 五個原型分別為水聲、石像滲出的女聲、無形體的低音、風聲與樹心的女聲，全部符合。
-2. **沒有與男性或男性形體者交合。** 十個場景的互動對象只有地標物件、地標顯化的力量與自己的身體，沒有第二個人類或獸人角色出現。
+1. **監護者不是男性。** 十個原型分別為水聲、石像滲出的女聲、無形體的低音、風聲、樹心的女聲、塚下的女聲、坑底的迴響、門洞裡的一道深影、瀑後的歌聲與廣場上的注視，全部符合。世界觀裡精靈全族皆為女性，任何場景都沒有男性或男性形體的角色出現。
+2. **沒有與男性或男性形體者交合。** 二十個場景裡互動的只有地標物件、地標顯化的力量與自己的身體，沒有第二個人類或獸人角色出現。
 3. **三拍皆有世界觀內的理由。** 每個選項都是監護者以一句問答換取觸碰，物件在被使用時才回答，高潮即地標收下或記下的東西；取得情報以動作與物件回應呈現，沒有直述「你得知」。
-4. **展示而非告知。** 全篇沒有「你得知了」「你感到非常興奮」一類句子，情報由水面浮出的話、眼窩映出的路、砂水排出的名字、光照出的路、樹脂流成的線與鐘聲帶回的方向呈現。
+4. **展示而非告知。** 全篇沒有「你得知了」「你感到非常興奮」一類句子，情報由水面浮出的話、眼窩映出的路、砂水排出的名字、光照出的路、樹脂流成的線、鐘聲帶回的方向、碑面透出的凹道、壙底排出的碎石、坑底的火星、門軸鬆開的縫、水簾後的路、吹開雲的獸徑、石板浮起的舊名與逐段亮起的線呈現。
 5. **`self` 場景為第二人稱並預設女性身體。** 全部場景以「你」敘述，身體描寫為乳房、腰腹、臀部、大腿內側、私處、花蒂；每個選項 `watch` 為 `null`，本次不交運第三人稱場景，也不出現 `{name}` 佔位。
 6. **正體中文、全形標點、日式劍與魔法語彙。** 全篇未出現江湖、客官、過招、劍招、招式、祕技、拜師、功夫、掌門一類中式武俠詞彙，也沒有指令、系統、選單、按鈕、熟練度等出戲用語。
-7. **場景識別碼與修訂號。** 十個場景識別碼為 `rite.<原型>.<選項>.self`，修訂號皆為 `r1`；本文件為首次交運，尚無需遞增。
-8. **情報節拍不寫入圖鑑。** 場景只產生文字與身體反應，未提及、也未觸發任何圖鑑或探索紀錄的寫入；本變更唯一的程式碼是文件載入與其啟動步驟，不寫入任何圖鑑或探索紀錄。
+7. **場景識別碼與修訂號。** 二十個場景識別碼為 `rite.<原型>.<選項>.self`，修訂號皆為 `r1`。前一版的十個場景本次沒有改動，修訂號不動；本次新增的十個場景為首次交運。
+8. **情報節拍不寫入圖鑑。** 場景只產生文字與身體反應，未提及、也未觸發任何圖鑑或探索紀錄的寫入；這兩次內容變更都沒有程式碼，文件載入不寫入任何圖鑑或探索紀錄。
 
 ## 6. 語言與風格檢核
 
 - 初稿審查時改寫了兩類問題。重複量詞（「一下一下」「一粒一粒」「一圈一圈」）改為單一動作描述；任何落在「，」或「。」前的句末「的」皆改寫為名詞收尾。
+- 第二次交運的十個場景逐一核對。初稿在廣場的敘述裡用了重複詞，已改成「旅人沿著邊上走」；新增場景沒有疊字、沒有落在標點前的句末「的」、沒有破折號、沒有句中冒號，也沒有對比式句型。
 - 全篇使用全形標點；中文字與英數字之間沒有混排，場景內沒有半形逗號、冒號、括號或反引號。
-- 沒有敬稱「您」，也沒有第一人稱複數；敘述一律為第二人稱。
-- 沒有破折號、沒有對比式句型、沒有排比堆疊；資訊以動作與物件回應交代。
-- 世界觀檢核方面，場景沿用世界觀的輕鬆冒險基調，未加入黑暗或沉重劇情；地標、地名與行政區名稱全部取自 `content/maps/districts.yaml`，場景內沒有自創地名、組織、物品或職稱。監護者台詞提到的「守林的人」與「巡守的人」是通用指稱，不是專有名詞，也未建立新的組織或職位。
+- 沒有敬稱，也沒有第一人稱複數；敘述一律為第二人稱。
+- 沒有破折號、沒有對比式句型，也沒有刻意的排比堆疊；資訊以動作與物件回應交代。
+- 世界觀檢核方面，場景沿用世界觀的輕鬆冒險基調，未加入黑暗或沉重劇情；地標、地名與行政區名稱全部取自 `content/maps/districts.yaml`，場景內沒有自創地名、組織、物品或職稱。監護者台詞提到的「守林的人」「巡守的人」「送葬的人」與「門後的東西」都是通用指稱，不是專有名詞，也未建立新的組織或職位。廣場的敘述提到的攤販與旅人沿用 `world/ai/director_templates.py` 既有的中央廣場描述。
 
 ## 7. 行政區指派
 
-指派依設計 D3 的三級規則完成。二十五個 §6.3 前五列代表地標取其所在列的原型；十九個依「地標是什麼」直接歸類（泉、井、雕像與雕琢形體、立石與石柱與巨石、塔、樹）；其餘七十六個行政區的地標屬於尚未交運的家族（墓、礦、門、崖、廣場）或僅能依儀式調性就近安置，全部置於 `# provisional: reassigned by landmark-rite-content-completion` 註解行之後，交由 `landmark-rite-content-completion` 重新指派。其中 `western_ore_hills` 的地標灰岩礦塔在名稱與形體上都是塔，依規則二直接歸為 `tower`，不是暫定指派。
+一百二十個行政區各有一個原型。第一次交運依設計 D3 的規則一與規則二完成四十四個指派，本次沒有改動；剩下七十六個原本排在 `# provisional: reassigned by landmark-rite-content-completion` 註解行之後，本次依本變更設計 D2 重新指派，註解行已經移除。其中 `western_ore_hills` 的地標灰岩礦塔在名稱與形體上都是塔，一併維持第一次交運的 `tower`，而不是 `mine`。
 
-七十六個暫定指派按「地標本來屬於哪個家族，或為何只能就近安置」分組如下，供後續變更逐項重新指派。
+七十六個重新指派分成三類。二十一個取設計 §6.3 最後五列的代表地標所在列原型，其中 `royal_river_valley` 的王都中央廣場是全城唯一的廣場，取 `plaza`；其餘行政區沒有任何一個是 `plaza`。
 
-| 分組 | 理由 | 本次指派 | 行政區 |
+| 原型 | 代表地標 | 行政區 |
+| --- | --- | --- |
+| `grave` | 騎士墓碑群、荒廢修道院、先祖石冢、野牛頭骨塚、珍珠貝塚 | `old_battlefield`、`bell_vale`、`ancestor_cairn_hills`、`bison_plateau`、`pearl_bay_coast` |
+| `mine` | 廢棄紫晶坑、白灰窯遺址、河畔舊磨坊、潮音洞窟、巫醫石窟 | `amethyst_mine_vale`、`limestone_terrace`、`mill_reach`、`tidesong_dunes`、`shaman_cave_woods` |
+| `gate` | 赤岩拱門、南隘古道碑、潮汐石閘、銀溪石橋、七拱石橋 | `red_earth_hills`、`south_pass_west_slopes`、`estuary_flats`、`silverbrook_vale`、`imperial_river_reach` |
+| `cliff` | 冰泉瀑布、裂岩斷崖、白鹽崖、蒼鷹岩、黑曜石峰 | `icespring_gorge`、`rift_scarp_plateau`、`salt_cliff_coast`、`eyrie_cliffs`、`obsidian_ridge` |
+| `plaza` | 王都中央廣場 | `royal_river_valley` |
+
+二十三個依地標本身是什麼歸類。墓、冢、塚與修道院歸 `grave`；坑、窯、磨坊、洞窟、石窟與洞穴歸 `mine`；拱門、石門、閘、橋、里程碑、道標與界石歸 `gate`；瀑布、斷崖、峭壁、峰與岩壁歸 `cliff`。
+
+| 原型 | 行政區（地標） |
+| --- | --- |
+| `mine` | `starfall_plain`（隕星坑）、`mithril_foothills`（秘銀礦坑）、`grizzly_vale`（灰熊洞穴）、`east_river_fields`（古水車） |
+| `gate` | `north_road_uplands`（白石里程碑）、`westpass_uplands`（西隘道標石）、`salt_road_hills`（鹽商界石）、`white_sand_coast`（海蝕拱門）、`whalebone_heath`（鯨骨拱門）、`forest_rim_heath`（守林人石標）、`echo_canyon`（回音石門）、`imperial_capital_plain`（帝都凱旋門）、`canal_plain`（古運河閘門）、`south_pass_east_slopes`（南隘石門）、`flax_plain`（藍花石橋）、`spice_road_plain`（香料古道碑）、`great_pass_east`（大隘道標）、`imperial_delta`（三角洲古碑） |
+| `cliff` | `maple_vale`（紅葉瀑布）、`honey_vale`（千巢岩壁）、`thunder_peak_range`（雷鳴峰）、`griffin_plateau`（獅鷲巢岩）、`iron_vein_highlands`（赤鐵岩壁） |
+
+三十二個地標不屬於上述家族，依儀式調性就近安置，逐項理由如下。
+
+| 行政區 | 地標 | 原型 | 理由 |
 | --- | --- | --- | --- |
-| 墓與死者 | `grave` 家族尚未交運，依設計 D3 的「墓→`statue`」安置 | `statue` | `bell_vale`、`old_battlefield`、`pearl_bay_coast`、`bison_plateau`、`ancestor_cairn_hills` |
-| 洞窟、礦坑、窯與磨坊 | `mine` 家族尚未交運，依「洞窟或礦坑→`megalith`」安置 | `megalith` | `amethyst_mine_vale`、`mill_reach`、`limestone_terrace`、`tidesong_dunes`、`mithril_foothills`、`shaman_cave_woods`、`grizzly_vale`、`starfall_plain` |
-| 門、橋、閘、渡與道標 | `gate` 家族尚未交運，依「門或橋→`megalith`」安置 | `megalith` | `north_road_uplands`、`westpass_uplands`、`silverbrook_vale`、`red_earth_hills`、`white_sand_coast`、`whalebone_heath`、`echo_canyon`、`imperial_capital_plain`、`canal_plain`、`imperial_river_reach`、`flax_plain`、`south_pass_east_slopes`、`east_branch_ford`、`estuary_flats`、`imperial_wheatlands`、`south_pass_west_slopes`、`spice_road_plain`、`imperial_delta`、`salt_road_hills`、`forest_rim_heath`、`great_pass_east` |
-| 崖、瀑布、峰與岩壁 | `cliff` 家族尚未交運，依「瀑布或斷崖→`spring` 或 `tower`」安置 | `spring` 或 `tower` | `maple_vale`、`icespring_gorge`（`spring`）；`eyrie_cliffs`、`salt_cliff_coast`、`rift_scarp_plateau`、`thunder_peak_range`、`obsidian_ridge`、`honey_vale`、`iron_vein_highlands`（`tower`） |
-| 城市廣場 | `plaza` 家族尚未交運，依「廣場→`statue`」安置 | `statue` | `royal_river_valley` |
-| 其餘地標 | 不屬於後續五個家族，或家族歸屬未定；依儀式調性就近安置 | `spring`、`statue`、`tree` 或 `tower` | `vineyard_slopes`、`white_ram_foothills`、`east_river_fields`、`olive_slopes`、`anvil_vale`、`north_pass_east_slopes`、`sunken_bell_lake`、`spruce_foothills`、`sunrise_downs`、`black_soil_plain`、`hawkwing_heath`、`rose_plain`、`tide_wind_downs`、`stormrock_heath`、`emerald_lake_plain`、`eastern_pasture`、`river_isle_flats`、`herbal_plain`、`griffin_plateau`、`bluewave_downs`、`cloudsea_foothills`、`giants_stair_highlands`、`imperial_south_shore`、`sea_serpent_slopes`、`bear_claw_woods`、`north_pass_west_slopes`、`war_drum_highlands`、`pine_hunting_grounds`、`giant_rockfall_slopes`、`falcon_rise`、`blood_moon_vale`、`rivers_watch_woods` |
+| `vineyard_slopes` | 老橡木酒窖 | `mine` | 酒窖藏在地下，取坑道幽閉與回聲的調性 |
+| `white_ram_foothills` | 牧羊人石屋 | `gate` | 石屋的門隔開荒野與室內，取門檻與放行的調性 |
+| `olive_slopes` | 古榨油石臼 | `statue` | 石臼是被鑿出的石製器具，貼近時以石面回壓，取觸碰非活物的調性 |
+| `anvil_vale` | 巨鐵砧岩 | `megalith` | 砧岩受敲擊而共鳴，取巨石以震動引導身體的調性 |
+| `north_pass_east_slopes` | 北隘風蝕岩 | `cliff` | 岩體長年被風剝蝕，取風與裸露的調性 |
+| `sunken_bell_lake` | 沉鐘湖 | `spring` | 湖底沉著鐘，水下的東西出聲，取水與深處應答的調性 |
+| `spruce_foothills` | 雲杉石階 | `gate` | 石階是登上林地的通路，取通行與門檻的調性 |
+| `sunrise_downs` | 日出岩 | `megalith` | 岩石標出日出的方位，取石陣以石記時、身體隨之而動的調性 |
+| `black_soil_plain` | 豐饒石壇 | `tree` | 石壇供的是黑土的豐饒，取根系纏繞與被土地承接的調性 |
+| `hawkwing_heath` | 鷹翼石 | `statue` | 石形如展開的翼，取凝視與觸碰非活物的調性 |
+| `rose_plain` | 玫瑰石園 | `statue` | 石園裡的花以石鑿成，取凝視與觸碰非活物的調性 |
+| `tide_wind_downs` | 海神祭壇 | `spring` | 祭壇臨海而設，取水與深處應答的調性 |
+| `stormrock_heath` | 風暴岩 | `cliff` | 岩體迎著風暴，取風與裸露的調性 |
+| `emerald_lake_plain` | 翡翠湖 | `spring` | 湖即水，取水與浸沒的調性 |
+| `eastern_pasture` | 孤石望台 | `tower` | 望台是登高遠望的處所，取高度與風的調性 |
+| `river_isle_flats` | 白鷺沙洲 | `spring` | 沙洲被河水環抱，取水與浸沒的調性 |
+| `herbal_plain` | 賢者石圃 | `tree` | 石圃圍著藥草，取根系與土地的調性 |
+| `bluewave_downs` | 浪花石 | `spring` | 石面刻著浪花，取水與浪頭的調性 |
+| `cloudsea_foothills` | 雲海觀星台 | `tower` | 觀星台建在山麓高處，取高度與風的調性 |
+| `east_branch_ford` | 東支流古渡 | `gate` | 渡口是過河的關口，取通行與門檻的調性 |
+| `imperial_wheatlands` | 風車古道 | `gate` | 地標是運糧的舊道，取通行與門檻的調性 |
+| `giants_stair_highlands` | 巨人階梯 | `gate` | 石階是通往高地的通路，取通行與門檻的調性 |
+| `imperial_south_shore` | 燈塔岬 | `tower` | 燈塔是塔狀建築，取高度、風與遠望的調性 |
+| `sea_serpent_slopes` | 海蛇化石 | `grave` | 化石是留在石裡的死物，取死者出聲的調性 |
+| `bear_claw_woods` | 熊王岩 | `megalith` | 岩石以熊王為名、受林中人貼近，取立石受觸而共鳴的調性 |
+| `north_pass_west_slopes` | 雪豹岩 | `megalith` | 岩石以雪豹為名立在隘口，取立石受觸而共鳴的調性 |
+| `war_drum_highlands` | 戰鼓岩 | `megalith` | 岩石受敲擊如鼓，取巨石共鳴的調性 |
+| `pine_hunting_grounds` | 獵人祭壇 | `tree` | 祭壇獻給林地與獵人，取根系與被森林包覆的調性 |
+| `giant_rockfall_slopes` | 巨人落石 | `megalith` | 坡上堆著巨人的石塊，取立石共鳴的調性 |
+| `falcon_rise` | 獵鷹台 | `tower` | 台是登高放鷹的處所，取高度與風的調性 |
+| `blood_moon_vale` | 血月石 | `megalith` | 岩石在血月下轉紅，取石陣應月而共鳴的調性 |
+| `rivers_watch_woods` | 望河岩 | `tower` | 岩上望得見河，取高度與遠望的調性 |
 
-本次文件共指派 **120** 個行政區，其中 **44** 個依規則一與規則二直接歸類，**76** 個為暫定指派。
+規則四只保證儀式調性相符，地標物件不必與原型場景裡的物件同形。`black_soil_plain`（豐饒石壇）、`herbal_plain`（賢者石圃）與 `pine_hunting_grounds`（獵人祭壇）都沒有樹，`spruce_foothills`（雲杉石階）與 `giants_stair_highlands`（巨人階梯）的物件是石階，這些行政區的場景仍以原型的代表物件（樹身、石階、門檻）演出，這是設計把內容限制在原型層級的既定取捨。
+
+本次全文件的原型分布如下，合計一百二十個行政區。
+
+| 原型 | 行政區數 |
+| --- | --- |
+| `spring` | 12 |
+| `statue` | 10 |
+| `megalith` | 19 |
+| `tower` | 14 |
+| `tree` | 12 |
+| `grave` | 6 |
+| `mine` | 10 |
+| `gate` | 24 |
+| `cliff` | 12 |
+| `plaza` | 1 |
+
+七十六個重新指派中，二十一個依規則一與規則二、二十三個依規則三、三十二個依規則四；連同第一次交運的四十四個，一百二十個行政區全部完成指派，文件裡已無暫定指派。
