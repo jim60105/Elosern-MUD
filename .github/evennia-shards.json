@@ -1246,6 +1246,7 @@
         "world.observability.tests.test_recent",
         "world.observability.tests.test_render",
         "world.observability.tests.test_sanitize",
+        "world.observability.tests.test_tally",
         "world.observability.tests.test_transcript"
       ]
     },
