@@ -87,7 +87,12 @@ from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.movement_edges import LocationRef
 from world.rules.monster_individual import construct_species_individual
-from world.rules.surfaces import db_safe_attribute_snapshot, persisted_hp
+from world.rules.surfaces import (
+    db_safe_attribute_snapshot,
+    outer_rollback_active,
+    owned_atomic,
+    persisted_hp,
+)
 
 #: The world seed a freshly provisioned wilderness script starts with. It is an
 #: explicit configured value, never an implicit default for a missing seed: an
@@ -2307,7 +2312,13 @@ def commit_population_wave(wilderness: Any, plan: PopulationWavePlan) -> tuple[i
             state=zone_state(wilderness, plan.zone_key),
             counts=population_counts(wilderness, plan.zone_key, at_tick=plan.tick),
             protected=_protected_cells(wilderness, at_tick=plan.tick),
-            snapshot=snapshot_population_surfaces(wilderness),
+            # A pass inside an advance relies on that advance's rollback and
+            # takes no snapshot of its own.
+            snapshot=(
+                None
+                if outer_rollback_active()
+                else snapshot_population_surfaces(wilderness)
+            ),
         )
     )
 
@@ -2355,7 +2366,7 @@ def _commit_planned_wave(
     placement = plan.placements[0]
     created: list[Monster] = []
     try:
-        with transaction.atomic():
+        with owned_atomic():
             registration = dict(wilderness.db.itemcoordinates or {})
             room = (wilderness.db.rooms or {}).get(placement.cell)
             for variant_key, count in placement.groups:

@@ -81,7 +81,7 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.monster_individual import construct_species_individual
-from world.rules.surfaces import attribute_snapshot
+from world.rules.surfaces import attribute_snapshot, outer_rollback_active, owned_atomic
 from world.rules.surfaces import persisted_hp as _persisted_hp
 
 # The registered world-clock stage kind this module's settlement owns.
@@ -723,10 +723,15 @@ def settle_site_recovery(
     if _recovery_refusal(wilderness, site, record, tick) is not None:
         return False
     seed, saved_sequence = _require_occurrence(site, record)
-    states_before = _state_map(wilderness)
-    surfaces = snapshot_population_surfaces(wilderness)
+    # A pass inside an advance relies on that advance's rollback: it takes no
+    # pre-write copy of the durable records and opens no savepoint of its own.
+    states_before: dict[str, dict] | None = None
+    surfaces: dict[int, SurfaceSnapshot] | None = None
+    if not outer_rollback_active():
+        states_before = _state_map(wilderness)
+        surfaces = snapshot_population_surfaces(wilderness)
     try:
-        with transaction.atomic():
+        with owned_atomic():
             created = _apply_recovery(
                 wilderness,
                 states,
@@ -737,8 +742,9 @@ def settle_site_recovery(
             )
             _write_state(wilderness, states)
     except Exception:
-        _write_state(wilderness, states_before)
-        restore_population_surfaces(surfaces)
+        if states_before is not None and surfaces is not None:
+            _write_state(wilderness, states_before)
+            restore_population_surfaces(surfaces)
         raise
     return bool(created)
 

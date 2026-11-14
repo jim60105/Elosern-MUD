@@ -31,6 +31,7 @@ initialization remains an explicit owner operation.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from typing import Any
 
 from django.db import transaction
@@ -38,7 +39,13 @@ from django.db import transaction
 from world.maps import monster_activity, monster_sites, regional_population
 from world.observability import log_info
 from world.observability.tally import maintenance_tally, suspended_maintenance_tally
-from world.rules.clock import ScheduledEvent, SurfaceSnapshot, register_event_source
+from world.rules.clock import (
+    ScheduledEvent,
+    SurfaceSnapshot,
+    advance_registry_held,
+    register_event_source,
+)
+from world.rules.surfaces import outer_rollback_owner, suspended_outer_rollback
 
 #: The existing stage kind this coordinator installs itself under.
 STAGE_KIND = monster_sites.SITE_STAGE_KIND
@@ -108,13 +115,16 @@ def _settle_population_at(
     if contact_tick is not None and int(tick) == int(contact_tick):
         from world.rules.field_contact import settle_population_contact_at
 
-        # A failed contact restores its participants and the advance goes on.
-        # The block may change liveness, ownership markers and physiology, so
-        # no read of the pass's earlier facts may answer across it.
+        # A failed contact restores its participants before the failure reaches
+        # the caller. The block may change liveness, ownership markers and
+        # physiology, so no read of the pass's earlier facts may answer across
+        # it. It suspends the pass's rollback owner: work it recovers from must
+        # roll back to its own savepoint, because the pass is not going to.
         regional_population.forget_living_presence()
         with (
             monster_activity.unbatched_state_writes(),
             suspended_maintenance_tally(),
+            suspended_outer_rollback(),
         ):
             events.extend(
                 settle_population_contact_at(wilderness, tick, int(contact_tick))
@@ -184,6 +194,7 @@ def settle_population_lifecycle(
     tick = start_tick
     with maintenance_tally() as counts:
         with (
+            outer_rollback_owner() if advance_registry_held() else nullcontext(),
             monster_activity.batched_state_writes(wilderness),
             regional_population.reused_living_presence(),
         ):

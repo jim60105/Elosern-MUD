@@ -92,6 +92,8 @@ from world.rules.buffs import (
 from world.rules.rulebook.schema import SectionedRule, load_sectioned_rules
 from world.rules.surfaces import (
     attribute_snapshot,
+    outer_rollback_active,
+    owned_atomic,
     restore_attribute_best_effort,
 )
 
@@ -1186,21 +1188,25 @@ def settle_fatigue_intervals(
         )
 
     caller_context = dict(context or {})
+    # Under an enclosing owner (a settlement pass inside a clock advance) the
+    # owner restores every surface these writes touch, so no member is
+    # snapshotted and no savepoint is opened here.
     snapshots: list[tuple[Any, dict[str, tuple[bool, Any]]]] = []
-    surfaces = tuple(FATIGUE_ATTRIBUTE_SURFACES) + tuple(_receipt_surfaces())
-    for interval, _ in planned:
-        entity = interval.entity
-        snapshots.append(
-            (
-                entity,
-                {
-                    key: attribute_snapshot(entity, key, category)
-                    for key, category in surfaces
-                },
+    if not outer_rollback_active():
+        surfaces = tuple(FATIGUE_ATTRIBUTE_SURFACES) + tuple(_receipt_surfaces())
+        for interval, _ in planned:
+            entity = interval.entity
+            snapshots.append(
+                (
+                    entity,
+                    {
+                        key: attribute_snapshot(entity, key, category)
+                        for key, category in surfaces
+                    },
+                )
             )
-        )
     try:
-        with transaction.atomic():
+        with owned_atomic():
             for interval, prediction in planned:
                 if prediction.end == prediction.start:
                     continue

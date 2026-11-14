@@ -1500,3 +1500,115 @@ No new test module was added, so `.github/evennia-shards.json` is unchanged, and
 no data-contract module was added, so `tools/test_data_freeze.json` is unchanged.
 Only the placement dataclass definitions, the resolver and the validators
 changed: every shipped site and composition declaration is untouched.
+
+## Settlement Outer Rollback: One Rollback Owner Inside an Advance
+
+`settlement-outer-rollback` stops five population lifecycle operations from
+paying a second time for protection the enclosing clock advance already holds.
+It changes no rule, draw, order, event or stored format: a pass settles exactly
+the same state, and a failure restores exactly the same state.
+
+### Rollback ownership inside an advance
+
+`WorldClock.advance` already builds one pre-advance snapshot registry covering
+every surface its stages may write, runs the stages inside one
+`transaction.atomic()`, and on any exception restores the clock tick, the
+registry and the live caches. It now records that fact: `clock.py` keeps the
+module global `_ADVANCE_REGISTRY_HELD`, set immediately before the stage
+transaction opens and restored to its previous value in the same `finally`
+that resets the advance scope. `advance_registry_held()` reports it, so a
+nested advance (the pieces of `advance_bounded`) leaves the flag as it found it.
+
+`population_lifecycle.settle_population_lifecycle` opens
+`world.rules.surfaces.outer_rollback_owner()` exactly when that flag is set. A
+direct call — a test or a tool calling the pass itself — has no registry, so the
+owner is never opened and every operation keeps its own protection. Inside an
+owner, `outer_rollback_active()` is true and `owned_atomic()` returns
+`contextlib.nullcontext()` where it would otherwise return
+`transaction.atomic()`.
+
+The five operations that consult it, each with the same three edits (snapshot
+only when no owner holds the rollback, `owned_atomic()` instead of
+`transaction.atomic()`, restore only when a snapshot was taken, always
+re-raise):
+
+- `monster_activity._commit_stay` and `monster_activity._commit_departure`
+- `world.rules.fatigue.settle_fatigue_intervals`
+- `regional_population.commit_population_wave` (through `_commit_planned_wave`,
+  whose `snapshot=None` already meant "an enclosing owner holds the surface")
+- `monster_sites.settle_site_recovery`
+
+Nothing else changes. Combat, the GM console, cast settlement and every direct
+owner call stay outside a pass and keep their snapshot plus savepoint. The
+registry builder, `_restore_advance_registry`, every `snapshot_*_surfaces`
+contract and `regional_population.initialize_zones` are untouched.
+
+The one exception is the field-contact block in
+`population_lifecycle._settle_population_at`: it runs under
+`suspended_outer_rollback()` beside its existing `unbatched_state_writes()` and
+`suspended_maintenance_tally()`, so the work it recovers from rolls back to its
+own savepoint instead of the pass's. The rule that keeps this contract true:
+**a new lifecycle operation that recovers from its own failure and lets the pass
+continue must run under `suspended_outer_rollback()`.** An operation that only
+propagates needs no suspension; the advance's rollback restores it.
+
+### Disclosed limitation: an unrecovered contact failure
+
+`world/rules/field_contact.admit_field_contact_at` restores its participants,
+logs `field_contact_failed` and re-raises. No caller inside the pass catches
+that, so an unrecovered contact failure fails the advance, whose own rollback
+restores the complete pre-advance state — the participants are restored twice,
+and the second restore is the same value. This change adds no catch, because
+that would be a behaviour change. The delta's "Failed contact inside a pass"
+scenario is therefore evidenced in two parts: a recovering caller (a test
+wrapper that catches the failure and lets the pass continue) shows the contact
+block running with its owner suspended, its own savepoints, participants equal
+to their pre-contact values and the idle decision at that tick settled; the
+unrecovered path shows the advance failing closed with the same restored state.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_settlement_outer_rollback
+  -> Ran 10 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_activity
+  -> Ran 35 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
+  -> Ran 12 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_fatigue
+  -> Ran 49 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population_recovery
+  -> Ran 24 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
+  -> Ran 43 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape
+  -> Ran 16 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape world.rules.tests.test_clock
+  -> Ran 81 tests, OK
+```
+
+`test_clock` alone fails four of its own tests with `SettlementNotLoaded` /
+a missing ground observation, because those tests call `sync_quest_runtime()`
+without publishing the authored map world; they pass as soon as any module that
+publishes it runs first in the same process, which is how the suite runs them.
+The savepoint count is measured per lifecycle operation by the SQL statement's
+`transaction.atomic()` caller, never by wall-clock time.
+
+### Traceability hand-off
+
+Both requirements of this change ("Lifecycle operations inside an advance rely
+on the advance rollback" and "Operations that recover and continue keep their
+own protection") are added by the delta in
+`openspec/changes/settlement-outer-rollback/specs/world-clock/spec.md` and have
+no canonical ID until archive sync, so every test in the new module carries
+**no** `covers_requirement` annotation. The implementation report carries the
+test → (delta requirement, scenario) table; os-archive adds the tool-generated
+annotation after the sync.
+
+### Spec deviations
+
+The delta's "Failed contact inside a pass" scenario says the advance commits and
+the idle decisions settle when a contact admission fails. That holds only for a
+caller that recovers the failure; the shipped admission re-raises, so the
+advance fails closed instead. The behaviour was not changed (this change is a
+no-op) and the scenario is evidenced as described above.
