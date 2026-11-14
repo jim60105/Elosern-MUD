@@ -722,13 +722,21 @@ def zone_states(wilderness: Any) -> dict[str, ZonePopulationState]:
     return dict(validated)
 
 
-def due_recovery_zone_keys(wilderness: Any, *, tick: int) -> tuple[str, ...]:
-    """Zone keys whose recovery is due at or before ``tick``, in key order."""
+def due_recovery_zone_keys(
+    wilderness: Any, *, tick: int, scope: Any | None = None
+) -> tuple[str, ...]:
+    """Zone keys whose recovery is due at or before ``tick``, in key order.
+
+    ``scope`` answers for the zones of that scope only, so a scoped pass never
+    opens, cancels or waves another unit's episode.
+    """
     _require_argument_int(tick, "tick")
     return tuple(
         key
         for key, state in zone_states(wilderness).items()
-        if state.recovery_due_tick is not None and state.recovery_due_tick <= tick
+        if (scope is None or key in scope.zone_keys)
+        and state.recovery_due_tick is not None
+        and state.recovery_due_tick <= tick
     )
 
 
@@ -1694,7 +1702,12 @@ def presence_at(
 
 
 def settle_timeline_through(
-    wilderness: Any, tick: int, *, retain: frozenset[int] = frozenset()
+    wilderness: Any,
+    tick: int,
+    *,
+    retain: frozenset[int] = frozenset(),
+    scope: Any | None = None,
+    cursors: Any | None = None,
 ) -> None:
     """Consume every fact at or before ``tick`` after its boundary was applied.
 
@@ -1703,26 +1716,91 @@ def settle_timeline_through(
     has passed its inclusive end. ``retain`` names individuals whose latest
     loss is still owed to a deferred site clear: their evidence is not
     consumed until the site has used it. Repeating the same tick is a no-op.
+
+    ``scope`` retires only the evidence every concerned unit has passed: a
+    transition whose individual is not retained is dropped when each unit of its
+    before and after facts is settled to at least its occurrence tick, and a
+    closed protection interval is dropped only when the unit of its cell is
+    settled past its end. A unit of the scope counts as settled to ``tick``;
+    every other unit counts as settled to its own cursor, so shared evidence is
+    kept while one concerned unit lags behind. ``cursors`` is the per-unit record
+    the caller already read for this pass; reading it again at every boundary
+    would cost one decode per boundary.
     """
     _require_wilderness(wilderness)
     if not population_provisioned(wilderness):
         return
     _require_argument_int(tick, "tick")
     timeline = read_population_timeline(wilderness)
-    if tick <= timeline.settled_through_tick:
+    if scope is None:
+        if tick <= timeline.settled_through_tick:
+            return
+        _write_timeline(
+            wilderness,
+            PopulationTimeline(
+                tick,
+                tuple(
+                    t
+                    for t in timeline.transitions
+                    if t.occurred_tick > tick or t.individual_id in retain
+                ),
+                tuple(
+                    p
+                    for p in timeline.protection
+                    if p.end_tick is None or p.end_tick >= tick
+                ),
+            ),
+        )
         return
+    from world.maps import population_units
+
+    index = population_units.current_unit_index()
+    record = (
+        cursors
+        if cursors is not None
+        else population_units.read_unit_cursors(wilderness)
+    )
+    settled_units = scope.units
+
+    def settled_to(unit_id: str) -> int:
+        if unit_id in settled_units:
+            return tick
+        return population_units.unit_cursor(record, unit_id)
+
+    def still_needed(transition: Any) -> bool:
+        if transition.occurred_tick > tick:
+            return True
+        if transition.individual_id in retain:
+            return True
+        return not all(
+            settled_to(unit_id) >= transition.occurred_tick
+            for unit_id in population_units.concerned_units(index, transition)
+        )
+
+    transitions = tuple(t for t in timeline.transitions if still_needed(t))
+    protection = tuple(
+        p
+        for p in timeline.protection
+        if p.end_tick is None
+        or p.end_tick >= tick
+        or not scope.covers_cell((p.cell.x, p.cell.y))
+    )
+    dropped = len(transitions) != len(timeline.transitions) or len(
+        protection
+    ) != len(timeline.protection)
+    if not dropped and tick <= timeline.settled_through_tick:
+        return
+    # The marker is the pass endpoint, exactly as in the whole-world path: every
+    # unit of a closed set ends at the endpoint, so equal settlement leaves equal
+    # markers. A scoped pass may therefore leave a lagging *other* unit's evidence
+    # stored while the marker has passed it; that over-claim costs only retained
+    # evidence (a late retirement by that unit's own pass), never a lost fact.
     _write_timeline(
         wilderness,
         PopulationTimeline(
-            tick,
-            tuple(
-                t
-                for t in timeline.transitions
-                if t.occurred_tick > tick or t.individual_id in retain
-            ),
-            tuple(
-                p for p in timeline.protection if p.end_tick is None or p.end_tick >= tick
-            ),
+            max(timeline.settled_through_tick, tick),
+            transitions,
+            protection,
         ),
     )
 
@@ -2411,6 +2489,13 @@ def _commit_planned_wave(
 
     placement = plan.placements[0]
     created: list[Monster] = []
+    # A running scoped pass may only birth onto a cell it may settle; the check
+    # precedes the first write of the wave.
+    from world.maps import population_units
+
+    population_units.require_in_active_scope(
+        LocationRef.wilderness(_wilderness_name(wilderness), *placement.cell)
+    )
     try:
         with owned_atomic():
             registration = dict(wilderness.db.itemcoordinates or {})

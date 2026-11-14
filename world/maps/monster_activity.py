@@ -1119,6 +1119,20 @@ def create_group(
         seed=seed,
         member_time=member_time,
     )
+    # A running scoped pass may only create a group whose every unit it may
+    # settle. The unit computation is paid only inside a scoped pass, so the
+    # unwrapped path is unchanged.
+    from world.maps import population_units
+
+    if population_units.active_scope() is not None:
+        population_units.require_units_in_active_scope(
+            population_units.group_units(
+                population_units.current_unit_index(), group, None
+            )
+        )
+    # A group this pass creates is inside its scope by construction, so the
+    # running pass settles it from the moment it exists.
+    population_units.note_created_group(group_id)
     groups = dict(state.groups)
     groups[group_id] = group
     _write_state(wilderness, _copy_state(state, groups=groups))
@@ -1288,6 +1302,41 @@ def _locator_key(locator: Mapping[str, object]) -> str:
     return json.dumps(dict(locator), sort_keys=True, separators=(",", ":"))
 
 
+def movable_area(
+    group: MonsterGroup,
+) -> tuple[Mapping[str, object], ...] | None:
+    """The cells this group's own decision may move it to, or ``None`` for none.
+
+    ``None`` is every situation in which the owner itself answers a lawful
+    scheduled stay before it selects any edge: no published declaration (a
+    staged stationary binding), a ``stationary`` policy, an area the published
+    geography cannot resolve (``MonsterActivityRegistryError`` or
+    ``MovementEdgeError``, which :func:`_resolved_area_keys` deliberately
+    tolerates), and a declared area the activity registry does not carry.
+    The last one still refuses by name when that group's decision is planned --
+    :func:`plan_group_decision` keeps its own reader for exactly that -- but a
+    geometry read must not fail an interval in which the group is never planned.
+
+    Because such a group can never depart, its reachable cells are exactly the
+    ones its own record names; a caller that computes which units a group
+    touches (``world.maps.population_units.group_units``) may therefore treat a
+    ``None`` answer as "no area unit" without ever hiding a movement.
+    """
+    from world.lore.monster_activity import MonsterActivityRegistryError
+
+    declaration = _declaration(group.activity_key)
+    if declaration is None or declaration.policy == "stationary":
+        return None
+    try:
+        return group_area(group)
+    except (
+        MonsterActivityStateInvalid,
+        MonsterActivityRegistryError,
+        MovementEdgeError,
+    ):  # observability: ignore R2: each of these is a binding this group's own decision answers as a lawful scheduled stay, so the geometry reader reports "no movable area" instead of failing a player action; plan_group_decision still refuses a malformed record by name when that group is planned
+        return None
+
+
 def _body_at_position(wilderness: Any, body: Any, position: LocationRef) -> bool:
     from world.maps import regional_population
 
@@ -1295,6 +1344,15 @@ def _body_at_position(wilderness: Any, body: Any, position: LocationRef) -> bool
         cell = regional_population.actual_cell(wilderness, body)
         return cell == (position.x, position.y)
     return getattr(getattr(body, "location", None), "pk", None) == position.id
+
+
+def _settling_groups(scope: Any | None) -> set[str] | None:
+    """The groups one settlement scope may settle, including ones it creates."""
+    if scope is None:
+        return None
+    from world.maps import population_units
+
+    return population_units.settling_group_ids(scope)
 
 
 def _edge_key(edge: PhysicalEdge) -> str:
@@ -2001,7 +2059,7 @@ def _begin_group_journey(
     """
     from evennia.objects.models import ObjectDB
 
-    from world.maps import regional_population
+    from world.maps import population_units, regional_population
 
     _require_wilderness(wilderness)
     _require_name(operation_id, "operation_id")
@@ -2079,6 +2137,8 @@ def _begin_group_journey(
     residual = tuple(
         member_id for member_id in group.member_ids if member_id not in moving
     )
+    # A running scoped pass may only move this group to a cell it may settle.
+    population_units.require_in_active_scope(destination)
     groups = dict(state.groups)
     groups.pop(group.group_id, None)
     if residual:
@@ -2649,21 +2709,29 @@ def settle_group_idle(wilderness: Any, group_id: str, *, tick: int) -> None:
     )
 
 
-def settle_idle_physiology(wilderness: Any, tick: int) -> None:
+def settle_idle_physiology(
+    wilderness: Any, tick: int, *, scope: Any | None = None
+) -> None:
     """Settle every idle group globally through ``tick`` in one owner write.
 
     Groups in a journey settle their passage and waiting at their own due
     boundaries; combat-owned members are paid by the combat owner. This is the
     one bulk idle pass, so an arbitrary clock-advance partition leaves equal
     resources and cursors.
+
+    ``scope`` limits the pass to that scope's groups and leaves every other
+    group's cursors and resources untouched.
     """
     if not activity_provisioned(wilderness):
         return
     _require_int(tick, "tick")
     state = read_monster_activity(wilderness)
     groups = dict(state.groups)
+    settling = _settling_groups(scope)
     changed = False
     for group_id in sorted(groups):
+        if settling is not None and group_id not in settling:
+            continue
         group = groups[group_id]
         if group.journey_id is not None:
             continue
@@ -2684,20 +2752,26 @@ def settle_idle_physiology(wilderness: Any, tick: int) -> None:
 
 
 def settle_group_decisions_at(
-    wilderness: Any, tick: int
+    wilderness: Any, tick: int, *, scope: Any | None = None
 ) -> list[ScheduledEvent]:
     """Plan and commit every due idle group decision at one boundary tick.
 
     Decisions are observed through the committed logging event, not returned
     as clock boundary events: a distant scheduled stay is internal
     maintenance and must not surface as an interactive boundary.
+
+    ``scope`` plans decisions for that scope's groups only, so no decision is
+    ever planned for a group outside it.
     """
     _require_wilderness(wilderness)
     _require_int(tick, "tick")
     if not activity_provisioned(wilderness):
         return []
     with batched_state_writes(wilderness):
+        settling = _settling_groups(scope)
         for group_id in sorted(read_monster_activity(wilderness).groups):
+            if settling is not None and group_id not in settling:
+                continue
             state = read_monster_activity(wilderness)
             group = state.groups.get(group_id)
             if group is None or group.journey_id is not None:
@@ -2896,10 +2970,12 @@ def _arrive(
     state: MonsterActivityState,
     log_events: list[ScheduledEvent],
 ) -> None:
-    from world.maps import regional_population
+    from world.maps import population_units, regional_population
     from world.rules.movement_edges import room_for_ref
 
     destination = journey.destination
+    # A running scoped pass may only land this group on a cell it may settle.
+    population_units.require_in_active_scope(destination)
     group = state.groups[journey.group_id]
     befores = {
         body.pk: regional_population.presence_of(wilderness, body)
@@ -2996,7 +3072,9 @@ def _arrive(
         log_events.append(ScheduledEvent("monster_arrived", tick, dict(context)))
 
 
-def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEvent]:
+def settle_monster_activity_at(
+    wilderness: Any, tick: int, *, scope: Any | None = None
+) -> list[ScheduledEvent]:
     """Settle every due journey arrival or protected-arrival retry at ``tick``.
 
     Journeys settle in stable journey-id order. An arrival pays only the newly
@@ -3005,22 +3083,30 @@ def settle_monster_activity_at(wilderness: Any, tick: int) -> list[ScheduledEven
     settles ordinary waiting posture, and retries at one positive decision
     interval later without repricing the passage. A retry that finds the
     destination lawful arrives in the same pass.
+
+    ``scope`` settles that scope's journeys only; a journey of another unit is
+    never read, paid or retried here.
     """
     _require_wilderness(wilderness)
     _require_int(tick, "tick")
     if not activity_provisioned(wilderness):
         return []
     with batched_state_writes(wilderness):
-        return _settle_due_journeys(wilderness, tick)
+        return _settle_due_journeys(wilderness, tick, scope=scope)
 
 
-def _settle_due_journeys(wilderness: Any, tick: int) -> list[ScheduledEvent]:
+def _settle_due_journeys(
+    wilderness: Any, tick: int, *, scope: Any | None = None
+) -> list[ScheduledEvent]:
     from evennia.objects.models import ObjectDB
 
     state = read_monster_activity(wilderness)
     events: list[ScheduledEvent] = []
+    settling = _settling_groups(scope)
     for journey_id in sorted(state.journeys):
         journey = state.journeys[journey_id]
+        if settling is not None and journey.group_id not in settling:
+            continue
         due = journey.retry_tick if journey.retry_tick is not None else journey.arrival_tick
         if due != tick:
             continue
@@ -3168,18 +3254,26 @@ def _retry_group(
 
 
 def next_monster_activity_boundary(
-    wilderness: Any, after: int, end: int
+    wilderness: Any, after: int, end: int, *, scope: Any | None = None
 ) -> int | None:
-    """The earliest due journey or idle-decision boundary after ``after``."""
+    """The earliest due journey or idle-decision boundary after ``after``.
+
+    ``scope`` answers for that scope's journeys and groups only.
+    """
     if wilderness is None or not activity_provisioned(wilderness):
         return None
     state = read_monster_activity(wilderness)
     candidates: list[int] = []
+    settling = _settling_groups(scope)
     for journey in state.journeys.values():
+        if settling is not None and journey.group_id not in settling:
+            continue
         due = journey.retry_tick if journey.retry_tick is not None else journey.arrival_tick
         if after < due <= end:
             candidates.append(due)
     for group in state.groups.values():
+        if settling is not None and group.group_id not in settling:
+            continue
         if group.journey_id is not None:
             continue
         due = group.next_decision_tick
@@ -3188,10 +3282,22 @@ def next_monster_activity_boundary(
     return min(candidates) if candidates else None
 
 
-def retire_room_protection(wilderness: Any, tick: int) -> None:
-    """Consume closed room protection once chronological progress passes it."""
+def retire_room_protection(
+    wilderness: Any, tick: int, *, scope: Any | None = None
+) -> None:
+    """Consume closed room protection once chronological progress passes it.
+
+    Room protection belongs to no settlement unit: every authored room is the
+    residual unit, so a scoped pass retires it only when its scope holds the
+    residual unit.
+    """
     if not activity_provisioned(wilderness):
         return
+    if scope is not None:
+        from world.maps import population_units
+
+        if population_units.RESIDUAL_UNIT not in scope.units:
+            return
     state = read_monster_activity(wilderness)
     remaining = tuple(
         item
@@ -3202,21 +3308,43 @@ def retire_room_protection(wilderness: Any, tick: int) -> None:
         _write_state(wilderness, _copy_state(state, room_protection=remaining))
 
 
-def retire_settled_decision_receipts(wilderness: Any, tick: int) -> None:
+def retire_settled_decision_receipts(
+    wilderness: Any, tick: int, *, scope: Any | None = None
+) -> None:
     """Consume ordinary decision receipts once their replay window has passed.
 
     A decision's receipt answers a replay of that same tick. Once its journey
     has arrived and progress has moved past the tick, the group's sequence and
     next decision tick already refuse a stale plan, so the receipt protects
     nothing and would otherwise grow the whole-record write without bound.
+
+    ``scope`` adds one condition to every rule above: the receipt's group must be
+    inside the scope, or the group must no longer exist while the scope holds the
+    residual unit. A receipt whose group vanished names no unit, so only a
+    residual scope may consume it.
     """
     if not activity_provisioned(wilderness):
         return
+    from world.maps import population_units
+
     state = read_monster_activity(wilderness)
+    residual_settled = (
+        scope is None or population_units.RESIDUAL_UNIT in scope.units
+    )
+    settling = _settling_groups(scope)
+
+    def in_scope(receipt: ActivityReceipt) -> bool:
+        if settling is None:
+            return True
+        if receipt.group_id in state.groups:
+            return receipt.group_id in settling
+        return residual_settled
+
     retired = {
         operation_id
         for operation_id, receipt in state.receipts.items()
-        if operation_id.startswith(DECISION_OPERATION_PREFIX)
+        if in_scope(receipt)
+        and operation_id.startswith(DECISION_OPERATION_PREFIX)
         and receipt.occurred_tick < tick
         and receipt.journey_id not in state.journeys
     }
