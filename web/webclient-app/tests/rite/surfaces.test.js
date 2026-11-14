@@ -7,6 +7,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import RitePanels from "../../../static/webclient/js/elosern/protocol/panels/rite.js";
+import RiteBackdrop from "../../components/rite/RiteBackdrop.vue";
 import RitePanel from "../../components/rite/RitePanel.vue";
 import RiteArrivalCard from "../../components/rite/RiteArrivalCard.vue";
 import { SOLO_ONLY_REASON, UNSEEN_LABEL, riteRows, ritePerformers } from "../../components/rite/rite-model.js";
@@ -304,5 +305,28 @@ describe("RitePanel", () => {
     expect(w.emitted("perform")).toBeUndefined();
     await key(w, "1");
     expect(w.emitted("perform")).toEqual([["drink"]]);
+  });
+});
+
+describe("RiteBackdrop", () => {
+  it("names the landmark and the guardian over the artwork", () => {
+    const w = mount(RiteBackdrop, { props: { rite: ritePanelWithArt(), artPanel: RITE_ART_PANEL } });
+    const plate = w.get('[data-testid="rite-backdrop-plate"]').text();
+    expect(plate).toContain("合成石龕");
+    expect(plate).toContain("合成泉聲");
+    expect(w.find('[data-testid="artwork-preview"]').exists()).toBe(true);
+    expect(w.get('[data-testid="rite-backdrop"]').classes()).not.toContain("is-empty");
+    w.unmount();
+  });
+
+  it("shows quiet ink with the same plate and no image without artwork", () => {
+    const w = mount(RiteBackdrop, { props: { rite: ritePanel(), artPanel: RITE_ART_PANEL } });
+    const plate = w.get('[data-testid="rite-backdrop-plate"]').text();
+    expect(plate).toContain("合成石龕");
+    expect(plate).toContain("合成泉聲");
+    expect(w.find('[data-testid="artwork-preview"]').exists()).toBe(false);
+    expect(w.find("img").exists()).toBe(false);
+    expect(w.get('[data-testid="rite-backdrop"]').classes()).toContain("is-empty");
+    w.unmount();
   });
 });
