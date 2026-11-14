@@ -197,6 +197,10 @@ describe("ObjectiveTracker (webclient-align-09-objective-tracker-ui)", () => {
   });
 
   it("draws one stroke above twelve units, filled to the ratio", () => {
+    const thirteen = mountTracker({ rows: [counted("q_thirteen", 13, 5)] });
+    expect(thirteen.find('[data-testid="objective-tracker__tick"]').exists()).toBe(false);
+    expect(thirteen.find('[data-testid="objective-tracker__stroke"]').exists()).toBe(true);
+
     const w = mountTracker({ rows: [counted("q_long_count", 30, 12)] });
     expect(w.find('[data-testid="objective-tracker__tick"]').exists()).toBe(false);
     const stroke = w.get('[data-testid="objective-tracker__stroke"]');

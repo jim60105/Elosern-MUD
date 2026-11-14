@@ -236,14 +236,16 @@ _OBJECTIVE_PANEL_JS = """() => {
   const box = tracker.querySelector('[data-testid^="objective-tracker__box--"]');
   const stroke = tracker.querySelector('[data-testid="objective-tracker__stroke"]');
   const fill = tracker.querySelector('[data-testid="objective-tracker__stroke-fill"]');
+  const map = document.querySelector('[data-anchor="map"]');
   return {
     card: rect(card),
     tracker: rect(tracker),
     borders: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth],
-    radius: cs.borderTopLeftRadius,
+    radius: [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius],
     shadow: cs.boxShadow,
     background: cs.backgroundColor,
     groundMask: before.maskImage || before.webkitMaskImage,
+    mapScroll: map ? { scrollHeight: map.scrollHeight, clientHeight: map.clientHeight } : null,
     descendantRights: Array.from(tracker.querySelectorAll('*'))
       .map((el) => el.getBoundingClientRect())
       .filter((r) => r.width > 0 || r.height > 0)
@@ -257,7 +259,9 @@ _OBJECTIVE_PANEL_JS = """() => {
       width: el.getBoundingClientRect().width,
     })),
     strokeWidth: stroke ? stroke.getBoundingClientRect().width : null,
+    strokeLeft: stroke ? stroke.getBoundingClientRect().left : null,
     fillWidth: fill ? fill.getBoundingClientRect().width : null,
+    fillLeft: fill ? fill.getBoundingClientRect().left : null,
   };
 }"""
 
@@ -555,7 +559,7 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
 
                 # The panel is no box; its ground is decoration.
                 self.assertEqual(probe["borders"], ["0px"] * 4)
-                self.assertEqual(probe["radius"], "0px")
+                self.assertEqual(probe["radius"], ["0px"] * 4)
                 self.assertEqual(probe["shadow"], "none")
                 self.assertEqual(probe["background"], "rgba(0, 0, 0, 0)")
                 self.assertTrue(probe["groundMask"], "the ground has a mask")
@@ -579,6 +583,17 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                 for tick in probe["ticks"]:
                     self.assertAlmostEqual(tick["width"], 13 * scale, delta=1.0, msg="tick width")
 
+                # The counted panel is the taller form, and the column still
+                # fits it where the design promises it does (1280x720 is the
+                # viewport whose overflow the column's edge fade covers).
+                self.assertIsNotNone(probe["mapScroll"], "the map anchor exists")
+                if viewport != (1280, 720):
+                    self.assertLessEqual(
+                        probe["mapScroll"]["scrollHeight"],
+                        probe["mapScroll"]["clientHeight"] + 1,
+                        f"the counted panel keeps the column fitting at {viewport}",
+                    )
+
                 # Above twelve units: one stroke filled to the ratio.
                 inject_snapshot(page, {**base, "objectives": _counted_objectives_panel(30, 12)}, mode="exploration")
                 page.wait_for_selector('[data-testid="objective-tracker__stroke"]', timeout=15000)
@@ -590,6 +605,16 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                     probe["fillWidth"] / probe["strokeWidth"], 0.4,
                     delta=1 / probe["strokeWidth"] + 0.01, msg="the stroke fills to the ratio",
                 )
+                self.assertAlmostEqual(
+                    probe["fillLeft"], probe["strokeLeft"], delta=1.0,
+                    msg="the stroke fills from its tapered (left) end",
+                )
+                if viewport != (1280, 720):
+                    self.assertLessEqual(
+                        probe["mapScroll"]["scrollHeight"],
+                        probe["mapScroll"]["clientHeight"] + 1,
+                        f"the stroke panel keeps the column fitting at {viewport}",
+                    )
 
                 # A reached count fills the lozenge with a check.
                 inject_snapshot(page, {**base, "objectives": _counted_objectives_panel(5, 5)}, mode="exploration")
