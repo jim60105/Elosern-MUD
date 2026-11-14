@@ -133,7 +133,7 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(_WAIT_EDGES_JS, arg=[above, below], timeout=5000)
 
     @covers_requirement(
-        "webclient-contextual-hud::the-hud-island-stack-renders-as-bounded-floating-islands-not-column-cards",
+        "webclient-contextual-hud::the-map-column-holds-its-instrument-geometry-and-fades-hidden-overflow",
     )
     def test_map_column_holds_its_width_and_fades_hidden_overflow(self):
         """At 1280x720, 1451x790 and 2560x1440 the `map` anchor is the
