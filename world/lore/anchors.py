@@ -274,6 +274,7 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
     "hamlet_flat_meadow": AnchorLore("altoria", 110, None),
     "hamlet_ridge_edge": AnchorLore("altoria", 140, None),
     "hamlet_hillside": AnchorLore("altoria", 120, None),
+    "hamlet_city_foot": AnchorLore("altoria", 220, None),
 }
 
 

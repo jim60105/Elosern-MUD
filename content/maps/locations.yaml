@@ -1716,3 +1716,13 @@ locations:
       cell_y: 477
     geographic_constraint: Hillside on the climb from the south vale to the honey vale
     scene_archetype:
+  hamlet_city_foot:
+    kind: hamlet
+    display_name_zh: 城下
+    description: Gate settlement below the walls of the salt ferry city, on the road toward the west ore port.
+    cell:
+      cell_x: 406
+      cell_y: 499
+    geographic_constraint: Gate settlement at the landward approach of the salt ferry city
+    spacing_exemption: Gate settlement of city_salt_ferry; it necessarily stands within the 15 km hamlet minimum of the city whose gate it serves.
+    scene_archetype:
