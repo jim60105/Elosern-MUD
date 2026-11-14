@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_reed_islet
+location_ref: hamlet_reed_islet
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 155
+    y_m: 155
+    prototype_parent: anchor_room
+    key: 蘆洲岔路
+    desc: 岔路就在河灣的蘆葦叢邊，路面被蘆根撐得高低不平。河水從西邊彎進來，風一吹，葦穗全朝南倒。
+    anchor_key: hamlet_reed_islet
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前堆著曬乾的蘆葦，屋簷下掛著編了一半的葦簾。屋主每天清晨划小船到河心放網，回來正好曬網。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+city_gate:

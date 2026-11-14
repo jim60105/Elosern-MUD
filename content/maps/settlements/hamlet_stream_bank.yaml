@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_stream_bank
+location_ref: hamlet_stream_bank
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 205
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 溪畔岔路
+    desc: 岔路貼著南谷河的岸邊，路基用木樁加固過。往東的路通往鹽道城，漲水時得先繞上高地再走。
+    anchor_key: hamlet_stream_bank
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前晾著漁網與洗好的衣物，屋側棚下收著一艘平底船。屋主說河灣的魚最多，天未亮就出船。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

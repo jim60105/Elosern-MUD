@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_earthen_ridge
+location_ref: hamlet_earthen_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 185
+    y_m: 185
+    prototype_parent: anchor_room
+    key: 土岡岔路
+    desc: 岔路立在一道黃土岡上，路面被雨沖出淺溝。往東的路通往橄欖津，岡下的水塘是附近唯一的飲水處。
+    anchor_key: hamlet_earthen_ridge
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 屋前土埕
+    desc: 屋前有一片夯實的土埕，曬著豆子與辣椒。屋主把水缸埋進土裡，上頭覆著草蓆，免得日頭把水曬壞。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

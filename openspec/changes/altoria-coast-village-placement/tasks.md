@@ -18,24 +18,82 @@ Ground rules:
 
 ## 1. Baseline
 
-- [ ] 1.1 Confirm the prerequisites: `uv run --locked python -m tools.settlement_spacing` prints `spacing: 0 problems`, `uv run --locked python -m tools.road_network --check` exits 0, `uv run --locked python -m tools.settlement_synthesis generate --help` lists `--kind`, and `tools/settlement_spacing_areas.json` equals the "Before" content of design D7. If any fails, stop and report.
-- [ ] 1.2 Record the first timing line of design D9. Verify: the line is saved for the hand-off.
-- [ ] 1.3 Write the placement script per design D1 and list the road gaps over 75 km inside this change's scope. Verify: the list is saved under `snippets/` and names each gap's road, end cells and length.
+- [x] 1.1 Confirm the prerequisites: `uv run --locked python -m tools.settlement_spacing` prints `spacing: 0 problems`, `uv run --locked python -m tools.road_network --check` exits 0, `uv run --locked python -m tools.settlement_synthesis generate --help` lists `--kind`, and `tools/settlement_spacing_areas.json` equals the "Before" content of design D7. If any fails, stop and report.
+
+  Result: all four hold on `b6104326`.
+- [x] 1.2 Record the first timing line of design D9. Verify: the line is saved for the hand-off.
+
+  Result: `Ran 2 tests in 0.000s` — measured at the first compose-able tree
+  (after task 2.2's regeneration), because the pre-edit run of the same label
+  refused at import with `stale_partition` once the new rows were in
+  `locations.yaml`. The label itself discovers two tests and reports them
+  separately; the figure is recorded, never asserted.
+- [x] 1.3 Write the placement script per design D1 and list the road gaps over 75 km inside this change's scope. Verify: the list is saved under `snippets/` and names each gap's road, end cells and length.
+
+  Result: `snippets/place.py`, `snippets/plan.json`, `snippets/gaps_before.json`
+  and `snippets/gaps_before.txt`. Six gaps: `city_salt_ferry -- port_white_sail`
+  184.8 km, `city_salt_ferry -- town_olive_ferry` 431.6 km, `city_salt_road --
+  port_south_tide` 1031.7 km, `city_salt_road -- town_olive_ferry` 361.7 km,
+  `port_fishers_cove -- port_white_sail` 254.2 km, `port_fishers_cove --
+  town_olive_ferry` 310.8 km.
 
 ## 2. Villages
 
-- [ ] 2.1 Propose villages, approve each against design D2 and D3, and write the rows of design D4. Verify: `place_sites.py --locations` (command in design Context) reports every new cell walkable, off the water and of nation `altoria`, and `uv run --locked python -m tools.settlement_spacing` reports no problem except `village_off_road` for the new villages.
-- [ ] 2.2 Regenerate per design D6. Verify: `uv run --locked python -m tools.settlement_spacing` reports no `village_off_road`, and every new village ID appears as a `spur_of` value in `world/maps/data/road_network.json`.
+- [x] 2.1 Propose villages, approve each against design D2 and D3, and write the rows of design D4. Verify: `place_sites.py --locations` (command in design Context) reports every new cell walkable, off the water and of nation `altoria`, and `uv run --locked python -m tools.settlement_spacing` reports no problem except `village_off_road` for the new villages.
+
+  Result: `place_sites.py --locations` reports `177/177 sites valid` (exit 0).
+  `settlement_spacing` reported exactly three problems, all `village_off_road`,
+  for `village_cogongrass_flat (458, 119)`, `village_ridge_top (381, 449)` and
+  `village_sand_bar (485, 178)` — the three off-trunk villages of design D1,
+  nine of twelve villages on a trunk. No exemption is used.
+- [x] 2.2 Regenerate per design D6. Verify: `uv run --locked python -m tools.settlement_spacing` reports no `village_off_road`, and every new village ID appears as a `spur_of` value in `world/maps/data/road_network.json`.
+
+  Result: `spacing: 0 problems`; all twelve new village IDs are `spur_of`
+  values (`village_big_flat` from `port_south_tide`, `village_cogongrass_flat`
+  from `port_south_tide`, `village_creek_flat` from `port_white_sail`,
+  `village_reed_bank` from `village_big_flat`, `village_river_terrace` from
+  `village_reed_bank`, `village_ridge_top` and `village_stone_hill` from
+  `city_salt_ferry`, `village_sand_bar` from `village_cogongrass_flat`,
+  `village_sand_spit` from `port_fishers_cove`, `village_three_forks` from
+  `town_olive_ferry`, `village_tide_flat` from `village_sand_spit`,
+  `village_upper_vale` from `city_salt_road`). The road artifact grew from 80
+  to 92 nodes.
 
 ## 3. Hamlets
 
-- [ ] 3.1 Propose hamlets against the regenerated roads, approve each against design D2 and D3, and write the rows of design D4. Verify: `place_sites.py --locations` reports every new cell valid, and `uv run --locked python -m tools.settlement_spacing` reports no `hamlet_spacing`, `village_spacing`, `id_prefix`, `duplicate_name`, `no_nation`, `nation_mismatch`, `population_range` or `forbidden_region` problem.
-- [ ] 3.2 Regenerate per design D6 and make the trunk comparison of D6. Verify: no road row without `spur_of` changed.
+- [x] 3.1 Propose hamlets against the regenerated roads, approve each against design D2 and D3, and write the rows of design D4. Verify: `place_sites.py --locations` reports every new cell valid, and `uv run --locked python -m tools.settlement_spacing` reports no `hamlet_spacing`, `village_spacing`, `id_prefix`, `duplicate_name`, `no_nation`, `nation_mismatch`, `population_range` or `forbidden_region` problem.
+
+  Result: 25 hamlets (22 on a road, 3 off every road: `hamlet_reed_islet`,
+  `hamlet_pool_tail`, `hamlet_tide_sound`). `place_sites.py --locations` reports
+  `178/178 sites valid` (exit 0) once every row was written, and
+  `settlement_spacing` reports no identity, spacing, nation or population
+  problem — only the three expected pre-regeneration `village_off_road` rows.
+  `hamlet_tide_sound (527, 108)` closes the 148.3 km
+  `port_south_tide -- village_cogongrass_flat` gap the first village
+  regeneration exposed.
+- [x] 3.2 Regenerate per design D6 and make the trunk comparison of D6. Verify: no road row without `spur_of` changed.
+
+  Result: `head roads 99 (trunk 78)` / `work roads 111 (trunk 78)`, `trunk rows
+  changed: 0`; only `nodes`, `fingerprint`, `source_signature` and the twelve
+  `spur_of` rows differ.
 
 ## 4. Maps and prose
 
-- [ ] 4.1 Run `uv run --locked python -m tools.settlement_synthesis generate --missing --nation altoria --kind village --plan-only`, then without `--plan-only`; then the same two commands with `--kind hamlet`. Verify: each new ID has exactly one new file, no existing settlement file changed (`git status --short content/maps/settlements` shows only additions), and `uv run --locked python -m tools.settlement_synthesis lint` exits 0. A refusal is fixed by moving that location and repeating from group 2 or 3; never by hand-writing a map.
-- [ ] 4.2 Write and apply the prose of every new map per design D5a. Verify: `brief` of each new map shows no empty description and no duplicate key.
+- [x] 4.1 Run `uv run --locked python -m tools.settlement_synthesis generate --missing --nation altoria --kind village --plan-only`, then without `--plan-only`; then the same two commands with `--kind hamlet`. Verify: each new ID has exactly one new file, no existing settlement file changed (`git status --short content/maps/settlements` shows only additions), and `uv run --locked python -m tools.settlement_synthesis lint` exits 0. A refusal is fixed by moving that location and repeating from group 2 or 3; never by hand-writing a map.
+
+  Result: 12 village maps (4 nodes each) and 25 hamlet maps (2 nodes each), 98
+  nodes in all, every report warning-free. `git status --short
+  content/maps/settlements` lists 37 additions and no modification, and
+  `settlement_synthesis lint` prints `fit: 0 errors, 0 warnings` and exits 0.
+- [x] 4.2 Write and apply the prose of every new map per design D5a. Verify: `brief` of each new map shows no empty description and no duplicate key.
+
+  Result: 37 prose files written under the scratchpad and applied with `prose`;
+  every one of the 98 nodes now carries a `key` of 2 to 8 characters and a
+  `desc` of 40 to 140 characters, keys are unique within their map and no
+  description is empty. Villages name the well and the church front; hamlets
+  name the crossing and the single farmstead; each entrance names the direction
+  or the neighbour it leads to, and no shop, guild branch or service is
+  presented as usable.
 - [ ] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
 
 ## 5. Validation and hand-off

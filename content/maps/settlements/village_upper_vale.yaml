@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_upper_vale
+location_ref: village_upper_vale
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 273
+    y_m: 186
+    prototype_parent: anchor_room
+    key: 井邊綠地
+    desc: 村心的綠地圍著一口石井，井水引自南谷上游的支流。清晨挑水的人沿著鹽道來回，桶面映著東邊山壁的稜線。
+    anchor_key: village_upper_vale
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 446
+    y_m: 186
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口的車轍順著谷底往東轉，路面鋪著壓實的河砂。出了口便是鹽道回折的山腳，來往的鹽車習慣在此歇腳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 186
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口對著通往鹽道城方向的長路，道旁立著一塊被風蝕出凹面的路碑。傍晚常有商隊在碑下卸空鹽袋，隔日再走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 273
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂石階
+    desc: 教堂前的石階朝南鋪向河灘，階縫裡長著耐旱的草。鐘聲響起時，河面正好映出整排石階與鐘樓的影子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

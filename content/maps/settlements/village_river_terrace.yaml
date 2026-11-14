@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_river_terrace
+location_ref: village_river_terrace
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 319
+    y_m: 177
+    prototype_parent: anchor_room
+    key: 井台空地
+    desc: 綠地中央是一口砌了石欄的水井，井水甜而涼，是河階上少見的好水。綠地邊的曬架上攤著剛洗過的麥穗。
+    anchor_key: village_river_terrace
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 474
+    y_m: 332
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口接著一段石砌的坡道，往上就是河階的邊緣。坡頂能望見南谷河在正北方轉彎，水面浮著一層薄霧。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 177
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口外是通往鹽道城方向的官道，路基壓得平整筆直。清晨的鹽隊從西邊進村，把空擔擱在口邊的棚下。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 396
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前坡
+    desc: 教堂前的坡面向東南，正對著河階下的蘆葦灘。坡上種了兩排柏樹，午後的樹影正好蓋住半座石階。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

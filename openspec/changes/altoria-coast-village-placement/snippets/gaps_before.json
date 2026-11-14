@@ -1,0 +1,92 @@
+[
+ {
+  "road": "city_salt_ferry -- port_white_sail",
+  "from": [
+   403,
+   499
+  ],
+  "to": [
+   299,
+   359
+  ],
+  "from_index": 0,
+  "to_index": 143,
+  "cells": 144,
+  "km": 184.8
+ },
+ {
+  "road": "city_salt_ferry -- town_olive_ferry",
+  "from": [
+   403,
+   499
+  ],
+  "to": [
+   699,
+   255
+  ],
+  "from_index": 0,
+  "to_index": 355,
+  "cells": 356,
+  "km": 431.6
+ },
+ {
+  "road": "city_salt_road -- port_south_tide",
+  "from": [
+   1020,
+   363
+  ],
+  "to": [
+   599,
+   100
+  ],
+  "from_index": 0,
+  "to_index": 883,
+  "cells": 884,
+  "km": 1031.7
+ },
+ {
+  "road": "city_salt_road -- town_olive_ferry",
+  "from": [
+   1019,
+   361
+  ],
+  "to": [
+   700,
+   258
+  ],
+  "from_index": 0,
+  "to_index": 319,
+  "cells": 320,
+  "km": 361.7
+ },
+ {
+  "road": "port_fishers_cove -- port_white_sail",
+  "from": [
+   427,
+   153
+  ],
+  "to": [
+   301,
+   355
+  ],
+  "from_index": 0,
+  "to_index": 202,
+  "cells": 203,
+  "km": 254.2
+ },
+ {
+  "road": "port_fishers_cove -- town_olive_ferry",
+  "from": [
+   430,
+   154
+  ],
+  "to": [
+   699,
+   255
+  ],
+  "from_index": 0,
+  "to_index": 269,
+  "cells": 270,
+  "km": 310.8
+ }
+]

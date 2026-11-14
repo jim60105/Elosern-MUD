@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_bulrush_islet
+location_ref: hamlet_bulrush_islet
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 212
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 蒲洲岔路
+    desc: 岔路邊是一片蒲草灘，蒲穗比人還高。往西南的路通往橄欖津，路面在雨季會被水淹掉一段。
+    anchor_key: hamlet_bulrush_islet
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前曬著割下的蒲草，屋主把它編成席子與鞋。屋側的水塘裡還泡著一捆剛割下的草莖。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:
