@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from django.db import transaction
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 
 from world.lore.monster_placement import (
@@ -113,6 +114,9 @@ class DecodeReuseTests(ActivityFixture):
             regional_population, name, wraps=getattr(regional_population, name)
         )
 
+    @covers_requirement(
+        "regional-population::stored-population-records-are-decoded-once-per-stored-value"
+    )
     def test_repeated_reads_decode_each_record_once(self):
         with self._decoding("_zone_map_from_raw") as zone_decode:
             maps = [regional_population._state_map(self.wilderness) for _ in range(5)]
@@ -135,6 +139,9 @@ class DecodeReuseTests(ActivityFixture):
         self.assertIs(zones[0][ZONE_KEY], zones[-1][ZONE_KEY])
         self.assertEqual(zones[0][ZONE_KEY].settled_through_tick, 0)
 
+    @covers_requirement(
+        "regional-population::stored-population-records-are-decoded-once-per-stored-value"
+    )
     def test_a_read_follows_every_kind_of_timeline_write(self):
         first = read_population_timeline(self.wilderness)
         self.assertIs(read_population_timeline(self.wilderness), first)
@@ -163,6 +170,9 @@ class DecodeReuseTests(ActivityFixture):
             read_population_timeline(self.wilderness).settled_through_tick, 9
         )
 
+    @covers_requirement(
+        "regional-population::stored-population-records-are-decoded-once-per-stored-value"
+    )
     def test_a_zone_read_follows_every_kind_of_record_and_seed_write(self):
         self.assertEqual(
             zone_states(self.wilderness)[ZONE_KEY].settled_through_tick, 0
@@ -325,6 +335,9 @@ class SettlementScenarioFixture(ActivityFixture):
 class PassFactTests(SettlementScenarioFixture):
     """One pass reads each pass-stable population fact once."""
 
+    @covers_requirement(
+        "regional-population::a-settlement-pass-reuses-pass-stable-population-facts"
+    )
     def test_a_quiet_pass_over_many_boundaries_reads_each_fact_once(self):
         staying = self._seed_for(depart=False, activity=GROUP_ACTIVITY, cell=PROBE)
         departing = self._seed_for(
@@ -367,6 +380,9 @@ class PassFactTests(SettlementScenarioFixture):
         self.assertEqual(living_scan.call_count, 1)
         self.assertEqual(session_scan.call_count, 1)
 
+    @covers_requirement(
+        "regional-population::a-settlement-pass-reuses-pass-stable-population-facts"
+    )
     def test_a_birth_inside_the_pass_is_read_with_its_home_zone(self):
         created = self._deficit_zone()
         scans: list[tuple[int, ...]] = []
@@ -399,6 +415,9 @@ class PassFactTests(SettlementScenarioFixture):
             self.assertTrue(presence[newborn_id].alive)
             self.assertEqual(presence[newborn_id].home_zone, ZONE_KEY)
 
+    @covers_requirement(
+        "regional-population::a-settlement-pass-reuses-pass-stable-population-facts"
+    )
     def test_protected_cells_are_computed_once_per_tick(self):
         self._reset_activity(tick=START)
         record_population_protection(
@@ -563,6 +582,9 @@ class ScenarioSettlementFixture(SettlementScenarioFixture):
 class DifferentialSettlementTests(ScenarioSettlementFixture):
     """Reuse on and off leave the same state under every interval partition."""
 
+    @covers_requirement(
+        "regional-population::reuse-leaves-settlement-results-unchanged"
+    )
     def test_reuse_leaves_the_same_state_under_every_partition(self):
         partitions = ((1500,), (700, 800), (61, 1439))
         projections = {
