@@ -34,4 +34,4 @@ None.
 ## Batch:
 
 - depends-on: local-map-instrument-panel
-- conflicts: imports `components/instrument-panel.css` from `place-card-instrument-panel`; edits `tests/overlays/objective_tracker_integration.test.js` after `local-map-instrument-panel` changed its expected child order; adds a method to `web/tests/browser/test_browser_map_column_instruments.py` and appends to `.github/browser-shards.json`. Land it last.
+- conflicts: imports `components/instrument-panel.css` from `place-card-instrument-panel`; edits `tests/overlays/objective_tracker_integration.test.js` after `local-map-instrument-panel` changed its expected child order; edits `web/tests/browser/test_browser_contextual_hud_stage.py` after `local-map-instrument-panel` rewrote its minimap orientation probes in the same file; adds a method to `web/tests/browser/test_browser_map_column_instruments.py` and appends to `.github/browser-shards.json`. Land it last.

@@ -32,14 +32,17 @@ import "./instrument-panel.css";
 // continuous stroke, so the ticks never shrink below a readable width.
 const TICK_LIMIT = 12;
 
+// Same type rule as isDone: only a number counts, so the marks and the
+// completion state never disagree about a non-numeric payload field.
 const quantity = computed(() => {
-  const value = Number(first.value?.objective_quantity);
-  return Number.isFinite(value) ? value : 0;
+  const value = first.value?.objective_quantity;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 });
 const counted = computed(() => quantity.value > 1);
 const progress = computed(() => {
-  const value = Number(first.value?.stage_progress);
-  return Math.max(0, Math.min(quantity.value, Number.isFinite(value) ? value : 0));
+  const value = first.value?.stage_progress;
+  const reached = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return Math.max(0, Math.min(quantity.value, reached));
 });
 const done = computed(() => isDone(first.value));
 const ticked = computed(() => counted.value && quantity.value <= TICK_LIMIT);
@@ -277,7 +280,7 @@ Note: the stroke fills from its left (tapered) end, as the prototype does. The `
   - Progress/reward test (lines ~130-150): the progress element's `b` text is `2` and `i` text is `/ 5`; reward text stays `+80`.
   - New `it("draws one tick per unit up to twelve, reached ticks first")`: quantity 5 / progress 2 → 5 `objective-tracker__tick`, the first 2 with class `obj__tick--on`, `objective-tracker__ticks` has `aria-hidden="true"`, no stroke; quantity 12 / progress 15 → 12 ticks all on (clamped); quantity 5 / progress 5 → root has `obj--done`.
   - New `it("draws one stroke above twelve units, filled to the ratio")`: quantity 30 / progress 12 → no ticks, `objective-tracker__stroke` with `aria-hidden="true"`, fill `style` width `40%`; progress -3 → `0%`.
-  - New `it("draws no quantity marks for a single-count objective")`: quantity 1, and quantity missing → neither ticks nor stroke.
+  - New `it("draws no quantity marks for a single-count objective")`: quantity 1, quantity missing, and quantity given as the string `"5"` → neither ticks nor stroke (the string case also leaves the box without `done`).
   - New source test: `ObjectiveTracker.vue` contains `import "./instrument-panel.css";` and its `.obj {` rule contains none of `height:`, `padding`, `background`, `border`, `border-radius`, `box-shadow`, `backdrop-filter`.
 - `web/webclient-app/tests/overlays/objective_tracker_integration.test.js`: re-run; update any `+N` or `n/m` text expectations to the D2 markup (the child-order expectation was already updated by `local-map-instrument-panel`).
 
