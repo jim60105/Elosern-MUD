@@ -136,7 +136,57 @@ Ground rules:
   `road_network --check` and `map_reference_context --check` both report `is
   up to date`, exit 0. Enabling the full region surfaced no remaining road
   gap.
-- [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+
+  Result: every label was run with the test prefix, one label per command
+  except where the 100-test discovery cap forced the smallest grouping:
+  1,290 tests passed across 44 commands, with two skips. Green:
+  `commands.tests.test_localized.test_xyz_grid_and_help` 19,
+  `typeclasses.tests.test_exit_movement_cost` 22, `test_exits` 17,
+  `test_map_discovery` 9, `test_npc_dialogue` 56,
+  `web.webclient.actions.tests.test_exploration_actions.test_move_and_look` 37,
+  `test_area_map` 62 (skipped=1), `test_exploration_panel.test_presenter` 34,
+  `test_wilderness_and_npc_titles` 8, `test_local_map.test_gate_capacity` 8,
+  `test_gateway_resolution` 12, `test_grid_gateways` 11, `test_grid_helpers` 20,
+  `test_per_gate_footprint` 5, `test_presenter` 17, `test_wilderness` 21,
+  `test_map_quest_destinations` 19, `test_world_map` 9,
+  `world.lore.tests.test_anchor_placement` 6, `test_anchors` 7,
+  `test_map_district_content` 13, `test_nations` 5, `test_settlements` 35,
+  `test_sync` 6, `test_wilderness_entry` 15,
+  `world.maps.tests.test_altoria_capital` 12, `test_bootstrap` 46 (also the
+  D9 second timing), `test_city_movement_cost` 5, `test_city_walkthrough` 2,
+  `test_city_wilderness_roundtrip` 3,
+  `test_editor_final_yaml_adoption` 1; `test_geography_source
+  test_limbo_room test_movement_roundtrip` 47; `test_population_geometry
+  test_sparse_graph` 41; `test_runtime_adoption test_settlement_reload
+  test_static_map_references` 20; `test_village_ciaran
+  test_wilderness_destination test_wilderness_geography_contract` 51;
+  `test_wilderness_population test_wilderness_provider` 37;
+  `world.quests.tests.test_compile_blueprint test_compile_offline` 49;
+  `test_definitions test_scene_builder_offline` 62;
+  `test_compile_registration test_encounter_activation` 45;
+  `test_encounter_dispatch test_generated_dialogue_scenes` 52;
+  `test_room_observation test_scene_smoke test_story_dialogue
+  test_story_effects` 41; `world.rules.tests.test_movement
+  test_movement_settlement test_party_follow` 74;
+  `test_party_follow_possession test_party_time_settlement test_travel_plan`
+  80 (skipped=1); `test_dialogue_refresh_lifecycle
+  test_guild_config.test_price_scaling
+  test_guild_config.test_service_host_roster` 61;
+  `test_map_knowledge_integration test_sight` 67.
+
+  The only red is the documented data-independent set, unchanged in character
+  from earlier changes: `tests.test_map_core_contract` under the plain
+  `unittest` runner (`Ran 4 tests`, one `ImproperlyConfigured:
+  CHANNEL_LOG_NUM_TAIL_LINES` while importing the evennia wilderness,
+  runner/settings shape); `web.webclient.actions.tests.test_node_ids`
+  (`SettlementNotLoaded` in `setUpClass`, registry read before any module
+  publishes it in that process); `test_travel_actions` (6 of 8 errored the
+  same way); `world.quests.tests.test_package_proposal
+  test_quests_observability` (9 of 24 errored through the `_anchor_key`
+  import-time lookup on the unpublished registry). Every one of those modules
+  passes when an adopting module runs earlier in the same process, and none
+  reads a value this change wrote. No residual-pin rewrite was needed.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images rendered and read. Continent:
@@ -160,7 +210,31 @@ Ground rules:
   `roads_villages.png`, `roads_hamlets.png` and `roads_final.png`. The capture
   reported one advisory diagnostic about `city_imperial_ferry`'s footprint
   offset, which belongs to an earlier change.
-- [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-north-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+- [x] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate grandia-north-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+
+  Result: `test_data_lint check` -> `scanned=1621 flagged=121 universe=4486+37
+  quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` -> `contract
+  gate passed: reference-context, traceability, observability, test-data,
+  manifests, contracts`, exit 0; `openspec validate
+  grandia-north-village-placement --strict` -> `Change
+  'grandia-north-village-placement' is valid`, exit 0.
+
+  Hand-off counts: 62 settlements — 14 villages and 48 hamlets. No spacing
+  exemption is used anywhere in this change. Hamlets placed under the boundary
+  exception of D2, all `eastern_plains` at y 1100 or below:
+  `hamlet_channel_plain`, `hamlet_bean_plain`, `hamlet_caltrop_pond`,
+  `hamlet_fallow_field`, `hamlet_locust_plain`, `hamlet_bulrush_shoal`,
+  `hamlet_bean_knoll`, `hamlet_alfalfa_plain`, `hamlet_reed_bar`,
+  `hamlet_river_beach`, `hamlet_alfalfa_knoll`, `hamlet_buckwheat_slope`,
+  `hamlet_parasol_knoll`, `hamlet_channel_beach`. First timing line:
+  `Ran 46 tests in 334.189s` (one error from the racing first edit; task 1.2).
+  Second timing line: `Ran 46 tests in 344.958s`, `OK`.
+
+  Scope of the checkers, for the next placement change: `settlement_spacing`
+  covers spacing, road gaps, prefixes, nation/population and duplicate names;
+  `place_sites.py --locations` covers walkability, water and nation;
+  `check_map_sources.py` covers cross-file and adoption rules; and the
+  synthesis lint's `fit_entrance_mismatch` covers gates against road contacts.
 
 ## Workflow follow-up
 
