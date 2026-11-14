@@ -2921,6 +2921,43 @@ every cell a committed edge passes through: a wilderness step moves one cell
 and an authored exit moves room to room or cell to gate, so no intermediate
 cell exists.
 
+## Observed-only advance
+
+`world/maps/population_lifecycle.py::settle_observed_population(start_tick, end_tick)` is the
+registered clock stage. It returns nothing when the world has no wilderness or no population seed;
+otherwise it reads the per-unit cursor record once, builds the closed set of
+`population_units.observed_units(wilderness)` with `build_scope`, starts at
+`min(start_tick, scope_start_tick(wilderness, scope))` and runs one scoped pass through `end_tick`
+with the authored field contact admitted at that endpoint only. The lowest cursor is used because an
+observed unit can be behind the advance's start: first observed during this advance, or linked to an
+observed unit by a group. `settle_population_lifecycle` keeps its whole-world meaning as a function;
+tools and tests call it directly, while the clock stage is the observed pass.
+
+The advance's registry contract and its contact forecast share that scope:
+
+- `snapshot_population_lifecycle_surfaces(start_tick, end_tick, *, scope=None)` computes the observed
+  scope when it is omitted (the clock's own pre-advance call) and narrows the site owner's member
+  discovery to `scope.site_keys` and the activity owner's rollback bodies to the sorted member ids of
+  the scope's groups and their journeys.
+- `population_forecast.capture_activity_snapshot(*, start_tick, scope=None)` keeps only the scope's
+  groups, the journeys of those groups, its zones and its sites; the presence and protection facts
+  stay whole-world because a projected contact is looked up at real cells of every unit.
+- `next_population_lifecycle_boundary` passes the observed scope, so a lagging unobserved zone can
+  never contribute a maintenance boundary to an interruptible skip.
+
+No stage before the lifecycle stage moves a player character or announces a location, so the
+registry's scope and the stage's scope are the same set.
+
+Remaining whole-record work: one pass still decodes and stores the activity record once, scans the
+coordinate map once and enumerates living individuals once, whatever the number of units it settles.
+Those are constant-per-advance operations that still grow with world size;
+`observed-unit-read-narrowing` narrows the living-individual scan for the clock stage.
+
+A world save needs no flush: it stores the per-unit cursor record (`population_unit_cursors`) as one
+whole value, so a restored world continues every unit from its own settled-through tick. A unit that
+was unobserved for a long game time is caught up in one synchronous step when it is first needed, and
+the outcome is the same whenever that settlement happens.
+
 ## The pass marker
 
 `population_units.running_pass()` marks the whole body of a settlement pass and
@@ -2960,6 +2997,13 @@ the outer one's marker.
   captures the source position and before its owning transaction: the
   relocation records a presence transition for the cells it leaves and enters,
   and a catch-up can move the relocated individual itself.
+- A terminal combat settlement catches its own recorded population cell up
+  before it writes the closed protection interval
+  (`world/rules/combat_session/settlement.py::_catch_up_population_cell`, called
+  before that protection write). A party that no longer stands on its
+  battlefield -- an arrival contact that stopped the relocation, a retirement --
+  would otherwise reach the writer with that unit behind; the cell is settled to
+  the current tick first.
 
 **The rule for new code.** Any new code that writes population state for a
 cell, or reads it to decide something, calls `ensure_locations_current` before

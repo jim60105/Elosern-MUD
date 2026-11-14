@@ -211,6 +211,12 @@ Use synthetic species, variants, zones, and settlement geometry for mechanism te
 | Quest behavior | An undersupplied legitimate regional hunt accepts without creating an individual and retains truthful habitat guidance without a fabricated target; bound clear-outs retain identity and recovery restrictions. |
 | Unknown content | Undefined tier examples never reach automatic construction; current valid construction still uses the approved registry and literal stats. |
 
+> **Amended 2026-11-14 (change observed-unit-advance).** The "Timing" row above keeps its guarantee
+> and gains one statement about when the work happens: a clock advance settles only the party's
+> observed settlement units. Due waves of an unobserved zone are computed at catch-up with their
+> original due ticks, so equal clock advancement partitions still preserve due-wave outcomes; only
+> the moment a zone's episodes are materialised moves, not their due times or their results.
+
 Implementation smoke must exercise real construction, placement, map/view consumption, encounter selection, committed defeat, clock-driven recovery, and reload. Tests alone are insufficient evidence. Use the smallest relevant Evennia, command, presentation, or browser labels; register any new test modules or browser methods in their owning manifests. Run observability lint with focused tests whenever a logging path changes, plus `uv run --locked python -m tools.contract_gate` before handoff. Full managed browser and complete evidence verification remain CI-owned.
 
 ## 13. Written-spec review gate
