@@ -1,7 +1,7 @@
 # Landmark Rites: gated district discovery and repeatable adult ritual scenes
 
 **Date:** 2026-11-14
-**Status:** Design approved by the user section by section on 2026-11-14. Interface design (§12.2) approved on 2026-11-14 from the Storybook prototype `Design/LandmarkRites` (`docs/design/landmark-rites/`). Written-spec review pending.
+**Status:** Design approved by the user section by section on 2026-11-14. Interface design (§12.2) approved on 2026-11-14 from the Storybook prototype `Design/LandmarkRites` (`docs/design/landmark-rites/`). Proposed as seventeen OpenSpec changes on 2026-11-14 (§16); where a proposal refines this document, §16.1 lists the difference and the proposal is authoritative.
 **Implementation status:** Not implemented by this document.
 **Scope:** Replaces the instant district reveal at a landmark with an authored,
 repeatable rite: the player (or one companion) chooses one of two or three
@@ -626,24 +626,71 @@ failure, and the climax→afterglow transition. No test echoes shipped prose.
 
 ## 16. Delivery
 
-Six changes, each under eight hours, shipped in this order. Content lands
-before the lighting switch so no district is ever unlit-by-construction.
+Seventeen OpenSpec changes under `openspec/changes/`, each sized for one
+engineer-day. Content and every player entry point land before the lighting
+switch, so no district is ever unlit-by-construction.
 
 | # | Change | Contents | Depends on |
 | --- | --- | --- | --- |
-| 1 | `landmark-rite-content` | `world/lore/rites/` package, ten archetypes with two options each and a `self` scene per option (20 scenes), `watch: null`, ten `scene:` art subjects, all 120 assignments, data-contract tests | — |
-| 2 | `landmark-rite-action` | Record module, `explore.landmark_rite` preflight and settlement, text command, observability events, command docs, tests | 1 |
-| 3 | `landmark-rite-panel` | `rite` panel presenter and validator, webclient store, rite arrival card, rite stage and rite panel, `ChoiceCard` header slot, return entry, scene playback, browser journeys | 2 |
-| 4 | `landmark-rite-lighting` | Lit set from the record, reveal projection takes the lit set, `district_lit` and `lit_district` removal, tests | 2, 3 |
-| 5 | `landmark-rite-watch-perspectives` | Twenty `watch` scenes, companion body journey (stage performer picking becomes reachable), data-contract update | 3 |
-| 6 | `landmark-rite-third-option` | A third option per archetype (self and watch), authored only where it earns its place | 5 |
+| 1 | `landmark-rite-content-model` | `world/lore/rites/` shapes, strict loader, snapshot holder; no content | — |
+| 2 | `landmark-rite-content` | First five archetypes (ten `self` scenes), assignment of every district (the other families provisional), startup adoption, data-contract test, authoring review | 1 |
+| 3 | `landmark-rite-content-completion` | Remaining five archetypes and the final assignment; content only | 2 |
+| 4 | `landmark-rite-settlement` | Completion record, preflight and atomic settlement, refusal codes, observability events | 1 |
+| 5 | `landmark-rite-action` | `explore.landmark_rite`, the `儀式` command, command echo, command docs | 3, 4 |
+| 6 | `landmark-rite-panel` | `rite` panel presenter and validator, browser protocol mirror, stored delivery | 5 |
+| 7 | `landmark-rite-surfaces` | `RiteArrivalCard`, `RitePanel`, `RiteBackdrop`, `ChoiceCard` header slot, stories | 6 |
+| 8 | `landmark-rite-store` | Rite presentation state as a webclient store group | 7 |
+| 9 | `landmark-rite-stage` | Shell integration: card, stage, playback through the shared player, return entry and R key | 8 |
+| 10 | `landmark-rite-journeys` | Managed browser journeys (wilderness and city) at both viewports | 9 |
+| 11 | `landmark-rite-performer-picking` | Performer picked on the stage figures and with the arrow keys | 9 |
+| 12 | `landmark-rite-lighting` | Lit set from the record, reveal projection takes the lit set, movement announces nothing | 9 |
+| 13 | `landmark-rite-discovery-notice` | `已探明` on the first completed rite, in text and on the stage | 12 |
+| 14 | `landmark-rite-arrival-signal-removal` | `district_lit` and `lit_district` removal | 12 |
+| 15 | `landmark-rite-art` | Ten `rite_*` scene archetypes with bundled illustrations, panel artwork | 3, 6 |
+| 16 | `landmark-rite-watch-perspectives` | `watch` scenes; content only | 11 |
+| 17 | `landmark-rite-third-option` | A third option where an archetype supports one; content only | 16 |
 
-Change 1 is additive and changes nothing the player sees. Change 2 makes rites
-performable and records completions while districts still light from visits, so
-the game remains fully playable. Change 3 gives the browser the card. Change 4
-is the behavioural flip: everything a player needs already exists, so no
-interval exists in which a district cannot be lit. Changes 5 and 6 only add
-content.
+Changes 1 to 4 are additive and change nothing the player sees. Change 5 makes
+rites performable from the text client while districts still light from visits.
+Changes 6 to 11 give the browser the approved interface. Change 12 is the
+behavioural flip: everything a player needs already exists, so no interval
+exists in which a district cannot be lit. Changes 13 to 17 complete the notice,
+remove the dead signals and add art and content.
+
+Serial constraints beyond the dependencies: 9, 10, 11 and 13 edit the same
+shell and store files; 12, 14 and 15 edit `travel_events.py`,
+`travel_interrupts.py` or the panel presenter; 2, 3, 16 and 17 edit the same
+content document. Run each group serially.
+
+### 16.1 Refinements made by the proposals
+
+The proposals were checked against the code and by an independent review. They
+differ from the sections above in these points:
+
+- **Art (decision 13, §5).** A registered scene archetype must ship a bundled
+  illustration and a declared terminal (`bundled-scene-art`). The ten `rite_*`
+  subjects therefore land together with ten bundled images in change 15, which
+  needs the maintainer's image generation service. Art is not lazily generated
+  and is present offline. A rite archetype is an ordinary scene archetype that
+  quests and rooms may also use.
+- **Watch scenes (§6.1, §11 rule 5).** A watch scene names the companion only
+  through the literal placeholder `{name}`; the delivery substitutes the
+  performing companion's name. The example's fixed name is not valid content.
+- **Perspective (§9.4).** The `self` perspective applies exactly when the
+  acting body is the record owner's own body. A possessed companion acting as
+  the controlled character performs in the `watch` perspective.
+- **Panel (§12.1).** `district` gains `lit`; each `performers` row gains
+  `owner`; `art` is the existing artwork descriptor or null; a performer name
+  is bounded at 128 code points; the delivery's revision key is
+  `scene_revision`, because the action result schema forbids the key
+  `revision`.
+- **Request identity (§9.2).** The rite keeps its own commit-only replay cache
+  and never passes the request identity to the time advance, whose in-memory
+  ledger is not cleared by a rollback.
+- **Removal (§10).** The `travel_log` schema version does not change; the
+  exact-field validators reject a stale record.
+- **Discovery line.** The `已探明：<district>` narrative moves from the
+  movement message to the first rite's completion message (changes 12 and 13).
 
 ## 17. Specification impacts
 
