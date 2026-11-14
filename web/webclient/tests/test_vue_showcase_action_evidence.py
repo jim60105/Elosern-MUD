@@ -287,6 +287,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The gallery window, composed and story-documented before it mounts
                 # (gallery-window-component).
                 "Overlays/GalleryWindow",
+                # The landmark rite's arrival card, panel and backdrop joined
+                # the frozen set with landmark-rite-surfaces.
+                "World/LandmarkRite",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)

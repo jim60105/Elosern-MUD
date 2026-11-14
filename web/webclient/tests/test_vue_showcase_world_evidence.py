@@ -278,6 +278,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The gallery window, composed and story-documented before it mounts
     # (gallery-window-component).
     "Overlays/GalleryWindow",
+    # The landmark rite's arrival card, panel and backdrop joined the frozen
+    # set with landmark-rite-surfaces.
+    "World/LandmarkRite",
 }
 
 # The World-directory story files that sit outside the B4 family: the
@@ -311,6 +314,9 @@ WORLD_KEYS_JOINED_AFTER_B4 = (
     # The handbook titles tab replaced the title-codex big window
     # (handbook-titles-tab).
     "World/TitleCodexTab",
+    # The landmark rite's arrival card, panel and backdrop
+    # (landmark-rite-surfaces).
+    "World/LandmarkRite",
 )
 
 

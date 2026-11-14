@@ -302,6 +302,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The gallery window, composed and story-documented before it mounts
     # (gallery-window-component).
     "Overlays/GalleryWindow",
+    # The landmark rite's arrival card, panel and backdrop joined the frozen
+    # set with landmark-rite-surfaces.
+    "World/LandmarkRite",
 }
 
 # The Overlays-directory story files that sit outside the B5 family: the
