@@ -104,6 +104,14 @@ The other `store.view.mode` readers named in Context keep the committed explorat
 
 Extend the rite paragraph of `web/webclient-app/AGENTS.md` with the store group, the composable, the rule that the stage is local presentation over exploration mode, and the return entry.
 
+### D7. Recorded during implementation
+
+- `AppShell` re-homes focus on every `:mode` change: entering the dialogue presentation parks it on the message page, leaving it on the exploration home in the action dock. The shell therefore takes focus back after the shell's two follow-up ticks: while the rite panel is shown it focuses the panel (on entry to the stage and after a scene finishes), and on leave the map (travel) or `RiteEntry` (room), in both cases only when focus is lost, on a rite surface, on the message page or in the action dock. `RitePanel` exposes `focus()` for this; nothing else in it changes.
+- `useRiteStage` returns the panel at once (`finishRiteScene`) when the store is playing a delivery the shared player does not present (an unknown kind, no lines, a key already retired), so the stage can never be held without its panel and without a way out.
+- Hidden on the stage in addition to the action dock, under the Risks clause: the presence rail (also while the rite card is open, as other centred cards do) and the right-hand standee (the person in focus). The `RiteBackdrop` uses the travel map's `travel-stage` crossfade.
+- The arrival dismissal watch reads `cardOpen` together with the held arrival id, so an arrival notice committed after the card opened is dismissed too.
+- A refused perform writes the server's message to the transcript, which the stage does not show (the stage's message window shows the guardian's form, D3); the panel returns. Surfacing the refusal on the stage is left to a later change.
+
 ## Risks / Trade-offs
 
 - `AppClient.vue` is large and shared by every stage. The change is confined to the bindings of D3 and one composable; the two serial follow-up changes touch the same lines.

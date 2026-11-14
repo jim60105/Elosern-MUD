@@ -27,7 +27,7 @@ None.
 ## Impact
 
 - New: `web/webclient-app/composables/use-rite-stage.js`, `web/webclient-app/components/rite/RiteEntry.vue`, `web/webclient-app/tests/app_client_rite.test.js`.
-- Edits: `web/webclient-app/AppClient.vue`, `web/webclient-app/composables/use-window-hotkeys.js`, `web/webclient-app/stories/World/LandmarkRite.stories.js` (an entry story), `web/webclient-app/AGENTS.md`.
+- Edits: `web/webclient-app/AppClient.vue`, `web/webclient-app/composables/use-window-hotkeys.js`, `web/webclient-app/components/rite/RitePanel.vue` (exposes `focus`), `web/webclient-app/stories/World/LandmarkRite.stories.js` (an entry story), `web/webclient-app/AGENTS.md`.
 - The performer is always the controlled character in this change (`landmark-rite-performer-picking`). No line announces a newly lit district (`landmark-rite-discovery-notice`).
 
 ## Batch:
