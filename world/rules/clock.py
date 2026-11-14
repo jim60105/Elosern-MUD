@@ -13,6 +13,7 @@ import yaml
 from django.db import transaction
 from evennia import DefaultScript
 from evennia.utils.create import create_script
+from evennia.utils.dbserialize import deserialize
 from evennia.utils.search import search_script
 
 from world.observability import log_info, log_warn
@@ -56,9 +57,11 @@ from world.rules.sleep_receipt import (
     write_sleep_receipt,
 )
 from world.rules.surfaces import (
+    attribute_stores_deferred,
     attribute_snapshot,
     flush_orphan_instances,
     restore_attribute_best_effort,
+    store_attribute,
 )
 from world.rules.traits import GAUGE_KEYS
 from world.rules.unlock_notices import PRACTICE_UNLOCK_EVENT, UnlockNotice
@@ -380,6 +383,7 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
             except Exception:  # observability: ignore R2: entity may be a test double without db or complete attributes, treating as unscaled
                 pass
 
+        updates: list[tuple[str, int, float]] = []
         for key in GAUGE_KEYS:
             gauge = getattr(entity.traits, key, None)
             if gauge is None:
@@ -397,12 +401,50 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
             carried = float(getattr(gauge, "regen_remainder", 0.0))
             continuous = _gauge_value(gauge) + carried + rate * elapsed_seconds
             if continuous >= maximum:
-                gauge.current = round(maximum)
-                gauge.regen_remainder = 0.0
+                updates.append((key, round(maximum), 0.0))
             else:
                 whole = floor(continuous)
-                gauge.current = whole
-                gauge.regen_remainder = continuous - whole
+                updates.append((key, whole, continuous - whole))
+        if not updates:
+            continue
+        record = None
+        if (
+            attribute_stores_deferred()
+            and getattr(entity, "attributes", None) is not None
+        ):
+            # One trait record per body per settlement call: the gauges are
+            # written into a detached copy of the record and stored once.
+            record = deserialize(entity.attributes.get("traits", category="traits"))
+            if not isinstance(record, Mapping):
+                # No materialized trait record: keep the handler's own write
+                # path rather than failing an advance that used to settle.
+                record = None
+        if record is None:
+            for key, new_current, new_remainder in updates:
+                gauge = getattr(entity.traits, key)
+                gauge.current = new_current
+                gauge.regen_remainder = new_remainder
+        else:
+            for key, new_current, new_remainder in updates:
+                gauge = getattr(entity.traits, key)
+                record[key]["current"] = round(
+                    min(max(new_current, gauge.min), gauge.max)
+                )
+                record[key]["regen_remainder"] = new_remainder
+            store_attribute(entity, "traits", record, category="traits")
+            entity.traits.trait_data = entity.attributes.get(
+                "traits", default={}, category="traits"
+            )
+            # Re-point the already materialized gauges at the new record
+            # instead of dropping them: a cold read would construct the Trait
+            # again, and Evennia's constructor validation saves the whole
+            # record — a second store this change exists to avoid.
+            for key in list(entity.traits._cache):
+                cached_record = entity.traits.trait_data.get(key)
+                if cached_record is None:
+                    del entity.traits._cache[key]
+                else:
+                    entity.traits._cache[key]._data = cached_record
 
 
 def settle_gauge_regeneration(

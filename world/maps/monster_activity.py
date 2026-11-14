@@ -43,7 +43,7 @@ from world.rules.movement_edges import (
     legal_edges,
     quote_edge,
 )
-from world.rules.surfaces import outer_rollback_active, owned_atomic
+from world.rules.surfaces import outer_rollback_active, owned_atomic, store_attribute
 from world.rules.travel_cost import (
     MovementPreflightRefused,
     TraversalStatus,
@@ -2149,7 +2149,9 @@ def _begin_group_journey(
         coordinates = dict(wilderness.db.itemcoordinates)
         for body in bodies:
             coordinates.pop(body, None)
-        wilderness.db.itemcoordinates = coordinates
+        store_attribute(
+            wilderness, regional_population.ITEMCOORDINATES_ATTRIBUTE, coordinates
+        )
     for body in bodies:
         body.location = None
     if source.kind == "wilderness":
@@ -2909,7 +2911,9 @@ def _arrive(
                 coordinates[body] = cell
             else:
                 coordinates.pop(body, None)
-        wilderness.db.itemcoordinates = coordinates
+        store_attribute(
+            wilderness, regional_population.ITEMCOORDINATES_ATTRIBUTE, coordinates
+        )
         room = (wilderness.db.rooms or {}).get(cell)
         if room is not None:
             for body in bodies:

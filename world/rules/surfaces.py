@@ -15,9 +15,11 @@ every room's contents cache disagreeing with the database.
 from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager, nullcontext
 from copy import deepcopy
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from django.db import transaction
+from evennia.utils.dbserialize import to_pickle
 
 from world.observability import log_warn
 
@@ -77,6 +79,133 @@ def owned_atomic() -> AbstractContextManager[Any]:
     if _OUTER_ROLLBACK:
         return nullcontext()
     return transaction.atomic()
+
+
+class DeferredStoreLost(RuntimeError):
+    """A buffered attribute was replaced before its value could be stored."""
+
+
+@dataclass(slots=True)
+class _DeferredStores:
+    """The attribute values one settlement pass has written but not stored.
+
+    Keyed on the identity of the cached ``Attribute`` row, so every additional
+    write to the same record replaces the pending value instead of queueing a
+    second store. The recorded original is what a failed pass puts back in
+    memory.
+    """
+
+    #: id(attribute) -> (attribute, original db_value, obj, key, category)
+    pending: dict[int, tuple[Any, Any, Any, str, str | None]] = field(
+        default_factory=dict
+    )
+
+
+_DEFERRED: _DeferredStores | None = None
+
+
+def attribute_stores_deferred() -> bool:
+    """Whether an open settlement buffer is deferring attribute stores."""
+    return _DEFERRED is not None
+
+
+def _discard_deferred(stores: _DeferredStores) -> None:
+    """Put every buffered value back in memory and store nothing further."""
+    for attribute, original, _obj, _key, _category in reversed(
+        list(stores.pending.values())
+    ):
+        attribute.db_value = original
+    stores.pending.clear()
+
+
+def _flush_deferred(stores: _DeferredStores) -> None:
+    """Store every buffered value once, in insertion order.
+
+    A pending record whose cached ``Attribute`` was replaced (an attribute
+    cache reset or an idmapper flush while a value was pending) would silently
+    store to the wrong row, so it fails the pass by name instead.
+    """
+    for attribute, _original, obj, key, category in list(stores.pending.values()):
+        if obj.attributes.get(key, category=category, return_obj=True) is not attribute:
+            raise DeferredStoreLost(
+                f"deferred store lost for {obj!r} attribute {key!r}"
+            )
+        attribute.save(update_fields=["db_value"])
+    stores.pending.clear()
+
+
+@contextmanager
+def deferred_attribute_stores() -> Iterator[None]:
+    """Buffer attribute stores; store once on exit, restore them on any failure.
+
+    A nested open buffer is reused: the innermost scope is not a commit
+    boundary, and whichever exception escapes restores every value recorded
+    since the buffer opened. A failure during the final flush restores the
+    recorded originals in memory too; the enclosing advance owns the rolled
+    back database rows.
+    """
+    global _DEFERRED
+    if _DEFERRED is not None:
+        yield
+        return
+    stores = _DeferredStores()
+    _DEFERRED = stores
+    try:
+        yield
+        _flush_deferred(stores)
+    except BaseException:
+        _discard_deferred(stores)
+        raise
+    finally:
+        _DEFERRED = None
+
+
+@contextmanager
+def flushed_attribute_stores() -> Iterator[None]:
+    """Flush now, run the enclosed work unbuffered, then resume buffering."""
+    global _DEFERRED
+    previous = _DEFERRED
+    if previous is not None:
+        _flush_deferred(previous)
+    _DEFERRED = None
+    try:
+        yield
+    finally:
+        _DEFERRED = previous
+
+
+def store_attribute(
+    obj: Any, key: str, value: Any, category: str | None = None
+) -> None:
+    """Write one attribute value, deferring the database store when a buffer is open.
+
+    With no buffer this is exactly ``attributes.add``. Under a buffer the
+    cached ``Attribute`` receives the pickled value directly, so every ordinary
+    reader already sees it, while its row is stored once when the pass
+    completes. A row that does not exist yet cannot be deferred: it is created
+    through the handler at once, which is the only write that can create it.
+    """
+    stores = _DEFERRED
+    if stores is None:
+        obj.attributes.add(key, value, category=category)
+        return
+    try:
+        attribute = obj.attributes.get(key, category=category, return_obj=True)
+    except TypeError:  # observability: ignore R2: a pure attribute double has no return_obj read and supports only the immediate store
+        obj.attributes.add(key, value, category=category)
+        return
+    if attribute is None:
+        obj.attributes.add(key, value, category=category)
+        return
+    if id(attribute) not in stores.pending:
+        stores.pending[id(attribute)] = (
+            attribute,
+            attribute.db_value,
+            obj,
+            key,
+            category,
+        )
+    attribute.db_value = to_pickle(value)
 
 
 def attribute_snapshot(obj: Any, key: str, category: str | None = None) -> tuple[bool, Any]:

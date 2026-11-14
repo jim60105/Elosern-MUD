@@ -1612,3 +1612,118 @@ the idle decisions settle when a contact admission fails. That holds only for a
 caller that recovers the failure; the shipped admission re-raises, so the
 advance fails closed instead. The behaviour was not changed (this change is a
 no-op) and the scenario is evidenced as described above.
+
+## Deferred Stores Inside an Advance
+
+`settlement-deferred-body-writes` stops a population lifecycle pass from
+rewriting the same few records at every boundary. It changes no rule, draw,
+order, event or stored format: a pass settles exactly the same state, and a
+failure restores exactly the same state.
+
+Deferred stores inside an advance are the whole mechanism this section
+documents: outside the pass every write is stored when the writer makes it.
+
+### The buffer
+
+`world/rules/surfaces.py` owns one process-global buffer (`_DEFERRED`) opened
+by `deferred_attribute_stores()` exactly while the pass runs under the outer
+rollback owner of `settlement-outer-rollback`. Settlement runs synchronously on
+the reactor thread, like the activity state batch, so there is no second writer
+to race.
+
+`store_attribute(obj, key, value, category)` is the single write entry point:
+
+- with no buffer it is exactly `attributes.add`;
+- under a buffer it fetches the cached `Attribute` row and assigns
+  `attribute.db_value = to_pickle(value)` without saving. Evennia's value
+  getter rebuilds from `db_value` on every ordinary read, so every read site —
+  `wilderness.db.population_timeline`, the identity-keyed decodes, the fatigue
+  and trait readers — sees the new value immediately while the row is still the
+  pre-pass one;
+- a row that does not exist yet is created through the handler at once, because
+  that is the only write that can create it.
+
+The flush stores every pending row once, in insertion order, after checking
+that the object still reads the same cached `Attribute`; a replacement fails
+the pass by name (`DeferredStoreLost`) instead of storing to the wrong row. A
+nested `deferred_attribute_stores()` reuses the open buffer and is not a commit
+boundary.
+
+### The pass and the contact block
+
+`population_lifecycle.settle_population_lifecycle` opens the buffer beside its
+outer rollback owner, so a direct pass call (a test or a tool) keeps immediate
+storage. On normal exit the buffer stores once, before the outer owner closes.
+Any exception — including a flush failure — stores nothing further and puts the
+recorded original back into memory (`attribute.db_value = original`); the
+advance's transaction rolls back the rows and its registry restores the live
+caches, so memory and database agree again.
+
+The field-contact block in `_settle_population_at` runs under
+`flushed_attribute_stores()`: it stores every pending value before admission,
+runs unbuffered (a write inside it is stored immediately, exactly as outside a
+pass), then resumes buffering for the rest of the tick.
+
+### Write sites
+
+- `regional_population._write_timeline` and `_write_state` (timeline and zone
+  state), plus the coordinate registration in `_commit_planned_wave` and
+  `register_explicit_group`;
+- `monster_activity._begin_group_journey` and `_arrive` (coordinate
+  registration);
+- `monster_sites._write_state` (site state);
+- `fatigue.write_fatigue_state` (mental reserve and sleep posture);
+- `clock._settle_gauge_regen` (one trait record per body per settlement call,
+  instead of one store per gauge property).
+
+The timeline and zone-state writers also seed or invalidate the decode reuse of
+`settlement-decode-reuse` with the value they just wrote, so the next read does
+not decode what was just written. No read site changed.
+
+**Rule for new writers:** a new pass writer of a wilderness record uses
+`store_attribute`. An in-place mutation of a `db` saver tree would still store
+through the handler immediately and pay a second full-dictionary write.
+
+### Focused verification run
+
+```text
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_settlement_deferred_writes
+  -> Ran 15 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_activity
+  -> Ran 35 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
+  -> Ran 12 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_regional_population_recovery
+  -> Ran 24 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_sites
+  -> Ran 43 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_settlement_decode_reuse
+  -> Ran 7 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_settlement_outer_rollback
+  -> Ran 11 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_fatigue
+  -> Ran 49 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape
+  -> Ran 16 tests, OK
+uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.rules.tests.test_world_escape world.rules.tests.test_clock
+  -> Ran 81 tests, OK
+```
+
+`world.rules.tests.test_clock` alone still fails four of its own tests with
+`SettlementNotLoaded` / a missing ground observation for the same pre-existing
+reason recorded under "Settlement Outer Rollback" above: those tests call
+`sync_quest_runtime()` without publishing the authored map world, and they pass
+as soon as a module that publishes it runs first in the same process, which is
+how the suite runs them. The statement counts are measured per Attribute row,
+never by wall-clock time.
+
+### Traceability hand-off
+
+The delta's three ADDED requirements — "A lifecycle pass inside an advance
+stores each written record once", "A failed pass stores nothing it deferred"
+and "Gauge regeneration stores a body's trait record once per settlement" — get
+no canonical ID until archive sync, so every test in
+`world/maps/tests/test_settlement_deferred_writes.py` carries **no**
+`covers_requirement` annotation. The implementation report carries the
+test → (delta requirement, scenario) hand-off; os-archive adds the generated
+annotation after the sync.

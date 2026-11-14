@@ -92,6 +92,7 @@ from world.rules.surfaces import (
     outer_rollback_active,
     owned_atomic,
     persisted_hp,
+    store_attribute,
 )
 
 #: The world seed a freshly provisioned wilderness script starts with. It is an
@@ -489,8 +490,20 @@ def _zone_map_from_raw(raw: object) -> dict[str, dict]:
 
 
 def _write_state(wilderness: Any, states: Mapping[str, Mapping]) -> None:
-    """Persist the whole per-zone state map (Evennia saves a top-level write)."""
-    wilderness.db.regional_population = {key: dict(value) for key, value in states.items()}
+    """Persist the whole per-zone state map, once per settlement pass.
+
+    The decode caches name the stored value they came from, so a write that
+    replaces it invalidates both of them explicitly instead of retaining the
+    superseded decode.
+    """
+    global _DECODED_ZONE_MAP, _DECODED_ZONE_STATES
+    store_attribute(
+        wilderness,
+        REGIONAL_POPULATION_ATTRIBUTE,
+        {key: dict(value) for key, value in states.items()},
+    )
+    _DECODED_ZONE_MAP = None
+    _DECODED_ZONE_STATES = None
 
 
 _SEED_ABSENT = object()
@@ -1347,11 +1360,27 @@ def _timeline_from_raw(raw: object) -> PopulationTimeline:
 
 
 def _write_timeline(wilderness: Any, timeline: PopulationTimeline) -> None:
-    wilderness.db.population_timeline = {
-        "settled_through_tick": timeline.settled_through_tick,
-        "transitions": [_transition_to_dict(t) for t in timeline.transitions],
-        "protection": [_protection_to_dict(p) for p in timeline.protection],
-    }
+    """Persist the whole timeline, once per settlement pass.
+
+    The writer already holds the decoded value, so it seeds the decode reuse
+    with the value it just stored instead of letting the next read decode it
+    again.
+    """
+    global _DECODED_TIMELINE
+    store_attribute(
+        wilderness,
+        POPULATION_TIMELINE_ATTRIBUTE,
+        {
+            "settled_through_tick": timeline.settled_through_tick,
+            "transitions": [_transition_to_dict(t) for t in timeline.transitions],
+            "protection": [_protection_to_dict(p) for p in timeline.protection],
+        },
+    )
+    stored = wilderness.attributes.get(
+        POPULATION_TIMELINE_ATTRIBUTE, return_obj=True
+    )
+    if stored is not None:
+        _DECODED_TIMELINE = (stored.db_value, timeline)
 
 
 def presence_of(
@@ -2380,7 +2409,7 @@ def _commit_planned_wave(
                     created.append(individual)
             # One durable write for the wave's whole registration instead of
             # one full-dictionary save per individual.
-            wilderness.db.itemcoordinates = registration
+            store_attribute(wilderness, ITEMCOORDINATES_ATTRIBUTE, registration)
             from world.maps import monster_activity
 
             # One group per movement unit: each row resolves the site-free
@@ -2642,10 +2671,12 @@ def register_explicit_group(
 
     seed = read_population_seed(wilderness)
     room = (wilderness.db.rooms or {}).get(cell)
+    registration = dict(wilderness.db.itemcoordinates or {})
     for individual in members:
-        wilderness.db.itemcoordinates[individual] = cell
+        registration[individual] = cell
         if room is not None:
             _attach(individual, room)
+    store_attribute(wilderness, ITEMCOORDINATES_ATTRIBUTE, registration)
     monster_activity.create_group(
         wilderness,
         operation_id=operation_id,

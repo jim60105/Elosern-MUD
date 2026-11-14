@@ -81,7 +81,12 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.observability import log_info, log_warn
 from world.rules.clock import ScheduledEvent, SurfaceSnapshot
 from world.rules.monster_individual import construct_species_individual
-from world.rules.surfaces import attribute_snapshot, outer_rollback_active, owned_atomic
+from world.rules.surfaces import (
+    attribute_snapshot,
+    outer_rollback_active,
+    owned_atomic,
+    store_attribute,
+)
 from world.rules.surfaces import persisted_hp as _persisted_hp
 
 # The registered world-clock stage kind this module's settlement owns.
@@ -195,8 +200,8 @@ def _state_map(wilderness: Any) -> dict[str, dict]:
 
 
 def _write_state(wilderness: Any, states: Mapping[str, dict]) -> None:
-    """Persist the whole per-site state map (Evennia saves a top-level write)."""
-    wilderness.db.monster_sites = dict(states)
+    """Persist the whole per-site state map, once per settlement pass."""
+    store_attribute(wilderness, _SITES_ATTRIBUTE, dict(states))
 
 
 def _saved_occurrence(site_key: str, record: Mapping[str, object]) -> tuple[int, int] | None:

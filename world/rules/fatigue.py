@@ -95,6 +95,7 @@ from world.rules.surfaces import (
     outer_rollback_active,
     owned_atomic,
     restore_attribute_best_effort,
+    store_attribute,
 )
 
 RESERVE_ATTRIBUTE = "mental_reserve_units"
@@ -603,9 +604,9 @@ def write_fatigue_state(
 ) -> FatigueState:
     """Persist one validated reserve/posture pair through the fatigue writer."""
     state = validate_fatigue_state(reserve_units, posture, policy)
-    attributes = _attributes_of(entity)
-    attributes.add(RESERVE_ATTRIBUTE, state.reserve_units)
-    attributes.add(POSTURE_ATTRIBUTE, state.posture.value)
+    _attributes_of(entity)  # the named refusal for an entity with no attribute store
+    store_attribute(entity, RESERVE_ATTRIBUTE, state.reserve_units)
+    store_attribute(entity, POSTURE_ATTRIBUTE, state.posture.value)
     return state
 
 

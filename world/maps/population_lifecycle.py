@@ -45,7 +45,12 @@ from world.rules.clock import (
     advance_registry_held,
     register_event_source,
 )
-from world.rules.surfaces import outer_rollback_owner, suspended_outer_rollback
+from world.rules.surfaces import (
+    deferred_attribute_stores,
+    flushed_attribute_stores,
+    outer_rollback_owner,
+    suspended_outer_rollback,
+)
 
 #: The existing stage kind this coordinator installs itself under.
 STAGE_KIND = monster_sites.SITE_STAGE_KIND
@@ -122,6 +127,7 @@ def _settle_population_at(
         # roll back to its own savepoint, because the pass is not going to.
         regional_population.forget_living_presence()
         with (
+            flushed_attribute_stores(),
             monster_activity.unbatched_state_writes(),
             suspended_maintenance_tally(),
             suspended_outer_rollback(),
@@ -195,6 +201,7 @@ def settle_population_lifecycle(
     with maintenance_tally() as counts:
         with (
             outer_rollback_owner() if advance_registry_held() else nullcontext(),
+            deferred_attribute_stores() if advance_registry_held() else nullcontext(),
             monster_activity.batched_state_writes(wilderness),
             regional_population.reused_living_presence(),
         ):
