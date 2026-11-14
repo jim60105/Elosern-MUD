@@ -3,7 +3,9 @@
 map-column-instrument-geometry: the `map` anchor's width floor, right gutter,
 paint-free box, 10px stack gap, presence-rail clearance, hidden scrollbar and
 scroll-edge fade. place-card-instrument-panel: the place card as an instrument
-panel. The later changes of this batch add their methods here.
+panel. local-map-instrument-panel: the minimap as a card-free island inside
+its own instrument panel. The later changes of this batch add their methods
+here.
 """
 
 from __future__ import annotations
@@ -153,6 +155,43 @@ _PLACE_PANEL_JS = """() => {
 
 _TICK_JS = """(id) => getComputedStyle(
   document.querySelector(`[data-testid="${id}"]`), '::after').opacity"""
+
+_MINIMAP_PANEL_JS = """() => {
+  const anchor = document.querySelector('[data-anchor="map"]');
+  const card = document.querySelector('[data-testid="place-card"]');
+  const panel = document.querySelector('[data-testid="local-map-panel"]');
+  const island = document.querySelector('[data-testid="local-map"]');
+  const lattice = island.querySelector('[data-testid="local-map__lattice"]');
+  const ps = getComputedStyle(panel);
+  const before = getComputedStyle(panel, '::before');
+  const after = getComputedStyle(panel, '::after');
+  const is = getComputedStyle(island);
+  const rect = (el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+  };
+  return {
+    anchor: rect(anchor),
+    card: rect(card),
+    panel: rect(panel),
+    lattice: rect(lattice),
+    panelBorders: [ps.borderTopWidth, ps.borderRightWidth, ps.borderBottomWidth, ps.borderLeftWidth],
+    panelRadius: ps.borderTopLeftRadius,
+    panelShadow: ps.boxShadow,
+    panelBackground: ps.backgroundColor,
+    groundMask: before.maskImage || before.webkitMaskImage,
+    fittingPointer: after.pointerEvents,
+    islandBorders: [is.borderTopWidth, is.borderRightWidth, is.borderBottomWidth, is.borderLeftWidth],
+    islandShadow: is.boxShadow,
+    islandBackground: is.backgroundColor,
+    islandPadding: [is.paddingTop, is.paddingRight, is.paddingBottom, is.paddingLeft],
+    latticeImage: getComputedStyle(lattice).backgroundImage,
+    legends: document.querySelectorAll('[data-testid="local-map__orientation"]').length,
+    axes: document.querySelectorAll('.local-map [data-testid="local-map__axis"]').length,
+  };
+}"""
+
+_GLYPH_OPACITY_JS = "() => getComputedStyle(document.querySelector('.local-map__expand-icon')).opacity"
 
 # Two animation frames: the observers' callbacks have run for the current
 # layout before an absence is asserted.
@@ -339,4 +378,80 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                         f"the column fits its anchor at {viewport}: "
                         f"scrollHeight {panel['scrollHeight']}, clientHeight {panel['clientHeight']}",
                     )
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-minimap-island-states-only-its-own-drawing-convention",
+        "webclient-contextual-hud::an-instrument-panel-wears-a-feathered-ground-and-one-brass-fitting-instead-of-a-box",
+        "webclient-local-map::minimap-presentation-retains-local-knowledge-and-readable-drawer-disclosure",
+    )
+    def test_minimap_is_a_card_free_instrument_panel(self):
+        """At 1280x720, 1451x790 and 2560x1440 the minimap's instrument panel
+        is no box, spans the column under the place card across the stack
+        gap, and paints a masked ground and an inert fitting; the island
+        inside it wears no card; the 240px x S canvas keeps its corner
+        brackets and stands 22px x S left of the panel's right edge; no
+        orientation legend exists while the lattice draws its axis; and the
+        open-map glyph is dimmed at rest and fully opaque on hover and on
+        keyboard focus."""
+        for viewport in ((1280, 720), (1451, 790), (2560, 1440)):
+            with self.subTest(viewport=viewport):
+                scale = ui_scale(viewport)
+                page = self.logged_in_page(viewport)
+                inject_snapshot(
+                    page,
+                    {
+                        "status": valid_status_panel("艾倫‧灰誓", "char-42"),
+                        "local_map": valid_local_map_panel(),
+                        "art": valid_art_panel(),
+                    },
+                    mode="exploration",
+                )
+                page.wait_for_selector('[data-testid="local-map-panel"]', timeout=15000)
+                page.wait_for_selector('[data-testid="local-map__lattice"]', timeout=15000)
+                page.evaluate("document.fonts.ready")
+                page.mouse.move(5, 5)
+                page.evaluate(_SETTLE_JS)
+                probe = page.evaluate(_MINIMAP_PANEL_JS)
+
+                # The panel is no box; its ground and fitting are decoration.
+                self.assertEqual(probe["panelBorders"], ["0px"] * 4)
+                self.assertEqual(probe["panelRadius"], "0px")
+                self.assertEqual(probe["panelShadow"], "none")
+                self.assertEqual(probe["panelBackground"], "rgba(0, 0, 0, 0)")
+                self.assertTrue(probe["groundMask"], "the ground has a mask")
+                self.assertNotEqual(probe["groundMask"], "none", "the ground is masked")
+                self.assertEqual(probe["fittingPointer"], "none")
+
+                # The panel spans the column directly under the place card.
+                panel, card = probe["panel"], probe["card"]
+                self.assertAlmostEqual(panel["width"], probe["anchor"]["width"], delta=1.0, msg="the panel spans the column")
+                self.assertAlmostEqual(panel["left"], card["left"], delta=1.0, msg="left edge matches the place card")
+                self.assertAlmostEqual(panel["right"], card["right"], delta=1.0, msg="right edge matches the place card")
+                self.assertAlmostEqual(panel["top"] - card["bottom"], 10 * scale, delta=1.0, msg="stack gap")
+
+                # The island inside it wears no card.
+                self.assertEqual(probe["islandBorders"], ["0px"] * 4)
+                self.assertEqual(probe["islandShadow"], "none")
+                self.assertEqual(probe["islandBackground"], "rgba(0, 0, 0, 0)")
+                self.assertEqual(probe["islandPadding"], ["0px"] * 4)
+
+                # The canvas keeps its size and brackets and clears the spine.
+                lattice = probe["lattice"]
+                self.assertAlmostEqual(lattice["width"], 240 * scale, delta=1.0, msg="canvas width")
+                self.assertAlmostEqual(lattice["height"], 240 * scale, delta=1.0, msg="canvas height")
+                self.assertAlmostEqual(panel["right"] - lattice["right"], 22 * scale, delta=1.0, msg="spine clearance")
+                self.assertIn("linear-gradient", probe["latticeImage"], "the corner brackets stay")
+
+                # No legend; the seeded grid payload is a lattice with its axis.
+                self.assertEqual(probe["legends"], 0)
+                self.assertEqual(probe["axes"], 1)
+
+                # The open-map glyph answers hover and focus.
+                self.assertEqual(page.evaluate(_GLYPH_OPACITY_JS), "0.86")
+                page.hover('[data-testid="local-map-detail"]')
+                page.wait_for_function(f"() => ({_GLYPH_OPACITY_JS})() === '1'", timeout=5000)
+                page.mouse.move(5, 5)
+                page.focus('[data-testid="local-map__expand"]')
+                page.wait_for_function(f"() => ({_GLYPH_OPACITY_JS})() === '1'", timeout=5000)
                 page.close()

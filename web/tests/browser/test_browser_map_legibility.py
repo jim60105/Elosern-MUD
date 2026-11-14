@@ -155,7 +155,6 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                       return {
                         scale,
                         title: px(island.querySelector('.local-map__meta-title')),
-                        orientation: px(island.querySelector('[data-testid="local-map__orientation"]')),
                         readout: px(island.querySelector('[data-testid="local-map-detail"]')),
                         rings: island.querySelectorAll('.local-map__current-ring').length,
                         context: svg.querySelectorAll('.local-map__node--context').length,
@@ -166,7 +165,6 @@ class MapLegibilityBrowserTest(BrowserAcceptanceTest):
                 )
                 chrome_step = 16.0 * ui_scale(viewport)
                 self.assertAlmostEqual(probe["title"], chrome_step, delta=0.5)
-                self.assertAlmostEqual(probe["orientation"], chrome_step, delta=0.5)
                 self.assertAlmostEqual(probe["readout"], chrome_step, delta=0.5)
                 self.assertAlmostEqual(probe["scale"], ui_scale(viewport), places=3)
                 # The current square and its four exits draw markers and

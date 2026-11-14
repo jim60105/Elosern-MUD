@@ -37,7 +37,8 @@
       "files_b": [
         "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_failed_original_never_saves",
         "web.tests.browser.test_browser_map_column_instruments.MapColumnInstrumentBrowserTest.test_map_column_holds_its_width_and_fades_hidden_overflow",
-        "web.tests.browser.test_browser_map_column_instruments.MapColumnInstrumentBrowserTest.test_place_card_is_an_instrument_panel"
+        "web.tests.browser.test_browser_map_column_instruments.MapColumnInstrumentBrowserTest.test_place_card_is_an_instrument_panel",
+        "web.tests.browser.test_browser_map_column_instruments.MapColumnInstrumentBrowserTest.test_minimap_is_a_card_free_instrument_panel"
       ]
     },
     {
