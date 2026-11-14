@@ -71,6 +71,10 @@ web/webclient/context_processors.py             webclient_vue_enabled 脈絡變�
 4. **執行瀏覽器測試前必須先建置 dist。** 受管瀏覽器套件會直接從工作樹提供靜態檔案；未執行 `pnpm run build` 會導致 Vue 分支檢查失敗（CI 會在兩個工作區中自動建置）。
 5. **XOR 旗標採互斥載入。** 每個頁面只啟用一種檢視堆疊，`webclient_vue_enabled`（脈絡變數）會挑選 Vue 組合包**或**舊版復原分支（D10 原生文字主控台，無檢視程式碼）。正式環境預設為 **Vue 組合包**（於 C4 切換）；舊版分支僅能透過復原機制進入。`?__vue=1` 可強制切換至 Vue 分支以供審查或離線載入檢查；`ELOSERN_BROWSER_VUE_CLIENT=1`（瀏覽器測試設定）為 C3 使用的測試設定開關。
 
+## HUD 面板樣式
+
+重構或新增疊在舞台上的 HUD 面板時，請依 [`hud-instrument-panels.md`](hud-instrument-panels.md) 的無框儀表式面板準則實作。生命值面板（`StatusPanel`、`ConditionChips`、`VitalsTrack`）是參考實作。
+
 ## 等寬字體（Jim Mono TC）
 
 `--f-mono` 為 `"Jim Mono TC", "Noto Sans TC", monospace`。拉丁字母、數字、箭頭、框線字元與 CJK 都由自我代管的 [Jim Mono TC](https://github.com/jim60105/JimMonoTC)（SIL OFL 1.1）繪製，不依賴玩家電腦安裝的字型。Jim Mono TC 合併了拉丁基底字形與 Noto Sans CJK TC 的 CJK 字形，每個 CJK 字元的寬度剛好是兩個拉丁字元，因此含中文的框線地圖能逐欄對齊。地圖幾何使用的一格寬度（`CELL_EM`，拉丁字元的 advance 除以 upem）唯一來源是匯入清單 `codepoints.json` 的 `cell_advance`，由 `lib/mono_cells.js` 的產生區塊匯出；上游換版改變格寬時，所有地圖標簽預算自動隨產生值重算，不需要改寫任何常數。Noto Sans TC 只負責 Jim Mono TC 未收錄的罕用 CJK（寬 1em）。

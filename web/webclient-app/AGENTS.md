@@ -382,6 +382,15 @@ dream or creation surface owns the stage. There is no server travel mode.
   `--motion-campfire` (both still at reduced and off). Any early key or click
   only finishes the beat.
 
+## HUD panel style
+
+Before restyling or adding a HUD panel that sits on the stage, read
+`docs/development/hud-instrument-panels.md`. It is the reusable borderless
+"instrument panel" style (feathered ink ground, brass fitting, thin tapered
+strokes, on-demand tooltips); the vitals dock (`StatusPanel`, `ConditionChips`,
+`VitalsTrack`) is its reference implementation. Window surfaces keep using the
+shared window primitives below.
+
 ## Styling pitfall
 
 `styles/app-shell.css` contains `.elosern-root …` rules that duplicate or override

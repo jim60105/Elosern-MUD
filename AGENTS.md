@@ -61,7 +61,7 @@ modules by task, so you do not have to read the package to find the owner.
 | Memory, recall, threads, dreams, letters | `world/narrative/AGENTS.md`, `docs/development/narrative-memory-and-recall.md` | `world/narrative/` |
 | A player text command | the command-documentation rule below | `commands/`, `docs/game/commands.md`, `docs/game/command-reference.md` |
 | A webclient panel or UI action (server side) | `docs/development/webclient-synchronization.md` | `web/webclient/presentation/` (one module per panel), `web/webclient/actions/` (one module per action family, allowlisted in `registry.py`) |
-| Webclient UI (Vue) | `web/webclient-app/AGENTS.md`, `docs/development/frontend-developer-guide.md` | `web/webclient-app/` |
+| Webclient UI (Vue) | `web/webclient-app/AGENTS.md`, `docs/development/frontend-developer-guide.md`, `hud-instrument-panels.md` (borderless HUD panel style) | `web/webclient-app/` |
 | A browser acceptance test | `web/tests/browser/AGENTS.md` | `web/tests/browser/` |
 | GM portal | `docs/development/gm-portal-runtime-inspection.md`, `gm-portal-world-data.md`, `gm-portal-saves.md` | `web/gm/`, `web/admin-app/`, `server/console/` |
 | Settings and environment variables | `docs/development/settings-and-environment.md` | `server/conf/settings.py`, `.env.example` |

@@ -74,6 +74,7 @@
   - [Evennia 測試效能報告](/development/evennia-test-performance)
   - [Vue 前端架構](/development/frontend-vue-architecture)
   - [Vue 前端開發指南](/development/frontend-developer-guide)
+  - [HUD 儀表式面板設計準則](/development/hud-instrument-panels)
   - [GM 執行期狀態檢視](/development/gm-portal-runtime-inspection)
   - [GM 世界資料瀏覽](/development/gm-portal-world-data)
   - [WebClient Phase-0 契約審查](/development/webclient-vue-frozen-contract-audit)
