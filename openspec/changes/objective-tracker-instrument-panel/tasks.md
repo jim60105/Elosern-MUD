@@ -20,5 +20,5 @@
 
 ## 4. Gates and human review material
 
-- [ ] 4.1 Run `pnpm test`, `uv run --locked python -m tools.contract_gate --change objective-tracker-instrument-panel`, `openspec validate objective-tracker-instrument-panel --strict` and `git diff --check`. Verify: all pass.
-- [ ] 4.2 Capture the design D7 live-client screenshots with `agent-browser` into the session scratchpad, then `agent-browser close`. Verify: the apply report lists their absolute paths for the human review (no automated judgement).
+- [x] 4.1 Run `pnpm test`, `uv run --locked python -m tools.contract_gate --change objective-tracker-instrument-panel`, `openspec validate objective-tracker-instrument-panel --strict` and `git diff --check`. Verify: all pass.
+- [x] 4.2 Capture the design D7 live-client screenshots with `agent-browser` into the session scratchpad, then `agent-browser close`. Verify: the apply report lists their absolute paths for the human review (no automated judgement).
