@@ -25,6 +25,7 @@ from evennia.utils.create import create_object
 
 from commands.localized.general import CmdLook
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 
 from world.maps import (
@@ -118,6 +119,9 @@ class CatchUpFixture(ScopedSettlementFixture):
 class CatchUpSettlementTests(CatchUpFixture):
     """A catch-up settles a lagging closed set, and leaves a current one alone."""
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
+    )
     def test_a_lagging_unit_is_settled_to_the_current_tick(self):
         self._build_scenario()
         self.lag()
@@ -157,6 +161,9 @@ class CatchUpSettlementTests(CatchUpFixture):
         )
         self.assertEqual(caught_up, settlement_projection(self.wilderness))
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
+    )
     def test_a_current_unit_is_written_and_reported_nowhere(self):
         self._build_scenario()
         before = settlement_projection(self.wilderness)
@@ -171,6 +178,9 @@ class CatchUpSettlementTests(CatchUpFixture):
         self.assertEqual(self.cursor_record(), cursors)
         logged.assert_not_called()
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
+    )
     def test_a_failed_catch_up_restores_the_unit(self):
         self._build_scenario()
         self.lag()
@@ -208,6 +218,9 @@ class CatchUpSettlementTests(CatchUpFixture):
 class ObservedUnitTests(CatchUpFixture):
     """Observed units come from player positions and running announcements."""
 
+    @covers_requirement(
+        "population-settlement-units::observed-units-are-derived-from-player-positions-and-announcements"
+    )
     def test_the_sight_radius_bounds_the_observed_units(self):
         self._build_scenario()
         self.assertEqual(self.world.unit(WEST_OF_ZONE_A), self.unit_a)
@@ -230,6 +243,9 @@ class ObservedUnitTests(CatchUpFixture):
             ),
         )
 
+    @covers_requirement(
+        "population-settlement-units::observed-units-are-derived-from-player-positions-and-announcements"
+    )
     def test_an_announced_location_is_observed_only_while_it_runs(self):
         self._build_scenario()
         place_player(self, WEST_OF_ZONE_A)
@@ -258,6 +274,9 @@ class CommandCatchUpTests(CatchUpFixture):
         command.args = ""
         return command
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_command_settles_the_units_around_the_player(self):
         self._build_scenario()
         player = place_player(self, EAST_OF_ZONE_A)
@@ -273,6 +292,9 @@ class CommandCatchUpTests(CatchUpFixture):
             "the neighbouring unit is current before the command's own code",
         )
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_failed_catch_up_is_reported_and_the_command_still_runs(self):
         self._build_scenario()
         player = place_player(self, EAST_OF_ZONE_A)
@@ -303,6 +325,9 @@ class CommandCatchUpTests(CatchUpFixture):
 class CommandSeamTests(CatchUpFixture):
     """A localized command inherits the same seam as the repository base."""
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_localized_command_settles_the_units_around_the_player(self):
         self._build_scenario()
         player = place_player(self, EAST_OF_ZONE_A)
@@ -320,6 +345,9 @@ class CommandSeamTests(CatchUpFixture):
 class OperatorCatchUpTests(CatchUpFixture):
     """The operator and quest entry points catch their target up first."""
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_gm_placement_settles_the_target_cell(self):
         self._build_scenario()
         enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
@@ -328,6 +356,9 @@ class OperatorCatchUpTests(CatchUpFixture):
         map_gm.spawn_monster(SPECIES, ORDINARY, f"#{room.pk}")
         self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_gm_removal_settles_the_removed_entity(self):
         self._build_scenario()
         enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
@@ -336,6 +367,9 @@ class OperatorCatchUpTests(CatchUpFixture):
         map_gm.delete_entity(f"#{removed.pk}")
         self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_gm_hit_point_edit_settles_the_target(self):
         self._build_scenario()
         enter_wilderness(self.char1, coordinates=EAST_OF_ZONE_A, name=WILDERNESS_NAME)
@@ -348,6 +382,9 @@ class OperatorCatchUpTests(CatchUpFixture):
 class CatchUpBoundaryTests(CatchUpFixture):
     """A catch-up never starts inside a pass and refuses another transaction."""
 
+    @covers_requirement(
+        "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
+    )
     def test_a_catch_up_inside_a_running_pass_writes_nothing(self):
         self._build_scenario()
         self.lag()
@@ -358,6 +395,9 @@ class CatchUpBoundaryTests(CatchUpFixture):
         self.assertEqual(self.cursor_record(), cursors)
 
     @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
+    @covers_requirement(
+        "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
+    )
     def test_a_writing_catch_up_refuses_an_enclosing_transaction(self):
         self._build_scenario()
         self.lag()
@@ -386,6 +426,9 @@ class MovementCatchUpTests(CatchUpFixture):
                 return (519, y), destination
         return None, None
 
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
     def test_a_movement_edge_catches_the_destination_up_first(self):
         self._build_scenario()
         cell, destination = self._crossing_step()
