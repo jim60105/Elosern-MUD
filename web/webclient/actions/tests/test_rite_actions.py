@@ -339,6 +339,19 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(error.call_args.args[0], "landmark_rite_failed")
         self.assertEqual(error.call_args.kwargs["context"], {"char": self.player.pk})
 
+    def test_without_a_request_identity_each_call_settles(self):
+        # Only an admitted transport request is replayable: a caller that brings
+        # no identity must never reuse one derived constant and replay a rite.
+        payload = validate_landmark_rite_payload({"option": "solo", "member_id": None})
+        tick_before = get_world_clock().tick
+
+        for _ in range(2):
+            result = landmark_rite_adapter(self.player, payload)
+            self.assertEqual(result["outcome"], "success")
+
+        self.assertEqual(get_world_clock().tick - tick_before, 2 * SOLO.seconds)
+        self.assertEqual(self.record()["completed"][DISTRICT_KEY]["count"], 2)
+
     def test_the_success_result_passes_the_browser_result_schema(self):
         result = self.settle("solo")
 

@@ -125,11 +125,18 @@ def landmark_rite_adapter(
         # The owner resolution refuses too; it belongs inside this boundary so a
         # normal refusal can never surface as the dispatcher's internal error.
         owner = record_owner_for(actor)
-        operation_id = operation_identity(
-            int(owner.pk),
-            "rite",
-            identity.get("epoch", ""),
-            identity.get("request_id", ""),
+        # Only an admitted transport request is replayable: without a request id
+        # a derived identity would be one constant per owner, so a second call
+        # would replay the first rite instead of settling a new one.
+        operation_id = (
+            operation_identity(
+                int(owner.pk),
+                "rite",
+                identity.get("epoch", ""),
+                identity.get("request_id", ""),
+            )
+            if identity.get("request_id")
+            else None
         )
         result = perform_rite(
             actor,
