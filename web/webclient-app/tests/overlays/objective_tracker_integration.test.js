@@ -145,7 +145,7 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
         candidates: [{ index: 1, display: "異名1", basis: "第1條事蹟引用。" }],
       },
     });
-    expect(mapChildren(w)).toEqual(["place-card", "local-map", "objective-tracker", "title-ballot-menu"]);
+    expect(mapChildren(w)).toEqual(["place-card", "local-map-panel", "objective-tracker", "title-ballot-menu"]);
     expect(w.find('[data-anchor="vitals"] [data-testid="objective-tracker"]').exists()).toBe(false);
   });
 

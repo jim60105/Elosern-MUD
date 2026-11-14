@@ -62,14 +62,16 @@ describe("map layout variants (B4 world family, map-02)", () => {
     wrapper = mount(LocalMap, {
       props: { localMap: localMapModelFor(LOCAL_MAP_SAMPLE) },
     });
-    expect(wrapper.find('[data-testid="local-map__orientation"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="local-map__axis"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="local-map__orientation"]').exists()).toBe(false);
     expect(
       wrapper.find('[data-testid="local-map__edge-marker--grid:altoria:5:5"]').exists(),
     ).toBe(true);
 
     const interior = localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE);
     await wrapper.setProps({ localMap: interior });
-    // Orientation legend: the radial variant has no axis convention to state.
+    // The radial variant asserts no axis, and no surface states a legend.
+    expect(wrapper.find('[data-testid="local-map__axis"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="local-map__orientation"]').exists()).toBe(false);
     // Edge markers: the graph variant never marks.
     expect(
@@ -85,21 +87,24 @@ describe("map layout variants (B4 world family, map-02)", () => {
     }
   });
 
-  it("drives the orientation legend from layoutVariant, not the payload layer", () => {
-    // A lattice-coordinate model whose layoutVariant is absent gets no
-    // orientation legend — the legend follows the RESOLVED variant (design
-    // D3), never a re-derivation from the payload's layer field.
+  it("draws the axis cross from the resolved layout variant and states no legend", () => {
+    // The axis follows the RESOLVED variant (design D3): a model whose
+    // layoutVariant is absent resolves to the lattice and draws the axis, an
+    // interior model resolves to the graph and draws none; no orientation
+    // legend is ever stated (local-map-instrument-panel).
     const model = localMapModelFor(LOCAL_MAP_SAMPLE);
     expect(model.layoutVariant).toBe("lattice");
-    wrapper = mount(LocalMap, {
-      props: { localMap: { ...model, layoutVariant: undefined } },
-    });
-    expect(wrapper.find('[data-testid="local-map__orientation"]').exists()).toBe(false);
-    wrapper.unmount();
-
-    wrapper = mount(LocalMap, { props: { localMap: model } });
-    const orientation = wrapper.get('[data-testid="local-map__orientation"]');
-    expect(orientation.text()).toBe("北↑ 東→");
+    for (const [localMap, axis] of [
+      [{ ...model, layoutVariant: undefined }, true],
+      [model, true],
+      [localMapModelFor(LOCAL_MAP_INTERIOR_SAMPLE), false],
+    ]) {
+      wrapper = mount(LocalMap, { props: { localMap } });
+      expect(wrapper.find('[data-testid="local-map__axis"]').exists()).toBe(axis);
+      expect(wrapper.find('[data-testid="local-map__orientation"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = null;
+    }
   });
 
   it("renders edge direction markers only for off-extent remembered places on the lattice variant", () => {

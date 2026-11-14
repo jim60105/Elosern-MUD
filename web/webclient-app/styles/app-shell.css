@@ -402,8 +402,6 @@ body {
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-.elosern-root .local-map { border-color: #bca57966; }
-.elosern-root .local-map:hover { border-color: var(--gold-500); }
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) #0003; }
 .elosern-root .cmdline {
   height: var(--command-line-h);
