@@ -310,7 +310,7 @@ archetypes:
         watch: null
   cliff:
     guardian_name_zh: 瀑後的歌聲
-    guardian_form_zh: 風與水霧裡傳出的女聲，只在有人靠近崖邊時應答。
+    guardian_form_zh: 風與水霧裡傳出的女聲，只在有人走到崖下或崖邊時應答。
     options:
       - key: bathe
         label_zh: 走進瀑下
