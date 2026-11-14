@@ -1283,6 +1283,7 @@
         "web.webclient.presentation.tests.test_movement_alignment",
         "web.webclient.presentation.tests.test_settlement_alignment",
         "web.webclient.presentation.tests.test_travel_log",
+        "web.webclient.presentation.tests.test_rite_panel",
         "web.webclient.presentation.tests.test_creation_panel.test_presenter",
         "web.webclient.presentation.tests.test_creation_panel.test_transient_fill",
         "web.webclient.presentation.tests.test_creation_panel.test_validation_core",

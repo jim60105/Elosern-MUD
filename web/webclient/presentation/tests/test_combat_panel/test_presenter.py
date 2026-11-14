@@ -560,6 +560,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                     "skill_use",
                     "sleep_handoff",
                     "travel_log",
+                    "rite",
                     "party_inventory",
                     "item_holdings",
                     "party_member",

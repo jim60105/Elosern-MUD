@@ -580,6 +580,20 @@ def build_production_registry() -> PresentationRegistry:
         unavailable_reason=UNAVAILABLE_REASON,
         presenter=travel_log_presenter,
     ))
+    from web.webclient.presentation.rite import (
+        RITE_SCHEMA_VERSION,
+        RITE_UNAVAILABLE_REASON,
+        rite_presenter,
+    )
+
+    # The committed site, options, performers and delivery of one landmark
+    # rite (landmark-rite-panel).
+    registry.register(PresenterSpec(
+        name="rite",
+        schema_version=RITE_SCHEMA_VERSION,
+        unavailable_reason=RITE_UNAVAILABLE_REASON,
+        presenter=rite_presenter,
+    ))
     _attach_production_validators(registry)
     return registry
 
@@ -619,6 +633,7 @@ def _attach_production_validators(registry: PresentationRegistry) -> None:
     from web.webclient.presentation.title_ballot import validate_title_ballot
     from web.webclient.presentation.title_codex import validate_title_codex
     from web.webclient.presentation.travel_log import validate_travel_log
+    from web.webclient.presentation.rite import validate_rite
 
     validators = {
         "art": validate_art,
@@ -646,6 +661,7 @@ def _attach_production_validators(registry: PresentationRegistry) -> None:
         "title_ballot": validate_title_ballot,
         "title_codex": validate_title_codex,
         "travel_log": validate_travel_log,
+        "rite": validate_rite,
     }
     for name, validator in validators.items():
         registry.attach_validator(name, validator)
