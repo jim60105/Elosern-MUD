@@ -1148,7 +1148,8 @@
       "labels": [
         "world.maps.tests.test_monster_activity",
         "world.maps.tests.test_population_maintenance_log",
-        "world.maps.tests.test_settlement_decode_reuse"
+        "world.maps.tests.test_settlement_decode_reuse",
+        "world.maps.tests.test_settlement_outer_rollback"
       ]
     },
     {
