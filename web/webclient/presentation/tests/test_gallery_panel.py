@@ -43,7 +43,8 @@ from web.webclient.presentation.gallery_selection import (
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import (
-    MAX_CANONICAL_JSON_BYTES, ProtocolValidationError, json_byte_size,
+    MAX_CANONICAL_JSON_BYTES, MAX_LIST_ITEMS, ProtocolValidationError,
+    json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.art.queue import enqueue_gallery_job, pending_gallery_jobs, settle_gallery_failed
@@ -1179,8 +1180,8 @@ process.stdout.write(JSON.stringify(results));
         add("is_current non-boolean", subject(is_current=1))
         add("no current subject", subject(is_current=False), True)
         add("two current subjects", lambda p: second_group(p, subjects=[v4_subject(1, current=True)]))
-        add("card_count at cap", subject(card_count=320), True)
-        add("card_count over cap", subject(card_count=321))
+        add("card_count at cap", subject(card_count=MAX_LIST_ITEMS), True)
+        add("card_count over cap", subject(card_count=MAX_LIST_ITEMS + 1))
         add("card_count boolean", subject(card_count=False))
         add("artwork null", subject(artwork=None), True)
         add("artwork invalid", lambda p: p["groups"][0]["subjects"][0]["artwork"].update(extra=1))
