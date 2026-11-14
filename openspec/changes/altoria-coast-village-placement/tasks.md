@@ -222,7 +222,7 @@ Ground rules:
   `roads_final2.png` and `roads_d7.png` beside it. The capture reported one
   advisory diagnostic about `city_imperial_ferry`'s footprint offset, which
   belongs to an earlier change.
-- [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-coast-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
+- [x] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-coast-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
   Result: `test_data_lint check` → `scanned=1613 flagged=121 universe=4258+37
   quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` → `contract
