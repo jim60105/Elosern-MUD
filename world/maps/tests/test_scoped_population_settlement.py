@@ -20,6 +20,7 @@ from dataclasses import replace
 from types import MappingProxyType
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 
 import world.lore.monster_activity as lore_activity
@@ -519,6 +520,9 @@ class ScopeObjectTests(ScopedSettlementFixture):
         self.assertTrue(narrowed.covers_cell(CELLS_A[0]))
         self.assertTrue(narrowed.covers_cell(CELLS_B[0]))
 
+    @covers_requirement(
+        "population-settlement-units::a-closed-set-of-units-settles-alone"
+    )
     def test_unequal_cursors_narrow_only_the_ahead_unit(self):
         self._build_scenario()
         population_units.write_unit_cursors(
@@ -613,6 +617,9 @@ class ScopeObjectTests(ScopedSettlementFixture):
 class ZoneMarkerTests(ScopedSettlementFixture):
     """A zone's settled-through marker records how far its own pass reached."""
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_the_marker_is_the_last_boundary_the_pass_noted(self):
         self._build_scenario()
         noted: list[tuple[tuple[str, ...], int]] = []
@@ -636,6 +643,9 @@ class ZoneMarkerTests(ScopedSettlementFixture):
         self.assertEqual(markers[ZONE_B], START)
         self.assertFalse([tick for keys, tick in noted if ZONE_B in keys])
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_the_marker_never_decreases(self):
         self._build_scenario()
         settle_population_scope(self.wilderness, [self.unit_a], 800)
@@ -646,6 +656,9 @@ class ZoneMarkerTests(ScopedSettlementFixture):
         )
         self.assertGreaterEqual(marker, START)
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_no_decision_reads_the_marker(self):
         reference = self.run_plan([([self.unit_a], 800)])
         self._build_scenario()
@@ -665,6 +678,9 @@ class ZoneMarkerTests(ScopedSettlementFixture):
 class ScopeCursorTests(ScopedSettlementFixture):
     """A scoped pass moves its own unit's cursor and nobody else's."""
 
+    @covers_requirement(
+        "population-settlement-units::a-closed-set-of-units-settles-alone"
+    )
     def test_cursor_moves_only_for_the_scope(self):
         self._build_scenario()
         settle_population_scope(self.wilderness, [self.unit_a], 400)
@@ -709,6 +725,9 @@ class ScopeCursorTests(ScopedSettlementFixture):
             zone_states(self.wilderness)[ZONE_A].settled_through_tick, 400
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-closed-set-of-units-settles-alone"
+    )
     def test_unequal_cursors_run_no_zone_or_site_step_for_the_ahead_unit(self):
         self._build_scenario()
         population_units.write_unit_cursors(
@@ -783,6 +802,9 @@ class DifferentialSettlementTests(ScopedSettlementFixture):
             ],
         }
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_order_and_partition_leave_one_state(self):
         projections = {
             name: self.run_plan(plan) for name, plan in self._plans().items()
@@ -831,12 +853,18 @@ class DifferentialSettlementTests(ScopedSettlementFixture):
             settle_population_scope(self.wilderness, [self.unit_a], 700)
         return settlement_projection(self.wilderness)
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_units_linked_after_diverging_settle_identically(self):
         whole = self._linked(whole=True)
         linked = self._linked(whole=False)
         for part in ("activity", "timeline", "zones", "sites", "bodies"):
             self.assertEqual(linked[part], whole[part], msg=f"linked: {part}")
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_linked_units_settle_together(self):
         self._build_scenario()
         group_id, _bodies = self._group(
@@ -850,6 +878,9 @@ class DifferentialSettlementTests(ScopedSettlementFixture):
         self.assertEqual(population_units.unit_cursor(record, self.unit_a), 400)
         self.assertEqual(population_units.unit_cursor(record, self.unit_b), 400)
 
+    @covers_requirement(
+        "population-settlement-units::separate-settlement-equals-whole-world-settlement"
+    )
     def test_reload_between_parts_leaves_the_same_state(self):
         one_part = self.run_plan([([self.unit_a], END)])
         self._build_scenario()
@@ -935,6 +966,9 @@ class OtherUnitTests(ScopedSettlementFixture):
             "cursor": population_units.unit_cursor(self.cursor_record(), self.unit_b),
         }
 
+    @covers_requirement(
+        "population-settlement-units::a-closed-set-of-units-settles-alone"
+    )
     def test_other_units_are_untouched(self):
         self._build_scenario()
         before = self._sub_view()
@@ -964,6 +998,9 @@ class SharedEvidenceTests(ScopedSettlementFixture):
             for transition in read_population_timeline(self.wilderness).transitions
         ]
 
+    @covers_requirement(
+        "population-settlement-units::shared-evidence-is-kept-until-every-concerned-unit-has-passed-it"
+    )
     def test_loss_recorded_ahead_of_one_unit(self):
         self._build_scenario()
         # One individual stands in zone B and is homed in zone A: its loss
@@ -977,6 +1014,9 @@ class SharedEvidenceTests(ScopedSettlementFixture):
         self.assertNotIn(118, self._loss_ticks())
         self.assertIn(END, self._loss_ticks())
 
+    @covers_requirement(
+        "population-settlement-units::shared-evidence-is-kept-until-every-concerned-unit-has-passed-it"
+    )
     def test_protection_of_a_lagging_cell(self):
         self._build_scenario()
         population_units.write_unit_cursors(
@@ -1075,6 +1115,9 @@ class ScopeRefusalTests(ScopedSettlementFixture):
         )
         return group_id
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-never-writes-outside-its-scope"
+    )
     def test_out_of_scope_destination(self):
         group_id = self._refusal_world()
         before = settlement_projection(self.wilderness)
@@ -1139,6 +1182,9 @@ class ScopeRefusalTests(ScopedSettlementFixture):
         self.assertEqual(len(groups), 1)
         return groups[0]
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-never-writes-outside-its-scope"
+    )
     def test_group_reaching_outside_the_scope(self):
         self._build_scenario()
         before = {
