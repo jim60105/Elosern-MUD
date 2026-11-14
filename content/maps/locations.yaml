@@ -2896,3 +2896,318 @@ locations:
       cell_y: 1763
     geographic_constraint: Reindeer shoal on the north bank of the highland river at the frost wind and stag ferry road junction
     scene_archetype:
+  hamlet_otter_tail:
+    kind: hamlet
+    display_name_zh: 獺尾營地
+    description: Beastfolk clan camp on the highland river beside the capital to tiger roar road.
+    cell:
+      cell_x: 747
+      cell_y: 1723
+    geographic_constraint: Highland river bank on the capital to tiger roar road
+    scene_archetype:
+  hamlet_wolf_bend:
+    kind: hamlet
+    display_name_zh: 狼坳營地
+    description: Beastfolk hunting camp in a wolf bend of the capital to tiger roar road, east of the capital.
+    cell:
+      cell_x: 795
+      cell_y: 1767
+    geographic_constraint: Forest bend on the capital to tiger roar road
+    scene_archetype:
+  hamlet_deer_islet:
+    kind: hamlet
+    display_name_zh: 鹿洲營地
+    description: Beastfolk clan camp on a deer islet of the highland river by the capital to moon howl road.
+    cell:
+      cell_x: 666
+      cell_y: 1726
+    geographic_constraint: Highland river islet on the capital to moon howl road
+    scene_archetype:
+  hamlet_bear_bend:
+    kind: hamlet
+    display_name_zh: 熊坳營地
+    description: Beastfolk hunting camp in a bear bend of the capital to tiger roar road, below the tiger roar city.
+    cell:
+      cell_x: 848
+      cell_y: 1799
+    geographic_constraint: Forest bend on the capital to tiger roar road
+    scene_archetype:
+  hamlet_badger_knoll:
+    kind: hamlet
+    display_name_zh: 獾岡營地
+    description: Beastfolk clan camp on a badger knoll where the grizzly and pine ferry roads meet.
+    cell:
+      cell_x: 947
+      cell_y: 1456
+    geographic_constraint: Badger knoll at the grizzly and pine ferry road junction
+    scene_archetype:
+  hamlet_hare_den:
+    kind: hamlet
+    display_name_zh: 兔穴營地
+    description: Beastfolk hunting camp at a hare den on the capital to moon howl road.
+    cell:
+      cell_x: 612
+      cell_y: 1746
+    geographic_constraint: Hare den hollow on the capital to moon howl road
+    scene_archetype:
+  hamlet_eagle_nest:
+    kind: hamlet
+    display_name_zh: 鷹巢營地
+    description: Beastfolk hunting camp at an eagle nest on the tiger roar to pine ferry road.
+    cell:
+      cell_x: 1027
+      cell_y: 1812
+    geographic_constraint: Eagle nest on the tiger roar to pine ferry road
+    scene_archetype:
+  hamlet_wolf_beacon:
+    kind: hamlet
+    display_name_zh: 狼煙營地
+    description: Beastfolk clan camp at a wolf beacon where four highland roads meet below the horn plain.
+    cell:
+      cell_x: 360
+      cell_y: 1651
+    geographic_constraint: Four-road junction below the horn plain on the shadow wood roads
+    scene_archetype:
+  hamlet_panther_tail:
+    kind: hamlet
+    display_name_zh: 豹尾營地
+    description: Beastfolk hunting camp on a panther tail of the capital to tiger roar road.
+    cell:
+      cell_x: 905
+      cell_y: 1820
+    geographic_constraint: Forest tail on the capital to tiger roar road
+    scene_archetype:
+  hamlet_fox_knoll:
+    kind: hamlet
+    display_name_zh: 狐岡營地
+    description: Beastfolk clan camp on a fox knoll where the grizzly and pine ferry roads cross.
+    cell:
+      cell_x: 1012
+      cell_y: 1456
+    geographic_constraint: Fox knoll at the grizzly and pine ferry road junction
+    scene_archetype:
+  hamlet_roe_slope:
+    kind: hamlet
+    display_name_zh: 獐坡營地
+    description: Beastfolk hunting camp on a roe slope of the capital to moon howl road.
+    cell:
+      cell_x: 568
+      cell_y: 1788
+    geographic_constraint: Roe slope on the capital to moon howl road
+    scene_archetype:
+  hamlet_owl_wood:
+    kind: hamlet
+    display_name_zh: 梟林營地
+    description: Beastfolk hunting camp in an owl wood of the fox fire to shaman cave road.
+    cell:
+      cell_x: 1251
+      cell_y: 1731
+    geographic_constraint: Owl wood on the fox fire to shaman cave road
+    scene_archetype:
+  hamlet_marten_den:
+    kind: hamlet
+    display_name_zh: 貂穴營地
+    description: Beastfolk hunting camp at a marten den on the fox fire to iron claw road.
+    cell:
+      cell_x: 1265
+      cell_y: 1664
+    geographic_constraint: Marten den on the fox fire to iron claw road
+    scene_archetype:
+  hamlet_wolf_vale:
+    kind: hamlet
+    display_name_zh: 狼谷營地
+    description: Beastfolk clan camp in a wolf vale of the pine ferry to shaman cave road.
+    cell:
+      cell_x: 1114
+      cell_y: 1765
+    geographic_constraint: Wolf vale on the pine ferry to shaman cave road
+    scene_archetype:
+  hamlet_bear_creek:
+    kind: hamlet
+    display_name_zh: 熊溪營地
+    description: Beastfolk hunting camp on a bear creek of the tiger roar to pine ferry road.
+    cell:
+      cell_x: 1075
+      cell_y: 1763
+    geographic_constraint: Bear creek on the tiger roar to pine ferry road
+    scene_archetype:
+  hamlet_deer_trail:
+    kind: hamlet
+    display_name_zh: 鹿徑營地
+    description: Beastfolk hunting camp on a deer trail of the moon howl to stag ferry road.
+    cell:
+      cell_x: 419
+      cell_y: 1801
+    geographic_constraint: Deer trail on the moon howl to stag ferry road
+    scene_archetype:
+  hamlet_badger_bend:
+    kind: hamlet
+    display_name_zh: 獾坳營地
+    description: Beastfolk clan camp at a badger bend where the horn plain and shadow wood roads meet the stag ferry road.
+    cell:
+      cell_x: 375
+      cell_y: 1688
+    geographic_constraint: Badger bend at the horn plain and stag ferry road junction
+    scene_archetype:
+  hamlet_falcon_knoll:
+    kind: hamlet
+    display_name_zh: 隼岡營地
+    description: Beastfolk hunting camp on a falcon knoll of the capital to tiger roar road, above the pine ferry.
+    cell:
+      cell_x: 967
+      cell_y: 1829
+    geographic_constraint: Falcon knoll on the capital to tiger roar road
+    scene_archetype:
+  hamlet_serpent_ridge:
+    kind: hamlet
+    display_name_zh: 蛇嶺營地
+    description: Beastfolk clan camp on a serpent ridge where the iron claw and pine ferry roads cross.
+    cell:
+      cell_x: 1136
+      cell_y: 1555
+    geographic_constraint: Serpent ridge at the iron claw and pine ferry road junction
+    scene_archetype:
+  hamlet_weasel_knoll:
+    kind: hamlet
+    display_name_zh: 鼬岡營地
+    description: Beastfolk hunting camp on a weasel knoll south of the falcon town on the grizzly road.
+    cell:
+      cell_x: 1077
+      cell_y: 1456
+    geographic_constraint: Weasel knoll south of the falcon town on the grizzly road
+    scene_archetype:
+  hamlet_mastiff_slope:
+    kind: hamlet
+    display_name_zh: 獒坡營地
+    description: Beastfolk hunting camp on a mastiff slope of the capital to moon howl road.
+    cell:
+      cell_x: 523
+      cell_y: 1827
+    geographic_constraint: Mastiff slope on the capital to moon howl road
+    scene_archetype:
+  hamlet_raven_nest:
+    kind: hamlet
+    display_name_zh: 鴉巢營地
+    description: Beastfolk hunting camp at a raven nest on the fox fire to shaman cave road.
+    cell:
+      cell_x: 1209
+      cell_y: 1773
+    geographic_constraint: Raven nest on the fox fire to shaman cave road
+    scene_archetype:
+  hamlet_panther_knoll:
+    kind: hamlet
+    display_name_zh: 豹岡營地
+    description: Beastfolk clan camp on a panther knoll of the fox fire to iron claw road.
+    cell:
+      cell_x: 1223
+      cell_y: 1629
+    geographic_constraint: Panther knoll on the fox fire to iron claw road
+    scene_archetype:
+  hamlet_macaque_knoll:
+    kind: hamlet
+    display_name_zh: 獼岡營地
+    description: Beastfolk hunting camp on a macaque knoll of the east ford camp to falcon road.
+    cell:
+      cell_x: 1111
+      cell_y: 1406
+    geographic_constraint: Macaque knoll on the east ford camp to falcon road
+    scene_archetype:
+  hamlet_tiger_tail:
+    kind: hamlet
+    display_name_zh: 虎尾營地
+    description: Beastfolk clan camp on a tiger tail where the iron claw and pine ferry roads cross.
+    cell:
+      cell_x: 1098
+      cell_y: 1680
+    geographic_constraint: Tiger tail at the iron claw and pine ferry road junction
+    scene_archetype:
+  hamlet_wolf_den:
+    kind: hamlet
+    display_name_zh: 狼穴營地
+    description: Beastfolk hunting camp in a wolf den on the capital to ancestor shrine road.
+    cell:
+      cell_x: 722
+      cell_y: 1646
+    geographic_constraint: Wolf den on the capital to ancestor shrine road
+    scene_archetype:
+  hamlet_trout_shoal:
+    kind: hamlet
+    display_name_zh: 鱒灘營地
+    description: Beastfolk fishing camp on a trout shoal of the highland river, off every road below the otter ford.
+    cell:
+      cell_x: 296
+      cell_y: 1756
+    geographic_constraint: Trout shoal of the highland river, off the roads below the otter ford
+    scene_archetype:
+  hamlet_otter_islet:
+    kind: hamlet
+    display_name_zh: 獺洲營地
+    description: Beastfolk fishing camp on an otter islet of the highland river, off the roads above the stag ferry.
+    cell:
+      cell_x: 351
+      cell_y: 1756
+    geographic_constraint: Otter islet of the highland river, off the roads above the stag ferry
+    scene_archetype:
+  hamlet_marten_shoal:
+    kind: hamlet
+    display_name_zh: 貂灘營地
+    description: Beastfolk hunting camp on a marten shoal of the border river, off every road east of the mastiff ridge.
+    cell:
+      cell_x: 521
+      cell_y: 1346
+    geographic_constraint: Marten shoal of the border river, off the roads east of the mastiff ridge
+    scene_archetype:
+  hamlet_bear_shoal:
+    kind: hamlet
+    display_name_zh: 熊灘營地
+    description: Beastfolk fishing camp on a bear shoal of the highland river, off the roads south of the capital.
+    cell:
+      cell_x: 696
+      cell_y: 1716
+    geographic_constraint: Bear shoal of the highland river, off the roads south of the capital
+    scene_archetype:
+  hamlet_antelope_ridge:
+    kind: hamlet
+    display_name_zh: 羚嶺營地
+    description: Beastfolk herding camp on an antelope ridge of the border river, off the roads north of the sand bank village.
+    cell:
+      cell_x: 1066
+      cell_y: 1366
+    geographic_constraint: Antelope ridge above the border river, off the roads north of the sand bank village
+    scene_archetype:
+  hamlet_badger_shoal:
+    kind: hamlet
+    display_name_zh: 獾灘營地
+    description: Beastfolk fishing camp on a badger shoal of the border river, off the roads above the west ford camp.
+    cell:
+      cell_x: 476
+      cell_y: 1351
+    geographic_constraint: Badger shoal of the border river, off the roads above the west ford camp
+    scene_archetype:
+  hamlet_falcon_shoal:
+    kind: hamlet
+    display_name_zh: 隼灘營地
+    description: Beastfolk hunting camp on a falcon shoal of the border river, off the roads below the east ford camp.
+    cell:
+      cell_x: 1111
+      cell_y: 1356
+    geographic_constraint: Falcon shoal of the border river, off the roads below the east ford camp
+    scene_archetype:
+  hamlet_wolf_shoal:
+    kind: hamlet
+    display_name_zh: 狼灘營地
+    description: Beastfolk hunting camp on a wolf shoal of the highland river, off the roads below the stag ferry town.
+    cell:
+      cell_x: 391
+      cell_y: 1736
+    geographic_constraint: Wolf shoal of the highland river, off the roads below the stag ferry town
+    scene_archetype:
+  hamlet_reindeer_bend:
+    kind: hamlet
+    display_name_zh: 馴鹿坳營地
+    description: Beastfolk herding camp in a reindeer bend of the highland river, off the roads above the reindeer shoal.
+    cell:
+      cell_x: 251
+      cell_y: 1761
+    geographic_constraint: Reindeer bend of the highland river, off the roads above the reindeer shoal
+    scene_archetype:
