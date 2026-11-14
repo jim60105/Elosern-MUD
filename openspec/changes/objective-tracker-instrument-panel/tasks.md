@@ -14,9 +14,9 @@
 
 ## 3. Browser tests
 
-- [ ] 3.1 Update `test_objective_line_shows_only_in_exploration` in `web/tests/browser/test_browser_contextual_hud_stage.py` (design D5). Verify: the test no longer asserts a 34px height, `+1` or `1/3`.
-- [ ] 3.2 Add `test_objective_line_is_an_instrument_panel_with_quantity_strokes` to `MapColumnInstrumentBrowserTest` in `web/tests/browser/test_browser_map_column_instruments.py` (design D5), then run `uv run --locked python -m tools.shard_register fix`. Verify: `git diff .github/browser-shards.json` adds exactly that method id.
-- [ ] 3.3 Run `pnpm run build`, then `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_map_column_instruments web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports > <scratchpad>/objective-browser.log 2>&1`. Verify: every method passes (the whole new file covers all four instrument-panel methods of the batch).
+- [x] 3.1 Update `test_objective_line_shows_only_in_exploration` in `web/tests/browser/test_browser_contextual_hud_stage.py` (design D5). Verify: the test no longer asserts a 34px height, `+1` or `1/3`.
+- [x] 3.2 Add `test_objective_line_is_an_instrument_panel_with_quantity_strokes` to `MapColumnInstrumentBrowserTest` in `web/tests/browser/test_browser_map_column_instruments.py` (design D5), then run `uv run --locked python -m tools.shard_register fix`. Verify: `git diff .github/browser-shards.json` adds exactly that method id.
+- [x] 3.3 Run `pnpm run build`, then `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_map_column_instruments web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_objective_line_shows_only_in_exploration web.tests.browser.test_browser_shell_surfaces.ShellAcceptanceTest.test_populated_island_stack_fits_its_anchor_at_both_viewports > <scratchpad>/objective-browser.log 2>&1`. Verify: every method passes (the whole new file covers all four instrument-panel methods of the batch).
 
 ## 4. Gates and human review material
 

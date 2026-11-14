@@ -4,8 +4,8 @@ map-column-instrument-geometry: the `map` anchor's width floor, right gutter,
 paint-free box, 10px stack gap, presence-rail clearance, hidden scrollbar and
 scroll-edge fade. place-card-instrument-panel: the place card as an instrument
 panel. local-map-instrument-panel: the minimap as a card-free island inside
-its own instrument panel. The later changes of this batch add their methods
-here.
+its own instrument panel. objective-tracker-instrument-panel: the objective
+line as an instrument panel with its completion lozenge and quantity strokes.
 """
 
 from __future__ import annotations
@@ -188,6 +188,76 @@ _MINIMAP_PANEL_JS = """() => {
     latticeImage: getComputedStyle(lattice).backgroundImage,
     legends: document.querySelectorAll('[data-testid="local-map__orientation"]').length,
     axes: document.querySelectorAll('.local-map [data-testid="local-map__axis"]').length,
+  };
+}"""
+
+def _counted_objectives_panel(quantity: int, progress: int) -> dict:
+    """An objectives panel whose first row counts ``progress`` of ``quantity``
+    and whose second row is a single-count quest with an 80-copper reward."""
+    return {
+        "schema_version": 1,
+        "available": True,
+        "rows": [
+            {
+                "quest_id": "q_1042",
+                "display_name": "清點貨箱",
+                "objective_line": "清點碼頭倉庫的貨箱",
+                "stage_index": 1,
+                "stage_total": 1,
+                "stage_progress": progress,
+                "objective_quantity": quantity,
+                "reward_copper": None,
+                "deadline_line": None,
+            },
+            {
+                "quest_id": "q_1043",
+                "display_name": "過河商議",
+                "objective_line": "與灰婆婆議價過河",
+                "stage_index": 1,
+                "stage_total": 1,
+                "stage_progress": 0,
+                "objective_quantity": 1,
+                "reward_copper": 80,
+                "deadline_line": None,
+            },
+        ],
+    }
+
+
+_OBJECTIVE_PANEL_JS = """() => {
+  const card = document.querySelector('[data-testid="place-card"]');
+  const tracker = document.querySelector('[data-testid="objective-tracker"]');
+  const cs = getComputedStyle(tracker);
+  const before = getComputedStyle(tracker, '::before');
+  const rect = (el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, width: r.width };
+  };
+  const box = tracker.querySelector('[data-testid^="objective-tracker__box--"]');
+  const stroke = tracker.querySelector('[data-testid="objective-tracker__stroke"]');
+  const fill = tracker.querySelector('[data-testid="objective-tracker__stroke-fill"]');
+  return {
+    card: rect(card),
+    tracker: rect(tracker),
+    borders: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth],
+    radius: cs.borderTopLeftRadius,
+    shadow: cs.boxShadow,
+    background: cs.backgroundColor,
+    groundMask: before.maskImage || before.webkitMaskImage,
+    descendantRights: Array.from(tracker.querySelectorAll('*'))
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width > 0 || r.height > 0)
+      .map((r) => r.right),
+    innerText: tracker.innerText,
+    label: tracker.getAttribute('aria-label'),
+    boxLabel: box.getAttribute('aria-label'),
+    check: !!box.querySelector('.bx__check'),
+    ticks: Array.from(tracker.querySelectorAll('[data-testid="objective-tracker__tick"]')).map((el) => ({
+      on: el.classList.contains('obj__tick--on'),
+      width: el.getBoundingClientRect().width,
+    })),
+    strokeWidth: stroke ? stroke.getBoundingClientRect().width : null,
+    fillWidth: fill ? fill.getBoundingClientRect().width : null,
   };
 }"""
 
@@ -454,4 +524,81 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                 page.mouse.move(5, 5)
                 page.focus('[data-testid="local-map__expand"]')
                 page.wait_for_function(f"() => ({_GLYPH_OPACITY_JS})() === '1'", timeout=5000)
+                page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-objective-tracker-island-presents-the-committed-objectives-only",
+        "webclient-contextual-hud::an-instrument-panel-wears-a-feathered-ground-and-one-brass-fitting-instead-of-a-box",
+    )
+    def test_objective_line_is_an_instrument_panel_with_quantity_strokes(self):
+        """At 1280x720, 1451x790 and 2560x1440 the objective line is no box:
+        it paints a masked ground, shares the place card's edges and keeps
+        every element clear of the spine; 目標 is its accessible name only;
+        a count of 5 draws five 13px x S ticks with the reached ones first;
+        a count of 30 draws one stroke filled to the ratio; a reached count
+        fills the lozenge with a check named 已達成."""
+        for viewport in ((1280, 720), (1451, 790), (2560, 1440)):
+            with self.subTest(viewport=viewport):
+                scale = ui_scale(viewport)
+                page = self.logged_in_page(viewport)
+                base = {
+                    "status": valid_status_panel("艾倫‧灰誓", "char-42"),
+                    "local_map": valid_local_map_panel(),
+                    "art": valid_art_panel(),
+                }
+                inject_snapshot(page, {**base, "objectives": _counted_objectives_panel(5, 2)}, mode="exploration")
+                page.wait_for_selector('[data-testid="objective-tracker__ticks"]', timeout=15000)
+                page.wait_for_selector('[data-testid="place-card"]', timeout=15000)
+                page.evaluate("document.fonts.ready")
+                page.evaluate(_SETTLE_JS)
+                probe = page.evaluate(_OBJECTIVE_PANEL_JS)
+
+                # The panel is no box; its ground is decoration.
+                self.assertEqual(probe["borders"], ["0px"] * 4)
+                self.assertEqual(probe["radius"], "0px")
+                self.assertEqual(probe["shadow"], "none")
+                self.assertEqual(probe["background"], "rgba(0, 0, 0, 0)")
+                self.assertTrue(probe["groundMask"], "the ground has a mask")
+                self.assertNotEqual(probe["groundMask"], "none", "the ground is masked")
+
+                tracker, card = probe["tracker"], probe["card"]
+                self.assertAlmostEqual(tracker["left"], card["left"], delta=1.0, msg="left edge matches the place card")
+                self.assertAlmostEqual(tracker["right"], card["right"], delta=1.0, msg="right edge matches the place card")
+                spine = tracker["right"] - 14 * scale + 0.5
+                for right in probe["descendantRights"]:
+                    self.assertLessEqual(right, spine, f"content stays clear of the spine at {viewport}")
+
+                # 目標 is the accessible name, never visible text.
+                self.assertNotIn("目標", probe["innerText"])
+                self.assertEqual(probe["label"], "目標")
+                self.assertEqual(probe["boxLabel"], "進行中")
+                self.assertFalse(probe["check"], "an open lozenge carries no check")
+
+                # One tick per unit, the reached ones first.
+                self.assertEqual([t["on"] for t in probe["ticks"]], [True, True, False, False, False])
+                for tick in probe["ticks"]:
+                    self.assertAlmostEqual(tick["width"], 13 * scale, delta=1.0, msg="tick width")
+
+                # Above twelve units: one stroke filled to the ratio.
+                inject_snapshot(page, {**base, "objectives": _counted_objectives_panel(30, 12)}, mode="exploration")
+                page.wait_for_selector('[data-testid="objective-tracker__stroke"]', timeout=15000)
+                page.evaluate(_SETTLE_JS)
+                probe = page.evaluate(_OBJECTIVE_PANEL_JS)
+                self.assertEqual(probe["ticks"], [], "no ticks above twelve units")
+                self.assertGreater(probe["strokeWidth"], 0)
+                self.assertAlmostEqual(
+                    probe["fillWidth"] / probe["strokeWidth"], 0.4,
+                    delta=1 / probe["strokeWidth"] + 0.01, msg="the stroke fills to the ratio",
+                )
+
+                # A reached count fills the lozenge with a check.
+                inject_snapshot(page, {**base, "objectives": _counted_objectives_panel(5, 5)}, mode="exploration")
+                page.wait_for_function(
+                    "() => document.querySelector('[data-testid=\"objective-tracker__box--q_1042\"]')"
+                    "?.getAttribute('aria-label') === '已達成'",
+                    timeout=15000,
+                )
+                probe = page.evaluate(_OBJECTIVE_PANEL_JS)
+                self.assertEqual(probe["boxLabel"], "已達成")
+                self.assertTrue(probe["check"], "a reached lozenge carries a check")
                 page.close()
