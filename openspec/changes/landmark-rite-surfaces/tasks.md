@@ -16,7 +16,7 @@ Do not edit `AppClient.vue`, `AppShell.vue`, any store, or anything under `docs/
 
 - [x] 3.1 Create `components/rite/rite-model.js` per design D2 and `stories/fixtures/rite.js` per design D6; create `tests/rite/surfaces.test.js` with the model tests of design D7. Verify: `pnpm test -- web/webclient-app/tests/rite/surfaces.test.js` passes; one of its tests passes the fixture's panel through `validateRitePanel` of `web/static/webclient/js/elosern/protocol/panels/rite.js` so the fixture can never drift from the wire shape.
 - [x] 3.2 Create `RiteArrivalCard.vue` per design D3 with its tests of design D7. Verify: the same Vitest file passes.
-- [ ] 3.3 Create `RitePanel.vue` per design D4 with its tests of design D7. Verify: the same Vitest file passes and `pnpm test -- web/webclient-app/tests/components/choice_card.test.js` still passes.
+- [x] 3.3 Create `RitePanel.vue` per design D4 with its tests of design D7. Verify: the same Vitest file passes and `pnpm test -- web/webclient-app/tests/components/choice_card.test.js` still passes.
 - [ ] 3.4 Create `RiteBackdrop.vue` per design D5 with its tests of design D7. Verify: the same Vitest file passes.
 
 ## 4. Stories and guide

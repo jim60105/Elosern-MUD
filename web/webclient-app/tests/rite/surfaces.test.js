@@ -4,9 +4,10 @@
 // events; where two states differ, the rendered texts are compared rather
 // than the interface wording.
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import RitePanels from "../../../static/webclient/js/elosern/protocol/panels/rite.js";
+import RitePanel from "../../components/rite/RitePanel.vue";
 import RiteArrivalCard from "../../components/rite/RiteArrivalCard.vue";
 import { SOLO_ONLY_REASON, UNSEEN_LABEL, riteRows, ritePerformers } from "../../components/rite/rite-model.js";
 import { RITE_ART_PANEL, RITE_PARTY, ritePanel, ritePanelWithArt } from "../../stories/fixtures/rite.js";
@@ -212,5 +213,96 @@ describe("RiteArrivalCard", () => {
     expect(byId(w, "rite-arrival-card").classes()).toContain("choice-card--still");
     w.cleanup();
     w.unmount();
+  });
+});
+
+describe("RitePanel", () => {
+  let wrapper = null;
+  let documentKeys = [];
+  const onDocumentKey = (event) => documentKeys.push(event.key);
+
+  beforeEach(() => {
+    documentKeys = [];
+    document.addEventListener("keydown", onDocumentKey);
+  });
+
+  afterEach(() => {
+    document.removeEventListener("keydown", onDocumentKey);
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  function mountPanel(rite = ritePanel(), performerIndex = 0, props = {}) {
+    wrapper = mount(RitePanel, {
+      attachTo: document.body,
+      props: { rite, performer: ritePerformers(rite)[performerIndex], ...props },
+    });
+    return wrapper;
+  }
+
+  const card = (w) => w.get('[data-testid="rite-panel"]');
+  const rows = (w) => w.findAll('[role="menuitem"]');
+  const row = (w, rowKey) => w.get(`[data-row-key="${rowKey}"]`);
+
+  async function key(w, name, init = {}) {
+    card(w).element.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init }));
+    await nextTick();
+  }
+
+  it("renders one row per option in order and then the leave row", () => {
+    const w = mountPanel(ritePanel({ options: [...ritePanel().options, { key: "listen", label: "合成第三式", companion: true }] }));
+    expect(rows(w).map((r) => r.attributes("data-row-key"))).toEqual(["drink", "bathe", "listen", "leave"]);
+    expect(rows(w)[0].text()).toContain("俯身飲下");
+    expect(rows(w)[3].classes()).toContain("choice-card__row--trailing");
+    expect(document.activeElement).toBe(card(w).element);
+  });
+
+  it("a digit performs its option, Enter performs the active row, Escape and the leave row leave", async () => {
+    const w = mountPanel();
+    await key(w, "1");
+    expect(w.emitted("perform")).toEqual([["drink"]]);
+    await key(w, "ArrowDown");
+    await key(w, "Enter");
+    expect(w.emitted("perform")).toEqual([["drink"], ["bathe"]]);
+    await key(w, "Escape");
+    await row(w, "leave").trigger("click");
+    expect(w.emitted("leave")).toHaveLength(2);
+    await key(w, "Tab");
+    expect(documentKeys).toEqual([]);
+  });
+
+  it("names the performer in the header inside the card frame, before the rows", () => {
+    const rite = ritePanel({ performers: RITE_PARTY });
+    const w = mountPanel(rite, 1);
+    const header = card(w).get(".choice-card__header");
+    expect(header.get('[data-testid="rite-panel-performer"]').text()).toContain("合成同伴");
+    const rowsBox = card(w).get(".choice-card__rows").element;
+    expect(header.element.compareDocumentPosition(rowsBox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card(w).attributes("data-view")).toBe("rite-7");
+  });
+
+  it("only the unseen row carries the not-yet-experienced mark and text", () => {
+    const w = mountPanel(ritePanel({ seen: ["bathe"] }));
+    const unseen = row(w, "drink");
+    const seen = row(w, "bathe");
+    expect(unseen.attributes("data-unread")).toBe("true");
+    expect(unseen.find('[data-testid="choice-card-unread"]').exists()).toBe(true);
+    expect(unseen.text()).toContain(UNSEEN_LABEL);
+    expect(seen.attributes("data-unread")).toBeUndefined();
+    expect(seen.find('[data-testid="choice-card-unread"]').exists()).toBe(false);
+    expect(seen.text()).not.toContain(UNSEEN_LABEL);
+  });
+
+  it("a companion's solo-only row is disabled with its reason and emits nothing", async () => {
+    const w = mountPanel(ritePanel({ performers: RITE_PARTY }), 1);
+    const solo = row(w, "bathe");
+    expect(solo.attributes("aria-disabled")).toBe("true");
+    expect(solo.get('[data-testid="choice-card-reason"]').text()).toBe(SOLO_ONLY_REASON);
+    await key(w, "2");
+    await key(w, "Enter");
+    await solo.trigger("click");
+    expect(w.emitted("perform")).toBeUndefined();
+    await key(w, "1");
+    expect(w.emitted("perform")).toEqual([["drink"]]);
   });
 });
