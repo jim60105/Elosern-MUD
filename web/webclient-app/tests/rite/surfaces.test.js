@@ -13,7 +13,16 @@ import RiteArrivalCard from "../../components/rite/RiteArrivalCard.vue";
 import { SOLO_ONLY_REASON, UNSEEN_LABEL, riteRows, ritePerformers } from "../../components/rite/rite-model.js";
 import { RITE_ART_PANEL, RITE_PARTY, ritePanel, ritePanelWithArt } from "../../stories/fixtures/rite.js";
 
+// Every mounted wrapper is unmounted, then the body cleared, in one hook, so
+// a failed assertion never leaves a live app or listener behind.
+const mounted = [];
+function track(wrapper) {
+  mounted.push(wrapper);
+  return wrapper;
+}
+
 afterEach(() => {
+  while (mounted.length) mounted.pop().unmount();
   document.body.innerHTML = "";
 });
 
@@ -64,12 +73,17 @@ describe("RiteArrivalCard", () => {
   let documentKeys = [];
   const onDocumentKey = (event) => documentKeys.push(event.key);
 
-  function mountCard(rite = ritePanel(), props = {}) {
+  beforeEach(() => {
     documentKeys = [];
     document.addEventListener("keydown", onDocumentKey);
-    const wrapper = mount(RiteArrivalCard, { attachTo: document.body, props: { rite, artPanel: RITE_ART_PANEL, ...props } });
-    wrapper.cleanup = () => document.removeEventListener("keydown", onDocumentKey);
-    return wrapper;
+  });
+
+  afterEach(() => {
+    document.removeEventListener("keydown", onDocumentKey);
+  });
+
+  function mountCard(rite = ritePanel(), props = {}) {
+    return track(mount(RiteArrivalCard, { attachTo: document.body, props: { rite, artPanel: RITE_ART_PANEL, ...props } }));
   }
 
   const byId = (w, id) => w.get(`[data-testid="${id}"]`);
@@ -91,16 +105,12 @@ describe("RiteArrivalCard", () => {
     expect([seen.attributes("data-seen"), seen.attributes("data-total")]).toEqual(["1", "2"]);
     expect(seen.text()).toMatch(/1\D+2/);
     const unlitText = unlitLine.text();
-    unlit.cleanup();
-    unlit.unmount();
 
     const litCard = mountCard(ritePanel({ district: { ...ritePanel().district, lit: true } }));
     const litLine = byId(litCard, "rite-arrival-district");
     expect(litLine.attributes("data-lit")).toBe("true");
     expect(litLine.text()).toContain("合成高地");
     expect(litLine.text()).not.toBe(unlitText);
-    litCard.cleanup();
-    litCard.unmount();
   });
 
   it("reads differently as a revisit than as an arrival", () => {
@@ -108,13 +118,9 @@ describe("RiteArrivalCard", () => {
     const kicker = byId(arrival, "rite-arrival-kicker");
     expect(kicker.attributes("data-revisit")).toBe("false");
     const arrivalText = kicker.text();
-    arrival.cleanup();
-    arrival.unmount();
     const revisit = mountCard(ritePanel(), { revisit: true });
     expect(byId(revisit, "rite-arrival-kicker").attributes("data-revisit")).toBe("true");
     expect(byId(revisit, "rite-arrival-kicker").text()).not.toBe(arrivalText);
-    revisit.cleanup();
-    revisit.unmount();
   });
 
   it("focuses approach on mount; Enter approaches once and a held repeat does nothing", async () => {
@@ -131,8 +137,13 @@ describe("RiteArrivalCard", () => {
     expect(w.emitted("leave")).toHaveLength(1);
     await key(root, "x");
     expect(documentKeys).toEqual([]);
-    w.cleanup();
-    w.unmount();
+  });
+
+  it("Enter on the dialog itself approaches", async () => {
+    const w = mountCard();
+    await key(byId(w, "rite-arrival-card").element, "Enter");
+    expect(w.emitted("approach")).toHaveLength(1);
+    expect(w.emitted("leave")).toBeUndefined();
   });
 
   it("an IME composition's Enter and Escape do nothing", async () => {
@@ -141,8 +152,6 @@ describe("RiteArrivalCard", () => {
     await key(document.activeElement, "Escape", { isComposing: true });
     expect(w.emitted("approach")).toBeUndefined();
     expect(w.emitted("leave")).toBeUndefined();
-    w.cleanup();
-    w.unmount();
   });
 
   it("Tab moves only between the two buttons, and Enter on the leave button leaves", async () => {
@@ -159,8 +168,6 @@ describe("RiteArrivalCard", () => {
     await key(leave, "Enter");
     expect(w.emitted("leave")).toHaveLength(1);
     expect(w.emitted("approach")).toBeUndefined();
-    w.cleanup();
-    w.unmount();
   });
 
   it("each button's click emits its own event", async () => {
@@ -169,8 +176,6 @@ describe("RiteArrivalCard", () => {
     await byId(w, "rite-arrival-approach").trigger("click");
     expect(w.emitted("leave")).toHaveLength(1);
     expect(w.emitted("approach")).toHaveLength(1);
-    w.cleanup();
-    w.unmount();
   });
 
   it("collapses the art band without a descriptor and shows the artwork with one", () => {
@@ -178,13 +183,9 @@ describe("RiteArrivalCard", () => {
     expect(plain.find('[data-testid="artwork-preview"]').exists()).toBe(false);
     expect(plain.find("img").exists()).toBe(false);
     expect(byId(plain, "rite-arrival-art").classes()).toContain("is-empty");
-    plain.cleanup();
-    plain.unmount();
     const art = mountCard(ritePanelWithArt());
     expect(art.find('[data-testid="artwork-preview"]').exists()).toBe(true);
     expect(byId(art, "rite-arrival-art").classes()).not.toContain("is-empty");
-    art.cleanup();
-    art.unmount();
   });
 
   it("renders no line of the panel's delivery", () => {
@@ -205,20 +206,15 @@ describe("RiteArrivalCard", () => {
     const w = mountCard(rite);
     const text = w.text();
     for (const line of delivery.lines) expect(text).not.toContain(line.text);
-    w.cleanup();
-    w.unmount();
   });
 
   it("shows at rest when the entrance is off", () => {
     const w = mountCard(ritePanel(), { entrance: false });
     expect(byId(w, "rite-arrival-card").classes()).toContain("choice-card--still");
-    w.cleanup();
-    w.unmount();
   });
 });
 
 describe("RitePanel", () => {
-  let wrapper = null;
   let documentKeys = [];
   const onDocumentKey = (event) => documentKeys.push(event.key);
 
@@ -229,16 +225,15 @@ describe("RitePanel", () => {
 
   afterEach(() => {
     document.removeEventListener("keydown", onDocumentKey);
-    wrapper?.unmount();
-    wrapper = null;
   });
 
   function mountPanel(rite = ritePanel(), performerIndex = 0, props = {}) {
-    wrapper = mount(RitePanel, {
-      attachTo: document.body,
-      props: { rite, performer: ritePerformers(rite)[performerIndex], ...props },
-    });
-    return wrapper;
+    return track(
+      mount(RitePanel, {
+        attachTo: document.body,
+        props: { rite, performer: ritePerformers(rite)[performerIndex], ...props },
+      }),
+    );
   }
 
   const card = (w) => w.get('[data-testid="rite-panel"]');
@@ -310,23 +305,21 @@ describe("RitePanel", () => {
 
 describe("RiteBackdrop", () => {
   it("names the landmark and the guardian over the artwork", () => {
-    const w = mount(RiteBackdrop, { props: { rite: ritePanelWithArt(), artPanel: RITE_ART_PANEL } });
+    const w = track(mount(RiteBackdrop, { props: { rite: ritePanelWithArt(), artPanel: RITE_ART_PANEL } }));
     const plate = w.get('[data-testid="rite-backdrop-plate"]').text();
     expect(plate).toContain("合成石龕");
     expect(plate).toContain("合成泉聲");
     expect(w.find('[data-testid="artwork-preview"]').exists()).toBe(true);
     expect(w.get('[data-testid="rite-backdrop"]').classes()).not.toContain("is-empty");
-    w.unmount();
   });
 
   it("shows quiet ink with the same plate and no image without artwork", () => {
-    const w = mount(RiteBackdrop, { props: { rite: ritePanel(), artPanel: RITE_ART_PANEL } });
+    const w = track(mount(RiteBackdrop, { props: { rite: ritePanel(), artPanel: RITE_ART_PANEL } }));
     const plate = w.get('[data-testid="rite-backdrop-plate"]').text();
     expect(plate).toContain("合成石龕");
     expect(plate).toContain("合成泉聲");
     expect(w.find('[data-testid="artwork-preview"]').exists()).toBe(false);
     expect(w.find("img").exists()).toBe(false);
     expect(w.get('[data-testid="rite-backdrop"]').classes()).toContain("is-empty");
-    w.unmount();
   });
 });
