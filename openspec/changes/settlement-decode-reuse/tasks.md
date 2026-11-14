@@ -27,7 +27,7 @@ Do not edit `world/maps/monster_activity.py`, `world/maps/population_forecast.py
 
 - [x] 5.1 Apply design D7. Verify: `grep -c "Settlement read reuse" docs/development/regional-monster-population.md` prints 1.
 - [x] 5.2 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate --change settlement-decode-reuse` and `openspec validate settlement-decode-reuse --strict`. Verify: all exit 0.
-- [ ] 5.3 Information only, never a gate: if a profiling database copy is available, record in the hand-off the wall time and SQL statement count of one 3,580 second `clock.advance(seconds, AdvanceSource.COMMAND, [])` before and after this change. Skip this task without failing when no copy is available.
+- [x] 5.3 Information only, never a gate: if a profiling database copy is available, record in the hand-off the wall time and SQL statement count of one 3,580 second `clock.advance(seconds, AdvanceSource.COMMAND, [])` before and after this change. Skip this task without failing when no copy is available.
   Skipped: no profiling database copy exists on this workstation (`server/db/evennia.db3` is empty and no copy is present under `/tmp`).
 
 ## Workflow follow-up
