@@ -49,6 +49,16 @@ class SampleTests(TestCase):
         self.assertTrue(True)
 """
 
+STACKED_ANNOTATED_TEST = """from unittest import TestCase
+from tools.spec_traceability import covers_requirement
+
+class SampleTests(TestCase):
+    @covers_requirement("sample::useful-behavior")
+    @covers_requirement("sample::useful-behavior")
+    def test_behavior(self):
+        self.assertTrue(True)
+"""
+
 
 class RequirementParsingTests(unittest.TestCase):
     @covers_requirement(
@@ -330,30 +340,38 @@ class RuntimeEvidenceTests(unittest.TestCase):
 
     def test_evidence_identity_follows_the_repository_path(self):
         """Detect evidence named after a package directory that cannot be imported."""
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            spec_path = root / "openspec" / "specs" / "sample" / "spec.md"
-            spec_path.parent.mkdir(parents=True)
-            spec_path.write_text(SPEC, encoding="utf-8")
-            package = root / "packages" / "map-core" / "tests"
-            package.mkdir(parents=True)
-            module_path = package / "test_sample.py"
-            module_path.write_text(ANNOTATED_TEST, encoding="utf-8")
-            spec = importlib.util.spec_from_file_location("test_sample", module_path)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            evidence = root / "evidence.jsonl"
-            with patch.dict(os.environ, {EVIDENCE_ENV: str(evidence)}):
-                module.SampleTests("test_behavior").test_behavior()
-            records = [
-                record["test"]
-                for record in map(json.loads, evidence.read_text().splitlines())
-            ]
-            report = verify(root, evidence)
-        self.assertEqual(
-            records, ["packages.map-core.tests.test_sample.SampleTests.test_behavior"]
-        )
-        self.assertTrue(report.ok)
+        for source in (ANNOTATED_TEST, STACKED_ANNOTATED_TEST):
+            with self.subTest(stacked=source != ANNOTATED_TEST):
+                with TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    spec_path = root / "openspec" / "specs" / "sample" / "spec.md"
+                    spec_path.parent.mkdir(parents=True)
+                    spec_path.write_text(SPEC, encoding="utf-8")
+                    package = root / "packages" / "map-core" / "tests"
+                    package.mkdir(parents=True)
+                    module_path = package / "test_sample.py"
+                    module_path.write_text(source, encoding="utf-8")
+                    module_spec = importlib.util.spec_from_file_location(
+                        "test_sample", module_path
+                    )
+                    module = importlib.util.module_from_spec(module_spec)
+                    module_spec.loader.exec_module(module)
+                    evidence = root / "evidence.jsonl"
+                    with patch.dict(os.environ, {EVIDENCE_ENV: str(evidence)}):
+                        module.SampleTests("test_behavior").test_behavior()
+                    records = [
+                        record["test"]
+                        for record in map(
+                            json.loads, evidence.read_text().splitlines()
+                        )
+                    ]
+                    report = verify(root, evidence)
+                self.assertTrue(records)
+                self.assertEqual(
+                    set(records),
+                    {"packages.map-core.tests.test_sample.SampleTests.test_behavior"},
+                )
+                self.assertTrue(report.ok)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import defaultdict
+import inspect
 from dataclasses import asdict, dataclass
 from functools import lru_cache, wraps
 import json
@@ -117,9 +118,14 @@ def evidence_identity(test: Callable[..., Any]) -> str:
     ``packages.map-core.tests.test_authoring``. Building the identity from the
     file path makes the two sides agree for every layout pytest can collect; a
     test file outside any main spec tree keeps its imported module name.
+
+    Stacked decorators hand this function the previous layer's wrapper, whose
+    code lives in this module, so the identity is taken from the innermost
+    wrapped function: the test's own file.
     """
-    module = getattr(test, "__module__", "")
-    filename = getattr(getattr(test, "__code__", None), "co_filename", None)
+    original = inspect.unwrap(test)
+    module = getattr(original, "__module__", "")
+    filename = getattr(getattr(original, "__code__", None), "co_filename", None)
     if filename:
         path = Path(filename).resolve()
         root = _repository_root_for(path)
@@ -130,7 +136,7 @@ def evidence_identity(test: Callable[..., Any]) -> str:
                 relative = None
             if relative is not None:
                 module = ".".join(relative.with_suffix("").parts)
-    return f"{module}.{test.__qualname__}"
+    return f"{module}.{original.__qualname__}"
 
 
 def covers_requirement(*requirement_ids: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
