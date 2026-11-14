@@ -33,11 +33,12 @@ from world.maps import (
 from world.maps.population_lifecycle import settle_population_lifecycle
 from world.maps.regional_population import (
     POPULATION_SEED_ATTRIBUTE,
-    PopulationTransition,
     MalformedPopulationState,
+    PopulationTransition,
     initialize_zone,
     presence_of,
     read_population_timeline,
+    record_population_protection,
     record_population_transition,
     restore_population_surfaces,
     snapshot_population_surfaces,
@@ -50,6 +51,8 @@ from world.maps.tests.test_monster_activity import (
     SOLO_ACTIVITY,
     ActivityFixture,
 )
+from world.maps.wilderness_provider import WILDERNESS_NAME
+from world.rules.movement_edges import LocationRef
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS
 
 ORDINARY = next(iter(SYNTH_MONSTER_VARIANTS))
@@ -88,6 +91,11 @@ def _timeline_record(settled_through_tick: int) -> dict:
         "transitions": [],
         "protection": [],
     }
+
+
+def _cell_ref(cell: tuple[int, int]) -> LocationRef:
+    """One wilderness locator for a protection decision."""
+    return LocationRef.wilderness(WILDERNESS_NAME, *cell)
 
 
 class DecodeReuseTests(ActivityFixture):
@@ -169,8 +177,8 @@ class DecodeReuseTests(ActivityFixture):
             zone_states(self.wilderness)
 
 
-class ScenarioSettlementFixture(ActivityFixture):
-    """A synthetic world with two groups, a deficit zone and a due site."""
+class SettlementScenarioFixture(ActivityFixture):
+    """A synthetic ecology zone and composition the settlement can write."""
 
     def setUp(self):
         super().setUp()
@@ -191,22 +199,15 @@ class ScenarioSettlementFixture(ActivityFixture):
             SOLO_ACTIVITY,
             (CompositionMember(ORDINARY, 1, 1),),
         )
-        self.site = MonsterSite(
-            key=SITE_KEY,
-            kind="camp",
-            region_key=self.region,
-            coordinates=CELLS[0],
-            composition_key=COMPOSITION_KEY,
-            activity_key=SOLO_ACTIVITY,
-            capacity=1,
-            one_shot=False,
-            recover_after_ticks=SITE_RECOVERY_TICKS,
-        )
+        # The fixture's own zone stays addressable, but only a zone with a
+        # stored record ever settles: the scenario zone is the only one noted.
+        zones = dict(regional_population.ECOLOGY_ZONE_REGISTRY)
+        zones[ZONE_KEY] = self.zone
         self.enterContext(
             patch.object(
                 regional_population,
                 "ECOLOGY_ZONE_REGISTRY",
-                MappingProxyType({ZONE_KEY: self.zone}),
+                MappingProxyType(zones),
             )
         )
         self.enterContext(
@@ -244,66 +245,6 @@ class ScenarioSettlementFixture(ActivityFixture):
                 lambda zone: frozenset(CELLS),
             )
         )
-        self.enterContext(
-            patch.object(
-                monster_sites,
-                "MONSTER_SITE_REGISTRY",
-                MappingProxyType({SITE_KEY: self.site}),
-            )
-        )
-        self._wandering_seed: int | None = None
-        self._travelling_seed: int | None = None
-
-    # -- scenario seams -----------------------------------------------------
-
-    def _stay_seed_at(self, cell: tuple[int, int]) -> int:
-        """A seed whose first decision at the probe's cadence is a stay."""
-        if self._wandering_seed is not None:
-            return self._wandering_seed
-        interval = monster_activity.activity_decision_interval(GROUP_ACTIVITY)
-        for seed in range(64):
-            self._reset_activity(tick=START)
-            group_id, _bodies = self._group(cell=cell, seed=seed, tick=START)
-            decision = monster_activity.plan_group_decision(
-                self.wilderness, group_id, tick=START + interval
-            )
-            if decision.edge is None:
-                self._wandering_seed = seed
-                return seed
-        raise AssertionError("no seed produced a lawful stay at the first decision")
-
-    def _departure_seed_at(self, cell: tuple[int, int], wandering: int) -> int:
-        """A seed whose first decision is a lawful departure, after group one."""
-        if self._travelling_seed is not None:
-            return self._travelling_seed
-        interval = monster_activity.activity_decision_interval(SOLO_ACTIVITY)
-        for seed in range(64):
-            self._reset_activity(tick=START)
-            self._group(cell=WANDERING_CELL, seed=wandering, tick=START)
-            group_id, _bodies = self._group(
-                cell=cell, seed=seed, tick=START, activity=SOLO_ACTIVITY
-            )
-            decision = monster_activity.plan_group_decision(
-                self.wilderness, group_id, tick=START + interval
-            )
-            if decision.edge is not None:
-                self._travelling_seed = seed
-                return seed
-        raise AssertionError("no seed produced a lawful departure at the first decision")
-
-    def _cleared_site_record(self) -> dict:
-        """One cleared, recoverable site that repopulates inside the scenario."""
-        return {
-            SITE_KEY: {
-                "state": monster_sites.SITE_STATE_CLEARED,
-                "cleared_at_tick": START,
-                "seed": monster_sites._site_seed(self.wilderness, self.site),
-                "generation_sequence": 0,
-                # The defeated identities stay recorded across a clear; no
-                # recovered group ever reuses one.
-                "member_ids": [DEFEATED_ID],
-            }
-        }
 
     def _kill(self, individual: Monster, tick: int) -> None:
         """Zero one individual's HP and record its loss at that tick."""
@@ -320,10 +261,240 @@ class ScenarioSettlementFixture(ActivityFixture):
             ),
         )
 
+    def _deficit_zone(self) -> tuple[int, ...]:
+        """A fresh zone one member below its lower density at ``START``."""
+        self._reset_activity(tick=START)
+        self.wilderness.db.regional_population = {}
+        created = initialize_zone(self.wilderness, ZONE_KEY, seed=SEED, tick=START)
+        self._kill(Monster.objects.get(pk=created[0]), START)
+        return created
+
+    def _seed_for(
+        self,
+        *,
+        depart: bool,
+        activity: str,
+        cell: tuple[int, int],
+        prefix: tuple[str, int] | None = None,
+    ) -> int:
+        """A seed whose first scheduled decision departs (or stays)."""
+        interval = monster_activity.activity_decision_interval(activity)
+        for seed in range(64):
+            self._reset_activity(tick=START)
+            if prefix is not None:
+                self._group(
+                    cell=WANDERING_CELL, seed=prefix[1], tick=START, activity=prefix[0]
+                )
+            group_id, _bodies = self._group(
+                cell=cell, seed=seed, tick=START, activity=activity
+            )
+            decision = monster_activity.plan_group_decision(
+                self.wilderness, group_id, tick=START + interval
+            )
+            if (decision.edge is not None) == depart:
+                return seed
+        raise AssertionError("no seed produced the requested first decision")
+
+
+class PassFactTests(SettlementScenarioFixture):
+    """One pass reads each pass-stable population fact once."""
+
+    def test_a_quiet_pass_over_many_boundaries_reads_each_fact_once(self):
+        staying = self._seed_for(depart=False, activity=GROUP_ACTIVITY, cell=PROBE)
+        departing = self._seed_for(
+            depart=True,
+            activity=SOLO_ACTIVITY,
+            cell=TRAVELLING_CELL,
+            prefix=(GROUP_ACTIVITY, staying),
+        )
+        self._reset_activity(tick=START)
+        staying_group, _bodies = self._group(cell=PROBE, seed=staying, tick=START)
+        self._group(
+            cell=TRAVELLING_CELL,
+            seed=departing,
+            tick=START,
+            activity=SOLO_ACTIVITY,
+        )
+        with (
+            patch.object(
+                regional_population,
+                "_living_monsters",
+                wraps=regional_population._living_monsters,
+            ) as living_scan,
+            patch.object(
+                regional_population,
+                "_active_session_protection",
+                wraps=regional_population._active_session_protection,
+            ) as session_scan,
+        ):
+            settle_population_lifecycle(START, START + 300)
+        # The pass really crossed several boundaries.
+        self.assertGreaterEqual(
+            monster_activity.read_monster_activity(self.wilderness)
+            .groups[staying_group]
+            .sequence,
+            2,
+        )
+        self.assertEqual(living_scan.call_count, 1)
+        self.assertEqual(session_scan.call_count, 1)
+
+    def test_a_birth_inside_the_pass_is_read_with_its_home_zone(self):
+        created = self._deficit_zone()
+        scans: list[tuple[int, ...]] = []
+        living_scan = regional_population._living_monsters
+
+        def recording_scan():
+            rows = living_scan()
+            scans.append(tuple(int(row.pk) for row in rows))
+            return rows
+
+        with patch.object(regional_population, "_living_monsters", recording_scan):
+            settle_population_lifecycle(START, START + RECOVERY_DELAY + 20)
+        newborn_ids = {
+            int(row.pk)
+            for row in Monster.objects.all_family()
+            if int(row.pk) not in set(created)
+            and row.db.home_ecology_zone == ZONE_KEY
+        }
+        self.assertTrue(newborn_ids)
+        # A later read of the same pass enumerated the newborn individuals; the
+        # first one could not have.
+        self.assertNotIn(newborn_ids, [set(scan) for scan in scans[:1]])
+        self.assertTrue(
+            any(newborn_ids <= set(scan) for scan in scans[1:]),
+            msg=f"newborn {sorted(newborn_ids)} missing from a later scan",
+        )
+        presence = regional_population.presence_at(self.wilderness)
+        for newborn_id in newborn_ids:
+            self.assertTrue(presence[newborn_id].alive)
+            self.assertEqual(presence[newborn_id].home_zone, ZONE_KEY)
+
+    def test_protected_cells_are_computed_once_per_tick(self):
+        self._reset_activity(tick=START)
+        record_population_protection(
+            self.wilderness,
+            engagement_id="scenario-engagement",
+            cell=WANDERING_CELL,
+            start_tick=START,
+            end_tick=None,
+        )
+        cells = (WANDERING_CELL, TRAVELLING_CELL, CELLS[0])
+        with patch.object(
+            regional_population,
+            "_protected_cells_at",
+            wraps=regional_population._protected_cells_at,
+        ) as shared_compute:
+            with regional_population.reused_living_presence():
+                shared = [
+                    monster_activity._destination_blocked(
+                        self.wilderness, _cell_ref(cell), START
+                    )
+                    for cell in cells
+                ]
+        unaided_compute = patch.object(
+            regional_population,
+            "_protected_cells_at",
+            wraps=regional_population._protected_cells_at,
+        )
+        with unaided_compute as unshared_compute:
+            unaided = [
+                monster_activity._destination_blocked(
+                    self.wilderness, _cell_ref(cell), START
+                )
+                for cell in cells
+            ]
+        self.assertEqual(shared_compute.call_count, 1)
+        self.assertEqual(unshared_compute.call_count, len(cells))
+        self.assertEqual(shared, unaided)
+        self.assertEqual(shared, [True, False, False])
+        # A timeline write at the same tick is a new stored value.
+        with patch.object(
+            regional_population,
+            "_protected_cells_at",
+            wraps=regional_population._protected_cells_at,
+        ) as recompute:
+            with regional_population.reused_living_presence():
+                before = regional_population.protected_cells(
+                    self.wilderness, at_tick=START
+                )
+                record_population_protection(
+                    self.wilderness,
+                    engagement_id="second-engagement",
+                    cell=TRAVELLING_CELL,
+                    start_tick=START,
+                    end_tick=None,
+                )
+                after = regional_population.protected_cells(
+                    self.wilderness, at_tick=START
+                )
+        self.assertEqual(recompute.call_count, 2)
+        self.assertNotIn(TRAVELLING_CELL, before)
+        self.assertIn(TRAVELLING_CELL, after)
+
+
+class ScenarioSettlementFixture(SettlementScenarioFixture):
+    """A synthetic world with two groups, a deficit zone and a due site."""
+
+    def setUp(self):
+        super().setUp()
+        self.site = MonsterSite(
+            key=SITE_KEY,
+            kind="camp",
+            region_key=self.region,
+            coordinates=CELLS[0],
+            composition_key=COMPOSITION_KEY,
+            activity_key=SOLO_ACTIVITY,
+            capacity=1,
+            one_shot=False,
+            recover_after_ticks=SITE_RECOVERY_TICKS,
+        )
+        self.enterContext(
+            patch.object(
+                monster_sites,
+                "MONSTER_SITE_REGISTRY",
+                MappingProxyType({SITE_KEY: self.site}),
+            )
+        )
+        self._wandering_seed: int | None = None
+        self._travelling_seed: int | None = None
+
+    def _stay_seed(self, cell: tuple[int, int]) -> int:
+        """A seed whose first decision is a stay, with no earlier group."""
+        if self._wandering_seed is None:
+            self._wandering_seed = self._seed_for(
+                depart=False, activity=GROUP_ACTIVITY, cell=cell
+            )
+        return self._wandering_seed
+
+    def _departure_seed(self, cell: tuple[int, int], wandering: int) -> int:
+        """A seed whose first decision departs, after the wandering group."""
+        if self._travelling_seed is None:
+            self._travelling_seed = self._seed_for(
+                depart=True,
+                activity=SOLO_ACTIVITY,
+                cell=cell,
+                prefix=(GROUP_ACTIVITY, wandering),
+            )
+        return self._travelling_seed
+
+    def _cleared_site_record(self) -> dict:
+        """One cleared, recoverable site that repopulates inside the scenario."""
+        return {
+            SITE_KEY: {
+                "state": monster_sites.SITE_STATE_CLEARED,
+                "cleared_at_tick": START,
+                "seed": monster_sites._site_seed(self.wilderness, self.site),
+                "generation_sequence": 0,
+                # The defeated identities stay recorded across a clear; no
+                # recovered group ever reuses one.
+                "member_ids": [DEFEATED_ID],
+            }
+        }
+
     def _build_scenario(self) -> tuple[int, ...]:
         """Rebuild the identical starting world of the differential test."""
-        wandering = self._stay_seed_at(WANDERING_CELL)
-        travelling = self._departure_seed_at(TRAVELLING_CELL, wandering)
+        wandering = self._stay_seed(WANDERING_CELL)
+        travelling = self._departure_seed(TRAVELLING_CELL, wandering)
         self._reset_activity(tick=START)
         self.wilderness.db.regional_population = {}
         self.wilderness.db.monster_sites = self._cleared_site_record()
@@ -378,5 +549,8 @@ class DifferentialSettlementTests(ScenarioSettlementFixture):
         # The scenario really settled: a due episode, a site recovery and a
         # journey all happened, so the equality above is not an untouched state.
         self.assertGreater(reference["zones"][ZONE_KEY]["generation_sequence"], 0)
-        self.assertEqual(reference["sites"][SITE_KEY]["state"], monster_sites.SITE_STATE_POPULATED)
+        self.assertEqual(
+            reference["sites"][SITE_KEY]["state"],
+            monster_sites.SITE_STATE_POPULATED,
+        )
         self.assertTrue(reference["activity"]["journeys"])

@@ -1361,16 +1361,18 @@ class BulkSettlementEconomyTests(ActivityFixture):
                 self.assertEqual(scan.call_count, 1)
                 self.wilderness.db.itemcoordinates[bodies[0]] = (501, 701)
                 moved = regional_population.presence_at(self.wilderness)
-                self.assertEqual(scan.call_count, 2)
+                # A moved individual changes the measured presence, never the
+                # pass's enumerated roster: the members are enumerated once.
+                self.assertEqual(scan.call_count, 1)
                 self.assertEqual(
                     (moved[bodies[0].pk].position.x, moved[bodies[0].pk].position.y),
                     (501, 701),
                 )
                 regional_population.forget_living_presence()
                 regional_population.presence_at(self.wilderness)
-                self.assertEqual(scan.call_count, 3)
+                self.assertEqual(scan.call_count, 2)
             regional_population.presence_at(self.wilderness)
-            self.assertEqual(scan.call_count, 4)
+            self.assertEqual(scan.call_count, 3)
 
 
 def from_stored(wilderness):
