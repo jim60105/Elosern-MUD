@@ -134,11 +134,11 @@ def perform_rite(actor: Any, option_key: str, member_id: int | None = None, *, o
 5. Perspective `watch` and `option.watch_scene is None` -> `rite_no_watch_scene`.
 6. `read_record(owner)`; `LandmarkRiteRecordError` -> `log_warn("landmark_rite_record_corrupt", exc=error, context={"char": owner.pk, "district": site.district_key})`, then `rite_record_corrupt`.
 7. `party_in_combat(actor, body)`, or `live_dialogue_session(owner) is not None`, or `sleep_blocks_actions(actor)` -> `rite_unavailable`.
-8. `entities = present_party_scope(actor)`; inside `advance_scope(entities)`, `planned_seconds(entities, option.seconds, tick=get_world_clock().tick) != option.seconds` -> `rite_interrupted`.
+8. `entities = present_party_scope(actor)`; inside `advance_scope(entities)`, `planned_seconds(entities, option.seconds, tick=<current tick>) != option.seconds` -> `rite_interrupted`. The current tick is `read_world_clock()`'s, or `0` when no clock exists: preflight is a read and must never create the clock singleton (`get_world_clock` would).
 
 **`perform_rite`**:
 
-1. Replay: when `operation_id` is not `None` and the module-level receipt cache holds it, return the cached `RiteResult` and do nothing else. The cache is an insertion-ordered dict bounded to 256 entries (drop the oldest), written only from an `on_commit` callback.
+1. Replay: when `operation_id` is not `None` and the module-level receipt cache holds it, return the cached `RiteResult` and do nothing else. The cache is keyed by the acting body's pk together with the request identity, so a colliding identity from another character replays nothing that character never did; it is an insertion-ordered dict bounded to 256 entries (drop the oldest), written only from an `on_commit` callback.
 2. `plan = preflight(...)`.
 3. `admit_contact_before_action(actor)`, then `evaluate_skip_safety(actor) is not None` -> `rite_unsafe`. (Admission may start an encounter; that is the existing behaviour of every time-consuming action and is not a rite write.)
 4. Build the rollback state before the transaction, exactly as the prayer rite does: `entities = present_party_scope(actor)`, `registry = build_advance_snapshot_registry(clock, option.seconds, AdvanceSource.SKIP, entities, mental_scope=entities)`, `tick_snapshot = _snapshot_clock_tick(clock)`, `record_snapshot = attribute_snapshot(owner, RECORD_ATTR)`. Read `climax_before = body.sexual.climax_today` and `first = site.district_key not in read_record(owner)["completed"]`.
@@ -146,9 +146,11 @@ def perform_rite(actor: Any, option_key: str, member_id: int | None = None, *, o
    - `apply_pleasure_gain(body, 100)` then `apply_pleasure_gain(body, 0)`;
    - `body.sexual.shame.value += option.shame`; `body.sexual.exposure.value += option.exposure`;
    - `result = advance_wait(actor, option.seconds)` — never pass the caller's `operation_id`: `advance_wait` records its id in an in-memory ledger that no rollback clears (`world/rules/time_skip.py` `_record`), so a retried id after a rolled-back rite would return the old result without advancing time; `result.elapsed_seconds != option.seconds` -> raise `RiteRefused("rite_interrupted")`;
-   - `write_record(owner, with_completion(read_record(owner), site.district_key, option.key, clock.tick))`;
+   - `write_record(owner, with_completion(read_record(owner), site.district_key, option.key, tick))`, `tick` being the world tick after the advance (`int(get_world_clock().tick)`: the enclosing snapshot's clock instance is pre-advance, because `advance_wait` resolves its own);
    - build the `RiteResult` (`climax = body.sexual.climax_today > climax_before`);
    - `transaction.on_commit(...)`: store the receipt and `log_info("landmark_rite_committed", context={"char": owner.pk, "district": ..., "archetype": ..., "option": ..., "body": body.pk, "seconds": option.seconds, "elapsed": result.elapsed_seconds, "climax": climax})`.
+
+   The record is the one surface re-read under the transaction (`with_completion(read_record(owner), ...)`); the district, option and acting body come from the plan `preflight` resolved microseconds earlier in the same synchronous request, so nothing can change them between the two steps.
 6. `except Exception:` restore with `_restore_clock_tick(clock, tick_snapshot)`, `_restore_advance_registry(registry, entities)`, `restore_attribute_best_effort(owner, RECORD_ATTR, record_snapshot)`, then re-raise.
 7. Every `RiteRefused` leaving `perform_rite` is logged once before it propagates: `log_info("landmark_rite_refused", context={"char": <owner pk or actor pk>, "district": <district key or "">, "reason": code})`.
 

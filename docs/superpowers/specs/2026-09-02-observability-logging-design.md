@@ -300,6 +300,9 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
 | `quest_beat_publication_rejected` | `beat_id`, `snapshot_id`, `owner`; warning with sanitized exception type/message, no blueprint or prose-bearing chain |
 | `possession_release` | `char`、`npc`、`reason`、`room`；正常歸位或隊伍變更交還控制權的狀態邊界（`handback`／`party_change`），記錄同伴最終所在房間 |
+| `landmark_rite_committed` | `char`、`district`、`archetype`、`option`、`body`、`seconds`、`elapsed`、`climax`；地標儀式完成的耐用提交邊界，`char` 為紀錄擁有者、`body` 為實際演出的身體，僅於最外層提交時發出 |
+| `landmark_rite_refused` | `char`、`district`、`reason`；儀式以穩定代碼拒絕（`reason` 為拒絕代碼）；拒絕後未留下任何世界時間、性狀態或紀錄變更（提交後的護欄先還原其已寫入的部分） |
+| `landmark_rite_record_corrupt` | `char`、`district`（warn 級；儀式紀錄違反 schema 1 封套，讀取即拒絕且永不覆寫，修復屬 GM 控制台） |
 
 `fatigue_transition`、`monster_activity_decided`、`monster_departed`、`monster_arrived` 與 `monster_arrival_deferred` 在 population lifecycle settlement pass 內一律降為 debug 級，並由該 pass 的 `population_maintenance_settled` 匯總；同一批事件在 pass 之外（戰鬥逃逸、直接 owner 操作、clock 的 mental stage）以及 field contact 入場時仍維持 info 級。
 

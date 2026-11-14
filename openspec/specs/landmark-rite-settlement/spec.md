@@ -1,10 +1,9 @@
-# Spec Delta
+# landmark-rite-settlement Specification
 
 ## Purpose
-
 Defines where a landmark rite is available, who may perform it, when it is refused, and how one rite settles time, the acting body's sexual state and the completion record as a single atomic unit.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: A rite is available exactly on a rite landmark's node
 A rite SHALL be available when the record owner's current canonical node equals the canonical node of a district landmark whose district is assigned a ritual archetype, and nowhere else. The district and archetype SHALL be resolved by the server from that node.
@@ -33,7 +32,7 @@ Sexual state SHALL be written only to the acting body. The completion record SHA
 
 #### Scenario: Companion performs
 - **WHEN** a present companion performs an option that declares a watch scene
-- **THEN** the companion's sexual state changed, the player character's did not, the record is the player character's, and the delivered scene is the watch scene
+- **THEN** the companion's sexual state changed, no rite sexual write reached the player character (ordinary time settlement still settles it), the record is the player character's, and the delivered scene is the watch scene
 
 #### Scenario: Possessed companion
 - **WHEN** the player possesses a companion and that companion performs with no member named
