@@ -43,6 +43,7 @@ from world.rules.movement_edges import (
     legal_edges,
     quote_edge,
 )
+from world.rules.surfaces import outer_rollback_active, owned_atomic
 from world.rules.travel_cost import (
     MovementPreflightRefused,
     TraversalStatus,
@@ -1656,10 +1657,15 @@ def _emit_decided(plan: ActivityDecision) -> None:
 
 def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -> None:
     # The group is re-read inside the owning transaction; a stay writes only
-    # this record and the group's own bodies.
-    snapshot = snapshot_activity_surfaces(wilderness, member_ids=group.member_ids)
+    # this record and the group's own bodies. A pass inside an advance relies
+    # on that advance's rollback and keeps no protection of its own.
+    snapshot = (
+        None
+        if outer_rollback_active()
+        else snapshot_activity_surfaces(wilderness, member_ids=group.member_ids)
+    )
     try:
-        with transaction.atomic():
+        with owned_atomic():
             settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
             state = read_monster_activity(wilderness)
             current = state.groups.get(plan.group_id)
@@ -1690,7 +1696,8 @@ def _commit_stay(wilderness: Any, group: MonsterGroup, plan: ActivityDecision) -
             )
             _emit_decided(plan)
     except Exception:
-        restore_activity_surfaces(snapshot, wilderness=wilderness)
+        if snapshot is not None:
+            restore_activity_surfaces(snapshot, wilderness=wilderness)
         raise
 
 
@@ -1768,9 +1775,13 @@ def _commit_departure(
             "monster_activity_route_stale",
             "at least one living member can no longer take the selected edge",
         )
-    snapshot = snapshot_group_decision_surfaces(wilderness, plan.group_id)
+    snapshot = (
+        None
+        if outer_rollback_active()
+        else snapshot_group_decision_surfaces(wilderness, plan.group_id)
+    )
     try:
-        with transaction.atomic():
+        with owned_atomic():
             settle_group_idle(wilderness, plan.group_id, tick=plan.tick)
             state = read_monster_activity(wilderness)
             current = state.groups.get(plan.group_id)
@@ -1856,7 +1867,8 @@ def _commit_departure(
             )
             _emit_decided(plan)
     except Exception:
-        restore_activity_surfaces(snapshot, wilderness=wilderness)
+        if snapshot is not None:
+            restore_activity_surfaces(snapshot, wilderness=wilderness)
         raise
 
 

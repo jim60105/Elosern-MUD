@@ -126,6 +126,17 @@ def current_advance_scope() -> tuple[int, ...]:
     return _ADVANCE_SCOPE.get()
 
 
+#: Whether an advance currently holds the pre-advance snapshot registry that
+#: restores every surface its stages write. A lifecycle pass may rely on it
+#: instead of protecting each operation a second time.
+_ADVANCE_REGISTRY_HELD: bool = False
+
+
+def advance_registry_held() -> bool:
+    """Whether the running advance holds the rollback for its stages' writes."""
+    return _ADVANCE_REGISTRY_HELD
+
+
 @contextmanager
 def advance_scope(entities: Iterable[Any]):
     """Bind the settled bodies for one outer owner's snapshot and advance."""
@@ -1489,6 +1500,7 @@ class WorldClock:
         stages and tick persistence inside the same transaction, once, and only
         for a positive interval.
         """
+        global _ADVANCE_REGISTRY_HELD
         if seconds < 0:
             raise ValueError("seconds must be non-negative")
         if seconds > MAX_ADVANCE_SECONDS:
@@ -1525,7 +1537,13 @@ class WorldClock:
             raise
         tick_snapshot = _snapshot_clock_tick(self)
         tick_from = self.tick
+        # The registry captured above restores every surface the stages write,
+        # so a lifecycle pass may rely on it instead of protecting each
+        # operation a second time. A nested advance restores the previous
+        # value, so ``advance_bounded``'s own registry keeps owning the window.
+        held_before = _ADVANCE_REGISTRY_HELD
         try:
+            _ADVANCE_REGISTRY_HELD = True
             with transaction.atomic():
                 events = _run_stages(self, seconds, source, scope, mental=mental)
                 self.tick += seconds
@@ -1572,6 +1590,7 @@ class WorldClock:
             _restore_advance_registry(registry, scope)
             raise
         finally:
+            _ADVANCE_REGISTRY_HELD = held_before
             _ADVANCE_SCOPE.reset(scope_token)
         return events
 

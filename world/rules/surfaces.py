@@ -12,10 +12,71 @@ The same module owns the engine-cache recovery those failure paths need
 every room's contents cache disagreeing with the database.
 """
 
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from copy import deepcopy
 from typing import Any, Mapping
 
+from django.db import transaction
+
 from world.observability import log_warn
+
+
+#: Whether an enclosing owner currently restores every surface the enclosed
+#: work writes. A plain module global, like ``monster_activity._ACTIVE_BATCH``:
+#: settlement runs synchronously on the reactor thread, so there is no second
+#: writer to race.
+_OUTER_ROLLBACK: bool = False
+
+
+@contextmanager
+def outer_rollback_owner() -> Iterator[None]:
+    """Declare that an enclosing owner restores every surface the enclosed work writes.
+
+    The enclosed work must not snapshot or open a savepoint of its own: a
+    failure propagates to the owner, which rolls the whole operation back and
+    restores the live caches its registry captured before the first write.
+    """
+    global _OUTER_ROLLBACK
+    previous = _OUTER_ROLLBACK
+    _OUTER_ROLLBACK = True
+    try:
+        yield
+    finally:
+        _OUTER_ROLLBACK = previous
+
+
+@contextmanager
+def suspended_outer_rollback() -> Iterator[None]:
+    """Run the enclosed work with its own protection, then resume the owner.
+
+    For an operation inside an owner that recovers from its own failure and
+    lets the enclosing work continue: that operation's writes must roll back
+    to its own savepoint, because the owner is not going to roll back.
+    """
+    global _OUTER_ROLLBACK
+    previous = _OUTER_ROLLBACK
+    _OUTER_ROLLBACK = False
+    try:
+        yield
+    finally:
+        _OUTER_ROLLBACK = previous
+
+
+def outer_rollback_active() -> bool:
+    """Whether an enclosing owner currently holds the rollback."""
+    return _OUTER_ROLLBACK
+
+
+def owned_atomic() -> AbstractContextManager[Any]:
+    """``contextlib.nullcontext()`` under an outer owner, else ``transaction.atomic()``.
+
+    Under an owner the enclosing transaction already covers the write, so a
+    savepoint would only pay for protection the owner provides.
+    """
+    if _OUTER_ROLLBACK:
+        return nullcontext()
+    return transaction.atomic()
 
 
 def attribute_snapshot(obj: Any, key: str, category: str | None = None) -> tuple[bool, Any]:
