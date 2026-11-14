@@ -6,11 +6,11 @@ Do not edit `AppClient.vue`, `AppShell.vue`, any store, or anything under `docs/
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `landmark-rite-panel` is merged: `node -e "const p=require('./web/static/webclient/js/elosern/protocol/panels/rite.js'); if(typeof p.validateRitePanel!=='function') process.exit(1)"` exits 0. If not, stop and report.
+- [x] 1.1 Confirm `landmark-rite-panel` is merged: `node -e "const p=require('./web/static/webclient/js/elosern/protocol/panels/rite.js'); if(typeof p.validateRitePanel!=='function') process.exit(1)"` exits 0. If not, stop and report.
 
 ## 2. ChoiceCard header slot
 
-- [ ] 2.1 Apply design D1 to `ChoiceCard.vue`, add the `WithHeader` story and the header test. Verify: `pnpm test -- web/webclient-app/tests/components/choice_card.test.js` passes and `pnpm test -- web/webclient-app/tests/dialogue_choices.test.js` passes.
+- [x] 2.1 Apply design D1 to `ChoiceCard.vue`, add the `WithHeader` story and the header test. Verify: `pnpm test -- web/webclient-app/tests/components/choice_card.test.js` passes and `pnpm test -- web/webclient-app/tests/dialogue_choices.test.js` passes.
 
 ## 3. Components
 

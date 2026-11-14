@@ -98,6 +98,8 @@ const props = defineProps({
   autofocus: { type: Boolean, default: false },
   // A second BEM block rendered in parallel with `choice-card`.
   block: { type: String, default: null },
+  // The text an unread row's pip is named by for assistive technology.
+  unreadLabel: { type: String, default: "（未讀）" },
 });
 
 const emit = defineEmits(["pick", "back"]);
@@ -472,6 +474,10 @@ defineExpose({ focus, setActive, focusRow });
   >
     <span :class="cls('__corners')" aria-hidden="true"></span>
     <div v-if="caption" :class="cls('__caption')" aria-hidden="true">{{ caption }}</div>
+    <!-- A consumer's header inside the frame (it never scrolls with the
+         rows). It is not a menu item, so it is presentational inside the
+         menu; its text stays exposed. -->
+    <div v-if="$slots.header" :class="cls('__header')" role="presentation"><slot name="header" /></div>
     <div
       :key="viewKey"
       ref="scrollRef"
@@ -567,7 +573,7 @@ defineExpose({ focus, setActive, focusRow });
         <!-- A locked topic says so in text, not only by its padlock. -->
         <span v-if="row.lock" :class="cls('__sr')">（尚未解鎖）</span>
         <!-- An unread topic says so in text, not only by its pip. -->
-        <span v-else-if="row.unread" :class="cls('__sr')">（未讀）</span>
+        <span v-else-if="row.unread" :class="cls('__sr')">{{ unreadLabel }}</span>
       </span>
       <span
         v-if="row.unread && !row.lock"
@@ -716,6 +722,20 @@ defineExpose({ focus, setActive, focusRow });
 
 .choice-card__caption + .choice-card__rows {
   padding-top: calc(8px * var(--ui-scale));
+}
+
+/* A consumer's header (a line naming who acts, for one): a fixed row above
+   the rows, inset like a row's text, closed by a gold hairline. */
+.choice-card__header {
+  flex: none;
+  margin: 0 calc(22px * var(--ui-scale));
+  padding: calc(14px * var(--ui-scale)) 0 calc(6px * var(--ui-scale));
+  border-bottom: 1px solid rgba(185, 154, 96, 0.18);
+  animation: elosern-choice-card-in var(--motion-reveal) var(--ease-standard) backwards;
+}
+
+.choice-card--still .choice-card__header {
+  animation: none;
 }
 
 /* A labelled row group (slice U): the heading is a caption step above its
