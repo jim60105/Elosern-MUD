@@ -36,7 +36,7 @@ The validation SHALL skip every minimum-spacing pair in which a village or hamle
 - **THEN** the hamlet is reported
 
 ### Requirement: Road coverage bounds the gap between consecutive road settlements
-For each checked road, the validation SHALL treat as settlement positions the road's two ends, every cell on it that is an end of any road, and every village or hamlet cell on it, and SHALL report each pair of consecutive positions whose road length exceeds the configured maximum, counting a diagonal step as the square root of two.
+For every road, the validation SHALL treat as settlement positions the road's two ends, every cell on it that is an end of any road, and every village or hamlet cell on it, and SHALL report each pair of consecutive positions whose road length exceeds the configured maximum, counting a diagonal step as the square root of two.
 
 #### Scenario: Gap boundary
 - **WHEN** a straight synthetic road has its ends exactly the maximum apart, and a second road is one cell longer
@@ -58,24 +58,9 @@ For each checked road, the validation SHALL treat as settlement positions the ro
 - **WHEN** a diagonal road and a straight road have the same number of cells and only the diagonal one exceeds the maximum by length
 - **THEN** only the diagonal road is reported
 
-### Requirement: Road coverage applies only inside completed areas
-The validation SHALL check a road gap only when every cell of the gap lies in a completed area, where an area is a terrain region optionally narrowed to an inclusive cell rectangle. An empty area list SHALL check no gap.
-
-#### Scenario: Inside, crossing and outside
-- **WHEN** three over-long gaps lie wholly inside a completed area, across its boundary and wholly outside it
-- **THEN** only the first is reported
-
-#### Scenario: Rectangle bounds
-- **WHEN** an area narrows its region to a rectangle and an over-long gap lies in the region but outside the rectangle
-- **THEN** the gap is not reported
-
-#### Scenario: Empty list
-- **WHEN** the area list is empty and a road has an over-long gap
-- **THEN** no road gap is reported, and the other rules still run
-
-#### Scenario: Invalid area file
-- **WHEN** an area file has an unknown key, a duplicate identifier, malformed bounds or an undeclared region
-- **THEN** loading fails with an error naming the entry
+#### Scenario: A gap across regions is checked
+- **WHEN** an over-long gap has cells in two different terrain regions
+- **THEN** the road is reported
 
 ### Requirement: Villages and hamlets satisfy the placement identity rules
 The validation SHALL report a village or hamlet with a wrong identifier prefix, no lore row, a cell in a region without a nation, a lore nation that differs from its region's nation, a population outside its kind's range, or a cell in a road-forbidden region; a village on no road cell; any other kind using a reserved prefix; and any two locations sharing a display name.
@@ -89,7 +74,7 @@ The validation SHALL report a village or hamlet with a wrong identifier prefix, 
 - **THEN** both are reported, the duplicate once
 
 ### Requirement: The spacing command reports by exit status and writes nothing
-The command SHALL print one line per problem with its code and subject, and SHALL exit 0 with no problem, 1 with any problem, and 2 when the sources, the road artifact, the lore override or the area file do not load. It SHALL write no file.
+The command SHALL print one line per problem with its code and subject, and SHALL exit 0 with no problem, 1 with any problem, and 2 when the sources, the road artifact or the lore override do not load. It SHALL write no file.
 
 #### Scenario: Synthetic workspace runs
 - **WHEN** the command runs on a clean synthetic workspace, then after a hamlet is moved too close to a town, then with a corrupt road artifact
