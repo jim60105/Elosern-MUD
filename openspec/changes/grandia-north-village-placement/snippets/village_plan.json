@@ -1,0 +1,128 @@
+[
+  {
+    "id": "village_elm_flat",
+    "kind": "village",
+    "cell": [1639, 1179],
+    "display_name_zh": "榆埔村",
+    "description": "Farming village on the elm-dotted flat of the maple foot road, between the maple wood and the steed plain.",
+    "geographic_constraint": "Elm-dotted open flat on the Maple Foot to Steed Plain road",
+    "population": 900
+  },
+  {
+    "id": "village_buckwheat_hollow",
+    "kind": "village",
+    "cell": [1672, 1470],
+    "display_name_zh": "蕎坳村",
+    "description": "Buckwheat-growing village in a shallow hollow of the crystal road, north of the black soil fields.",
+    "geographic_constraint": "Buckwheat hollow on the Black Soil to Crystal road",
+    "population": 800
+  },
+  {
+    "id": "village_wheat_slope",
+    "kind": "village",
+    "cell": [1990, 1331],
+    "display_name_zh": "麥坡村",
+    "description": "Wheat village on a long slope of the capital highway, between the capital and the wheat wave city.",
+    "geographic_constraint": "Wheat slope on the capital to Wheat Wave highway",
+    "population": 1200
+  },
+  {
+    "id": "village_birch_hollow",
+    "kind": "village",
+    "cell": [1832, 1316],
+    "display_name_zh": "樺坳村",
+    "description": "Village among birches in a hollow of the capital to maple foot road, west of the imperial river.",
+    "geographic_constraint": "Birch hollow on the capital to Maple Foot road",
+    "population": 700
+  },
+  {
+    "id": "village_linden_ridge",
+    "kind": "village",
+    "cell": [1719, 1516],
+    "display_name_zh": "椴嶺村",
+    "description": "Village on a linden-crowned ridge of the crystal road, north of the black soil fields.",
+    "geographic_constraint": "Linden ridge on the Black Soil to Crystal road",
+    "population": 900
+  },
+  {
+    "id": "village_hemp_plain",
+    "kind": "village",
+    "cell": [2017, 1515],
+    "display_name_zh": "麻原村",
+    "description": "Hemp-growing village on the open plain between the wheat wave city and the crystal town.",
+    "geographic_constraint": "Open hemp plain between Wheat Wave and Crystal",
+    "population": 1100
+  },
+  {
+    "id": "village_grain_hollow",
+    "kind": "village",
+    "cell": [1970, 1557],
+    "display_name_zh": "穀坳村",
+    "description": "Grain village in a hollow of the crystal road, south of the black soil downland.",
+    "geographic_constraint": "Grain hollow on the Wheat Wave to Crystal road",
+    "population": 800
+  },
+  {
+    "id": "village_awn_plain",
+    "kind": "village",
+    "cell": [2063, 1448],
+    "display_name_zh": "芒原村",
+    "description": "Village of awned barley fields on the plain of the capital highway, east of the imperial river.",
+    "geographic_constraint": "Barley plain on the capital to Wheat Wave highway",
+    "population": 1000
+  },
+  {
+    "id": "village_locust_hollow",
+    "kind": "village",
+    "cell": [1705, 1271],
+    "display_name_zh": "槐坳村",
+    "description": "Village under locust trees in a hollow of the capital to maple foot road, south of the maple woods.",
+    "geographic_constraint": "Locust hollow on the capital to Maple Foot road",
+    "population": 800
+  },
+  {
+    "id": "village_fallow_plain",
+    "kind": "village",
+    "cell": [1644, 1306],
+    "display_name_zh": "蕪原村",
+    "description": "Farming village on fallow flats beside the maple foot road, west of the imperial river.",
+    "geographic_constraint": "Fallow flats on the Black Soil to Maple Foot road",
+    "population": 700
+  },
+  {
+    "id": "village_bulrush_bend",
+    "kind": "village",
+    "cell": [1682, 1216],
+    "display_name_zh": "蒲灣村",
+    "description": "Village at a bulrush bend of the imperial west tributary, in the maple wood below the maple foot town.",
+    "geographic_constraint": "Bulrush bend of the imperial west tributary in the maple wood",
+    "population": 1400
+  },
+  {
+    "id": "village_channel_mouth",
+    "kind": "village",
+    "cell": [1946, 1140],
+    "display_name_zh": "汊口村",
+    "description": "Village where a side channel of the imperial west tributary meets the river flat, west of the imperial ferry city.",
+    "geographic_constraint": "Side channel and river flat of the imperial west tributary",
+    "population": 1500
+  },
+  {
+    "id": "village_tide_meadow",
+    "kind": "village",
+    "cell": [2398, 1516],
+    "display_name_zh": "潮野村",
+    "description": "Village on the tidal meadow of the east coast river, between the sunrise town and the dawnlight port.",
+    "geographic_constraint": "Tidal meadow of the east coast river below the coastal ridge",
+    "population": 1300
+  },
+  {
+    "id": "village_reed_shore",
+    "kind": "village",
+    "cell": [2122, 1508],
+    "display_name_zh": "荻岸村",
+    "description": "Village on a reed bank of the east coast river, on the plain east of the wheat wave city.",
+    "geographic_constraint": "Reed bank of the east coast river east of the wheat plain",
+    "population": 1200
+  }
+]

@@ -1,0 +1,227 @@
+[
+ {
+  "road": "capital_grandia -- city_imperial_ferry",
+  "from": [
+   1955,
+   1266
+  ],
+  "to": [
+   1987,
+   1132
+  ],
+  "from_index": 0,
+  "to_index": 134,
+  "cells": 135,
+  "km": 147.3
+ },
+ {
+  "road": "capital_grandia -- city_wheatwave",
+  "from": [
+   1955,
+   1272
+  ],
+  "to": [
+   2081,
+   1513
+  ],
+  "from_index": 0,
+  "to_index": 241,
+  "cells": 242,
+  "km": 293.2
+ },
+ {
+  "road": "capital_grandia -- town_maple_foot",
+  "from": [
+   1955,
+   1272
+  ],
+  "to": [
+   1645,
+   1239
+  ],
+  "from_index": 0,
+  "to_index": 315,
+  "cells": 316,
+  "km": 365.5
+ },
+ {
+  "road": "city_imperial_ferry -- city_starglow",
+  "from": [
+   1987,
+   1130
+  ],
+  "to": [
+   2031,
+   962
+  ],
+  "from_index": 0,
+  "to_index": 169,
+  "cells": 170,
+  "km": 187.6
+ },
+ {
+  "road": "city_imperial_ferry -- town_east_pasture",
+  "from": [
+   1987,
+   1130
+  ],
+  "to": [
+   2299,
+   901
+  ],
+  "from_index": 0,
+  "to_index": 339,
+  "cells": 340,
+  "km": 422.7
+ },
+ {
+  "road": "city_wheatwave -- town_crystal",
+  "from": [
+   2081,
+   1515
+  ],
+  "to": [
+   1872,
+   1632
+  ],
+  "from_index": 0,
+  "to_index": 209,
+  "cells": 210,
+  "km": 257.5
+ },
+ {
+  "road": "city_wheatwave -- town_sunken_bell",
+  "from": [
+   2081,
+   1515
+  ],
+  "to": [
+   2223,
+   1722
+  ],
+  "from_index": 0,
+  "to_index": 207,
+  "cells": 208,
+  "km": 265.8
+ },
+ {
+  "road": "city_wheatwave -- town_sunrise",
+  "from": [
+   2081,
+   1513
+  ],
+  "to": [
+   2393,
+   1463
+  ],
+  "from_index": 0,
+  "to_index": 318,
+  "cells": 319,
+  "km": 337.1
+ },
+ {
+  "road": "port_dawnlight -- town_sunrise",
+  "from": [
+   2465,
+   1529
+  ],
+  "to": [
+   2395,
+   1465
+  ],
+  "from_index": 0,
+  "to_index": 70,
+  "cells": 71,
+  "km": 96.5
+ },
+ {
+  "road": "port_tide_wind -- town_east_pasture",
+  "from": [
+   2581,
+   1160
+  ],
+  "to": [
+   2299,
+   901
+  ],
+  "from_index": 0,
+  "to_index": 283,
+  "cells": 284,
+  "km": 389.9
+ },
+ {
+  "road": "port_tide_wind -- town_sunrise",
+  "from": [
+   2581,
+   1161
+  ],
+  "to": [
+   2393,
+   1463
+  ],
+  "from_index": 0,
+  "to_index": 302,
+  "cells": 303,
+  "km": 379.9
+ },
+ {
+  "road": "town_black_soil -- town_crystal",
+  "from": [
+   1624,
+   1427
+  ],
+  "to": [
+   1871,
+   1632
+  ],
+  "from_index": 0,
+  "to_index": 247,
+  "cells": 248,
+  "km": 331.9
+ },
+ {
+  "road": "town_black_soil -- town_maple_foot",
+  "from": [
+   1624,
+   1427
+  ],
+  "to": [
+   1644,
+   1241
+  ],
+  "from_index": 0,
+  "to_index": 186,
+  "cells": 187,
+  "km": 194.3
+ },
+ {
+  "road": "town_crystal -- town_north_wood_keep",
+  "from": [
+   1871,
+   1632
+  ],
+  "to": [
+   1815,
+   1884
+  ],
+  "from_index": 0,
+  "to_index": 253,
+  "cells": 254,
+  "km": 275.8
+ },
+ {
+  "road": "town_maple_foot -- town_steed_plain",
+  "from": [
+   1644,
+   1241
+  ],
+  "to": [
+   1688,
+   865
+  ],
+  "from_index": 0,
+  "to_index": 381,
+  "cells": 382,
+  "km": 404.6
+ }
+]
