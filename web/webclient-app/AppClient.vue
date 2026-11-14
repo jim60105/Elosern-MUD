@@ -71,6 +71,11 @@ import CampfireCard from "./components/travel/CampfireCard.vue";
 import { medallionMembers, travelPlace } from "./components/travel/travel-model.js";
 import { useTravelMap } from "./composables/use-travel-map.js";
 import { useTravelInput } from "./composables/use-travel-input.js";
+import RiteArrivalCard from "./components/rite/RiteArrivalCard.vue";
+import RitePanel from "./components/rite/RitePanel.vue";
+import RiteBackdrop from "./components/rite/RiteBackdrop.vue";
+import RiteEntry from "./components/rite/RiteEntry.vue";
+import { useRiteStage } from "./composables/use-rite-stage.js";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
 const store = useElosernStore();
@@ -215,14 +220,103 @@ const travelPlan = computed(() => {
 // travel layout, so the arrival waits there and opens only if its cell is
 // still current when they close.
 const landmarkArrival = computed(() => (travelLayout.value ? store.view.travel?.arrival ?? null : null));
-const landmarkCardOpen = computed(
+// The landmark rite (landmark-rite-stage design D2/D3): on a rite landmark
+// the rite arrival card replaces the generic landmark card, behind the same
+// dream and sleep-handoff cards. 走近 presents the rite stage over the
+// committed exploration mode: the frame takes the dialogue presentation, the
+// party stands in the left actor anchor, the rite backdrop replaces the map,
+// and the message window shows the guardian's form, then the delivered
+// scene. Everything but the one perform is local and sends nothing.
+const choicesOwnedBySleep = computed(
   () =>
-    !!landmarkArrival.value &&
-    !dreamStage.active.value &&
-    !sleepHandoffSelectionOpen.value &&
-    !sleepHandoffQuestionOpen.value &&
-    !sleepHandoffContinuationOpen.value,
+    dreamStage.active.value ||
+    sleepHandoffSelectionOpen.value ||
+    sleepHandoffQuestionOpen.value ||
+    sleepHandoffContinuationOpen.value,
 );
+const riteStage = useRiteStage({ store, panel, travelLayout, blocked: choicesOwnedBySleep });
+const riteOnStage = riteStage.onStage;
+// The rite card or the stage holds the stage: the presence rail steps away.
+const riteSurfaceOpen = computed(() => riteStage.cardOpen.value || riteStage.onStage.value);
+const riteEntryRef = ref(null);
+const landmarkCardOpen = computed(
+  () => !!landmarkArrival.value && !choicesOwnedBySleep.value && !riteStage.rite.value,
+);
+// The arrival that brought the party onto a rite landmark is the rite card's:
+// once that card opens, the generic card never opens for it, then or later.
+watch(
+  () => (riteStage.cardOpen.value ? landmarkArrival.value?.id ?? null : null),
+  (id) => {
+    if (id) store.dismissTravelArrival(id);
+  },
+  { immediate: true },
+);
+// Focus the rite surfaces may take back: fallen out of the layout, still on
+// a rite surface, or where the shell's own mode-change rescue parked it (the
+// message page on entering the dialogue presentation, the action dock on
+// leaving it). Focus the player put anywhere else stays.
+function riteFocusReclaimable() {
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  return (
+    !active ||
+    active === document.body ||
+    !active.isConnected ||
+    !!active.closest?.('.rite-arrival, .rite-panel, [data-testid="message-page"], #action-dock')
+  );
+}
+async function afterShellFocus() {
+  // The shell re-homes focus one tick after a mode change and its
+  // exploration entry one tick later still.
+  await nextTick();
+  await nextTick();
+  await nextTick();
+}
+// 退開 from the card or the panel: back to the map (travel) or the room,
+// with focus on the map or on the return entry unless another surface
+// already took it.
+async function onRiteLeave() {
+  if (!riteStage.leave()) return;
+  await afterShellFocus();
+  if (!riteFocusReclaimable()) return;
+  if (travelLayout.value && travelMapRef.value?.focus) travelMapRef.value.focus();
+  else riteEntryRef.value?.focus?.();
+}
+// The rite panel holds focus while it is shown: on entering the stage and
+// when a scene's last acknowledgement returns it, the shell has parked focus
+// on the message page, and the panel takes it back.
+const ritePanelRef = ref(null);
+watch(
+  () => riteStage.panelShown.value,
+  async (shown) => {
+    if (!shown) return;
+    await afterShellFocus();
+    if (riteStage.panelShown.value && riteFocusReclaimable()) ritePanelRef.value?.focus?.();
+  },
+);
+function onRiteEntryOpen() {
+  if (!riteStage.entryShown.value) return false;
+  return riteStage.openEntry();
+}
+// The shell's bindings while the rite stage is presented (design D3); every
+// other surface reads the committed mode.
+const shellMode = computed(() => (riteOnStage.value ? "dialogue" : store.view.mode || "exploration"));
+const shellNarrative = computed(() => (riteOnStage.value ? riteStage.lines.value : store.narrative));
+const shellResponseMarks = computed(() => (riteOnStage.value ? [] : store.responseMarks));
+const shellDialogue = computed(() => (riteOnStage.value ? riteStage.dialogueModel.value : dialogueVM.value));
+const shellScene = computed(() => (riteOnStage.value ? riteStage.scene.presentation.value : scenePresentation.value));
+const shellSceneHold = computed(() => (riteOnStage.value ? riteStage.sceneHold.value : sceneHold.value));
+const shellSpeaker = computed(() => {
+  if (!riteOnStage.value) return speaker.value;
+  return riteStage.scene.active.value ? riteStage.scene.speaker.value : "host";
+});
+const shellTravel = computed(() => travelLayout.value && !riteOnStage.value);
+const shellTravelLog = computed(() =>
+  !riteOnStage.value && travelLogShown.value ? store.view.travel.entries : null,
+);
+function onShellSceneAdvance() {
+  if (riteOnStage.value) riteStage.advance();
+  else onSceneAdvance();
+}
 async function onLandmarkContinue(id) {
   if (!store.dismissTravelArrival(id)) return;
   await nextTick();
@@ -417,6 +511,7 @@ useWindowHotkeys(store, {
   openMap: () => openOverlayByName("map"),
   questsEnabled: () => navigationItems.value.some((item) => item.key === "quests" && item.enabled !== false),
   fullLogOpen: () => fullLogOpen.value,
+  onRiteEntry: onRiteEntryOpen,
 });
 // A companion figure on the stage lineup opens 成員 with that companion
 // (design §8): exploration only, outside the stage target step, and never
@@ -966,20 +1061,20 @@ const rootStyle = computed(() => {
   >
       <AppShell
         ref="shellRef"
-        :mode="store.view.mode || 'exploration'"
+        :mode="shellMode"
         :connected="store.view.connected"
         :location-label="placeLocationLabel"
         :time-label="placeTimeLabel"
-        :narrative="store.narrative"
-        :response-marks="store.responseMarks"
-        :dialogue="dialogueVM"
+        :narrative="shellNarrative"
+        :response-marks="shellResponseMarks"
+        :dialogue="shellDialogue"
         :font-scale="store.view.fontScale"
         :text-speed="store.view.textSpeed"
         :auto-advance="store.view.autoAdvance"
         :motion-level="store.view.motionLevel"
         :beat-playback="store.view.beatPlayback"
-        :scene="scenePresentation"
-        :scene-hold="sceneHold"
+        :scene="shellScene"
+        :scene-hold="shellSceneHold"
         :mode-change="modeChange"
         :beat-hold="beatHold"
         :card-open="
@@ -989,13 +1084,14 @@ const rootStyle = computed(() => {
           sleepHandoffQuestionOpen ||
           sleepHandoffContinuationOpen ||
           landmarkCardOpen ||
+          riteStage.cardOpen.value ||
           campOpen
         "
         :person-focus="personFocus"
         :formation="!!formation"
-        :travel="travelLayout"
-        :travel-log="travelLogShown ? store.view.travel.entries : null"
-        :speaker="speaker"
+        :travel="shellTravel"
+        :travel-log="shellTravelLog"
+        :speaker="shellSpeaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
         :offline="!store.view.connected"
@@ -1023,7 +1119,7 @@ const rootStyle = computed(() => {
         @focus-lost="onShellFocusLost"
         @open-full-log="openFullLog"
         @reading-change="onReadingChange"
-        @scene-advance="onSceneAdvance"
+        @scene-advance="onShellSceneAdvance"
         @beat-shown="store.beatShown"
         @beat-skip="store.skipBeats"
         @switch-character="onSwitchCharacter"
@@ -1064,7 +1160,7 @@ const rootStyle = computed(() => {
                combat in the wilderness keep their region art. -->
           <Transition name="travel-stage" :css="travelStageCss" v-bind="inertWhileLeaving">
             <TravelMap
-              v-if="travelLayout"
+              v-if="travelLayout && !riteOnStage"
               ref="travelMapRef"
               :grid="store.view.travel.map"
               :status="travelMapStatus"
@@ -1089,6 +1185,12 @@ const rootStyle = computed(() => {
               @retry="retryTravelMap"
             />
           </Transition>
+          <!-- The rite stage's ground (landmark-rite-stage design D3): the
+               archetype art under its ink wash covers the scene and takes
+               the map's place, crossfading with it like the travel map. -->
+          <Transition name="travel-stage" :css="travelStageCss" v-bind="inertWhileLeaving">
+            <RiteBackdrop v-if="riteOnStage" :rite="riteStage.rite.value" :art-panel="panel('art')" />
+          </Transition>
         </template>
         <!-- The player's standing portrait (webclient-avg-stage-shell D4):
              the current roster character's portrait stands on the bottom
@@ -1096,7 +1198,7 @@ const rootStyle = computed(() => {
              dimmed while the dialogue host speaks. -->
         <template #actor-left>
           <CompanionLineup
-            v-if="store.view.mode !== 'creation' && !travelLayout"
+            v-if="store.view.mode !== 'creation' && (!travelLayout || riteOnStage)"
             :slots="companionLineupSlots"
             :compact="inDialogue"
             :speaking-identity="companionSpeakingIdentity"
@@ -1131,7 +1233,7 @@ const rootStyle = computed(() => {
                copy. -->
           <Transition name="actor-enter" :css="standeeTransitionCss" v-bind="inertWhileLeaving">
             <StageActor
-              v-if="standee"
+              v-if="standee && !riteOnStage"
               :key="standee.identity"
               :data-identity="standee.identity"
               side="right"
@@ -1321,6 +1423,31 @@ const rootStyle = computed(() => {
             autofocus
             @pick="onSleepContinuationPick"
             @back="onSleepContinuationPick('back')"
+          />
+          <!-- The landmark rite (landmark-rite-stage design D3): on a rite
+               landmark its arrival card stands in for the generic landmark
+               card, and on the rite stage the rite panel offers the options
+               while no request is pending and no scene plays. Both trap
+               focus and send nothing themselves. -->
+          <RiteArrivalCard
+            v-else-if="riteStage.cardOpen.value"
+            :key="`rite-card:${riteStage.rite.value.district.key}:${store.view.rite.revisit}`"
+            :rite="riteStage.rite.value"
+            :art-panel="panel('art')"
+            :revisit="store.view.rite.revisit"
+            :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
+            @approach="riteStage.approach()"
+            @leave="onRiteLeave"
+          />
+          <RitePanel
+            v-else-if="riteStage.panelShown.value"
+            ref="ritePanelRef"
+            :key="`rite-panel:${riteStage.rite.value.district.key}`"
+            :rite="riteStage.rite.value"
+            :performer="riteStage.performer.value"
+            :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
+            @perform="riteStage.perform"
+            @leave="onRiteLeave"
           />
           <!-- The landmark arrival (wilderness-travel-route-ui): one
                committed typed arrival bound to the current node, after the
@@ -1528,12 +1655,12 @@ const rootStyle = computed(() => {
           <Transition name="presence-rail-fade" :css="store.view.motionLevel !== 'off'">
             <PresenceRail
               v-if="railMounted"
-              v-show="railShown"
+              v-show="railShown && !riteSurfaceOpen"
               ref="railRef"
               :entries="store.view.presenceEntries"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
-              :inert="!railShown || null"
+              :inert="!railShown || riteSurfaceOpen || null"
               @activate="onRailActivate"
               @hover="onRailHover"
               @tab="onRailTab"
@@ -1562,6 +1689,15 @@ const rootStyle = computed(() => {
            column (webclient-combat-formation D2). No reference panel lives
            here; they are drawers. -->
       <template #map>
+        <!-- The landmark rite's return entry (landmark-rite-stage design
+             D4): directly under the place card while the rite panel is
+             available and neither its card nor its stage is open. -->
+        <RiteEntry
+          v-if="riteStage.entryShown.value"
+          ref="riteEntryRef"
+          :guardian="riteStage.rite.value.guardian.name"
+          @open="riteStage.openEntry()"
+        />
         <!-- The minimap island (H2, design D9); hidden in combat. The
              `@move` wiring and `explore.move` submission are untouched. -->
         <LocalMap
@@ -1591,7 +1727,7 @@ const rootStyle = computed(() => {
       </template>
       <template #action-dock>
         <ActionDock
-          v-if="rootItems.length > 0 || !!store.view.degradedRoot || (store.view.mode !== 'creation' && !!store.view.dockSource) || (store.view.mode === 'creation' && panelAvailable('creation'))"
+          v-if="!riteOnStage && (rootItems.length > 0 || !!store.view.degradedRoot || (store.view.mode !== 'creation' && !!store.view.dockSource) || (store.view.mode === 'creation' && panelAvailable('creation')))"
           :mode="store.view.mode || 'exploration'"
           :root-items="rootItems"
           :tab-stop="!(store.view.mode === 'exploration' && explorationRootShown)"
