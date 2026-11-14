@@ -269,11 +269,11 @@ A scoped settlement pass SHALL build its presence facts from the members of the 
 - **THEN** both state projections are equal
 
 ### Requirement: Advance database work is independent of unobserved units
-The number of database statements one clock advance issues SHALL NOT depend on how many groups or individuals unobserved units hold.
+One clock advance SHALL NOT read, snapshot, write or otherwise name any individual, group or cell registration of an unobserved unit. The database work it issues for its own units SHALL be the same work whatever the unobserved units hold, so the rows it touches are those of the observed units, however many groups or individuals an unobserved unit has.
 
 #### Scenario: Growing the far zone
 - **WHEN** the same advance runs over a world whose unobserved zone holds one group of one individual and over a world whose unobserved zone holds six groups of three
-- **THEN** both advances issue the same number of database statements
+- **THEN** neither advance issues a statement that names an individual of the unobserved zone, while the same world enumerated whole does name them
 
 ### Requirement: A drain run settles the most lagging closed set by one bounded slice
 One drain run SHALL select the closed set of units with the lowest settled-through tick, ties broken by the smallest unit identifier, and SHALL settle it forward by at most the configured slice of game time and never past the world tick, admitting no field contact and leaving the world tick unchanged. A world with no lagging unit SHALL be left untouched.

@@ -5,8 +5,8 @@ same read: the members of the pass's own groups and the individuals registered
 on cells it covers, never every living row of the world. The proof is equality
 of two reads of one world (the zone measures and the individual facts) plus
 equality of state: the narrowed and the whole-world enumeration leave the same
-world after the same advances, and one advance's statement count does not follow
-how much an unobserved zone holds.
+world after the same advances, and one advance names no individual of an
+unobserved unit however much that unit holds.
 
 Every scenario is built from the synthetic two-zone world of
 :func:`world.maps.tests.test_scoped_population_settlement.build_two_zone_world`;
@@ -20,6 +20,7 @@ assertions establish; the archive sync produced those identifiers.
 from __future__ import annotations
 
 import contextlib
+import re
 from unittest.mock import patch
 
 from django.db import connection, reset_queries
@@ -306,15 +307,36 @@ class UnchangedOutcomeTests(ReadNarrowingFixture):
 
 
 class AdvanceWorkTests(ReadNarrowingFixture):
-    """One advance's statement count does not follow the unobserved units."""
+    """One advance touches no individual of the unobserved units.
+
+    The measured quantity is attribution, not a total: the captured statements
+    are read for the individual identifiers they filter those tables by. A
+    total mixes the advance's own work with the process-wide first calls, the
+    create-versus-update shape of a shared row and the object ids an earlier
+    world left behind; none of that says anything about the unobserved units,
+    and all of it moves a total between two otherwise equal runs.
+    """
 
     #: One short advance. Django keeps at most 9000 statements per capture, so
     #: the measured interval stays far below it (asserted in :meth:`capture`).
     INTERVAL = 60
 
-    def build_world(
-        self, *, groups: int, members: int, announced: list
-    ) -> int:
+    #: The tables a statement names an individual in.
+    _INDIVIDUAL_TABLES = (
+        'FROM "objects_objectdb"',
+        'FROM "objects_objectdb_db_attributes"',
+        'FROM "objects_objectdb_db_tags"',
+        'UPDATE "objects_objectdb"',
+        'DELETE FROM "objects_objectdb"',
+    )
+
+    #: An identifier one of those tables is filtered by.
+    _ID_FILTER = re.compile(
+        r'(?:objectdb_id|"objects_objectdb"\."id")"?\s*'
+        r"(?:=\s*(\d+)|IN\s*\(([^)]*)\))"
+    )
+
+    def build_world(self, *, groups: int, members: int, announced: list) -> int:
         """Rebuild the world, add ``groups`` unobserved groups, warm it once."""
         self._build_scenario()
         for _ in range(groups):
@@ -334,39 +356,56 @@ class AdvanceWorkTests(ReadNarrowingFixture):
         )
         with population_units.announced_observation(announced):
             self.advance(0)
-        # A cold attribute cache makes a whole-world enumeration really pay one
-        # row read per individual instead of a live-cache hit.
+        # A cold attribute cache makes a read of an unobserved individual really
+        # issue its statement instead of answering from memory.
+        for individual in self._unobserved_individuals():
+            individual.attributes.reset_cache()
         _drop_attribute_caches(self.wilderness, *Monster.objects.all_family())
         return far_groups
 
-    def capture(self, announced: list) -> tuple[int, frozenset[str]]:
-        """The statements and the observed set of one measured advance."""
-        reset_queries()
-        with population_units.announced_observation(announced):
-            observed = population_units.observed_units(self.wilderness)
-            with CaptureQueriesContext(connection) as queries:
-                self.advance(self.INTERVAL)
-        total = len(queries)
-        self.assertLess(total, 9000, "the captured statements were not truncated")
-        return total, observed
+    def _unobserved_individuals(self) -> list[Monster]:
+        """Every living individual of the unobserved zone, as objects."""
+        state = monster_activity.read_monster_activity(self.wilderness)
+        far_members = {
+            int(member)
+            for group in state.groups.values()
+            if group.home_owner == ("zone", ZONE_B)
+            for member in group.member_ids
+        }
+        return [
+            individual
+            for individual in Monster.objects.all_family()
+            if int(individual.pk) in far_members
+        ]
 
-    def measure(
-        self, *, groups: int, members: int, narrow: bool = True
-    ) -> tuple[int, frozenset[str], int]:
-        """One measured advance over a world with ``groups`` extra far groups.
+    def unobserved_ids(self) -> frozenset[int]:
+        """The identifiers the unobserved zone holds."""
+        return frozenset(int(individual.pk) for individual in self._unobserved_individuals())
 
-        The advance carries no entity and announces one zone-A cell instead, so
-        the observed set is the same in every measurement and the contact and
-        forecast paths (whose presence read stays whole-world) are outside what
-        is measured. Each world is warmed identically by one zero-second advance
-        and one attribute-cache reset.
+    def named_ids(self, queries: list[str]) -> frozenset[int]:
+        """Every individual identifier the statements filter one of them by."""
+        found: set[int] = set()
+        for sql in queries:
+            if not any(table in sql for table in self._INDIVIDUAL_TABLES):
+                continue
+            for single, many in self._ID_FILTER.findall(sql):
+                if single:
+                    found.add(int(single))
+                if many:
+                    found.update(
+                        int(part) for part in many.split(",") if part.strip().isdigit()
+                    )
+        return frozenset(found)
 
-        The first advance of a fresh test process creates one attribute row that
-        every rebuilt world afterwards only updates, so one whole measurement is
-        discarded first: both compared sides are then measured from the same
-        steady state, and the compared counts differ only in the far zone.
+    def capture(
+        self, announced: list, *, narrow: bool = True
+    ) -> tuple[list[str], frozenset[str]]:
+        """The statements and the observed set of one measured advance.
+
+        ``narrow`` keeps the scoped enumeration; ``False`` swaps in the
+        whole-world roster read, which is the control that proves a statement
+        naming an unobserved individual is detectable at all.
         """
-        announced = [_ref(WANDER_A)]
         scanner = (
             contextlib.nullcontext()
             if narrow
@@ -376,31 +415,53 @@ class AdvanceWorkTests(ReadNarrowingFixture):
                 lambda wilderness, scope: regional_population._living_monsters(),
             )
         )
-        with scanner:
-            self.build_world(groups=groups, members=members, announced=announced)
-            self.capture(announced)
-            far_groups = self.build_world(
-                groups=groups, members=members, announced=announced
-            )
-            total, observed = self.capture(announced)
-        return total, observed, far_groups
+        # Cold unobserved rows: a read of one of them has to issue its query, so
+        # a cache hit cannot hide the whole-world roster's work.
+        for individual in self._unobserved_individuals():
+            individual.attributes.reset_cache()
+        reset_queries()
+        with population_units.announced_observation(announced), scanner:
+            observed = population_units.observed_units(self.wilderness)
+            with CaptureQueriesContext(connection) as queries:
+                self.advance(self.INTERVAL)
+        total = len(queries)
+        self.assertLess(total, 9000, "the captured statements were not truncated")
+        return [query["sql"] for query in queries.captured_queries], observed
 
     @covers_requirement(
         "population-settlement-units::advance-database-work-is-independent-of-unobserved-units"
     )
-    def test_growing_the_far_zone_keeps_the_advance_statement_count(self):
-        one, one_units, one_groups = self.measure(groups=1, members=1)
-        many, many_units, many_groups = self.measure(groups=6, members=3)
-        self.assertNotIn(self.unit_b, one_units)
-        self.assertEqual(one_units, many_units, "both advances observe the same units")
-        self.assertLess(one_groups, many_groups, "the unobserved zone really grew")
-        self.assertEqual(one, many)
+    def test_growing_the_far_zone_leaves_the_advance_outside_it(self):
+        announced = [_ref(WANDER_A)]
+        sizes: list[int] = []
+        touched: dict[str, frozenset[int]] = {}
+        for label, groups, members in (("one", 1, 1), ("many", 6, 3)):
+            with self.subTest(far_zone=label):
+                far_groups = self.build_world(
+                    groups=groups, members=members, announced=announced
+                )
+                unobserved = self.unobserved_ids()
+                statements, observed = self.capture(announced)
+                self.assertTrue(unobserved, "the unobserved zone holds individuals")
+                self.assertNotIn(self.unit_b, observed)
+                touched[label] = self.named_ids(statements) & unobserved
+                sizes.append(far_groups)
+        self.assertLess(sizes[0], sizes[1], "the unobserved zone really grew")
+        # The same advance over both worlds names no unobserved individual: the
+        # work it issues for its own units is the same set of rows either way.
+        self.assertEqual(touched["one"], frozenset())
+        self.assertEqual(touched["many"], frozenset())
 
     def test_the_whole_world_enumeration_would_pay_for_the_far_zone(self):
-        many, _units, _groups = self.measure(groups=6, members=3)
-        whole, _units, _groups = self.measure(groups=6, members=3, narrow=False)
-        self.assertGreater(
-            whole,
-            many,
-            "the unobserved rows cost statements when the enumeration is whole-world",
+        announced = [_ref(WANDER_A)]
+        self.build_world(groups=6, members=3, announced=announced)
+        unobserved = self.unobserved_ids()
+        whole, _units = self.capture(announced, narrow=False)
+        self.assertTrue(
+            self.named_ids(whole) & unobserved,
+            "the whole-world roster read names the unobserved rows",
         )
+        self.build_world(groups=6, members=3, announced=announced)
+        unobserved = self.unobserved_ids()
+        narrow, _units = self.capture(announced)
+        self.assertFalse(self.named_ids(narrow) & unobserved)
