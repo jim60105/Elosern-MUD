@@ -36,8 +36,23 @@ MAINTENANCE_EVENTS = (
     "monster_arrival_deferred",
 )
 
+#: The tick the departing group's seed commits its departure at.
+DEPARTURE_TICK = 90
+
+
 def _events(logged) -> list[str]:
     return [call.args[0] for call in logged.call_args_list if call.args]
+
+
+def _stationary_tick(arrival: int) -> int:
+    """The creation tick that gives each stationary group one pass decision."""
+    return max(0, arrival - activity_owner.RESTING_DECISION_INTERVAL)
+
+
+def _stationary_due(arrival: int) -> int:
+    return _stationary_tick(arrival) + activity_owner.activity_decision_interval(
+        STATIONARY_ACTIVITY
+    )
 
 
 class PopulationMaintenanceLogTests(ActivityFixture):
@@ -54,35 +69,35 @@ class PopulationMaintenanceLogTests(ActivityFixture):
         """
         self._reset_activity(tick=0)
         group_id, bodies = self._group(seed=seed, tick=0, members=2)
-        stationary_tick = max(
-            0, arrival - activity_owner.RESTING_DECISION_INTERVAL
+        stationary_tick = _stationary_tick(arrival)
+        self.assertGreater(
+            _stationary_due(arrival),
+            DEPARTURE_TICK,
+            "the stationary cadence must fall after the departure and before "
+            "the arrival for exactly one decision per group",
         )
         self._group(activity=STATIONARY_ACTIVITY, tick=stationary_tick, members=1)
         self._group(activity=STATIONARY_ACTIVITY, tick=stationary_tick, members=1)
         return group_id, bodies
 
     def _arrival_tick(self, seed: int) -> int:
-        """The departing group's arrival tick, read from a probe pass to 90."""
+        """The departing group's arrival tick, read after the departure pass."""
         self._reset_activity(tick=0)
         group_id, _bodies = self._group(seed=seed, tick=0, members=2)
         with self.captureOnCommitCallbacks(execute=False):
-            settle_population_lifecycle(0, 90)
+            settle_population_lifecycle(0, DEPARTURE_TICK)
         state = read_monster_activity(self.wilderness)
         journey_id = state.groups[group_id].journey_id
         if journey_id is None:
-            return 90
+            return DEPARTURE_TICK
         return state.journeys[journey_id].arrival_tick
 
     def test_many_groups_emit_one_info_summary_and_debug_detail(self) -> None:
         self._register_lifecycle()
-        seed = self._departure_seed(tick=90, members=2)
+        seed = self._departure_seed(tick=DEPARTURE_TICK, members=2)
         arrival = self._arrival_tick(seed)
-        stationary_due = max(0, arrival - activity_owner.RESTING_DECISION_INTERVAL)
-        stationary_due += activity_owner.activity_decision_interval(
-            STATIONARY_ACTIVITY
-        )
         _group_id, bodies = self._scenario_groups(seed, arrival)
-        end_tick = max(arrival, stationary_due)
+        end_tick = max(arrival, _stationary_due(arrival))
         with (
             patch.object(activity_owner, "log_info") as activity_info,
             patch.object(activity_owner, "log_debug") as activity_debug,
@@ -124,14 +139,10 @@ class PopulationMaintenanceLogTests(ActivityFixture):
 
     def test_a_rolled_back_advance_emits_neither_summary_nor_detail(self) -> None:
         self._register_lifecycle()
-        seed = self._departure_seed(tick=90, members=2)
+        seed = self._departure_seed(tick=DEPARTURE_TICK, members=2)
         arrival = self._arrival_tick(seed)
-        stationary_due = max(0, arrival - activity_owner.RESTING_DECISION_INTERVAL)
-        stationary_due += activity_owner.activity_decision_interval(
-            STATIONARY_ACTIVITY
-        )
         self._scenario_groups(seed, arrival)
-        end_tick = max(arrival, stationary_due)
+        end_tick = max(arrival, _stationary_due(arrival))
         with (
             patch.object(activity_owner, "log_info") as activity_info,
             patch.object(activity_owner, "log_debug") as activity_debug,
