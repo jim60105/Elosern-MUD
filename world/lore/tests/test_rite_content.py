@@ -21,6 +21,7 @@ import unittest
 
 import yaml
 
+from tools.spec_traceability import covers_requirement
 from world.lore.rites import (
     CONTENT_PATH,
     RitesNotLoaded,
@@ -118,6 +119,10 @@ def _pairs(error: RiteContentError) -> list[tuple[str, str]]:
 
 
 class ValidDocumentTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot",
+        "landmark-rite-content::a-rite-scene-needs-narration-and-may-omit-the-watch-perspective",
+    )
     def test_the_snapshot_exposes_the_authored_content(self):
         snapshot = _load(_document())
 
@@ -154,6 +159,9 @@ class ValidDocumentTests(unittest.TestCase):
         self.assertEqual(dict(snapshot.districts), {"d1": "alpha", "d2": "alpha"})
         self.assertEqual(art_subject_key("alpha"), "rite_alpha")
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_the_snapshot_is_immutable(self):
         snapshot = _load(_document())
         archetype = snapshot.archetypes["alpha"]
@@ -171,16 +179,25 @@ class ValidDocumentTests(unittest.TestCase):
 
 
 class DocumentShapeTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_unknown_top_level_field(self):
         document = _document()
         document["zeta"] = 1
         self.assertEqual(_pairs(_error(document)), [("zeta", "unknown_field")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_missing_top_level_field(self):
         document = _document()
         del document["id"]
         self.assertEqual(_pairs(_error(document)), [("id", "document_shape")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_wrong_version_type(self):
         for version in (2, "1", True, None):
             with self.subTest(version=version):
@@ -188,6 +205,9 @@ class DocumentShapeTests(unittest.TestCase):
                 document["version"] = version
                 self.assertEqual(_pairs(_error(document)), [("version", "document_shape")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_non_mapping_documents(self):
         for text in ("- one\n- two\n", "just a scalar\n", ""):
             with self.subTest(text=text):
@@ -195,6 +215,9 @@ class DocumentShapeTests(unittest.TestCase):
                     parse_rites_document(text, district_keys=DISTRICT_KEYS)
                 self.assertEqual(_pairs(caught.exception), [("", "document_shape")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_yaml_layer_faults_report_one_document_shape(self):
         texts = {
             "duplicate mapping key": "version: 1\nversion: 1\n",
@@ -213,6 +236,9 @@ class DocumentShapeTests(unittest.TestCase):
                     parse_rites_document(text, district_keys=DISTRICT_KEYS)
                 self.assertEqual(_pairs(caught.exception), [("", "document_shape")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_wrong_container_types(self):
         cases = {
             "archetypes": ("archetypes", "document_shape"),
@@ -224,11 +250,17 @@ class DocumentShapeTests(unittest.TestCase):
                 document[label] = []
                 self.assertEqual(_pairs(_error(document)), [(path, code)])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_an_archetype_entry_that_is_not_a_mapping(self):
         document = _document()
         document["archetypes"]["alpha"] = 5
         self.assertEqual(_pairs(_error(document)), [("archetypes.alpha", "document_shape")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_options_that_are_not_a_sequence(self):
         document = _document()
         document["archetypes"]["alpha"]["options"] = {"solo": _option("solo")}
@@ -238,6 +270,9 @@ class DocumentShapeTests(unittest.TestCase):
 
 
 class CountTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_too_few_and_too_many_archetypes(self):
         empty = _document()
         empty["archetypes"] = {}
@@ -254,6 +289,9 @@ class CountTests(unittest.TestCase):
         self.assertEqual(len(pairs), 16)
         self.assertIn(("archetypes.a16", "archetype_unused"), pairs)
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_too_few_and_too_many_options(self):
         for option_keys, count in ((("solo",), 1), (("one", "two", "three", "four"), 4)):
             with self.subTest(count=count):
@@ -265,12 +303,18 @@ class CountTests(unittest.TestCase):
 
 
 class KeyAndTextTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_archetype_key_format(self):
         document = _document()
         document["archetypes"] = {"Alpha": _archetype("Alpha")}
         document["districts"] = {"d1": "Alpha", "d2": "Alpha"}
         self.assertEqual(_pairs(_error(document)), [("archetypes.Alpha", "key_format")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_option_key_format(self):
         document = _document()
         document["archetypes"]["alpha"]["options"][0]["key"] = "Solo"
@@ -278,6 +322,9 @@ class KeyAndTextTests(unittest.TestCase):
             _pairs(_error(document)), [("archetypes.alpha.options[0].key", "key_format")]
         )
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_text_bounds(self):
         cases = {
             "guardian_name_zh too long": ("guardian_name_zh", "字" * 33),
@@ -298,6 +345,9 @@ class KeyAndTextTests(unittest.TestCase):
 
 
 class OptionBoundTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_duplicate_option_key(self):
         document = _document()
         document["archetypes"]["alpha"]["options"][1]["key"] = "solo"
@@ -305,6 +355,9 @@ class OptionBoundTests(unittest.TestCase):
             _pairs(_error(document)), [("archetypes.alpha.options[1].key", "duplicate_option")]
         )
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_duplicate_option_key_survives_an_unrelated_option_fault(self):
         document = _document()
         options = document["archetypes"]["alpha"]["options"]
@@ -318,6 +371,9 @@ class OptionBoundTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_seconds_bound(self):
         for seconds in (119, 901, "180", True):
             with self.subTest(seconds=seconds):
@@ -328,6 +384,9 @@ class OptionBoundTests(unittest.TestCase):
                     [("archetypes.alpha.options[0].seconds", "seconds_bound")],
                 )
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_level_bounds(self):
         for field, value in (("shame", 3), ("shame", -1), ("exposure", 3), ("exposure", -1)):
             with self.subTest(field=field, value=value):
@@ -368,6 +427,9 @@ class SceneTests(unittest.TestCase):
                 document["archetypes"]["alpha"]["options"][0]["self"][field] = value
                 self.assertEqual(_pairs(_error(document)), [(path, "scene_invalid")])
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_scene_identifier_is_unique_across_the_document(self):
         document = _document()
         options = document["archetypes"]["alpha"]["options"]
@@ -377,6 +439,9 @@ class SceneTests(unittest.TestCase):
             [("archetypes.alpha.options[1].self.scene_id", "duplicate_scene_id")],
         )
 
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_absent_scene_identifier_is_not_a_duplicate(self):
         document = _document()
         options = document["archetypes"]["alpha"]["options"]
@@ -390,6 +455,9 @@ class SceneTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement(
+        "landmark-rite-content::a-rite-scene-needs-narration-and-may-omit-the-watch-perspective"
+    )
     def test_a_scene_needs_narration(self):
         document = _document()
         document["archetypes"]["alpha"]["options"][0]["self"]["lines"] = [
@@ -406,6 +474,9 @@ class SceneTests(unittest.TestCase):
             _pairs(_error(empty)), [("archetypes.alpha.options[0].self", "scene_no_narration")]
         )
 
+    @covers_requirement(
+        "landmark-rite-content::a-rite-scene-needs-narration-and-may-omit-the-watch-perspective"
+    )
     def test_narration_first_is_accepted(self):
         document = _document()
         document["archetypes"]["alpha"]["options"][0]["self"]["lines"] = [
@@ -484,6 +555,9 @@ class SceneTests(unittest.TestCase):
             [("archetypes.alpha.options[0].self.lines[0]", "document_shape")],
         )
 
+    @covers_requirement(
+        "landmark-rite-content::a-rite-scene-needs-narration-and-may-omit-the-watch-perspective"
+    )
     def test_missing_watch_key_is_a_scene_fault(self):
         document = _document()
         del document["archetypes"]["alpha"]["options"][0]["watch"]
@@ -493,26 +567,41 @@ class SceneTests(unittest.TestCase):
 
 
 class AssignmentTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::every-district-is-assigned-exactly-one-archetype"
+    )
     def test_unknown_district(self):
         document = _document()
         document["districts"]["zz"] = "alpha"
         self.assertEqual(_pairs(_error(document)), [("districts.zz", "district_unknown")])
 
+    @covers_requirement(
+        "landmark-rite-content::every-district-is-assigned-exactly-one-archetype"
+    )
     def test_unassigned_district(self):
         document = _document()
         del document["districts"]["d2"]
         self.assertEqual(_pairs(_error(document)), [("districts.d2", "district_unassigned")])
 
+    @covers_requirement(
+        "landmark-rite-content::every-district-is-assigned-exactly-one-archetype"
+    )
     def test_unknown_archetype(self):
         document = _document()
         document["districts"]["d2"] = "ghost"
         self.assertEqual(_pairs(_error(document)), [("districts.d2", "archetype_unknown")])
 
+    @covers_requirement(
+        "landmark-rite-content::every-district-is-assigned-exactly-one-archetype"
+    )
     def test_unused_archetype(self):
         document = _document()
         document["archetypes"]["beta"] = _archetype("beta", option_keys=("one", "two"))
         self.assertEqual(_pairs(_error(document)), [("archetypes.beta", "archetype_unused")])
 
+    @covers_requirement(
+        "landmark-rite-content::every-district-is-assigned-exactly-one-archetype"
+    )
     def test_assignment_value_must_be_an_archetype_key(self):
         document = _document()
         document["districts"]["d1"] = 5
@@ -520,6 +609,9 @@ class AssignmentTests(unittest.TestCase):
 
 
 class SeveralFaultsTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-rite-document-loads-into-one-validated-immutable-snapshot"
+    )
     def test_three_unrelated_faults_are_reported_together(self):
         document = _document()
         document["zeta"] = 1
@@ -544,6 +636,9 @@ class SnapshotHolderTests(unittest.TestCase):
         uninstall()
         self.addCleanup(uninstall)
 
+    @covers_requirement(
+        "landmark-rite-content::rite-content-is-read-only-after-it-is-installed"
+    )
     def test_reading_before_install_raises(self):
         with self.assertRaises(RitesNotLoaded):
             current()
@@ -559,6 +654,9 @@ class SnapshotHolderTests(unittest.TestCase):
         with self.assertRaises(RitesNotLoaded):
             current()
 
+    @covers_requirement(
+        "landmark-rite-content::rite-content-is-read-only-after-it-is-installed"
+    )
     def test_scoped_install_restores_the_previous_value(self):
         first = RiteSnapshot(archetypes={}, districts={})
         second = RiteSnapshot(archetypes={}, districts={"d1": "alpha"})
