@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_alfalfa_knoll
+location_ref: hamlet_alfalfa_knoll
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 161
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西北是帝河津的舊道，往東南通往東牧鎮。路旁的苜蓿沿著土岡鋪開，紫花在風裡起伏。
+    anchor_key: hamlet_alfalfa_knoll
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 161
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東南，屋後堆著晒乾的苜蓿捆。牲口棚裡傳出鈴聲，混著草料的氣味。棚邊的草叉靠在牆上，柄被磨得光滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

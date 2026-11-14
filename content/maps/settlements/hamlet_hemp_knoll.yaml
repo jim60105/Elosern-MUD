@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_hemp_knoll
+location_ref: hamlet_hemp_knoll
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 161
+    y_m: 161
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西南接麥浪城的來路，往東北通往沉鐘鎮。路旁的麻田已經剝完，田裡只剩光禿禿的稈子。
+    anchor_key: hamlet_hemp_knoll
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東北，屋前架著晾麻的長桿。風一吹，掛著的麻線就整排擺動。麻線晾到半乾就得收，免得被露水打濕。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

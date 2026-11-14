@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_alfalfa_plain
+location_ref: hamlet_alfalfa_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 186
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往南通往駿原鎮，往北接楓麓鎮的舊道。路旁的苜蓿田綠得發亮，割過的地方留著整齊的茬。
+    anchor_key: hamlet_alfalfa_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝北，屋後堆著一垛晒乾的苜蓿。牲口在棚裡探出頭，鼻子不停抽動。夜裡的風聲，混著嚼草的聲音。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

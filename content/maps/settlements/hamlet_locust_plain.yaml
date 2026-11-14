@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_locust_plain
+location_ref: hamlet_locust_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 182
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往南通往駿原鎮，往北接楓麓鎮的舊道。路旁的槐樹稀疏，樹下的草被牛啃得很短。牛群沿著路邊慢慢走，蹄印疊在車轍上。
+    anchor_key: hamlet_locust_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝北，屋後是一片沒有圍牆的荒原。風大時，遠處的槐樹像一排晃動的黑影。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

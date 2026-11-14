@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_fallow_plain
+location_ref: village_fallow_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 278
+    prototype_parent: anchor_room
+    key: 蕪原綠地
+    desc: 綠地邊的井才鑿好不久，井臺上還留著鑿子的痕跡。四周的田歇了幾年，長滿野草，村民打算明年再翻。
+    anchor_key: village_fallow_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 456
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口往黑土鎮，路穿過一片休耕的荒地。草長得齊腰高，車過時驚起一群群的雀鳥。村人說再過幾年，這片荒地也要翻成田。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口通往楓麓鎮，路邊堆著去年翻出的石頭。再往南便是鎮上的果園，春天花香能飄過整片原野。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 189
+    y_m: 278
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的空地朝東，擺著幾張石凳。日頭好的時候，村裡的老人坐在凳上縫補農具。凳腳埋在土裡，坐上去很穩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:

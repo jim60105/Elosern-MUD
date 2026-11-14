@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_caltrop_pond
+location_ref: hamlet_caltrop_pond
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 155
+    y_m: 155
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西南通往東牧鎮，往東北接潮風鎮的海岸路。路邊的池塘長滿菱角，水面浮著一圈圈的葉子。
+    anchor_key: hamlet_caltrop_pond
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東北，屋後就是那片菱塘。秋天採菱時，小船從塘心划過，驚起藏在葉下的水鳥。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

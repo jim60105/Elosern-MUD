@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_reed_shoal
+location_ref: hamlet_reed_shoal
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 182
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往南接潮風鎮的港道，往北通往日出鎮。路旁的荻草長到路肩，穗子在風裡一齊低頭。
+    anchor_key: hamlet_reed_shoal
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝北，屋後是河口的淺灘。退潮時灘上露出成片泥地，孩子提著籃子去撿蛤蜊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

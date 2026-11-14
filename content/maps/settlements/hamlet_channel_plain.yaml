@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_channel_plain
+location_ref: hamlet_channel_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 186
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西是回帝河津的舊道，往東接東牧鎮的長路。路面鋪著壓實的沙土，車轍裡留著前一天的雨痕。
+    anchor_key: hamlet_channel_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東，屋後堆著過冬的柴捆。風從平原上吹來，把曬在籬上的麥稈翻得沙沙作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

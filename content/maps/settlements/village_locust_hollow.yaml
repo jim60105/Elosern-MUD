@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_locust_hollow
+location_ref: village_locust_hollow
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 232
+    y_m: 232
+    prototype_parent: anchor_room
+    key: 槐坳綠地
+    desc: 綠地被幾株老槐圍住，井水從槐根下滲出來。花開時整片綠地落滿細碎的白花，掃起來能裝滿幾筐。
+    anchor_key: village_locust_hollow
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 364
+    y_m: 364
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口往帝都的方向出坳，槐樹蔭把路遮去大半。夏天趕路的人靠著樹幹歇腳，樹皮被磨得光滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口接著楓麓鎮的來路，路面鋪著碎石子。雨後石子鬆動，馬蹄踩上去發出清脆的聲響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 298
+    y_m: 166
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的石階朝東南，階上落著槐花。風一吹花便從屋簷滑下來，堆在牆腳。掃攏的槐花堆在牆腳，晒乾了可當柴。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:
