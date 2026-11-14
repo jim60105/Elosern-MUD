@@ -78,7 +78,8 @@
     "title.remove",
     "travel.plan",
     "explore.camp",
-    "explore.camp_preview"
+    "explore.camp_preview",
+    "explore.landmark_rite"
   ],
   "silentPresentationControlIds": [
     "account.character.create",

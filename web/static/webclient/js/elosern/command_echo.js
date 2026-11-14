@@ -291,6 +291,17 @@
       }
       return join(["camp", mode, payload.dream === true ? "dream" : ""]);
     },
+    // The landmark rite (commands/rite.py CmdRite `儀式 <選項> [隊友]`) echoes
+    // the typed option key; the performer is a party member and is never
+    // echoed, so the line stops at the option. An empty or spacing-bearing
+    // option stays silent rather than implying the bare listing form.
+    "explore.landmark_rite": function (payload) {
+      var option = payload && payload.option;
+      if (!isNonEmpty(option) || /\s/.test(option)) {
+        return null;
+      }
+      return join(["rite", option]);
+    },
     "explore.sleep_dream": function (payload) {
       return payload && payload.decision === "enter" ? "dream enter" : "dream decline";
     },

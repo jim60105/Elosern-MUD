@@ -965,6 +965,24 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
     });
   }
+  SURFACES.push({
+    id: "accepted landmark rite: explore.landmark_rite",
+    ids: ["explore.landmark_rite"],
+    expected: "rite t_rite_option",
+    prepare() {
+      openExploration();
+      store.dispatchAction("explore.landmark_rite", {
+        option: "t_rite_option",
+        member_id: null,
+      });
+      expect(sender.sent.actions).toHaveLength(1);
+      expect(lastEnvelope().action_id).toBe("explore.landmark_rite");
+      expect(lastEnvelope().payload).toEqual({
+        option: "t_rite_option",
+        member_id: null,
+      });
+    },
+  });
   for (const [actionId, payload] of [
     ["gallery.subject.select", { subject_key: gallerySubject }],
     ["gallery.category.select", { category: "monster" }],

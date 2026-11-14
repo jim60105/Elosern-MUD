@@ -90,6 +90,7 @@ class RegistryTests(unittest.TestCase):
                     "explore.sleep_party",
                     "explore.camp_preview",
                     "explore.camp",
+                    "explore.landmark_rite",
                     "explore.sleep_continue",
                     "explore.sleep_dream",
                     "explore.deliver",

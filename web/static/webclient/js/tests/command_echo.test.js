@@ -749,6 +749,7 @@ const REGISTERED_MUTATION_ACTIONS = {
   "explore.sleep_party": { payload: {}, display: {} },
   "explore.camp": { payload: { mode: "until-dawn", dream: false }, display: {} },
   "explore.camp_preview": null,
+  "explore.landmark_rite": { payload: { option: "t_rite_option", member_id: null }, display: {} },
   "explore.talk_freeform": { payload: { npc_id: "bard", speech: "你好" }, display: { npcLabel: "吟遊詩人" } },
   "explore.talk_open": { payload: { npc_id: 7 }, display: { npcLabel: "旅店老闆" } },
   "explore.talk_scripted": { payload: { npc_id: "bard", keyword_id: "guild" }, display: { npcLabel: "吟遊詩人", keywordLabel: "公會" } },
@@ -797,6 +798,25 @@ const REGISTERED_MUTATION_ACTIONS = {
   "title.equip": { payload: { kind: "fixed", identifier: SYNTH_TITLE.id }, display: {} },
   "title.remove": { payload: { display: "夜襲之人" }, display: {} },
 };
+
+test("the landmark rite echo names the option and never the performer", () => {
+  assert.strictEqual(
+    Echo.commandLine(
+      "explore.landmark_rite",
+      { option: "t_rite_option", member_id: 7 },
+      {}
+    ),
+    "rite t_rite_option"
+  );
+  // A non-string, empty or spacing-bearing option cannot be replayed as the
+  // same action, so the echo stays silent instead of inventing a line.
+  for (const option of [7, null, "", "t rite"]) {
+    assert.strictEqual(
+      Echo.commandLine("explore.landmark_rite", { option, member_id: null }, {}),
+      null
+    );
+  }
+});
 
 test("every registered mutation action resolves non-null or is declared silent", () => {
   const manifestIds = COVERAGE_MANIFEST.registeredMutationActionIds.slice().sort();
