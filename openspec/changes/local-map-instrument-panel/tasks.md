@@ -22,5 +22,5 @@
 
 ## 4. Gates and human review material
 
-- [ ] 4.1 Run `pnpm test`, `uv run --locked python -m tools.contract_gate --change local-map-instrument-panel`, `openspec validate local-map-instrument-panel --strict` and `git diff --check`. Verify: all pass.
-- [ ] 4.2 Capture the design D7 live-client screenshots with `agent-browser` into the session scratchpad, then `agent-browser close`. Verify: the apply report lists their absolute paths for the human review (no automated judgement).
+- [x] 4.1 Run `pnpm test`, `uv run --locked python -m tools.contract_gate --change local-map-instrument-panel`, `openspec validate local-map-instrument-panel --strict` and `git diff --check`. Verify: all pass.
+- [x] 4.2 Capture the design D7 live-client screenshots with `agent-browser` into the session scratchpad, then `agent-browser close`. Verify: the apply report lists their absolute paths for the human review (no automated judgement). (Captured from the built Storybook's full-shell `Core/AppShell` `PopulatedHud` story, which mounts the shipped shell components, because a managed Evennia server runs only inside the browser test harness; the live-server geometry is asserted by `test_minimap_is_a_card_free_instrument_panel`.)
