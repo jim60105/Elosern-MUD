@@ -312,7 +312,12 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
             "default": tick,
             "units": {},
         }
-        get_world_clock().tick = tick
+        # The clock script is the durable tick every reader sees, so the reset
+        # writes it: a world rebuild at ``tick`` must not leave a later world
+        # tick standing over a cursor record the reset just lowered.
+        clock = get_world_clock()
+        clock.tick = tick
+        clock._persist(tick)
 
     def _departure_seed(
         self,
@@ -625,14 +630,48 @@ class SeededDecisionTests(ActivityFixture):
         self.assertIsNone(decision.edge)
         self.assertEqual(decision.reason, monster_activity.STAY_NO_LEGAL_ROUTE)
 
+    @covers_requirement(
+        "population-settlement-units::the-gm-monster-view-reports-settlement-progress-without-settling",
+    )
     def test_gm_inspection_reports_the_committed_activity_binding(self):
         from web.gm.readers import monsters as reader
 
+        from world.maps import population_units
+
         _group_id, bodies = self._group(tick=0, members=1)
-        section = reader.placement_section(ObjectDB.objects.get(pk=bodies[0].pk))
-        labels = {entry["label"] for entry in section["rows"]}
-        self.assertIn("活動", labels)
-        self.assertIn("下一次決策", labels)
+        monster = ObjectDB.objects.get(pk=bodies[0].pk)
+        clock = get_world_clock()
+        clock.tick = 100
+        clock._persist(100)
+        population_units.write_unit_cursors(
+            self.wilderness, population_units.UnitCursors(100, MappingProxyType({}))
+        )
+        section = reader.placement_section(monster)
+        rows = {entry["label"]: entry for entry in section["rows"]}
+        self.assertIn("活動", rows)
+        self.assertIn("下一次決策", rows)
+        self.assertIn("實際座標", rows)
+        # A current unit carries its progress and no behind row, with the same
+        # row keys as the neighbouring activity row.
+        self.assertEqual(rows["結算進度"]["value"], "100")
+        self.assertTrue(rows["結算進度"]["mono"])
+        self.assertEqual(
+            set(rows["結算進度"]), set(rows["下一次決策"])
+        )
+        self.assertNotIn("結算落後", rows)
+        # A unit behind the world tick is marked with its lag, and the read
+        # settles nothing: the cursor record and the clock stay as they were.
+        clock.tick = 700
+        clock._persist(700)
+        section = reader.placement_section(monster)
+        rows = {entry["label"]: entry for entry in section["rows"]}
+        self.assertEqual(rows["結算進度"]["value"], "100")
+        self.assertEqual(rows["結算落後"]["value"], "600")
+        self.assertTrue(rows["結算落後"]["mono"])
+        self.assertEqual(
+            population_units.read_unit_cursors(self.wilderness).default, 100
+        )
+        self.assertEqual(get_world_clock().tick, 700)
 
     def test_committed_decision_emits_the_catalog_event(self):
         group_id, _bodies = self._group(tick=0, members=1)

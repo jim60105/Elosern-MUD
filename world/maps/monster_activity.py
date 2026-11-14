@@ -1119,17 +1119,19 @@ def create_group(
         seed=seed,
         member_time=member_time,
     )
-    # A running scoped pass may only create a group whose every unit it may
-    # settle. The unit computation is paid only inside a scoped pass, so the
-    # unwrapped path is unchanged.
+    # Both writer checks read one shared unit computation and run before the
+    # write: outside a pass a group touching a unit behind the world tick
+    # refuses by name, and a running scoped pass may only create a group whose
+    # every unit it may settle. A movable binding reads the published geography
+    # here, exactly as its own decision would.
     from world.maps import population_units
 
+    touched = population_units.group_units(
+        population_units.current_unit_index(), group, None
+    )
+    population_units.require_units_current(wilderness, touched)
     if population_units.active_scope() is not None:
-        population_units.require_units_in_active_scope(
-            population_units.group_units(
-                population_units.current_unit_index(), group, None
-            )
-        )
+        population_units.require_units_in_active_scope(touched)
     # A group this pass creates is inside its scope by construction, so the
     # running pass settles it from the moment it exists.
     population_units.note_created_group(group_id)
@@ -2292,10 +2294,18 @@ def commit_monster_departure(wilderness: Any, plan: Any) -> str:
     operation receipt makes a replay a no-op, the group sequence, source and
     physiology fingerprint must still match, and only then is the unpaid
     combat prefix settled and the durable journey begun in one transaction.
+    Both endpoints of the selected edge refuse by name when a unit they touch
+    is behind the world tick, before the receipt read; a replay is a commit
+    attempt on those units too.
     """
     from world.rules import world_escape
 
     _require_wilderness(wilderness)
+    from world.maps import population_units
+
+    population_units.require_current(
+        wilderness, (plan.edge.source, plan.edge.destination)
+    )
     state = read_monster_activity(wilderness)
     existing = state.receipts.get(plan.operation_id)
     if existing is not None:

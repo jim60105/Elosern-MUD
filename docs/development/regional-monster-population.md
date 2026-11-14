@@ -2954,6 +2954,12 @@ the outer one's marker.
   `guild_offers.accept_guild_offer`, `npc_intents._apply_offer_quest`, and the
   dialogue story effect (`world/rules/dialogue.py`, before the selection's
   transaction opens).
+- The operator relocation
+  (`world/rules/movement_settlement.py::settle_relocation`, reached by the
+  map-lifecycle `teleport` verb) catches both endpoint units up before it
+  captures the source position and before its owning transaction: the
+  relocation records a presence transition for the cells it leaves and enters,
+  and a catch-up can move the relocated individual itself.
 
 **The rule for new code.** Any new code that writes population state for a
 cell, or reads it to decide something, calls `ensure_locations_current` before
@@ -2978,3 +2984,67 @@ endpoint) skips the command catch-up: its writers are guarded by
 - `announced_observation` keeps its entries in a module-level list, like the
   running scope and the running pass marker. The reactor runs these paths
   synchronously; a future asynchronous interleave must revisit all three.
+
+## The writer guard
+
+`population_units.require_units_current(wilderness, units)` and
+`population_units.require_current(wilderness, locations)` refuse a population
+write by name: `population_units.PopulationUnitNotCurrent` (reason
+`population_unit_not_current`) is raised when any touched unit's cursor is below
+`regional_population.current_population_tick()`. The message names the first
+offending unit in sorted order, its settled-through tick and the world tick, so
+an operator sees which unit stopped where. Both answer before reading anything
+when a settlement pass is running or when the world has no population seed (no
+population state is recorded there). In a provisioned world a missing or
+malformed cursor record refuses through `MalformedPopulationState` unchanged,
+so a world provisioned before the cursor record existed refuses on its first
+writer read exactly as it refuses its first advance.
+
+The pass gate is sound for a whole-world pass, which owns every unit: inside it
+the cursors are raised to the advance's end tick before the clock tick moves.
+A writer reachable from a *scoped* pass must therefore also carry the
+active-scope check (`require_units_in_active_scope`), as group creation does, so
+the pass cannot settle the units it owns while another writer stores a lagging
+unit it does not.
+
+Five writers call the guard before any write, and before the timeline, cursor
+and registration reads that could raise for another reason, so a refusal stores
+nothing:
+
+- `regional_population.register_explicit_group` -- the target cell. The group it
+  creates is created before its own coordinate and room attachment writes, so a
+  binding that reaches a unit of its own (an activity area, a site or a zone)
+  refuses before the registration has written anything.
+- `monster_activity.create_group` -- every unit of the group it is about to
+  store (`population_units.group_units`): home, position, its activity area and
+  its owner. It must read the activity record first to reject a duplicate group
+  id, so this is the one writer whose guard follows a read.
+- `regional_population.record_population_transition` -- the before and after
+  positions that belong to this wilderness; a position on another map names no
+  unit of this record. A presence's home-zone and site markers are deliberately
+  not guarded: `population_units.concerned_units` retires a transition only
+  once every unit it names has settled through its tick, so a lagging home unit
+  keeps the evidence until its own pass consumes it, and a transition recorded
+  for a tick that unit already settled is the chronology's own
+  already-accounted case.
+- `regional_population.record_population_protection` -- the protected cell.
+- `monster_activity.commit_monster_departure` -- the selected edge's source and
+  destination, before the operation-receipt replay read; a replay is a commit
+  attempt on those units too.
+
+The guard never replaces the catch-up. An entry point that reaches a writer with
+a lagging unit has a missing catch-up, not a weakened guard: the error names the
+unit and both ticks, and the fix is `ensure_locations_current` at that entry
+point, before its own snapshot and transaction.
+
+## The GM settlement rows
+
+`web/gm/readers/monsters.py::placement_section` appends `結算進度` with the
+monster's unit settled-through tick whenever the world is provisioned and the
+monster stands on an actual wilderness cell, and `結算落後` with the world tick
+minus the cursor when that unit is behind. The read only reads: it never calls a
+catch-up and never settles. A room-resident monster carries no wilderness cell,
+so it reports neither row, and both rows carry the same keys as every other
+placement row. A provisioned world whose cursor record is malformed refuses
+through the owner's error, and the section reports itself unavailable instead
+of the placement ledger.

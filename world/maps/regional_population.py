@@ -1466,6 +1466,21 @@ def record_population_transition(
         transition.after, PopulationPresence
     ):
         raise ValueError("before and after must be PopulationPresence facts")
+    from world.maps import population_units
+
+    # A presence fact recorded now into a unit that stopped at an earlier tick
+    # is history that unit never settled, so both of its own positions refuse
+    # by name before the timeline is read or written. A position of another
+    # wilderness names no unit of this record's world and is skipped.
+    map_name = _wilderness_name(wilderness)
+    population_units.require_current(
+        wilderness,
+        (
+            LocationRef.wilderness(position.wilderness, position.x, position.y)
+            for position in (transition.before.position, transition.after.position)
+            if position is not None and position.wilderness == map_name
+        ),
+    )
     timeline = read_population_timeline(wilderness)
     for pending in timeline.transitions:
         if (
@@ -1509,6 +1524,13 @@ def record_population_protection(
     _require_argument_int(start_tick, "start_tick")
     if end_tick is not None:
         _require_argument_int(end_tick, "end_tick", start_tick)
+    from world.maps import population_units
+
+    # The protected cell is this writer's whole touch: a unit behind the world
+    # tick refuses by name before the timeline is read or written.
+    population_units.require_current(
+        wilderness, [LocationRef.wilderness(_wilderness_name(wilderness), *coordinates)]
+    )
     position = PopulationPosition(
         _wilderness_name(wilderness), coordinates[0], coordinates[1]
     )
@@ -2769,16 +2791,18 @@ def register_explicit_group(
         raise ExplicitPlacementRefused(
             f"{PLACEMENT_REFUSED}: {cell} is not a valid wilderness placement surface"
         )
-    from world.maps import monster_activity
+    from world.maps import monster_activity, population_units
 
+    # A registration whose cell is behind the world tick refuses by name before
+    # any read that could raise for another reason and before any write.
+    population_units.require_current(
+        wilderness, [LocationRef.wilderness(_wilderness_name(wilderness), *cell)]
+    )
     seed = read_population_seed(wilderness)
-    room = (wilderness.db.rooms or {}).get(cell)
-    registration = dict(wilderness.db.itemcoordinates or {})
-    for individual in members:
-        registration[individual] = cell
-        if room is not None:
-            _attach(individual, room)
-    store_attribute(wilderness, ITEMCOORDINATES_ATTRIBUTE, registration)
+    # The group is created before this writer's own coordinate and room
+    # attachment writes: a binding that reaches a unit of its own (its activity
+    # area or its owner) is refused there, and this registration must then have
+    # written nothing.
     monster_activity.create_group(
         wilderness,
         operation_id=operation_id,
@@ -2792,6 +2816,13 @@ def register_explicit_group(
         seed=seed,
         tick=tick,
     )
+    room = (wilderness.db.rooms or {}).get(cell)
+    registration = dict(wilderness.db.itemcoordinates or {})
+    for individual in members:
+        registration[individual] = cell
+        if room is not None:
+            _attach(individual, room)
+    store_attribute(wilderness, ITEMCOORDINATES_ATTRIBUTE, registration)
     # The arrival is presence evidence, not only a coordinate write: a later
     # historical projection must know this individual did not stand here
     # before this tick, so an earlier wave cannot borrow its headroom.

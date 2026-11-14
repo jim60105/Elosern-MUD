@@ -62,6 +62,7 @@ from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.monster_individual import construct_species_individual
 from world.rules.movement_edges import LocationRef, PhysicalEdge
 from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.population_cursor_stage import register_cursor_stage
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registries
 
 PROBE = (500, 700)
@@ -458,6 +459,10 @@ class MappedFleeIntegrationTests(EvenniaTest):
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=SEED, tick=0)
+        # The shipped placement's births name variants the synthetic registry
+        # does not carry, so the real lifecycle stage cannot run here; this
+        # fixture needs only its cursor step to keep the writer guards honest.
+        register_cursor_stage(self, self.wilderness)
         self.assertTrue(
             enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
         )
