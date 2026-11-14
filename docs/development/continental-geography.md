@@ -113,7 +113,7 @@ document, never an automated visual test.
 
 界河 (`terrain.waterways["border_river"]` in the continent document) rises at
 the mountain corridor's
-first cell `(1320, 1410)` and meanders west inside Y 1290..1410 to the west
+first cell `(1320, 1410)` and meanders west inside Y 1290..1411 to the west
 coast at `(124, 1290)`. Its segments are all shallower than 45 degrees, so the
 existing rasterizer lays exactly one water cell per column and
 `border_river_row(x)` returns that cell. Corner cutting is forbidden for
@@ -146,6 +146,38 @@ the stem's clipped authored polyline split at that row (Altoria | Grandia,
 Grandia | Valhalla), stopping at the forest edge. No political polyline is
 authored. The layout prototype under `docs/design/world-map/` predates this
 geography and is not runtime data.
+
+## Waterway courses and river valleys
+
+Every waterway route is authored with natural sinuosity rather than straight
+chords: irregular, low-amplitude bends near the source, wider meanders across
+the plains and the widest in the lower course. The border river is the
+exception in degree, not in kind: it keeps one water cell per column, so its
+bends stay shallower than 45 degrees.
+
+Three kinds of reach keep their exact cells whenever a course is reshaped,
+because other authored content is fitted to them:
+
+- the cells beside a location, a settlement footprint, a harbour site or a
+  nearby district landmark, so river towns keep their bank and their water;
+- every ford and every junction with another waterway;
+- any reach a trunk road of `world/maps/data/road_network.json` runs beside.
+  Villages and hamlets are placed on those roads and their gates face the road
+  cells, so a course change that reroutes a road breaks `fit_entrance_mismatch`
+  and `road_gap`. After a waterway edit the regenerated road artifact should
+  differ from the committed one only in `source_signature`.
+
+River valleys are `elevation_shapes` rows of `op: lower` in the continent
+document, named by their `note`: a broad valley along the meander belt, an
+entrenched inner valley on the upper course, a headwater gorge, and an alluvial
+lowland on the lower course. The rows nest, so their amounts add. They are
+authored only where the belt and its feather stay clear of every road, for the
+same reason as above; a reach beside a road therefore has no valley yet.
+
+The capital river and the hills river cross at `(600, 800)` and reach the sea
+separately, and the imperial east branch leaves the imperial river at
+`(2070, 700)`. Both are deliberate four-way and distributary junctions on low
+ground, not confluence errors.
 
 ## Map districts
 
