@@ -114,19 +114,25 @@ class DecodeReuseTests(ActivityFixture):
         )
 
     def test_repeated_reads_decode_each_record_once(self):
+        with self._decoding("_zone_map_from_raw") as zone_decode:
+            maps = [regional_population._state_map(self.wilderness) for _ in range(5)]
+        self.assertEqual(zone_decode.call_count, 1)
+        for zone_map in maps[1:]:
+            self.assertEqual(zone_map, maps[0])
         with (
             self._decoding("_timeline_from_raw") as timeline_decode,
-            self._decoding("_zone_map_from_raw") as zone_decode,
+            self._decoding("_zone_state_from_record") as record_decode,
         ):
             timelines = [read_population_timeline(self.wilderness) for _ in range(5)]
             zones = [zone_states(self.wilderness) for _ in range(5)]
         self.assertEqual(timeline_decode.call_count, 1)
-        self.assertEqual(zone_decode.call_count, 1)
+        self.assertEqual(record_decode.call_count, 1)
         self.assertIs(timelines[0], timelines[-1])
         for timeline in timelines[1:]:
             self.assertEqual(timeline, timelines[0])
         for zone_map in zones[1:]:
             self.assertEqual(zone_map, zones[0])
+        self.assertIs(zones[0][ZONE_KEY], zones[-1][ZONE_KEY])
         self.assertEqual(zones[0][ZONE_KEY].settled_through_tick, 0)
 
     def test_a_read_follows_every_kind_of_timeline_write(self):
@@ -171,6 +177,22 @@ class DecodeReuseTests(ActivityFixture):
         self.assertEqual(
             zone_states(self.wilderness)[ZONE_KEY].generation_sequence, 2
         )
+        # A rolled-back write is restored through the owner's own contract, and
+        # the read follows the restored record again.
+        snapshot = snapshot_population_surfaces(self.wilderness)
+        with self.assertRaises(ZeroDivisionError):
+            with transaction.atomic():
+                self.wilderness.db.regional_population = {
+                    ZONE_KEY: {**ZONE_RECORD, "settled_through_tick": 40}
+                }
+                self.assertEqual(
+                    zone_states(self.wilderness)[ZONE_KEY].settled_through_tick, 40
+                )
+                raise ZeroDivisionError
+        restore_population_surfaces(snapshot)
+        restored = zone_states(self.wilderness)[ZONE_KEY]
+        self.assertEqual(restored.settled_through_tick, 4)
+        self.assertEqual(restored.generation_sequence, 2)
         # The seed every record is validated against is part of those facts.
         self.wilderness.attributes.add(POPULATION_SEED_ATTRIBUTE, SEED + 1)
         with self.assertRaises(MalformedPopulationState):
@@ -365,7 +387,8 @@ class PassFactTests(SettlementScenarioFixture):
         }
         self.assertTrue(newborn_ids)
         # A later read of the same pass enumerated the newborn individuals; the
-        # first one could not have.
+        # first one could not have, and no read rescanned the roster again.
+        self.assertEqual(len(scans), 2)
         self.assertNotIn(newborn_ids, [set(scan) for scan in scans[:1]])
         self.assertTrue(
             any(newborn_ids <= set(scan) for scan in scans[1:]),
