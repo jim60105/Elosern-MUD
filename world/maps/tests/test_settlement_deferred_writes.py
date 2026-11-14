@@ -36,6 +36,7 @@ from world.maps.regional_population import (
     POPULATION_TIMELINE_ATTRIBUTE,
     presence_at,
     read_population_timeline,
+    zone_states,
 )
 from world.maps.tests._settlement_projection import settlement_projection
 from world.maps.tests.test_monster_activity import (
@@ -478,6 +479,7 @@ class PendingVisibilityTests(_PassScenarioFixture):
 
         def contact_probe(wilderness, tick, contact_tick):
             observed["deferred"] = surfaces.attribute_stores_deferred()
+            observed["activity_unbatched"] = monster_activity._ACTIVE_BATCH is None
             observed["timeline_stored_equals_memory"] = (
                 _stored_attribute(timeline_id)
                 == dict(wilderness.db.population_timeline)
@@ -496,11 +498,57 @@ class PendingVisibilityTests(_PassScenarioFixture):
             self._advance(arrival_tick - START)
 
         self.assertFalse(observed["deferred"])
+        self.assertTrue(observed["activity_unbatched"])
         self.assertTrue(observed["timeline_stored_equals_memory"])
         self.assertEqual(observed["reserve_stored"], observed["reserve_memory"])
         self.assertNotEqual(observed["reserve_stored"], RESERVE - 1000)
         self.assertEqual(observed["reserve_after_in_block_write"], RESERVE - 1000)
         self.assertEqual(read_optional_fatigue_state(body).reserve_units, RESERVE - 1000)
+
+    def test_a_fault_after_the_contact_flush_restores_every_surface(self):
+        arrival_tick = self._arrival_tick()
+        _group_id, bodies = self._build_travelling_world()
+        before = settlement_projection(self.wilderness)
+        observed: dict = {}
+        real_contact = field_contact.settle_population_contact_at
+
+        def contact_probe(wilderness, tick, contact_tick):
+            observed["deferred"] = surfaces.attribute_stores_deferred()
+            real_contact(wilderness, tick, contact_tick)
+            raise RuntimeError("injected fault after the contact flush")
+
+        with patch.object(
+            field_contact, "settle_population_contact_at", contact_probe
+        ):
+            with self.assertRaises(RuntimeError):
+                self._advance(arrival_tick - START)
+
+        # The fault landed after the flush: the buffer was already closed.
+        self.assertFalse(observed["deferred"])
+        self.assertFalse(surfaces.attribute_stores_deferred())
+        self.assertEqual(settlement_projection(self.wilderness), before)
+        _drop_attribute_caches(self.wilderness, Monster.objects.all_family())
+        self.assertEqual(settlement_projection(self.wilderness), before)
+
+
+class ZoneCacheInvalidationTests(ScenarioSettlementFixture):
+    """A zone-state write replaces the decode it supersedes."""
+
+    def setUp(self):
+        super().setUp()
+        self._register_lifecycle()
+
+    def test_a_zone_state_write_invalidates_the_decode_caches(self):
+        self._build_scenario()
+        regional_population._state_map(self.wilderness)
+        self.assertIsNotNone(regional_population._DECODED_ZONE_MAP)
+        zone_states(self.wilderness)
+        self.assertIsNotNone(regional_population._DECODED_ZONE_STATES)
+        regional_population._write_state(
+            self.wilderness, regional_population._state_map(self.wilderness)
+        )
+        self.assertIsNone(regional_population._DECODED_ZONE_MAP)
+        self.assertIsNone(regional_population._DECODED_ZONE_STATES)
 
 
 class FaultAfterDeferredWritesTests(_PassScenarioFixture):
@@ -589,7 +637,9 @@ class GaugeRecordStoreTests(ActivityFixture):
                 continue
             gauge.base = 1000
             gauge.rate = 1.0
-            gauge.current = 500
+            # Saturated by the settled interval: the deferred clamp/round
+            # must store exactly what the gauge setter stores.
+            gauge.current = 900
 
     @staticmethod
     def _gauge_pairs(entity) -> dict[str, tuple[int, float]]:

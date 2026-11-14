@@ -1688,7 +1688,7 @@ through the handler immediately and pay a second full-dictionary write.
 
 ```text
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_settlement_deferred_writes
-  -> Ran 13 tests, OK
+  -> Ran 15 tests, OK
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_activity
   -> Ran 35 tests, OK
 uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb world.maps.tests.test_monster_journeys
