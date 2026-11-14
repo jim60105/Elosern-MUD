@@ -2,11 +2,11 @@
 
 ## 1. The objective line as an instrument panel
 
-- [ ] 1.1 In `web/webclient-app/components/ObjectiveTracker.vue`, add the design D1 import, constant and computeds and rewrite the header comment. Verify: the file defines `TICK_LIMIT = 12` and imports `./instrument-panel.css`.
-- [ ] 1.2 Replace the template with the design D2 template. Verify: `grep -oE 'data-testid="[^"]+"|:data-testid="[^"]+"' web/webclient-app/components/ObjectiveTracker.vue` lists `objective-tracker`, the `__box--`, `__text--`, `__progress--`, `__reward--` bindings, `objective-tracker__more`, `__ticks`, `__tick`, `__stroke` and `__stroke-fill`, and `grep -n "obj__label" web/webclient-app/components/ObjectiveTracker.vue` prints nothing.
-- [ ] 1.3 Replace the scoped style block with the design D3 block. Verify: `grep -nE "height: calc\(32px|border: var\(--line\)|var\(--shadow\)" web/webclient-app/components/ObjectiveTracker.vue` prints nothing.
-- [ ] 1.4 Update and add the design D4 tests in `tests/overlays/objective_tracker.test.js` and re-run `tests/overlays/objective_tracker_integration.test.js`, fixing only text expectations the D2 markup changes. Verify: `pnpm vitest run web/webclient-app/tests/overlays` passes.
-- [ ] 1.5 Run the Node gate `node --test web/static/webclient/js/tests/ui_contract.test.js`. Verify: it passes.
+- [x] 1.1 In `web/webclient-app/components/ObjectiveTracker.vue`, add the design D1 import, constant and computeds and rewrite the header comment. Verify: the file defines `TICK_LIMIT = 12` and imports `./instrument-panel.css`.
+- [x] 1.2 Replace the template with the design D2 template. Verify: `grep -oE 'data-testid="[^"]+"|:data-testid="[^"]+"' web/webclient-app/components/ObjectiveTracker.vue` lists `objective-tracker`, the `__box--`, `__text--`, `__progress--`, `__reward--` bindings, `objective-tracker__more`, `__ticks`, `__tick`, `__stroke` and `__stroke-fill`, and `grep -n "obj__label" web/webclient-app/components/ObjectiveTracker.vue` prints nothing.
+- [x] 1.3 Replace the scoped style block with the design D3 block. Verify: `grep -nE "height: calc\(32px|border: var\(--line\)|var\(--shadow\)" web/webclient-app/components/ObjectiveTracker.vue` prints nothing.
+- [x] 1.4 Update and add the design D4 tests in `tests/overlays/objective_tracker.test.js` and re-run `tests/overlays/objective_tracker_integration.test.js`, fixing only text expectations the D2 markup changes. Verify: `pnpm vitest run web/webclient-app/tests/overlays` passes.
+- [x] 1.5 Run the Node gate `node --test web/static/webclient/js/tests/ui_contract.test.js`. Verify: it passes.
 
 ## 2. Stories
 
