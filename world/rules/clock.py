@@ -1,7 +1,7 @@
 """Player-driven deterministic world time and settlement ordering."""
 
 import contextvars
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
@@ -138,6 +138,24 @@ _ADVANCE_REGISTRY_HELD: bool = False
 def advance_registry_held() -> bool:
     """Whether the running advance holds the rollback for its stages' writes."""
     return _ADVANCE_REGISTRY_HELD
+
+
+@contextmanager
+def held_advance_registry() -> Iterator[None]:
+    """Mark that the caller holds a restore registry for everything the enclosed stages write.
+
+    A lifecycle pass reads this flag to skip its own per-operation snapshots and
+    savepoints; whoever enters this scope must restore every surface the pass
+    writes when it fails (``restore_advance_registry``), exactly as
+    :meth:`WorldClock.advance` does.
+    """
+    global _ADVANCE_REGISTRY_HELD
+    previous = _ADVANCE_REGISTRY_HELD
+    _ADVANCE_REGISTRY_HELD = True
+    try:
+        yield
+    finally:
+        _ADVANCE_REGISTRY_HELD = previous
 
 
 @contextmanager
@@ -1491,6 +1509,19 @@ def _restore_advance_registry(
     flush_orphan_instances()
 
 
+def restore_advance_registry(
+    registry: dict[int, SurfaceSnapshot],
+    entities: Iterable[Any] = (),
+) -> None:
+    """Public name of the advance restore for another registry owner.
+
+    The caller built ``registry`` with the same advance-surface contract and
+    holds the rollback for the enclosed stages (:func:`held_advance_registry`);
+    this restores every surface the stages wrote after their database rollback.
+    """
+    _restore_advance_registry(registry, entities)
+
+
 def _refresh_advance_entity_caches(entity: Any) -> None:
     """Drop stale in-memory trait/sexual caches so the next read matches the DB."""
     try:
@@ -1542,7 +1573,6 @@ class WorldClock:
         stages and tick persistence inside the same transaction, once, and only
         for a positive interval.
         """
-        global _ADVANCE_REGISTRY_HELD
         if seconds < 0:
             raise ValueError("seconds must be non-negative")
         if seconds > MAX_ADVANCE_SECONDS:
@@ -1583,10 +1613,8 @@ class WorldClock:
         # so a lifecycle pass may rely on it instead of protecting each
         # operation a second time. A nested advance restores the previous
         # value, so ``advance_bounded``'s own registry keeps owning the window.
-        held_before = _ADVANCE_REGISTRY_HELD
         try:
-            _ADVANCE_REGISTRY_HELD = True
-            with transaction.atomic():
+            with held_advance_registry(), transaction.atomic():
                 events = _run_stages(self, seconds, source, scope, mental=mental)
                 self.tick += seconds
                 persist = getattr(self, "_persist", None)
@@ -1632,7 +1660,6 @@ class WorldClock:
             _restore_advance_registry(registry, scope)
             raise
         finally:
-            _ADVANCE_REGISTRY_HELD = held_before
             _ADVANCE_SCOPE.reset(scope_token)
         return events
 
