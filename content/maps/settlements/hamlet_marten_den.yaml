@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_marten_den
+location_ref: hamlet_marten_den
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 169
+    y_m: 169
+    prototype_parent: anchor_room
+    key: 貂穴圖騰
+    desc: 圖騰柱的柱腳伸進一處石穴，穴口蓋著石板。族人說，柱的位置就是母貂最早築窩的地方。
+    anchor_key: hamlet_marten_den
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 共火塘
+    desc: 共火塘旁的架子上晾著剛鞣過的皮子。往東北的官道通往狐火城，往西南通往鐵爪城。鞣過的皮子疊成整齊的一落。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

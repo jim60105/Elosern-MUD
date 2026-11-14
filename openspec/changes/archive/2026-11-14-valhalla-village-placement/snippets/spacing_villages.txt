@@ -1,0 +1,21 @@
+road_gap capital_valhalla--city_moon_howl: (710, 1699) to (470, 1849) is 309.2 km along the road
+road_gap capital_valhalla--city_tiger_roar: (710, 1699) to (1000, 1869) is 384.4 km along the road
+road_gap capital_valhalla--town_ancestor_shrine: (714, 1695) to (729, 1596) is 105.2 km along the road
+road_gap city_fox_fire--city_iron_claw: (1298, 1701) to (1176, 1606) is 169.9 km along the road
+road_gap city_fox_fire--town_shaman_cave: (1298, 1701) to (1167, 1815) is 178.8 km along the road
+road_gap city_horn_plain--city_shadow_wood: (391, 1662) to (300, 1635) is 102.2 km along the road
+road_gap city_horn_plain--town_stag_ferry: (391, 1662) to (370, 1752) is 98.7 km along the road
+road_gap city_horn_plain--village_deer_vale: (391, 1662) to (300, 1635) is 102.2 km along the road
+road_gap city_iron_claw--town_falcon: (1174, 1605) to (1103, 1503) is 131.4 km along the road
+road_gap city_iron_claw--town_pine_ferry: (1136, 1642) to (1059, 1714) is 108.6 km along the road
+road_gap city_moon_howl--town_stag_ferry: (468, 1849) to (371, 1753) is 136.8 km along the road
+road_gap city_shadow_wood--town_frost_wind: (300, 1635) to (370, 1752) is 199.5 km along the road
+road_gap city_shadow_wood--town_west_ford_camp: (300, 1635) to (391, 1662) is 102.2 km along the road
+road_gap city_tiger_roar--town_pine_ferry: (1000, 1869) to (1061, 1715) is 205.5 km along the road
+road_gap town_east_ford_camp--town_falcon: (1148, 1367) to (1094, 1454) is 109.4 km along the road
+road_gap town_falcon--town_grizzly: (1092, 1456) to (895, 1488) is 210.3 km along the road
+road_gap town_grizzly--town_pine_ferry: (895, 1488) to (1103, 1503) is 261.2 km along the road
+road_gap town_grizzly--town_pine_ferry: (1103, 1503) to (1174, 1605) is 131.4 km along the road
+road_gap town_grizzly--town_pine_ferry: (1136, 1642) to (1059, 1714) is 108.6 km along the road
+road_gap town_pine_ferry--town_shaman_cave: (1061, 1715) to (1167, 1815) is 147.4 km along the road
+spacing: 20 problems

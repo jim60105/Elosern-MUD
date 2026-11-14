@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_hare_den
+location_ref: hamlet_hare_den
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 161
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 兔首圖騰
+    desc: 圖騰柱上刻著躍起的兔首，柱腳塞著幾束乾草。土穴的洞口就在柱旁，是營地最暖和的地方。
+    anchor_key: hamlet_hare_den
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 161
+    prototype_parent: grid_room
+    key: 共用火塘
+    desc: 火塘的火常年不熄，旁邊鋪著給旅人過夜的乾草。往南的路通往月嚎城的官道。乾草每隔幾天就換一次，免得受潮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

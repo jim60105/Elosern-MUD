@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_serpent_creek
+location_ref: village_serpent_creek
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 229
+    y_m: 229
+    prototype_parent: anchor_room
+    key: 蛇紋圖騰
+    desc: 寨心立著盤成圈的蛇形圖騰，柱底繞著一條終年不斷的小溪。溪水在石縫間轉了幾個彎才流走。
+    anchor_key: village_serpent_creek
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 358
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南寨門
+    desc: 東南寨門通往灰熊鎮，門外路面被溪水浸得發軟。走這段路的人多半赤腳。溪水漫過路面時，過路的人得踩著石頭跳過去。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 358
+    prototype_parent: grid_room
+    key: 西北寨門
+    desc: 西北寨門朝祖靈聖地的方向，門柱上盤著真實的藤蔓，和圖騰的蛇紋幾乎分不清。藤蔓上還掛著上次祭典留下的布條。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 165
+    y_m: 165
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子西南的小溪源頭，壇石被水氣浸得發綠。族人相信溪水會把祭詞帶去聖地。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

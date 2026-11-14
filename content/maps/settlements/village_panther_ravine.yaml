@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_panther_ravine
+location_ref: village_panther_ravine
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 289
+    y_m: 234
+    prototype_parent: anchor_room
+    key: 澗旁圖騰
+    desc: 寨心架在澗谷的兩岸之間，豹紋圖騰柱立在石橋旁。澗水從寨子下方穿過，夜裡聽得見水聲。
+    anchor_key: village_panther_ravine
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 423
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南寨門
+    desc: 東南寨門順著澗谷下行，通往灰熊鎮。門外的路面鋪著從澗底撈上來的圓石。圓石之間的縫隙在雨天會積水，走過時會濺起水花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 234
+    prototype_parent: grid_room
+    key: 西寨門
+    desc: 西寨門朝祖靈聖地的方向，門後一排木架晾著剛剝下來的獸皮。皮子的氣味很重，守門人會在上風處點一把艾草。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 222
+    y_m: 167
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子西南的岩臺上，壇前插著豹尾裝飾的木樁。獵人歸來時會先把獵物抬到壇前。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

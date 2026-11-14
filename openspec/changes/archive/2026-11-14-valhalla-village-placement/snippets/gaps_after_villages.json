@@ -1,0 +1,302 @@
+[
+ {
+  "road": "capital_valhalla -- city_moon_howl",
+  "from": [
+   710,
+   1699
+  ],
+  "to": [
+   470,
+   1849
+  ],
+  "from_index": 0,
+  "to_index": 252,
+  "cells": 253,
+  "km": 309.2
+ },
+ {
+  "road": "capital_valhalla -- city_tiger_roar",
+  "from": [
+   710,
+   1699
+  ],
+  "to": [
+   1000,
+   1869
+  ],
+  "from_index": 0,
+  "to_index": 331,
+  "cells": 332,
+  "km": 384.4
+ },
+ {
+  "road": "capital_valhalla -- town_ancestor_shrine",
+  "from": [
+   714,
+   1695
+  ],
+  "to": [
+   729,
+   1596
+  ],
+  "from_index": 0,
+  "to_index": 99,
+  "cells": 100,
+  "km": 105.2
+ },
+ {
+  "road": "city_fox_fire -- city_iron_claw",
+  "from": [
+   1298,
+   1701
+  ],
+  "to": [
+   1176,
+   1606
+  ],
+  "from_index": 0,
+  "to_index": 131,
+  "cells": 132,
+  "km": 169.9
+ },
+ {
+  "road": "city_fox_fire -- town_shaman_cave",
+  "from": [
+   1298,
+   1701
+  ],
+  "to": [
+   1167,
+   1815
+  ],
+  "from_index": 0,
+  "to_index": 132,
+  "cells": 133,
+  "km": 178.8
+ },
+ {
+  "road": "city_horn_plain -- city_shadow_wood",
+  "from": [
+   391,
+   1662
+  ],
+  "to": [
+   300,
+   1635
+  ],
+  "from_index": 0,
+  "to_index": 91,
+  "cells": 92,
+  "km": 102.2
+ },
+ {
+  "road": "city_horn_plain -- town_stag_ferry",
+  "from": [
+   391,
+   1662
+  ],
+  "to": [
+   370,
+   1752
+  ],
+  "from_index": 0,
+  "to_index": 90,
+  "cells": 91,
+  "km": 98.7
+ },
+ {
+  "road": "city_horn_plain -- village_deer_vale",
+  "from": [
+   391,
+   1662
+  ],
+  "to": [
+   300,
+   1635
+  ],
+  "from_index": 0,
+  "to_index": 91,
+  "cells": 92,
+  "km": 102.2
+ },
+ {
+  "road": "city_iron_claw -- town_falcon",
+  "from": [
+   1174,
+   1605
+  ],
+  "to": [
+   1103,
+   1503
+  ],
+  "from_index": 0,
+  "to_index": 102,
+  "cells": 103,
+  "km": 131.4
+ },
+ {
+  "road": "city_iron_claw -- town_pine_ferry",
+  "from": [
+   1136,
+   1642
+  ],
+  "to": [
+   1059,
+   1714
+  ],
+  "from_index": 38,
+  "to_index": 118,
+  "cells": 81,
+  "km": 108.6
+ },
+ {
+  "road": "city_moon_howl -- town_stag_ferry",
+  "from": [
+   468,
+   1849
+  ],
+  "to": [
+   371,
+   1753
+  ],
+  "from_index": 0,
+  "to_index": 97,
+  "cells": 98,
+  "km": 136.8
+ },
+ {
+  "road": "city_shadow_wood -- town_frost_wind",
+  "from": [
+   300,
+   1635
+  ],
+  "to": [
+   370,
+   1752
+  ],
+  "from_index": 112,
+  "to_index": 292,
+  "cells": 181,
+  "km": 199.5
+ },
+ {
+  "road": "city_shadow_wood -- town_west_ford_camp",
+  "from": [
+   300,
+   1635
+  ],
+  "to": [
+   391,
+   1662
+  ],
+  "from_index": 112,
+  "to_index": 203,
+  "cells": 92,
+  "km": 102.2
+ },
+ {
+  "road": "city_tiger_roar -- town_pine_ferry",
+  "from": [
+   1000,
+   1869
+  ],
+  "to": [
+   1061,
+   1715
+  ],
+  "from_index": 0,
+  "to_index": 155,
+  "cells": 156,
+  "km": 205.5
+ },
+ {
+  "road": "town_east_ford_camp -- town_falcon",
+  "from": [
+   1148,
+   1367
+  ],
+  "to": [
+   1094,
+   1454
+  ],
+  "from_index": 0,
+  "to_index": 87,
+  "cells": 88,
+  "km": 109.4
+ },
+ {
+  "road": "town_falcon -- town_grizzly",
+  "from": [
+   1092,
+   1456
+  ],
+  "to": [
+   895,
+   1488
+  ],
+  "from_index": 0,
+  "to_index": 197,
+  "cells": 198,
+  "km": 210.3
+ },
+ {
+  "road": "town_grizzly -- town_pine_ferry",
+  "from": [
+   895,
+   1488
+  ],
+  "to": [
+   1103,
+   1503
+  ],
+  "from_index": 0,
+  "to_index": 243,
+  "cells": 244,
+  "km": 261.2
+ },
+ {
+  "road": "town_grizzly -- town_pine_ferry",
+  "from": [
+   1103,
+   1503
+  ],
+  "to": [
+   1174,
+   1605
+  ],
+  "from_index": 243,
+  "to_index": 345,
+  "cells": 103,
+  "km": 131.4
+ },
+ {
+  "road": "town_grizzly -- town_pine_ferry",
+  "from": [
+   1136,
+   1642
+  ],
+  "to": [
+   1059,
+   1714
+  ],
+  "from_index": 383,
+  "to_index": 463,
+  "cells": 81,
+  "km": 108.6
+ },
+ {
+  "road": "town_pine_ferry -- town_shaman_cave",
+  "from": [
+   1061,
+   1715
+  ],
+  "to": [
+   1167,
+   1815
+  ],
+  "from_index": 0,
+  "to_index": 106,
+  "cells": 107,
+  "km": 147.4
+ }
+]

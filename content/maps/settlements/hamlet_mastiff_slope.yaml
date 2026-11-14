@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_mastiff_slope
+location_ref: hamlet_mastiff_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 165
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 獒首圖騰
+    desc: 圖騰柱的獒首朝向坡下，柱身圍著一圈防風的石堆。坡上的草被風壓得伏在地上。石堆的高度差不多到人的腰際。
+    anchor_key: hamlet_mastiff_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 165
+    prototype_parent: grid_room
+    key: 公用火塘
+    desc: 火塘邊掛著幾條風乾的肉條，煙總往西北飄。往西北的官道通往月嚎城。肉條在風裡晃動，發出輕微的摩擦聲。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

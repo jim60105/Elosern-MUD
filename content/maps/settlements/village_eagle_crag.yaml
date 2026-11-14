@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_eagle_crag
+location_ref: village_eagle_crag
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 230
+    y_m: 230
+    prototype_parent: anchor_room
+    key: 崖頂圖騰
+    desc: 寨心立在崖頂的平石上，鷹形圖騰的雙翼伸向兩側。風大得讓人說話都得提高嗓門。平石邊緣沒有護欄，往下望是整片樹海。
+    anchor_key: village_eagle_crag
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 360
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南寨門
+    desc: 東南寨門開在崖壁的緩折處，門外石階盤下山腰，接上通往疾風城的官道。石階末端接上一座窄橋，橋板每隔幾年就得換。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 360
+    prototype_parent: grid_room
+    key: 西北寨門
+    desc: 西北寨門面向角原城，門柱用整根崖松削成。崖下雲霧散開時，能望見角原城的城郭。崖松的樹脂在門柱上結成琥珀色的硬塊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 165
+    y_m: 165
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇嵌在寨子西南的岩洞前，壇面被香火熏得發黑。洞頂垂下來的藤蔓在風裡擺動。洞裡的空氣比外頭涼，藤蔓的影子在壇上晃動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

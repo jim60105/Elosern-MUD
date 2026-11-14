@@ -1,0 +1,27 @@
+hamlet   (747, 1723) roads=1 relief=1 water=3 band=5
+hamlet   (795, 1767) roads=1 relief=0 water=None band=5
+hamlet   (666, 1726) roads=1 relief=0 water=3 band=5
+hamlet   (848, 1799) roads=1 relief=1 water=None band=5
+hamlet   (947, 1456) roads=2 relief=0 water=None band=6
+hamlet   (612, 1746) roads=1 relief=0 water=None band=6
+hamlet   (1027, 1812) roads=1 relief=0 water=None band=5
+hamlet   (360, 1651) roads=4 relief=1 water=None band=6
+hamlet   (905, 1820) roads=1 relief=1 water=None band=5
+hamlet   (1012, 1456) roads=2 relief=0 water=None band=6
+hamlet   (568, 1788) roads=1 relief=0 water=None band=6
+hamlet   (1251, 1731) roads=1 relief=1 water=None band=6
+hamlet   (1265, 1664) roads=1 relief=0 water=None band=5
+hamlet   (1114, 1765) roads=1 relief=0 water=None band=6
+hamlet   (1075, 1763) roads=1 relief=1 water=None band=5
+hamlet   (419, 1801) roads=1 relief=0 water=None band=5
+hamlet   (375, 1688) roads=2 relief=1 water=None band=5
+hamlet   (967, 1829) roads=1 relief=1 water=None band=5
+hamlet   (1136, 1555) roads=2 relief=0 water=None band=6
+hamlet   (1077, 1456) roads=2 relief=1 water=None band=5
+hamlet   (523, 1827) roads=1 relief=0 water=None band=6
+hamlet   (1209, 1773) roads=1 relief=0 water=None band=5
+hamlet   (1223, 1629) roads=1 relief=1 water=None band=5
+hamlet   (1111, 1406) roads=1 relief=1 water=None band=5
+hamlet   (1098, 1680) roads=2 relief=0 water=None band=5
+hamlet   (722, 1646) roads=1 relief=1 water=None band=5
+26 cells (0 villages); 0 km of over-length left

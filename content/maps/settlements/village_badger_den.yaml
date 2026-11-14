@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_badger_den
+location_ref: village_badger_den
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 226
+    y_m: 226
+    prototype_parent: anchor_room
+    key: 橡下圖騰
+    desc: 寨心圍著一株老橡樹，獾首圖騰就刻在樹幹上。樹下是族中議事的地方，地面被踩得光滑。
+    anchor_key: village_badger_den
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 352
+    y_m: 352
+    prototype_parent: grid_room
+    key: 東北寨門
+    desc: 東北寨門通往祖靈聖地，門外是一段樹根盤結的小路。族人往聖地送供品時都走這道門。路旁的樹根被踩得發亮，供品籃就擱在樹根上。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南寨門
+    desc: 西南寨門朝疾風城的方向，門邊挖了淺淺的壕溝。守門人說這裡是寨子最容易被風雪撲到的一面。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 289
+    y_m: 163
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子東南的土丘上，壇身半埋在坡裡。祭壇旁的老樹上掛著歷年留下的骨飾。老樹的枝椏伸到壇頂，雨天替祭壇擋住大半的雨。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

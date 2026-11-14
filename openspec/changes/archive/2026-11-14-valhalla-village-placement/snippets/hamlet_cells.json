@@ -1,0 +1,317 @@
+[
+ {
+  "id": "hamlet_r1",
+  "cell": [
+   747,
+   1723
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r2",
+  "cell": [
+   795,
+   1767
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r3",
+  "cell": [
+   666,
+   1726
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r4",
+  "cell": [
+   848,
+   1799
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r5",
+  "cell": [
+   947,
+   1456
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r6",
+  "cell": [
+   612,
+   1746
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r7",
+  "cell": [
+   1027,
+   1812
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r8",
+  "cell": [
+   360,
+   1651
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r9",
+  "cell": [
+   905,
+   1820
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r10",
+  "cell": [
+   1012,
+   1456
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r11",
+  "cell": [
+   568,
+   1788
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r12",
+  "cell": [
+   1251,
+   1731
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r13",
+  "cell": [
+   1265,
+   1664
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r14",
+  "cell": [
+   1114,
+   1765
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r15",
+  "cell": [
+   1075,
+   1763
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r16",
+  "cell": [
+   419,
+   1801
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r17",
+  "cell": [
+   375,
+   1688
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r18",
+  "cell": [
+   967,
+   1829
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r19",
+  "cell": [
+   1136,
+   1555
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r20",
+  "cell": [
+   1077,
+   1456
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r21",
+  "cell": [
+   523,
+   1827
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r22",
+  "cell": [
+   1209,
+   1773
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r23",
+  "cell": [
+   1223,
+   1629
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r24",
+  "cell": [
+   1111,
+   1406
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r25",
+  "cell": [
+   1098,
+   1680
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_r26",
+  "cell": [
+   722,
+   1646
+  ],
+  "kind": "hamlet",
+  "on_road": true
+ },
+ {
+  "id": "hamlet_o1",
+  "cell": [
+   296,
+   1756
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o2",
+  "cell": [
+   351,
+   1756
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o3",
+  "cell": [
+   521,
+   1346
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o4",
+  "cell": [
+   696,
+   1716
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o5",
+  "cell": [
+   1066,
+   1366
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o6",
+  "cell": [
+   476,
+   1351
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o7",
+  "cell": [
+   1111,
+   1356
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o8",
+  "cell": [
+   391,
+   1736
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ },
+ {
+  "id": "hamlet_o9",
+  "cell": [
+   251,
+   1761
+  ],
+  "kind": "hamlet",
+  "on_road": false
+ }
+]

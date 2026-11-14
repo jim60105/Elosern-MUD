@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_boar_wood
+location_ref: village_boar_wood
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 280
+    prototype_parent: anchor_room
+    key: 野豬圖騰
+    desc: 寨心圍著一圈削尖的木樁，中間的野豬圖騰柱上掛滿獸牙。林子在四周合攏，白天也顯得昏暗。
+    anchor_key: village_boar_wood
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 460
+    prototype_parent: grid_room
+    key: 北寨門
+    desc: 北寨門通往灰熊鎮，門外是一段踩得極深的林道。野豬拱過的泥地就在路旁。林道兩側的樹皮被野豬蹭得光亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南寨門
+    desc: 南寨門朝向互市城，門邊堆著林木與炭窯的成品。這些貨物每隔幾天就有人來收。炭窯的煙順著樹梢慢慢散開，遠處也看得見。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 190
+    y_m: 280
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子東側的林間空地，壇上的木架掛著風乾的獸肉。祭壇四周的樹皮被磨得發亮。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:
