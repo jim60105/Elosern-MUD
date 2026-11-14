@@ -26,6 +26,7 @@ None.
 
 - New: `world/lore/rites/__init__.py`, `world/lore/rites/shape.py`, `world/lore/rites/loader.py`, `world/lore/tests/test_rite_content.py`.
 - Edits: `.github/evennia-shards.json` (register the test module).
+- Regenerated: `content/map-reference-context.json`; the map reference index fingerprints every `world/lore` source file, so the three new modules change its digest.
 - No shipped content, no startup step, no wire change.
 
 ## Batch:
