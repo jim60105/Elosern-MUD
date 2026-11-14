@@ -1,25 +1,31 @@
 import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import PlaceCard from "../../components/PlaceCard.vue";
 
-// PlaceCard (webclient-avg-place-card-top-bar design D3): the stage's place
-// card. Props: locationLabel (the store's resolved place name — the
-// `local_map` current-node label, else the status location) and timeLabel
-// (the committed world time); null renders the `位置：--` / `時間：--`
+// PlaceCard (webclient-avg-place-card-top-bar design D3;
+// place-card-instrument-panel): the stage's place card, an instrument panel
+// (a feathered ink ground and one brass fitting, no box). Props:
+// locationLabel (the store's resolved place name — the `local_map`
+// current-node label, else the status location) and timeLabel (the
+// committed world time); null renders the `位置：--` / `時間：--`
 // placeholders. actionsEnabled (exploration-room-actions): only in
 // exploration with the panel available, the 查看房間 magnifier beside the
-// heading and the 等待 hourglass beside the time, emitting `look-room`,
+// heading and the 休息 hourglass beside the time, emitting `look-room`,
 // `wait`, `hover` (readout content), and `tab`; otherwise the card has no
-// control and no tab stop. The frame
-// below sizes it like its island slot at the head of the `map` anchor
-// (the minimap column's width, content-sized height).
+// control and no tab stop. The frame below sizes it like its slot at the
+// head of the `map` anchor (the column's width at the 1451x790 reference,
+// content-sized height) over a dark scene-like ground, so the feathered ink
+// reads.
+
+// The scene-like ground around the column-wide slot.
+const frame = (children) =>
+  h(
+    "div",
+    { style: "background:linear-gradient(135deg, #2b3440, #151920);padding:20px;" },
+    [h("div", { style: "width:calc(291px * var(--ui-scale));" }, children)],
+  );
 
 const renderCard = (args) => ({
-  render: () =>
-    h(
-      "div",
-      { style: "width:calc(230px * var(--ui-scale));padding:0;" },
-      [h(PlaceCard, args)],
-    ),
+  render: () => frame([h(PlaceCard, args)]),
 });
 
 export default {
@@ -68,7 +74,7 @@ export const LongLabelWithActions = {
 };
 
 // A location change (webclient-scene-transitions, design D3): every few
-// seconds the location moves on — the new name slides in from the left as
+// seconds the location moves on — the new name slides in from the right as
 // the old one fades — and in between only the world time ticks, which swaps
 // the time line with no transition.
 const WALK = ["石板廣場", "北岸大道", "西風酒館", "伊洛瑟恩王都外城區‧商人公會附屬倉庫的地下儲藏室"];
@@ -87,9 +93,7 @@ function renderLocationChange() {
       return () => {
         const place = WALK[Math.floor(tick.value / 2) % WALK.length];
         const minute = String((tick.value * 5) % 60).padStart(2, "0");
-        return h("div", { style: "width:calc(230px * var(--ui-scale));padding:0;" }, [
-          h(PlaceCard, { locationLabel: place, timeLabel: `春季 3 日 ‧ 12:${minute}` }),
-        ]);
+        return frame([h(PlaceCard, { locationLabel: place, timeLabel: `春季 3 日 ‧ 12:${minute}` })]);
       };
     },
   };

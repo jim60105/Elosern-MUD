@@ -13,7 +13,7 @@
 
 ## 3. Stories
 
-- [ ] 3.1 Update the frame and header comment of `web/webclient-app/stories/Core/PlaceCard.stories.js` (design D6), keeping every export and arg. Verify: `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
+- [x] 3.1 Update the frame and header comment of `web/webclient-app/stories/Core/PlaceCard.stories.js` (design D6), keeping every export and arg. Verify: `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
 
 ## 4. Live-client browser acceptance
 
