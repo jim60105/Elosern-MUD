@@ -18,7 +18,8 @@
    "index": 2,
    "name": "top-level-2",
    "labels": [
-    "tests.test_frontend_toolchain_contract"
+    "tests.test_frontend_toolchain_contract",
+    "tests.test_shard_register"
    ]
   },
   {

@@ -15,7 +15,9 @@ removes or renames (they stay in openspec/specs/ until the sync):
     uv run --locked python -m tools.contract_gate --change <change>
 
 Each gate runs even when an earlier one fails, so one invocation reports every
-broken contract. The exit status is non-zero when any selected gate fails.
+broken contract. The exit status is non-zero when any selected gate fails, and
+every failed gate is followed by its `NEXT_STEPS` entry: the command or the
+document that repairs it.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+
+from tools import shard_register
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SHARD_MANIFESTS = ("evennia-shards", "browser-shards", "top-level-shards")
@@ -68,7 +72,11 @@ def _check_manifests() -> bool:
         errors.extend(manifest_errors(name, json.loads(path.read_text(encoding="utf-8"))))
     for error in errors:
         print(error)
-    return not errors
+    if errors:
+        return False
+    # Ownership drift (an unregistered or stale test label), reported with the
+    # labels and the one command that repairs it.
+    return shard_register.main(["check"]) == 0
 
 
 def _run(*args: str) -> Callable[[], bool]:
@@ -90,6 +98,46 @@ GATES: dict[str, Callable[[], bool]] = {
     "test-data": _run("-m", "tools.test_data_lint", "check"),
     "manifests": _check_manifests,
     "contracts": _run("-m", "unittest", *CONTRACT_MODULES),
+}
+
+
+# What to do when a gate fails. Printed after the run for every failed gate, so
+# the repair is in the output instead of in a document the reader must find.
+NEXT_STEPS: dict[str, str] = {
+    "reference-context": (
+        "content/map-reference-context.json is generated. Regenerate and commit it:\n"
+        "    uv run --locked python -m tools.map_reference_context"
+    ),
+    "traceability": (
+        "A main requirement has no covering test, or an annotation is wrong. Print the canonical IDs with\n"
+        "    uv run --locked python -m tools.spec_traceability list\n"
+        "then put @covers_requirement(\"<id>\") on the test_* whose assertions establish that requirement\n"
+        "(write the test if none exists). There is no waiver list; never annotate an unrelated or skipped\n"
+        "test. Guide: docs/development/spec-test-traceability.md"
+    ),
+    "observability": (
+        "Fix each `path:line: rule` above in the production file: R1 = log through world.observability\n"
+        "(log_debug/log_info/log_warn/log_error) instead of the Evennia logger or stdlib logging;\n"
+        "R2 = an except block re-raises, emits a facade event with exc=, or carries\n"
+        "`# observability: ignore R2: <reason>`; R3 = pass context={...} (and exc= for log_error).\n"
+        "Never add an entry to tools/observability_freeze.json: it is shrink-only."
+    ),
+    "test-data": (
+        "A behavior test names shipped game content. Rewrite it on the synthetic test-data kit or a\n"
+        "file-local synthetic fixture; do not add the file to the debt ledger in\n"
+        "tools/test_data_freeze.json. Only a real data-contract test (first docstring line\n"
+        "`Data-contract test: <rationale>`) is registered there. See AGENTS.md, section Testing."
+    ),
+    "manifests": (
+        "A test has no CI owner, or a label points at a test that no longer exists. Run and commit:\n"
+        f"    {shard_register.FIX_COMMAND}"
+    ),
+    "contracts": (
+        "Read the assertion message above. For an unowned/stale shard label run\n"
+        f"    {shard_register.FIX_COMMAND}\n"
+        "A frozen-audit failure means docs/development/webclient-vue-frozen-contract-audit.md and the\n"
+        "webclient specs disagree: change the audit only in the change that owns that requirement."
+    ),
 }
 
 
@@ -139,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
             failed.append(name)
     if failed:
         print(f"contract gate FAILED: {', '.join(failed)}")
+        for name in failed:
+            print(f"\n-- next step for {name}:\n{NEXT_STEPS[name]}")
         return 1
     print(f"contract gate passed: {', '.join(selected)}")
     return 0

@@ -326,6 +326,7 @@ class TestOwnershipContractTests(unittest.TestCase):
             (unowned, stale),
             ([], []),
             "every discovered browser test method must be in exactly one process list. "
+            "Run `uv run --locked python -m tools.shard_register fix`, or by hand: "
             f"Add each unowned method (or its class/module label) to one shard's files_a or "
             f"files_b in .github/browser-shards.json: {unowned}; remove stale labels: {stale}",
         )
@@ -391,6 +392,7 @@ class TestOwnershipContractTests(unittest.TestCase):
             (unowned, stale),
             ([], []),
             "every discovered non-browser test module must be in exactly one shard. "
+            "Run `uv run --locked python -m tools.shard_register fix`, or by hand: "
             f"Add each unowned module to one shard's labels in .github/evennia-shards.json: "
             f"{unowned}; remove stale labels: {stale}",
         )
@@ -420,6 +422,7 @@ class TestOwnershipContractTests(unittest.TestCase):
             (sorted(duplicates), unowned, stale),
             ([], [], []),
             "every tests/ module must be in exactly one top-level shard. "
+            "Run `uv run --locked python -m tools.shard_register fix`, or by hand: "
             f"Add each unowned module to one shard's labels in .github/top-level-shards.json: "
             f"{unowned}; remove stale labels: {stale}",
         )
