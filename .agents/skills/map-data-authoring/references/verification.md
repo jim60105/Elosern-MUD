@@ -75,7 +75,7 @@ needs the test database, so run it only when the user asks or the change
 touches the runtime:
 
 ```console
-uv run --locked --env-file=<file with MUD_TEST_SETTINGS=1> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
 ```
 
 ## Focused tests

@@ -80,7 +80,7 @@ Then open `http://localhost:3000` in a browser.
 Use the explicit retained test profile for package-local non-browser tests:
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py \
   --keepdb commands server typeclasses world web.webclient
 ```
 

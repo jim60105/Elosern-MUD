@@ -100,7 +100,7 @@ traceability_evidence=$(mktemp)
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
   uv run --locked python -m unittest discover -s web/tests/browser -t .
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \
-  MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+  uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py --keepdb \
     commands server typeclasses world web.webclient
 OPENSPEC_TEST_EVIDENCE="$traceability_evidence" \

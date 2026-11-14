@@ -204,7 +204,7 @@ Backend: Evennia test runner on SQLite (`server/db/evennia-test.sqlite3`); Pytho
 3.13.14; measured revision `169e7299`, re-confirmed row for row at the branch tip
 `4bc68a1e`; deterministic per trial (each trial seeds `random` with its cell's seed,
 one trial per cell/seed pair). Focused label:
-`uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb
+`uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb
 world.rules.tests.test_human_combat_calibration.EncounterCalibrationTests
 world.rules.tests.test_human_combat_calibration.EncounterSelectedValueTests`.
 

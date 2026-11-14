@@ -84,7 +84,7 @@ pnpm exec vitest run \
   web/webclient-app/tests/world/map_lattice_renderer.test.js \
   web/webclient-app/tests/world/map_lattice_name_fit.test.js
 
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   web.webclient.presentation.tests.test_local_map
 ```
 

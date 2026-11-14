@@ -1221,7 +1221,7 @@ uv run --locked playwright install chromium firefox
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_workflows
 uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_map_editor_accessibility
 uv run --locked python -m unittest tests.test_map_editor_independent_environment
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb world.maps.tests.test_editor_final_yaml_adoption
 uv run --locked python -m tools.contract_gate
 ```
 

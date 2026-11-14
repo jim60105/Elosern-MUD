@@ -209,7 +209,7 @@ uv run --locked python -m tools.map_reference_context
 uv run --locked python -c "from world.lore.monster_species import MONSTER_VARIANT_REGISTRY"
 
 # 聚焦測試，label 換成你改到的模組
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.lore.tests.test_monster_species_content \
   world.lore.tests.test_bestiary_documentation \
   world.rules.tests.test_monster_composition_coverage \

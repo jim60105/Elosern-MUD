@@ -91,7 +91,7 @@ deleted by that cleanup.
 ## Verification
 
 ```sh
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.maps.tests.test_bootstrap \
   world.maps.tests.test_altoria_capital \
   world.maps.tests.test_village_ciaran \

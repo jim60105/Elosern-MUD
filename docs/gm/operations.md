@@ -38,9 +38,9 @@ uv run --locked evennia createsuperuser
 
 ```sh
 uv run --locked -m world.imports.validate world/imports/examples/example_character.json
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py \
   --keepdb world.imports world.quests world.rules commands
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py \
   --keepdb commands server typeclasses world web.webclient
 uv run --locked python -m unittest discover -s web/tests/browser -t .
 uv run --locked -m unittest discover -s tests -t .
