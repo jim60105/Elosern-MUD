@@ -151,12 +151,16 @@ def landmark_rite_adapter(
         return _rejected("rite_failed", FAILED_MESSAGE)
     message = rite_completion_line(result)
     owner.msg(message)
+    delivery = rite_delivery(result)
+    from web.webclient.presentation.rite import store_rite_delivery
+
+    store_rite_delivery(owner, delivery)
     return {
         "outcome": "success",
         "code": "explore.landmark_rite",
         "message": message,
         "data": {
-            "delivery": rite_delivery(result),
+            "delivery": delivery,
             "first_completion": result.first_completion,
         },
         "affected_panels": AFFECTED_FULL,
