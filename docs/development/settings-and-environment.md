@@ -253,6 +253,12 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `CONTAINER_UID`、`IMAGE_TAG`、`VERSION`、`RELEASE` | compose.yaml／Containerfile | 建置 ARG 與 OCI 標籤 |
 | `TEST_DB_PATH` | Evennia `settings_default` | 測試資料庫名預設；本專案的 test_settings 無條件覆寫，實際上無效 |
 
+## SQLite 連線選項（不是環境變數）
+
+世界資料庫的連線選項集中在 `server/conf/sqlite_options.py`，`settings.py` 與 `test_settings.py` 都從這個模組匯入，所以 Server、Portal、`evennia migrate`、`collectstatic` 與 shell 以相同的模式開啟同一個檔案。三個值是 `timeout`（10 秒）、`transaction_mode`（`IMMEDIATE`）與 `init_command`（`PRAGMA journal_mode=WAL;`）。`IMMEDIATE` 讓寫入交易在 `BEGIN` 就取得寫入鎖，等不到鎖時會等到 `timeout` 期滿才回報 `database is locked`，而帳號登入這類純讀取不會被另一個行程的寫入交易阻擋。
+
+測試設定是例外。`SQLITE_TEST_OPTIONS` 不含 `init_command`，保留 rollback-journal 模式，因為平行測試 runner 以檔案複製複製保留的測試資料庫，複製可能漏掉仍在 `-wal` 檔裡的資料列。write-ahead log 模式需要支援共享記憶體的檔案系統，`evennia-db` 具名磁碟區是本機檔案系統，符合這項條件。
+
 ## 測試／harness 變數
 
 | 環境變數 | 讀者 | 說明 |

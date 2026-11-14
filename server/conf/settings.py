@@ -249,6 +249,10 @@ SERVERNAME = "Elosern"
 # Keep mutable SQLite state in the dedicated container volume.
 DATABASES["default"]["NAME"] = os.path.join(GAME_DIR, "server", "db", "evennia.db3")
 
+from server.conf.sqlite_options import SQLITE_OPTIONS
+
+DATABASES["default"]["OPTIONS"] = dict(SQLITE_OPTIONS)
+
 # Project-authored Evennia trait types.
 TRAIT_CLASS_PATHS = [
     "world.rules.sexual_state.OrderedLevelTrait",

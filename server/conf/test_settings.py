@@ -91,6 +91,10 @@ ART_TRANSLATE_DOWNLOAD_ENABLED = False
 LLM_TRANSCRIPT_ENABLED = False
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+from server.conf.sqlite_options import SQLITE_TEST_OPTIONS
+
+DATABASES["default"]["OPTIONS"] = dict(SQLITE_TEST_OPTIONS)
 DATABASES["default"].setdefault("TEST", {})["NAME"] = os.path.join(
     GAME_DIR,
     "server",

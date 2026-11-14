@@ -10,8 +10,9 @@ Consistency: one snapshot at a time (``_snapshot_lock``); the art store is
 held still through ``world.art.publication.paused`` across the database
 backup and the art mirror, so no art file is written mid-snapshot and the
 saved database and art agree. The database copy uses SQLite's online backup
-API (``pages=-1``: one pass under a shared lock, which briefly delays writer
-commits), never a byte copy of the live file. Art files are hardlinked into
+API (``pages=-1``: the backup reads a consistent snapshot), never a byte copy
+of the live file, and the saved copy is converted to rollback-journal mode so
+a save holds one self-contained database file. Art files are hardlinked into
 the save (copy fallback), which is safe because every live art writer
 replaces files atomically and never writes in place.
 
@@ -215,6 +216,7 @@ def _backup_database(source: Path, target: Path) -> None:
         dst = sqlite3.connect(target)
         try:
             src.backup(dst)
+            dst.execute("PRAGMA journal_mode=DELETE")
         finally:
             dst.close()
     finally:

@@ -29,7 +29,7 @@ server/.art/.saves/<id>/...              # 美術庫樹狀結構的鏡像
 `server/saves/snapshot.py` 的 `create_snapshot(kind, label)` 負責建立。同一時間只會有一份存檔在進行，重疊的請求回 `save_in_progress`。
 
 1. 進入 `world.art.publication.paused()`：設定暫停旗標，讓 `ArtDrainScript` 的每次觸發與手動 drain 都直接返回，並取得美術發布閘門。任何正在發布的生成結果（記錄轉換、原子取代、刪除被取代的舊檔）會先完成；之後到來的發布會等待。生成本身（等待 sd-webui）不在閘門內，只有很短的發布步驟會等待。玩家刪除圖庫卡片時最多等 2 秒，等不到就略過刪檔，留下的未引用檔案由啟動時的孤兒清理回收。閘門一律在 `queue_lock`、`gallery_lock` 之前取得，從不在持有它們時等待：卡片的刪檔在釋放 `gallery_lock` 之後才進行。
-2. 以 SQLite online backup API 複製資料庫（一次完成，期間其他寫入者的 commit 會短暫延後），絕不直接複製執行中的檔案位元組。
+2. 以 SQLite online backup API 複製資料庫，讀取的是一致快照，絕不直接複製執行中的檔案位元組。複製完成後把存檔的副本轉為 rollback-journal 模式，所以每份存檔只含一個可獨立讀取的資料庫檔案。
 3. 走訪美術庫（略過 `.saves/`、`.restore-*` 工作目錄、符號連結與寫入者的暫存檔 `.<name>.<random>.tmp`），把每個檔案 hardlink 進存檔，連結失敗時改為複製。走訪途中消失的檔案會略過。
 4. 離開閘門後寫入 manifest，再把兩個 `.partial` 目錄改名為正式名稱。任何失敗都會移除 `.partial` 與已發布的一半，並送出 `save_failed`；閘門與暫停旗標一定會解除。
 

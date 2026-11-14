@@ -96,6 +96,53 @@ class RestoreToolTests(unittest.TestCase):
         self.assertEqual(self.result()["save"], self.save.id)
         self.assertEqual(self.result()["kind"], "manual")
 
+    @covers_requirement("gm-save-management::restoration-never-pairs-a-sidecar-with-another-database")
+    def test_a_restore_over_a_write_ahead_database_drops_its_sidecars(self):
+        wal = self.layout.db_file.parent / "evennia.db3-wal"
+        shm = self.layout.db_file.parent / "evennia.db3-shm"
+        wal.write_bytes(b"stale wal")
+        shm.write_bytes(b"stale shm")
+        self.stage()
+
+        self.assertEqual(self.apply(), restore.EXIT_OK)
+
+        self.assertEqual(self.result()["outcome"], "restored")
+        self.assertEqual(self.world.read_state(), "original")
+        self.assertFalse(wal.exists())
+        self.assertFalse(shm.exists())
+
+    @covers_requirement("gm-save-management::restoration-never-pairs-a-sidecar-with-another-database")
+    def test_a_rollback_returns_the_original_write_ahead_sidecars(self):
+        db_dir = self.layout.db_file.parent
+        wal = db_dir / "evennia.db3-wal"
+        shm = db_dir / "evennia.db3-shm"
+        journal = db_dir / "evennia.db3-journal"
+        wal.write_bytes(b"original wal")
+        shm.write_bytes(b"original shm")
+        # This world carried no rollback journal, so a journal written
+        # against the installed database is not part of the moved-aside set.
+        journal.unlink()
+        self.stage()
+
+        def sidecar_of_the_installed_database(swap):
+            (swap.layout.db_file.parent / "evennia.db3-journal").write_bytes(b"installed journal")
+            raise OSError("volume vanished")
+
+        with mock.patch("server.saves.restore.install_art", side_effect=sidecar_of_the_installed_database):
+            self.assertEqual(self.apply(), restore.EXIT_OK)
+
+        self.assertEqual(self.result()["outcome"], "failed")
+        self.assertEqual(wal.read_bytes(), b"original wal")
+        self.assertEqual(shm.read_bytes(), b"original shm")
+        self.assertFalse(journal.exists())
+        # Checked before SQLite opens the database (it discards stale sidecars).
+        self.assertEqual(
+            sorted(path.name for path in db_dir.iterdir() if path.name.startswith("evennia.db3")),
+            ["evennia.db3", "evennia.db3-shm", "evennia.db3-wal"],
+        )
+        self.assertEqual(self.world.read_state(), "current")
+        self.assert_no_work_dirs()
+
     def assert_failed_cleanly(self, status=restore.EXIT_OK):
         self.assertEqual(self.apply(), status)
         self.assert_current_world_intact()
