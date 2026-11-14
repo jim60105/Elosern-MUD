@@ -23,11 +23,12 @@ Ground rules:
   Result: all four hold on `b6104326`.
 - [x] 1.2 Record the first timing line of design D9. Verify: the line is saved for the hand-off.
 
-  Result: `Ran 2 tests in 0.000s` — measured at the first compose-able tree
-  (after task 2.2's regeneration), because the pre-edit run of the same label
-  refused at import with `stale_partition` once the new rows were in
-  `locations.yaml`. The label itself discovers two tests and reports them
-  separately; the figure is recorded, never asserted.
+  Result: `Ran 2 tests in 0.000s`, `FAILED (errors=2)` — the start run could
+  not measure anything: with the new rows in `locations.yaml` and the
+  partition artifact not yet regenerated, both modules refused at import with
+  `stale_partition: the partition artifact was generated from different map
+  inputs`, which is the composition guard of D7 step 1. The first genuine
+  timing line is the one under task 5.4.
 - [x] 1.3 Write the placement script per design D1 and list the road gaps over 75 km inside this change's scope. Verify: the list is saved under `snippets/` and names each gap's road, end cells and length.
 
   Result: `snippets/place.py`, `snippets/plan.json`, `snippets/gaps_before.json`
@@ -151,9 +152,10 @@ Ground rules:
   gate passed: reference-context, traceability, observability, test-data,
   manifests, contracts`, exit 0; `openspec validate
   altoria-coast-village-placement --strict` → `Change
-  'altoria-coast-village-placement' is valid`, exit 0. Forty-one settlements
-  were added: 12 villages (9 on a trunk, 3 off-trunk) and 29 hamlets (22 on an
-  existing road, 5 on a new spur, 2 off every road), of which five sit on the
+  'altoria-coast-village-placement' is valid`, exit 0. Second timing line:
+  `Ran 46 tests in 337.103s`, `OK`. Forty-two settlements were added: 12
+  villages (9 on a trunk, 3 off-trunk) and 30 hamlets (27 on an existing road
+  or a new spur, 3 off every road or on a spur end), of which five sit on the
   earlier side of the boundary under D2's exception. No spacing exemption is
   used anywhere.
 
