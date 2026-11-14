@@ -630,6 +630,9 @@ class SeededDecisionTests(ActivityFixture):
         self.assertIsNone(decision.edge)
         self.assertEqual(decision.reason, monster_activity.STAY_NO_LEGAL_ROUTE)
 
+    @covers_requirement(
+        "population-settlement-units::the-gm-monster-view-reports-settlement-progress-without-settling",
+    )
     def test_gm_inspection_reports_the_committed_activity_binding(self):
         from web.gm.readers import monsters as reader
 

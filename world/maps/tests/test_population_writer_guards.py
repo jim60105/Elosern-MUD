@@ -12,10 +12,9 @@ The two synthetic zones are two settlement units. A unit lags by advancing the
 world clock while its cursor stays at the scenario start; a unit is made current
 by naming it in the cursor record at the advanced tick.
 
-The requirements this module proves are ADDED by the change and carry no
-canonical identifier before the archive sync, so no test here is annotated. The
-test-to-requirement-and-scenario hand-off is recorded in the change's apply
-report.
+The requirements this module proves were ADDED by the change; their canonical
+identifiers appeared when the archive synced the delta into the main spec, and
+every test below claims the requirement whose behaviour it establishes.
 """
 
 from __future__ import annotations
@@ -23,6 +22,7 @@ from __future__ import annotations
 from types import MappingProxyType, SimpleNamespace
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 
 from world.maps import monster_activity, population_units, regional_population
@@ -262,6 +262,9 @@ class WriterGuardFixture(ActivityFixture):
 class RequireUnitsCurrentTests(WriterGuardFixture):
     """The guard itself: the refusal, its silence, and the owner's own error."""
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_lagging_unit_refuses_by_name_with_both_ticks(self):
         self.lag()
         units = {self.unit_b, self.unit_a}
@@ -276,6 +279,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
         self.assertIn(str(LAG), message)
         self.assertNotIsInstance(caught.exception, population_units.PopulationScopeViolation)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_current_unit_passes_beside_a_lagging_one(self):
         self.lag()
         self.make_current(self.unit_a)
@@ -283,6 +289,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
         with self.assertRaises(population_units.PopulationUnitNotCurrent):
             population_units.require_units_current(self.wilderness, {self.unit_b})
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_running_pass_answers_without_reading_the_record(self):
         self.lag()
         with self.assertRaises(population_units.PopulationUnitNotCurrent):
@@ -300,6 +309,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
                 self.wilderness, [_wilderness_ref(WANDER_B)]
             )
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_an_unprovisioned_world_answers_without_reading_the_record(self):
         unprovisioned = SimpleNamespace(
             attributes=_Unseeded(), db_key="t_guard_unprovisioned"
@@ -317,6 +329,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
             population_units.require_units_current(None, {self.unit_a})
             population_units.require_current(None, [_wilderness_ref(WANDER_A)])
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_an_empty_answer_reads_no_record(self):
         self.wilderness.attributes.remove(
             population_units.POPULATION_UNIT_CURSORS_ATTRIBUTE
@@ -324,6 +339,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
         population_units.require_units_current(self.wilderness, set())
         population_units.require_current(self.wilderness, [None])
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_missing_record_refuses_through_the_owner(self):
         self.wilderness.attributes.remove(
             population_units.POPULATION_UNIT_CURSORS_ATTRIBUTE
@@ -335,6 +353,9 @@ class RequireUnitsCurrentTests(WriterGuardFixture):
 class WriterRefusalTests(WriterGuardFixture):
     """Each writer refuses a lagging unit and leaves every surface untouched."""
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_an_explicit_registration_into_a_lagging_unit_writes_nothing(self):
         self.lag()
         individual = self._monster(WANDER_B)
@@ -357,6 +378,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertEqual(self.group_ids(), groups)
         self.assertEqual(self.timeline().transitions, ())
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_registration_reaching_a_lagging_area_writes_nothing(self):
         # The cell and the owner are current; only the group's activity area is
         # in unit B, so the activity-area unit alone must refuse.
@@ -381,6 +405,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assert_nothing_written(before, coordinates)
         self.assertEqual(self.group_ids(), groups)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_group_creation_in_a_lagging_unit_writes_nothing(self):
         self.lag()
         individual = self._monster(WANDER_B)
@@ -404,6 +431,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assert_nothing_written(before, coordinates)
         self.assertEqual(self.group_ids(), groups)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_group_reaching_a_lagging_unit_writes_nothing(self):
         # The home cell and the owner are in the current unit; the activity
         # area is not, so the activity-area unit alone must refuse.
@@ -430,6 +460,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assert_nothing_written(before, coordinates)
         self.assertEqual(self.group_ids(), groups)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_transition_from_a_lagging_unit_writes_nothing(self):
         self.lag()
         individual = self.bodies[ZONE_B][0]
@@ -440,6 +473,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertIn(self.unit_b, str(caught.exception))
         self.assert_nothing_written(before, coordinates)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_transition_into_a_lagging_unit_writes_nothing(self):
         self.lag()
         self.make_current(self.unit_a)
@@ -450,6 +486,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertIn(self.unit_b, str(caught.exception))
         self.assert_nothing_written(before, coordinates)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_protection_of_a_lagging_cell_writes_nothing(self):
         self.lag()
         before = settlement_projection(self.wilderness)
@@ -459,6 +498,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertIn(self.unit_b, str(caught.exception))
         self.assert_nothing_written(before, coordinates)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_transition_of_a_lagging_home_zone_is_recorded(self):
         # Both positions are in the current unit; the lagging unit is named
         # only by the home-zone marker, whose evidence the owner retires once
@@ -484,6 +526,9 @@ class WriterRefusalTests(WriterGuardFixture):
             {transition.source_id for transition in self.timeline().transitions},
         )
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_transition_position_on_another_map_is_skipped(self):
         self.lag()
         individual = self.bodies[ZONE_B][0]
@@ -508,6 +553,9 @@ class WriterRefusalTests(WriterGuardFixture):
             {transition.source_id for transition in self.timeline().transitions},
         )
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_departure_from_a_lagging_unit_writes_nothing(self):
         self.lag()
         plan = self.plan_departure()
@@ -519,6 +567,9 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertIn(self.unit_a, str(caught.exception))
         self.assert_nothing_written(before, coordinates)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_a_departure_into_a_lagging_unit_writes_nothing(self):
         # The departure cell is current; the selected destination is not.
         self.lag()
@@ -589,6 +640,9 @@ class WriterSuccessTests(WriterGuardFixture):
         )
         self.assertTrue(state.journeys)
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_every_writer_writes_for_a_current_unit(self):
         registered = self.write_registration(WANDER_A)
         group_id = self.write_group(WANDER_A)
@@ -600,6 +654,9 @@ class WriterSuccessTests(WriterGuardFixture):
         self.assertIn(journey_id, read_monster_activity(self.wilderness).journeys)
         self.assert_every_writer_wrote()
 
+    @covers_requirement(
+        "population-settlement-units::population-writers-refuse-a-lagging-unit",
+    )
     def test_every_writer_writes_for_a_lagging_unit_inside_a_pass(self):
         self.lag()
         plan = self.plan_departure()
