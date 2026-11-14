@@ -1070,8 +1070,8 @@ class ChronologicalSettlementTests(ActivityFixture):
             decisions.append(plan.tick)
             return real_commit(wilderness, plan)
 
-        def arrival_spy(wilderness, tick):
-            events = real_arrival(wilderness, tick)
+        def arrival_spy(wilderness, tick, *, scope=None):
+            events = real_arrival(wilderness, tick, scope=scope)
             if events:
                 arrivals.append(tick)
             return events
@@ -1153,7 +1153,7 @@ class ChronologicalSettlementTests(ActivityFixture):
         clock.tick = 100
         created: dict = {}
 
-        def birth_then_sites(tick):
+        def birth_then_sites(tick, *, scope=None):
             if not created:
                 group_id, bodies = self._group(
                     cell=(505, 705),

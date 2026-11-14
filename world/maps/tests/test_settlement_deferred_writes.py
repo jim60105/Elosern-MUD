@@ -305,9 +305,9 @@ class StatementBoundTests(_PassScenarioFixture):
         seen: list[int] = []
         settle_at = population_lifecycle._settle_population_at
 
-        def probe(wilderness, tick, *, contact_tick=None):
+        def probe(wilderness, tick, **kwargs):
             seen.append(int(tick))
-            return settle_at(wilderness, tick, contact_tick=contact_tick)
+            return settle_at(wilderness, tick, **kwargs)
 
         with patch.object(population_lifecycle, "_settle_population_at", probe):
             self._advance(end_tick - START)
@@ -341,9 +341,9 @@ class StatementBoundTests(_PassScenarioFixture):
         contacts: list[int] = []
         settle_at = population_lifecycle._settle_population_at
 
-        def probe(wilderness, tick, *, contact_tick=None):
+        def probe(wilderness, tick, **kwargs):
             seen.append(int(tick))
-            return settle_at(wilderness, tick, contact_tick=contact_tick)
+            return settle_at(wilderness, tick, **kwargs)
 
         def contact_probe(*args, **kwargs):
             contacts.append(1)
@@ -616,7 +616,7 @@ class FaultAfterDeferredWritesTests(_PassScenarioFixture):
                 issued.append(str(sql))
             return execute(sql, params, many, context)
 
-        def fail_on_third(wilderness, tick):
+        def fail_on_third(wilderness, tick, *, scope=None):
             calls["count"] += 1
             if calls["count"] == 3:
                 # The pass already deferred timeline, coordinate and reserve
@@ -629,7 +629,7 @@ class FaultAfterDeferredWritesTests(_PassScenarioFixture):
                 )
                 recording["on"] = False
                 raise RuntimeError("injected third-decision fault")
-            return real_decisions(wilderness, tick)
+            return real_decisions(wilderness, tick, scope=scope)
 
         with patch.object(
             monster_activity, "settle_group_decisions_at", fail_on_third
