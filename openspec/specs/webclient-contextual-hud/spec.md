@@ -773,19 +773,19 @@ The active conditions SHALL NOT render as a chipped island with a background win
 - **THEN** the tooltip names the known key in the stat vocabulary, names the unknown key 其他修正, and keeps both original values verbatim with their signs and units
 
 ### Requirement: The minimap island states only its own drawing convention
-The minimap SHALL render as a bounded HUD island in the `map` anchor, below the place card and above the objective line, carrying the committed `local_map` payload's title, sharing the anchor's content-column width with the place card so the two read as one column. On the coordinate lattice — selected exactly by the coordinate-bearing layers (`grid`, `wilderness`) — it SHALL state the renderer's axis convention as orientation marks in its header; on the radial graph variant it SHALL omit them.
+The minimap SHALL render as a bounded HUD island inside its own instrument panel in the `map` anchor, below the place card and above the objective line, carrying the committed `local_map` payload's title; the panel SHALL span the column's width like the place card. The island SHALL state no orientation marks: on the coordinate lattice (`grid`, `wilderness`) it SHALL draw the axis cross through the current node, and on the radial graph none.
 
 #### Scenario: Omitted marks never assert an undrawn axis
 - **WHEN** the resolved layout variant is the radial graph
-- **THEN** the island omits the orientation marks rather than assert an axis the presentation does not draw (a radial graph draws no axis)
+- **THEN** the island states no orientation marks and draws no axis cross (a radial graph asserts no axis)
 
 #### Scenario: The worded marks and the drawn axis travel together
 - **WHEN** the island draws its lattice
-- **THEN** those marks and the axis cross the lattice draws are ONE claim stated twice — once in words, once as geometry — so the two travel together: a map surface draws the axis cross only where that same surface states the axis convention in words, and the island's marks are what license the axis its lattice draws; the island therefore draws the axis cross through the `current` node on the coordinate lattice and draws none on the radial graph, and a surface that states no orientation marks — the full-map surface as it stands — draws no axis at all
+- **THEN** the island states no orientation marks on any variant, because the minimap never rotates and a fixed north-up, east-right legend carries no information; the axis cross is the lattice's own geometry, drawn through the `current` node on the island's coordinate lattice, drawn on neither the radial graph nor the full-map surface, and never accompanied by worded marks
 
 #### Scenario: The header follows the redesign draft's treatment
 - **WHEN** the island renders on the coordinate lattice
-- **THEN** it states the orientation marks following the redesign draft's header treatment — the letterspaced title style and the `北↑ 東→` marks the draft's lattice header draws
+- **THEN** its header carries the letterspaced title and the decorative open-map glyph and no orientation marks
 
 #### Scenario: Decoration states nothing in words
 - **WHEN** the lattice draws its coordinate dot field and its knowledge-edge vignette
@@ -833,17 +833,16 @@ The minimap SHALL render as a bounded HUD island in the `map` anchor, below the 
 
 #### Scenario: The island states the axis convention on a coordinate-bearing layer
 - **WHEN** the committed payload's layer places nodes on coordinates and the resolved variant is the lattice
-- **THEN** the island renders the renderer's axis orientation marks in its draft-styled header
-  alongside the map title, and its readout line states the current node's two payload coordinates as
-  its entire content — no place name, no visibility-state word, no destination
+- **THEN** the island renders the map title and no orientation marks in its header, and its readout
+  line states the current node's two payload coordinates as its entire content — no place name, no
+  visibility-state word, no destination
 
 #### Scenario: The stated convention and the drawn axis travel together
 - **WHEN** a coordinate-bearing payload renders on the island, then a coordinate-free payload renders on
   the island, then the same coordinate-bearing payload renders on the full-map surface, which states no
   orientation marks
-- **THEN** the island draws the axis cross exactly where it states `北↑ 東→` and nowhere else — drawn on
-  the lattice, absent on the graph, and absent on the full-map surface — so no surface ever draws an axis
-  it does not name or names an axis it does not draw
+- **THEN** the island draws the axis cross on the lattice and nowhere else — absent on the graph and
+  absent on the full-map surface — and no surface states orientation marks
 - **AND** the island's coordinate dot field and knowledge-edge vignette add no word, figure, or angle to
   the island: no bearing, no distance, and no coordinate figure beyond the current node's own pair appears
   anywhere because of them
@@ -913,8 +912,20 @@ The minimap SHALL render as a bounded HUD island in the `map` anchor, below the 
 
 #### Scenario: The island sits under the place card at the column's width
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel
-- **THEN** the minimap island's top edge lies directly below the place card's bottom edge across the
-  anchor's gap, and the two islands' left and right edges coincide
+- **THEN** the minimap's instrument panel's top edge lies directly below the place card's bottom edge
+  across the anchor's gap, and the panel's left and right edges coincide with the place card's (±1px)
+
+#### Scenario: The island wears no card inside its panel
+- **WHEN** an available payload renders on the island in the live client
+- **THEN** the island element has no border, corner radius, box shadow, background fill or padding of its own, its panel is an instrument panel as "An instrument panel wears a feathered ground and one brass fitting instead of a box" defines, and the canvas keeps its own ink ground and its four corner brackets
+
+#### Scenario: The canvas stands clear of the spine
+- **WHEN** the island renders at 1280x720, 1451x790 and 2560x1440
+- **THEN** the canvas is 240px × S square (±1px) and its right edge stands 22px × S (±1px) left of the panel's right edge, so the panel's spine runs unbroken beside it
+
+#### Scenario: The open-map glyph answers hover and focus
+- **WHEN** the pointer rests outside the island, then hovers the island, then keyboard focus enters the island's full-map affordance
+- **THEN** the header's open-map glyph is dimmed (opacity below 1) at rest and fully opaque while the island is hovered or holds focus
 
 ### Requirement: The combat dock root renders as a vertical command window with a truthful skills count
 In combat mode the root SHALL render one vertical icon-and-label command list with a neutral inline Skills count equal to the committed descriptor count, omitted at zero. The active root SHALL be the only listbox/tab stop and expose its focused row by active descendant. No other mode SHALL render this combat root.
