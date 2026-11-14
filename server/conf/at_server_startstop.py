@@ -47,6 +47,7 @@ def _late(module: str, name: str):
 # this catalog (behaviorally, via stubs) instead of source text.
 STARTUP_STEP_ORDER: tuple[str, ...] = (
     "map_world_adoption",
+    "landmark_rites_adoption",
     "world_clock_init",
     "equipment_rulebook_validation",
     "guild_exam_restriction_validation",
@@ -445,6 +446,15 @@ def at_server_start():
     _startup_step(
         "map_world_adoption",
         lambda: _late("world.maps.runtime", "adopt"),
+    )
+    # The shipped rite document is validated against the freshly adopted
+    # district world and installed as one snapshot before anything else runs:
+    # a district without an assignment stops boot here (landmark-rite-content
+    # D2). The step reads the published districts, so it must follow the
+    # adoption above.
+    _startup_step(
+        "landmark_rites_adoption",
+        lambda: _late("world.lore.rites", "load_published"),
     )
     # Deterministic startup owns the world-clock singleton; presentation reads
     # only through read_world_clock() and must never create it.

@@ -10,14 +10,18 @@ Covers:
 - ``watch: null`` against a missing ``watch`` key, and narration-first scenes.
 - The snapshot holder: read before install, install, scoped restore and type check.
 - ``load_rites`` file reading: size limit, non-UTF-8 and an unreadable path.
+- ``load_published``: a valid document installs, a rejected or missing document
+  installs nothing and leaves the previous snapshot current.
 
 Every document here is synthetic placeholder data, never shipped prose or rows.
 """
 
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 
@@ -28,6 +32,7 @@ from world.lore.rites import (
     current,
     install,
     installed,
+    load_published,
     uninstall,
 )
 from world.lore.rites.loader import (
@@ -710,6 +715,71 @@ class LoadRitesTests(unittest.TestCase):
                 load_rites(path, district_keys=DISTRICT_KEYS)
 
         self.assertEqual(_pairs(caught.exception), [("", "document_shape")])
+
+
+class LoadPublishedTests(unittest.TestCase):
+    """``load_published`` adopts the document and installs only on success."""
+
+    def setUp(self):
+        uninstall()
+        self.addCleanup(uninstall)
+
+    def _write(self, directory: str, document: object) -> Path:
+        path = Path(directory) / "landmark_rites.yaml"
+        path.write_text(_text(document), encoding="utf-8")
+        return path
+
+    def test_a_valid_document_is_installed_and_returned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, _document())
+            snapshot = load_published(path, district_keys=DISTRICT_KEYS)
+
+        self.assertEqual(dict(snapshot.districts), {"d1": "alpha", "d2": "alpha"})
+        self.assertIs(current(), snapshot)
+
+    def test_the_published_district_world_supplies_the_default_keys(self):
+        document = SimpleNamespace(districts={"d1": "alpha", "d2": "alpha"})
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, _document())
+            with patch("world.lore.map_districts.current", return_value=document):
+                snapshot = load_published(path)
+
+        self.assertEqual(set(snapshot.districts), {"d1", "d2"})
+        self.assertIs(current(), snapshot)
+
+    def test_a_rejected_document_leaves_the_previous_snapshot_current(self):
+        previous = RiteSnapshot(archetypes={}, districts={})
+        install(previous)
+        document = _document()
+        document["districts"] = {"d1": "alpha"}
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, document)
+            with self.assertRaises(RiteContentError):
+                load_published(path, district_keys=DISTRICT_KEYS)
+
+        self.assertIs(current(), previous)
+
+    def test_a_missing_document_raises_and_leaves_the_previous_snapshot_current(self):
+        previous = RiteSnapshot(archetypes={}, districts={})
+        install(previous)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "missing.yaml"
+            with self.assertRaises(RiteContentError):
+                load_published(path, district_keys=DISTRICT_KEYS)
+
+        self.assertIs(current(), previous)
+
+    def test_a_missing_document_installs_nothing_without_a_previous_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "missing.yaml"
+            with self.assertRaises(RiteContentError):
+                load_published(path, district_keys=DISTRICT_KEYS)
+
+        with self.assertRaises(RitesNotLoaded):
+            current()
 
 
 if __name__ == "__main__":
