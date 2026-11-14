@@ -1844,6 +1844,23 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         # the centred-card predicate seen through the travel store's walk refusal.
         self._run_vitest("web/webclient-app/tests/rite/store.test.js")
 
+    @covers_requirement(
+        "authored-scene-playback::rite-deliveries-play-through-the-shared-scene-player",
+        "webclient-landmark-rite::a-rite-landmark-arrival-opens-the-rite-arrival-card",
+        "webclient-landmark-rite::approaching-presents-the-rite-stage-without-sending-anything",
+        "webclient-landmark-rite::picking-an-option-dispatches-one-rite-and-plays-its-delivery",
+        "webclient-landmark-rite::a-return-entry-reopens-the-rite-card-while-the-panel-is-available",
+        "webclient-landmark-rite::leaving-the-landmark-drops-every-rite-surface",
+    )
+    def test_landmark_rite_stage_vitest_evidence_passes(self):
+        # landmark-rite-stage D5: the mounted client shell. The arrival card
+        # replacing the generic landmark card and waiting behind a sleep-handoff
+        # card; the stage as local presentation over exploration mode; one pick
+        # sending one rite and its delivery advancing line by line through the
+        # shared player with narration, actor and guardian attribution; the
+        # return entry and R key; and the withdrawal dropping every surface.
+        self._run_vitest("web/webclient-app/tests/app_client_rite.test.js")
+
 
 class RoomActionsEvidenceTest(unittest.TestCase):
     """exploration-room-actions; redesign-rest-entry: the rest entry is the
