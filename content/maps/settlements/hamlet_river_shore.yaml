@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_river_shore
+location_ref: hamlet_river_shore
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 176
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東南接往雙流城的官道，路邊是低窪的濕地。雨後常積著水，水面上浮著一層細碎的草葉。
+    anchor_key: hamlet_river_shore
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 176
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西北小路通往香道城，屋簷下晾著編到一半的草鞋。院裡有一方小菜圃，圃邊的泥還帶著濕氣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

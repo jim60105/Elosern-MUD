@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_bay_flat
+location_ref: hamlet_bay_flat
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 214
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東接上海岸官道，順路下去便是東南方的東灣港。路口鋪著壓實的貝殼與細沙，車輪走過留下淺淺的印子。
+    anchor_key: hamlet_bay_flat
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西邊小路通向雙流城方向，路旁是低矮的防風籬。屋簷下晾著幾張補過的網，海風一吹便輕輕擺動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

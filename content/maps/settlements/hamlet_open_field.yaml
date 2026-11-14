@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_open_field
+location_ref: hamlet_open_field
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 198
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東通往翠湖鎮，路邊的野草高到腰際。風一吹，草浪從路面一直推到天邊，看不見一間屋舍。
+    anchor_key: hamlet_open_field
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西邊小路通往駿原鎮，屋後是一片空曠的草地。院牆低矮，站在門口就能望見遠處的牧群。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

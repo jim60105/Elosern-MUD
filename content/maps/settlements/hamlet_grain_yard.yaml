@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_grain_yard
+location_ref: hamlet_grain_yard
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 167
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東南接上平原大道，遠處通往星輝城。路面平直，車轍在日頭下乾得發硬，走起來沙沙作響。
+    anchor_key: hamlet_grain_yard
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 167
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西北小路通往翠湖鎮，屋前攤著剛打下的穀子。院裡立著一架舊風車，風車葉片上積著穀殼。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: nw
+- source: homestead_front
+  destination: crossing
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: crossing
+  - return_direction: se
+    destination_node: homestead_front
+city_gate:

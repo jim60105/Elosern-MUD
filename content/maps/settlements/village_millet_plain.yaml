@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_millet_plain
+location_ref: village_millet_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 287
+    y_m: 194
+    prototype_parent: anchor_room
+    key: 石磨綠地
+    desc: 綠地的井旁架著石磨，磨盤邊散落著金黃的粟粒。井水打上來總帶著穀殼的氣味，磨坊裡終日響著石盤轉動的聲音。
+    anchor_key: village_millet_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 474
+    y_m: 194
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口往香道城，粟米車在路口一輛挨著一輛。車轅上掛著驅鳥的布條，風一吹便啪啪作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 194
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口通往橙花鎮，路兩旁全是結穗的粟田。穗子低垂得幾乎碰到路面，行人走過得側身避讓。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 287
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝南，正對著一片低垂的粟穗。階上曬著剛簸淨的穀子，麻雀在階邊跳來跳去，趕走了又飛回來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

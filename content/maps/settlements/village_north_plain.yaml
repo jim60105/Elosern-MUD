@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_north_plain
+location_ref: village_north_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 226
+    y_m: 226
+    prototype_parent: anchor_room
+    key: 井臺綠地
+    desc: 綠地中央的井是方圓數里唯一的水源，井臺上總擱著幾只木桶。桶沿被繩子磨得光滑，提水的人得排著隊等。
+    anchor_key: village_north_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 352
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口通往東灣港的官道，路旁是一望無際的麥田。麥穗成熟時整片翻著金浪，風一過便露出田壟間的小徑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 352
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口朝雙流城方向，風起時整條路都揚著草屑。行人得瞇著眼走，偶爾停下來背過身子避一避。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 163
+    y_m: 163
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝西南，石牆擋住海風，牆根晾著一疊疊採回來的草藥。藥香混著土味，在牆邊久久不散。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

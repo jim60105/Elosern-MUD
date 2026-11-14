@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_river_sand
+location_ref: hamlet_river_sand
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 189
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往北接往香道城的官道，路旁是帝河沖下的沙地。沙裡混著細碎的貝殼，踩上去會發出輕輕的聲響。
+    anchor_key: hamlet_river_sand
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的南邊小路通往金穗港，屋前晾著一層細沙。院子圍著蘆蓆，蓆後是幾株耐鹽的矮樹。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

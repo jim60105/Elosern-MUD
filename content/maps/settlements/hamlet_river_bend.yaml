@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_river_bend
+location_ref: hamlet_river_bend
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 210
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往北接上帝河沿岸的官道，直上雙流城。路肩外就是河灣，水面在蘆葦後閃著光，偶有小船划過。
+    anchor_key: hamlet_river_bend
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的南邊小路通往香道城，路肩外的葦叢高過人頭。屋後的小碼頭拴著一條平底船，船底積著淺淺的河水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_wild_road
+location_ref: hamlet_wild_road
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 182
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東接上草原長路，路面被車輪壓出兩道深轍。路旁是一望無際的荒草，偶有野兔從草叢竄出。
+    anchor_key: hamlet_wild_road
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西邊小路通往雙流城方向，屋後是一片空曠的荒草。院牆用草泥糊成，牆頭長著細細的野花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:
