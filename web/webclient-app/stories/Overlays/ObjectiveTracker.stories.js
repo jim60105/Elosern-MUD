@@ -6,12 +6,16 @@ import {
 } from "../fixtures.js";
 
 // ObjectiveTracker (webclient-align-09-objective-tracker-ui;
-// webclient-avg-stage-hud-anchors design D2): the one-line objective under the
-// minimap. Stories: three tracked (`ActiveObjectives`: the first row plus `+2`), a completed
-// objective, a progress counter, a reward tag, a row whose deadline stays in
-// the quest drawer, a long line that truncates, and empty rows (renders
-// nothing). The frame mimics the `map` anchor at 1451x790: its 291px
-// right-aligned column under a 250px minimap card.
+// webclient-avg-stage-hud-anchors design D2; objective-tracker-instrument-panel):
+// the objective line under the minimap, worn as an instrument panel that spans
+// the column, with no visible 目標 label (it is the region's accessible name).
+// Stories: three tracked (`ActiveObjectives`: the first row plus the
+// stacked-lines glyph count of 2), a completed objective, a progress counter
+// with its ticks, a reached count (`CountReached`), a count above twelve drawn
+// as one tapering stroke (`LongCount`), a reward tag, a row whose deadline
+// stays in the quest drawer, a long line that truncates, and empty rows
+// (renders nothing). The frame mimics the `map` anchor at 1451x790: its 291px
+// column under the 240px minimap canvas's footprint, 10px apart.
 
 export default {
   title: "Overlays/ObjectiveTracker",
@@ -31,13 +35,13 @@ const renderTracker = (args) => ({
           "div",
           {
             style:
-              "width: 291px; display: flex; flex-direction: column; align-items: stretch; gap: 14px;",
+              "width: 291px; display: flex; flex-direction: column; align-items: stretch; gap: 10px;",
           },
           [
             h("div", {
               "aria-hidden": "true",
               style:
-                "align-self: flex-end; width: 250px; height: 120px; box-sizing: border-box; " +
+                "align-self: flex-end; width: 240px; height: 120px; margin-right: 22px; box-sizing: border-box; " +
                 "border: 1px dashed #bda47766; border-radius: var(--radius);",
             }),
             h(ObjectiveTracker, args),
@@ -106,6 +110,44 @@ export const ProgressCounter = {
         stage_progress: 3,
         objective_quantity: 10,
         reward_copper: 200,
+        deadline_line: null,
+      },
+    ],
+  },
+};
+
+export const CountReached = {
+  render: renderTracker,
+  args: {
+    rows: [
+      {
+        quest_id: "q_reached",
+        display_name: "採集蘆葦",
+        objective_line: "割下渡口的蘆葦",
+        stage_index: 1,
+        stage_total: 1,
+        stage_progress: 5,
+        objective_quantity: 5,
+        reward_copper: null,
+        deadline_line: null,
+      },
+    ],
+  },
+};
+
+export const LongCount = {
+  render: renderTracker,
+  args: {
+    rows: [
+      {
+        quest_id: "q_long_count",
+        display_name: "清點貨箱",
+        objective_line: "清點碼頭倉庫的貨箱",
+        stage_index: 1,
+        stage_total: 1,
+        stage_progress: 12,
+        objective_quantity: 30,
+        reward_copper: null,
         deadline_line: null,
       },
     ],

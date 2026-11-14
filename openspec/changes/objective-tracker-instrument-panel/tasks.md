@@ -10,7 +10,7 @@
 
 ## 2. Stories
 
-- [ ] 2.1 Update the frame and header comment of `web/webclient-app/stories/Overlays/ObjectiveTracker.stories.js` and add the `CountReached` and `LongCount` stories (design D6). Verify: `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
+- [x] 2.1 Update the frame and header comment of `web/webclient-app/stories/Overlays/ObjectiveTracker.stories.js` and add the `CountReached` and `LongCount` stories (design D6). Verify: `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
 
 ## 3. Browser tests
 
