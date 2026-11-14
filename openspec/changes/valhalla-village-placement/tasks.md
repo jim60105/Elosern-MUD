@@ -151,7 +151,25 @@ Ground rules:
   problems`, `settlement_synthesis lint` `fit: 0 errors, 0 warnings`, and both
   `road_network --check` and `map_reference_context --check` `is up to date`.
   No `road_gap` remained, so no group was repeated for one.
-- [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+
+  Result: every label of the § Settlement-sensitive list, plus
+  `world.lore.tests.test_anchors` (rerun on the final data) and
+  `world.maps.tests.test_population_geometry`, was run with the test prefix —
+  `snippets/test_sweep.md` records the command grouping and every result.
+  About 1,284 tests ran: all green except the documented data-independent red
+  set (`tests.test_map_core_contract` runner error, `test_node_ids`
+  `SettlementNotLoaded`, `test_travel_actions` 6 of 8, `test_package_proposal`
+  + `test_quests_observability` 9 through the `_anchor_key` fixture lookup) and
+  one inherited baseline failure with the same signature already fixed on
+  `master` by `16bd6484` (see `snippets/test_sweep.md` § the one non-red
+  failure). No test file was rewritten: no residual pin was found, and no
+  annotation was added because this change declares no spec deltas.
+
+  Grouping note: a label runs alone whenever it fits the guard; labels are
+  grouped only where the runner's 100-discovered-test cap makes a single
+  command of several small modules the smallest legal run, the same rule the
+  Grandia north change recorded.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images rendered and read from the current disk sources.

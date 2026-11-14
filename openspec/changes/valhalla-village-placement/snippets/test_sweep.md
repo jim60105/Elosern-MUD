@@ -43,3 +43,30 @@ label that would have run alone is marked "single".
 | 2 | `world.quests.tests.test_package_proposal`, `test_quests_observability` | Ran 24, 9 `SettlementNotLoaded` errors through the `_anchor_key` fixture lookup, 15 passed — documented red |
 | 4 | `test_room_observation`, `test_scene_smoke`, `test_story_dialogue`, `test_story_effects` | Ran 41, OK |
 | 3 | `test_dialogue_refresh_lifecycle`, `test_guild_config.test_price_scaling`, `test_guild_config.test_service_host_roster` | Ran 61, OK |
+| 2 | `test_map_knowledge_integration`, `test_sight` | Ran 67, OK — 131.037 s |
+| 3 | `test_movement`, `test_movement_settlement`, `test_party_follow` | Ran 74, OK — 192.044 s |
+| 3 | `test_party_follow_possession`, `test_party_time_settlement`, `test_travel_plan` | Ran 80, 1 failure and 1 skip — the one failure is the inherited baseline red described below |
+| single | `world.lore.tests.test_anchors` (rerun on the final data) | Ran 7, OK |
+
+## The one non-red failure, and why it is not this change's
+
+`world.rules.tests.test_party_follow_possession.PossessedWildernessSettlementTests.test_falsy_wilderness_return_compensates_the_whole_party`
+fails on its own in this worktree with
+`{...settled population...} != {...start population...}` and a 6010-character
+state difference. It is inherited from the baseline, not caused by this
+change:
+
+- this branch changes nothing in `world/rules/tests/test_party_follow_possession.py`
+  (`git log c70b1eac..HEAD -- <file>` is empty);
+- upstream `master` already fixes exactly this failure in
+  `16bd6484 test(population): keep the possessed-wilderness fixture's cursors
+  current`, whose message records the same test failing on its own in a
+  throwaway checkout of an earlier merge point with the identical assertion
+  and the identical 6010-character difference, caused by a catch-up settling
+  world state between the two snapshots;
+- that fix (+25 lines) is not in this change's baseline `c70b1eac`, and the
+  fix belongs to the `population-writer-guards` change, not to a data change's
+  file list.
+
+Recorded under Spec deviations in the hand-off; no residual-pin rewrite was
+made, and no test file was touched.
