@@ -127,7 +127,7 @@ body {
   top: calc(14px * var(--ui-scale));
   bottom: auto;
   left: auto;
-  right: calc(var(--right-column) + 12px * var(--ui-scale));
+  right: calc(var(--map-column-w) + 40px * var(--ui-scale));
   transform: none;
   padding: calc(4px * var(--ui-scale)) calc(9px * var(--ui-scale));
   border: 1px solid #baa98440;
@@ -169,7 +169,9 @@ body {
    design D1). `map` begins directly below the top band; `vitals` is the
    lower-left dock standing on the band's top edge (vitals-bar-redesign
    design D1). These offsets repeat HudFrame.vue's own rules, which govern
-   where no `.elosern-root` wraps the stage — keep the two in step. */
+   where no `.elosern-root` wraps the stage — keep the two in step. The
+   `map` column's width is `--map-column-w` in both copies
+   (map-column-instrument-geometry). */
 .elosern-root .elosern-stage [data-anchor="vitals"] {
   bottom: var(--band-h);
   left: calc(16px * var(--ui-scale));
@@ -180,15 +182,17 @@ body {
 .elosern-root .elosern-stage [data-anchor="map"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
   right: calc(16px * var(--ui-scale));
-  width: calc(var(--right-column) - 28px * var(--ui-scale));
+  width: var(--map-column-w);
   max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   align-items: stretch;
-  gap: calc(14px * var(--ui-scale));
+  gap: calc(10px * var(--ui-scale));
 }
 .elosern-root [data-anchor="vitals"] > *,
 .elosern-root [data-anchor="map"] > * { flex-shrink: 0; }
-.elosern-root [data-anchor="vitals"],
-.elosern-root [data-anchor="map"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
+/* The `map` column hides its scrollbar and fades its clipped edge instead
+   (HudFrame.vue; map-column-instrument-geometry), so only the vitals dock
+   keeps the thin bar. */
+.elosern-root [data-anchor="vitals"] { scrollbar-color: #55524b transparent; scrollbar-width: thin; }
 /* Mirror HudFrame's dialogue gate; the frame owns its live exit fade. */
 .elosern-stage[data-elosern-mode="dialogue"] [data-anchor="vitals"],
 .elosern-stage[data-elosern-mode="dialogue"] [data-anchor="map"] {
@@ -201,10 +205,9 @@ body {
   :root { --stage-inset-y: calc(10px * var(--ui-scale)); }
   .elosern-root .elosern-stage [data-anchor="vitals"] { gap: calc(8px * var(--ui-scale)); }
   /* The map column holds the place card on top of the minimap and the
-     objective line (place-card-relocation D1); at 720px the column tightens
-     its gaps and the place card compacts its padding, rule gap, and time
-     leading so the whole stack still fits its anchor without scrolling. */
-  .elosern-root .elosern-stage [data-anchor="map"] { gap: calc(10px * var(--ui-scale)); }
+     objective line (place-card-relocation D1); at 720px the place card
+     compacts its padding, rule gap, and time leading so the whole stack
+     still fits its anchor without scrolling. */
   .place-card {
     padding: calc(7px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(6px * var(--ui-scale));
     row-gap: calc(3px * var(--ui-scale));

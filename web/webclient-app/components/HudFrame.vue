@@ -85,6 +85,7 @@
 // recessed; the mark clears only when no open surface remains.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { bindPlateGroup } from "./plate-group.js";
+import { useScrollEdgeFade } from "../composables/use-scroll-edge-fade.js";
 
 const props = defineProps({
   // The committed mode value rendered on the shell root. The store's reducer
@@ -190,6 +191,12 @@ function mountCardHost(el) {
   }
 }
 
+// The `map` column's edge fade (map-column-instrument-geometry design D5):
+// an over-tall column shows no scrollbar; the edge with content beyond it
+// carries `data-more-above` / `data-more-below`, which the stylesheet masks.
+const mapAnchorRef = ref(null);
+const { moreAbove: mapMoreAbove, moreBelow: mapMoreBelow } = useScrollEdgeFade(mapAnchorRef);
+
 defineExpose({ menuOpen });
 </script>
 
@@ -261,9 +268,12 @@ defineExpose({ menuOpen });
       <slot name="vitals" />
     </div>
     <div
+      ref="mapAnchorRef"
       class="stage-anchor"
       data-anchor="map"
       data-testid="anchor-map"
+      :data-more-above="mapMoreAbove || null"
+      :data-more-below="mapMoreBelow || null"
       :inert="mode === 'dialogue' || personFocus || null"
       :aria-hidden="mode === 'dialogue' || personFocus ? 'true' : null"
     >
@@ -440,7 +450,8 @@ defineExpose({ menuOpen });
    (vitals-bar-redesign design D1): bottom-anchored on the band's top edge,
    growing upward only as far as its compact content. The
    `.elosern-root` override in app-shell.css repeats these offsets (it sets
-   the column widths); keep the two in step. */
+   the column widths); keep the two in step. Both `map` copies read their
+   width from `--map-column-w` (map-column-instrument-geometry). */
 .elosern-stage [data-anchor="vitals"] {
   bottom: var(--band-h);
   left: calc(16px * var(--ui-scale));
@@ -456,15 +467,35 @@ defineExpose({ menuOpen });
 .elosern-stage [data-anchor="map"] {
   top: calc(var(--header-h) + var(--stage-inset-y));
   right: calc(16px * var(--ui-scale));
-  width: calc(230px * var(--ui-scale));
+  width: var(--map-column-w);
   z-index: 4;
   display: flex;
   flex-direction: column;
-  gap: calc(9px * var(--ui-scale));
+  gap: calc(10px * var(--ui-scale));
   align-items: flex-end;
   max-height: calc(100% - var(--header-h) - var(--band-h) - 2 * var(--stage-inset-y));
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: none;
+}
+/* An over-tall `map` column (map-column-instrument-geometry): no scrollbar
+   (it would cross the instrument panels' spines and take their width); the
+   clipped edge fades out over 32px only while content lies beyond it. The
+   mask drops the panels' backdrop blur while it applies (their ink is 90%
+   opaque, so the loss is negligible). */
+.elosern-stage [data-anchor="map"]::-webkit-scrollbar {
+  display: none;
+}
+.elosern-stage [data-anchor="map"][data-more-above],
+.elosern-stage [data-anchor="map"][data-more-below] {
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 var(--map-fade-top, 0px), #000 calc(100% - var(--map-fade-bottom, 0px)), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 var(--map-fade-top, 0px), #000 calc(100% - var(--map-fade-bottom, 0px)), transparent 100%);
+}
+.elosern-stage [data-anchor="map"][data-more-above] {
+  --map-fade-top: calc(32px * var(--ui-scale));
+}
+.elosern-stage [data-anchor="map"][data-more-below] {
+  --map-fade-bottom: calc(32px * var(--ui-scale));
 }
 
 /* The portrait anchors (design D4): standing on the band's top edge,
@@ -587,11 +618,12 @@ defineExpose({ menuOpen });
 
 /* presence (exploration-presence-rail design D4; redesign §4.1): the
    presence rail stands on the stage floor, right-aligned and inset left of
-   the right-hand island column (whose left edge is `--right-column - 12px`
-   from the stage's right edge), its baseline just above the band. The anchor
-   is pointer-transparent; the rail inside it takes pointer events. */
+   the right-hand island column (whose left edge is `16px + --map-column-w`
+   from the stage's right edge; map-column-instrument-geometry) by 24px, its
+   baseline just above the band. The anchor is pointer-transparent; the rail
+   inside it takes pointer events. */
 .elosern-stage [data-anchor="presence"] {
-  right: calc(var(--right-column, 258px * var(--ui-scale)) + 12px * var(--ui-scale));
+  right: calc(var(--map-column-w) + 40px * var(--ui-scale));
   bottom: calc(var(--band-h) + 10px * var(--ui-scale));
   z-index: 4;
   display: flex;
