@@ -565,8 +565,12 @@ class ScenarioSettlementFixture(SettlementScenarioFixture):
     def _reuse(self, enabled: bool):
         if enabled:
             return contextlib.nullcontext()
+        # ``reused_living_presence`` now names the pass's scope; the variant
+        # under test is "no reuse at all", so the replacement swallows it.
         return patch.object(
-            regional_population, "reused_living_presence", contextlib.nullcontext
+            regional_population,
+            "reused_living_presence",
+            lambda **_: contextlib.nullcontext(),
         )
 
     def _settle(self, parts: tuple[int, ...], *, reuse: bool) -> dict:

@@ -288,7 +288,7 @@ def _run_pass(
                     else nullcontext()
                 ),
                 monster_activity.batched_state_writes(wilderness),
-                regional_population.reused_living_presence(),
+                regional_population.reused_living_presence(scope=scope),
                 population_units.scoped(scope),
             ):
                 while tick <= end_tick:

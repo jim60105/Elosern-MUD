@@ -765,6 +765,65 @@ def _living_monsters() -> tuple[Monster, ...]:
     )
 
 
+def _scope_living_monsters(wilderness: Any, scope: Any) -> tuple[Monster, ...]:
+    """The living individuals one scoped pass may see, in persistent-ID order.
+
+    A scoped pass builds its presence facts from its own units only: the
+    members of every group it may settle and every individual the coordinate
+    registration places on a cell it covers. A group the pass creates inside
+    itself joins the running pass's set as it is created, so a birth is
+    enumerated from the moment it exists. Everything else is invisible here: an
+    individual that is a member of no settled group and is registered on no
+    covered cell is found by the whole-world pass only, and no writer creates
+    one -- a birth stamps a home marker, registers the individual and creates
+    its group, and an explicit placement registers the individual and creates
+    its group without stamping a home marker.
+
+    Liveness and order stay the whole-world ones (stored HP over the family
+    rows, sorted by persistent ID), so a narrower roster never reorders or
+    reinterprets an individual it shares with the whole-world pass. The stored
+    map is unpacked once (the same view :func:`actual_cell` reads) and a key
+    whose row an operator removal deleted is skipped, so the scan adds no row
+    read per covered cell.
+    """
+    from world.maps import monster_activity, population_units
+
+    state = monster_activity.read_monster_activity(wilderness)
+    ids: set[int] = set()
+    for group_id in population_units.settling_group_ids(scope) or ():
+        group = state.groups.get(group_id)
+        if group is not None:
+            ids.update(int(member_id) for member_id in group.member_ids)
+    registration = _coordinate_registration(wilderness)
+    if registration is not None:
+        for entity, stored in registration.items():
+            if not isinstance(entity, Monster):
+                continue
+            # A removed individual keeps its registration key until the next
+            # map write; its row is gone, so the scan skips it exactly as the
+            # live population view skips a revoked instance.
+            pk = getattr(entity, "pk", None)
+            if pk is None:
+                continue
+            cell = coordinate_pair(stored)
+            if cell is not None and scope.covers_cell(cell):
+                ids.add(int(pk))
+    if not ids:
+        return ()
+    return tuple(
+        sorted(
+            (
+                individual
+                for individual in Monster.objects.all_family().filter(
+                    pk__in=sorted(ids)
+                )
+                if persisted_hp(individual) > 0
+            ),
+            key=lambda individual: individual.pk,
+        )
+    )
+
+
 def _is_wilderness(wilderness: Any, candidate: Any) -> bool:
     """Whether ``candidate`` is that wilderness script instance (same record)."""
     if candidate is None:
@@ -1587,12 +1646,16 @@ class _PresenceReuse:
     ``living`` the individuals it enumerated, ``facts`` each individual's
     durable home zone and site marker, ``session_protection`` the active
     sessions' protection, and ``protected`` one tick's protected cells together
-    with the stored timeline value they were computed from.
+    with the stored timeline value they were computed from. ``scope`` is the
+    settlement scope the pass settles, or ``None`` for the whole-world pass: it
+    decides which individuals the one scan enumerates and survives
+    :func:`forget_living_presence`, so a re-enumeration reads the same roster.
     """
 
     fingerprint: tuple[Any, ...] | None = None
     presence: Mapping[int, PopulationPresence] = field(default_factory=dict)
     living: tuple[Monster, ...] | None = None
+    scope: Any = None
     facts: dict[int, tuple[str | None, str | None]] = field(default_factory=dict)
     session_protection: tuple[PopulationProtection, ...] | None = None
     protected: dict[tuple[int, int], tuple[Any, frozenset[tuple[int, int]]]] = field(
@@ -1604,16 +1667,21 @@ _PRESENCE_REUSE: _PresenceReuse | None = None
 
 
 @contextmanager
-def reused_living_presence() -> Iterator[None]:
+def reused_living_presence(scope: Any | None = None) -> Iterator[None]:
     """Reuse one living-presence read while its stored facts stand still.
 
     Only for bulk settlement, where nothing changes an individual's liveness:
     a loss arrives through combat, which :func:`forget_living_presence` brackets.
     Scanning every individual is a boundary's costliest read and it recurs at
     every step of the merged lifecycle.
+
+    ``scope`` narrows that one scan to the pass's own individuals
+    (:func:`_scope_living_monsters`), so the read's cost follows the units it
+    settles instead of the world. ``None`` keeps the whole-world roster the
+    whole-world pass has always read.
     """
     global _PRESENCE_REUSE
-    _PRESENCE_REUSE = _PresenceReuse()
+    _PRESENCE_REUSE = _PresenceReuse(scope=scope)
     try:
         yield
     finally:
@@ -1624,6 +1692,8 @@ def forget_living_presence() -> None:
     """Drop the reused facts after work that may have changed them.
 
     A no-op with no open scope, so a direct owner operation never pays for it.
+    The pass's own scope survives: the next read re-enumerates the same roster,
+    which is why a birth inside a scoped pass enters its presence facts.
     """
     reuse = _PRESENCE_REUSE
     if reuse is None:
@@ -1636,14 +1706,18 @@ def forget_living_presence() -> None:
 
 
 def _living_presence(wilderness: Any) -> Mapping[int, PopulationPresence]:
-    """Every living individual's actual presence, keyed by persistent ID."""
+    """Every enumerated living individual's actual presence, keyed by ID.
+
+    The enumeration is the whole world outside a settlement pass and, inside
+    one, exactly the individuals that pass may see (:func:`_scope_living_monsters`).
+    """
     reuse = _PRESENCE_REUSE
     fingerprint = presence_fingerprint(wilderness)
     if reuse is not None and reuse.fingerprint == fingerprint:
         return reuse.presence
     name = _wilderness_name(wilderness)
     presence: dict[int, PopulationPresence] = {}
-    for individual in _living_individuals(reuse):
+    for individual in _living_individuals(wilderness, reuse):
         cell = actual_cell(wilderness, individual)
         home_zone, site_key = _individual_facts(reuse, individual)
         presence[individual.pk] = PopulationPresence(
@@ -1658,12 +1732,18 @@ def _living_presence(wilderness: Any) -> Mapping[int, PopulationPresence]:
     return presence
 
 
-def _living_individuals(reuse: _PresenceReuse | None) -> tuple[Monster, ...]:
-    """Every living individual, enumerated once per reuse scope."""
+def _living_individuals(
+    wilderness: Any, reuse: _PresenceReuse | None
+) -> tuple[Monster, ...]:
+    """Every living individual of this read, enumerated once per reuse scope."""
     if reuse is None:
         return _living_monsters()
     if reuse.living is None:
-        reuse.living = _living_monsters()
+        reuse.living = (
+            _living_monsters()
+            if reuse.scope is None
+            else _scope_living_monsters(wilderness, reuse.scope)
+        )
     return reuse.living
 
 

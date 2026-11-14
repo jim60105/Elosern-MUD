@@ -825,8 +825,10 @@ def retained_loss_ids(
     reference, and are otherwise consumed normally.
 
     ``scope`` answers for the sites of that scope only. The measure itself still
-    reads the whole world (one presence read and one session read per boundary,
-    exactly like the whole-world pass); this change narrows neither.
+    reads one presence fact per member and one session record per boundary,
+    exactly like the whole-world pass; inside a scoped pass that presence read
+    is the pass's own scoped read, so its cost follows the settled units. The
+    session read stays whole-world.
     """
     wilderness = _wilderness() if wilderness is None else wilderness
     if wilderness is None:
