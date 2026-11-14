@@ -6,8 +6,8 @@ See proposal.md - Why. Facts verified at commit `f9925e49`:
 
 - `world/lore/monster_placement.py::EcologyZone` has `key`, `region_key`, `rectangles` (inclusive `(x_min, x_max, y_min, y_max)`). `ECOLOGY_ZONE_REGISTRY` holds 175 zones.
 - `world/lore/monster_activity.py::ActivityArea` has `key` and either `region_key` + `rectangles` (260 areas) or `home_radius` (3 areas, all radius 0). `MonsterActivity.area_key` names the area.
-- Measured on the shipped registries with the rectangle-overlap rule alone: 175 units, each of one zone. The birth-binding links of D1 can merge some of them; task 2.3 records the resulting count as information. The design does not rely on that; tests use synthetic registries only.
-- `world/maps/monster_activity.py::MonsterGroup` has `home_owner: tuple[str, str]` (kind in `OWNER_KINDS = ("zone", "site", "quest", "explicit")`, then key), `home: LocationRef`, `position: LocationRef | None`, `journey_id`. `MonsterJourney` has `source` and `destination`. `_group_area(group)` returns the resolved locators of the group's area.
+- Measured on the shipped registries with the rectangle-overlap rule alone: 175 units, each of one zone (the 260 region-bound areas all overlap a zone). The birth-binding links of D1 can merge some of them, but on the shipped data they merge none: 42 further units hold site activity areas that no zone covers, so the world resolves to 217 units. The design does not rely on that; tests use synthetic registries only.
+- `world/maps/monster_activity.py::MonsterGroup` has `home_owner: tuple[str, str]` (kind in `OWNER_KINDS = ("zone", "site", "quest", "explicit")`, then key), `home: LocationRef`, `position: LocationRef | None`, `journey_id`. `MonsterJourney` has `source` and `destination`. `group_area(group)` returns the resolved locators of the group's area.
 - `world/rules/movement_edges.py::LocationRef` has `kind` (`"wilderness"` with `map`, `x`, `y`, or a room with `id`).
 - `world/lore/monster_placement.py::MONSTER_SITE_REGISTRY` rows have `key` and `coordinates`.
 - `world/maps/regional_population.py::_published_geography().terrain` plus `elosern_map_core.terrain.region_for_coordinates(terrain, x, y)` give a cell's region key.
@@ -82,7 +82,7 @@ def site_unit(index: UnitIndex, site_key: str) -> str
 def unit_closure(index: UnitIndex, state: MonsterActivityState, seeds: Iterable[str]) -> frozenset[str]
 ```
 
-`group_units` is the set of: `unit_of_location(home)`, `unit_of_location(position)`, the journey's `source` and `destination` units, the unit of every locator returned by `monster_activity._group_area(group)` (decode each with `world.rules.movement_edges.decode_location_ref`; find the exact name with `grep -n "def decode_location_ref\|def encode_location_ref" world/rules/movement_edges.py`), `index.unit_of_zone[key]` when `home_owner[0] == "zone"` and the key is in the index, and `site_unit(index, key)` when `home_owner[0] == "site"`. `None` entries are dropped. Expose `_group_area` as public `monster_activity.group_area(group)`.
+`group_units` is the set of: `unit_of_location(home)`, `unit_of_location(position)`, the journey's `source` and `destination` units, the unit of every locator returned by `monster_activity.group_area(group)` (decode each with `world.rules.movement_edges.decode_location_ref`; find the exact name with `grep -n "def decode_location_ref\|def encode_location_ref" world/rules/movement_edges.py`), `index.unit_of_zone[key]` when `home_owner[0] == "zone"` and the key is in the index, and `site_unit(index, key)` when `home_owner[0] == "site"`. `None` entries are dropped. `monster_activity.group_area` is public: the former `_group_area` now serves the decision path and this index from one reader.
 
 `site_unit` is `unit_of_location` of the site's wilderness cell from `MONSTER_SITE_REGISTRY[site_key].coordinates`; an unknown key gives `RESIDUAL_UNIT`.
 

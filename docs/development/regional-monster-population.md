@@ -2553,6 +2553,22 @@ and its owning zone's or site's unit. `unit_closure(index, state, seeds)` is the
 least fixed point of adding every group's units once one of them is in the set.
 It is the set a caller may settle without reading state another unit owns.
 
+### Cost and refusal boundary
+
+Information for `unit-scoped-population-settlement`, which first puts the
+closure on the advance path. As written, `unit_closure` recomputes
+`group_units` for every group on every fixed-point iteration and decodes every
+locator of each group's area, so its cost grows with the world's population:
+that is the quantity the chain exists to remove, and no production caller uses
+it yet. A scoped pass must compute it once per advance over the groups whose
+units it can reach, and keep that result for the whole pass. It must also
+decide whether a refusal may escape: `group_units` propagates
+`MonsterActivityStateInvalid`, `MonsterActivityRegistryError` and
+`MovementEdgeError`, while `monster_activity._resolved_area_keys` deliberately
+answers `None` for the last two because an unresolvable area is a lawful
+scheduled stay. Refusing a player action over one unresolvable area would be a
+behaviour change, so the boundary belongs to that change's design.
+
 ## The cursor record
 
 `wilderness.db.population_unit_cursors` is a whole-value mapping with exactly
@@ -2601,7 +2617,9 @@ a gate; the tests use synthetic registries.
 - `UnitCursorTests` -- fresh provisioning at 100 makes every unit report 100; a
   pass through 260 records 260; a scoped advance raises only its units and never
   lowers one; a later clock stage's failure restores 100 in memory and after a
-  cache reload; a missing or malformed record refuses and rewrites nothing.
+  cache reload; a missing or malformed record refuses and rewrites nothing, a
+  pass over one refuses before any settlement is committed, and a refused
+  advance leaves the stored mapping byte-identical.
 
 No test measures wall-clock time; the bounds are unit identifiers, exact cursor
 values and state equality. Run the module from the worktree root with the
