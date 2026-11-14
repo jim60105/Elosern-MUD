@@ -51,6 +51,7 @@ import { applySkillUse } from "./elosern/skill_use.js";
 import { applyTravel } from "./elosern/travel.js";
 import { applyTravelLog } from "./elosern/travel_log.js";
 import { applyCamp } from "./elosern/camp.js";
+import { applyRite } from "./elosern/rite.js";
 
 export { resolveLocationLabel };
 
@@ -180,6 +181,9 @@ export const useElosernStore = defineStore("elosern", () => {
   // committed selection, the active stage's map state and the recovery
   // signal the transport seam raises.
   applyTravelLog(ctx);
+  // The landmark rite presentation (landmark-rite-store): one more centred
+  // card, its local phases and its one action.
+  applyRite(ctx);
   applyTravel(ctx);
   // The whole-party camp card and campfire beat (wilderness-camping): one
   // more centred card over the travel stage.
@@ -273,6 +277,13 @@ export const useElosernStore = defineStore("elosern", () => {
     toggleCampDream: ctx.toggleCampDream,
     confirmCamp: ctx.confirmCamp,
     continueCampTravel: ctx.continueCampTravel,
+    // The landmark rite (landmark-rite-store): the local card and stage
+    // transitions, the one perform and the scene's end.
+    openRiteCard: ctx.openRiteCard,
+    approachRite: ctx.approachRite,
+    leaveRite: ctx.leaveRite,
+    performRite: ctx.performRite,
+    finishRiteScene: ctx.finishRiteScene,
     // The route preview (wilderness-travel-planning-ui): the hovered cell's
     // debounced query, a locked destination and Esc's clear.
     hoverTravelCell: ctx.hoverTravelCell,
