@@ -698,12 +698,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         page.wait_for_selector('[data-testid="local-map"]', timeout=15000)
 
-        # Axis/words coupling (Task 3.5):
-        # On coordinate-bearing layer (lattice variant), orientation marks "北↑ 東→" are stated
-        # and the island draws the axis cross.
-        orientation = page.locator('[data-testid="local-map__orientation"]')
-        self.assertEqual(orientation.count(), 1)
-        self.assertIn("北↑ 東→", orientation.inner_text())
+        # On the coordinate-bearing layer (lattice variant) the island states
+        # no orientation legend; the axis cross is the lattice's own geometry.
+        self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
         self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 1)
 
         # Exactly one affordance exists, carrying the accessible name.
@@ -722,9 +719,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         affordances.focus()
         page.keyboard.press("Enter")
         page.wait_for_selector('[data-testid="map-drawer"]', timeout=15000)
-        # The drawer draws its own views, never the island's orientation
-        # marks or axis cross.
-        self.assertEqual(page.locator('[data-testid="map-drawer"] [data-testid="local-map__orientation"]').count(), 0)
+        # The drawer draws its own views, never the island's axis cross, and
+        # no surface states an orientation legend.
+        self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="map-drawer"] [data-testid="local-map__axis"]').count(), 0)
         page.keyboard.press("Escape")
         page.wait_for_function(
@@ -808,7 +805,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector('[data-testid="local-map-remembered-mirror"]', state="attached", timeout=15000)
         self.assertEqual(page.locator('[data-testid="local-map-remembered"]').count(), 0)
         self.assertEqual(page.locator('[data-testid="local-map-remembered-mirror"] li').count(), 1)
-        # On coordinate-free layer (radial graph variant), orientation marks and axis are absent
+        # On a coordinate-free layer (radial graph variant) no axis is drawn and no legend stated
         self.assertEqual(page.locator('[data-testid="local-map__orientation"]').count(), 0)
         self.assertEqual(page.locator('.local-map [data-testid="local-map__axis"]').count(), 0)
         # Island still offers exactly one tab stop (the affordance)

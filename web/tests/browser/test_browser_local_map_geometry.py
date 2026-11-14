@@ -495,7 +495,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
         The spec bounds the node label at "the surface's own smallest chrome
         type step" and states the readout at that same step. Since
         retarget-desktop-viewport-contract D7 the island has one chrome step
-        — the 16px floor at the reference (title, orientation marks, readout,
+        — the 16px floor at the reference (title, readout,
         node labels and marker names all at `--text-xs`/16 units) — each drawn
         at the drawing's uniform scale (≤ 1 at the reference).
         """
@@ -546,7 +546,7 @@ class LocalMapBrowserTest(BrowserAcceptanceTest):
                     }"""
                 )
                 # One chrome step (webclient-map-legibility; retarget D7): the
-                # title, orientation marks and readout all compute to --text-xs
+                # title and readout compute to --text-xs
                 # — 16px at the reference, scaled once by the chrome factor.
                 chrome_step = 16.0 * ui_scale(viewport)
                 self.assertAlmostEqual(

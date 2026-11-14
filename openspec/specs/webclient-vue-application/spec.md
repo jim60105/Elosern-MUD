@@ -16,7 +16,7 @@ Every visible text in the client — chrome text, the drawn-map text, and the me
 - **THEN** their numeric columns remain aligned using tabular figures without switching the surrounding UI to monospace
 
 #### Scenario: Islands and overlays carry no sub-floor steps
-- **WHEN** the minimap island's title, orientation marks and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list render
+- **WHEN** the minimap island's title and readout and the full-map overlay's guide, input hint, view controls, legend and remembered list render
 - **THEN** each carries a reference-scale type step of at least 16 CSS px
 
 #### Scenario: The drawn map meets the floor through the fitted label contract

@@ -17,7 +17,8 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
     These journeys prove the resolved layout follows the committed payload's
     layer on the island (the full map is the drawer's own area/world views), edge markers appear
     only for lattice payloads with remembered places outside the drawn
-    extent, the radial graph carries neither orientation marks nor markers,
+    extent, the radial graph carries neither the axis cross nor markers, no
+    surface states an orientation legend,
     no layout control exists anywhere in the map chrome, and no outbound
     envelope is emitted beyond the existing flows.
     """
@@ -59,8 +60,9 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
     def _surface(page, root_selector):
         """(variant, node positions, marker ids) read from one surface's DOM.
 
-        The variant comes from the rendered DOM itself (the orientation span
-        exists only for the lattice variant); node positions are the node
+        The variant comes from the rendered DOM itself (the axis cross is
+        drawn only on the lattice variant; ``legend`` records whether an
+        orientation legend exists, which it never should); node positions are the node
         groups' translate coordinates; marker identities come from the edge
         markers' testid hook, which carries the remembered node id on both
         surfaces.
@@ -86,9 +88,10 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
               ).sort();
               return {
                 lattice: !!svg,
-                // The orientation span lives in the island's header row (the
-                // drawing never renders one), so it is looked up under root.
-                orientation: !!root.querySelector('[data-testid="local-map__orientation"]'),
+                axis: !!svg.querySelector('[data-testid="local-map__axis"]'),
+                // A legend would live in the island's header row, outside the
+                // drawing, so it is looked up under root.
+                legend: !!root.querySelector('[data-testid="local-map__orientation"]'),
                 nodes,
                 markers,
               };
@@ -189,7 +192,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
     )
     def test_layout_follows_payload_layer_without_any_control(self):
         # Grid layer (seeded 南門): the island resolves to the lattice —
-        # orientation marks on the island, edge markers for the remembered
+        # the axis cross and no legend on the island, edge markers for the remembered
         # 北門 outside the drawn extent, and no layout control anywhere.
         page = self.logged_in_page()
         from .browser_helpers import install_outbound_recorder, sent_action_count
@@ -199,7 +202,8 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         panel = store_state(page)["panels"]["local_map"]
         island = self._surface(page, '[data-testid="local-map"]')
         self.assertIsNotNone(island)
-        self.assertTrue(island["orientation"], "the lattice island renders orientation marks")
+        self.assertTrue(island["axis"], "the lattice island draws the axis cross")
+        self.assertFalse(island["legend"], "the lattice island states no orientation legend")
         expected = self._expected_marker_ids(panel)
         self.assertGreaterEqual(len(expected), 1, "fixture must carry an off-extent remembered node")
         self.assertEqual(island["markers"], expected)
@@ -239,7 +243,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         )
 
         # Interior payload (committed without movement): the island
-        # live-swaps to the radial graph — no orientation marks, no markers,
+        # live-swaps to the radial graph — no axis cross, no legend, no markers,
         # and every node group's translate equals the model's scaled radial
         # placement.
         result = self._inject_panel(page, self._interior_panel())
@@ -286,9 +290,10 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
                 )
 
         # The coordinate-free interior payload renders neither the axis
-        # marks nor a coordinate figure (slim-minimap-island): the island
-        # header drops the marks and the detail line loses the figure.
-        self.assertFalse(island["orientation"], "the graph island omits the axis marks")
+        # cross nor a coordinate figure (slim-minimap-island), and states no
+        # legend; the detail line loses the figure.
+        self.assertFalse(island["axis"], "the graph island draws no axis cross")
+        self.assertFalse(island["legend"], "the graph island states no orientation legend")
         island_detail = page.locator('[data-testid="local-map-detail"]').inner_text()
         self.assertNotIn("座標", island_detail)
 
@@ -338,7 +343,7 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
     def test_walked_instance_layer_renders_radial_on_both_surfaces(self):
         # A REAL movement (the seeded 進洞窟 exit) commits an instance payload;
         # the island must render the radial graph truthfully from the
-        # committed data — no orientation marks, no edge markers, node
+        # committed data — no axis cross, no legend, no edge markers, node
         # positions equal to the model's scaled radial placement.
         page = self.logged_in_page()
         from .browser_helpers import install_outbound_recorder, sent_action_count
@@ -357,9 +362,8 @@ class LayoutVariantsBrowserTest(BrowserAcceptanceTest):
         island = self._surface(page, '[data-testid="local-map"]')
         for name, surface in (("island", island),):
             self.assertTrue(surface["lattice"], f"{name}: the canvas is mounted")
-            self.assertFalse(
-                surface["orientation"], f"{name}: the coordinate-free layer omits orientation marks"
-            )
+            self.assertFalse(surface["axis"], f"{name}: the coordinate-free layer draws no axis cross")
+            self.assertFalse(surface["legend"], f"{name}: the coordinate-free layer states no legend")
             self.assertEqual(surface["markers"], [], f"{name}: the graph variant never marks")
         # The island renders the radial at markerScale 1 (the prop default).
         placed = {node["id"]: node for node in model["radial"]["nodes"]}

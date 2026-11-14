@@ -464,7 +464,7 @@ The wilderness presenter SHALL append one localized cell-scale note after the fo
 - **THEN** the scale note's kilometre figure equals the patched value, proving the note is derived from the provider constant rather than a duplicated literal
 
 ### Requirement: Map chrome and ordinary node labels are legible without dropping topology
-The minimap island's title, orientation marks and readout SHALL render at the shared `--text-xs` step (16 CSS px at the reference scale), which is the island's one and smallest chrome step, and the map drawer's controls, legend, quest list and details SHALL render at 16 CSS px or more through the shared type tokens; neither surface SHALL hardcode a map chrome type size below that step.
+The minimap island's title and readout SHALL render at the shared `--text-xs` step (16 CSS px at the reference scale), which is the island's one and smallest chrome step, and the map drawer's controls, legend, quest list and details SHALL render at 16 CSS px or more through the shared type tokens; neither surface SHALL hardcode a map chrome type size below that step.
 
 #### Scenario: Node text keeps its declared floor at every scale
 - **WHEN** the island draws node labels and marker names
@@ -480,7 +480,7 @@ The minimap island's title, orientation marks and readout SHALL render at the sh
 
 #### Scenario: Ordinary neighbourhood is readable
 - **WHEN** a three-by-three grid lattice of distinct two- and four-glyph room names with no remembered gateway renders on the island at 1451x790 and at 2560x1440
-- **THEN** the title, orientation marks and readout compute to 16 CSS px at the reference viewport, the drawing's scale is 1, every drawn node label is at least 16 CSS px at the reference viewport (and at least 22.4 CSS px at 2560x1440, the same labels at the 1.4 chrome cap) and at most the island's declared 16-unit step at the reference scale, and no node marker or node label overlaps another node's marker or label
+- **THEN** the title and readout compute to 16 CSS px at the reference viewport, the drawing's scale is 1, every drawn node label is at least 16 CSS px at the reference viewport (and at least 22.4 CSS px at 2560x1440, the same labels at the 1.4 chrome cap) and at most the island's declared 16-unit step at the reference scale, and no node marker or node label overlaps another node's marker or label
 
 #### Scenario: Dense knowledge stays available
 - **WHEN** a bounded dense payload with remembered gateways renders on the island and map drawer
@@ -682,11 +682,11 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 #### Scenario: The island is a bounded constant-size HUD anchored on the stage
 - **WHEN** the component renders
 - **THEN** it renders as a bounded HUD island anchored on the stage, not as a card inside a scrolling layout column
-- **AND** the island SHALL have a constant size that no payload changes: a single 1px hairline frame, a padding no larger than the shared spacing scale's smallest step, a single-row header, a square map canvas of 240 CSS px on each side at the 1451x790 reference scale, multiplied once by the desktop chrome factor above the reference height, and a readout row that always reserves its one line
+- **AND** the island SHALL have a constant size that no payload changes: no frame, fill, shadow or padding of its own (it stands inside its instrument panel), a single-row header, a square map canvas of 240 CSS px on each side at the 1451x790 reference scale, multiplied once by the desktop chrome factor above the reference height, and a readout row that always reserves its one line
 
 #### Scenario: The island never sizes itself from its surroundings
 - **WHEN** the island lays out at any anchor size or payload
-- **THEN** the island SHALL NOT stretch to its anchor's width, SHALL NOT measure its anchor or any other surface to size itself, and SHALL NOT draw a second frame around its canvas inside its own frame
+- **THEN** the island SHALL NOT stretch to its anchor's width, SHALL NOT measure its anchor or any other surface to size itself, and SHALL draw no frame around its canvas beyond the canvas's own four corner brackets
 
 #### Scenario: The island root keeps the identifier the shell selects on
 - **WHEN** the shell's mode-gated visibility rules or its focus-rescue path select the island
@@ -729,13 +729,13 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: The axis cross follows the stated convention
 - **WHEN** a surface considers drawing the axis cross
-- **THEN** it SHALL draw a full-width and full-height axis line through the `current` node's drawn position ONLY where that same surface states the axis convention in words; a surface that states no orientation marks SHALL draw no axis, and the radial graph variant SHALL draw none on the island because a graph asserts no axis
+- **THEN** it SHALL draw a full-width and full-height axis line through the `current` node's drawn position only on the island's coordinate lattice; the full-map surface SHALL draw no axis, the radial graph variant SHALL draw none on the island because a graph asserts no axis, and no surface SHALL state the axis convention as worded orientation marks
 - **AND** the axis SHALL be drawn beneath every node marker — it necessarily passes through the `current` node's own marker, which is what an origin is, and that crossing SHALL NOT be read as a violation of the non-overlap invariant, whose axis clause governs the edge direction markers in the gutter band
 
 #### Scenario: Decoration contrast is pinned in a band against the ground
 - **WHEN** the dot field and the axis render against the canvas ground
 - **THEN** each SHALL be present as a painted element whose resolved colour differs from the canvas ground; each SHALL keep a contrast ratio against that ground of at least 1.15:1 at every point of the canvas and at least 1.35:1 within the vignette's un-darkened inner field; and neither SHALL exceed the contrast that the connector-edge ink itself keeps against the same ground, so the coordinate decoration never reads louder than the topology it decorates
-- **AND** these layers are decoration, not information: the coordinate claim they picture is carried redundantly by the node placement itself, by the header's axis orientation marks, and by the readout's coordinate figure, so no reader depends on them — but the lattice's geometry is its claim, so they SHALL NOT be invisible
+- **AND** these layers are decoration, not information: the coordinate claim they picture is carried redundantly by the node placement itself and by the readout's coordinate figure, so no reader depends on them — but the lattice's geometry is its claim, so they SHALL NOT be invisible
 
 #### Scenario: The render model exports two placements
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD island
@@ -819,16 +819,16 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: The header stays one row at every title length
 - **WHEN** the island carries the payload's `title`, server-authored and bounded only by the payload's 128-code-point ceiling
-- **THEN** its header SHALL stay a single row at every authored title length as a localization-safe container: the title SHALL be the row's only elastic item — rendered on one line, truncated with an overflow indicator when it does not fit, and keeping its complete string available as the element's own tooltip/accessible text — while the orientation marks and every other header item SHALL be fixed-size items that neither shrink nor wrap
-- **AND** no authored or translated title SHALL be able to reflow the header onto a second line, and the island's card SHALL keep its constant width rather than being sized by its widest row, so neither the card's width nor the canvas's is a function of the title's length
+- **THEN** its header SHALL stay a single row at every authored title length as a localization-safe container: the title SHALL be the row's only elastic item — rendered on one line, truncated with an overflow indicator when it does not fit, and keeping its complete string available as the element's own tooltip/accessible text — while the decorative open-map glyph and every other header item SHALL be fixed-size items that neither shrink nor wrap
+- **AND** no authored or translated title SHALL be able to reflow the header onto a second line, and the island SHALL keep its constant width rather than being sized by its widest row, so neither the island's width nor the canvas's is a function of the title's length
 
 #### Scenario: The header carries no full-map control
 - **WHEN** the island's header is composed
-- **THEN** it SHALL carry no full-map control of its own: the island's single full-map affordance is the full-bleed element specified below, so the header's fixed-size items are the orientation marks and nothing else unless a later change adds one
+- **THEN** it SHALL carry no full-map control of its own: the island's single full-map affordance is the full-bleed element specified below, so the header's only fixed-size item is the decorative open-map glyph, hidden from assistive technology, unless a later change adds one
 
 #### Scenario: Orientation marks appear only on the lattice variant
 - **WHEN** the island renders a payload
-- **THEN** on the lattice variant — which exactly the coordinate-bearing layers select — the island SHALL state the renderer's own axis orientation as orientation marks in its header and SHALL omit those marks otherwise rather than assert a direction or an axis the presentation does not support (a radial graph asserts no axis)
+- **THEN** the island SHALL state no orientation marks on any variant: the minimap never rotates, so a renderer-axis legend carries no information, and on the lattice variant — which exactly the coordinate-bearing layers select — the drawn axis cross and the readout's coordinate figure carry the coordinate claim
 
 #### Scenario: Node coordinates carry layer-scoped semantics
 - **WHEN** a consumer reads node x/y
@@ -1018,15 +1018,15 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: Map content stays inside its island
 - **WHEN** the minimap renders as the stage's minimap island at 1451x790 and at 1741x948, on a lattice payload with named edge markers and on a graph payload with remembered nodes
-- **THEN** the canvas renders at exactly 240 × 240 CSS px (S = 1) at the reference acceptance viewport and 288 × 288 CSS px (±1) at 1741x948 (S = 1.2), the title, orientation marks, marker names, and readout line remain readable, no node marker, marker name, or edge overprints other island content, the island's rendered box is identical for both payloads, and no required island content has to be scrolled to
+- **THEN** the canvas renders at exactly 240 × 240 CSS px (S = 1) at the reference acceptance viewport and 288 × 288 CSS px (±1) at 1741x948 (S = 1.2), the title, marker names, and readout line remain readable, no node marker, marker name, or edge overprints other island content, the island's rendered box is identical for both payloads, and no required island content has to be scrolled to
 
 #### Scenario: The island keeps the identifier its mode gating selects on
 - **WHEN** the minimap island renders after a chrome change
-- **THEN** its root element still carries the stable `local-map` component identifier, and the mode whose matrix hides the minimap still removes it from the layout and from the tab order
+- **THEN** its island element, inside its instrument panel, still carries the stable `local-map` component identifier, and the mode whose matrix hides the minimap still removes it from the layout and from the tab order
 
 #### Scenario: The island states its convention and the current coordinates
 - **WHEN** the committed payload layer is coordinate-bearing
-- **THEN** the island retains its axis orientation marks and current-node-only coordinate readout; its scale caption or compressed rings state the mapping separately without adding any per-node distance or numeric bearing.
+- **THEN** the island retains its current-node-only coordinate readout and states no orientation marks; its scale caption or compressed rings state the mapping separately without adding any per-node distance or numeric bearing.
 
 #### Scenario: The readout states the coordinate figure and nothing else
 - **WHEN** a wilderness payload whose current node is labelled 西部丘陵與谷地 at (60, 107) renders on the island
@@ -1098,7 +1098,7 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 
 #### Scenario: The orientation mark follows the resolved layout
 - **WHEN** the payload's layer resolves to the graph variant (`interior`, `instance`)
-- **THEN** the island renders no axis orientation mark and no coordinate figure, and on a layer resolving to the lattice (`grid`, `wilderness`) the mark renders alongside the current node's coordinate figure
+- **THEN** the island renders no axis orientation mark and no coordinate figure, and on a layer resolving to the lattice (`grid`, `wilderness`) it renders the current node's coordinate figure and still no orientation mark
 
 #### Scenario: The island's canvas claims its content width as coordinate margin
 - **WHEN** a coordinate-bearing sparse map is projected into the fixed HUD island
@@ -1129,8 +1129,8 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 - **THEN** the island's rendered width and height are identical for every one of them and its canvas is 240 × 240 CSS px each time at the 1451x790 reference viewport
 
 #### Scenario: A long authored title never reflows the island's header
-- **WHEN** the committed payload's server-authored title is long enough that the title and the orientation marks together exceed the island's content width (e.g. `冒險者公會外街道圖` beside the axis marks in the island's reference-scale 240px content box)
-- **THEN** the header stays a single row: the title renders on one line truncated with an overflow indicator while its complete string stays available as the element's tooltip/accessible text, the orientation marks keep their full size without wrapping, no full-map control occupies the row at all, and the island's card width is unchanged
+- **WHEN** the committed payload's server-authored title is long enough that the title and the open-map glyph together exceed the island's content width (e.g. `冒險者公會外街道圖` beside the glyph in the island's reference-scale 240px content box)
+- **THEN** the header stays a single row: the title renders on one line truncated with an overflow indicator while its complete string stays available as the element's tooltip/accessible text, the open-map glyph keeps its full size without wrapping, no full-map control occupies the row at all, and the island's width is unchanged
 
 #### Scenario: The readout follows the player after a move
 - **WHEN** a newly committed payload replaces the rendered one with a different `current_node`
@@ -1185,8 +1185,8 @@ The minimap SHALL retain the completed automatic projection, exit labels, gatewa
 - **THEN** they retain the existing contrast presence floor; compressed island mode uses rings in place of dots and the vignette cannot erase their distance information.
 
 #### Scenario: The axis is drawn only where the convention is stated in words
-- **WHEN** a coordinate-bearing island states 北↑ 東→
-- **THEN** its full-width/full-height axis passes beneath the current marker, and a coordinate-free graph states/draws no axis
+- **WHEN** a coordinate-bearing island renders
+- **THEN** its full-width/full-height axis passes beneath the current marker while the island states no orientation marks, and a coordinate-free graph draws no axis
 
 #### Scenario: The axis crossing the current marker is not a collision
 - **WHEN** the island draws its axis through the `current` node

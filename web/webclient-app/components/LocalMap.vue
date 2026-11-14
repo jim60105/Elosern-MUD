@@ -1,7 +1,7 @@
 <script setup>
 // LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
 // `local_map` v1 panel renderer, re-chromed as the stage's right-anchor
-// island. The root keeps the stable `.local-map` class that H1's
+// island. The island element keeps the stable `.local-map` class that H1's
 // combat-hide CSS and the shell's `HIDDEN_BY_MODE` focus-rescue map select
 // on literally, so the re-chrome never silently un-hides the minimap in a
 // mode whose matrix hides it. The lattice itself (nodes, markers,
@@ -32,11 +32,21 @@
 // move on one map keeps it and another map, the wilderness or a
 // coordinate-free layer resets it; it is never persisted. Server coordinates
 // and node identity stay authoritative; only the drawing is presentation.
+//
+// The minimap as an instrument panel (local-map-instrument-panel): the
+// component's root is the shared `instrument-panel` chrome
+// (instrument-panel.css), spanning the `map` column; the island stands
+// card-free inside it, one level down, and its canvas clears the panel's
+// brass spine. The header states no direction legend: the minimap never
+// rotates, so a fixed north-up, east-right legend carries no information.
+// The axis cross the lattice draws through the current node stays as the
+// drawing's own geometry.
 import { computed, shallowRef, watch } from "vue";
 import LocalMap from "../lib/local_map.js";
 import { CANVAS_SIZE, CENTRE, previousLevelFor, projectIsland, rememberLevel } from "../lib/minimap_projection.js";
 import { ISLAND_MARKER_HALF } from "../composables/use-map-lattice-geometry.js";
 import MapLattice from "./MapLattice.vue";
+import "./instrument-panel.css";
 
 const props = defineProps({
   // The committed `local_map` v1 panel payload (available form or the
@@ -58,14 +68,6 @@ const layer = computed(() => props.localMap.layer ?? null);
 const nodes = computed(() => (Array.isArray(props.localMap.nodes) ? props.localMap.nodes : []));
 const remembered = computed(() => (Array.isArray(props.localMap.remembered) ? props.localMap.remembered : []));
 
-// The orientation legend states the renderer's own axis convention only
-// (design D9): the lattice renderer puts north at +y and inverts y so +y
-// draws upward — a statement about the drawing, not about the world. The
-// radial graph variant has no axis convention to state, so the legend
-// follows the resolved layout variant (map-02), not the payload layer.
-const showsOrientation = computed(
-  () => props.localMap.layoutVariant === "lattice",
-);
 const isGraph = computed(
   () => (props.localMap.layoutVariant || "lattice") === "graph",
 );
@@ -174,148 +176,164 @@ function onIslandClick(event) {
 </script>
 
 <template>
-  <aside class="local-map" data-testid="local-map" @click="onIslandClick">
-    <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
-      {{ reason }}
-    </p>
-    <template v-else>
-      <!-- Single full-map affordance (webclient-minimap-04-island-single-affordance
-           D1): a content-free <button> spanning the island's whole box,
-           transparent and layered beneath the island's visual content so the
-           button element itself contains no focusable descendant. It is a real
-           <button> (Enter/Space via the platform, never a key handler on a
-           div), carries 展開全地圖 as its accessible name.
+  <div class="instrument-panel local-map-panel" data-testid="local-map-panel">
+    <aside class="local-map" data-testid="local-map" @click="onIslandClick">
+      <p v-if="!available" class="local-map__unavailable" data-testid="local-map__unavailable">
+        {{ reason }}
+      </p>
+      <template v-else>
+        <!-- Single full-map affordance (webclient-minimap-04-island-single-affordance
+             D1): a content-free <button> spanning the island's whole box,
+             transparent and layered beneath the island's visual content so the
+             button element itself contains no focusable descendant. It is a real
+             <button> (Enter/Space via the platform, never a key handler on a
+             div), carries 展開全地圖 as its accessible name.
 
-           Pointer behaviour is unchanged and stays single-emit: content sits
-           above this button, so a click on visible content targets that
-           content and reaches onIslandClick, which emits open-map. A click on
-           genuinely empty island area lands on this button, which emits
-           open-map itself — and onIslandClick, which also sees that bubbling
-           click, skips it because event.target.closest("button, …") matches
-           this button. Keyboard activation produces the same bubbling click
-           and is skipped by the same guard. So every path emits exactly one
-           open-map, and a click originating in a lattice node group still emits none. -->
-      <button
-        type="button"
-        class="local-map__affordance"
-        data-testid="local-map__expand"
-        aria-label="展開全地圖"
-        title="展開全地圖"
-        @click="emit('open-map')"
-      ></button>
+             Pointer behaviour is unchanged and stays single-emit: content sits
+             above this button, so a click on visible content targets that
+             content and reaches onIslandClick, which emits open-map. A click on
+             genuinely empty island area lands on this button, which emits
+             open-map itself — and onIslandClick, which also sees that bubbling
+             click, skips it because event.target.closest("button, …") matches
+             this button. Keyboard activation produces the same bubbling click
+             and is skipped by the same guard. So every path emits exactly one
+             open-map, and a click originating in a lattice node group still emits none. -->
+        <button
+          type="button"
+          class="local-map__affordance"
+          data-testid="local-map__expand"
+          aria-label="展開全地圖"
+          title="展開全地圖"
+          @click="emit('open-map')"
+        ></button>
 
-      <!-- The island's top-meta line (design D9): the payload's title plus,
-           on the coordinate-bearing layers only, the renderer's axis
-           orientation marks in the draft's header treatment (`北↑ 東→`,
-           webclient-map-01-draft-chrome). No bearing or distance is
-           rendered.
+        <!-- The island's top-meta line (design D9): the payload's title and
+             the decorative open-map glyph. It states no direction legend: the
+             minimap never rotates (local-map-instrument-panel). No bearing or
+             distance is rendered.
 
-           Header budget (the redesign review's first finding): the header
-           carries no full-map control of its own — the single full-bleed
-           affordance above is the island's only full-map affordance (D1),
-           so the elastic title now owns the space the control occupied. -->
-      <div class="local-map__meta" data-testid="local-map__title">
-        <span class="local-map__meta-title" :title="title">{{ title }}</span>
-        <span v-if="showsOrientation" class="local-map__orientation" data-testid="local-map__orientation">
-          北↑ 東→
-        </span>
-        <svg class="local-map__expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-          <path d="M14 3h7v7M21 3l-7 7M10 21H3v-7M3 21l7-7" />
-        </svg>
-      </div>
+             Header budget (the redesign review's first finding): the header
+             carries no full-map control of its own — the single full-bleed
+             affordance above is the island's only full-map affordance (D1),
+             so the elastic title now owns the space the control occupied. -->
+        <div class="local-map__meta" data-testid="local-map__title">
+          <span class="local-map__meta-title" :title="title">{{ title }}</span>
+          <svg class="local-map__expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M14 3h7v7M21 3l-7 7M10 21H3v-7M3 21l7-7" />
+          </svg>
+        </div>
 
-      <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
-           minimap composes MapLattice with a fixed square 240px canvasSize
-           (retarget-desktop-viewport-contract D7), pitch-fit (D3), and
-           footprint crop (D4). Scale never exceeds 1.
+        <!-- Shared lattice renderer (improve-webclient-map-overlay-scale): the
+             minimap composes MapLattice with a fixed square 240px canvasSize
+             (retarget-desktop-viewport-contract D7), pitch-fit (D3), and
+             footprint crop (D4). Scale never exceeds 1.
 
-           The declared node-label and marker-name steps are the shared 16-unit
-           floor: at the reference scale the drawn labels therefore read at
-           exactly 16 CSS px (scale 1 on ordinary neighbourhoods), which the
-           208px square could not reach — it rendered the reported wilderness
-           shape at scale 0.933 (11.2 CSS px labels) under the old reference.
+             The declared node-label and marker-name steps are the shared 16-unit
+             floor: at the reference scale the drawn labels therefore read at
+             exactly 16 CSS px (scale 1 on ordinary neighbourhoods), which the
+             208px square could not reach — it rendered the reported wilderness
+             shape at scale 0.933 (11.2 CSS px labels) under the old reference.
 
-           The island no longer listens to select/hover/leave (D3): the shared
-           renderer keeps its event surface for the overlay and future changes
-           to consume. -->
-      <MapLattice
-        :local-map="localMap"
-        :variant="localMap.layoutVariant || 'lattice'"
-        :canvas-size="240"
-        :label-font="16"
-        :marker-name-font="16"
-        :show-axis="true"
-        :fog-vignette="true"
-        :marker-names="true"
-        :pan-on-move="true"
-        :motion-level="motionLevel"
-        :aimed-node="aimedNode"
-        :island-projection="islandProjection"
-        @move="(p) => emit('move', p)"
-      />
+             The island no longer listens to select/hover/leave (D3): the shared
+             renderer keeps its event surface for the overlay and future changes
+             to consume. -->
+        <MapLattice
+          :local-map="localMap"
+          :variant="localMap.layoutVariant || 'lattice'"
+          :canvas-size="240"
+          :label-font="16"
+          :marker-name-font="16"
+          :show-axis="true"
+          :fog-vignette="true"
+          :marker-names="true"
+          :pan-on-move="true"
+          :motion-level="motionLevel"
+          :aimed-node="aimedNode"
+          :island-projection="islandProjection"
+          @move="(p) => emit('move', p)"
+        />
 
-      <!-- Assistive technology mirror for edge direction markers (design D1):
-           visually-hidden, non-focusable list ordered by octant then payload index,
-           one entry per drawn marker. -->
-      <ul
-        v-if="markerMirrorList.length"
-        class="visually-hidden"
-        aria-label="已知的地圖出入口"
-        data-testid="local-map-edge-markers-mirror"
-      >
-        <li v-for="marker in markerMirrorList" :key="marker.id">
-          {{ marker.label }}，{{ marker.octantWord }}
-        </li>
-      </ul>
-
-      <!-- Assistive technology mirror for graph variant remembered nodes (design D5):
-           visually-hidden, non-focusable list in payload order. -->
-      <ul
-        v-if="isGraph && remembered.length"
-        class="visually-hidden"
-        aria-label="記得的地點"
-        data-testid="local-map-remembered-mirror"
-      >
-        <li v-for="node in remembered" :key="node.id">
-          {{ node.label }}
-        </li>
-      </ul>
-
-      <!-- The island's closing readout line, in the draft `.mini .compass`
-           treatment (design D7): the island's smallest type step, monospace,
-           centred, de-emphasised (--paper-500, 4.98:1 on --panel), with no
-           border, background, or padded box. The element itself stays
-           unconditionally mounted — `local-map-detail` is a committed testid
-           and the island's plain-text body click target. On coordinate-free
-           layers (interior/instance) there is no coordinate figure, so the
-           readout states nothing and paints no box (the --empty modifier). -->
-      <!-- The island footer (render-auto-scaled-minimap-island): the scale
-           caption leads, the unchanged current-coordinate readout trails. Two
-           separate elements at the same chrome step, so a scale figure never
-           reads as part of the position statement. -->
-      <div class="local-map__footer">
-        <p
-          v-if="scaleCaption"
-          class="local-map__scale"
-          data-testid="local-map__scale"
+        <!-- Assistive technology mirror for edge direction markers (design D1):
+             visually-hidden, non-focusable list ordered by octant then payload index,
+             one entry per drawn marker. -->
+        <ul
+          v-if="markerMirrorList.length"
+          class="visually-hidden"
+          aria-label="已知的地圖出入口"
+          data-testid="local-map-edge-markers-mirror"
         >
-          {{ scaleCaption }}
-        </p>
-        <p
-          class="local-map__detail"
-          :class="{ 'local-map__detail--empty': detail === '' }"
-          data-testid="local-map-detail"
+          <li v-for="marker in markerMirrorList" :key="marker.id">
+            {{ marker.label }}，{{ marker.octantWord }}
+          </li>
+        </ul>
+
+        <!-- Assistive technology mirror for graph variant remembered nodes (design D5):
+             visually-hidden, non-focusable list in payload order. -->
+        <ul
+          v-if="isGraph && remembered.length"
+          class="visually-hidden"
+          aria-label="記得的地點"
+          data-testid="local-map-remembered-mirror"
         >
-          {{ detail }}
-        </p>
-      </div>
-    </template>
-  </aside>
+          <li v-for="node in remembered" :key="node.id">
+            {{ node.label }}
+          </li>
+        </ul>
+
+        <!-- The island's closing readout line, in the draft `.mini .compass`
+             treatment (design D7): the island's smallest type step, monospace,
+             centred, de-emphasised (--paper-500, 4.98:1 on --panel), with no
+             border, background, or padded box. The element itself stays
+             unconditionally mounted — `local-map-detail` is a committed testid
+             and the island's plain-text body click target. On coordinate-free
+             layers (interior/instance) there is no coordinate figure, so the
+             readout states nothing and paints no box (the --empty modifier). -->
+        <!-- The island footer (render-auto-scaled-minimap-island): the scale
+             caption leads, the unchanged current-coordinate readout trails. Two
+             separate elements at the same chrome step, so a scale figure never
+             reads as part of the position statement. -->
+        <div class="local-map__footer">
+          <p
+            v-if="scaleCaption"
+            class="local-map__scale"
+            data-testid="local-map__scale"
+          >
+            {{ scaleCaption }}
+          </p>
+          <p
+            class="local-map__detail"
+            :class="{ 'local-map__detail--empty': detail === '' }"
+            data-testid="local-map-detail"
+          >
+            {{ detail }}
+          </p>
+        </div>
+      </template>
+    </aside>
+  </div>
 </template>
 
 <style scoped>
+/* The minimap's instrument panel (local-map-instrument-panel): the canvas
+   stands clear of the spine (22px of right padding, the spine at 14px), so
+   the brass line runs unbroken past the footer; the ink holds solid under
+   the canvas and its clearance (240px + 22px from the right) and feathers
+   out over a short 24px band to its left, so the opaque canvas never sits
+   on thinned ink. The column is at least 282px wide for this. */
+.local-map-panel {
+  --instrument-pad-right: 22px;
+  --instrument-solid: calc(262px * var(--ui-scale));
+  --instrument-clear: calc(286px * var(--ui-scale));
+  align-self: stretch;
+  width: 100%;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 /* The island chrome (design D9): the shared tokens, so a token change or
-   the motion level's blocks reach it at once. The root keeps the
+   the motion level's blocks reach it at once. The island element keeps the
    load-bearing `.local-map` class that H1's mode-gate CSS selects on.
 
    `position: relative` (webclient-minimap-04-island-single-affordance D1):
@@ -328,19 +346,13 @@ function onIslandClick(event) {
   gap: var(--sp-2);
   box-sizing: border-box;
   /* The island renders at a constant size (design D1/D2;
-     retarget-desktop-viewport-contract D7): a fixed 240px square canvas, 1px
-     hairline border, and --sp-1 padding — a 250px card. It is right-aligned in
-     the anchor and does not stretch to the column width. */
+     retarget-desktop-viewport-contract D7): its width is the fixed 240px
+     square canvas. It wears no card (local-map-instrument-panel): the
+     instrument panel around it carries the ink ground. It is right-aligned
+     in the panel and does not stretch to the column width. */
   min-height: auto;
   width: auto;
   align-self: flex-end;
-  padding: var(--sp-1);
-  background: var(--panel);
-  backdrop-filter: blur(calc(8px * var(--ui-scale)));
-  -webkit-backdrop-filter: blur(calc(8px * var(--ui-scale)));
-  border: var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
   font-family: var(--f-sans);
   font-size: var(--text-md);
   font-variant-numeric: normal;
@@ -348,10 +360,6 @@ function onIslandClick(event) {
      island reads as clickable because the body click opens the full map;
      the interactive descendants keep their own cursors. */
   cursor: pointer;
-}
-
-.local-map:hover {
-  border-color: var(--ink-600);
 }
 
 /* Single full-map affordance (D1): a content-free transparent button
@@ -366,14 +374,15 @@ function onIslandClick(event) {
   border: 0;
   background: transparent;
   cursor: pointer;
-  border-radius: var(--radius);
+  border-radius: 0;
 }
 
 /* Focus indication on the whole island (D1): the affordance IS the island's
-   box, so :focus-visible draws a ring around the entire island. A box-shadow
-   renders in the paint phase and is not affected by the z-index stack, so it
-   is always visible above the island's content layers. The inset offset keeps
-   the ring inside the card's border-radius without clipping. */
+   box, so :focus-visible draws a ring around the entire island, which is
+   square now that the island wears no card. A box-shadow renders in the
+   paint phase and is not affected by the z-index stack, so it is always
+   visible above the island's content layers; the inset ring stays inside
+   the island's box. */
 .local-map__affordance:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--gold-400) inset;
@@ -411,6 +420,7 @@ function onIslandClick(event) {
   letter-spacing: 0.04em;
   color: var(--paper-500);
   margin-bottom: calc(4px * var(--ui-scale));
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
 }
 
 /* The one elastic item in the row, and the only localization-safe container
@@ -434,18 +444,13 @@ function onIslandClick(event) {
   width: calc(14px * var(--ui-scale));
   height: calc(14px * var(--ui-scale));
   color: var(--gold-400);
+  /* The open-map glyph answers the hover the card's border used to answer. */
+  opacity: 0.86;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
-
-/* The renderer-axis orientation legend (北↑): a statement about the
-   drawing's axis convention, not about the world (design D9). Fixed-size:
-   the marks are a two-token convention, never a wrapping phrase. */
-.local-map__orientation {
-  flex: none;
-  white-space: nowrap;
-  font-family: var(--f-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0;
-  color: var(--gold-400);
+.local-map:hover .local-map__expand-icon,
+.local-map:focus-within .local-map__expand-icon {
+  opacity: 1;
 }
 
 .local-map__unavailable {
@@ -475,7 +480,8 @@ function onIslandClick(event) {
   justify-content: center;
   gap: var(--sp-2);
   padding-top: var(--sp-1);
-  padding-inline: calc(4px * var(--ui-scale));
+  padding-inline: 0;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
 }
 
 .local-map__footer:has(.local-map__scale) {
@@ -501,8 +507,8 @@ function onIslandClick(event) {
   margin: 0;
   color: var(--paper-500);
   font-family: var(--f-mono);
-  /* The island's one chrome step (webclient-map-legibility): title,
-     orientation marks and readout all read at the shared `--text-xs` step
+  /* The island's one chrome step (webclient-map-legibility): title and
+     readout read at the shared `--text-xs` step
      (16 CSS px at the 1451x790 reference). */
   font-size: var(--text-xs);
   line-height: 1.45;
@@ -512,7 +518,7 @@ function onIslandClick(event) {
 }
 
 /* An island with no coordinate figure on the current layer states nothing
-   and paints no box, while reserving its single line height so the card height
+   and paints no box, while reserving its single line height so the island height
    does not change with the layer (design D2). */
 .local-map__detail--empty {
   visibility: hidden;

@@ -47,8 +47,8 @@ describe("LocalMap (B4 world family)", () => {
 
   it("renders the payload's map title in the island's meta line", () => {
     const w = mountMap();
-    // H2: the meta line carries the title plus, on the coordinate-bearing
-    // layers only, the renderer-axis orientation legend (design D9).
+    // H2: the meta line carries the title only (local-map-instrument-panel
+    // removed the legend); the island stands inside its instrument panel.
     const title = w.get('[data-testid="local-map__title"] .local-map__meta-title');
     expect(title.text()).toBe("霧骨渡口");
   });
@@ -227,37 +227,66 @@ describe("LocalMap (B4 world family)", () => {
     expect(w.get('[data-testid="local-map-detail"]').text()).toBe("座標 1,2");
   });
 
-  // H2 (webclient-hud-02-status-islands, design D9/D10): the island
-  // re-chrome keeps the load-bearing `.local-map` root class, adds the
-  // renderer-axis orientation legend on the coordinate-bearing layers only,
-  // and renders no bearing, no compass angle, or distance.
+  // H2 (webclient-hud-02-status-islands, design D9/D10) and
+  // local-map-instrument-panel: the island stands inside its own instrument
+  // panel and keeps the load-bearing `.local-map` class the mode-gate CSS
+  // selects on; it states no orientation legend, and renders no bearing, no
+  // compass angle, or distance.
 
-  it("keeps the .local-map root class the mode-gate CSS selects on", () => {
+  it("stands the island card-free inside its own instrument panel", () => {
     const w = mountMap();
-    expect(w.find(".local-map").exists()).toBe(true);
-    expect(w.attributes("data-testid")).toBe("local-map");
-  });
+    const panel = w.element;
+    expect(panel.classList.contains("instrument-panel")).toBe(true);
+    expect(panel.classList.contains("local-map-panel")).toBe(true);
+    expect(panel.getAttribute("data-testid")).toBe("local-map-panel");
+    expect(panel.children).toHaveLength(1);
+    const island = panel.firstElementChild;
+    expect(island.tagName).toBe("ASIDE");
+    expect(island.classList.contains("local-map")).toBe(true);
+    expect(island.getAttribute("data-testid")).toBe("local-map");
 
-  it("shows the orientation legend on grid and wilderness layers only", () => {
-    for (const sample of [LOCAL_MAP_SAMPLE, LOCAL_MAP_WILDERNESS_SAMPLE]) {
-      const w = mountMap({ localMap: localMapModelFor(sample) });
-      const orientation = w.find('[data-testid="local-map__orientation"]');
-      expect(orientation.exists(), `legend present for ${sample.layer}`).toBe(true);
-      // The draft header pair (webclient-map-01-draft-chrome D5): the axis
-      // marks name both readable directions; it carries no bearing or
-      // distance (the no-bearing assertions below still bind).
-      expect(orientation.text()).toBe("北↑ 東→");
-      w.unmount();
+    // The scoped styles are not applied by jsdom, so the card-free contract
+    // is read from the authored rule text (comments stripped).
+    const source = readFileSync(join(import.meta.dirname, "../../components/LocalMap.vue"), "utf-8");
+    const rule = (selector) => {
+      const start = source.indexOf(`\n${selector} {`);
+      expect(start, `rule not found: ${selector}`).toBeGreaterThan(-1);
+      return source.slice(start, source.indexOf("}", start)).replace(/\/\*[\s\S]*?\*\//g, "");
+    };
+    const islandRule = rule(".local-map");
+    for (const declaration of ["padding", "background", "backdrop-filter", "border:", "border-radius", "box-shadow"]) {
+      expect(islandRule, `.local-map declares ${declaration}`).not.toContain(declaration);
     }
+    expect(source).not.toContain(".local-map:hover {");
+    expect(source).not.toContain("local-map__orientation");
+    expect(source).not.toContain("showsOrientation");
+    expect(source).not.toContain("北↑");
+    const panelRule = rule(".local-map-panel");
+    expect(panelRule).toContain("--instrument-pad-right: 22px;");
+    expect(panelRule).toContain("--instrument-solid: calc(262px * var(--ui-scale));");
+    expect(panelRule).toContain("--instrument-clear: calc(286px * var(--ui-scale));");
+    expect(rule(".local-map__expand-icon")).toContain("opacity: 0.86;");
+    expect(source).toContain(
+      ".local-map:hover .local-map__expand-icon,\n.local-map:focus-within .local-map__expand-icon {\n  opacity: 1;",
+    );
+    expect(source).toContain('import "./instrument-panel.css";');
+    const shell = readFileSync(join(import.meta.dirname, "../../styles/app-shell.css"), "utf-8");
+    expect(shell).not.toMatch(/\.local-map\b/);
   });
 
-  it("omits the orientation legend on the coordinate-free instance and interior layers", () => {
-    for (const sample of [LOCAL_MAP_INSTANCE_SAMPLE, LOCAL_MAP_INTERIOR_SAMPLE]) {
+  it("states no orientation legend on any layer and draws the axis only on the lattice", () => {
+    for (const [sample, lattice] of [
+      [LOCAL_MAP_SAMPLE, true],
+      [LOCAL_MAP_WILDERNESS_SAMPLE, true],
+      [LOCAL_MAP_INTERIOR_SAMPLE, false],
+      [LOCAL_MAP_INSTANCE_SAMPLE, false],
+    ]) {
       const w = mountMap({ localMap: localMapModelFor(sample) });
-      expect(
-        w.find('[data-testid="local-map__orientation"]').exists(),
-        `legend absent for ${sample.layer}`,
-      ).toBe(false);
+      expect(w.find('[data-testid="local-map__orientation"]').exists(), `no legend for ${sample.layer}`).toBe(false);
+      const text = w.get('[data-testid="local-map"]').text();
+      expect(text).not.toContain("北↑");
+      expect(text).not.toContain("東→");
+      expect(w.find('[data-testid="local-map__axis"]').exists(), `axis for ${sample.layer}`).toBe(lattice);
       w.unmount();
     }
   });
@@ -418,7 +447,7 @@ describe("LocalMap (B4 world family)", () => {
 
   it("keeps the header on one row: an elastic title, fixed marks, and no trailing control", () => {
     // webclient-minimap-04-island-single-affordance (task 1.1): the meta row
-    // carries the title and the axis marks, with no expand button.
+    // carries the title and the decorative glyph, with no expand button.
     const w = mountMap({
       localMap: {
         ...localMapModelFor(LOCAL_MAP_SAMPLE),
@@ -431,8 +460,8 @@ describe("LocalMap (B4 world family)", () => {
     expect(titleEl.attributes("title")).toBe("冒險者公會外街道圖");
     // The header carries no expand button of its own.
     expect(w.find('.local-map__meta button').exists()).toBe(false);
-    // The axis marks stay in the header, unwrapped, on the lattice variant.
-    expect(w.find('[data-testid="local-map__orientation"]').exists()).toBe(true);
+    // The header states no orientation legend.
+    expect(w.find('[data-testid="local-map__orientation"]').exists()).toBe(false);
   });
 
   it("follows the payload's current node coordinates when the player moves", async () => {
@@ -584,11 +613,11 @@ describe("LocalMap (B4 world family)", () => {
     expect(ISLAND_SOURCE).toContain(':marker-name-font="16"');
     // Every type size the island declares is at or below its own chrome step
     // (retarget-desktop-viewport-contract D7): the node label (16), the marker
-    // name (16), and the title, orientation marks and readout at `--text-xs`
+    // name (16), and the title and readout at `--text-xs`
     // (16px at the reference) — one 16px floor for the whole island, no drawn
     // label or name below it.
     const chromeStep = 16;
-    for (const selector of [".local-map__meta", ".local-map__orientation", ".local-map__detail"]) {
+    for (const selector of [".local-map__meta", ".local-map__detail"]) {
       expect(ruleBody(ISLAND_SOURCE, selector)).toContain("font-size: var(--text-xs)");
     }
     expect(lattice.props("labelFont")).toBeLessThanOrEqual(chromeStep);
