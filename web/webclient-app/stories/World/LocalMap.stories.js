@@ -25,10 +25,10 @@ import {
 } from "../fixtures.js";
 
 // LocalMap (H2, webclient-hud-02-status-islands, design D9/D10): the
-// minimap renders as the stage's right-anchor island — bounded, the
-// renderer-axis orientation legend on the lattice variant (`grid` /
-// `wilderness` payloads) only, no bearing, no distance, and one full-map
-// opener (the map drawer). Layout variants (webclient-map-02): the island
+// minimap renders as the stage's right-anchor island — bounded, standing
+// card-free inside its own instrument panel (local-map-instrument-panel),
+// with no direction legend (the minimap never rotates), no bearing, no
+// distance, and one full-map opener (the map drawer). Layout variants (webclient-map-02): the island
 // draws grid/wilderness payloads through its automatic projection and
 // instance/interior payloads as the model's radial placement — the variant
 // comes from the model itself, so each story below renders its payload's
@@ -39,12 +39,16 @@ import {
 // through the shared `localMapModelFor` helper — the EXACT derived shape
 // `stores/elosern.js` passes in production.
 
-// The island is a fixed 240-unit canvas inside its padded card, so the story
-// frame is a column sized to that card (as the right anchor sizes it in the
-// client) rather than a narrower fixed width that would clip the card.
+// The island is a fixed 240-unit canvas inside an instrument panel that
+// spans its column, so the story frame is the `map` column at its width at
+// the 1451x790 reference (291px x S), on a dark stage-like ground so the
+// panel's feathered ink and brass spine read as they do in the client.
+const COLUMN_STYLE = "width: calc(291px * var(--ui-scale)); display: flex; flex-direction: column;";
 const renderMap = (args) => ({
   render: () =>
-    h("div", { style: "display: flex; flex-direction: column; width: max-content;" }, [h(LocalMap, args)]),
+    h("div", { style: "padding: 20px; background: linear-gradient(135deg, #2b3440, #151920);" }, [
+      h("div", { style: COLUMN_STYLE }, [h(LocalMap, args)]),
+    ]),
 });
 
 export default {
@@ -571,7 +575,7 @@ const MovementIsland = defineComponent({
     const mount = ref(0);
     const models = [localMapModelFor(props.pair.from), localMapModelFor(props.pair.to)];
     return () =>
-      h("div", { style: "display: flex; flex-direction: column; gap: 8px; width: max-content;" }, [
+      h("div", { style: `${COLUMN_STYLE} gap: 8px;` }, [
         h(
           "button",
           {

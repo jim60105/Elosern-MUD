@@ -324,8 +324,9 @@ export const LOCAL_MAP_GEOMETRY_STRESS_SAMPLE = {
   ],
 };
 
-// The single-node room (delta spec scenario "A single-node room states
-// orientation without any collision risk"): exactly one current node, no
+// The single-node room (spec scenario "A single-node room states
+// orientation without any collision risk"; the island draws only its axis
+// cross, no legend): exactly one current node, no
 // neighbors to collide with — the pitch/sizing change must produce no
 // regression for the single-node case.
 export const LOCAL_MAP_SINGLE_NODE_SAMPLE = {
@@ -352,8 +353,8 @@ export const LOCAL_MAP_SINGLE_NODE_SAMPLE = {
   legend: ["你目前所在的位置"],
 };
 
-// The wilderness layer: coordinate-bearing nodes (the renderer-axis
-// orientation legend 北↑ applies).
+// The wilderness layer: coordinate-bearing nodes (the lattice draws its
+// axis cross through the current node).
 export const LOCAL_MAP_WILDERNESS_SAMPLE = {
   schema_version: 1,
   available: true,
@@ -422,7 +423,7 @@ export const LOCAL_MAP_WILDERNESS_SAMPLE = {
 };
 
 // The instance layer: the presenter's layout-index coordinates (a
-// coordinate-free graph — the orientation legend is omitted).
+// coordinate-free graph — no axis cross is drawn).
 export const LOCAL_MAP_INSTANCE_SAMPLE = {
   schema_version: 1,
   available: true,
@@ -475,7 +476,7 @@ export const LOCAL_MAP_INSTANCE_SAMPLE = {
 };
 
 // The interior layer: the same layout-index coordinate shape as instance
-// (coordinate-free graph — the orientation legend is omitted).
+// (coordinate-free graph — no axis cross is drawn).
 export const LOCAL_MAP_INTERIOR_SAMPLE = {
   schema_version: 1,
   available: true,

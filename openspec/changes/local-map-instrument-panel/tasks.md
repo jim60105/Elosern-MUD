@@ -10,7 +10,7 @@
 
 ## 2. Stories
 
-- [ ] 2.1 Update `web/webclient-app/stories/World/LocalMap.stories.js` frames and comments and the legend comments in `web/webclient-app/stories/fixtures/local_map.js` (design D6). Verify: `grep -n "orientation legend" web/webclient-app/stories/World/LocalMap.stories.js web/webclient-app/stories/fixtures/local_map.js` prints nothing, and `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
+- [x] 2.1 Update `web/webclient-app/stories/World/LocalMap.stories.js` frames and comments and the legend comments in `web/webclient-app/stories/fixtures/local_map.js` (design D6). Verify: `grep -n "orientation legend" web/webclient-app/stories/World/LocalMap.stories.js web/webclient-app/stories/fixtures/local_map.js` prints nothing, and `pnpm run build-storybook` and `pnpm run showcase-coverage` pass with `web/webclient-app/component-manifest.json` unchanged.
 
 ## 3. Browser tests
 
