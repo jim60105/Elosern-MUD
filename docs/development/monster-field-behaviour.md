@@ -380,6 +380,12 @@ enclosing durable transaction commits):
 | `monster_escape_resolved` | `operation`, `group`, `individual`, `source`, `destination`, `journey`, `tick` |
 | `monster_escape_failed` | `session`, `operation`, `individual`, `group`, `source`, `destination`, `tick` (warn; emitted before the enclosing commit restores every surface) |
 
+`monster_departed`, `monster_arrived` and `monster_arrival_deferred` committed
+inside an unobserved population lifecycle settlement pass are debug-level, and
+the pass reports their counts once in the info event
+`population_maintenance_settled`. Committed outside a pass, or by a field
+contact admission inside one, they stay info.
+
 A rolled-back departure emits none of the success rows.
 
 ### Review dispositions
@@ -502,6 +508,10 @@ tick stay, and protected destinations are never entered.
 | Event | Context |
 | --- | --- |
 | `monster_activity_decided` | `group`, `sequence`, `tick`, `reason` (outer commit only; reads emit no mutation event) |
+
+Inside a population lifecycle settlement pass this event is debug-level and is
+counted by that pass's `population_maintenance_settled` info event; a direct
+owner commit stays info.
 
 ### Evidence map
 

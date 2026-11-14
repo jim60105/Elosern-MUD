@@ -210,6 +210,8 @@ Replaying a committed operation does not move, charge, detach, or create a secon
 
 Use named imports from `world.observability`. Emit committed boundary events for movement departure/arrival, aggression admission, and escape outcome, with available zone/site, group, individual, source/destination, session, and tick identifiers. Rollback must discard success events. Preserve the existing exception and credential-handling rules; do not introduce a parallel logging facade.
 
+> **Amended 2026-11-14 (change population-maintenance-log-tally).** Departure and arrival events committed by unobserved lifecycle settlement are debug-level and summarised by one info event per pass.
+
 ## 12. Specification changes and verification
 
 Implementation must use the repository OpenSpec workflow, explicitly depending on the first specification's individual identity, population ownership, and whole-cell admission changes. Update the old no-relocation disengage/party-retreat contracts, affected clock/skip/sleep and movement contracts, monster activity and journey contracts, travel interruption, quest target observation, and browser/text encounter surfaces. This document does not modify main specifications itself.
