@@ -6,6 +6,7 @@ import unittest
 from copy import deepcopy
 from typing import Any, Callable
 
+from tools.spec_traceability import covers_requirement
 from world.rules.landmark_rite_record import (
     RECORD_ATTR,
     LandmarkRiteRecordError,
@@ -79,6 +80,9 @@ class RecordRoundTripTests(unittest.TestCase):
         self.assertEqual(read_record(owner), record)
         self.assertEqual(owner.attributes.stored[RECORD_ATTR], record)
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-envelope-is-strict-and-never-repaired"
+    )
     def test_a_missing_attribute_reads_empty_and_creates_nothing(self):
         owner = _Owner()
         self.assertEqual(read_record(owner), empty_record())
@@ -187,12 +191,18 @@ class RecordEnvelopeTests(unittest.TestCase):
         ),
     ]
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-envelope-is-strict-and-never-repaired"
+    )
     def test_every_envelope_violation_raises(self):
         for label, record in self.VIOLATIONS:
             with self.subTest(label):
                 with self.assertRaises(LandmarkRiteRecordError):
                     validate_record(record)
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-envelope-is-strict-and-never-repaired"
+    )
     def test_a_corrupt_stored_value_raises_and_is_left_unchanged(self):
         owner = _Owner()
         corrupt = {"schema_version": 1, "completed": {"t_district": {"count": 0}}}
@@ -201,6 +211,9 @@ class RecordEnvelopeTests(unittest.TestCase):
             read_record(owner)
         self.assertEqual(owner.attributes.stored[RECORD_ATTR], corrupt)
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-envelope-is-strict-and-never-repaired"
+    )
     def test_write_record_refuses_an_invalid_record_and_stores_nothing(self):
         owner = _Owner()
         owner.attributes.add(RECORD_ATTR, _record())
@@ -210,6 +223,9 @@ class RecordEnvelopeTests(unittest.TestCase):
 
 
 class RecordCompletionTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-counts-completions-per-district-and-per-option"
+    )
     def test_the_first_completion_starts_the_district_and_the_option(self):
         updated = with_completion(empty_record(), "t_district", "t_option", 100)
         self.assertEqual(
@@ -222,6 +238,9 @@ class RecordCompletionTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-counts-completions-per-district-and-per-option"
+    )
     def test_a_repeat_keeps_the_first_tick_and_counts_twice(self):
         once = with_completion(empty_record(), "t_district", "t_option", 100)
         twice = with_completion(once, "t_district", "t_option", 250)
@@ -231,6 +250,9 @@ class RecordCompletionTests(unittest.TestCase):
         self.assertEqual(entry["last_tick"], 250)
         self.assertEqual(entry["options"]["t_option"], {"count": 2, "last_tick": 250})
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-counts-completions-per-district-and-per-option"
+    )
     def test_a_second_option_counts_inside_the_same_district(self):
         first = with_completion(empty_record(), "t_district", "t_first", 100)
         repeat = with_completion(first, "t_district", "t_first", 250)
@@ -247,6 +269,7 @@ class RecordCompletionTests(unittest.TestCase):
             },
         )
 
+    @covers_requirement("landmark-rite-record::undeclared-keys-survive-a-write")
     def test_undeclared_district_and_option_entries_survive_a_completion(self):
         stored = {
             "schema_version": 1,

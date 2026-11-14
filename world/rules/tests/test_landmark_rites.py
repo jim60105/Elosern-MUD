@@ -11,6 +11,7 @@ from evennia.utils.create import create_object
 from evennia.utils.dbserialize import deserialize
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from world.lore.rites import installed, uninstall
 from world.lore.rites.shape import RiteArchetype, RiteOption, RiteSnapshot
@@ -183,6 +184,9 @@ class RiteSettlementFixture(EvenniaTest):
 
 
 class RiteSiteTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::a-rite-is-available-exactly-on-a-rite-landmark-s-node"
+    )
     def test_the_site_names_the_district_landmark_and_archetype(self):
         site = rite_site_for(self.player)
         self.assertIsNotNone(site)
@@ -191,16 +195,27 @@ class RiteSiteTests(RiteSettlementFixture):
         self.assertEqual(site.landmark_name, LANDMARK_NAME)
         self.assertIs(site.archetype, SNAPSHOT.archetypes[ARCHETYPE_KEY])
 
+    @covers_requirement(
+        "landmark-rite-settlement::a-rite-is-available-exactly-on-a-rite-landmark-s-node",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_a_neighbouring_node_has_no_rite_site_and_no_landmark_refusal(self):
         self.player.location = self.source
         self.assertIsNone(rite_site_for(self.player))
         self.refused("rite_no_landmark", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::a-rite-is-available-exactly-on-a-rite-landmark-s-node",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_no_installed_rite_content_has_no_rite_site(self):
         uninstall()
         self.assertIsNone(rite_site_for(self.player))
         self.refused("rite_no_landmark", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::a-rite-is-available-exactly-on-a-rite-landmark-s-node"
+    )
     def test_a_plain_interior_room_never_builds_the_landmark_node_table(self):
         self.player.location = self.room1
         with patch(
@@ -219,6 +234,10 @@ class RiteSiteTests(RiteSettlementFixture):
 
 
 class RiteCommitTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::one-rite-settles-as-a-single-atomic-unit",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_a_committed_rite_settles_time_sexual_state_and_the_record(self):
         tick_before = get_world_clock().tick
         with patch("world.rules.landmark_rites.log_info") as info:
@@ -259,6 +278,9 @@ class RiteCommitTests(RiteSettlementFixture):
             },
         )
 
+    @covers_requirement(
+        "landmark-rite-record::the-rite-record-counts-completions-per-district-and-per-option"
+    )
     def test_a_repeated_rite_updates_the_counts_only(self):
         first = self.perform(self.player, "solo")
         second = self.perform(self.player, "solo")
@@ -271,6 +293,10 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertTrue(first.first_completion)
         self.assertFalse(second.first_completion)
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_a_companion_body_settles_its_own_sexual_state(self):
         player_state = self.sexual_state(self.player)
         with patch("world.rules.landmark_rites.log_info") as info:
@@ -290,6 +316,9 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(context["char"], self.player.pk)
         self.assertEqual(context["body"], self.companion.pk)
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles"
+    )
     def test_a_companion_rite_writes_no_sexual_state_to_the_owner(self):
         # The owner sits in afterglow, the one state ordinary time settlement
         # may damp while a companion performs. The rite itself must add no
@@ -308,6 +337,7 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.shame.value, SHARED_SHAME)
         self.assertEqual(self.companion.sexual.exposure.value, SHARED_EXPOSURE)
 
+    @covers_requirement("landmark-rite-record::undeclared-keys-survive-a-write")
     def test_a_rite_preserves_retired_record_entries(self):
         retired = {
             "first_tick": 5,
@@ -326,6 +356,10 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(record["completed"]["t_retired_district"], retired)
         self.assertEqual(record["completed"][DISTRICT_KEY]["count"], 1)
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_a_possessed_companion_delivers_the_watch_scene(self):
         enter_possession(self.player, self.companion)
         with patch("world.rules.landmark_rites.log_info") as info:
@@ -350,9 +384,17 @@ class RiteCommitTests(RiteSettlementFixture):
 
 
 class RiteRefusalTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_an_unknown_option_is_refused(self):
         self.refused("rite_unknown_option", lambda: self.perform(self.player, "t_none"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_an_absent_member_is_refused(self):
         absent = self._companion("測試遠伴", location=self.end)
         self.refused(
@@ -360,6 +402,10 @@ class RiteRefusalTests(RiteSettlementFixture):
             lambda: self.perform(self.player, "shared", member_id=absent.id),
         )
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_a_sleeping_member_is_refused(self):
         write_fatigue_state(self.companion, 360000, SleepPosture.VOLUNTARY)
         self.refused(
@@ -367,6 +413,10 @@ class RiteRefusalTests(RiteSettlementFixture):
             lambda: self.perform(self.player, "shared", member_id=self.companion.id),
         )
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_a_knocked_out_or_unrelated_member_is_refused(self):
         knocked_out = self._companion("測試倒地")
         knocked_out.traits.hp.current = 0
@@ -380,16 +430,26 @@ class RiteRefusalTests(RiteSettlementFixture):
                     ),
                 )
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+    )
     def test_a_solo_only_option_refuses_a_companion(self):
         self.refused(
             "rite_no_watch_scene",
             lambda: self.perform(self.player, "solo", member_id=self.companion.id),
         )
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write"
+    )
     def test_an_unavailable_body_is_refused(self):
         with patch("world.rules.fatigue.sleep_blocks_actions", return_value=True):
             self.refused("rite_unavailable", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write"
+    )
     def test_a_body_away_from_its_owner_is_refused(self):
         # There is no remote rite: the record owner and the acting body must
         # stand in the same place.
@@ -403,6 +463,9 @@ class RiteRefusalTests(RiteSettlementFixture):
             district=DISTRICT_KEY,
         )
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write"
+    )
     def test_an_unsafe_place_is_refused(self):
         with (
             patch(
@@ -415,6 +478,9 @@ class RiteRefusalTests(RiteSettlementFixture):
         ):
             self.refused("rite_unsafe", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write"
+    )
     def test_a_truncated_interval_is_refused(self):
         with patch(
             "world.rules.mental_time.planned_seconds",
@@ -422,6 +488,10 @@ class RiteRefusalTests(RiteSettlementFixture):
         ):
             self.refused("rite_interrupted", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+        "landmark-rite-settlement::one-rite-settles-as-a-single-atomic-unit",
+    )
     def test_an_interval_that_cannot_elapse_rolls_the_advance_back(self):
         # The preflight prediction admits the full duration and the advance
         # itself settles only a shorter one: the post-advance guard is the only
@@ -431,6 +501,10 @@ class RiteRefusalTests(RiteSettlementFixture):
         ):
             self.refused("rite_interrupted", lambda: self.perform(self.player, "solo"))
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_a_post_preflight_refusal_names_the_owner_not_the_body(self):
         # The resolved plan carries both roles: the refused event must still
         # name the record owner, not the companion that would have performed.
@@ -447,6 +521,9 @@ class RiteRefusalTests(RiteSettlementFixture):
                 district=DISTRICT_KEY,
             )
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write"
+    )
     def test_an_unreadable_site_still_reports_the_refusal(self):
         # The refusal code is already determined when the diagnostic identity
         # re-read runs: a broken site read may drop the district, never the code.
@@ -461,6 +538,10 @@ class RiteRefusalTests(RiteSettlementFixture):
                 district="",
             )
 
+    @covers_requirement(
+        "landmark-rite-settlement::every-refusal-leaves-no-rite-write",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_a_corrupt_record_is_refused_and_left_untouched(self):
         corrupt = {"schema_version": 1, "completed": {DISTRICT_KEY: "not a mapping"}}
         self.player.attributes.add(RECORD_ATTR, corrupt)
@@ -476,6 +557,10 @@ class RiteRefusalTests(RiteSettlementFixture):
 
 
 class RiteRollbackTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::one-rite-settles-as-a-single-atomic-unit",
+        "landmark-rite-settlement::rite-outcomes-are-logged-as-structured-events",
+    )
     def test_a_failed_record_write_rolls_the_whole_rite_back(self):
         tick_before = get_world_clock().tick
         state_before = self.sexual_state(self.player)
@@ -491,6 +576,10 @@ class RiteRollbackTests(RiteSettlementFixture):
         self.assertIsNone(self.record())
         self.assertEqual(info.call_count, 0)
 
+    @covers_requirement(
+        "landmark-rite-settlement::one-rite-settles-as-a-single-atomic-unit",
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles",
+    )
     def test_a_failed_companion_rite_rolls_both_bodies_back(self):
         # The record owner and the acting body differ here: a restore that
         # covered only one of them would still pass the single-body test.
@@ -508,6 +597,9 @@ class RiteRollbackTests(RiteSettlementFixture):
         self.assertEqual(self.sexual_state(self.companion), companion_before)
         self.assertIsNone(self.record())
 
+    @covers_requirement(
+        "landmark-rite-settlement::a-repeated-request-identity-settles-once"
+    )
     def test_a_retry_after_a_rolled_back_attempt_commits_once(self):
         tick_start = get_world_clock().tick
         with patch(
@@ -523,6 +615,9 @@ class RiteRollbackTests(RiteSettlementFixture):
 
 
 class RiteReplayTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::a-repeated-request-identity-settles-once"
+    )
     def test_a_duplicate_request_identity_settles_once(self):
         tick_before = get_world_clock().tick
         with patch("world.rules.landmark_rites.log_info") as info:
@@ -534,6 +629,9 @@ class RiteReplayTests(RiteSettlementFixture):
         self.assertEqual(info.call_count, 1)
         self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
 
+    @covers_requirement(
+        "landmark-rite-settlement::a-repeated-request-identity-settles-once"
+    )
     def test_a_request_identity_is_scoped_to_the_acting_body(self):
         first = self.perform(self.player, "solo", operation_id="t_rite_shared_id")
         self.char2.race = "human"
@@ -548,6 +646,9 @@ class RiteReplayTests(RiteSettlementFixture):
 
 
 class EligiblePerformerTests(RiteSettlementFixture):
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles"
+    )
     def test_the_actor_leads_and_unavailable_members_are_excluded(self):
         sleeping = self._companion("測試沉睡")
         write_fatigue_state(sleeping, 360000, SleepPosture.VOLUNTARY)
@@ -557,12 +658,18 @@ class EligiblePerformerTests(RiteSettlementFixture):
         self.assertNotIn(sleeping, performers)
         self.assertNotIn(absent, performers)
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles"
+    )
     def test_the_acting_body_leads_when_it_is_a_companion(self):
         enter_possession(self.player, self.companion)
         performers = eligible_performers(self.companion)
         self.assertIs(performers[0], self.companion)
         self.assertIn(self.player, performers)
 
+    @covers_requirement(
+        "landmark-rite-settlement::the-acting-body-and-the-record-owner-are-distinct-roles"
+    )
     def test_a_preflight_plan_names_owner_and_body(self):
         plan = preflight(self.player, "shared", member_id=self.companion.id)
         self.assertIs(plan.owner, self.player)
