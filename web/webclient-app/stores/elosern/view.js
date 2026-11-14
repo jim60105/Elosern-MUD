@@ -261,6 +261,8 @@ export function applyView(ctx) {
       travel: ctx.travelView(rs),
       // The camp card and its beat (wilderness-camping).
       camp: ctx.campView(rs),
+      // The landmark rite presentation (landmark-rite-store).
+      rite: ctx.riteView(rs),
       mutationsLocked: rs.mutationsLocked,
       protocolError: rs.protocolError,
       // The bounded complete recovery state (webclient-sync-recovery): the
@@ -567,6 +569,7 @@ export function applyView(ctx) {
     ctx.settlePresence(rs);
     ctx.settleRoomCard(rs);
     ctx.settleCamp(rs);
+    ctx.settleRite(rs);
     ctx.syncHudDrawer(prev, rs);
     ctx.syncSkillUse(prev, rs);
     // A free-form borrow speaks to the conversation's host. A refused

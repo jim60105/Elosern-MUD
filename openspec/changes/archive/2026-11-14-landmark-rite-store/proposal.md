@@ -27,7 +27,7 @@ None.
 ## Impact
 
 - New: `web/webclient-app/stores/elosern/rite.js`, `web/webclient-app/tests/rite/store.test.js`.
-- Edits: `web/webclient-app/stores/elosern.js` (compose the group).
+- Edits: `web/webclient-app/stores/elosern.js` (compose the group), `web/webclient-app/stores/elosern/view.js` (settle the group and publish `view.rite`).
 
 ## Batch:
 
