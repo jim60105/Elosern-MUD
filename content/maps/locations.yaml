@@ -2655,7 +2655,7 @@ locations:
     scene_archetype:
   hamlet_bay_shore:
     kind: hamlet
-    display_name_zh: 灣汀
+    display_name_zh: 灣口
     description: Hamlet on the low shore of a bay of the dawnlight road, below the dawnlight port.
     cell:
       cell_x: 2429
@@ -2673,7 +2673,7 @@ locations:
     scene_archetype:
   hamlet_channel_beach:
     kind: hamlet
-    display_name_zh: 渠汀
+    display_name_zh: 渠頭
     description: Hamlet on a channel beach of the starglow road, below the imperial ferry city.
     cell:
       cell_x: 2016

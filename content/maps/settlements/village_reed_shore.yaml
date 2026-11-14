@@ -32,7 +32,7 @@ nodes:
     y_m: 406
     prototype_parent: grid_room
     key: 東北巷尾
-    desc: 東北的巷尾接著往沉鐘鎮的長路，路從荻叢間穿出去。再往遠處是河的下游，水面寬得看不見對岸。
+    desc: 東北的巷尾通向村外的一片荻地，沒有築好的路。再往遠處是河的下游，水面寬得看不見對岸。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -1,5 +1,5 @@
 command: place.py plan --foreign --without without_hamlets.json hamlet_plan.json
-All 48 hamlet rows are present in locations.yaml; they are hidden for the spacing check so each candidate is compared with the 62-1 existing rows instead of itself. The 14 villages stay visible.
+All 48 hamlet rows are present in locations.yaml; they are hidden for the spacing check so each candidate is compared with the 249 visible authored locations (235 pre-existing rows plus the 14 new villages) instead of itself.
 
 ok  hamlet_channel_plain               hamlet   (2026, 1092) road 
 ok  hamlet_sand_shore                  hamlet   (2528, 1130) road 

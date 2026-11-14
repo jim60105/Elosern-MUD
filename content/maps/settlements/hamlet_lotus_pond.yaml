@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 小徑口
-    desc: 路口往北的小徑通向平原上的牧道，路邊是一方種藕的水塘。夏天荷葉鋪滿水面，把整個塘口遮得看不見水。
+    desc: 路口往北的小徑通向平原深處，路邊是一方種藕的水塘。夏天荷葉鋪滿水面，把整個塘口遮得看不見水。
     anchor_key: hamlet_lotus_pond
     typeclass:
     scene_archetype: city_street
