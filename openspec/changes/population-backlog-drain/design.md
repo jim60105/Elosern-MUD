@@ -37,9 +37,9 @@ def closed_sets(index: UnitIndex, state: MonsterActivityState, seeds: Iterable[s
 def lagging_sets(wilderness, now: int) -> tuple[tuple[int, frozenset[str]], ...]
 ```
 
-`closed_sets`: the distinct `unit_closure` results of the seeds, sorted by their smallest unit identifier.
+`closed_sets`: the distinct `unit_closure` results of the seeds, sorted by their smallest unit identifier. The group units are computed once for all seeds (`group_units_map`), which is the same least fixed point at one group scan.
 
-`lagging_sets`: `closed_sets(index, read_monster_activity(wilderness), all_units(index))`; the cursor of a set is the lowest `unit_cursor` of its units (a set with unequal cursors is lawful and is settled from its lowest cursor, `unit-scoped-population-settlement` D1); keep sets with cursor below `now`; return `(cursor, set)` pairs sorted by `(cursor, min(set))`.
+`lagging_sets`: `closed_sets(index, read_monster_activity(wilderness), all_units(index))`; the cursor of a set is the lowest `unit_cursor` of its units (a set with unequal cursors is lawful and is settled from its lowest cursor, `unit-scoped-population-settlement` D1); keep sets with cursor below `now`; return `(cursor, set)` pairs sorted by `(cursor, min(set))`. When every unit of `all_units(index)` has already settled through `now`, it answers with no set after one cursor-read and without decoding the activity record.
 
 ### D2. Drain function
 
@@ -54,9 +54,9 @@ def drain_population_backlog(slice_seconds: int) -> bool:
 2. Resolve `regional_population.live_wilderness()`; return `False` when it is `None`, not provisioned, or has no cursor record.
 3. `now = regional_population.current_population_tick()`; `pending = lagging_sets(wilderness, now)`; return `False` when empty.
 4. For each `(start, units)` of `pending[:MAX_SETS_PER_RUN]` (module constant `MAX_SETS_PER_RUN = 3`), in order:
-   1. `target = min(now, start + slice_seconds)`; `scope = build_scope(wilderness, units)`; `registry = snapshot_population_lifecycle_surfaces(start, target, scope=scope)`.
-   2. `try:` → `with held_advance_registry(), transaction.atomic():` → `settle_population_scope(wilderness, units, target, contact=False)`; `remaining = len(pending) - (1 if target >= now else 0)`; `transaction.on_commit(lambda: log_info("population_backlog_drained", context={"units": len(units), "tick_from": start, "tick_to": target, "remaining": remaining}))`. On success return `True`.
-   3. `except Exception as error:` → `restore_advance_registry(registry)`; `log_error("population_backlog_drain_failed", exc=error, context={"units": len(units), "tick_from": start, "tick_to": target})`; continue with the next set.
+   1. `target = min(now, start + slice_seconds)`; `scope = build_scope(wilderness, units)`; `registry = snapshot_population_lifecycle_surfaces(start, target, scope=scope)`. The preparation is inside the same per-set `try` (below), so a malformed record at this point is reported and skipped like a settlement failure.
+   2. `try:` → `with held_advance_registry(), transaction.atomic():` → `settle_population_scope(wilderness, units, target, contact=False)`; `remaining = <units in pending> - (len(units) if target >= now else 0)`, the number of units still lagging after this run (a set finishing exactly at the world tick leaves none of its units behind); `transaction.on_commit(lambda: log_info("population_backlog_drained", context={"units": len(units), "tick_from": start, "tick_to": target, "remaining": remaining}))`. On success return `True`.
+   3. `except Exception as error:` → `restore_advance_registry(registry, (wilderness,))` when a registry was built; `log_error("population_backlog_drain_failed", exc=error, context={"units": len(units), "tick_from": start, "tick_to": target})`; continue with the next set.
 5. Return `False` when no set succeeded.
 
 Steps 2 and 3 of the list above (wilderness resolution and `lagging_sets`) are inside one outer `try/except Exception` that emits the same error event with `units=0` and returns `False`, so the repeating script survives a malformed record. The function never re-raises. A failing set is tried again by the next run, after which the run moves on to the next sets; the error event repeats once per interval, which is the intended signal.
