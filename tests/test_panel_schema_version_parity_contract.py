@@ -65,6 +65,7 @@ _PANEL_MODULES = (
     ("skill_use", "skill_use.py"),
     ("sleep_handoff", "sleep_handoff.py"),
     ("travel_log", "travel_log.py"),
+    ("rite", "rite.py"),
 )
 
 
