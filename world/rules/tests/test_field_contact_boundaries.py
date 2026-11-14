@@ -29,6 +29,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import Room
+import world.lore.monster_placement as lore_placement
 from world.lore.monster_activity import (
     ActivityArea,
     AggressionCondition,
@@ -101,6 +102,7 @@ _SITE_CELL = (520, 700)
 _SEED = 11
 _CONTACT = "t_boundary_contact"
 _PASSIVE = "t_boundary_passive"
+_SITE_PASSIVE = "t_boundary_site_passive"
 _GROUND = "t_boundary_ground"
 _ZONE_KEY = "t_boundary_zone"
 _SITE_KEY = "t_boundary_site"
@@ -150,7 +152,16 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
         self.zone = EcologyZone(
             _ZONE_KEY,
             region,
-            ((0, 0, 0, 0),),
+            # The zone's own eligible birth cells are inside its authored
+            # rectangles, so one unit settles the zone and everything it births.
+            (
+                (
+                    min(cell[0] for cell in _ZONE_CELLS),
+                    max(cell[0] for cell in _ZONE_CELLS),
+                    min(cell[1] for cell in _ZONE_CELLS),
+                    max(cell[1] for cell in _ZONE_CELLS),
+                ),
+            ),
             (WeightedComposition(_PASSIVE_COMPOSITION, 1),),
             75,
             99,
@@ -180,7 +191,10 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
             capacity=1,
             one_shot=False,
             recover_after_ticks=20,
-            activity_key=_PASSIVE,
+            # The site's own births stay inside its settlement unit: a
+            # stationary binding contributes no movable area, so its group never
+            # reaches a cell of the activity ground around the probe.
+            activity_key=_SITE_PASSIVE,
         )
         self.enterContext(
             patch.object(
@@ -189,9 +203,28 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
                 MappingProxyType({self.zone.key: self.zone}),
             )
         )
+        # The settlement-unit index resolves the published authored registry, so
+        # the fixture zone is published there too: one authored row, one unit.
+        self.enterContext(
+            patch.object(
+                lore_placement,
+                "ECOLOGY_ZONE_REGISTRY",
+                MappingProxyType({self.zone.key: self.zone}),
+            )
+        )
         self.enterContext(
             patch.object(
                 regional_population,
+                "ENCOUNTER_COMPOSITION_REGISTRY",
+                MappingProxyType(dict(self.compositions)),
+            )
+        )
+        # The settlement-unit index binds a zone to the areas its births can
+        # reach through the published composition registry, so the fixture
+        # compositions are published there too.
+        self.enterContext(
+            patch.object(
+                lore_placement,
                 "ENCOUNTER_COMPOSITION_REGISTRY",
                 MappingProxyType(dict(self.compositions)),
             )
@@ -242,6 +275,17 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
                 ),
             )
         )
+        # The settlement-unit index resolves the published authored registry, so
+        # the fixture sites are published there too: one authored row, one unit.
+        self.enterContext(
+            patch.object(
+                lore_placement,
+                "MONSTER_SITE_REGISTRY",
+                MappingProxyType(
+                    {self.site.key: self.site, self.contact_site.key: self.contact_site}
+                ),
+            )
+        )
         self.enterContext(
             patch(
                 "world.lore.monster_activity.MONSTER_ACTIVITY_REGISTRY",
@@ -251,6 +295,13 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
                     ),
                     _PASSIVE: _activity(
                         _PASSIVE, aggression=AggressionCondition("passive")
+                    ),
+                    _SITE_PASSIVE: MonsterActivity(
+                        _SITE_PASSIVE,
+                        "stationary",
+                        _GROUND,
+                        20,
+                        AggressionCondition("passive"),
                     ),
                 },
             )
@@ -608,7 +659,9 @@ class WaitBoundaryTests(_BoundaryBase):
         self.assertEqual(result.elapsed_seconds, 300)
         self.assertFalse(result.interrupted)
         self.assertIsNone(read_session(self.player))
-        # The zone's own maintenance still ran inside the interval.
+        # The zone's own maintenance still ran inside the interval: the party
+        # stands in the settlement unit the zone and its birth ground share, so
+        # the wait's observed pass settled it.
         self.assertGreater(
             regional_population.zone_state(self.wilderness, _ZONE_KEY).generation_sequence,
             0,
@@ -819,6 +872,9 @@ class IndivisibleEdgeTests(_BoundaryBase):
         self.assertIsNotNone(record)
         self.assertEqual(record.started_tick, start)
         self.assertIn(int(enemy.pk), record.enemy_ids)
+        # The arrival contact stopped the party in its origin room, so the fight
+        # cell's unit is behind the world tick: the defeat settlement itself
+        # catches that cell up before it writes the protection evidence.
         forfeit(self.player)
         self.assertIsNone(read_session(self.player))
 

@@ -49,6 +49,7 @@ from world.maps.tests.test_monster_activity import (
     STATIONARY_ACTIVITY,
     ActivityFixture,
 )
+from world.maps.tests.test_population_catch_up import place_player
 from world.maps.tests.test_settlement_decode_reuse import (
     SITE_KEY,
     START,
@@ -282,6 +283,9 @@ class _PassScenarioFixture(ActivityFixture):
         """Reset the world and create the identical travelling group."""
         seed = self._travelling_seed()
         self._reset_activity(tick=START)
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, TRAVELLING_CELL)
         return self._group(
             cell=TRAVELLING_CELL,
             seed=seed,
@@ -686,6 +690,9 @@ class GaugeRecordStoreTests(ActivityFixture):
     )
     def test_three_regenerating_gauges(self):
         self._reset_activity(tick=START)
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, PROBE)
         _group_id, bodies = self._group(
             cell=PROBE,
             tick=START,
@@ -755,6 +762,9 @@ class DifferentialDeferredWritesTests(ScenarioSettlementFixture):
 
     def _advance(self, parts: tuple[int, ...], *, deferred: bool) -> dict:
         self._build_scenario()
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, PROBE)
         self._lower_gauges()
         clock = get_world_clock()
         clock.tick = START

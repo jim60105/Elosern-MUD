@@ -39,6 +39,7 @@ from world.maps.tests.test_monster_activity import (
     RESERVE,
     SOLO_ACTIVITY,
 )
+from world.maps.tests.test_population_catch_up import place_player
 from world.maps.tests.test_settlement_decode_reuse import (
     SITE_KEY,
     START,
@@ -165,6 +166,9 @@ class SavepointBoundTests(ActivityFixture):
         clock = get_world_clock()
         clock.tick = 100
         clock._persist(100)
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, PROBE)
         opened: list[str] = []
 
         def wrapper(execute, sql, params, many, context):
@@ -337,6 +341,9 @@ class FatigueFaultTests(ActivityFixture):
     def test_fault_during_a_fatigue_write(self):
         self._register_lifecycle()
         self._reset_activity(tick=100)
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, PROBE)
         _group_id, bodies = self._group(
             cell=PROBE,
             tick=100,
@@ -404,6 +411,9 @@ class DifferentialSettlementTests(ScenarioSettlementFixture):
         clock = get_world_clock()
         clock.tick = START
         clock._persist(START)
+        # The clock stage settles the units a player observes; the fixture's own
+        # zone is that unit here, so the party stands inside it.
+        place_player(self, PROBE)
         with self._protection(owned):
             for part in parts:
                 clock.advance(part, AdvanceSource.COMMAND, ())

@@ -1190,6 +1190,7 @@
         "world.maps.tests.test_regional_population_recovery",
         "world.maps.tests.test_retention_reclamation",
         "world.maps.tests.test_room_art_metadata",
+        "world.maps.tests.test_observed_unit_advance",
         "world.maps.tests.test_population_catch_up",
         "world.maps.tests.test_population_writer_guards",
         "world.maps.tests.test_population_units",

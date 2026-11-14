@@ -665,12 +665,17 @@ class UnitCursorTests(ActivityFixture):
         clock = get_world_clock()
         clock.tick = 100
         clock._persist(100)
+        before = read_unit_cursors(self.wilderness)
         recorded: list[int] = []
         advance = population_units.advance_unit_cursors
 
         def recording(wilderness, unit_ids, tick):
             advance(wilderness, unit_ids, tick)
-            recorded.append(read_unit_cursors(wilderness).default)
+            # The clock stage settles the observed units, and this world has no
+            # party: the residual unit is the one that really advanced.
+            recorded.append(
+                unit_cursor(read_unit_cursors(wilderness), RESIDUAL_UNIT)
+            )
 
         from world.rules import clock as clock_module
 
@@ -685,9 +690,9 @@ class UnitCursorTests(ActivityFixture):
             with self.assertRaises(RuntimeError):
                 clock.advance(160, AdvanceSource.SKIP, [])
         self.assertEqual(recorded, [260])
-        self.assertEqual(read_unit_cursors(self.wilderness).default, 100)
+        self.assertEqual(read_unit_cursors(self.wilderness), before)
         self.wilderness.attributes.reset_cache()
-        self.assertEqual(read_unit_cursors(self.wilderness).default, 100)
+        self.assertEqual(read_unit_cursors(self.wilderness), before)
 
     @covers_requirement(
         "population-settlement-units::each-unit-records-its-settlement-progress"
