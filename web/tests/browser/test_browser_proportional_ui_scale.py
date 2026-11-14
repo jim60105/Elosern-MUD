@@ -116,9 +116,8 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
         self.assertScaled(ref["nav"]["h"], big["nav"]["h"], "nav height")
         self.assertScaled(ref["nav"]["w"], big["nav"]["w"], "nav width")
         self.assertScaled(ref["navFont"], big["navFont"], "nav type", delta=0.5)
-        # The place card compacts under the short-viewport media query
-        # (max-height: 820px) that the reference activates, so its ratio is
-        # measured between the two query-inactive acceptance sizes.
+        # The place card's ratio is measured between the two acceptance
+        # sizes above the reference (UNCAPPED and LARGE).
         mid = self.story("core-appshell--populated-hud", '[data-testid="nav-settings"]', UNCAPPED)
         self.assertScaled(
             mid["place"]["h"], big["place"]["h"], "place card",

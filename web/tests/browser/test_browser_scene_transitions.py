@@ -309,7 +309,8 @@ _HEADING_PAIR = """() => {
   return hs.map((h) => {
     const cs = getComputedStyle(h);
     return { text: h.textContent.trim(), inert: h.inert, property: cs.transitionProperty,
-             duration: cs.transitionDuration, transform: cs.transform };
+             duration: cs.transitionDuration, transform: cs.transform,
+             tx: new DOMMatrixReadOnly(cs.transform === 'none' ? undefined : cs.transform).m41 };
   });
 }"""
 
@@ -478,6 +479,8 @@ class SceneTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(by_text["南門"]["inert"])
         self.assertFalse(by_text["南大道"]["inert"])
         self.assertIn("transform", by_text["南大道"]["property"])
+        # The entering heading travels in from the right (place-card-instrument-panel).
+        self.assertGreater(by_text["南大道"]["tx"], 0)
         self._settled(page, '[data-testid="place-card__location"]')
 
         page.focus('[data-testid="message-page"]')

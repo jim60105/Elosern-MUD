@@ -2,14 +2,17 @@
 
 map-column-instrument-geometry: the `map` anchor's width floor, right gutter,
 paint-free box, 10px stack gap, presence-rail clearance, hidden scrollbar and
-scroll-edge fade. The later changes of this batch add their methods here.
+scroll-edge fade. place-card-instrument-panel: the place card as an instrument
+panel. The later changes of this batch add their methods here.
 """
 
 from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
+from ._journey_support import _exploration_context_actions_panel, _exploration_panel
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
+    PLACE_LOOK_SELECTOR,
     inject_snapshot,
     valid_art_panel,
     valid_local_map_panel,
@@ -100,6 +103,56 @@ _SCROLL_JS = """(position) => {
   const span = anchor.scrollHeight - anchor.clientHeight;
   anchor.scrollTop = position === 'top' ? 0 : position === 'middle' ? span / 2 : anchor.scrollHeight;
 }"""
+
+_PLACE_PANEL_JS = """() => {
+  const anchor = document.querySelector('[data-anchor="map"]');
+  const card = document.querySelector('[data-testid="place-card"]');
+  const cs = getComputedStyle(card);
+  const before = getComputedStyle(card, '::before');
+  const after = getComputedStyle(card, '::after');
+  const box = (el) => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, width: r.width, height: r.height };
+  };
+  const q = (id) => card.querySelector(`[data-testid="${id}"]`);
+  const button = (id) => {
+    const el = q(id);
+    const style = getComputedStyle(el);
+    return {
+      ...box(el),
+      border: style.borderTopWidth,
+      background: style.backgroundColor,
+      tick: getComputedStyle(el, '::after').opacity,
+      text: el.innerText.trim(),
+    };
+  };
+  return {
+    card: box(card),
+    anchorWidth: anchor.getBoundingClientRect().width,
+    scrollHeight: anchor.scrollHeight,
+    clientHeight: anchor.clientHeight,
+    borderTop: cs.borderTopWidth,
+    borderLeft: cs.borderLeftWidth,
+    radius: cs.borderTopLeftRadius,
+    shadow: cs.boxShadow,
+    background: cs.backgroundColor,
+    paddingRight: parseFloat(cs.paddingRight),
+    groundMask: before.maskImage || before.webkitMaskImage,
+    groundBackground: before.backgroundColor,
+    fittingImage: after.backgroundImage,
+    fittingPointer: after.pointerEvents,
+    headingAlign: getComputedStyle(q('place-card__location')).textAlign,
+    timeAlign: getComputedStyle(q('place-card__time')).textAlign,
+    rule: box(q('place-card__rule')),
+    location: box(q('place-card__location')),
+    time: box(q('place-card__time')),
+    look: button('place-card-look'),
+    wait: button('place-card-wait'),
+  };
+}"""
+
+_TICK_JS = """(id) => getComputedStyle(
+  document.querySelector(`[data-testid="${id}"]`), '::after').opacity"""
 
 # Two animation frames: the observers' callbacks have run for the current
 # layout before an absence is asserted.
@@ -205,3 +258,84 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                         self.assertEqual(page.evaluate(_EDGES_JS)["mask"], "none")
                 finally:
                     page.evaluate(_REMOVE_PROBE_JS)
+
+    @covers_requirement(
+        "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
+    )
+    def test_place_card_is_an_instrument_panel(self):
+        """At 1280x720, 1451x790 and 2560x1440 the place card is no box: it
+        paints a masked, blurred ground and a brass fitting as decoration,
+        spans the column, right-aligns its lines and its rule, keeps every
+        content element and both chromeless room actions clear of the spine,
+        and ticks only the hovered action; at 1451x790 and 2560x1440 the
+        column with the two-row action card still fits its anchor."""
+        for viewport in ((1280, 720), (1451, 790), (2560, 1440)):
+            with self.subTest(viewport=viewport):
+                scale = ui_scale(viewport)
+                page = self.logged_in_page(viewport)
+                inject_snapshot(
+                    page,
+                    {
+                        "status": valid_status_panel("艾倫‧灰誓", "char-42"),
+                        "local_map": valid_local_map_panel(),
+                        "exploration": _exploration_panel([]),
+                        "context_actions": _exploration_context_actions_panel(),
+                        "art": valid_art_panel(),
+                        "objectives": _objectives_panel(3),
+                    },
+                    mode="exploration",
+                )
+                page.wait_for_selector('[data-testid="place-card-wait"]', timeout=15000)
+                page.evaluate("document.fonts.ready")
+                page.mouse.move(0, 0)
+                page.evaluate(_SETTLE_JS)
+                panel = page.evaluate(_PLACE_PANEL_JS)
+
+                # The panel itself is not a box.
+                self.assertEqual(panel["borderTop"], "0px")
+                self.assertEqual(panel["borderLeft"], "0px")
+                self.assertEqual(panel["radius"], "0px")
+                self.assertEqual(panel["shadow"], "none")
+                self.assertEqual(panel["background"], "rgba(0, 0, 0, 0)")
+                # The ground and the fitting are painted decoration.
+                self.assertTrue(panel["groundMask"], "the ground has a mask")
+                self.assertNotEqual(panel["groundMask"], "none", "the ground is masked")
+                self.assertNotIn(panel["groundBackground"], ("rgba(0, 0, 0, 0)", "transparent"))
+                self.assertTrue(
+                    "url(" in panel["fittingImage"] or "gradient" in panel["fittingImage"],
+                    f"the fitting paints the ornament: {panel['fittingImage']}",
+                )
+                self.assertEqual(panel["fittingPointer"], "none")
+
+                card = panel["card"]
+                self.assertAlmostEqual(card["width"], panel["anchorWidth"], delta=1.0, msg="the card spans the column")
+                self.assertEqual(panel["headingAlign"], "right")
+                self.assertEqual(panel["timeAlign"], "right")
+                self.assertAlmostEqual(
+                    panel["rule"]["right"], card["right"] - panel["paddingRight"], delta=1.0,
+                    msg="the rule stands at the content box's right end",
+                )
+                spine = card["right"] - 14 * scale + 0.5
+                for name in ("location", "time", "look", "wait"):
+                    self.assertLessEqual(panel[name]["right"], spine, f"{name} stays clear of the spine at {viewport}")
+
+                for name in ("look", "wait"):
+                    btn = panel[name]
+                    self.assertEqual(btn["border"], "0px", f"{name} has no border")
+                    self.assertEqual(btn["background"], "rgba(0, 0, 0, 0)", f"{name} has no fill")
+                    self.assertGreaterEqual(btn["width"], 30 * scale - 0.5, f"{name} hit box width")
+                    self.assertGreaterEqual(btn["height"], 30 * scale - 0.5, f"{name} hit box height")
+                    self.assertEqual(btn["tick"], "0", f"{name} shows no tick at rest")
+                self.assertEqual(panel["wait"]["text"], "休息")
+
+                page.hover(PLACE_LOOK_SELECTOR)
+                page.wait_for_function(f"() => ({_TICK_JS})('place-card-look') === '1'", timeout=5000)
+                self.assertEqual(page.evaluate(_TICK_JS, "place-card-wait"), "0", "only the hovered action ticks")
+
+                if viewport != (1280, 720):
+                    self.assertLessEqual(
+                        panel["scrollHeight"], panel["clientHeight"] + 1,
+                        f"the column fits its anchor at {viewport}: "
+                        f"scrollHeight {panel['scrollHeight']}, clientHeight {panel['clientHeight']}",
+                    )
+                page.close()
