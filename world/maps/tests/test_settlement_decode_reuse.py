@@ -199,15 +199,11 @@ class SettlementScenarioFixture(ActivityFixture):
             SOLO_ACTIVITY,
             (CompositionMember(ORDINARY, 1, 1),),
         )
-        # The fixture's own zone stays addressable, but only a zone with a
-        # stored record ever settles: the scenario zone is the only one noted.
-        zones = dict(regional_population.ECOLOGY_ZONE_REGISTRY)
-        zones[ZONE_KEY] = self.zone
         self.enterContext(
             patch.object(
                 regional_population,
                 "ECOLOGY_ZONE_REGISTRY",
-                MappingProxyType(zones),
+                MappingProxyType({ZONE_KEY: self.zone}),
             )
         )
         self.enterContext(
@@ -283,10 +279,18 @@ class SettlementScenarioFixture(ActivityFixture):
             self._reset_activity(tick=START)
             if prefix is not None:
                 self._group(
-                    cell=WANDERING_CELL, seed=prefix[1], tick=START, activity=prefix[0]
+                    cell=WANDERING_CELL,
+                    seed=prefix[1],
+                    tick=START,
+                    activity=prefix[0],
+                    owner_key=ZONE_KEY,
                 )
             group_id, _bodies = self._group(
-                cell=cell, seed=seed, tick=START, activity=activity
+                cell=cell,
+                seed=seed,
+                tick=START,
+                activity=activity,
+                owner_key=ZONE_KEY,
             )
             decision = monster_activity.plan_group_decision(
                 self.wilderness, group_id, tick=START + interval
@@ -308,12 +312,15 @@ class PassFactTests(SettlementScenarioFixture):
             prefix=(GROUP_ACTIVITY, staying),
         )
         self._reset_activity(tick=START)
-        staying_group, _bodies = self._group(cell=PROBE, seed=staying, tick=START)
+        staying_group, _bodies = self._group(
+            cell=PROBE, seed=staying, tick=START, owner_key=ZONE_KEY
+        )
         self._group(
             cell=TRAVELLING_CELL,
             seed=departing,
             tick=START,
             activity=SOLO_ACTIVITY,
+            owner_key=ZONE_KEY,
         )
         with (
             patch.object(
@@ -498,12 +505,13 @@ class ScenarioSettlementFixture(SettlementScenarioFixture):
         self._reset_activity(tick=START)
         self.wilderness.db.regional_population = {}
         self.wilderness.db.monster_sites = self._cleared_site_record()
-        self._group(cell=WANDERING_CELL, seed=wandering, tick=START)
+        self._group(cell=WANDERING_CELL, seed=wandering, tick=START, owner_key=ZONE_KEY)
         self._group(
             cell=TRAVELLING_CELL,
             seed=travelling,
             tick=START,
             activity=SOLO_ACTIVITY,
+            owner_key=ZONE_KEY,
         )
         created = initialize_zone(self.wilderness, ZONE_KEY, seed=SEED, tick=START)
         # One loss leaves the zone exactly one member below its lower density,
