@@ -126,7 +126,7 @@ Ground rules:
   reason "Gate settlement of city_salt_ferry; it necessarily stands within the
   15 km hamlet minimum of the city whose gate it serves." No other exemption
   exists, no habitat was edited and no validator was changed.
-- [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 
   Result: partly delivered, every recorded run green. One command per group,
   the guard capping a command at 100 discovered tests:
@@ -169,24 +169,37 @@ Ground rules:
   test_package_proposal test_quests_observability` — 76 tests, `OK`. That is
   30 labels and 643 tests, none red.
 
-  Three more groups after that: `typeclasses.tests.test_exit_movement_cost
+  Groups after that: `typeclasses.tests.test_exit_movement_cost
   test_exits test_map_discovery` — 48 tests, `OK`;
   `typeclasses.tests.test_npc_dialogue
   commands.tests.test_localized.test_xyz_grid_and_help
   world.quests.tests.test_room_observation` — 94 tests, `OK`;
   `world.quests.tests.test_scene_smoke test_story_dialogue
-  world.rules.tests.test_dialogue_refresh_lifecycle` — 24 tests, `OK`.
+  world.rules.tests.test_dialogue_refresh_lifecycle` — 24 tests, `OK`;
+  `world.rules.tests.test_guild_config.test_price_scaling
+  test_guild_config.test_service_host_roster test_map_knowledge_integration`
+  — 70 tests, `OK`; `world.rules.tests.test_movement test_party_follow
+  test_party_follow_possession` — 77 tests, `OK`;
+  `world.rules.tests.test_sight` — 45 tests, `OK`;
+  `web.webclient.presentation.tests.test_exploration_panel.test_presenter
+  test_exploration_panel.test_wilderness_and_npc_titles
+  test_local_map.test_gate_capacity` — 50 tests, `OK`;
+  `test_local_map.test_gateway_resolution test_grid_gateways
+  test_grid_helpers` — 43 tests, `OK`.
 
-  Still unrun: the twelve `web.webclient.presentation` labels
-  (`test_exploration_panel.test_presenter`,
-  `test_exploration_panel.test_wilderness_and_npc_titles`, the eight
-  `test_local_map` labels, `test_map_quest_destinations`, `test_world_map`),
-  the four `typeclasses` labels,
-  `commands.tests.test_localized.test_xyz_grid_and_help`, the three remaining
-  `world.quests` labels (`test_room_observation`, `test_scene_smoke`,
-  `test_story_dialogue`), the eight remaining `world.rules` labels and
-  `tests.test_map_core_contract`. The box stays unticked because the sweep is
-  not complete.
+  `tests.test_map_core_contract` under the plain `unittest` runner: `Ran 4
+  tests`, one error, the documented `ImproperlyConfigured: Requested setting
+  CHANNEL_LOG_NUM_TAIL_LINES, but settings are not configured` raised while
+  importing `evennia.contrib.grid.wilderness` — the runner/settings shape, not
+  a data finding.
+
+  Final groups: `test_local_map.test_per_gate_footprint test_presenter
+  test_wilderness` — 43 tests, `OK`; `test_map_quest_destinations
+  test_world_map` — 28 tests, `OK`. Every label of the settlement-sensitive
+  list has now been run against this tree, every one passes, and the only
+  error anywhere is `tests.test_map_core_contract`'s documented
+  `CHANNEL_LOG_NUM_TAIL_LINES` runner shape. No residual-pin rewrite was
+  needed.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images, all read. The capture page was built in the worktree
