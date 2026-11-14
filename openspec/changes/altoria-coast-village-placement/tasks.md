@@ -156,12 +156,29 @@ Ground rules:
   `tests.test_map_core_contract` keeps its known `CHANNEL_LOG_NUM_TAIL_LINES`
   runner error. No residual-pin rewrite was needed.
 
-  One further group ran green after that record was written:
+  Groups run green after that record was written, all one command each:
   `world.rules.tests.test_movement_settlement test_party_time_settlement
-  test_travel_plan` — `Ran 77 tests in 222.292s`, `OK (skipped=1)`. The
-  `typeclasses` and `commands` labels could not be grouped inside the guard's
-  100-test cap in the remaining budget, so this box stays unticked because the
-  sweep is not complete.
+  test_travel_plan` — 77 tests, `OK (skipped=1)`;
+  `web.webclient.actions.tests.test_travel_actions
+  web.webclient.presentation.tests.test_area_map` — 70 tests,
+  `OK (skipped=1)`; `world.quests.tests.test_compile_offline test_definitions
+  test_scene_builder_offline test_story_effects` — 74 tests, `OK`;
+  `world.quests.tests.test_compile_blueprint test_compile_registration
+  test_encounter_activation` — 93 tests, `OK`;
+  `world.quests.tests.test_encounter_dispatch test_generated_dialogue_scenes
+  test_package_proposal test_quests_observability` — 76 tests, `OK`. That is
+  30 labels and 643 tests, none red.
+
+  Still unrun: the twelve `web.webclient.presentation` labels
+  (`test_exploration_panel.test_presenter`,
+  `test_exploration_panel.test_wilderness_and_npc_titles`, the eight
+  `test_local_map` labels, `test_map_quest_destinations`, `test_world_map`),
+  the four `typeclasses` labels,
+  `commands.tests.test_localized.test_xyz_grid_and_help`, the three remaining
+  `world.quests` labels (`test_room_observation`, `test_scene_smoke`,
+  `test_story_dialogue`), the eight remaining `world.rules` labels and
+  `tests.test_map_core_contract`. The box stays unticked because the sweep is
+  not complete.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images, all read. The capture page was built in the worktree
