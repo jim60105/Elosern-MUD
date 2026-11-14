@@ -385,6 +385,48 @@ confirmation sends exactly one `explore.camp`; a refusal returns to the card
 with the server reason, a dream entry hands over to the existing dream
 stage, and a settled camp becomes the presentation-only campfire beat.
 
+### The rite panel
+
+`rite` (landmark-rite-panel) is an eager panel available exactly when the
+record owner's current canonical node is a rite landmark's node — lit or
+unlit, a wilderness cell or a settlement room. Anywhere else it is the
+registered unavailable form (`rite_no_landmark`). Its available form is
+exactly:
+
+- `schema_version: 1`, `available: true`, `kind: "rite"`;
+- `district: {key, name, landmark, lit}` — `key` 1..64 ASCII characters,
+  `name`/`landmark` non-blank 1..256 code points, `lit` an exact boolean;
+- `guardian: {name, form}` — `name` non-blank 1..32 code points, `form`
+  non-blank 1..200;
+- `art` — `null` in this change, or a canonical artwork descriptor
+  (`landmark-rite-art` fills it);
+- `options` — 1..3 rows in authored order, each exactly `{key, label,
+  companion}`: `key` matches `^[a-z][a-z0-9_]{0,31}$` and is unique, `label`
+  is non-blank 1..32 code points, `companion` an exact boolean;
+- `performers` — 1..16 rows: the controlled body first with `member_id:
+  null`, marked `owner` only when it is the record owner, then each present
+  eligible party member with a unique integer `member_id` in
+  `1..MAX_SAFE_INTEGER`; at most one row is `owner`;
+- `delivery` — `null`, or the last committed rite at this node as exactly
+  `{kind: "formal", delivery_id, scene_id, scene_revision, actor_name,
+  guardian_name, lines}` (ASCII ids 1..128 / 96 / 32, names non-blank 1..128,
+  1..32 lines of `{kind: "narration", text}` or `{kind: "speech", speaker:
+  "actor"|"host", text}`, `text` 1..2000 code points); the field is
+  `scene_revision` because `revision` is a reserved result-data key;
+- `seen` — 0..3 unique option keys, each one of `options[].key`;
+- the whole panel stays within 32,768 canonical JSON bytes.
+
+`options` and `performers` are advisory presentation data: the action
+re-derives the option, the performer and every gate itself, so a forged panel
+can never authorize a rite. `seen` lists the record owner's completed option
+keys at this district, filtered to the current archetype's options. `delivery`
+is non-persistent server state bound to the node it committed on: a snapshot
+replay on that node carries it, any other node carries none, and a server
+restart drops it (the player may perform the rite again). The server validator
+and the browser mirror (`protocol/panels/rite.js`) accept exactly the same
+shape and reject a malformed or oversize panel whole, never trimming it into
+validity.
+
 ### General publication parts
 
 An eager `ui_snapshot`/`ui_update` whose canonical document does not fit its
