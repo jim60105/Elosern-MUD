@@ -146,7 +146,8 @@ def _population_guard(entity):
 
     Only a parked ``Monster`` on a provisioned wilderness world carries
     population evidence; every other entity (and every nonwilderness world)
-    needs no snapshot, no transition and no compensation.
+    needs no snapshot, no transition and no compensation. The caller catches
+    the entity's settlement unit up before this snapshot is taken.
     """
     from typeclasses.monsters import Monster
     from world.maps import regional_population
@@ -161,6 +162,39 @@ def _population_guard(entity):
         wilderness,
         regional_population.snapshot_population_surfaces(wilderness),
     )
+
+
+def _catch_up_population(entity) -> None:
+    """Catch the settlement unit an operator HP write may change up to now.
+
+    The verb reads the target's physiology and records a presence transition,
+    so the unit around the target must be settled before the snapshot: a
+    catch-up can itself change a gauge current or move the individual.
+    """
+    from typeclasses.monsters import Monster
+    from world.maps import regional_population
+    from world.maps.population_lifecycle import ensure_locations_current
+    from world.rules.movement_edges import (
+        LocationRefError,
+        MovementEdgeError,
+        location_ref,
+    )
+
+    if not isinstance(entity, Monster):
+        return
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(
+        wilderness
+    ):
+        return
+    try:
+        location = location_ref(entity)
+    except (
+        LocationRefError,
+        MovementEdgeError,
+    ):  # observability: ignore R2: an unrepresentable position has no unit to catch up, and the write records no usable evidence either
+        return
+    ensure_locations_current([location])
 
 
 def _record_hp_transition(guard, entity, was_alive: bool, is_alive: bool) -> None:
@@ -196,6 +230,10 @@ def set_trait_base(target, trait, value):
         raise ConsoleError("registry_key_not_found")
     lower, upper = _base_band(entity, trait)
     integer(value, minimum=lower, maximum=upper)
+    _catch_up_population(entity)
+    # The catch-up may have replaced the decoded trait record, so the write and
+    # the live-state read below must use the post-settlement handler.
+    selected = entity.traits.get(trait)
     before = snapshot_traits(entity)
     # Only an HP base write can cross the live/dead boundary. Every other
     # non-gauge trait is a static base with no ``current`` at all.
@@ -225,6 +263,8 @@ def set_gauge(target, gauge, value):
     if gauge not in GAUGE_KEYS or selected.trait_type != "gauge":
         raise ConsoleError("registry_key_not_found")
     integer(value, minimum=int(selected.min), maximum=selected.max)
+    _catch_up_population(entity)
+    selected = entity.traits.get(gauge)
     before = snapshot_traits(entity)
     was_alive = selected.current > 0
     guard = _population_guard(entity)

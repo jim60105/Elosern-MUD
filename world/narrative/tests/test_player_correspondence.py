@@ -164,11 +164,12 @@ class PlayerCorrespondenceTests(EvenniaTest):
         command.caller = self.player
         self.player.msg = Mock()
         command.args = f"寄 #{self.other.pk}=合成機密=原文"
-        with patch("commands.correspondence.log_info") as cmd_log:
+        with patch("commands.command.log_info") as cmd_log:
             command.at_pre_cmd()
             command.func()
-            # The letter command logs its arguments like every other command;
-            # the facade bounds the value, so no args_count stand-in remains.
+            # The repository command base logs the bounded arguments for every
+            # command, including this one; the facade bounds the value, so no
+            # args_count stand-in remains.
             cmd_in = [call.kwargs["context"] for call in cmd_log.call_args_list
                       if call.args[0] == "cmd_in"]
             self.assertEqual(cmd_in[0]["args"], command.args)

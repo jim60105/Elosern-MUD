@@ -313,8 +313,17 @@ def spawn_monster(
         wilderness_registration_target,
     )
     from world.maps.monster_activity import STAGED_STATIONARY_ACTIVITY
+    from world.maps.population_lifecycle import ensure_locations_current
+    from world.rules.movement_edges import LocationRef
 
     target = wilderness_registration_target(room)
+    if target is not None:
+        # The registration writes the cell's population evidence, so its unit
+        # must be current before this function's own snapshot is taken.
+        wilderness, coordinates = target
+        ensure_locations_current(
+            [LocationRef.wilderness(wilderness.db_key, *coordinates)]
+        )
     prototype = {
         "prototype_parent": "scene_monster",
         "key": f"{scene_name(archetype)}的魔物",

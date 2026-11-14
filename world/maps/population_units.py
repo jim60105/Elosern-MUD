@@ -27,16 +27,24 @@ from world.lore import monster_activity as lore_activity
 from world.lore import monster_placement as lore_placement
 from world.maps import regional_population
 from world.maps.published import SourceMemo
+from world.rules.sight import MAX_GROUND_SIGHT_RADIUS
 from world.rules.surfaces import store_attribute
 
 #: The unit of every room, and of every cell no authored rectangle covers.
 RESIDUAL_UNIT = "~residual"
+
+#: How far one player observes a settlement unit: the maximum ground sight a
+#: rulebook policy can derive, so the answer can never be too narrow.
+OBSERVATION_RADIUS = MAX_GROUND_SIGHT_RADIUS
 
 #: The wilderness Attribute recording each unit's settled-through tick.
 POPULATION_UNIT_CURSORS_ATTRIBUTE = "population_unit_cursors"
 
 #: The named refusal of a scoped pass that would write outside its scope.
 POPULATION_SCOPE_VIOLATION = "population_scope_violation"
+
+#: The named refusal of a catch-up that would settle inside another transaction.
+POPULATION_CATCH_UP_NESTED = "population_catch_up_nested"
 
 _ZONE = "zone"
 _AREA = "area"
@@ -423,6 +431,16 @@ class PopulationScopeViolation(regional_population.RegionalPopulationError):
     """A scoped pass would write outside the units it may settle."""
 
 
+class PopulationCatchUpNested(regional_population.RegionalPopulationError):
+    """A catch-up that would settle units was reached inside another transaction.
+
+    Its write would be a savepoint of that transaction: a later rollback of the
+    enclosing block reverts the durable rows while every live cache keeps the
+    settled values. Entry points call the catch-up before their own transaction,
+    so reaching this refusal means a caller is nested and must be fixed.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class PopulationScope:
     """The closed set of settlement units one scoped pass may settle."""
@@ -587,6 +605,86 @@ def concerned_units(index: UnitIndex, transition: Any) -> frozenset[str]:
     return frozenset(units) if units else frozenset({RESIDUAL_UNIT})
 
 
+def units_around(index: UnitIndex, location: Any | None) -> frozenset[str]:
+    """Every settlement unit inside the observation radius of one locator.
+
+    A room, and the absence of a locator, observe only the residual unit. A
+    wilderness locator observes the units of every cell of the square window
+    ``OBSERVATION_RADIUS`` around it (non-negative coordinates only), so the
+    answer is a superset of every derivation of ground sight.
+    """
+    if location is None or location.kind == "room":
+        return frozenset({RESIDUAL_UNIT})
+    units = {RESIDUAL_UNIT}
+    x, y = location.x, location.y
+    for dx in range(-OBSERVATION_RADIUS, OBSERVATION_RADIUS + 1):
+        for dy in range(-OBSERVATION_RADIUS, OBSERVATION_RADIUS + 1):
+            cell = (x + dx, y + dy)
+            if cell[0] < 0 or cell[1] < 0:
+                continue
+            units.add(index.unit_of_cell(regional_population.cell_region(cell), cell))
+    return frozenset(units)
+
+
+#: The locations a running action announced it is about to enter.
+_ANNOUNCED: list[Any] = []
+
+
+@contextmanager
+def announced_observation(locations: Iterable[Any]) -> Iterator[None]:
+    """Add ``locations`` to the observed set for the duration of the block.
+
+    Each entry is removed again on every exit path, so a failure inside the
+    action cannot leave a later catch-up observing a place nothing announced.
+    """
+    announced = list(locations)
+    target = _ANNOUNCED
+    target.extend(announced)
+    try:
+        yield
+    finally:
+        for location in reversed(announced):
+            for index in range(len(target) - 1, -1, -1):
+                if target[index] is location:
+                    del target[index]
+                    break
+
+
+def observed_units(wilderness: Any) -> frozenset[str]:
+    """Every unit a player observes, or a running action announced it enters.
+
+    A player character in a room observes nothing beyond the residual unit. A
+    player position or an announced location on another wilderness map is not
+    this world's observation.
+    """
+    from typeclasses.characters import PlayerCharacter
+    from world.rules.movement_edges import (
+        LocationRefError,
+        MovementEdgeError,
+        location_ref,
+    )
+
+    index = current_unit_index()
+    map_name = getattr(wilderness, "db_key", None)
+    units: set[str] = {RESIDUAL_UNIT}
+    for player in PlayerCharacter.objects.all_family():
+        try:
+            location = location_ref(player)
+        except (
+            LocationRefError,
+            MovementEdgeError,
+        ):  # observability: ignore R2: an unrepresentable player position adds no unit, and the next command repairs it
+            continue
+        if location.kind == "room" or location.map != map_name:
+            continue
+        units |= units_around(index, location)
+    for location in tuple(_ANNOUNCED):
+        if location.kind == "room" or location.map != map_name:
+            continue
+        units |= units_around(index, location)
+    return frozenset(units)
+
+
 #: The scope of the settlement pass currently running, if any.
 _ACTIVE_SCOPE: PopulationScope | None = None
 
@@ -642,6 +740,31 @@ def scoped(scope: PopulationScope | None) -> Iterator[None]:
     finally:
         _ACTIVE_SCOPE = previous
         _ACTIVE_GROUPS = previous_groups
+
+
+#: How many settlement passes are running; a pass never starts a nested catch-up.
+_PASS_RUNNING = 0
+
+
+def pass_running() -> bool:
+    """Whether a settlement pass is running now."""
+    return _PASS_RUNNING > 0
+
+
+@contextmanager
+def running_pass() -> Iterator[None]:
+    """Mark the enclosed work as a settlement pass.
+
+    Counted rather than boolean: an entry point reached from a pass must never
+    start a nested catch-up, and a nested pass must not clear the outer one's
+    marker when it exits.
+    """
+    global _PASS_RUNNING
+    _PASS_RUNNING += 1
+    try:
+        yield
+    finally:
+        _PASS_RUNNING -= 1
 
 
 def require_in_active_scope(location: Any | None) -> None:
@@ -800,16 +923,34 @@ def advance_unit_cursors(
     write_unit_cursors(wilderness, UnitCursors(default, units))
 
 
+def all_units_current(cursors: UnitCursors, tick: int) -> bool:
+    """Whether every unit one record names has already settled through ``tick``.
+
+    The unlisted default covers every unit without its own entry, so the whole
+    record is current exactly when the default and every listed value have
+    reached ``tick``. A caller uses this to answer "nothing to settle" without
+    resolving a closed set the settlement would leave untouched.
+    """
+    if cursors.default < tick:
+        return False
+    return all(value >= tick for value in cursors.units.values())
+
+
 __all__ = [
+    "OBSERVATION_RADIUS",
+    "POPULATION_CATCH_UP_NESTED",
     "POPULATION_UNIT_CURSORS_ATTRIBUTE",
     "POPULATION_SCOPE_VIOLATION",
     "RESIDUAL_UNIT",
+    "PopulationCatchUpNested",
     "PopulationScope",
     "PopulationScopeViolation",
     "UnitCursors",
     "UnitIndex",
     "active_scope",
     "advance_unit_cursors",
+    "all_units_current",
+    "announced_observation",
     "build_scope",
     "build_unit_index",
     "concerned_units",
@@ -818,9 +959,12 @@ __all__ = [
     "group_units_map",
     "initialize_unit_cursors",
     "note_created_group",
+    "observed_units",
+    "pass_running",
     "read_unit_cursors",
     "require_in_active_scope",
     "require_units_in_active_scope",
+    "running_pass",
     "scope_start_tick",
     "scoped",
     "settling_group_ids",
@@ -829,6 +973,7 @@ __all__ = [
     "unit_closure",
     "unit_cursor",
     "unit_of_location",
+    "units_around",
     "write_unit_cursors",
     "zone_bound_areas",
 ]

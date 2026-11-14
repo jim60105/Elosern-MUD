@@ -49,7 +49,9 @@ from world.rules.clock import (
     ScheduledEvent,
     SurfaceSnapshot,
     advance_registry_held,
+    held_advance_registry,
     register_event_source,
+    restore_advance_registry,
 )
 from world.rules.surfaces import (
     deferred_attribute_stores,
@@ -259,75 +261,87 @@ def _run_pass(
     ``scope=None`` is the whole-world pass. A scoped pass settles only that
     scope's groups, journeys, zones and sites and advances only its units'
     cursors; every other unit's records and individuals are left untouched.
+    The whole body runs marked as a settlement pass, so a catch-up entry point
+    reached from inside it never starts a nested catch-up.
     """
-    # A world without a usable per-unit record must refuse before any
-    # settlement work, not after it: a direct caller outside a clock advance
-    # owns its own commit, so a tail-only check would leave settled state
-    # behind a raised advance. The record is read once per pass -- the scoped
-    # entry point hands over the one `build_scope` already read -- and handed to
-    # every boundary, because it cannot change before the pass advances it.
-    if cursors is None:
-        cursors = population_units.read_unit_cursors(wilderness)
-    contact_tick = end_tick if contact else None
-    events: list[ScheduledEvent] = []
-    tick = start_tick
-    with maintenance_tally() as counts:
-        with (
-            outer_rollback_owner() if advance_registry_held() else nullcontext(),
-            deferred_attribute_stores() if advance_registry_held() else nullcontext(),
-            monster_activity.batched_state_writes(wilderness),
-            regional_population.reused_living_presence(),
-            population_units.scoped(scope),
-        ):
-            while tick <= end_tick:
-                events.extend(
-                    _settle_population_at(
-                        wilderness,
-                        tick,
-                        contact_tick=contact_tick,
-                        scope=scope,
-                        first_tick=tick == start_tick,
-                        cursors=cursors,
+    with population_units.running_pass():
+        # A world without a usable per-unit record must refuse before any
+        # settlement work, not after it: a direct caller outside a clock advance
+        # owns its own commit, so a tail-only check would leave settled state
+        # behind a raised advance. The record is read once per pass -- the scoped
+        # entry point hands over the one `build_scope` already read -- and handed
+        # to every boundary, because it cannot change before the pass advances
+        # it.
+        if cursors is None:
+            cursors = population_units.read_unit_cursors(wilderness)
+        contact_tick = end_tick if contact else None
+        events: list[ScheduledEvent] = []
+        tick = start_tick
+        with maintenance_tally() as counts:
+            with (
+                outer_rollback_owner() if advance_registry_held() else nullcontext(),
+                (
+                    deferred_attribute_stores()
+                    if advance_registry_held()
+                    else nullcontext()
+                ),
+                monster_activity.batched_state_writes(wilderness),
+                regional_population.reused_living_presence(),
+                population_units.scoped(scope),
+            ):
+                while tick <= end_tick:
+                    events.extend(
+                        _settle_population_at(
+                            wilderness,
+                            tick,
+                            contact_tick=contact_tick,
+                            scope=scope,
+                            first_tick=tick == start_tick,
+                            cursors=cursors,
+                        )
+                    )
+                    following = _next_population_boundary(
+                        wilderness, tick, end_tick, scope
+                    )
+                    if following is None or following <= tick:
+                        break
+                    tick = following
+                # Progress is the interval endpoint whether or not a boundary fell
+                # there: equal elapsed time must leave equal settlement progress and
+                # equal protection retirement.
+                monster_activity.settle_idle_physiology(
+                    wilderness, end_tick, scope=scope
+                )
+                regional_population.settle_timeline_through(
+                    wilderness,
+                    end_tick,
+                    retain=monster_sites.retained_loss_ids(wilderness, scope=scope),
+                    scope=scope,
+                    cursors=cursors,
+                )
+                monster_activity.retire_room_protection(
+                    wilderness, end_tick, scope=scope
+                )
+                monster_activity.retire_settled_decision_receipts(
+                    wilderness, end_tick, scope=scope
+                )
+                # The pass endpoint is the scope's progress: a whole-world pass
+                # raises every unit, a scoped pass only its own.
+                population_units.advance_unit_cursors(
+                    wilderness, None if scope is None else scope.units, end_tick
+                )
+            if counts:
+                context = {
+                    "tick_from": int(start_tick),
+                    "tick_to": int(end_tick),
+                    **dict(sorted(counts.items())),
+                }
+                transaction.on_commit(
+                    lambda context=context: log_info(
+                        "population_maintenance_settled", context=context
                     )
                 )
-                following = _next_population_boundary(
-                    wilderness, tick, end_tick, scope
-                )
-                if following is None or following <= tick:
-                    break
-                tick = following
-            # Progress is the interval endpoint whether or not a boundary fell
-            # there: equal elapsed time must leave equal settlement progress and
-            # equal protection retirement.
-            monster_activity.settle_idle_physiology(wilderness, end_tick, scope=scope)
-            regional_population.settle_timeline_through(
-                wilderness,
-                end_tick,
-                retain=monster_sites.retained_loss_ids(wilderness, scope=scope),
-                scope=scope,
-                cursors=cursors,
-            )
-            monster_activity.retire_room_protection(wilderness, end_tick, scope=scope)
-            monster_activity.retire_settled_decision_receipts(
-                wilderness, end_tick, scope=scope
-            )
-            # The pass endpoint is the scope's progress: a whole-world pass
-            # raises every unit, a scoped pass only its own.
-            population_units.advance_unit_cursors(
-                wilderness, None if scope is None else scope.units, end_tick
-            )
-        if counts:
-            context = {
-                "tick_from": int(start_tick),
-                "tick_to": int(end_tick),
-                **dict(sorted(counts.items())),
-            }
-            transaction.on_commit(
-                lambda context=context: log_info(
-                    "population_maintenance_settled", context=context
-                )
-            )
-    return events
+        return events
 
 
 def settle_population_lifecycle(
@@ -381,6 +395,114 @@ def settle_population_scope(
         end_tick,
         contact=False,
         cursors=cursors,
+    )
+
+
+def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
+    """Catch the closed set around ``seeds`` up to the current tick.
+
+    Returns ``True`` when it settled anything. A world with no wilderness or no
+    population, a catch-up reached from inside a settlement pass, an empty seed
+    set and a set that is already current all settle nothing and return
+    ``False``.
+
+    The set is settled in its own transaction with the same rollback strength
+    as a clock advance: the pre-catch-up surface registry is built first and
+    restores every surface the pass writes when anything fails.
+    """
+    if wilderness is None or not regional_population.population_provisioned(
+        wilderness
+    ):
+        return False
+    if population_units.pass_running():
+        return False
+    # One cursor read answers the common case: a world whose whole record has
+    # settled through ``now`` has no unit left to settle, so the closed set is
+    # never resolved (the second read a clock advance's merge point relies on).
+    cursors = population_units.read_unit_cursors(wilderness)
+    now = regional_population.current_population_tick()
+    if population_units.all_units_current(cursors, now):
+        return False
+    scope = population_units.build_scope(wilderness, seeds, cursors=cursors)
+    if not scope.units:
+        return False
+    start = population_units.scope_start_tick(wilderness, scope)
+    if start >= now:
+        return False
+    if _refuse_nested_catch_up():
+        from django.db import transaction as _transaction
+
+        connection = _transaction.get_connection()
+        if connection.in_atomic_block:
+            raise population_units.PopulationCatchUpNested(
+                f"{population_units.POPULATION_CATCH_UP_NESTED}: a catch-up that "
+                f"would settle {sorted(scope.units)} from {start} to {now} was "
+                "reached inside an enclosing transaction"
+            )
+    # Nothing writes between the scope build above and the pass's own scope
+    # build, so both derive the same closed set and the same start tick.
+    registry = snapshot_population_lifecycle_surfaces(start, now)
+    try:
+        with held_advance_registry(), transaction.atomic():
+            settle_population_scope(wilderness, scope.units, now, contact=False)
+            transaction.on_commit(
+                lambda: log_info(
+                    "population_caught_up",
+                    context={
+                        "units": len(scope.units),
+                        "tick_from": start,
+                        "tick_to": now,
+                    },
+                )
+            )
+    except Exception:
+        restore_advance_registry(registry, (wilderness,))
+        raise
+    return True
+
+
+def _refuse_nested_catch_up() -> bool:
+    """Whether a writing catch-up refuses an enclosing transaction.
+
+    Fail closed in production. The test harness wraps every case in one outer
+    atomic block that no game owner opened, so the test settings disable the
+    refusal and the refusal's own test re-enables it explicitly.
+    """
+    from django.conf import settings
+
+    return bool(getattr(settings, "POPULATION_CATCH_UP_REFUSES_NESTED", True))
+
+
+def ensure_locations_current(locations: Iterable[Any]) -> bool:
+    """Catch up every unit within the observation radius of ``locations``."""
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(
+        wilderness
+    ):
+        return False
+    if population_units.pass_running():
+        return False
+    index = population_units.current_unit_index()
+    map_name = getattr(wilderness, "db_key", None)
+    seeds: set[str] = set()
+    for location in locations:
+        if location.kind != "room" and location.map != map_name:
+            continue
+        seeds |= population_units.units_around(index, location)
+    return ensure_population_current(wilderness, seeds)
+
+
+def ensure_observed_population_current() -> bool:
+    """Catch up every unit a player observes, or a running action announced."""
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(
+        wilderness
+    ):
+        return False
+    if population_units.pass_running():
+        return False
+    return ensure_population_current(
+        wilderness, population_units.observed_units(wilderness)
     )
 
 
@@ -455,6 +577,9 @@ def register_regional_population() -> None:
 
 __all__ = [
     "STAGE_KIND",
+    "ensure_locations_current",
+    "ensure_observed_population_current",
+    "ensure_population_current",
     "next_population_lifecycle_boundary",
     "register_regional_population",
     "settle_population_lifecycle",

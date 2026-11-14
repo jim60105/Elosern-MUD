@@ -426,6 +426,21 @@ class MovementSettlementWildernessTests(EvenniaTest):
             list(script.db.unused_rooms),
         )
 
+    def _settle_population_here(self):
+        """Catch the traverser's settlement units up before a baseline read.
+
+        This module advances the clock without registering the population
+        lifecycle stage, so the entry charge leaves the units behind the world
+        tick. A movement edge catches its passage up before it settles
+        anything, so the baseline a compensation test compares against must be
+        taken from the settled state or it measures the catch-up, not the
+        compensation.
+        """
+        from world.maps.population_lifecycle import ensure_locations_current
+        from world.rules.movement_edges import location_ref
+
+        ensure_locations_current([location_ref(self.char1)])
+
     def _assert_rooms_coherent(self):
         """Every bookkeeping room must be the room actively bound to its key."""
         for coordinates, room in self._script().db.rooms.items():
@@ -664,6 +679,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         real_advance = WorldClock.advance
         with patch.object(WorldClock, "advance", _flaky_advance(real_advance)):
             self.gate.at_traverse(self.char1, self.east_gate)
+            self._settle_population_here()
             before_tick = get_world_clock().tick
             before_coords = self.char1.location.coordinates
             before_bookkeeping = self._bookkeeping()
@@ -683,6 +699,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
         real_advance = WorldClock.advance
         with patch.object(WorldClock, "advance", _flaky_advance(real_advance)):
             self.gate.at_traverse(self.char1, self.east_gate)
+            self._settle_population_here()
             before_tick = get_world_clock().tick
             before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
             before_bookkeeping = self._bookkeeping()
@@ -705,6 +722,7 @@ class MovementSettlementWildernessTests(EvenniaTest):
     def test_falsy_return_after_relocation_is_compensated(self):
         script = self._script()
         self.gate.at_traverse(self.char1, self.east_gate)
+        self._settle_population_here()
         before_tick = get_world_clock().tick
         before_knowledge = {visit.node_id for visit in parse_knowledge(self.char1)}
         before_bookkeeping = self._bookkeeping()

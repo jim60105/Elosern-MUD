@@ -28,7 +28,10 @@ from evennia.commands.default.account import (
 from evennia.commands.default.comms import CmdPage as _CmdPage
 from evennia.utils import create, search, utils
 
-class CmdOOCLook(_CmdOOCLook):
+from commands.command import PopulationCatchUpMixin
+
+
+class CmdOOCLook(PopulationCatchUpMixin, _CmdOOCLook):
     """在離開角色（OOC）狀態下查看
 
     用法：
@@ -50,7 +53,7 @@ class CmdOOCLook(_CmdOOCLook):
         self.msg(self.account.at_look(target=self.playable, session=self.session))
 
 
-class CmdIC(_CmdIC):
+class CmdIC(PopulationCatchUpMixin, _CmdIC):
     """進入遊戲世界（附身角色）
 
     用法：
@@ -124,7 +127,7 @@ class CmdIC(_CmdIC):
             self.msg(f"|r你無法附身 |C{new_character.name}|n：{exc}")
 
 
-class CmdOOC(_CmdOOC):
+class CmdOOC(PopulationCatchUpMixin, _CmdOOC):
     """停止附身，離開角色（OOC）
 
     用法：
@@ -173,7 +176,7 @@ class CmdOOC(_CmdOOC):
             self.msg(f"|r無法離開角色 |c{old_char}|n：{exc}")
 
 
-class CmdSessions(_CmdSessions):
+class CmdSessions(PopulationCatchUpMixin, _CmdSessions):
     """查看你目前的連線
 
     用法：
@@ -205,7 +208,7 @@ class CmdSessions(_CmdSessions):
         self.msg(f"|w你目前的連線：|n\n{table}")
 
 
-class CmdWho(_CmdWho):
+class CmdWho(PopulationCatchUpMixin, _CmdWho):
     """列出目前在線的玩家
 
     用法：
@@ -281,7 +284,7 @@ class CmdWho(_CmdWho):
         )
 
 
-class CmdOption(_CmdOption):
+class CmdOption(PopulationCatchUpMixin, _CmdOption):
     """設定帳號選項
 
     用法：
@@ -430,7 +433,7 @@ class CmdOption(_CmdOption):
             self.session.update_flags(**optiondict)
 
 
-class CmdPassword(_CmdPassword):
+class CmdPassword(PopulationCatchUpMixin, _CmdPassword):
     """變更你的密碼
 
     用法：
@@ -464,7 +467,7 @@ class CmdPassword(_CmdPassword):
             self.msg("密碼已變更。")
 
 
-class CmdQuit(_CmdQuit):
+class CmdQuit(PopulationCatchUpMixin, _CmdQuit):
     """登出遊戲
 
     用法：
@@ -506,7 +509,7 @@ class CmdQuit(_CmdQuit):
             account.disconnect_session_from_account(self.session, reason)
 
 
-class CmdColorTest(_CmdColorTest):
+class CmdColorTest(PopulationCatchUpMixin, _CmdColorTest):
     """測試你的客戶端支援哪些色彩
 
     用法：
@@ -611,7 +614,7 @@ class CmdColorTest(_CmdColorTest):
             self.msg("用法：色彩 ansi || xterm256 || truecolor")
 
 
-class CmdQuell(_CmdQuell):
+class CmdQuell(PopulationCatchUpMixin, _CmdQuell):
     """以角色的權限取代帳號的權限
 
     用法：
@@ -664,7 +667,7 @@ class CmdQuell(_CmdQuell):
         self._recache_locks(account)
 
 
-class CmdStyle(_CmdStyle):
+class CmdStyle(PopulationCatchUpMixin, _CmdStyle):
     """遊戲內樣式選項
 
     用法：
@@ -702,7 +705,7 @@ class CmdStyle(_CmdStyle):
         self.msg(f"樣式 {result.key} 已設為 {result.display()}")
 
 
-class CmdPage(_CmdPage):
+class CmdPage(PopulationCatchUpMixin, _CmdPage):
     """傳送私人訊息給另一個帳號
 
     用法：

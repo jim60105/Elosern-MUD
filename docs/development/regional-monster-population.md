@@ -2844,3 +2844,137 @@ archive sync, so the module carries no `covers_requirement` annotation. The
 hand-off from each test to its delta requirement and scenario is recorded in the
 change's apply report; `tools.spec_traceability list` prints the identifiers the
 archive assigns.
+
+# Catch-up and observed units
+
+Developer document for the `population-catch-up-entry-points` change. After
+`unit-scoped-population-settlement` a closed set of units can be settled alone,
+but every place that reads or writes population state for a decision must still
+be sure the units it touches are settled to the current tick. This change adds
+that safety net; the clock stage still settles the whole world, so no unit lags
+yet and the catch-up is a no-op in practice when it merges.
+
+## The catch-up
+
+`world/maps/population_lifecycle.py::ensure_population_current(wilderness, seeds)`
+settles the closed set reached from `seeds` from its lowest cursor to
+`regional_population.current_population_tick()`. It answers `False` and writes
+nothing when the world has no wilderness or no population seed, when a
+settlement pass is already running, when the seed set resolves to no unit, and
+when every unit of the set is already current (`start >= now`).
+
+An asked-for catch-up settles in its own transaction with the same rollback
+strength as a clock advance:
+
+1. `build_scope` reads the cursor record once and resolves the closed set, its
+   groups, its zones and its sites.
+2. `snapshot_population_lifecycle_surfaces(start, now)` captures the combined
+   advance-surface contract of the three owners before anything is written.
+3. Inside `held_advance_registry()` and one `transaction.atomic()`, the scoped
+   pass runs with `contact=False`. The authored field contact is a whole-world
+   write, so the scoped entry point refuses it by name; the catch-up never
+   asks for it.
+4. On any failure the error propagates, the transaction rolls back, and
+   `restore_advance_registry` restores every surface the pass wrote in memory.
+
+One `population_caught_up` info event is scheduled on commit, carrying the unit
+count and both ticks. A catch-up that settles nothing emits nothing.
+
+The common case is answered by one cursor read: `all_units_current` proves the
+whole record has settled through the current tick, so a catch-up of a current
+world never resolves a closed set, decodes the activity record or writes
+anything.
+
+A catch-up that would write refuses an enclosing transaction:
+`population_units.PopulationCatchUpNested` (reason
+`population_catch_up_nested`) is raised when the set is behind and the
+connection is already inside an atomic block, so a future nested entry point
+fails loudly instead of leaving live caches ahead of a rolled-back block. The
+refusal is on by default; the test settings disable it because every test case
+runs inside the harness's own outer transaction that no game owner opened, and
+the refusal's own test re-enables it with `override_settings`.
+
+`ensure_locations_current(locations)` seeds the units around each locator
+(`population_units.units_around`) and `ensure_observed_population_current()`
+seeds the observed units below; both resolve the live wilderness themselves.
+
+## Observed units
+
+`population_units.observed_units(wilderness)` is the residual unit plus the
+units of every cell within `MAX_GROUND_SIGHT_RADIUS` (8) of a player
+character's wilderness position, plus the same window around every location a
+running action announced. A player character in a room adds no unit beyond the
+residual unit, and a locator on another wilderness map adds none: the answer is
+filtered to the world's own key.
+
+`OBSERVATION_RADIUS` is the rulebook's maximum ground sight rather than the
+derived radius of a particular observer, so the answer can never be narrower
+than what any light phase, terrain or vantage would derive. The cost is one
+player scan and a 17x17 window of pure cell lookups per command, independent
+of lag and of the number of settlement units.
+
+`population_units.announced_observation(locations)` is the context manager an
+action wraps around its own settlement: the announced locations join the
+observed set for the duration of the block and are removed again on every exit
+path. A movement edge announces exactly its source and destination, which is
+every cell a committed edge passes through: a wilderness step moves one cell
+and an authored exit moves room to room or cell to gate, so no intermediate
+cell exists.
+
+## The pass marker
+
+`population_units.running_pass()` marks the whole body of a settlement pass and
+`pass_running()` reads it. `ensure_population_current` refuses to start inside
+one, so an entry point reached from inside a pass can never nest a second
+catch-up. The marker counts rather than toggles, so a nested pass cannot clear
+the outer one's marker.
+
+## The entry points
+
+- Every repository command catches the observed units up in
+  `commands/command.py::Command.at_pre_cmd`, after the `cmd_in` event and
+  before parsing. A failed catch-up emits `population_catch_up_failed` (error
+  level, `char`, `cmd`, `exc`) and the command still runs.
+- `settle_movement` catches its passage up before it builds the pre-move
+  snapshot and before its own transaction, then wraps the rest of the
+  settlement in `announced_observation(passage)`.
+- Quest scene-monster materialisation (`world/quests/materializer.py`) and the
+  GM placement verb (`world/maps/gm.py::spawn_monster`) catch their target cell
+  up before their snapshot and transaction.
+- The GM removal verb catches the removed entity's position up before it
+  captures the pre-removal presence, because a catch-up can move that entity.
+- A GM hit-point trait or gauge write catches the monster's unit up before it
+  reads the current gauge and takes its trait snapshot
+  (`world/rules/gm.py::_catch_up_population`), so a later failure restores the
+  settled state rather than reverting a committed settlement.
+- The quest site-target read (`world/quests/runtime.py::_site_clear_out_read`)
+  catches the site's unit up first; `accept_quest` performs that read before it
+  opens its own transaction, and every caller that opens a transaction around
+  the acceptance calls `ensure_quest_site_current` before its block instead:
+  `guild_offers.accept_guild_offer`, `npc_intents._apply_offer_quest`, and the
+  dialogue story effect (`world/rules/dialogue.py`, before the selection's
+  transaction opens).
+
+**The rule for new code.** Any new code that writes population state for a
+cell, or reads it to decide something, calls `ensure_locations_current` before
+its own `transaction.atomic()` and before its own snapshot. A catch-up inside
+an enclosing transaction would be only a savepoint: the enclosing rollback
+would revert the durable rows while the live caches kept the settled values.
+Input that never passes through `Command.at_pre_cmd` (a menu node, a web
+endpoint) skips the command catch-up: its writers are guarded by
+`population-writer-guards`, and its reads are corrected by the next command.
+
+## Costs and residual risks
+
+- A catch-up of a unit that lagged for a long game time is slow, and it runs
+  synchronously in the command or movement that needs it. Its cost grows with
+  that unit's lag, not with the world; `population-backlog-drain` pays lag off
+  between commands, but a long time skip followed at once by travel into
+  another unit still pays that unit's whole lag in one step.
+- `units_around` scans a 17x17 window and `build_scope` resolves the closed set
+  from the activity record per call. Both are per-action whole-record reads,
+  independent of lag; `observed-unit-advance` and
+  `observed-unit-read-narrowing` narrow them for the clock stage.
+- `announced_observation` keeps its entries in a module-level list, like the
+  running scope and the running pass marker. The reactor runs these paths
+  synchronously; a future asynchronous interleave must revisit all three.

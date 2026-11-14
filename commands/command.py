@@ -9,9 +9,40 @@ import time
 
 from evennia.commands.command import Command as BaseCommand
 
-from world.observability import log_info
+from world.observability import log_error, log_info
 
 # from evennia import default_cmds
+
+
+def _catch_up_observed_population(char, key) -> None:
+    """Catch the observed units up, reporting a failure without aborting the command."""
+
+    # Imported here so the command module keeps its own import order and never
+    # loads the population owner while commands register.
+    from world.maps.population_lifecycle import ensure_observed_population_current
+
+    try:
+        ensure_observed_population_current()
+    except Exception as error:
+        log_error(
+            "population_catch_up_failed",
+            exc=error,
+            context={"char": char, "cmd": key},
+        )
+
+
+class PopulationCatchUpMixin:
+    """Catch the observed population up before a command parses or runs.
+
+    :class:`Command` below already carries this seam. The localized wrappers
+    build on Evennia's own command classes, so they take it from this mixin
+    instead and every player command still begins on a current population.
+    """
+
+    def at_pre_cmd(self):
+        result = super().at_pre_cmd()
+        _catch_up_observed_population(getattr(self.caller, "pk", 0) or 0, self.key)
+        return result
 
 
 class Command(BaseCommand):
@@ -40,7 +71,14 @@ class Command(BaseCommand):
     # an aborted command is reconstructed from an unpaired cmd_in.
 
     def at_pre_cmd(self) -> None:
-        """Emit the cmd_in boundary event before parse/func."""
+        """Emit the cmd_in boundary event, then catch the observed population up.
+
+        A command may be the first thing that happens after a relocation that
+        ran no clock advance, so the settlement units around every player are
+        brought to the current tick before the command parses or reads any
+        population state. A failed catch-up is reported and never prevents the
+        command: its own writer guard is the thing that refuses unsafe work.
+        """
         self._observability_started = time.perf_counter()
         char = getattr(self.caller, "pk", 0) or 0
         args = self.args or ""
@@ -48,6 +86,7 @@ class Command(BaseCommand):
             "cmd_in",
             context={"char": char, "cmd": self.key, "args": args[:200]},
         )
+        _catch_up_observed_population(char, self.key)
         return None
 
     def at_post_cmd(self) -> None:

@@ -353,9 +353,12 @@ def _apply_offer_quest(npc: Any, player: Any, intent: dict[str, Any]) -> IntentO
     else:
         return IntentOutcome(False, f"no commission {quest_key!r} at this issuer")
 
-    from world.quests.runtime import accept_quest
+    from world.quests.runtime import accept_quest, ensure_quest_site_current
     from world.rules.affinity import AffinitySource
 
+    # The acceptance reads a bound clear-out's site population, so the site's
+    # unit is caught up before this block's transaction rather than inside it.
+    ensure_quest_site_current(quest_key)
     quest_log_snapshot = attribute_snapshot(player, "quest_log")
     relations_snapshot = attribute_snapshot(npc, "relations_data")
     affinity_capped = False
