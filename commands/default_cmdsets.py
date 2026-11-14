@@ -71,6 +71,7 @@ from commands.npc_services import CmdServices
 from commands.possess import CmdHandoff, CmdPossess, CmdUnpossess
 from commands.party_views import CmdMemberSkills, CmdMemberStatus
 from commands.quest_delivery import CmdDeliver
+from commands.rite import CmdRite
 from commands.localized import (
     CmdColorTest,
     CmdDrop,
@@ -219,6 +220,7 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdGuildRegister)
         self.add(CmdChurchJoin)
         self.add(CmdChurchPray)
+        self.add(CmdRite)
         self.add(CmdChurchOffer)
         self.add(CmdChurchRedeem)
         self.add(CmdChurchMerit)

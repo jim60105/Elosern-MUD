@@ -246,6 +246,10 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "context": "一般（探索中可用；戰鬥中拒絕）",
     },
     "回家": {"syntax": "回家", "context": "一般（需 home 權限或建造者權限）"},
+    "rite": {
+        "syntax": "rite、rite <選項>、rite <選項> <隊友>",
+        "context": "一般（需站在具有儀式的地標節點上）",
+    },
     "耳語": {"syntax": "耳語 <角色> = <訊息>", "context": "一般"},
     "暱稱": {"syntax": "暱稱 <字串> = [<替換字串>]", "context": "一般"},
     "設定描述": {"syntax": "設定描述 <描述>", "context": "一般"},
