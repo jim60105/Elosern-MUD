@@ -14,7 +14,7 @@ Do not change `settle_population_lifecycle`, unit resolution, owner filters, cat
 - [x] 2.1 Add `catch_up_world` to `world/maps/tests/_settlement_projection.py` (design D4). Apply design D2 (registry contract). Verify: the test prefix passes for each of `world.maps.tests.test_scoped_population_settlement`, `world.maps.tests.test_population_catch_up`.
   - `world.maps.tests.test_scoped_population_settlement` and `world.maps.tests.test_population_catch_up`: 30 tests OK in one run; the catch-up path is additionally exercised by `world.maps.tests.test_regional_population_recovery` and `test_settlement_outer_rollback`.
 - [x] 2.2 Apply design D1 (`settle_observed_population`, registration) and D3 (forecast). Create `world/maps/tests/test_observed_unit_advance.py` per design D4 and register it in `.github/evennia-shards.json` beside `world.maps.tests.test_population_catch_up`. Verify: the test prefix with `world.maps.tests.test_observed_unit_advance` passes.
-  - 12 tests OK, including the defeat-protection regression case added after review.
+  - 13 tests OK, including the two defeat-protection regression cases added after review.
 
 ## 3. Existing tests (design D5)
 
