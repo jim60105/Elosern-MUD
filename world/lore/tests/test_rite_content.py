@@ -748,6 +748,21 @@ class LoadPublishedTests(unittest.TestCase):
         self.assertEqual(set(snapshot.districts), {"d1", "d2"})
         self.assertIs(current(), snapshot)
 
+    def test_an_unpublished_district_world_raises_before_anything_installs(self):
+        from world.lore.map_districts import DistrictNotLoaded
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, _document())
+            with patch(
+                "world.lore.map_districts.current",
+                side_effect=DistrictNotLoaded("no districts"),
+            ):
+                with self.assertRaises(DistrictNotLoaded):
+                    load_published(path)
+
+        with self.assertRaises(RitesNotLoaded):
+            current()
+
     def test_a_rejected_document_leaves_the_previous_snapshot_current(self):
         previous = RiteSnapshot(archetypes={}, districts={})
         install(previous)

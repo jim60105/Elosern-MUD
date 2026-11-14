@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "d37a380114e23e487fdda68a00b36d3f3b66dd5bdacc5e26feeafaabf6b8721c",
+  "fingerprint": "b20be216ef98293087d957dbbe937b12d2f8b7a2284073aef0f1c9fc556db714",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16123,7 +16123,7 @@
     "world/lore/races.py": "2813a9519a7950394d0b976910d61ba1d3debe725f56c276f688272e0955e752",
     "world/lore/registry_index.py": "3d087f6ef42b1ebf3d0ce16ce695674269d4c07525b8b6d31df16970de9b33ee",
     "world/lore/registry_refs.py": "26bf919f94ae5cd7a451570d734c5d13bd2080137f55a111a26c4554d29646b8",
-    "world/lore/rites/__init__.py": "ee6990599865d29070ddaca78d38548094e17f25ae4ea5f57ce735a3aebb552c",
+    "world/lore/rites/__init__.py": "6eceed5547aa4e23e2f5b8625aea8bc29472f73ba81fabaaa1e35373e8d66d5f",
     "world/lore/rites/loader.py": "b5521462eaafd626a9d7aaaf0c16a28416208c945d3e284a396b0506c5135c41",
     "world/lore/rites/shape.py": "d5a6d0101fe248b89f6b33456455a2c813dc75cfdb30a4942706c486306605f5",
     "world/lore/scene_archetypes.py": "737c650a1a5223defef655520242cc162301181b63f1f783e451def3f19b4388",

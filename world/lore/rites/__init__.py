@@ -72,8 +72,10 @@ def load_published(
     :class:`world.lore.map_districts.DistrictNotLoaded`, not
     :class:`world.lore.rites.loader.RiteContentError`. Every failure
     propagates: a rejected or unreadable document installs nothing and a
-    previously installed snapshot stays current. The snapshot is loaded once
-    per process; a runtime map re-adoption does not re-adopt rites, by design.
+    previously installed snapshot stays current. Each call re-reads the
+    document and replaces the installed snapshot; startup calls it once per
+    process, after the map world is adopted, so a snapshot installed against an
+    earlier district world becomes stale rather than invalid.
     """
 
     from world.lore.rites.loader import load_rites
