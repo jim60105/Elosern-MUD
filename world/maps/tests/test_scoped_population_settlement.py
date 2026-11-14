@@ -734,6 +734,50 @@ class DifferentialSettlementTests(ScopedSettlementFixture):
         settle_population_scope(self.wilderness, [self.unit_a], END)
         self.assertEqual(settlement_projection(self.wilderness), one_part)
 
+    def test_a_partial_departure_settles_its_derived_group(self):
+        """A departed group with one dead identity splits into a new group id.
+
+        That id did not exist when the scope was built, so the running pass must
+        adopt it; otherwise its journey is never settled and is stranded. The
+        projection cannot compare this scenario, because the derived group id
+        embeds the moving member's persistent identity.
+        """
+        self._build_scenario()
+        group_id, bodies = self._group(
+            cell=TRAVEL_A,
+            seed=self._seeds["travel"],
+            tick=START,
+            activity=SOLO_ACTIVITY,
+            owner_key=ZONE_A,
+            members=2,
+        )
+        self._kill(bodies[1], START)
+        # Long enough for the derived group's journey to arrive: without the
+        # adoption its arrival tick is never a boundary, so it never arrives at
+        # any endpoint.
+        settle_population_scope(self.wilderness, [self.unit_a], 4000)
+        state = self.group_state()
+        derived = [
+            travelled
+            for travelled in state.groups
+            if travelled.startswith(f"{group_id}~")
+        ]
+        self.assertTrue(derived, "the partial departure derived a travelling group")
+        # Every journey that derived group began inside the interval was settled:
+        # its arrival tick was a boundary, so no journey due inside the pass
+        # survives it.
+        self.assertFalse(
+            [
+                journey
+                for journey in state.journeys.values()
+                if journey.group_id in derived and journey.arrival_tick <= 4000
+            ],
+            "a derived group's journey was never settled",
+        )
+        # The dead identity stayed behind in the residual group.
+        residual = state.groups[group_id]
+        self.assertEqual(residual.member_ids, (int(bodies[1].pk),))
+
 
 class OtherUnitTests(ScopedSettlementFixture):
     """A scoped pass leaves every record and individual of other units alone."""

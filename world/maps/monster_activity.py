@@ -2191,6 +2191,9 @@ def _begin_group_journey(
         edge=edge,
         plan=plan,
     )
+    # A partial departure derives a new travelling group id; the running scoped
+    # pass must settle that group's journey and arrival too.
+    population_units.note_created_group(travelling_id)
     receipts = dict(state.receipts)
     receipts[operation_id] = ActivityReceipt(
         operation_id,
