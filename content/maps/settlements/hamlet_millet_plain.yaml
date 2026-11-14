@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_millet_plain
+location_ref: hamlet_millet_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 186
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西通往魔晶鎮，往東則是穀坳村外的小路。路旁的黍田已經收了兩輪，田埂上堆著紮好的稈束。
+    anchor_key: hamlet_millet_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東，屋前曬著新打的黍米。場邊的雞群趁人不注意，啄走幾粒又散開。場上鋪著竹席，米粒在日頭下泛著白光。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

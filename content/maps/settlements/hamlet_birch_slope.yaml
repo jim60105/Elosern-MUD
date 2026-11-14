@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_birch_slope
+location_ref: hamlet_birch_slope
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 182
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往南通往魔晶鎮，往北是北林堡的林道。路旁的樺樹皮剝落，露出底下發亮的白木。樹皮下的白木在日頭下反光，遠遠就看得見。
+    anchor_key: hamlet_birch_slope
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝北，屋後的坡上滿是樺樹。秋天落葉時，風一過就捲起一整片金黃。掃起的落葉堆在屋後，晒乾了當柴燒。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

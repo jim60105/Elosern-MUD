@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_lotus_pond
+location_ref: hamlet_lotus_pond
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 小徑口
+    desc: 路口往北的小徑通向平原深處，路邊是一方種藕的水塘。夏天荷葉鋪滿水面，把整個塘口遮得看不見水。
+    anchor_key: hamlet_lotus_pond
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 178
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝南，屋後是塘邊的泥地。採藕時村人赤腳下塘，挖出的藕節堆在岸上。藕節上的泥還沒乾，堆在岸邊散著土腥味。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: n
+- source: homestead_front
+  destination: crossing
+  direction: s
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: n
+    destination_node: crossing
+city_gate:

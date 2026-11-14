@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_locust_knoll
+location_ref: hamlet_locust_knoll
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 161
+    y_m: 161
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西南接黑土鎮的來路，往東北通往魔晶鎮。路旁的槐樹長得歪斜，樹根把土岡抓得很牢。
+    anchor_key: hamlet_locust_knoll
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東北，屋後是魔晶鎮的邊界。春天槐花開時，整個岡上都是甜味，蜂群在枝間盤旋。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

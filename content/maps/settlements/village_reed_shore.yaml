@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_reed_shore
+location_ref: village_reed_shore
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 253
+    y_m: 253
+    prototype_parent: anchor_room
+    key: 荻岸綠地
+    desc: 綠地靠著河岸的荻叢，井臺築在葦根之間。秋天荻花開時，整片綠地都覆著一層白絮。白絮飄到井裡，打水的人得先撈一撈。
+    anchor_key: village_reed_shore
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口接著往麥浪城的來路，路沿著河岸的荻地延伸。荻稈被割下來堆在路邊，等曬乾了編成席子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 406
+    y_m: 406
+    prototype_parent: grid_room
+    key: 東北巷尾
+    desc: 東北的巷尾通向村外的一片荻地，沒有築好的路。再往遠處是河的下游，水面寬得看不見對岸。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 177
+    y_m: 329
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的石階朝西北，階面常沾著荻花的細絮。風一大，絮子便沿著牆根滾成一團。上階的人總要撥開貼在牆上的絮子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: shrine_front
+  direction: nw
+- source: shrine_front
+  destination: village_green
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

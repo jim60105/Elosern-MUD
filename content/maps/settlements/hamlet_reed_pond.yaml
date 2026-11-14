@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_reed_pond
+location_ref: hamlet_reed_pond
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 小徑口
+    desc: 路口往東北的小徑接上海岸路，路邊是一方長滿蘆葦的池塘。葦叢密得看不見水面，只有水鳥的叫聲傳出來。
+    anchor_key: hamlet_reed_pond
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 152
+    y_m: 152
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝西南，屋後是塘邊的葦地。秋天割葦時，村人把葦捆靠在牆邊晾著。葦捆曬乾後要浸水一天，才好剖成細條。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: ne
+- source: homestead_front
+  destination: crossing
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: ne
+    destination_node: crossing
+city_gate:

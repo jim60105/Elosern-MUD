@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_elm_flat
+location_ref: village_elm_flat
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 295
+    prototype_parent: anchor_room
+    key: 榆下井畔
+    desc: 綠地邊的老榆樹下有一口石井，井水清涼，村人早晚都來取水。樹蔭罩住整片綠地，日頭再大也留著涼意。
+    anchor_key: village_elm_flat
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 490
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口接著往楓麓鎮的土路，路兩旁是剛翻過的麥田。車轍裡壓著碎草，往北走一程便望得見楓麓鎮的炊煙。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村尾
+    desc: 村子南側的巷尾通向駿原鎮的長路，路邊散著幾堆乾草。往南望去盡是平闊的草原，風裡帶著牲畜的味道。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 198
+    y_m: 295
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的石階朝東，晨光最早照到這裡。階旁種著兩株老榆，落葉積在牆腳，掃了又落。掃攏的落葉堆在牆腳，晒乾了當柴燒。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:

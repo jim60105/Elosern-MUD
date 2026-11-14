@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_sand_shore
+location_ref: hamlet_sand_shore
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 158
+    y_m: 158
+    prototype_parent: anchor_room
+    key: 路口
+    desc: 路口往西通往東牧鎮，往東北則一路下到潮風鎮的海岸。路邊的沙地被車輪翻起，走起來深一腳淺一腳。
+    anchor_key: hamlet_sand_shore
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的空地朝東北，望得見潮風鎮方向的低平海岸。屋簷下掛著補過的漁網，海風一吹便輕輕擺動。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

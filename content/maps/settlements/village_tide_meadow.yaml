@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_tide_meadow
+location_ref: village_tide_meadow
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 211
+    y_m: 322
+    prototype_parent: anchor_room
+    key: 潮野綠地
+    desc: 綠地點在潮水漫不到的草甸上，井離河岸有一段路。甸上的草被潮氣養得肥厚，牛群整日散在四周。
+    anchor_key: village_tide_meadow
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 211
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口往日出鎮，路穿過低平的草甸。雨季時路面積水，村人鋪了成排的木板當步道。木板被踩得發亮，邊角還釘著防滑的橫條。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 211
+    y_m: 544
+    prototype_parent: grid_room
+    key: 北堤巷口
+    desc: 北邊的巷口接著往朝陽港的堤路，堤外就是東岸河的潮水。退潮時灘上留下成片的水窪，映著天光。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 100
+    y_m: 322
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的空地朝西，日頭落在草甸盡頭。石階邊晾著漁網，風把網線吹得輕輕作響。漁網晾乾後，村人會在階上補網。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: shrine_front
+  direction: w
+- source: shrine_front
+  destination: village_green
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:
