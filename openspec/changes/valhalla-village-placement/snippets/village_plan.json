@@ -1,0 +1,19 @@
+[
+ {"id": "village_wolf_fang", "cell": [236, 1628], "kind": "village"},
+ {"id": "village_bear_ridge", "cell": [436, 1620], "kind": "village"},
+ {"id": "village_deer_vale", "cell": [300, 1635], "kind": "village"},
+ {"id": "village_eagle_crag", "cell": [480, 1576], "kind": "village"},
+ {"id": "village_panther_ravine", "cell": [845, 1538], "kind": "village"},
+ {"id": "village_badger_den", "cell": [685, 1544], "kind": "village"},
+ {"id": "village_lynx_slope", "cell": [1103, 1503], "kind": "village"},
+ {"id": "village_fox_tail", "cell": [524, 1533], "kind": "village"},
+ {"id": "village_macaque_cliff", "cell": [555, 1395], "kind": "village"},
+ {"id": "village_otter_ford", "cell": [314, 1759], "kind": "village"},
+ {"id": "village_tiger_claw", "cell": [1136, 1642], "kind": "village"},
+ {"id": "village_boar_wood", "cell": [868, 1426], "kind": "village"},
+ {"id": "village_serpent_creek", "cell": [785, 1560], "kind": "village"},
+ {"id": "village_crane_knoll", "cell": [637, 1495], "kind": "village"},
+ {"id": "village_falcon_nest", "cell": [568, 1490], "kind": "village"},
+ {"id": "village_mastiff_ridge", "cell": [505, 1365], "kind": "village"},
+ {"id": "village_reindeer_shoal", "cell": [267, 1763], "kind": "village"}
+]

@@ -390,6 +390,24 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
     "hamlet_lotus_pond": AnchorLore("grandia", 70, None),
     "hamlet_caltrop_shore": AnchorLore("grandia", 60, None),
     "hamlet_reed_pond": AnchorLore("grandia", 60, None),
+    # Valhalla Beast Kingdom villages and hamlets: valhalla-village-placement.
+    "village_wolf_fang": AnchorLore("valhalla", 1_240, None),
+    "village_bear_ridge": AnchorLore("valhalla", 880, None),
+    "village_deer_vale": AnchorLore("valhalla", 1_180, None),
+    "village_eagle_crag": AnchorLore("valhalla", 760, None),
+    "village_panther_ravine": AnchorLore("valhalla", 820, None),
+    "village_badger_den": AnchorLore("valhalla", 700, None),
+    "village_lynx_den": AnchorLore("valhalla", 820, None),
+    "village_fox_tail": AnchorLore("valhalla", 760, None),
+    "village_macaque_cliff": AnchorLore("valhalla", 740, None),
+    "village_otter_ford": AnchorLore("valhalla", 1_060, None),
+    "village_tiger_claw": AnchorLore("valhalla", 860, None),
+    "village_boar_wood": AnchorLore("valhalla", 720, None),
+    "village_serpent_creek": AnchorLore("valhalla", 740, None),
+    "village_crane_knoll": AnchorLore("valhalla", 680, None),
+    "village_falcon_nest": AnchorLore("valhalla", 720, None),
+    "village_mastiff_ridge": AnchorLore("valhalla", 760, None),
+    "village_reindeer_shoal": AnchorLore("valhalla", 980, None),
 }
 
 
