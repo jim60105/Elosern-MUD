@@ -57,9 +57,10 @@ from world.maps.population_units import (
 from world.maps.regional_population import (
     MalformedPopulationState,
     initialize_population_seed,
+    read_population_timeline,
 )
 from world.maps.tests.test_monster_activity import (
-    GROUP_ACTIVITY,
+    AREA_KEY,
     PROBE,
     SEED,
     ActivityFixture,
@@ -383,6 +384,11 @@ class UnitResolutionFixture(ActivityFixture):
 
     def setUp(self):
         super().setUp()
+        # A runtime lookup by attribute string: the sanctioned seam for reading
+        # one authored row of a shipped registry from a behaviour test.
+        self.probe_area = getattr(lore_activity, "ACTIVITY_AREA_REGISTRY")[
+            AREA_KEY
+        ].rectangles[0]
         self.second_cell = self._outside_cell(PROBE, self.region)
         self.enterContext(
             patch.object(
@@ -442,11 +448,11 @@ class UnitResolutionFixture(ActivityFixture):
                 return candidate
         raise AssertionError("no second cell of the probe region")
 
-    @staticmethod
-    def _in_probe_area(candidate: tuple[int, int]) -> bool:
+    def _in_probe_area(self, candidate: tuple[int, int]) -> bool:
         """Whether a cell lies inside the fixture's authored activity extent."""
+        x_min, x_max, y_min, y_max = self.probe_area
         x, y = candidate
-        return PROBE[0] <= x <= PROBE[0] + 19 and PROBE[1] <= y <= PROBE[1] + 19
+        return x_min <= x <= x_max and y_min <= y <= y_max
 
     def test_a_group_inside_its_zone_touches_exactly_that_unit(self):
         group_id, _bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
@@ -541,9 +547,17 @@ class UnitResolutionFixture(ActivityFixture):
     def _uncovered_cell(self) -> tuple[int, int]:
         """One published cell of no authored zone or activity area."""
         for offset in range(20, 120):
-            candidate = (self.second_cell[0] + offset, self.second_cell[1] + 60)
-            if regional_population.cell_region(candidate) is not None:
-                return candidate
+            for candidate in (
+                (self.second_cell[0] + offset, self.second_cell[1] + 60),
+                (self.second_cell[0] + 60, self.second_cell[1] + offset),
+            ):
+                region_key = regional_population.cell_region(candidate)
+                if (
+                    region_key is not None
+                    and self.index.unit_of_cell(region_key, candidate)
+                    == RESIDUAL_UNIT
+                ):
+                    return candidate
         raise AssertionError("no uncovered published cell")
 
 
@@ -655,3 +669,62 @@ class UnitCursorTests(ActivityFixture):
                     self.wilderness.attributes.get(POPULATION_UNIT_CURSORS_ATTRIBUTE),
                     case,
                 )
+
+    def test_a_pass_over_a_missing_or_malformed_record_refuses_before_settling(self):
+        timeline_tick = read_population_timeline(self.wilderness).settled_through_tick
+        activity_tick = read_monster_activity(self.wilderness).settled_through_tick
+        cases = (None, {"default": "5", "units": {}}, {"default": 0})
+        for case in cases:
+            with self.subTest(case=case):
+                self.wilderness.attributes.remove(POPULATION_UNIT_CURSORS_ATTRIBUTE)
+                if case is not None:
+                    self.wilderness.db.population_unit_cursors = case
+                with self.assertRaises(MalformedPopulationState):
+                    settle_population_lifecycle(100, 260)
+                # No settlement was committed, so a direct caller outside a
+                # clock advance cannot leave an advanced world behind a raise.
+                self.assertEqual(
+                    read_population_timeline(self.wilderness).settled_through_tick,
+                    timeline_tick,
+                )
+                self.assertEqual(
+                    read_monster_activity(self.wilderness).settled_through_tick,
+                    activity_tick,
+                )
+                if case is None:
+                    self.assertFalse(
+                        self.wilderness.attributes.has(
+                            POPULATION_UNIT_CURSORS_ATTRIBUTE
+                        )
+                    )
+                else:
+                    self.assertEqual(
+                        self.wilderness.attributes.get(
+                            POPULATION_UNIT_CURSORS_ATTRIBUTE
+                        ),
+                        case,
+                    )
+
+    def _stored_cursor_bytes(self) -> object:
+        """The serialized stored cursor value, for a byte-level comparison."""
+        attribute = self.wilderness.attributes.get(
+            POPULATION_UNIT_CURSORS_ATTRIBUTE, return_obj=True
+        )
+        return None if attribute is None else repr(attribute.db_value)
+
+    def test_a_refused_advance_leaves_the_stored_mapping_untouched(self):
+        write_unit_cursors(self.wilderness, UnitCursors(50, {"zone:t_one": 60}))
+        before = self._stored_cursor_bytes()
+        # The invalid unit identifier is reached before the one write, so
+        # neither its own unit nor the earlier one is raised.
+        with self.assertRaises(ValueError):
+            advance_unit_cursors(self.wilderness, ("zone:t_one", ""), 80)
+        self.assertEqual(self._stored_cursor_bytes(), before)
+        # An invalid tick refuses before the read that could store anything.
+        with self.assertRaises(ValueError):
+            advance_unit_cursors(self.wilderness, None, -1)
+        self.assertEqual(self._stored_cursor_bytes(), before)
+        self.assertEqual(
+            read_unit_cursors(self.wilderness),
+            UnitCursors(50, {"zone:t_one": 60}),
+        )

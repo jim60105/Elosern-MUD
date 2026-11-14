@@ -2823,7 +2823,9 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
                     wilderness, "monster_activity"
                 ),
                 # The per-unit settlement cursors are advanced by every
-                # lifecycle pass, so the same rollback must restore them.
+                # lifecycle pass, so the same rollback must restore them. The
+                # literal matches "monster_activity" above: importing the
+                # population_units constant here would close an import cycle.
                 ("population_unit_cursors", None): _db_safe_attribute_snapshot(
                     wilderness, "population_unit_cursors"
                 ),

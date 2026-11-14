@@ -201,6 +201,11 @@ def settle_population_lifecycle(
     wilderness = _wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return []
+    # A world without a usable per-unit record must refuse before any
+    # settlement work, not after it: a direct caller outside a clock advance
+    # owns its own commit, so a tail-only check would leave settled state
+    # behind a raised advance.
+    population_units.read_unit_cursors(wilderness)
     events: list[ScheduledEvent] = []
     tick = start_tick
     with maintenance_tally() as counts:
