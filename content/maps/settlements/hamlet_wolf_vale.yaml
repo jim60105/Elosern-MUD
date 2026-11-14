@@ -13,8 +13,8 @@ nodes:
     x_m: 165
     y_m: 165
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 狼谷圖騰
+    desc: 圖騰柱立在谷底最窄處，柱頂的狼首朝向下坡。谷裡的水聲在兩壁之間來回傳。谷底的風向總在傍晚改變。
     anchor_key: hamlet_wolf_vale
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘灶
+    desc: 火塘灶用谷裡的青石壘成，石頭遇熱會發出細微的爆裂聲。往北的官道通往巫醫窟。爆裂聲在谷壁之間會傳成回音。
     anchor_key:
     typeclass:
     scene_archetype: city_street

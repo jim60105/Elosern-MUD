@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門通往灰熊鎮，門外路面被溪水浸得發軟。走這段路的人多半赤腳。
+    desc: 東南寨門通往灰熊鎮，門外路面被溪水浸得發軟。走這段路的人多半赤腳。溪水漫過路面時，過路的人得踩著石頭跳過去。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 358
     prototype_parent: grid_room
     key: 西北寨門
-    desc: 西北寨門朝祖靈聖地的方向，門柱上盤著真實的藤蔓，和圖騰的蛇紋幾乎分不清。
+    desc: 西北寨門朝祖靈聖地的方向，門柱上盤著真實的藤蔓，和圖騰的蛇紋幾乎分不清。藤蔓上還掛著上次祭典留下的布條。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門通往疾風城，門外那道風口常年不停。守門人用獸皮裹住臉才站得住。
+    desc: 東南寨門通往疾風城，門外那道風口常年不停。守門人用獸皮裹住臉才站得住。風口兩側的草被吹得貼地，門柱上綁著加重的石塊。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 354
     prototype_parent: grid_room
     key: 西北寨門
-    desc: 西北寨門朝西渡營的方向，門前一段路穿過低矮的灌木。
+    desc: 西北寨門朝西渡營的方向，門前一段路穿過低矮的灌木。灌木上結著細小的紅果，是守門人打發時間的零嘴。
     anchor_key:
     typeclass:
     scene_archetype: city_street

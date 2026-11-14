@@ -13,8 +13,8 @@ nodes:
     x_m: 167
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 梟木圖騰
+    desc: 圖騰柱是用一株半枯的梟木削成，樹皮上還留著原來的眼狀節。林裡的夜比別處來得早。梟木的樹皮聞起來有一股淡淡的苦味。
     anchor_key: hamlet_owl_wood
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 167
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘棚
+    desc: 火塘棚用樹枝搭成，棚頂鋪著厚厚一層落葉。往東的路通往巫醫窟，往西南則是狐火城。落葉層踩上去很軟，走路幾乎沒有聲音。
     anchor_key:
     typeclass:
     scene_archetype: city_street

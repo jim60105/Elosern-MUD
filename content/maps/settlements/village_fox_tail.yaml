@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門順坡而下通往疾風城，門外的路邊開著一帶野花。
+    desc: 東南寨門順坡而下通往疾風城，門外的路邊開著一帶野花。野花的花期很短，過了盛夏就只剩灰綠的草葉。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 360
     prototype_parent: grid_room
     key: 西北寨門
-    desc: 西北寨門面向角原城的方向，門內是族中存放獵具的棚屋。
+    desc: 西北寨門面向角原城的方向，門內是族中存放獵具的棚屋。棚屋的木架上掛著換下來的舊弓與斷箭。
     anchor_key:
     typeclass:
     scene_archetype: city_street

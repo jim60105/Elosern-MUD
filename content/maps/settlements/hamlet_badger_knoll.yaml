@@ -13,8 +13,8 @@ nodes:
     x_m: 203
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 獾形圖騰
+    desc: 獾形圖騰柱短而粗，柱頂挖出一個小凹槽用來放鹽塊。岡上的風把地面的砂吹得沙沙作響。
     anchor_key: hamlet_badger_knoll
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘石圈
+    desc: 火塘四周圍著一圈石頭，石頭被煙熏得漆黑。往東的路通往獵鷹鎮，往西北則是灰熊鎮。石圈外的地面被踩出一條通往官道的小徑。
     anchor_key:
     typeclass:
     scene_archetype: city_street

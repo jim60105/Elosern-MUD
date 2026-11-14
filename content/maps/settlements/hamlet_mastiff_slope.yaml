@@ -13,8 +13,8 @@ nodes:
     x_m: 165
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 獒首圖騰
+    desc: 圖騰柱的獒首朝向坡下，柱身圍著一圈防風的石堆。坡上的草被風壓得伏在地上。石堆的高度差不多到人的腰際。
     anchor_key: hamlet_mastiff_slope
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 165
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 公用火塘
+    desc: 火塘邊掛著幾條風乾的肉條，煙總往西北飄。往西北的官道通往月嚎城。肉條在風裡晃動，發出輕微的摩擦聲。
     anchor_key:
     typeclass:
     scene_archetype: city_street

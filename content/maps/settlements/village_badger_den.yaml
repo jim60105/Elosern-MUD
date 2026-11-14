@@ -23,7 +23,7 @@ nodes:
     y_m: 352
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往祖靈聖地，門外是一段樹根盤結的小路。族人往聖地送供品時都走這道門。
+    desc: 東北寨門通往祖靈聖地，門外是一段樹根盤結的小路。族人往聖地送供品時都走這道門。路旁的樹根被踩得發亮，供品籃就擱在樹根上。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 163
     prototype_parent: grid_room
     key: 祖靈祭壇
-    desc: 祖靈祭壇在寨子東南的土丘上，壇身半埋在坡裡。祭壇旁的老樹上掛著歷年留下的骨飾。
+    desc: 祖靈祭壇在寨子東南的土丘上，壇身半埋在坡裡。祭壇旁的老樹上掛著歷年留下的骨飾。老樹的枝椏伸到壇頂，雨天替祭壇擋住大半的雨。
     anchor_key:
     typeclass:
     scene_archetype: city_street

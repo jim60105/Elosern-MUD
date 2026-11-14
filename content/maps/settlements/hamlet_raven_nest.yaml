@@ -13,8 +13,8 @@ nodes:
     x_m: 161
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 烏鴉圖騰
+    desc: 圖騰柱頂端削成鴉首，柱上釘著收集來的黑羽。林梢的鴉群在營地上空盤旋。黑羽在柱上排成一圈，像一道深色的環。
     anchor_key: hamlet_raven_nest
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 161
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共火塘
+    desc: 共火塘用石頭圍出低矮的圈，圈邊插著幾枝驅獸的草束。往東南的官道通往巫醫窟。草束是曬乾的艾草，用來攔住靠近的野獸。
     anchor_key:
     typeclass:
     scene_archetype: city_street

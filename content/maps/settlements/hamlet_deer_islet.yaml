@@ -13,8 +13,8 @@ nodes:
     x_m: 205
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 祖靈柱
+    desc: 祖靈柱立在河洲的高處，柱身被河水泡得發黑。洲上草叢裡有鹿群踏出來的細徑。洲上的草被鹿群啃得短而整齊。
     anchor_key: hamlet_deer_islet
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘棚
+    desc: 火塘上搭著遮雨的棚子，棚柱是從河洲砍來的柳木。往東南的官道通往咆哮王城。棚柱上綁著用柳皮搓成的繩子。
     anchor_key:
     typeclass:
     scene_archetype: city_street

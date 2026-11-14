@@ -13,8 +13,8 @@ nodes:
     x_m: 163
     y_m: 163
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 鹿徑圖騰
+    desc: 圖騰柱上刻著鹿蹄的印子，柱旁是鹿群踩了多年的舊徑。草地被兩側的坡夾成長條。舊徑上的蹄印一層疊著一層。
     anchor_key: hamlet_deer_trail
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共火塘
+    desc: 共火塘的火不大，剛好夠烘乾獵物的毛皮。往西南的路通往鹿鳴渡，往西北通往月嚎城。毛皮掛在火塘上風處，煙會慢慢滲進去。
     anchor_key:
     typeclass:
     scene_archetype: city_street

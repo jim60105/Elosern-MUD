@@ -23,7 +23,7 @@ nodes:
     y_m: 348
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往祖靈聖地，門外是一段徐徐上升的崗道。
+    desc: 東北寨門通往祖靈聖地，門外是一段徐徐上升的崗道。崗道兩側長著成排的矮松，松針積在路邊。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南寨門
-    desc: 西南寨門朝疾風城的方向，門邊的草叢裡常停著幾隻真正的白鶴。
+    desc: 西南寨門朝疾風城的方向，門邊的草叢裡常停著幾隻真正的白鶴。白鶴不怕人，守門的孩子會蹲在草邊看牠們覓食。
     anchor_key:
     typeclass:
     scene_archetype: city_street

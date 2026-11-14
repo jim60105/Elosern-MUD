@@ -14,7 +14,7 @@ nodes:
     y_m: 236
     prototype_parent: anchor_room
     key: 寨心圖騰
-    desc: 寨心立著熊首圖騰，柱腳拴著幾匹剛從山坡牽下來的馱獸。四野是高過屋脊的草坡。
+    desc: 寨心立著熊首圖騰，柱腳拴著幾匹剛從山坡牽下來的馱獸。四野是高過屋脊的草坡。山坡上的風把圖騰柱上的布條吹得筆直。
     anchor_key: village_bear_ridge
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門順著山脊下行，通往西渡營那一頭的官道。門外坡面開著成片的野花。
+    desc: 東南寨門順著山脊下行，通往西渡營那一頭的官道。門外坡面開著成片的野花。這段坡道雨後會變得泥濘，馱隊得靠繩索牽引。
     anchor_key:
     typeclass:
     scene_archetype: city_street

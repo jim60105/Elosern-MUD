@@ -13,8 +13,8 @@ nodes:
     x_m: 100
     y_m: 155
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 隼羽圖騰
+    desc: 圖騰柱頂插著隼羽，柱身在河風裡微微傾斜。灘上的石頭被水磨得扁平。隼羽的顏色在河風裡顯得更深。
     anchor_key: hamlet_falcon_shoal
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 155
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘石圈
+    desc: 火塘石圈邊晾著網具，繩結打在石上。往東的官道通往東渡鎮。繩結打得很密，免得網具被水沖走。
     anchor_key:
     typeclass:
     scene_archetype: city_street

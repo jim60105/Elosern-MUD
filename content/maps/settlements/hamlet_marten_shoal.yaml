@@ -13,8 +13,8 @@ nodes:
     x_m: 155
     y_m: 155
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 貂尾圖騰
+    desc: 圖騰柱上綁著貂尾，柱旁是界河邊的卵石灘。河水在這裡轉了一個大彎。卵石灘在陽光下泛著河水的濕光。
     anchor_key: hamlet_marten_shoal
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共火塘
+    desc: 共火塘的石圈外晾著幾張剛洗過的皮子。往西的路通往西渡營。皮子晾在石圈外的木架上，需要常翻面。
     anchor_key:
     typeclass:
     scene_archetype: city_street

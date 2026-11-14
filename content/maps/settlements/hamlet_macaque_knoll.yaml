@@ -13,8 +13,8 @@ nodes:
     x_m: 165
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 獼猴圖騰
+    desc: 圖騰柱上雕著攀爬的獼猴，柱身留著供人手抓握的凹槽。岡上的灌木結著小紅果。凹槽的深度剛好能握住，往上攀的人不會滑手。
     anchor_key: hamlet_macaque_knoll
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 165
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共用火塘
+    desc: 火塘邊堆著採來的乾柴與野果。往北的官道通往獵鷹鎮，往東南通往東渡營。野果挑過一輪，壞的都丟在火塘邊當柴燒。
     anchor_key:
     typeclass:
     scene_archetype: city_street

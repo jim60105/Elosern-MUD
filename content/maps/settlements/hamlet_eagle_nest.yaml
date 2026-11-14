@@ -13,8 +13,8 @@ nodes:
     x_m: 165
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 鷹翅圖騰
+    desc: 圖騰柱的頂端刻成展開的鷹翅，柱身留著風沙磨出的紋路。獵人說鷹群每年都回到這片崖上。
     anchor_key: hamlet_eagle_nest
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 165
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘座
+    desc: 火塘座嵌在岩縫裡，煮肉的石鍋擱在燒紅的石塊上。往東的路通往松濤渡，往西則是虎嘯城。
     anchor_key:
     typeclass:
     scene_archetype: city_street

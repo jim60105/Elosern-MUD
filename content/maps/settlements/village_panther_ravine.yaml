@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門順著澗谷下行，通往灰熊鎮。門外的路面鋪著從澗底撈上來的圓石。
+    desc: 東南寨門順著澗谷下行，通往灰熊鎮。門外的路面鋪著從澗底撈上來的圓石。圓石之間的縫隙在雨天會積水，走過時會濺起水花。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 234
     prototype_parent: grid_room
     key: 西寨門
-    desc: 西寨門朝祖靈聖地的方向，門後一排木架晾著剛剝下來的獸皮。
+    desc: 西寨門朝祖靈聖地的方向，門後一排木架晾著剛剝下來的獸皮。皮子的氣味很重，守門人會在上風處點一把艾草。
     anchor_key:
     typeclass:
     scene_archetype: city_street

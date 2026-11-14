@@ -23,7 +23,7 @@ nodes:
     y_m: 204
     prototype_parent: grid_room
     key: 東寨門
-    desc: 東寨門順著河岸往東，通往鹿鳴渡的官道。門外晾著成排的漁網，風一吹便鼓起來。
+    desc: 東寨門順著河岸往東，通往鹿鳴渡的官道。門外晾著成排的漁網，風一吹便鼓起來。漁網上掛著的浮木是河裡撈來的舊料。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 204
     prototype_parent: grid_room
     key: 西寨門
-    desc: 西寨門通往霜風鎮那一側，門前拴著幾條運貨的木筏。渡口的船伕在門邊等客人。
+    desc: 西寨門通往霜風鎮那一側，門前拴著幾條運貨的木筏。渡口的船伕在門邊等客人。木筏上堆著要送到下游的糧袋，艄公坐在筏尾打盹。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -13,8 +13,8 @@ nodes:
     x_m: 171
     y_m: 171
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 狼首圖騰
+    desc: 圖騰柱上刻著狼首，柱頂繫著幾束曬乾的草繩。營地四周的林地靜得只剩風聲。火塘的煙在樹冠下散不開。
     anchor_key: hamlet_wolf_bend
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 公用火塘
+    desc: 火塘挖在土坡背風的一面，柴火整齊堆在旁邊。往東的路通往虎嘯城，往西則是咆哮王城。
     anchor_key:
     typeclass:
     scene_archetype: city_street

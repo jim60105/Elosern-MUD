@@ -14,7 +14,7 @@ nodes:
     y_m: 234
     prototype_parent: anchor_room
     key: 貓影圖騰
-    desc: 寨心鋪著山貓形狀的石板，中央的圖騰柱刻著躍起的貓影。石板縫裡嵌滿了細碎的獸牙。
+    desc: 寨心鋪著山貓形狀的石板，中央的圖騰柱刻著躍起的貓影。石板縫裡嵌滿了細碎的獸牙。石板的貓形輪廓在黃昏時最清楚。
     anchor_key: village_lynx_den
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 368
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往鐵爪城，門外那道坡是整片丘陵最陡的一段。馱隊經過時總要在門前歇腳。
+    desc: 東北寨門通往鐵爪城，門外那道坡是整片丘陵最陡的一段。馱隊經過時總要在門前歇腳。坡底的轉彎處立著一塊指路的石頭，上面刻著鐵爪城的標記。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南寨門
-    desc: 西南寨門朝獵鷹鎮的方向，門洞正對著南邊的官道。鎮上的獵戶常從這道門進出。
+    desc: 西南寨門朝獵鷹鎮的方向，門洞正對著南邊的官道。鎮上的獵戶常從這道門進出。南邊的官道穿過一片低矮的灌木，獵戶天一黑就回來。
     anchor_key:
     typeclass:
     scene_archetype: city_street

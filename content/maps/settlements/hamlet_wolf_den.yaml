@@ -13,8 +13,8 @@ nodes:
     x_m: 100
     y_m: 205
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 狼穴圖騰
+    desc: 圖騰柱埋在一處土穴旁，柱身的下半段幾乎被土遮住。穴口掛著防風的皮簾。皮簾內側縫著幾層舊布，擋得住穿堂風。
     anchor_key: hamlet_wolf_den
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 公共火塘
+    desc: 公共火塘的火光在土穴裡映出很長的影子。往南的官道通往祖靈聖地，往北通往咆哮王城。
     anchor_key:
     typeclass:
     scene_archetype: city_street

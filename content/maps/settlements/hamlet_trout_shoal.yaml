@@ -13,8 +13,8 @@ nodes:
     x_m: 186
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 鱒魚圖騰
+    desc: 圖騰柱立在河灘上，柱身刻著逆流而上的鱒魚。灘上的淺水裡看得見魚影。淺水裡常見成群的小魚逆流打轉。
     anchor_key: hamlet_trout_shoal
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共用火塘
+    desc: 火塘以河石圍成，石頭被水沖得圓滑。往東的路沿河通往鹿鳴渡。石頭被河水沖得幾乎沒有稜角。
     anchor_key:
     typeclass:
     scene_archetype: city_street

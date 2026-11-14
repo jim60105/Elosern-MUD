@@ -13,8 +13,8 @@ nodes:
     x_m: 182
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 水獺圖騰
+    desc: 圖騰柱立在河洲中央，柱腳被河水舔得發亮。洲邊的蘆葦比人還高。蘆葦叢間有築巢的鳥，清晨叫聲很雜。
     anchor_key: hamlet_otter_islet
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘棚
+    desc: 火塘棚用蘆葦編成，風穿過縫隙時帶著河水的氣味。往東的官道通往鹿鳴渡。棚子的縫隙裡看得到外面的河水。
     anchor_key:
     typeclass:
     scene_archetype: city_street

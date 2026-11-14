@@ -13,8 +13,8 @@ nodes:
     x_m: 167
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 虎尾圖騰
+    desc: 圖騰柱上的虎尾繞柱一圈，尾端朝向外側。柱下是兩條官道交會後的空地。空地中央留著生火的圓形焦痕。
     anchor_key: hamlet_tiger_tail
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 167
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘灶
+    desc: 火塘灶旁立著幾根削尖的木樁，用來掛獵物。往西北的路通往松濤渡。木樁上還留著上一季的獸骨殘片。
     anchor_key:
     typeclass:
     scene_archetype: city_street

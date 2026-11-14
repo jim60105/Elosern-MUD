@@ -13,8 +13,8 @@ nodes:
     x_m: 161
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 熊掌圖騰
+    desc: 圖騰柱上刻著張開的熊掌，柱底的石頭被河泥染成深色。王城的煙在東南方向隱約可見。熊掌的凹刻裡也積著河泥。
     anchor_key: hamlet_bear_shoal
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 161
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘灶
+    desc: 火塘灶旁堆著從河灘撿來的浮木。往東南的路通往咆哮王城。浮木大多是上游沖下來的舊樹枝。
     anchor_key:
     typeclass:
     scene_archetype: city_street

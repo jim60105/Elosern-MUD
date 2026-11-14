@@ -13,8 +13,8 @@ nodes:
     x_m: 222
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 烽煙圖騰
+    desc: 圖騰柱立於四條官道的交會處，柱頂留著點火用的凹槽。戰時這裡升起的煙能傳很遠。凹槽裡常年備著乾柴與引火的絨草。
     anchor_key: hamlet_wolf_beacon
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 公火塘
+    desc: 公火塘邊排著幾張粗木凳，族人用它在霧重時分派任務。往東的官道通往角原城。霧重的日子裡，木凳上會多鋪一層獸皮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

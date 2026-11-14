@@ -23,7 +23,7 @@ nodes:
     y_m: 358
     prototype_parent: grid_room
     key: 東北寨門
-    desc: 東北寨門通往疾風城，門外石階沿崖面折了七次。階旁的鐵鏈是給老人和小獸扶著走的。
+    desc: 東北寨門通往疾風城，門外石階沿崖面折了七次。階旁的鐵鏈是給老人和小獸扶著走的。七折之後的階梯出口是一塊平緩的岩臺。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 西南寨門
-    desc: 西南寨門朝西渡營的方向，門前是一段黃土坡。雨季時坡上的水會匯成小溝流進寨裡。
+    desc: 西南寨門朝西渡營的方向，門前是一段黃土坡。雨季時坡上的水會匯成小溝流進寨裡。黃土坡的邊緣長著一片耐旱的芒草。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -13,8 +13,8 @@ nodes:
     x_m: 198
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 豹尾圖騰
+    desc: 圖騰柱上綁著真正的豹尾，風來時尾端輕輕擺動。柱下的地面鋪著一層碎石。碎石的來源是澗底沖下來的石礫。
     anchor_key: hamlet_panther_tail
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘地
+    desc: 火塘挖在碎石地上，四周用獸皮擋風。往東南的路通往虎嘯城，往西則是咆哮王城。獸皮擋風的一側朝向谷口。
     anchor_key:
     typeclass:
     scene_archetype: city_street

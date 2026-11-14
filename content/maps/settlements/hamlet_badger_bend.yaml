@@ -13,8 +13,8 @@ nodes:
     x_m: 178
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 獾首圖騰
+    desc: 圖騰柱上的獾首朝著轉彎的方向，柱身被往來的馱獸蹭得光滑。彎道內側留著卸貨的空地。
     anchor_key: hamlet_badger_bend
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 178
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 火塘石臺
+    desc: 火塘砌在石臺上，臺下是排水的淺溝。往東南的官道通往角原城，往北通往鹿鳴渡。淺溝在雨季能把積水引到坡下。
     anchor_key:
     typeclass:
     scene_archetype: city_street

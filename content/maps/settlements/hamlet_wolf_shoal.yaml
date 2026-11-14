@@ -13,8 +13,8 @@ nodes:
     x_m: 182
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 狼牙灘柱
+    desc: 圖騰柱立在河灘的高處，柱上刻著狼牙的鋸齒紋。往北能看見鹿鳴渡方向的炊煙。柱上的鋸齒紋和真正的狼牙形狀很接近。
     anchor_key: hamlet_wolf_shoal
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共用火塘
+    desc: 共用火塘旁堆著河灘撿來的圓石，石頭用來壓住棚布。往西北的路通往鹿鳴渡。棚布被石頭壓住，風再大也不拍打。
     anchor_key:
     typeclass:
     scene_archetype: city_street

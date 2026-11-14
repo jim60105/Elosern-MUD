@@ -13,8 +13,8 @@ nodes:
     x_m: 171
     y_m: 100
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 熊溪圖騰
+    desc: 圖騰柱旁的小溪從岩縫裡滲出，在柱底匯成一小汪水。熊掌印在泥地上還看得出來。泥地上的掌印比人的手掌大上一圈。
     anchor_key: hamlet_bear_creek
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 171
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 公用火塘
+    desc: 火塘邊擱著幾隻舀水的木瓢，溪水就從旁邊的凹槽引過來。往南的路通往松濤渡。凹槽是族人用石鑿一點一點挖出來的。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -14,7 +14,7 @@ nodes:
     y_m: 192
     prototype_parent: anchor_room
     key: 獒犬圖騰
-    desc: 寨心的獒犬圖騰朝南蹲坐，石雕的鼻頭被摸得光滑。嶺上的風把旗繩打得啪啪作響。
+    desc: 寨心的獒犬圖騰朝南蹲坐，石雕的鼻頭被摸得光滑。嶺上的風把旗繩打得啪啪作響。旗繩上的布條已經被風撕成細條。
     anchor_key: village_mastiff_ridge
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 192
     prototype_parent: grid_room
     key: 東寨門
-    desc: 東寨門通往疾風城的方向，門外沿嶺脊而行的路窄得只能過一列人。
+    desc: 東寨門通往疾風城的方向，門外沿嶺脊而行的路窄得只能過一列人。兩側是陡落的草坡，走慣的人也不敢並行。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 192
     prototype_parent: grid_room
     key: 西寨門
-    desc: 西寨門朝西渡營，門前是一片可以望遠的草嶺。巡嶺的族人每天從這裡出發。
+    desc: 西寨門朝西渡營，門前是一片可以望遠的草嶺。巡嶺的族人每天從這裡出發。草嶺上的獸徑交錯，走遠了得靠風向認路。
     anchor_key:
     typeclass:
     scene_archetype: city_street

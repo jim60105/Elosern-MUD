@@ -23,7 +23,7 @@ nodes:
     y_m: 208
     prototype_parent: grid_room
     key: 東寨門
-    desc: 東寨門正對角原城方向，門外的官道沿谷地東行。清晨常有鹿群在門外林緣停留。
+    desc: 東寨門正對角原城方向，門外的官道沿谷地東行。清晨常有鹿群在門外林緣停留。谷地的晨霧散得慢，日出時林緣總是一片白。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 208
     prototype_parent: grid_room
     key: 西寨門
-    desc: 西寨門通往影林城那一側的林子，門前架著拒馬。守門的族人習慣在這裡分派獵隊。
+    desc: 西寨門通往影林城那一側的林子，門前架著拒馬。守門的族人習慣在這裡分派獵隊。拒馬的木樁上還留著去年的刀痕。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -41,7 +41,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 祖靈祭壇
-    desc: 祖靈祭壇在南邊的谷坡上，壇前的石階一路通到寨心。祭壇後方是鹿谷最密的林子。
+    desc: 祖靈祭壇在南邊的谷坡上，壇前的石階一路通到寨心。祭壇後方是鹿谷最密的林子。壇前的石階被踩出淺淺的凹痕。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 東南寨門
-    desc: 東南寨門朝鐵爪城的方向敞開，門外的官道順著丘陵東行。門柱上掛著新換的虎骨串。
+    desc: 東南寨門朝鐵爪城的方向敞開，門外的官道順著丘陵東行。門柱上掛著新換的虎骨串。虎骨串隨風碰撞，聲音在丘陵間傳得很遠。
     anchor_key:
     typeclass:
     scene_archetype: city_street
@@ -32,7 +32,7 @@ nodes:
     y_m: 372
     prototype_parent: grid_room
     key: 西北寨門
-    desc: 西北寨門通往松濤渡，門前那條路兩旁都是高過人頭的茅草。
+    desc: 西北寨門通往松濤渡，門前那條路兩旁都是高過人頭的茅草。茅草開花時，整條路都覆著一層白絮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

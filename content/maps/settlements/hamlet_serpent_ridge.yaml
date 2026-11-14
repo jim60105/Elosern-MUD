@@ -13,8 +13,8 @@ nodes:
     x_m: 169
     y_m: 169
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 蛇紋圖騰
+    desc: 圖騰柱上刻著盤繞的蛇紋，紋路順著木頭原來的裂縫走。嶺上的風從兩側的樹林間穿過。裂縫裡有時會鑽出細小的蜥蜴。
     anchor_key: hamlet_serpent_ridge
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共用火塘
+    desc: 火塘旁的木樁上掛著幾張待修的弓。往東北的路通往鐵爪城，往西南通往獵鷹鎮。待修的弓上都綁著標記繩。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -13,8 +13,8 @@ nodes:
     x_m: 178
     y_m: 178
     prototype_parent: anchor_room
-    key: 圖騰柱下
-    desc: ''
+    key: 圖騰柱
+    desc: 圖騰柱立在營地中央，柱身刻著水獺啣魚的圖樣。柱腳一圈石頭圍著火塘，河上的水氣常把石頭打濕。
     anchor_key: hamlet_otter_tail
     typeclass:
     scene_archetype: city_street
@@ -22,8 +22,8 @@ nodes:
     x_m: 100
     y_m: 100
     prototype_parent: grid_room
-    key: 火塘邊
-    desc: ''
+    key: 共火塘
+    desc: 共火塘邊架著熏魚的木架，煙順著河風往東飄。往東的路接上咆哮王城到虎嘯城的官道。官道的車轍裡積著河水帶上來的細沙。
     anchor_key:
     typeclass:
     scene_archetype: city_street
