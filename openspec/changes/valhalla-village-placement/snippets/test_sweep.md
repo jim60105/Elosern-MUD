@@ -30,3 +30,16 @@ label that would have run alone is marked "single".
 | single | `world.maps.tests.test_altoria_capital` | Ran 12, OK |
 | single | `world.maps.tests.test_bootstrap` | Ran 46, OK — 348.860 s, also the second D9 timing line |
 | 3 | `test_city_movement_cost`, `test_city_walkthrough`, `test_city_wilderness_roundtrip` | Ran 10, OK |
+| single | `world.maps.tests.test_editor_final_yaml_adoption` | Ran 1, OK — 136.054 s |
+| 3 | `test_geography_source`, `test_limbo_room`, `test_movement_roundtrip` | Ran 47, OK |
+| 2 | `world.maps.tests.test_population_geometry`, `test_sparse_graph` | Ran 41, OK |
+| 3 | `test_runtime_adoption`, `test_settlement_reload`, `test_static_map_references` | Ran 20, OK — 136.931 s |
+| 3 | `test_village_ciaran`, `test_wilderness_destination`, `test_wilderness_geography_contract` | Ran 51, OK |
+| 2 | `test_wilderness_population`, `test_wilderness_provider` | Ran 37, OK |
+| 2 | `world.quests.tests.test_compile_blueprint`, `test_compile_offline` | Ran 49, OK |
+| 2 | `world.quests.tests.test_definitions`, `test_scene_builder_offline` | Ran 62, OK |
+| 2 | `world.quests.tests.test_compile_registration`, `test_encounter_activation` | Ran 45, OK |
+| 2 | `world.quests.tests.test_encounter_dispatch`, `test_generated_dialogue_scenes` | Ran 52, OK |
+| 2 | `world.quests.tests.test_package_proposal`, `test_quests_observability` | Ran 24, 9 `SettlementNotLoaded` errors through the `_anchor_key` fixture lookup, 15 passed — documented red |
+| 4 | `test_room_observation`, `test_scene_smoke`, `test_story_dialogue`, `test_story_effects` | Ran 41, OK |
+| 3 | `test_dialogue_refresh_lifecycle`, `test_guild_config.test_price_scaling`, `test_guild_config.test_service_host_roster` | Ran 61, OK |
