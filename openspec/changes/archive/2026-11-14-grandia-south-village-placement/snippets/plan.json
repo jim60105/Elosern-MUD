@@ -1,0 +1,614 @@
+[
+ {
+  "id": "village_reed_ford",
+  "kind": "village",
+  "cell": [
+   2299,
+   526
+  ],
+  "display_name_zh": "蘆渡村",
+  "description": "Village at the reed-banked ford of the imperial east branch, where the bay road crosses the river.",
+  "geographic_constraint": "Reed-banked ford of the imperial east branch on the east bay road",
+  "population": 1300
+ },
+ {
+  "id": "village_east_junction",
+  "kind": "village",
+  "cell": [
+   2371,
+   491
+  ],
+  "display_name_zh": "東匯村",
+  "description": "Village at the junction of the coast highway and the pasture road, above the east bay.",
+  "geographic_constraint": "Road junction above the east bay, on the coast highway",
+  "population": 1800
+ },
+ {
+  "id": "village_north_plain",
+  "kind": "village",
+  "cell": [
+   2173,
+   557
+  ],
+  "display_name_zh": "北原村",
+  "description": "Farming village on the open northern plain, on the road between the twin currents and the east bay.",
+  "geographic_constraint": "Open northern plain on the east bay road",
+  "population": 700
+ },
+ {
+  "id": "village_wind_plain",
+  "kind": "village",
+  "cell": [
+   2351,
+   590
+  ],
+  "display_name_zh": "風原村",
+  "description": "Village on the windswept plain behind the east coast ridge, on the pasture road.",
+  "geographic_constraint": "Windswept plain above the east coast on the pasture road",
+  "population": 600
+ },
+ {
+  "id": "village_salt_pan",
+  "kind": "village",
+  "cell": [
+   2072,
+   330
+  ],
+  "display_name_zh": "鹽埕村",
+  "description": "Salt-making village on the coastal flats north of the golden sheaf, on the coast road.",
+  "geographic_constraint": "Salt flats of the south-east coast, on the coast road north of the golden sheaf",
+  "population": 900
+ },
+ {
+  "id": "village_river_flat",
+  "kind": "village",
+  "cell": [
+   2068,
+   519
+  ],
+  "display_name_zh": "河埔村",
+  "description": "Farming village on the flat west bank of the imperial river, on the coast road.",
+  "geographic_constraint": "Flat west bank of the imperial river on the coast road",
+  "population": 1200
+ },
+ {
+  "id": "village_three_roads",
+  "kind": "village",
+  "cell": [
+   2049,
+   644
+  ],
+  "display_name_zh": "三路村",
+  "description": "Village where the spice road, the twin currents road and the bay road meet on the open plain.",
+  "geographic_constraint": "Three-road junction on the plain west of the twin currents",
+  "population": 1700
+ },
+ {
+  "id": "village_pasture_road",
+  "kind": "village",
+  "cell": [
+   2330,
+   714
+  ],
+  "display_name_zh": "牧道村",
+  "description": "Cattle village on the pasture road between the east bay and the east pasture.",
+  "geographic_constraint": "Open pasture on the road between the east bay and the east pasture",
+  "population": 800
+ },
+ {
+  "id": "village_level_field",
+  "kind": "village",
+  "cell": [
+   1985,
+   809
+  ],
+  "display_name_zh": "平疇村",
+  "description": "Farming village on the level fields of the central plain, on the road between the twin currents and the emerald lake.",
+  "geographic_constraint": "Level fields of the central plain on the emerald lake road",
+  "population": 1100
+ },
+ {
+  "id": "village_pepper_plain",
+  "kind": "village",
+  "cell": [
+   1918,
+   522
+  ],
+  "display_name_zh": "椒原村",
+  "description": "Village of spice gardens on the open plain east of the orange blossom, on the spice road.",
+  "geographic_constraint": "Spice gardens on the plain east of the orange blossom",
+  "population": 900
+ },
+ {
+  "id": "village_millet_plain",
+  "kind": "village",
+  "cell": [
+   1863,
+   518
+  ],
+  "display_name_zh": "粟原村",
+  "description": "Millet-farming village on the open plain west of the orange blossom, on the spice road.",
+  "geographic_constraint": "Open millet plain west of the orange blossom on the spice road",
+  "population": 800
+ },
+ {
+  "id": "village_open_plain",
+  "kind": "village",
+  "cell": [
+   1666,
+   657
+  ],
+  "display_name_zh": "廣原村",
+  "description": "Farming village on the broad open plain between the orange blossom and the silver ridge.",
+  "geographic_constraint": "Open plain on the road between the orange blossom and the silver ridge",
+  "population": 700
+ },
+ {
+  "id": "village_orange_grove",
+  "kind": "village",
+  "cell": [
+   1759,
+   564
+  ],
+  "display_name_zh": "橙林村",
+  "description": "Village among orange groves on the plain south-east of the orange blossom, on the spice road.",
+  "geographic_constraint": "Orange groves south-east of the orange blossom on the spice road",
+  "population": 1000
+ },
+ {
+  "id": "village_west_plain",
+  "kind": "village",
+  "cell": [
+   1581,
+   785
+  ],
+  "display_name_zh": "西原村",
+  "description": "Farming village on the western plain below the silver ridge, on the pasture road.",
+  "geographic_constraint": "Western plain below the silver ridge on the pasture road",
+  "population": 600
+ },
+ {
+  "id": "village_west_bend",
+  "kind": "village",
+  "cell": [
+   2095,
+   669
+  ],
+  "display_name_zh": "西灣村",
+  "description": "Village on the western bend of the imperial east branch, off the roads west of the twin currents.",
+  "geographic_constraint": "Western bend of the imperial east branch, off the roads west of the twin currents",
+  "population": 1100
+ },
+ {
+  "id": "village_mill_flat",
+  "kind": "village",
+  "cell": [
+   2055,
+   764
+  ],
+  "display_name_zh": "磨坊村",
+  "description": "Mill village on a flat of the imperial river, south of the twin currents.",
+  "geographic_constraint": "Mill flat on the imperial river south of the twin currents",
+  "population": 900
+ },
+ {
+  "id": "village_river_plain",
+  "kind": "village",
+  "cell": [
+   2040,
+   919
+  ],
+  "display_name_zh": "河原村",
+  "description": "Farming village on the river plain of the imperial river, west of the star glow city.",
+  "geographic_constraint": "River plain of the imperial river west of the star glow city",
+  "population": 1000
+ },
+ {
+  "id": "hamlet_bay_flat",
+  "kind": "hamlet",
+  "cell": [
+   2365,
+   516
+  ],
+  "display_name_zh": "灣埔",
+  "description": "Hamlet on the low coastal flat above the east bay, on the coast highway.",
+  "geographic_constraint": "Coastal flat above the east bay on the coast highway",
+  "population": 200
+ },
+ {
+  "id": "hamlet_reed_plain",
+  "kind": "hamlet",
+  "cell": [
+   2231,
+   529
+  ],
+  "display_name_zh": "蘆原",
+  "description": "Hamlet among reed beds on the plain north of the bay road.",
+  "geographic_constraint": "Reed plain north of the east bay road",
+  "population": 120
+ },
+ {
+  "id": "hamlet_high_field",
+  "kind": "hamlet",
+  "cell": [
+   2120,
+   597
+  ],
+  "display_name_zh": "高野",
+  "description": "Hamlet on the high open field between the twin currents and the bay.",
+  "geographic_constraint": "High open field on the road between the twin currents and the east bay",
+  "population": 90
+ },
+ {
+  "id": "hamlet_tide_bay",
+  "kind": "hamlet",
+  "cell": [
+   2368,
+   531
+  ],
+  "display_name_zh": "潮灣",
+  "description": "Hamlet on the seaward flats east of the coast highway.",
+  "geographic_constraint": "Seaward flats east of the coast highway",
+  "population": 110
+ },
+ {
+  "id": "hamlet_river_bend",
+  "kind": "hamlet",
+  "cell": [
+   2068,
+   591
+  ],
+  "display_name_zh": "河灣",
+  "description": "Hamlet on a bend of the imperial river below the spice city.",
+  "geographic_constraint": "Bend of the imperial river below the spice city",
+  "population": 180
+ },
+ {
+  "id": "hamlet_wild_slope",
+  "kind": "hamlet",
+  "cell": [
+   2330,
+   648
+  ],
+  "display_name_zh": "野坡",
+  "description": "Hamlet on a wild slope of the pasture road.",
+  "geographic_constraint": "Wild slope of the pasture road above the east bay",
+  "population": 100
+ },
+ {
+  "id": "hamlet_flat_plain",
+  "kind": "hamlet",
+  "cell": [
+   1713,
+   610
+  ],
+  "display_name_zh": "平野",
+  "description": "Hamlet on the flat open plain between the orange blossom and the silver ridge.",
+  "geographic_constraint": "Open flat plain between the orange blossom and the silver ridge",
+  "population": 110
+ },
+ {
+  "id": "hamlet_south_river",
+  "kind": "hamlet",
+  "cell": [
+   2070,
+   448
+  ],
+  "display_name_zh": "南河",
+  "description": "Hamlet on the south bank of the imperial river, below the spice road.",
+  "geographic_constraint": "South bank of the imperial river below the spice road",
+  "population": 160
+ },
+ {
+  "id": "hamlet_river_shoal",
+  "kind": "hamlet",
+  "cell": [
+   2028,
+   761
+  ],
+  "display_name_zh": "河灘",
+  "description": "Hamlet on a river shoal east of the twin currents.",
+  "geographic_constraint": "River shoal east of the twin currents",
+  "population": 170
+ },
+ {
+  "id": "hamlet_rice_yard",
+  "kind": "hamlet",
+  "cell": [
+   1852,
+   877
+  ],
+  "display_name_zh": "稻場",
+  "description": "Rice-farming hamlet on the plain south of the emerald lake town.",
+  "geographic_constraint": "Rice fields on the plain south of the emerald lake town",
+  "population": 120
+ },
+ {
+  "id": "hamlet_river_sand",
+  "kind": "hamlet",
+  "cell": [
+   2075,
+   378
+  ],
+  "display_name_zh": "河沙",
+  "description": "Hamlet on sandy river ground north of the golden sheaf.",
+  "geographic_constraint": "Sandy river ground north of the golden sheaf",
+  "population": 100
+ },
+ {
+  "id": "hamlet_pasture_plain",
+  "kind": "hamlet",
+  "cell": [
+   2316,
+   775
+  ],
+  "display_name_zh": "牧原",
+  "description": "Hamlet on the pasture plain of the east pasture road.",
+  "geographic_constraint": "Pasture plain of the east pasture road",
+  "population": 110
+ },
+ {
+  "id": "hamlet_west_field",
+  "kind": "hamlet",
+  "cell": [
+   1620,
+   703
+  ],
+  "display_name_zh": "西疇",
+  "description": "Hamlet on the western fields below the silver ridge.",
+  "geographic_constraint": "Western fields below the silver ridge",
+  "population": 90
+ },
+ {
+  "id": "hamlet_open_field",
+  "kind": "hamlet",
+  "cell": [
+   1796,
+   877
+  ],
+  "display_name_zh": "原野",
+  "description": "Hamlet on the open field between the emerald lake and the steed plain.",
+  "geographic_constraint": "Open field between the emerald lake and the steed plain",
+  "population": 130
+ },
+ {
+  "id": "hamlet_star_field",
+  "kind": "hamlet",
+  "cell": [
+   1980,
+   956
+  ],
+  "display_name_zh": "星野",
+  "description": "Hamlet on the open field east of the star glow city.",
+  "geographic_constraint": "Open field east of the star glow city",
+  "population": 140
+ },
+ {
+  "id": "hamlet_pepper_field",
+  "kind": "hamlet",
+  "cell": [
+   2005,
+   561
+  ],
+  "display_name_zh": "椒田",
+  "description": "Hamlet in the pepper fields east of the spice city.",
+  "geographic_constraint": "Pepper fields east of the spice city",
+  "population": 130
+ },
+ {
+  "id": "hamlet_salt_field",
+  "kind": "hamlet",
+  "cell": [
+   2069,
+   305
+  ],
+  "display_name_zh": "鹽田",
+  "description": "Salt-field hamlet on the river flats above the golden sheaf.",
+  "geographic_constraint": "Salt fields on the river flats above the golden sheaf",
+  "population": 190
+ },
+ {
+  "id": "hamlet_grass_field",
+  "kind": "hamlet",
+  "cell": [
+   1632,
+   829
+  ],
+  "display_name_zh": "草野",
+  "description": "Hamlet on the grassy field east of the steed plain.",
+  "geographic_constraint": "Grassy field east of the steed plain",
+  "population": 90
+ },
+ {
+  "id": "hamlet_grain_yard",
+  "kind": "hamlet",
+  "cell": [
+   1945,
+   859
+  ],
+  "display_name_zh": "禾場",
+  "description": "Grain-threshing hamlet on the plain between the emerald lake and the star glow city.",
+  "geographic_constraint": "Grain fields between the emerald lake and the star glow city",
+  "population": 120
+ },
+ {
+  "id": "hamlet_east_field",
+  "kind": "hamlet",
+  "cell": [
+   2299,
+   834
+  ],
+  "display_name_zh": "東野",
+  "description": "Hamlet on the open field south of the east pasture town.",
+  "geographic_constraint": "Open field south of the east pasture town",
+  "population": 100
+ },
+ {
+  "id": "hamlet_ridge_plain",
+  "kind": "hamlet",
+  "cell": [
+   1576,
+   749
+  ],
+  "display_name_zh": "岡原",
+  "description": "Hamlet on the ridge plain above the silver ridge road.",
+  "geographic_constraint": "Ridge plain above the silver ridge road",
+  "population": 100
+ },
+ {
+  "id": "hamlet_level_plain",
+  "kind": "hamlet",
+  "cell": [
+   1740,
+   877
+  ],
+  "display_name_zh": "平川",
+  "description": "Hamlet on the level plain north of the steed plain.",
+  "geographic_constraint": "Level plain north of the steed plain",
+  "population": 120
+ },
+ {
+  "id": "hamlet_river_shore",
+  "kind": "hamlet",
+  "cell": [
+   2061,
+   605
+  ],
+  "display_name_zh": "河濱",
+  "description": "Hamlet on the river shore west of the twin currents.",
+  "geographic_constraint": "River shore west of the twin currents",
+  "population": 170
+ },
+ {
+  "id": "hamlet_lake_plain",
+  "kind": "hamlet",
+  "cell": [
+   1935,
+   940
+  ],
+  "display_name_zh": "湖原",
+  "description": "Hamlet on the lake plain north-east of the emerald lake town.",
+  "geographic_constraint": "Lake plain north-east of the emerald lake town",
+  "population": 140
+ },
+ {
+  "id": "hamlet_flat_land",
+  "kind": "hamlet",
+  "cell": [
+   2039,
+   597
+  ],
+  "display_name_zh": "平埔",
+  "description": "Hamlet on the flat land between the spice road and the twin currents.",
+  "geographic_constraint": "Flat land between the spice road and the twin currents",
+  "population": 110
+ },
+ {
+  "id": "hamlet_river_mouth",
+  "kind": "hamlet",
+  "cell": [
+   2057,
+   253
+  ],
+  "display_name_zh": "河口",
+  "description": "Hamlet in the reed marsh on the lower imperial river, north of the golden sheaf.",
+  "geographic_constraint": "Reed marsh on the lower imperial river",
+  "population": 160
+ },
+ {
+  "id": "hamlet_bay_head",
+  "kind": "hamlet",
+  "cell": [
+   2385,
+   461
+  ],
+  "display_name_zh": "灣頭",
+  "description": "Hamlet at the head of the east bay, off the coast highway.",
+  "geographic_constraint": "Head of the east bay, off the coast highway",
+  "population": 150
+ },
+ {
+  "id": "hamlet_spring_flat",
+  "kind": "hamlet",
+  "cell": [
+   2023,
+   983
+  ],
+  "display_name_zh": "泉埔",
+  "description": "Hamlet at a spring on the star glow plain.",
+  "geographic_constraint": "Spring on the star glow plain",
+  "population": 120
+ },
+ {
+  "id": "hamlet_lake_flat",
+  "kind": "hamlet",
+  "cell": [
+   1867,
+   905
+  ],
+  "display_name_zh": "湖埔",
+  "description": "Hamlet on the flat west of the emerald lake.",
+  "geographic_constraint": "Flat west of the emerald lake",
+  "population": 110
+ },
+ {
+  "id": "hamlet_orange_garden",
+  "kind": "hamlet",
+  "cell": [
+   1777,
+   519
+  ],
+  "display_name_zh": "橙園",
+  "description": "Hamlet among orange gardens west of the orange blossom.",
+  "geographic_constraint": "Orange gardens west of the orange blossom",
+  "population": 130
+ },
+ {
+  "id": "hamlet_south_sand",
+  "kind": "hamlet",
+  "cell": [
+   1671,
+   109
+  ],
+  "display_name_zh": "南沙",
+  "description": "Hamlet on the southern sands below the south cape.",
+  "geographic_constraint": "Southern sands below the south cape",
+  "population": 80
+ },
+ {
+  "id": "hamlet_wild_road",
+  "kind": "hamlet",
+  "cell": [
+   2298,
+   677
+  ],
+  "display_name_zh": "野道",
+  "description": "Hamlet on the long plain road west of the pasture road.",
+  "geographic_constraint": "Open plain on the west bend road",
+  "population": 80
+ },
+ {
+  "id": "hamlet_open_wild",
+  "kind": "hamlet",
+  "cell": [
+   2229,
+   677
+  ],
+  "display_name_zh": "曠野",
+  "description": "Hamlet in the open wild between the pasture road and the western bend.",
+  "geographic_constraint": "Open wild between the pasture road and the western bend",
+  "population": 90
+ },
+ {
+  "id": "hamlet_west_road",
+  "kind": "hamlet",
+  "cell": [
+   2161,
+   677
+  ],
+  "display_name_zh": "西道",
+  "description": "Hamlet on the plain road between the north plain and the western bend.",
+  "geographic_constraint": "Plain road between the north plain and the western bend",
+  "population": 70
+ }
+]

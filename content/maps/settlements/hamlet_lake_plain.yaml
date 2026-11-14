@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_lake_plain
+location_ref: hamlet_lake_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 171
+    y_m: 171
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東北接上平原大道，通往星輝城。路旁的地勢平緩，遠處的屋舍像散在草上的小石塊。
+    anchor_key: hamlet_lake_plain
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西南小路通往翠湖鎮，屋後是緩坡上的果園。院裡曬著果乾，竹匾邊圍著一圈防蠅的紗布。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_pepper_plain
+location_ref: village_pepper_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 295
+    y_m: 198
+    prototype_parent: anchor_room
+    key: 椒田綠地
+    desc: 綠地旁曬著成片紅椒，井臺上放著舀水的葫蘆瓢。空氣裡滿是曬乾的辛香，走進村口就先打起噴嚏。
+    anchor_key: village_pepper_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 490
+    y_m: 198
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口往香道城，路上飄著香料曬乾的氣味。連路面的塵土都帶著微紅，車輪輾過便騰起一陣嗆人的粉。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 198
+    prototype_parent: grid_room
+    key: 西村口
+    desc: 西村口通往橙花鎮，路邊的籬笆上爬滿椒藤。熟透的果子垂在籬外，路過的孩子總要伸手摘上一顆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 295
+    y_m: 100
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝南，階下是整齊的椒田。陽光把田壟照出一條條深淺分明的影子，風過時紅椒微微搖晃。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

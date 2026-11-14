@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "cdebdda7dadbe3bb00cd865622033f6ed79cf00c175b98ec2c13b6889e416111",
+  "fingerprint": "6078d6ed3e306d5236dd92568273772839f1bdf7102c196fbe54c18143936acd",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16067,7 +16067,7 @@
     "world/lore/__init__.py": "7fb8ceb1f6bd963e0f574afdfa86b79e34c57d7d30cfc56ad6330d2f536bf28b",
     "world/lore/action_evidence.py": "289a02f07d315ce03a24eb38bebf9cf46e7c7913b2c5b3f4adc68f85f9438b33",
     "world/lore/anchor_placement.py": "54bee28f0b1ed82d419431355140af86577371783077684bb3cea119bba37057",
-    "world/lore/anchors.py": "6346c0c90afb9f7150badeba3ea03a937f0086c39090ae33eead01e9b0e89939",
+    "world/lore/anchors.py": "22b97538f145afbdf703935b58630dcc3539755a76a313b86c2f1dc39a6f14a4",
     "world/lore/bestiary_documentation.py": "004694a0d21709fdf088b50f9bff46251bbc9f49a23d7b50208f459dd779703b",
     "world/lore/church/__init__.py": "49eca094998f4e49bae0354201121d22e895b386b737144af356e0acdf454694",
     "world/lore/church/places.py": "65d5e913b93cb203373da101c8c500a1fedc3e9abb2a299bf367b8279091f8f3",

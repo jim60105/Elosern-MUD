@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_flat_land
+location_ref: hamlet_flat_land
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 165
+    y_m: 165
+    prototype_parent: anchor_room
+    key: 岔路口
+    desc: 岔路口往東北接往雙流城的官道，路旁是空曠的平地。風從平地吹過，把路心的塵土掃成一道道細紋。
+    anchor_key: hamlet_flat_land
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的西南小路通往香道城，屋前攤著曬乾的草料。院裡放著一輛板車，車輪上還沾著乾泥。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+  - return_direction: ne
+    destination_node: homestead_front
+city_gate:

@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_river_plain
+location_ref: village_river_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 243
+    y_m: 243
+    prototype_parent: anchor_room
+    key: 河灘綠地
+    desc: 綠地緊挨著帝河的河灘，井水清得能看見井底的卵石。井繩常年是濕的，井口的木架被水氣浸得發黑。
+    anchor_key: village_river_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 386
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口往星輝城，路沿著河岸一直伸進城門。水聲一路跟在行人腳邊，偶爾有船從葦叢後划出來。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 386
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口外是收割後的河灘地，只有一條牛車道通向水邊。車道兩旁立著蘆捆，風過時沙沙作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 314
+    y_m: 314
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝東北，階前的柳樹把影子投在河面上。枝條垂得幾乎碰到水，船過時得低頭避開。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: shrine_front
+  direction: ne
+- source: shrine_front
+  destination: village_green
+  direction: sw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

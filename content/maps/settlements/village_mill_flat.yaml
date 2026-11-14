@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_mill_flat
+location_ref: village_mill_flat
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 238
+    y_m: 238
+    prototype_parent: anchor_room
+    key: 水磨綠地
+    desc: 綠地旁就是水磨，井水引自磨坊後頭的河渠。渠水日夜嘩嘩作響，連井裡打上來的水都帶著涼氣。
+    anchor_key: village_mill_flat
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口往雙流城，運麵粉的車從早到晚沒停過。路心積著一層白白的粉塵，走過去鞋面就沾了灰。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 376
+    y_m: 376
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口沒有路，只有一條挑水的小徑通向河灣。草叢間散落著幾片舊磨石，邊角被踩得圓滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 169
+    y_m: 307
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝西北，階下晾著剛洗過的麥袋。風一吹便鼓成圓圓的一面，遠遠看去像曬著的帆。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: shrine_front
+  direction: nw
+- source: shrine_front
+  destination: village_green
+  direction: se
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

@@ -1726,3 +1726,462 @@ locations:
     geographic_constraint: Gate settlement at the landward approach of the salt ferry city
     spacing_exemption: Gate settlement of city_salt_ferry; it necessarily stands within the 15 km hamlet minimum of the city whose gate it serves.
     scene_archetype:
+  village_reed_ford:
+    kind: village
+    display_name_zh: 蘆渡村
+    description: Village at the reed-banked ford of the imperial east branch, where the bay road crosses the river.
+    cell:
+      cell_x: 2299
+      cell_y: 526
+    geographic_constraint: Reed-banked ford of the imperial east branch on the east bay road
+    scene_archetype:
+  village_east_junction:
+    kind: village
+    display_name_zh: 東匯村
+    description: Village at the junction of the coast highway and the pasture road, above the east bay.
+    cell:
+      cell_x: 2371
+      cell_y: 491
+    geographic_constraint: Road junction above the east bay, on the coast highway
+    scene_archetype:
+  village_north_plain:
+    kind: village
+    display_name_zh: 北原村
+    description: Farming village on the open northern plain, on the road between the twin currents and the east bay.
+    cell:
+      cell_x: 2173
+      cell_y: 557
+    geographic_constraint: Open northern plain on the east bay road
+    scene_archetype:
+  village_wind_plain:
+    kind: village
+    display_name_zh: 風原村
+    description: Village on the windswept plain behind the east coast ridge, on the pasture road.
+    cell:
+      cell_x: 2351
+      cell_y: 590
+    geographic_constraint: Windswept plain above the east coast on the pasture road
+    scene_archetype:
+  village_salt_pan:
+    kind: village
+    display_name_zh: 鹽埕村
+    description: Salt-making village on the coastal flats north of the golden sheaf, on the coast road.
+    cell:
+      cell_x: 2072
+      cell_y: 330
+    geographic_constraint: Salt flats of the south-east coast, on the coast road north of the golden sheaf
+    scene_archetype:
+  village_river_flat:
+    kind: village
+    display_name_zh: 河埔村
+    description: Farming village on the flat west bank of the imperial river, on the coast road.
+    cell:
+      cell_x: 2068
+      cell_y: 519
+    geographic_constraint: Flat west bank of the imperial river on the coast road
+    scene_archetype:
+  village_three_roads:
+    kind: village
+    display_name_zh: 三路村
+    description: Village where the spice road, the twin currents road and the bay road share one stretch of the plain highway.
+    cell:
+      cell_x: 2049
+      cell_y: 644
+    geographic_constraint: Three-road meeting on the shared trunk west of the twin currents
+    scene_archetype:
+  village_pasture_road:
+    kind: village
+    display_name_zh: 牧道村
+    description: Cattle village on the pasture road between the east bay and the east pasture.
+    cell:
+      cell_x: 2330
+      cell_y: 714
+    geographic_constraint: Open pasture on the road between the east bay and the east pasture
+    scene_archetype:
+  village_level_field:
+    kind: village
+    display_name_zh: 平疇村
+    description: Farming village on the level fields of the central plain, on the road between the twin currents and the emerald lake.
+    cell:
+      cell_x: 1985
+      cell_y: 809
+    geographic_constraint: Level fields of the central plain on the emerald lake road
+    scene_archetype:
+  village_pepper_plain:
+    kind: village
+    display_name_zh: 椒原村
+    description: Village of spice gardens on the open plain east of the orange blossom, on the spice road.
+    cell:
+      cell_x: 1918
+      cell_y: 522
+    geographic_constraint: Spice gardens on the plain east of the orange blossom
+    scene_archetype:
+  village_millet_plain:
+    kind: village
+    display_name_zh: 粟原村
+    description: Millet-farming village on the open plain east of the orange blossom, on the spice road.
+    cell:
+      cell_x: 1863
+      cell_y: 518
+    geographic_constraint: Open millet plain east of the orange blossom on the spice road
+    scene_archetype:
+  village_open_plain:
+    kind: village
+    display_name_zh: 廣原村
+    description: Farming village on the broad open plain between the orange blossom and the silver ridge.
+    cell:
+      cell_x: 1666
+      cell_y: 657
+    geographic_constraint: Open plain on the road between the orange blossom and the silver ridge
+    scene_archetype:
+  village_orange_grove:
+    kind: village
+    display_name_zh: 橙林村
+    description: Village among orange groves on the plain north-west of the orange blossom, on the silver ridge road.
+    cell:
+      cell_x: 1759
+      cell_y: 564
+    geographic_constraint: Orange groves north-west of the orange blossom on the silver ridge road
+    scene_archetype:
+  village_west_plain:
+    kind: village
+    display_name_zh: 西原村
+    description: Farming village on the western plain below the silver ridge, on the pasture road.
+    cell:
+      cell_x: 1581
+      cell_y: 785
+    geographic_constraint: Western plain below the silver ridge on the pasture road
+    scene_archetype:
+  village_west_bend:
+    kind: village
+    display_name_zh: 西灣村
+    description: Village on a bend of the imperial east branch, off the roads east of the twin currents.
+    cell:
+      cell_x: 2095
+      cell_y: 669
+    geographic_constraint: Bend of the imperial east branch, off the roads east of the twin currents
+    scene_archetype:
+  village_mill_flat:
+    kind: village
+    display_name_zh: 磨坊村
+    description: Mill village on a flat of the imperial river, north of the twin currents.
+    cell:
+      cell_x: 2055
+      cell_y: 764
+    geographic_constraint: Mill flat on the imperial river north of the twin currents
+    scene_archetype:
+  village_river_plain:
+    kind: village
+    display_name_zh: 河原村
+    description: Farming village on the river plain of the imperial river, east of the star glow city.
+    cell:
+      cell_x: 2040
+      cell_y: 919
+    geographic_constraint: River plain of the imperial river east of the star glow city
+    scene_archetype:
+  hamlet_bay_flat:
+    kind: hamlet
+    display_name_zh: 灣埔
+    description: Hamlet on the low coastal flat above the east bay, on the coast highway.
+    cell:
+      cell_x: 2365
+      cell_y: 516
+    geographic_constraint: Coastal flat above the east bay on the coast highway
+    scene_archetype:
+  hamlet_reed_plain:
+    kind: hamlet
+    display_name_zh: 蘆原
+    description: Hamlet among reed beds on the plain north of the bay road.
+    cell:
+      cell_x: 2231
+      cell_y: 529
+    geographic_constraint: Reed plain north of the east bay road
+    scene_archetype:
+  hamlet_high_field:
+    kind: hamlet
+    display_name_zh: 高野
+    description: Hamlet on the high open field between the twin currents and the bay.
+    cell:
+      cell_x: 2120
+      cell_y: 597
+    geographic_constraint: High open field on the road between the twin currents and the east bay
+    scene_archetype:
+  hamlet_tide_bay:
+    kind: hamlet
+    display_name_zh: 潮灣
+    description: Hamlet on the seaward flats east of the coast highway.
+    cell:
+      cell_x: 2368
+      cell_y: 531
+    geographic_constraint: Seaward flats east of the coast highway
+    scene_archetype:
+  hamlet_river_bend:
+    kind: hamlet
+    display_name_zh: 河灣
+    description: Hamlet on a bend of the imperial river below the spice city.
+    cell:
+      cell_x: 2068
+      cell_y: 591
+    geographic_constraint: Bend of the imperial river below the spice city
+    scene_archetype:
+  hamlet_wild_slope:
+    kind: hamlet
+    display_name_zh: 野坡
+    description: Hamlet on a wild slope of the pasture road.
+    cell:
+      cell_x: 2330
+      cell_y: 648
+    geographic_constraint: Wild slope of the pasture road above the east bay
+    scene_archetype:
+  hamlet_flat_plain:
+    kind: hamlet
+    display_name_zh: 平野
+    description: Hamlet on the flat open plain between the orange blossom and the silver ridge.
+    cell:
+      cell_x: 1713
+      cell_y: 610
+    geographic_constraint: Open flat plain between the orange blossom and the silver ridge
+    scene_archetype:
+  hamlet_south_river:
+    kind: hamlet
+    display_name_zh: 南河
+    description: Hamlet on the south bank of the imperial river, below the spice road.
+    cell:
+      cell_x: 2070
+      cell_y: 448
+    geographic_constraint: South bank of the imperial river below the spice road
+    scene_archetype:
+  hamlet_river_shoal:
+    kind: hamlet
+    display_name_zh: 河灘
+    description: Hamlet on a river shoal north-west of the twin currents.
+    cell:
+      cell_x: 2028
+      cell_y: 761
+    geographic_constraint: River shoal north-west of the twin currents
+    scene_archetype:
+  hamlet_rice_yard:
+    kind: hamlet
+    display_name_zh: 稻場
+    description: Rice-farming hamlet on the plain south of the emerald lake town.
+    cell:
+      cell_x: 1852
+      cell_y: 877
+    geographic_constraint: Rice fields on the plain south of the emerald lake town
+    scene_archetype:
+  hamlet_river_sand:
+    kind: hamlet
+    display_name_zh: 河沙
+    description: Hamlet on sandy river ground north of the golden sheaf.
+    cell:
+      cell_x: 2075
+      cell_y: 378
+    geographic_constraint: Sandy river ground north of the golden sheaf
+    scene_archetype:
+  hamlet_pasture_plain:
+    kind: hamlet
+    display_name_zh: 牧原
+    description: Hamlet on the pasture plain of the east pasture road.
+    cell:
+      cell_x: 2316
+      cell_y: 775
+    geographic_constraint: Pasture plain of the east pasture road
+    scene_archetype:
+  hamlet_west_field:
+    kind: hamlet
+    display_name_zh: 西疇
+    description: Hamlet on the western fields below the silver ridge.
+    cell:
+      cell_x: 1620
+      cell_y: 703
+    geographic_constraint: Western fields below the silver ridge
+    scene_archetype:
+  hamlet_open_field:
+    kind: hamlet
+    display_name_zh: 原野
+    description: Hamlet on the open field between the emerald lake and the steed plain.
+    cell:
+      cell_x: 1796
+      cell_y: 877
+    geographic_constraint: Open field between the emerald lake and the steed plain
+    scene_archetype:
+  hamlet_star_field:
+    kind: hamlet
+    display_name_zh: 星野
+    description: Hamlet on the open field west of the star glow city.
+    cell:
+      cell_x: 1980
+      cell_y: 956
+    geographic_constraint: Open field west of the star glow city
+    scene_archetype:
+  hamlet_pepper_field:
+    kind: hamlet
+    display_name_zh: 椒田
+    description: Hamlet in the pepper fields east of the spice city.
+    cell:
+      cell_x: 2005
+      cell_y: 561
+    geographic_constraint: Pepper fields east of the spice city
+    scene_archetype:
+  hamlet_salt_field:
+    kind: hamlet
+    display_name_zh: 鹽田
+    description: Salt-field hamlet on the river flats above the golden sheaf.
+    cell:
+      cell_x: 2069
+      cell_y: 305
+    geographic_constraint: Salt fields on the river flats above the golden sheaf
+    scene_archetype:
+  hamlet_grass_field:
+    kind: hamlet
+    display_name_zh: 草野
+    description: Hamlet on the grassy field west of the steed plain.
+    cell:
+      cell_x: 1632
+      cell_y: 829
+    geographic_constraint: Grassy field west of the steed plain
+    scene_archetype:
+  hamlet_grain_yard:
+    kind: hamlet
+    display_name_zh: 禾場
+    description: Grain-threshing hamlet on the plain between the emerald lake and the star glow city.
+    cell:
+      cell_x: 1945
+      cell_y: 859
+    geographic_constraint: Grain fields between the emerald lake and the star glow city
+    scene_archetype:
+  hamlet_east_field:
+    kind: hamlet
+    display_name_zh: 東野
+    description: Hamlet on the open field south of the east pasture town.
+    cell:
+      cell_x: 2299
+      cell_y: 834
+    geographic_constraint: Open field south of the east pasture town
+    scene_archetype:
+  hamlet_ridge_plain:
+    kind: hamlet
+    display_name_zh: 岡原
+    description: Hamlet on the ridge plain above the silver ridge road.
+    cell:
+      cell_x: 1576
+      cell_y: 749
+    geographic_constraint: Ridge plain above the silver ridge road
+    scene_archetype:
+  hamlet_level_plain:
+    kind: hamlet
+    display_name_zh: 平川
+    description: Hamlet on the level plain north of the steed plain.
+    cell:
+      cell_x: 1740
+      cell_y: 877
+    geographic_constraint: Level plain north of the steed plain
+    scene_archetype:
+  hamlet_river_shore:
+    kind: hamlet
+    display_name_zh: 河濱
+    description: Hamlet on the river shore west of the twin currents.
+    cell:
+      cell_x: 2061
+      cell_y: 605
+    geographic_constraint: River shore west of the twin currents
+    scene_archetype:
+  hamlet_lake_plain:
+    kind: hamlet
+    display_name_zh: 湖原
+    description: Hamlet on the lake plain north-east of the emerald lake town.
+    cell:
+      cell_x: 1935
+      cell_y: 940
+    geographic_constraint: Lake plain north-east of the emerald lake town
+    scene_archetype:
+  hamlet_flat_land:
+    kind: hamlet
+    display_name_zh: 平埔
+    description: Hamlet on the flat land between the spice road and the twin currents.
+    cell:
+      cell_x: 2039
+      cell_y: 597
+    geographic_constraint: Flat land between the spice road and the twin currents
+    scene_archetype:
+  hamlet_river_mouth:
+    kind: hamlet
+    display_name_zh: 河口
+    description: Hamlet in the reed marsh on the lower imperial river, north of the golden sheaf.
+    cell:
+      cell_x: 2057
+      cell_y: 253
+    geographic_constraint: Reed marsh on the lower imperial river
+    scene_archetype:
+  hamlet_bay_head:
+    kind: hamlet
+    display_name_zh: 灣頭
+    description: Hamlet at the head of the east bay, off the coast highway.
+    cell:
+      cell_x: 2385
+      cell_y: 461
+    geographic_constraint: Head of the east bay, off the coast highway
+    scene_archetype:
+  hamlet_spring_flat:
+    kind: hamlet
+    display_name_zh: 泉埔
+    description: Hamlet at a spring on the star glow plain.
+    cell:
+      cell_x: 2023
+      cell_y: 983
+    geographic_constraint: Spring on the star glow plain
+    scene_archetype:
+  hamlet_lake_flat:
+    kind: hamlet
+    display_name_zh: 湖埔
+    description: Hamlet on the flat west of the emerald lake.
+    cell:
+      cell_x: 1867
+      cell_y: 905
+    geographic_constraint: Flat west of the emerald lake
+    scene_archetype:
+  hamlet_orange_garden:
+    kind: hamlet
+    display_name_zh: 橙園
+    description: Hamlet among orange gardens west of the orange blossom.
+    cell:
+      cell_x: 1777
+      cell_y: 519
+    geographic_constraint: Orange gardens west of the orange blossom
+    scene_archetype:
+  hamlet_south_sand:
+    kind: hamlet
+    display_name_zh: 南沙
+    description: Hamlet on the southern sands below the south cape.
+    cell:
+      cell_x: 1671
+      cell_y: 109
+    geographic_constraint: Southern sands below the south cape
+    scene_archetype:
+  hamlet_wild_road:
+    kind: hamlet
+    display_name_zh: 野道
+    description: Hamlet on the long plain road west of the pasture road.
+    cell:
+      cell_x: 2298
+      cell_y: 677
+    geographic_constraint: Open plain on the west bend road
+    scene_archetype:
+  hamlet_open_wild:
+    kind: hamlet
+    display_name_zh: 曠野
+    description: Hamlet in the open wild between the pasture road and the western bend.
+    cell:
+      cell_x: 2229
+      cell_y: 677
+    geographic_constraint: Open wild between the pasture road and the western bend
+    scene_archetype:
+  hamlet_west_road:
+    kind: hamlet
+    display_name_zh: 西道
+    description: Hamlet on the plain road between the north plain and the western bend.
+    cell:
+      cell_x: 2161
+      cell_y: 677
+    geographic_constraint: Plain road between the north plain and the western bend
+    scene_archetype:

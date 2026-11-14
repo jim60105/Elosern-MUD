@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_level_field
+location_ref: village_level_field
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 248
+    y_m: 248
+    prototype_parent: anchor_room
+    key: 田疇綠地
+    desc: 綠地四周是平整的田疇，井水順著石槽流進田邊的水溝。溝裡養著幾尾小魚，孩子常蹲在溝邊伸手去撈。
+    anchor_key: village_level_field
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 396
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口往雙流城，路旁堆著剛收割的麥捆。穗尖在風裡輕輕點頭，路上散落的麥粒引來成群麻雀。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 396
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口通往翠湖鎮，清晨常有人挑著鮮魚進村。魚簍一路滴著水，在土路上留下一串深色的斑點。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 174
+    y_m: 174
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝西南，階前的空地被牛車壓出兩道淺溝。溝裡積著昨夜的雨水，映著教堂低矮的屋簷。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_west_plain
+location_ref: village_west_plain
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 220
+    y_m: 220
+    prototype_parent: anchor_room
+    key: 坡腳綠地
+    desc: 綠地靠著西邊的坡腳，井邊砌著擋風的石牆。牆頭壓著幾塊從坡上滾落的碎石，石縫裡長出細細的野草。
+    anchor_key: village_west_plain
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 340
+    y_m: 340
+    prototype_parent: grid_room
+    key: 東北村口
+    desc: 東北村口往駿原鎮，牧人趕著羊群從這裡經過。路口總留下一層細密的蹄印，雨後就成了淺淺的水窪。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口通往銀嶺鎮，路上滾著從山上下來的碎石。車輪碾過便發出清脆的響聲，趕車的得慢些走。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 280
+    y_m: 160
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝東南，階下是一片剛翻過的旱田。土塊在風裡慢慢吹散，露出底下顏色更深的濕土。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

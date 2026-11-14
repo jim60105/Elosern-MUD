@@ -1,0 +1,167 @@
+[
+ {
+  "road": "city_spice_road -- city_twin_currents",
+  "from": [
+   1976,
+   523
+  ],
+  "to": [
+   2066,
+   707
+  ],
+  "from_index": 0,
+  "to_index": 184,
+  "cells": 185,
+  "km": 221.3
+ },
+ {
+  "road": "city_spice_road -- town_orange_blossom",
+  "from": [
+   1975,
+   522
+  ],
+  "to": [
+   1807,
+   518
+  ],
+  "from_index": 0,
+  "to_index": 168,
+  "cells": 169,
+  "km": 169.7
+ },
+ {
+  "road": "city_starglow -- town_emerald_lake",
+  "from": [
+   2030,
+   961
+  ],
+  "to": [
+   1898,
+   906
+  ],
+  "from_index": 0,
+  "to_index": 132,
+  "cells": 133,
+  "km": 154.8
+ },
+ {
+  "road": "city_twin_currents -- port_east_bay",
+  "from": [
+   2066,
+   707
+  ],
+  "to": [
+   2400,
+   462
+  ],
+  "from_index": 0,
+  "to_index": 466,
+  "cells": 467,
+  "km": 526.9
+ },
+ {
+  "road": "city_twin_currents -- port_golden_sheaf",
+  "from": [
+   2066,
+   707
+  ],
+  "to": [
+   2068,
+   239
+  ],
+  "from_index": 0,
+  "to_index": 473,
+  "cells": 474,
+  "km": 492.5
+ },
+ {
+  "road": "city_twin_currents -- town_emerald_lake",
+  "from": [
+   2067,
+   710
+  ],
+  "to": [
+   1898,
+   906
+  ],
+  "from_index": 0,
+  "to_index": 196,
+  "cells": 197,
+  "km": 266.0
+ },
+ {
+  "road": "port_east_bay -- port_golden_sheaf",
+  "from": [
+   2400,
+   462
+  ],
+  "to": [
+   2068,
+   239
+  ],
+  "from_index": 0,
+  "to_index": 712,
+  "cells": 713,
+  "km": 767.1
+ },
+ {
+  "road": "port_east_bay -- town_east_pasture",
+  "from": [
+   2400,
+   462
+  ],
+  "to": [
+   2299,
+   900
+  ],
+  "from_index": 0,
+  "to_index": 438,
+  "cells": 439,
+  "km": 479.8
+ },
+ {
+  "road": "town_emerald_lake -- town_steed_plain",
+  "from": [
+   1896,
+   907
+  ],
+  "to": [
+   1688,
+   865
+  ],
+  "from_index": 0,
+  "to_index": 208,
+  "cells": 209,
+  "km": 225.4
+ },
+ {
+  "road": "town_orange_blossom -- town_silver_ridge",
+  "from": [
+   1805,
+   519
+  ],
+  "to": [
+   1521,
+   762
+  ],
+  "from_index": 0,
+  "to_index": 286,
+  "cells": 287,
+  "km": 390.8
+ },
+ {
+  "road": "town_silver_ridge -- town_steed_plain",
+  "from": [
+   1521,
+   762
+  ],
+  "to": [
+   1686,
+   863
+  ],
+  "from_index": 0,
+  "to_index": 165,
+  "cells": 166,
+  "km": 206.8
+ }
+]

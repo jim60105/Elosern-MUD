@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_three_roads
+location_ref: village_three_roads
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 345
+    prototype_parent: anchor_room
+    key: 路口綠地
+    desc: 綠地就在三條大道交會的空地上，井欄邊放著幾只公用木桶。趕路的人在此歇腳飲馬，井臺四周終日人聲不斷。
+    anchor_key: village_three_roads
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 590
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口往雙流城，車馬在渡口前排成一線。轄具的聲響從早到晚不絕，連河上的水鳥都被驚得飛起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口分往香道城與金穗港，路口立著兩塊指路石。石面被來往行人的手掌摸得發亮，字跡卻還清楚。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 222
+    y_m: 345
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前朝東，階下望得見兩條河在遠處匯流。水光在平原上連成一片，天氣好時連對岸的樹都能數清。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:
