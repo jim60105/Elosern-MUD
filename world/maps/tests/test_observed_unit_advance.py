@@ -13,9 +13,8 @@ Every scenario is built from the synthetic two-zone world of
 and a player placed by
 :func:`world.maps.tests.test_population_catch_up.place_player`; no shipped zone,
 site, composition or individual is named, and no test asserts wall-clock time or
-hardware speed. The delta's requirements are ADDED, so their canonical
-identifiers exist only after the archive sync and these tests carry no
-``covers_requirement`` annotation yet.
+hardware speed. The delta's four ADDED requirements were annotated with their
+canonical identifiers during the archive sync; the classes follow them in order.
 """
 
 from __future__ import annotations
@@ -25,6 +24,9 @@ from unittest.mock import patch
 
 from django.test import override_settings
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
+
+from tools.spec_traceability import covers_requirement
+from typeclasses.monsters import Monster
 
 import world.lore.monster_activity as lore_activity
 from world.lore.monster_activity import (
@@ -74,7 +76,6 @@ from world.rules.movement_edges import quote_edge
 from world.rules.surfaces import persisted_hp
 from world.rules.tests._combat_session_helpers import _race_key
 from world.rules.world_escape import build_journey_plan
-from typeclasses.monsters import Monster
 
 START = 100
 END = 1600
@@ -151,6 +152,9 @@ class ObservedAdvanceFixture(ScopedSettlementFixture):
 class ObservedScopeTests(ObservedAdvanceFixture):
     """A clock advance settles the observed units and nothing else."""
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_the_far_unit_keeps_its_records_individuals_and_tick(self):
         self._build_scenario()
         place_player(self, WANDER_A)
@@ -160,6 +164,9 @@ class ObservedScopeTests(ObservedAdvanceFixture):
         self.assertEqual(self.settled_through(self.unit_b), START)
         self.assertEqual(self.far_zone_state(), before)
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_an_observed_unit_behind_the_start_settles_from_its_cursor(self):
         self._build_scenario()
         place_player(self, WANDER_A)
@@ -174,6 +181,9 @@ class ObservedScopeTests(ObservedAdvanceFixture):
         self.set_world_tick(700)
         self.assertEqual(observed, settlement_projection(self.wilderness))
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_a_world_without_a_player_moves_only_the_residual_unit(self):
         self._build_scenario()
         self.advance(600)
@@ -183,6 +193,9 @@ class ObservedScopeTests(ObservedAdvanceFixture):
         self.assertEqual(self.settled_through(self.unit_a), START)
         self.assertEqual(self.settled_through(self.unit_b), START)
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_a_later_stage_failure_restores_every_unit_and_the_state(self):
         self._build_scenario()
         place_player(self, WANDER_A)
@@ -237,6 +250,9 @@ class DeferredOutcomeTests(ObservedAdvanceFixture):
             self.set_world_tick(start + seconds)
         return settlement_projection(self.wilderness)
 
+    @covers_requirement(
+        "population-settlement-units::deferred-settlement-gives-the-whole-world-result"
+    )
     def test_advancing_then_catching_up_equals_whole_world_passes(self):
         observed = self.observed_run(reload=False)
         # The far zone really settled at the catch-up: its group took the
@@ -247,6 +263,9 @@ class DeferredOutcomeTests(ObservedAdvanceFixture):
         self.assertGreater(state.groups[group_id].sequence, 0)
         self.assertEqual(observed, self.reference_run())
 
+    @covers_requirement(
+        "population-settlement-units::deferred-settlement-gives-the-whole-world-result"
+    )
     def test_reloading_while_a_unit_is_behind_keeps_the_catch_up_result(self):
         self.assertEqual(
             self.observed_run(reload=True), self.observed_run(reload=False)
@@ -293,6 +312,9 @@ class UnobservedIndependenceTests(ObservedAdvanceFixture):
         members = [call.kwargs["member_ids"] for call in snapshotted.call_args_list]
         return group_ids, members, expected_order, set(scope.group_ids)
 
+    @covers_requirement(
+        "population-settlement-units::advance-decisions-and-snapshots-are-independent-of-unobserved-units"
+    )
     def test_growing_the_far_zone_changes_neither_decisions_nor_snapshots(self):
         one_planned, one_members, expected, scope_groups = self._advance_over(0)
         many_planned, many_members, expected_many, _ = self._advance_over(5)
@@ -422,6 +444,9 @@ class ContactForecastTests(ObservedAdvanceFixture):
                 wilderness=WILDERNESS_NAME,
             )
 
+    @covers_requirement(
+        "population-settlement-units::the-contact-forecast-reads-observed-units-only"
+    )
     def test_the_query_projects_only_observed_inputs_and_answers_the_contact(self):
         self._build_scenario()
         self._contact_activities()
@@ -461,6 +486,9 @@ class ContactForecastTests(ObservedAdvanceFixture):
             {group.group_id for group in world_snapshot.groups},
         )
 
+    @covers_requirement(
+        "population-settlement-units::the-contact-forecast-reads-observed-units-only"
+    )
     def test_a_lagging_far_zone_answers_the_same_tick(self):
         self._build_scenario()
         self._contact_activities()
@@ -523,6 +551,9 @@ class EndpointContactTests(ObservedAdvanceFixture):
             )
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_the_contact_runs_after_arrivals_and_before_idle_departures(self):
         order: list[tuple[int, str]] = []
         real_contact = field_contact.settle_population_contact_at
@@ -599,6 +630,9 @@ class DefeatProtectionTests(ObservedAdvanceFixture):
             )
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     def test_a_defeat_writes_protection_for_a_cell_whose_unit_is_behind(self):
         self._build_scenario()
         self._publish_contact()
@@ -639,6 +673,9 @@ class DefeatProtectionTests(ObservedAdvanceFixture):
             ]
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-clock-advance-settles-observed-units-only"
+    )
     @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
     def test_the_settlement_announces_its_cell_for_the_aftermath_advance(self):
         self._build_scenario()

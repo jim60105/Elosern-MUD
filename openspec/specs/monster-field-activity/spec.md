@@ -28,8 +28,8 @@ Activity publication SHALL atomically validate explicit bounded policy, positive
 Each actual activity group SHALL make saved deterministic positive-interval decisions globally, with cohesive members sharing one lawful affordable route inside ordinary bounds and stationary bindings remaining stationary.
 
 #### Scenario: Unobserved and restart
-- **WHEN** an inactive cell contains a due solitary or cohesive mixed group and game time advances
-- **THEN** saved selection chooses stay or a complete legal journey without creating rooms; reload/repeated reads never redraw or move a subset
+- **WHEN** an inactive cell contains a due solitary or cohesive mixed group, game time advances, and the group's settlement unit is settled to that time, whether during the advance or later
+- **THEN** saved selection chooses stay or a complete legal journey without creating rooms, with the same outcome whenever the unit is settled; reload/repeated reads never redraw or move a subset
 
 #### Scenario: Slowest member and topology
 - **WHEN** group members differ in speed, access, corner legality or full-route reserve
