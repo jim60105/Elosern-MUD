@@ -193,6 +193,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `sleep_interrupt_receipt_unusable` | `char`、`reason`（warn 級；接觸打斷讀到不可用的睡眠紀錄時不改寫、不補發） |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `population_maintenance_settled` | `tick_from`、`tick_to`，加上本次 pass 每個維護事件名稱的計數（`fatigue_transition`、`monster_activity_decided`、`monster_departed`、`monster_arrived`、`monster_arrival_deferred`）；一次 durable 提交的 population lifecycle settlement pass 僅一條 info 匯總 |
+| `population_caught_up` | `units`、`tick_from`、`tick_to`（catch-up 自行提交其耐用交易時一條 info；範圍內每個單位都已跟上目前 tick 時不發出） |
+| `population_catch_up_failed` | `char`、`cmd` + `exc`（error 級；指令開始前的 catch-up 失敗後已還原現場，指令仍照常執行） |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |
 | `quest_auto_settlement` | `char`、`quest`（quest_id，即領取憑證）、`issuer`、`copper`、`items`（item keys）；自動結算的付款邊界，與櫃檯交回（`settlement_done`）可區辨 |
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
