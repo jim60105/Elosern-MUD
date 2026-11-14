@@ -194,7 +194,8 @@ Ground rules:
   roar city, south-west toward the capital. `hamlet_trout_shoal` touches no
   road; its single west entrance faces the wilderness toward the otter ford
   village. The last road preview is
-  `/tmp/valhalla-placing/roads_final.png`; earlier runs left
+  `/tmp/valhalla-placing/roads_final4.png`; earlier runs left
+  `roads_final.png`, `roads_final2.png`, `roads_final3.png`,
   `roads_villages.png` and `roads_hamlets.png`. The continent capture shows
   the new markers crowding the northwest as the design's risk note predicted:
   that crowding is the human review item, not a data defect.
