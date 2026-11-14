@@ -1807,6 +1807,30 @@ class PresenceRailEvidenceTest(unittest.TestCase):
     def test_rail_digit_claims_vitest_evidence_passes(self):
         self._run_vitest("web/webclient-app/tests/store/digit_row_picks.test.js")
 
+    @covers_requirement(
+        "webclient-presence-rail::choicecard-offers-a-header-inside-its-frame",
+    )
+    def test_choice_card_header_vitest_evidence_passes(self):
+        # landmark-rite-surfaces D1: a supplied header renders inside the frame
+        # before the rows and leaves the keyboard composite unchanged
+        # (ArrowDown still moves the active row), and no header element exists
+        # without one.
+        self._run_vitest("web/webclient-app/tests/components/choice_card.test.js")
+
+    @covers_requirement(
+        "webclient-landmark-rite::the-rite-arrival-card-presents-the-landmark-and-offers-approach-or-leave",
+        "webclient-landmark-rite::the-rite-panel-lists-the-options-as-one-choice-card",
+        "webclient-landmark-rite::a-companion-performer-cannot-pick-a-solo-only-option",
+        "webclient-landmark-rite::the-rite-backdrop-names-the-landmark-and-guardian-over-the-art",
+    )
+    def test_landmark_rite_surfaces_vitest_evidence_passes(self):
+        # landmark-rite-surfaces D7: the arrival card's content, keys and focus
+        # trap, revisit and missing-art states; the panel's option rows, digit
+        # and Escape activation, unseen mark and performer header; the disabled
+        # solo-only row of a companion performer; and the backdrop's plate with
+        # and without artwork.
+        self._run_vitest("web/webclient-app/tests/rite/surfaces.test.js")
+
 
 class RoomActionsEvidenceTest(unittest.TestCase):
     """exploration-room-actions; redesign-rest-entry: the rest entry is the
