@@ -332,6 +332,15 @@ dream or creation surface owns the stage. There is no server travel mode.
   header band without a descriptor; `◆ <district>已探明` only when lit; the
   shared focus trap; 繼續/Enter/Esc close once through
   `store.dismissTravelArrival(id)` and AppClient returns focus to the map).
+- Landmark rites: `components/rite/` holds the three rite surfaces, each a
+  passive reader of the committed `rite` panel (`rite-model.js` derives the
+  performers and the rows). `RiteArrivalCard` shows the art band, the
+  district's lit state, the guardian and the experienced count, and emits
+  `approach` / `leave`; `RitePanel` is the shared `ChoiceCard` with the
+  performer named in its `header` slot and the unseen mark named through its
+  `unreadLabel`, and emits `perform(key)` / `leave`; `RiteBackdrop` is the
+  stage's art under an ink wash with the landmark・guardian plate. The card
+  and the panel send nothing themselves: the host dispatches and decides.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5+ emits one per
   source-present traveller), with its supplied reserve, stage label and
