@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from uuid import uuid4
 
+from tools.spec_traceability import covers_requirement
 from web.webclient.actions.dispatcher import _normalize_result, _result_envelope
 from web.webclient.actions.exploration_actions import ExplorationActionError
 from web.webclient.actions.registry import build_production_action_registry
@@ -105,6 +106,9 @@ def _three_line_scene() -> Scene:
 
 
 class RiteActionPayloadTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-command::the-rite-action-accepts-only-an-option-and-a-performer"
+    )
     def test_the_exact_payload_is_normalized(self):
         self.assertEqual(
             validate_landmark_rite_payload({"option": "t_solo", "member_id": None}),
@@ -115,6 +119,9 @@ class RiteActionPayloadTests(unittest.TestCase):
             {"option": "t_solo", "member_id": 42},
         )
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-action-accepts-only-an-option-and-a-performer"
+    )
     def test_an_extra_or_missing_field_is_rejected(self):
         for payload in (
             {"option": "t_solo"},
@@ -129,6 +136,9 @@ class RiteActionPayloadTests(unittest.TestCase):
                 with self.assertRaises(ExplorationActionError):
                     validate_landmark_rite_payload(payload)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-action-accepts-only-an-option-and-a-performer"
+    )
     def test_a_malformed_option_is_rejected(self):
         for option in ("", "T_solo", "9solo", "t-solo", "t_solo_x" * 5, 7, None, True):
             with self.subTest(option=option):
@@ -137,6 +147,9 @@ class RiteActionPayloadTests(unittest.TestCase):
                         {"option": option, "member_id": None}
                     )
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-action-accepts-only-an-option-and-a-performer"
+    )
     def test_a_boolean_or_out_of_range_member_id_is_rejected(self):
         for member_id in (True, False, 0, -1, 1.5, "7", 9_007_199_254_740_992):
             with self.subTest(member_id=member_id):
@@ -147,6 +160,9 @@ class RiteActionPayloadTests(unittest.TestCase):
 
 
 class RiteRenderingTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-command::a-successful-rite-action-returns-the-delivered-scene"
+    )
     def test_the_self_delivery_carries_the_scene_in_authored_order(self):
         scene = _three_line_scene()
         result = _pure_result(scene=scene, option=SOLO, perspective="self")
@@ -166,6 +182,9 @@ class RiteRenderingTests(unittest.TestCase):
         # The self perspective never substitutes the authored placeholder.
         self.assertEqual(delivery["lines"][2]["text"], _PURE_HOST_SPEECH)
 
+    @covers_requirement(
+        "landmark-rite-command::a-successful-rite-action-returns-the-delivered-scene"
+    )
     def test_the_watch_delivery_names_the_performing_companion(self):
         scene = _three_line_scene()
         result = _pure_result(scene=scene, option=SHARED, perspective="watch")
@@ -236,6 +255,9 @@ class RiteActionTests(RiteSettlementFixture):
                 self._adapter_payload(option, member_id, identity=identity),
             )
 
+    @covers_requirement(
+        "landmark-rite-command::a-successful-rite-action-returns-the-delivered-scene"
+    )
     def test_the_solo_result_carries_the_self_scene_and_first_completion(self):
         with patch.object(self.player, "msg") as message:
             result = self.settle("solo")
@@ -259,6 +281,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(delivery["lines"][2]["text"], "測試守護對{name}說話。")
         self.assertTrue(result["data"]["first_completion"])
 
+    @covers_requirement(
+        "landmark-rite-command::a-successful-rite-action-returns-the-delivered-scene"
+    )
     def test_a_companion_request_delivers_the_watch_scene(self):
         result = self.settle("shared", self.companion.id)
 
@@ -273,6 +298,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
 
+    @covers_requirement(
+        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
+    )
     def test_a_request_away_from_the_landmark_is_rejected_unchanged(self):
         self.player.location = self.source
         before = self.world_state()
@@ -288,6 +316,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(_normalize_result(result)["code"], "rite_no_landmark")
         self.assert_unchanged(before)
 
+    @covers_requirement(
+        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
+    )
     def test_an_unknown_option_is_rejected_unchanged(self):
         before = self.world_state()
 
@@ -299,6 +330,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertNotIn("data", result)
         self.assert_unchanged(before)
 
+    @covers_requirement(
+        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
+    )
     def test_two_requests_with_one_identity_settle_once(self):
         identity = self._identity()
         tick_before = get_world_clock().tick
@@ -339,6 +373,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(error.call_args.args[0], "landmark_rite_failed")
         self.assertEqual(error.call_args.kwargs["context"], {"char": self.player.pk})
 
+    @covers_requirement(
+        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
+    )
     def test_without_a_request_identity_each_call_settles(self):
         # Only an admitted transport request is replayable: a caller that brings
         # no identity must never reuse one derived constant and replay a rite.

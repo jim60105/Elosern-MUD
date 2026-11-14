@@ -13,6 +13,7 @@ import unittest
 from evennia.utils.test_resources import EvenniaCommandTestMixin
 
 from commands.rite import CmdRite
+from tools.spec_traceability import covers_requirement
 from world.rules.landmark_rites import REFUSAL_MESSAGES
 from world.rules.tests.rite_fixtures import (
     GUARDIAN_FORM,
@@ -31,6 +32,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
     def _listing(self, cmdstring: str | None = None) -> str:
         return self.call(CmdRite(), "", cmdstring=cmdstring)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_the_listing_names_the_guardian_options_and_usage(self):
         output = self._listing()
 
@@ -44,6 +48,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
     def test_the_alias_lists_the_same_surface(self):
         self.assertEqual(self._listing("儀式"), self._listing())
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_the_listing_changes_nothing(self):
         before = self.world_state()
 
@@ -51,6 +58,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
 
         self.assert_unchanged(before)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_only_the_completed_option_is_marked_experienced(self):
         self.call(CmdRite(), SHARED.key)
 
@@ -60,6 +70,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
         self.assertIn(f"　{SOLO.label_zh}（{SOLO.key}）", listing)
         self.assertNotIn(f"　{SOLO.label_zh}（{SOLO.key}）{_EXPERIENCED}", listing)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_key_and_label_each_perform_and_emit_the_scene_before_the_completion(self):
         for token in (SOLO.key, SOLO.label_zh):
             with self.subTest(token=token):
@@ -75,6 +88,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
                 self.assertEqual(offsets, sorted(offsets))
                 self.assertEqual(output.count(emitted[-1]), 1)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_a_named_companion_performs_with_the_watch_scene(self):
         output = self.call(CmdRite(), f"{SHARED.key} {self.companion.key}")
 
@@ -88,6 +104,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_an_unknown_option_is_refused_unchanged(self):
         before = self.world_state()
 
@@ -95,6 +114,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
 
         self.assert_unchanged(before)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_an_unknown_companion_is_refused_unchanged(self):
         before = self.world_state()
 
@@ -106,6 +128,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
 
         self.assert_unchanged(before)
 
+    @covers_requirement(
+        "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"
+    )
     def test_a_non_landmark_location_refuses_both_listing_and_performance(self):
         self.player.location = self.source
         before = self.world_state()
