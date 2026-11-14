@@ -116,9 +116,11 @@ def _settle_population_at(
     pass always settles: a unit whose cursor is that start has not settled it
     yet, so its zone and site steps run there too.
 
-    The authored field contact is a whole-world write (it contacts whoever stands
-    near the present party) and stays with the whole-world pass; a scoped pass
-    never runs it.
+    The authored field contact contacts whoever stands near the present party,
+    so it is admitted only by a pass whose scope covers that party: the
+    whole-world pass and the observed pass, whose party and every individual it
+    can contact lie inside the observed units. A direct scoped pass refuses the
+    flag at its own entry point by name.
     """
     step = None if scope is None else scope.behind(tick, inclusive=first_tick)
     zone_keys = _zone_keys(wilderness) if step is None else step.zone_keys
@@ -147,7 +149,7 @@ def _settle_population_at(
     # departures so a wandering departure can never avoid the encounter it
     # belongs to. The source persists the session only; the owning rules
     # action drains the predecessor continuation after the advance returned.
-    if contact_tick is not None and scope is None and int(tick) == int(contact_tick):
+    if contact_tick is not None and int(tick) == int(contact_tick):
         from world.rules.field_contact import settle_population_contact_at
 
         # A failed contact restores its participants before the failure reaches
@@ -351,12 +353,51 @@ def settle_population_lifecycle(
 
     A world with no wilderness script or no explicitly initialized population
     seed has no population lifecycle to run and settles nothing. This is the
-    whole-world pass, and it remains the clock stage.
+    whole-world pass: tools and tests call it directly, while the clock stage
+    is :func:`settle_observed_population`.
     """
     wilderness = _wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return []
     return _run_pass(wilderness, None, start_tick, end_tick, contact=True)
+
+
+def settle_observed_population(
+    start_tick: int, end_tick: int
+) -> list[ScheduledEvent]:
+    """The clock stage: settle the observed units through ``end_tick``.
+
+    The observed units are the closed set a player character observes, or a
+    running action announced, as :func:`population_units.observed_units`
+    answers. Every other unit keeps its records, individuals and settled-through
+    tick until an observation, an entry-point catch-up or the background drain
+    reaches it; any partition of the same elapsed interval yields the same
+    outcome per unit, so only the moment the work happens moves.
+
+    The pass starts at the lowest cursor of its set: an observed unit that is
+    behind the advance's start -- first observed during this advance, or linked
+    to an observed unit by a group -- is settled from its own cursor inside this
+    same advance. The authored field contact is admitted at the advance's
+    endpoint only, exactly as the whole-world pass admits it: every party and
+    every individual it can contact lies inside the observed units.
+    """
+    wilderness = _wilderness()
+    if wilderness is None or not regional_population.population_provisioned(wilderness):
+        return []
+    # The cursor record is validated and read once per pass: the scope build
+    # and the pass itself share this read, like a scoped entry point.
+    cursors = population_units.read_unit_cursors(wilderness)
+    scope = population_units.build_scope(
+        wilderness, population_units.observed_units(wilderness), cursors=cursors
+    )
+    if not scope.units:
+        return []
+    start = min(int(start_tick), population_units.scope_start_tick(wilderness, scope))
+    if end_tick < start:
+        return []
+    return _run_pass(
+        wilderness, scope, start, end_tick, contact=True, cursors=cursors
+    )
 
 
 def settle_population_scope(
@@ -441,7 +482,7 @@ def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
             )
     # Nothing writes between the scope build above and the pass's own scope
     # build, so both derive the same closed set and the same start tick.
-    registry = snapshot_population_lifecycle_surfaces(start, now)
+    registry = snapshot_population_lifecycle_surfaces(start, now, scope=scope)
     try:
         with held_advance_registry(), transaction.atomic():
             settle_population_scope(wilderness, scope.units, now, contact=False)
@@ -531,7 +572,12 @@ def next_population_lifecycle_boundary(
     observers = forecast_observers()
     if not observers:
         return None
-    snapshot = capture_activity_snapshot(start_tick=int(start_tick))
+    snapshot = capture_activity_snapshot(
+        start_tick=int(start_tick),
+        scope=population_units.build_scope(
+            wilderness, population_units.observed_units(wilderness)
+        ),
+    )
     forecast = project_activity_window(
         snapshot,
         start_tick=int(start_tick),
@@ -543,16 +589,37 @@ def next_population_lifecycle_boundary(
 
 
 def snapshot_population_lifecycle_surfaces(
-    start_tick: int, end_tick: int
+    start_tick: int, end_tick: int, *, scope: Any | None = None
 ) -> dict[int, SurfaceSnapshot]:
-    """The combined advance-surface contract of both merged owners."""
+    """The combined advance-surface contract of both merged owners.
+
+    ``scope`` narrows the individual and site surfaces to the units the pass
+    will settle. Omitted -- the clock's own call, before any stage runs -- it is
+    the observed scope of the advance that is about to run. No stage before this
+    one moves a player character or announces a location, so the registry's
+    scope and the stage's scope name the same set; a world with no wilderness or
+    no population answers exactly as it did before.
+    """
+    wilderness = _wilderness()
+    if (
+        scope is None
+        and wilderness is not None
+        and regional_population.population_provisioned(wilderness)
+    ):
+        scope = population_units.build_scope(
+            wilderness, population_units.observed_units(wilderness)
+        )
     merged: dict[int, SurfaceSnapshot] = {}
     for registry in (
-        monster_sites.snapshot_monster_site_surfaces(start_tick, end_tick),
+        monster_sites.snapshot_monster_site_surfaces(
+            start_tick, end_tick, scope=scope
+        ),
         regional_population.snapshot_regional_population_surfaces(
             start_tick, end_tick
         ),
-        monster_activity.snapshot_monster_activity_surfaces(start_tick, end_tick),
+        monster_activity.snapshot_monster_activity_surfaces(
+            start_tick, end_tick, scope=scope
+        ),
     ):
         for object_id, surface in registry.items():
             existing = merged.get(object_id)
@@ -569,7 +636,7 @@ def register_regional_population() -> None:
     """Install the merged coordinator as the live lifecycle stage (idempotent)."""
     register_event_source(
         STAGE_KIND,
-        settle_population_lifecycle,
+        settle_observed_population,
         snapshot_population_lifecycle_surfaces,
         next_boundary=next_population_lifecycle_boundary,
     )
@@ -582,6 +649,7 @@ __all__ = [
     "ensure_population_current",
     "next_population_lifecycle_boundary",
     "register_regional_population",
+    "settle_observed_population",
     "settle_population_lifecycle",
     "settle_population_scope",
     "snapshot_population_lifecycle_surfaces",

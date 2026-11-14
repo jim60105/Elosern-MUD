@@ -204,8 +204,18 @@ class ActivitySnapshot:
 # ---------------------------------------------------------------------------
 
 
-def capture_activity_snapshot(*, start_tick: int) -> ActivitySnapshot:
-    """Capture the projection inputs at ``start_tick`` through the owners."""
+def capture_activity_snapshot(
+    *, start_tick: int, scope: Any | None = None
+) -> ActivitySnapshot:
+    """Capture the projection inputs at ``start_tick`` through the owners.
+
+    ``scope`` keeps only the planning inputs of that settlement scope: its
+    groups, the journeys of those groups, its zones and its sites. The observed
+    advances pass the units their party and everything it can contact occupy, so
+    the contact forecast never projects an unobserved unit from its own lagging
+    due ticks; the presence and protection facts stay whole-world because a
+    projected contact is looked up at real cells of every unit.
+    """
     from world.maps import monster_activity, monster_sites, regional_population
 
     # The owner's own binding, so the projection plans exactly the sites the
@@ -298,6 +308,16 @@ def capture_activity_snapshot(*, start_tick: int) -> ActivitySnapshot:
             )
             for entry in record.room_protection
         )
+    if scope is not None:
+        kept = {
+            group.group_id for group in groups if group.group_id in scope.group_ids
+        }
+        groups = tuple(group for group in groups if group.group_id in kept)
+        journeys = tuple(
+            journey for journey in journeys if journey.group_id in kept
+        )
+        zones = tuple(zone for zone in zones if zone.key in scope.zone_keys)
+        sites = tuple(site for site in sites if site.key in scope.site_keys)
     return ActivitySnapshot(
         groups=groups,
         journeys=journeys,

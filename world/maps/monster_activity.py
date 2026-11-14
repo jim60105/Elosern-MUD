@@ -3396,16 +3396,49 @@ def _tracked_individual_ids(state: MonsterActivityState) -> tuple[int, ...]:
     return tuple(sorted(members))
 
 
+def _scoped_individual_ids(
+    state: MonsterActivityState, scope: Any
+) -> tuple[int, ...]:
+    """Every individual one scoped pass may write, in persistent-ID order.
+
+    A scoped pass settles only the groups its scope names, plus the journeys
+    those groups are on: the two places a member can be advanced from.
+    """
+    members: set[int] = set()
+    for group_id in scope.group_ids:
+        group = state.groups.get(group_id)
+        if group is None:
+            continue
+        members.update(group.member_ids)
+        journey = state.journeys.get(group.journey_id)
+        if journey is not None:
+            members.update(journey.member_ids)
+    return tuple(sorted(members))
+
+
 def snapshot_monster_activity_surfaces(
-    start_tick: int, end_tick: int
+    start_tick: int, end_tick: int, *, scope: Any | None = None
 ) -> dict[int, SurfaceSnapshot]:
-    """The clock advance-surface contract of this owner (pure read)."""
+    """The clock advance-surface contract of this owner (pure read).
+
+    ``scope`` narrows the bodies to the individuals one scoped pass can reach,
+    so an advance's rollback contract does not grow with the units it leaves
+    unsettled. Omitted, every tracked individual is snapshotted as before.
+    """
     from world.maps import regional_population
 
     wilderness = regional_population.live_wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return {}
-    return snapshot_activity_surfaces(wilderness)
+    if scope is None:
+        return snapshot_activity_surfaces(wilderness)
+    try:
+        state = read_monster_activity(wilderness)
+    except MonsterActivityError:  # observability: ignore R2: a malformed record still snapshots its own attribute; the write refuses before any member is read
+        return snapshot_activity_surfaces(wilderness, member_ids=())
+    return snapshot_activity_surfaces(
+        wilderness, member_ids=_scoped_individual_ids(state, scope)
+    )
 
 
 def snapshot_activity_surfaces(
