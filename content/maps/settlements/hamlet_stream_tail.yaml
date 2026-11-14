@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_stream_tail
+location_ref: hamlet_stream_tail
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 198
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 溪尾岔路
+    desc: 岔路在溪水流盡的地方，路邊只剩一片濕泥。往西的路通往鹽道城，夏天的泥地會陷住車輪。
+    anchor_key: hamlet_stream_tail
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 屋前小橋
+    desc: 屋前架著一座木橋，跨過已經很淺的溪尾。屋主在橋下養了幾隻鴨，鴨群整天在泥裡翻找。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

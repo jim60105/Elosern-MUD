@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_stone_hill
+location_ref: village_stone_hill
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 230
+    y_m: 230
+    prototype_parent: anchor_room
+    key: 石岡綠地
+    desc: 綠地鋪在一整片裸露的石板上，井是鑿開岩層才見水的深井。石縫間填著挑來的土，種了幾株耐風的果樹。
+    anchor_key: village_stone_hill
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 360
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口順著石坡往下，接上通往漁灣鎮的長路。坡下的平原一片青綠，與岡上的灰石判然有別。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 360
+    prototype_parent: grid_room
+    key: 西北村口
+    desc: 西北村口接著往鹽津城的路，兩側壘著乾砌的石牆。風從西北面的山口灌進來，牆縫裡發出低低的哨音。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 165
+    y_m: 165
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 教堂前的庭地朝西南，天氣好時能看見遠處白帆港的海色。庭中的石臼是共用碾麥的地方，邊緣已磨得圓滑。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

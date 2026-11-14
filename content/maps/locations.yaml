@@ -1338,3 +1338,391 @@ locations:
     geographic_constraint: End of the ridge road on the spur below the eastern 
       crossing
     scene_archetype:
+  village_big_flat:
+    kind: village
+    display_name_zh: 大坪村
+    description: Village on the open plain of the salt road, east of the south tide port.
+    cell:
+      cell_x: 711
+      cell_y: 183
+    geographic_constraint: Open coastal plain on the salt road east of the south tide port
+    scene_archetype:
+  village_cogongrass_flat:
+    kind: village
+    display_name_zh: 白茅村
+    description: Village in the cogongrass plain behind the southern dunes.
+    cell:
+      cell_x: 458
+      cell_y: 119
+    geographic_constraint: Cogongrass plain behind the southern shore dunes
+    scene_archetype:
+  village_creek_flat:
+    kind: village
+    display_name_zh: 溪埔村
+    description: Village on the flat beside the capital river, above the white sail port.
+    cell:
+      cell_x: 338
+      cell_y: 405
+    geographic_constraint: River flat on the capital river above the white sail port
+    scene_archetype:
+  village_reed_bank:
+    kind: village
+    display_name_zh: 蘆岸村
+    description: Village among reed beds on the north bank of the south vale, on the salt road.
+    cell:
+      cell_x: 817
+      cell_y: 280
+    geographic_constraint: Reed bank on the north side of the south vale river
+    scene_archetype:
+  village_river_terrace:
+    kind: village
+    display_name_zh: 河階村
+    description: Village on a terrace above the south vale river, west of the salt city.
+    cell:
+      cell_x: 1066
+      cell_y: 370
+    geographic_constraint: River terrace on the south bank of the south vale, on the salt road
+    scene_archetype:
+  village_ridge_top:
+    kind: village
+    display_name_zh: 嶺頂村
+    description: Village on the ridge top in the uplands above the salt ferry.
+    cell:
+      cell_x: 381
+      cell_y: 449
+    geographic_constraint: Ridge top in the uplands above the salt ferry
+    scene_archetype:
+  village_sand_bar:
+    kind: village
+    display_name_zh: 汀洲村
+    description: Village on a sand bar of the south vale, upstream of the fishers cove.
+    cell:
+      cell_x: 485
+      cell_y: 178
+    geographic_constraint: Sand bar in the south vale river upstream of the fishers cove
+    scene_archetype:
+  village_sand_spit:
+    kind: village
+    display_name_zh: 沙嘴村
+    description: Fishing village on a sand spit of the western shore.
+    cell:
+      cell_x: 392
+      cell_y: 202
+    geographic_constraint: Sand spit on the south-west shore inside the coastal road
+    scene_archetype:
+  village_stone_hill:
+    kind: village
+    display_name_zh: 石岡村
+    description: Stony village on the high ground where the confluence road meets the salt ferry road.
+    cell:
+      cell_x: 454
+      cell_y: 448
+    geographic_constraint: Stony high ground on the confluence road above the coastal plain
+    scene_archetype:
+  village_three_forks:
+    kind: village
+    display_name_zh: 三叉村
+    description: Village where the coast road forks toward the fishers cove.
+    cell:
+      cell_x: 626
+      cell_y: 255
+    geographic_constraint: Three-road junction on the plain between the salt ferry road and the fishers cove
+    scene_archetype:
+  village_tide_flat:
+    kind: village
+    display_name_zh: 潮埔村
+    description: Village on the tide flats inland of the western shore.
+    cell:
+      cell_x: 361
+      cell_y: 253
+    geographic_constraint: Tidal flat inland of the south-west shore
+    scene_archetype:
+  village_upper_vale:
+    kind: village
+    display_name_zh: 上谷村
+    description: Village on the upper south vale, where the salt road turns back from the eastern hills.
+    cell:
+      cell_x: 1210
+      cell_y: 414
+    geographic_constraint: Upper south vale on the salt road at the foot of the eastern hills
+    scene_archetype:
+  hamlet_bulrush_islet:
+    kind: hamlet
+    display_name_zh: 蒲洲
+    description: Hamlet on a bulrush islet of the south vale.
+    cell:
+      cell_x: 760
+      cell_y: 286
+    geographic_constraint: Bulrush islet in the south vale
+    scene_archetype:
+  hamlet_dry_field:
+    kind: hamlet
+    display_name_zh: 旱田
+    description: Hamlet of dry fields on the plain north of the south vale.
+    cell:
+      cell_x: 763
+      cell_y: 235
+    geographic_constraint: Dry fields on the plain north of the south vale
+    scene_archetype:
+  hamlet_dry_flat:
+    kind: hamlet
+    display_name_zh: 旱埔
+    description: Dry hamlet on the plateau above the south vale.
+    cell:
+      cell_x: 1006
+      cell_y: 339
+    geographic_constraint: Dry plateau above the south vale
+    scene_archetype:
+  hamlet_dry_plain:
+    kind: hamlet
+    display_name_zh: 旱原
+    description: Hamlet on the dry plain of the south coast road.
+    cell:
+      cell_x: 652
+      cell_y: 148
+    geographic_constraint: Dry plain on the south coast road
+    scene_archetype:
+  hamlet_earthen_ridge:
+    kind: hamlet
+    display_name_zh: 土岡
+    description: Hamlet on a low earthen ridge of the plain.
+    cell:
+      cell_x: 579
+      cell_y: 247
+    geographic_constraint: Earthen ridge on the plain
+    scene_archetype:
+  hamlet_grass_flat:
+    kind: hamlet
+    display_name_zh: 草埔
+    description: Hamlet on a grass flat of the coastal plain.
+    cell:
+      cell_x: 519
+      cell_y: 241
+    geographic_constraint: Grass flat on the coastal plain
+    scene_archetype:
+  hamlet_grass_ridge:
+    kind: hamlet
+    display_name_zh: 草嶺
+    description: Hamlet on a grassy ridge of the middle plain.
+    cell:
+      cell_x: 950
+      cell_y: 300
+    geographic_constraint: Grassy ridge on the middle plain
+    scene_archetype:
+  hamlet_high_flat:
+    kind: hamlet
+    display_name_zh: 高埔
+    description: Hamlet on the high flat of the middle plain.
+    cell:
+      cell_x: 884
+      cell_y: 284
+    geographic_constraint: High flat on the middle plain
+    scene_archetype:
+  hamlet_long_slope:
+    kind: hamlet
+    display_name_zh: 長坡
+    description: Hamlet on the long slope across the middle plain.
+    cell:
+      cell_x: 547
+      cell_y: 346
+    geographic_constraint: Long slope across the middle plain
+    scene_archetype:
+  hamlet_mountain_foot:
+    kind: hamlet
+    display_name_zh: 山麓
+    description: Hamlet at the foot of the eastern hills, south of the upper vale.
+    cell:
+      cell_x: 1212
+      cell_y: 398
+    geographic_constraint: Foot of the eastern hills south of the south vale
+    scene_archetype:
+  hamlet_plateau_top:
+    kind: hamlet
+    display_name_zh: 坪頂
+    description: Hamlet on the flat top of the coastal plain.
+    cell:
+      cell_x: 505
+      cell_y: 397
+    geographic_constraint: Flat top of the coastal plain
+    scene_archetype:
+  hamlet_pool_tail:
+    kind: hamlet
+    display_name_zh: 潭尾
+    description: Hamlet at the tail of a river pool below the salt city.
+    cell:
+      cell_x: 1044
+      cell_y: 370
+    geographic_constraint: Pool tail on the south vale below the salt city
+    scene_archetype:
+  hamlet_reed_islet:
+    kind: hamlet
+    display_name_zh: 蘆洲
+    description: Hamlet among reeds at a bend of the capital river.
+    cell:
+      cell_x: 319
+      cell_y: 370
+    geographic_constraint: Reed bend of the capital river
+    scene_archetype:
+  hamlet_river_dike:
+    kind: hamlet
+    display_name_zh: 河堤
+    description: Hamlet behind the dike of the south vale.
+    cell:
+      cell_x: 828
+      cell_y: 297
+    geographic_constraint: Dike of the south vale river
+    scene_archetype:
+  hamlet_river_side:
+    kind: hamlet
+    display_name_zh: 河邊
+    description: Hamlet on the riverbank of the upper south vale.
+    cell:
+      cell_x: 1129
+      cell_y: 393
+    geographic_constraint: Riverbank of the upper south vale
+    scene_archetype:
+  hamlet_river_sun:
+    kind: hamlet
+    display_name_zh: 河陽
+    description: Hamlet on the north bank of the capital river, above the salt ferry.
+    cell:
+      cell_x: 359
+      cell_y: 458
+    geographic_constraint: North bank of the capital river above the salt ferry
+    scene_archetype:
+  hamlet_sand_dune:
+    kind: hamlet
+    display_name_zh: 沙崙
+    description: Hamlet on a dune ridge behind the western shore.
+    cell:
+      cell_x: 474
+      cell_y: 198
+    geographic_constraint: Dune ridge behind the western shore
+    scene_archetype:
+  hamlet_shell_mound:
+    kind: hamlet
+    display_name_zh: 貝塚
+    description: Hamlet on a shell mound of the western shore.
+    cell:
+      cell_x: 342
+      cell_y: 308
+    geographic_constraint: Shell mound on the south-west shore
+    scene_archetype:
+  hamlet_shoal_head:
+    kind: hamlet
+    display_name_zh: 灘頭
+    description: Hamlet at the head of the shoals on the upper south vale.
+    cell:
+      cell_x: 1075
+      cell_y: 385
+    geographic_constraint: Head of the shoals on the upper south vale
+    scene_archetype:
+  hamlet_stone_knoll:
+    kind: hamlet
+    display_name_zh: 石崙
+    description: Hamlet on a stony knoll of the middle plain.
+    cell:
+      cell_x: 575
+      cell_y: 285
+    geographic_constraint: Stony knoll on the middle plain
+    scene_archetype:
+  hamlet_stone_shoal:
+    kind: hamlet
+    display_name_zh: 石灘
+    description: Hamlet on a stony shoal of the south vale.
+    cell:
+      cell_x: 1142
+      cell_y: 401
+    geographic_constraint: Stone shoal on the south vale river
+    scene_archetype:
+  hamlet_stream_bank:
+    kind: hamlet
+    display_name_zh: 溪畔
+    description: Hamlet on the bank of the south vale.
+    cell:
+      cell_x: 889
+      cell_y: 325
+    geographic_constraint: Bank of the south vale river
+    scene_archetype:
+  hamlet_stream_head:
+    kind: hamlet
+    display_name_zh: 溪頭
+    description: Hamlet at the head of a stream feeding the south vale.
+    cell:
+      cell_x: 952
+      cell_y: 347
+    geographic_constraint: Head of a stream feeding the south vale
+    scene_archetype:
+  hamlet_stream_tail:
+    kind: hamlet
+    display_name_zh: 溪尾
+    description: Hamlet at the tail of a stream below the eastern hills.
+    cell:
+      cell_x: 1170
+      cell_y: 397
+    geographic_constraint: Tail of a stream below the eastern hills
+    scene_archetype:
+  hamlet_tide_sound:
+    kind: hamlet
+    display_name_zh: 潮音
+    description: Hamlet on the south shore plain, between the tide port and the cogongrass flats.
+    cell:
+      cell_x: 527
+      cell_y: 108
+    geographic_constraint: South shore plain between the tide port and the cogongrass flats
+    scene_archetype:
+  hamlet_ridge_waist:
+    kind: hamlet
+    display_name_zh: 嶺腰
+    description: Hamlet on the waist of a hill ridge, on the road from the salt ferry to the west ore port.
+    cell:
+      cell_x: 351
+      cell_y: 544
+    geographic_constraint: Hill ridge on the road from the salt ferry to the west ore port
+    scene_archetype:
+  hamlet_mid_vale:
+    kind: hamlet
+    display_name_zh: 谷中
+    description: Hamlet in the middle of a valley on the road between the salt ferry and the west ore port.
+    cell:
+      cell_x: 302
+      cell_y: 593
+    geographic_constraint: Valley floor on the road between the salt ferry and the west ore port
+    scene_archetype:
+  hamlet_flat_meadow:
+    kind: hamlet
+    display_name_zh: 坪埔
+    description: Hamlet on a flat meadow above the western ore port.
+    cell:
+      cell_x: 249
+      cell_y: 646
+    geographic_constraint: Flat meadow above the western ore port
+    scene_archetype:
+  hamlet_ridge_edge:
+    kind: hamlet
+    display_name_zh: 嶺邊
+    description: Hamlet on the edge of a ridge north of the salt city.
+    cell:
+      cell_x: 1024
+      cell_y: 420
+    geographic_constraint: Ridge edge on the hill road north of the salt city
+    scene_archetype:
+  hamlet_hillside:
+    kind: hamlet
+    display_name_zh: 山腰
+    description: Hamlet on the hillside where the hill road climbs from the south vale.
+    cell:
+      cell_x: 1028
+      cell_y: 477
+    geographic_constraint: Hillside on the climb from the south vale to the honey vale
+    scene_archetype:
+  hamlet_city_foot:
+    kind: hamlet
+    display_name_zh: 城下
+    description: Gate settlement below the walls of the salt ferry city, on the road along its landward wall.
+    cell:
+      cell_x: 406
+      cell_y: 499
+    geographic_constraint: Gate settlement at the landward approach of the salt ferry city
+    spacing_exemption: Gate settlement of city_salt_ferry; it necessarily stands within the 15 km hamlet minimum of the city whose gate it serves.
+    scene_archetype:

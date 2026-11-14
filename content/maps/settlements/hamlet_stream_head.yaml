@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_stream_head
+location_ref: hamlet_stream_head
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 214
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 溪頭岔路
+    desc: 岔路在溪流初起的地方，路邊一股細水從石縫滲出。往東的路通往鹽道城，擔水的人多半在此歇腳。
+    anchor_key: hamlet_stream_head
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的石槽接著那股細水，常年不乾。屋主把菜圃開在槽邊，靠這點水種些耐旱的青菜。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

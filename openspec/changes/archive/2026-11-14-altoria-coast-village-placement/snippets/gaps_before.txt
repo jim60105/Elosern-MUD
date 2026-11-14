@@ -1,0 +1,6 @@
+city_salt_ferry -- port_white_sail: (403, 499) to (299, 359) is 184.8 km (144 cells)
+city_salt_ferry -- town_olive_ferry: (403, 499) to (699, 255) is 431.6 km (356 cells)
+city_salt_road -- port_south_tide: (1020, 363) to (599, 100) is 1031.7 km (884 cells)
+city_salt_road -- town_olive_ferry: (1019, 361) to (700, 258) is 361.7 km (320 cells)
+port_fishers_cove -- port_white_sail: (427, 153) to (301, 355) is 254.2 km (203 cells)
+port_fishers_cove -- town_olive_ferry: (430, 154) to (699, 255) is 310.8 km (270 cells)

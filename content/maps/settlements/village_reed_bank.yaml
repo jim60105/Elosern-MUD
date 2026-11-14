@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_reed_bank
+location_ref: village_reed_bank
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 242
+    y_m: 242
+    prototype_parent: anchor_room
+    key: 綠地石井
+    desc: 綠地中央的石井旁擺著編蘆席的長凳，村人閒時在此修補漁具。風從西南的坡地吹上來，帶著曬過的草味。
+    anchor_key: village_reed_bank
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 443
+    y_m: 242
+    prototype_parent: grid_room
+    key: 東村口
+    desc: 東村口迎著往鹽道城方向的大路，路肩外是一片低窪的蘆葦。車馬經過時，葦叢裡的鳥會一起飛起。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南村口
+    desc: 西南村口順著地勢往下，通往南潮港的岔路由此分開。口邊的木樁上曬著一網一網搓好的蘆葦繩。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 242
+    y_m: 142
+    prototype_parent: grid_room
+    key: 教堂前
+    desc: 教堂前的空地朝南敞開，石階下堆著準備運往橄欖津的蘆席。禮拜日的鐘聲越過葦叢，一路傳到河邊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:

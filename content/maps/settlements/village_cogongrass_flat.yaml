@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_cogongrass_flat
+location_ref: village_cogongrass_flat
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 100
+    y_m: 218
+    prototype_parent: anchor_room
+    key: 白茅綠地
+    desc: 綠地被及腰的白茅圍著，井台上的水瓢是用半個葫蘆做的。風吹過時，整片茅草像水面一樣起伏。
+    anchor_key: village_cogongrass_flat
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 100
+    y_m: 385
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口正對漁灣鎮，路邊的沙地上留著車輪與獸蹄的印子。清晨的魚販從這裡進村，擔子裡的魚還在滴水。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 218
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南村口
+    desc: 東南村口通往南潮港，路旁是一排排壓沙的茅束。走遠一點就能看見海，白色的浪線在日光下很清楚。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 184
+    y_m: 218
+    prototype_parent: grid_room
+    key: 教堂前庭
+    desc: 教堂前的庭地朝東敞開，階上總積著一層吹來的細沙。祭日前村人提水把階面沖淨，水痕很快又乾了。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: shrine_front
+  direction: e
+- source: shrine_front
+  destination: village_green
+  direction: w
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: village_end_north
+  - return_direction: nw
+    destination_node: village_end_southeast
+city_gate:

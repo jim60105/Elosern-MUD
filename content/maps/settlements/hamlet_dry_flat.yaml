@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_dry_flat
+location_ref: hamlet_dry_flat
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 198
+    y_m: 100
+    prototype_parent: anchor_room
+    key: 旱地岔路
+    desc: 岔路開在一片乾硬的台地上，車轍過後揚起細灰。往東北的路直通鹽道城，商隊常在此換馬歇腳。
+    anchor_key: hamlet_dry_flat
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前的水缸蓋著木板，怕日頭把水曬熱。屋旁挖了一口淺井，水不多，足夠一家人與牲口用。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: w
+- source: homestead_front
+  destination: crossing
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: crossing
+  - return_direction: e
+    destination_node: homestead_front
+city_gate:

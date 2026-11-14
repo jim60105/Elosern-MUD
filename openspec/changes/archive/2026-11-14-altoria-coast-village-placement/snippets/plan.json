@@ -1,0 +1,326 @@
+[
+  {
+    "id": "village_upper_vale",
+    "kind": "village",
+    "cell": [1210, 414],
+    "display_name_zh": "上谷村",
+    "description": "Village on the upper south vale, where the salt road turns back from the eastern hills.",
+    "geographic_constraint": "Upper south vale on the salt road at the foot of the eastern hills",
+    "population": 640
+  },
+  {
+    "id": "village_river_terrace",
+    "kind": "village",
+    "cell": [1066, 370],
+    "display_name_zh": "河階村",
+    "description": "Village on a terrace above the south vale river, west of the salt city.",
+    "geographic_constraint": "River terrace on the south bank of the south vale, on the salt road",
+    "population": 1240
+  },
+  {
+    "id": "village_reed_bank",
+    "kind": "village",
+    "cell": [817, 280],
+    "display_name_zh": "蘆岸村",
+    "description": "Village among reed beds on the north bank of the south vale, on the salt road.",
+    "geographic_constraint": "Reed bank on the north side of the south vale river",
+    "population": 980
+  },
+  {
+    "id": "village_three_forks",
+    "kind": "village",
+    "cell": [626, 255],
+    "display_name_zh": "三叉村",
+    "description": "Village where the coast road forks toward the fishers cove.",
+    "geographic_constraint": "Three-road junction on the plain between the salt ferry road and the fishers cove",
+    "population": 1620
+  },
+  {
+    "id": "village_stone_hill",
+    "kind": "village",
+    "cell": [454, 448],
+    "display_name_zh": "石岡村",
+    "description": "Stony village on the high ground where the confluence road meets the salt ferry road.",
+    "geographic_constraint": "Stony high ground on the confluence road above the coastal plain",
+    "population": 760
+  },
+  {
+    "id": "village_sand_spit",
+    "kind": "village",
+    "cell": [392, 202],
+    "display_name_zh": "沙嘴村",
+    "description": "Fishing village on a sand spit of the western shore.",
+    "geographic_constraint": "Sand spit on the north-west shore inside the coastal road",
+    "population": 860
+  },
+  {
+    "id": "village_tide_flat",
+    "kind": "village",
+    "cell": [361, 253],
+    "display_name_zh": "潮埔村",
+    "description": "Village on the tide flats inland of the western shore.",
+    "geographic_constraint": "Tidal flat inland of the north-west shore",
+    "population": 1060
+  },
+  {
+    "id": "village_creek_flat",
+    "kind": "village",
+    "cell": [338, 405],
+    "display_name_zh": "溪埔村",
+    "description": "Village on the flat beside the capital river, above the white sail port.",
+    "geographic_constraint": "River flat on the capital river above the white sail port",
+    "population": 920
+  },
+  {
+    "id": "village_big_flat",
+    "kind": "village",
+    "cell": [711, 183],
+    "display_name_zh": "大坪村",
+    "description": "Village on the open plain of the salt road, east of the south tide port.",
+    "geographic_constraint": "Open coastal plain on the salt road east of the south tide port",
+    "population": 700
+  },
+  {
+    "id": "village_cogongrass_flat",
+    "kind": "village",
+    "cell": [458, 119],
+    "display_name_zh": "白茅村",
+    "description": "Village in the cogongrass plain behind the northern dunes.",
+    "geographic_constraint": "Cogongrass plain behind the northern shore dunes",
+    "population": 580
+  },
+  {
+    "id": "village_sand_bar",
+    "kind": "village",
+    "cell": [485, 178],
+    "display_name_zh": "汀洲村",
+    "description": "Village on a sand bar of the south vale, upstream of the fishers cove.",
+    "geographic_constraint": "Sand bar in the south vale river upstream of the fishers cove",
+    "population": 740
+  },
+  {
+    "id": "village_ridge_top",
+    "kind": "village",
+    "cell": [381, 449],
+    "display_name_zh": "嶺頂村",
+    "description": "Village on the ridge top in the uplands above the salt ferry.",
+    "geographic_constraint": "Ridge top in the uplands above the salt ferry",
+    "population": 620
+  },
+  {
+    "id": "hamlet_shoal_head",
+    "kind": "hamlet",
+    "cell": [1075, 385],
+    "display_name_zh": "灘頭",
+    "description": "Hamlet at the head of the shoals on the upper south vale.",
+    "geographic_constraint": "Head of the shoals on the upper south vale",
+    "population": 120
+  },
+  {
+    "id": "hamlet_stone_shoal",
+    "kind": "hamlet",
+    "cell": [1142, 401],
+    "display_name_zh": "石灘",
+    "description": "Hamlet on a stony shoal of the south vale.",
+    "geographic_constraint": "Stone shoal on the south vale river",
+    "population": 150
+  },
+  {
+    "id": "hamlet_mountain_foot",
+    "kind": "hamlet",
+    "cell": [1212, 398],
+    "display_name_zh": "山麓",
+    "description": "Hamlet at the foot of the eastern hills, north of the upper vale.",
+    "geographic_constraint": "Foot of the eastern hills north of the south vale",
+    "population": 90
+  },
+  {
+    "id": "hamlet_river_side",
+    "kind": "hamlet",
+    "cell": [1129, 393],
+    "display_name_zh": "河邊",
+    "description": "Hamlet on the riverbank of the upper south vale.",
+    "geographic_constraint": "Riverbank of the upper south vale",
+    "population": 110
+  },
+  {
+    "id": "hamlet_dry_flat",
+    "kind": "hamlet",
+    "cell": [1006, 339],
+    "display_name_zh": "旱埔",
+    "description": "Dry hamlet on the plateau above the south vale.",
+    "geographic_constraint": "Dry plateau above the south vale",
+    "population": 130
+  },
+  {
+    "id": "hamlet_grass_ridge",
+    "kind": "hamlet",
+    "cell": [950, 300],
+    "display_name_zh": "草嶺",
+    "description": "Hamlet on a grassy ridge of the middle plain.",
+    "geographic_constraint": "Grassy ridge on the middle plain",
+    "population": 170
+  },
+  {
+    "id": "hamlet_stream_head",
+    "kind": "hamlet",
+    "cell": [952, 347],
+    "display_name_zh": "溪頭",
+    "description": "Hamlet at the head of a stream feeding the south vale.",
+    "geographic_constraint": "Head of a stream feeding the south vale",
+    "population": 200
+  },
+  {
+    "id": "hamlet_sand_dune",
+    "kind": "hamlet",
+    "cell": [474, 198],
+    "display_name_zh": "沙崙",
+    "description": "Hamlet on a dune ridge behind the western shore.",
+    "geographic_constraint": "Dune ridge behind the western shore",
+    "population": 100
+  },
+  {
+    "id": "hamlet_dry_field",
+    "kind": "hamlet",
+    "cell": [763, 235],
+    "display_name_zh": "旱田",
+    "description": "Hamlet of dry fields on the plain north of the south vale.",
+    "geographic_constraint": "Dry fields on the plain north of the south vale",
+    "population": 180
+  },
+  {
+    "id": "hamlet_stream_bank",
+    "kind": "hamlet",
+    "cell": [889, 325],
+    "display_name_zh": "溪畔",
+    "description": "Hamlet on the bank of the south vale.",
+    "geographic_constraint": "Bank of the south vale river",
+    "population": 160
+  },
+  {
+    "id": "hamlet_river_dike",
+    "kind": "hamlet",
+    "cell": [828, 297],
+    "display_name_zh": "河堤",
+    "description": "Hamlet behind the dike of the south vale.",
+    "geographic_constraint": "Dike of the south vale river",
+    "population": 140
+  },
+  {
+    "id": "hamlet_earthen_ridge",
+    "kind": "hamlet",
+    "cell": [579, 247],
+    "display_name_zh": "土岡",
+    "description": "Hamlet on a low earthen ridge of the plain.",
+    "geographic_constraint": "Earthen ridge on the plain",
+    "population": 230
+  },
+  {
+    "id": "hamlet_dry_plain",
+    "kind": "hamlet",
+    "cell": [652, 148],
+    "display_name_zh": "旱原",
+    "description": "Hamlet on the dry plain of the north coast road.",
+    "geographic_constraint": "Dry plain on the north coast road",
+    "population": 120
+  },
+  {
+    "id": "hamlet_shell_mound",
+    "kind": "hamlet",
+    "cell": [342, 308],
+    "display_name_zh": "貝塚",
+    "description": "Hamlet on a shell mound of the western shore.",
+    "geographic_constraint": "Shell mound on the north-west shore",
+    "population": 90
+  },
+  {
+    "id": "hamlet_stream_tail",
+    "kind": "hamlet",
+    "cell": [1170, 397],
+    "display_name_zh": "溪尾",
+    "description": "Hamlet at the tail of a stream below the eastern hills.",
+    "geographic_constraint": "Tail of a stream below the eastern hills",
+    "population": 130
+  },
+  {
+    "id": "hamlet_high_flat",
+    "kind": "hamlet",
+    "cell": [884, 284],
+    "display_name_zh": "高埔",
+    "description": "Hamlet on the high flat of the middle plain.",
+    "geographic_constraint": "High flat on the middle plain",
+    "population": 210
+  },
+  {
+    "id": "hamlet_plateau_top",
+    "kind": "hamlet",
+    "cell": [505, 397],
+    "display_name_zh": "坪頂",
+    "description": "Hamlet on the flat top of the coastal plain.",
+    "geographic_constraint": "Flat top of the coastal plain",
+    "population": 260
+  },
+  {
+    "id": "hamlet_long_slope",
+    "kind": "hamlet",
+    "cell": [547, 346],
+    "display_name_zh": "長坡",
+    "description": "Hamlet on the long slope across the middle plain.",
+    "geographic_constraint": "Long slope across the middle plain",
+    "population": 240
+  },
+  {
+    "id": "hamlet_grass_flat",
+    "kind": "hamlet",
+    "cell": [519, 241],
+    "display_name_zh": "草埔",
+    "description": "Hamlet on a grass flat of the north plain.",
+    "geographic_constraint": "Grass flat on the north plain",
+    "population": 220
+  },
+  {
+    "id": "hamlet_stone_knoll",
+    "kind": "hamlet",
+    "cell": [575, 285],
+    "display_name_zh": "石崙",
+    "description": "Hamlet on a stony knoll of the middle plain.",
+    "geographic_constraint": "Stony knoll on the middle plain",
+    "population": 250
+  },
+  {
+    "id": "hamlet_river_sun",
+    "kind": "hamlet",
+    "cell": [359, 458],
+    "display_name_zh": "河陽",
+    "description": "Hamlet on the north bank of the capital river, above the salt ferry.",
+    "geographic_constraint": "North bank of the capital river above the salt ferry",
+    "population": 160
+  },
+  {
+    "id": "hamlet_bulrush_islet",
+    "kind": "hamlet",
+    "cell": [760, 286],
+    "display_name_zh": "蒲洲",
+    "description": "Hamlet on a bulrush islet of the south vale.",
+    "geographic_constraint": "Bulrush islet in the south vale",
+    "population": 190
+  },
+  {
+    "id": "hamlet_reed_islet",
+    "kind": "hamlet",
+    "cell": [319, 370],
+    "display_name_zh": "蘆洲",
+    "description": "Hamlet among reeds at a bend of the capital river.",
+    "geographic_constraint": "Reed bend of the capital river",
+    "population": 70
+  },
+  {
+    "id": "hamlet_pool_tail",
+    "kind": "hamlet",
+    "cell": [1044, 370],
+    "display_name_zh": "潭尾",
+    "description": "Hamlet at the tail of a river pool below the salt city.",
+    "geographic_constraint": "Pool tail on the south vale below the salt city",
+    "population": 110
+  }
+]

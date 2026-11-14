@@ -1,0 +1,77 @@
+version: 1
+kind: settlement
+id: village_sand_bar
+location_ref: village_sand_bar
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 191
+    y_m: 282
+    prototype_parent: anchor_room
+    key: 汀洲綠地
+    desc: 綠地緊挨著河灘，井水清得能照見天。河心的沙洲在枯水期露出來，村人踩著石步去收沙洲上種的菜。
+    anchor_key: village_sand_bar
+    typeclass:
+    scene_archetype: city_street
+  village_end_south:
+    x_m: 191
+    y_m: 100
+    prototype_parent: grid_room
+    key: 南村口
+    desc: 南村口通往漁灣鎮，路面鋪著河灘上撿來的小石。雨季水漲時這段路常被漫過，行人得改走堤上。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_north:
+    x_m: 191
+    y_m: 464
+    prototype_parent: grid_room
+    key: 北村口
+    desc: 北村口的木橋跨過南谷河，往橄欖津的官道由橋頭接上。橋板換過幾回，欄上刻著歷次修橋的年份。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 100
+    y_m: 282
+    prototype_parent: grid_room
+    key: 教堂面河
+    desc: 教堂前的地坪朝西，正對河面最寬的一段。日落時水光反射到石牆上，整座教堂像被點亮了一陣。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_south
+  direction: s
+- source: village_end_south
+  destination: village_green
+  direction: n
+- source: village_green
+  destination: village_end_north
+  direction: n
+- source: village_end_north
+  destination: village_green
+  direction: s
+- source: village_green
+  destination: shrine_front
+  direction: w
+- source: shrine_front
+  destination: village_green
+  direction: e
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: n
+    destination_node: village_end_south
+city_gate:
