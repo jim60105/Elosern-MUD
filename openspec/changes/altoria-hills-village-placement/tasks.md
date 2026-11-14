@@ -41,7 +41,16 @@ Ground rules:
 ## 5. Validation and hand-off
 
 - [x] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
-- [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+- [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
+
+  Result: 71 labels run, no residual-pin rewrite needed. The twelve labels the
+  trial proved red at baseline `674c6007` fail here with the same shape and a
+  data-independent cause (`SettlementNotLoaded` from a registry read before the
+  map world is published; `no such table: django_content_type` on the
+  registration rollback; `_anchor_key`/`anchor_locator` at import). Every other
+  label passed. `tests.test_map_core_contract` runs 4 tests with one error,
+  `ImproperlyConfigured: CHANNEL_LOG_NUM_TAIL_LINES` raised while importing
+  `evennia.contrib.grid.wilderness` — before any authored source is read.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 - [x] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-hills-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
