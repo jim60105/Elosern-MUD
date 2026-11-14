@@ -2464,7 +2464,8 @@ record already uses.
 Inside `reused_living_presence()` one pass also reuses four measures that cannot
 change between the writes it owns:
 
-- the enumerated living individuals (`_living_monsters()` once per pass);
+- the enumerated living individuals once per pass: `_scope_living_monsters(wilderness, scope)` inside
+  a scoped pass and `_living_monsters()` in a whole-world one (see "The scoped enumeration");
 - each individual's durable `home_ecology_zone` and `site_key`;
 - the active sessions' open cell protection (`_active_session_protection()`
   once per pass);
@@ -2473,7 +2474,8 @@ change between the writes it owns:
 
 `presence_fingerprint` still decides whether a presence map must be rebuilt
 after a coordinate or timeline write, so a moved individual is measured again
-while the pass's enumerated roster stays shared.
+while the pass's enumerated roster -- the scope's own roster in a scoped pass --
+stays shared.
 
 ### Invalidation points
 
@@ -2981,8 +2983,9 @@ answer replays it.
 
 Remaining whole-record work per scoped pass, stated and not removed here: one decode and one store
 of the activity record, one `group_units_map` computation for the scope build, one in-memory scan of
-the coordinate registration (pure cell lookups, no row read), and the replay of the record's pending
-timeline transitions. The contact forecast is outside this pass:
+the coordinate registration (unpacked once per stored map, then pure cell lookups; a key whose row an
+operator removal deleted is skipped), and the replay of the record's pending timeline transitions.
+The contact forecast is outside this pass:
 `population_forecast.capture_activity_snapshot` keeps whole-world presence, and a player action
 reaches it through `mental_time.next_registered_boundary`. So the *settlement pass* is independent of
 unobserved units; the whole action's cost is that plus the forecast's own read.
