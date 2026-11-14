@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 火塘棚
-    desc: 火塘棚用蘆葦編成，風穿過縫隙時帶著河水的氣味。往東出營地的小徑沿河灘走，再接上通往鹿鳴渡的路。
+    desc: 火塘棚用蘆葦編成，風穿過縫隙時帶著河水的氣味，洲邊的蘆葦比人還高。棚柱用的是洲上砍來的柳木。
     anchor_key:
     typeclass:
     scene_archetype: city_street

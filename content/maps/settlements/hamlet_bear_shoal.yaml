@@ -23,7 +23,7 @@ nodes:
     y_m: 161
     prototype_parent: grid_room
     key: 火塘灶
-    desc: 火塘灶旁堆著從河灘撿來的浮木。往東南的獸徑繞過灘地，半日後接上通往咆哮王城的官道。
+    desc: 火塘灶旁堆著從河灘撿來的浮木，王城的煙在東南方向隱約可見。浮木大多是上游沖下來的舊樹枝。
     anchor_key:
     typeclass:
     scene_archetype: city_street

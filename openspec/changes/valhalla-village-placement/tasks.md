@@ -178,6 +178,18 @@ Ground rules:
   that crowding is the human review item, not a data defect.
 - [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate valhalla-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
+  Gates: `test_data_lint check` -> `scanned=1625 flagged=121 universe=4590+37
+  quantity-pins=8 violations=0`, exit 0; `tools.contract_gate` -> `contract
+  gate passed: reference-context, traceability, observability, test-data,
+  manifests, contracts`, exit 0; `openspec validate
+  valhalla-village-placement --strict` -> `Change
+  'valhalla-village-placement' is valid`, exit 0.
+
+  Counts: 52 settlements — 17 villages and 35 hamlets. No spacing exemption is
+  used anywhere in this change, and no hamlet uses the boundary exception of
+  D2: every new cell reports `"region": "northwest_highland_forest"` with
+  `"scope": "in"`. Both D9 timing lines are recorded in the final hand-off.
+
 ## Workflow follow-up
 
 - After merge, the user reviews the new maps and markers in the map editor and the webclient. The review does not block archive.

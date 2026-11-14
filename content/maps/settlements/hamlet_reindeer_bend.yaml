@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘邊曬著切好的草料，攤在向陽的石面上。往西北出營地的小徑繞過河灣，才接上通往霜風鎮的官道。
+    desc: 共火塘邊曬著切好的草料，攤在向陽的石面上，鹿群常在下游的淺灘飲水。草料曬乾後捆成小束收進棚裡。
     anchor_key:
     typeclass:
     scene_archetype: city_street

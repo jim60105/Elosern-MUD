@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 公用火塘
-    desc: 公用火塘邊鋪著給過路人休息的乾草。往東下嶺的獸徑走完一程，才接上通往東渡營的官道。
+    desc: 公用火塘邊鋪著給過路人休息的乾草，嶺下的河水在石間折成幾道白線。乾草每隔幾天就換一次，免得受潮。
     anchor_key:
     typeclass:
     scene_archetype: city_street

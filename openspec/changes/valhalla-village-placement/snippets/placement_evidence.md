@@ -32,6 +32,12 @@ Renames made before commit, so the ID is fixed at its final spelling:
 den), and `hamlet_deer_slope` became `hamlet_deer_trail` because the Altoria
 `hamlet_deer_slope` already exists. The plan snippets carry the final IDs.
 
+`wilderness_entry.gates[].return_direction` is the inward walking direction, so
+a gate's exit bearing is its opposite. For a single-gate camp the trail
+sentence belongs on the entrance node (`crossing`) and must name that opposite
+bearing; an earlier draft put it on `homestead_front` with a different bearing
+and was corrected before the change closed.
+
 No hamlet uses the D2 boundary exception: every one of the 52 cells reports
 `"region": "northwest_highland_forest", "scope": "in"` from
 `snippets/place.py context`.
