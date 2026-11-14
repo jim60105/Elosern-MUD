@@ -1,6 +1,7 @@
 // The window hotkeys (webclient-main-navigation-hotkeys; design §8 of the
 // party member management design): P 隊伍 (the party window on its last
-// tab), B 背包, C 狀態, K 技能, L 系譜, J 手帳 and M 地圖. Each key runs the very
+// tab), B 背包, C 狀態, K 技能, L 系譜, J 手帳 and M 地圖, and R the landmark
+// rite's return entry (landmark-rite-stage design D4). Each key runs the very
 // opener its navigation control (or the party window tab alias) runs, so the
 // surface captures the focused element as its opener exactly as a click
 // does.
@@ -18,13 +19,15 @@
 //   keys. The one exception: while the party window itself is open, its tab
 //   keys (P B C K L) switch it live;
 // - the surface is available: an absent 隊伍 (no committed party panel), an
-//   absent or disabled 手帳 and the 地圖 entry in combat ignore their keys.
+//   absent or disabled 手帳 and the 地圖 entry in combat ignore their keys, and
+//   R acts only while the host's `onRiteEntry` reports that it opened the
+//   rite card (the entry is shown).
 import { onBeforeUnmount, onMounted } from "vue";
 
 // The party window's tab aliases, as `openHudDrawer` resolves them; P is the
 // bare window, which reopens on the remembered tab.
 const PARTY_KEYS = { KeyP: "party", KeyB: "inventory", KeyC: "status", KeyK: "skill", KeyL: "lineage" };
-const LETTER_CODES = { p: "KeyP", b: "KeyB", c: "KeyC", k: "KeyK", l: "KeyL", j: "KeyJ", m: "KeyM" };
+const LETTER_CODES = { p: "KeyP", b: "KeyB", c: "KeyC", k: "KeyK", l: "KeyL", j: "KeyJ", m: "KeyM", r: "KeyR" };
 
 // The letter the player typed decides, so the chip's letter is the key on
 // any Latin layout (Dvorak, AZERTY, ...). Only when the layout types no
@@ -67,13 +70,13 @@ function modalOpen(view) {
   return [...document.querySelectorAll('[role="alertdialog"], [aria-modal="true"]:not([data-testid="hud-drawer"])')].some(rendered);
 }
 
-export function useWindowHotkeys(store, { openParty, openQuests, openMap, questsEnabled, fullLogOpen }) {
+export function useWindowHotkeys(store, { openParty, openQuests, openMap, questsEnabled, fullLogOpen, onRiteEntry = null }) {
   function onKeydown(event) {
     if (event.defaultPrevented || event.repeat) return;
     if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
     if (event.isComposing || event.keyCode === 229) return;
     const code = hotkeyCode(event);
-    if (!code || !(code in PARTY_KEYS || code === "KeyJ" || code === "KeyM")) return;
+    if (!code || !(code in PARTY_KEYS || code === "KeyJ" || code === "KeyM" || code === "KeyR")) return;
     if (isTextEntry(event.target) || isTextEntry(document.activeElement)) return;
     const view = store.view;
     if (!view || view.mode === "creation" || !view.mode) return;
@@ -94,6 +97,8 @@ export function useWindowHotkeys(store, { openParty, openQuests, openMap, quests
       if (view.mode === "combat") return;
       openMap();
       acted = true;
+    } else if (code === "KeyR") {
+      acted = typeof onRiteEntry === "function" && onRiteEntry() === true;
     }
     if (acted) event.preventDefault();
   }
