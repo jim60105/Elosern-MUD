@@ -117,13 +117,17 @@ Ground rules:
   shop, guild branch or service is presented as usable. The D9 timing lines are
   recorded in task 1.2 and task 5.4.
 
-  Review correction (final rubber-duck findings 5 and 6): the nine off-road
-  camps now say an exit trail reaches the named road ("往東出營地的小徑…接上
-  通往鹿鳴渡的官道") instead of implying a road at the camp, and the
-  `hamlet_antelope_ridge` exit names 東渡營, the Valhalla-side crossing rather
-  than the Kingdom town. Two descriptions that still said roads 交會 —
-  `village_wolf_fang` and `hamlet_wolf_beacon` — now describe the shared
-  corridor, and `hamlet_tiger_tail` likewise.
+  Review corrections (final rubber-duck findings 5 and 6, and the closure
+  review): each of the nine off-road camps now carries its exit sentence on
+  the entrance node (`crossing`), names the trail and the road or neighbour it
+  reaches there ("往東出營地的小徑沿河灘走，接上通往鹿鳴渡的路"), and keeps
+  the homestead node to hearth scenery, so no camp implies a road at its own
+  gate and no bearing contradicts the single gate's `return_direction`. Every
+  written node was read back and asserted equal after the `prose` run.
+  `hamlet_antelope_ridge` names 東渡營, the Valhalla-side crossing rather than
+  the Kingdom town. Descriptions that still said roads 交會 —
+  `village_wolf_fang`, `hamlet_wolf_beacon` and `hamlet_tiger_tail` — now
+  describe the shared corridor.
 - [x] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
 
   Result: `/tmp/valhalla-placing/road_after_villages.json` is the task 3.2
@@ -153,11 +157,12 @@ Ground rules:
   No `road_gap` remained, so no group was repeated for one.
 - [x] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 
-  Result: every label of the § Settlement-sensitive list, plus
-  `world.lore.tests.test_anchors` (rerun on the final data) and
+  Result: every label of the § Settlement-sensitive list (including
+  `typeclasses.tests.test_npc_dialogue`, 56 tests, the last label to run),
+  plus `world.lore.tests.test_anchors` (rerun on the final data) and
   `world.maps.tests.test_population_geometry`, was run with the test prefix —
   `snippets/test_sweep.md` records the command grouping and every result.
-  About 1,284 tests ran: all green except the documented data-independent red
+  About 1,340 tests ran: all green except the documented data-independent red
   set (`tests.test_map_core_contract` runner error, `test_node_ids`
   `SettlementNotLoaded`, `test_travel_actions` 6 of 8, `test_package_proposal`
   + `test_quests_observability` 9 through the `_anchor_key` fixture lookup) and

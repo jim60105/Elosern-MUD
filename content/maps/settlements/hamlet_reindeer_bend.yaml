@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 鹿角圖騰
-    desc: 圖騰柱上綁著成對的鹿角，柱旁是河灣最平緩的一段。鹿群常在下游的淺灘飲水。鹿角上還留著去秋的脫落痕跡。
+    desc: 圖騰柱上綁著成對的鹿角，柱旁是河灣最平緩的一段。往東出營地的小徑繞過河灣，才接上通往霜風鎮的官道。
     anchor_key: hamlet_reindeer_bend
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘邊曬著切好的草料，攤在向陽的石面上，鹿群常在下游的淺灘飲水。草料曬乾後捆成小束收進棚裡。
+    desc: 共火塘邊曬著切好的草料，草料曬乾後捆成小束收進棚裡。棚裡還留著去年過冬剩下的乾草。
     anchor_key:
     typeclass:
     scene_archetype: city_street

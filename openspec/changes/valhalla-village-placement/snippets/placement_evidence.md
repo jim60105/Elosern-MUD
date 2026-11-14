@@ -38,6 +38,13 @@ sentence belongs on the entrance node (`crossing`) and must name that opposite
 bearing; an earlier draft put it on `homestead_front` with a different bearing
 and was corrected before the change closed.
 
+Naming exception, recorded deliberately: four village display names are
+toponymic rather than 寨 compounds — 獼猴崖, 水獺渡, 野豬林, 馴鹿灘. Design D3
+gives 灰狼寨 only as an example, and the existing Valhalla names already use
+toponyms for settlements (松濤渡, 鹿鳴渡, 東渡營), so the suffix follows the
+site (a cliff, a ford, a wood, a shoal) rather than breaking the terrain fit.
+The other thirteen villages end in 寨.
+
 No hamlet uses the D2 boundary exception: every one of the 52 cells reports
 `"region": "northwest_highland_forest", "scope": "in"` from
 `snippets/place.py context`.

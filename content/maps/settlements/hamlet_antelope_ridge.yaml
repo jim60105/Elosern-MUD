@@ -14,7 +14,7 @@ nodes:
     y_m: 158
     prototype_parent: anchor_room
     key: 羚角圖騰
-    desc: 圖騰柱上掛著一對長羚角，柱立在界河高岸的稜線上。嶺下的河水在石間折成幾道白線。羚角是族中獵手在嶺上撿到的。
+    desc: 圖騰柱上掛著一對長羚角，柱立在界河高岸的稜線上。往西北下嶺的獸徑走完一程，才接上通往東渡營的官道。
     anchor_key: hamlet_antelope_ridge
     typeclass:
     scene_archetype: city_street
@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 公用火塘
-    desc: 公用火塘邊鋪著給過路人休息的乾草，嶺下的河水在石間折成幾道白線。乾草每隔幾天就換一次，免得受潮。
+    desc: 公用火塘邊鋪著給過路人休息的乾草，乾草每隔幾天就換一次，免得受潮。鋪草的角落靠著石牆。
     anchor_key:
     typeclass:
     scene_archetype: city_street

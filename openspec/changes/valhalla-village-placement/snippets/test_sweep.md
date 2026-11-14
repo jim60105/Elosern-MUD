@@ -47,6 +47,19 @@ label that would have run alone is marked "single".
 | 3 | `test_movement`, `test_movement_settlement`, `test_party_follow` | Ran 74, OK — 192.044 s |
 | 3 | `test_party_follow_possession`, `test_party_time_settlement`, `test_travel_plan` | Ran 80, 1 failure and 1 skip — the one failure is the inherited baseline red described below |
 | single | `world.lore.tests.test_anchors` (rerun on the final data) | Ran 7, OK |
+| single | `typeclasses.tests.test_npc_dialogue` | Ran 56, OK |
+
+Total: about 1,340 tests across every label of the § Settlement-sensitive
+list, the two task-mandated modules and the inherited-red module.
+
+After the sweep, the nine off-road camps' two prose nodes were rewritten once
+more (closure review: the earlier pass had overwritten the entrance
+sentences). That is a prose-only edit; the maps were re-linted
+(`fit: 0 errors, 0 warnings`), the road artifact refreshed for its source
+signature, and the partition and reference context regenerated. No test reads
+those descriptions, and `world.lore.tests.test_anchors` and
+`typeclasses.tests.test_npc_dialogue` were run after the rewrite on the final
+tree; `typeclasses.tests.test_npc_dialogue` is the last label to run.
 
 ## The one non-red failure, and why it is not this change's
 
