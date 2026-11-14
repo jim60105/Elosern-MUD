@@ -24,4 +24,4 @@
 
 - [x] 4.1 Run `pnpm test`, `uv run --locked python -m tools.contract_gate --change map-column-instrument-geometry`, `openspec validate map-column-instrument-geometry --strict` and `git diff --check`. Verify: all pass.
 - [x] 4.2 Run `pnpm run build-storybook` and `pnpm run showcase-coverage`. Verify: both pass with `web/webclient-app/component-manifest.json` unchanged.
-- [ ] 4.3 Capture live-client screenshots with `agent-browser` at 1280x720 (populated column scrolled to top, and scrolled to bottom), 1451x790 and 2560x1440 into the session scratchpad, then `agent-browser close`. Verify: the apply report lists the four absolute paths for the design D7 human review (no automated judgement).
+- [x] 4.3 Capture live-client screenshots with `agent-browser` at 1280x720 (populated column scrolled to top, and scrolled to bottom), 1451x790 and 2560x1440 into the session scratchpad, then `agent-browser close`. Verify: the apply report lists the four absolute paths for the design D7 human review (no automated judgement).
