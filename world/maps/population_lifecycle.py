@@ -439,7 +439,9 @@ def settle_population_scope(
     )
 
 
-def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
+def ensure_population_current(
+    wilderness: Any, seeds: Iterable[str], *, enclosing_owner: bool = False
+) -> bool:
     """Catch the closed set around ``seeds`` up to the current tick.
 
     Returns ``True`` when it settled anything. A world with no wilderness or no
@@ -450,6 +452,14 @@ def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
     The set is settled in its own transaction with the same rollback strength
     as a clock advance: the pre-catch-up surface registry is built first and
     restores every surface the pass writes when anything fails.
+
+    A catch-up reached inside a game transaction is refused by name, because
+    its write would only be a savepoint of that block. ``enclosing_owner`` is
+    the one exception, and only for a caller whose own durable unit already
+    snapshots and restores these population surfaces on failure: the combat
+    settlement settles a terminal round inside the round or exit transaction it
+    owns, and that unit's advance registry covers every surface the catch-up
+    writes.
     """
     if wilderness is None or not regional_population.population_provisioned(
         wilderness
@@ -470,7 +480,7 @@ def ensure_population_current(wilderness: Any, seeds: Iterable[str]) -> bool:
     start = population_units.scope_start_tick(wilderness, scope)
     if start >= now:
         return False
-    if _inside_game_transaction():
+    if _inside_game_transaction() and not enclosing_owner:
         raise population_units.PopulationCatchUpNested(
             f"{population_units.POPULATION_CATCH_UP_NESTED}: a catch-up that "
             f"would settle {sorted(scope.units)} from {start} to {now} was "
@@ -513,8 +523,15 @@ def _inside_game_transaction() -> bool:
     )
 
 
-def ensure_locations_current(locations: Iterable[Any]) -> bool:
-    """Catch up every unit within the observation radius of ``locations``."""
+def ensure_locations_current(
+    locations: Iterable[Any], *, enclosing_owner: bool = False
+) -> bool:
+    """Catch up every unit within the observation radius of ``locations``.
+
+    ``enclosing_owner`` follows :func:`ensure_population_current`: only a caller
+    that owns the enclosing durable unit and compensates its population
+    surfaces on failure passes it.
+    """
     wilderness = regional_population.live_wilderness()
     if wilderness is None or not regional_population.population_provisioned(
         wilderness
@@ -529,7 +546,9 @@ def ensure_locations_current(locations: Iterable[Any]) -> bool:
         if location.kind != "room" and location.map != map_name:
             continue
         seeds |= population_units.units_around(index, location)
-    return ensure_population_current(wilderness, seeds)
+    return ensure_population_current(
+        wilderness, seeds, enclosing_owner=enclosing_owner
+    )
 
 
 def ensure_observed_population_current() -> bool:

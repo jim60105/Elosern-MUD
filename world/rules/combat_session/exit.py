@@ -429,22 +429,31 @@ def _snapshot_exit_surfaces(
         read_world_clock,
     )
     from world.rules.combat_session.snapshot import _ROUND_ENTITY_SURFACES
-    from world.rules.combat_session.settlement import _ROUND_SECONDS
+    from world.rules.combat_session.settlement import (
+        _ROUND_SECONDS,
+        announced_population_cell,
+    )
     from world.rules.progression import snapshot_practice_dedupe
     from world.rules.skip_safety import _BATTLEFIELDS
 
     practice_dedupe = snapshot_practice_dedupe()
     if battlefield is None:
         clock = read_world_clock()
-        clock_snapshot = (
-            clock,
-            _snapshot_clock_tick(clock) if clock is not None else None,
-            build_advance_snapshot_registry(
+        # The terminal settlement's own cell catch-up writes the units around
+        # the fight cell even when the party already left it, and the registry
+        # discovers population surfaces from the observed units: announce the
+        # cell so they fall inside this unit's rollback contract.
+        with announced_population_cell(record):
+            registry = build_advance_snapshot_registry(
                 clock if clock is not None else WorldClock(),
                 record.rounds_elapsed * _ROUND_SECONDS,
                 AdvanceSource.COMBAT,
                 (commander,),
-            ),
+            )
+        clock_snapshot = (
+            clock,
+            _snapshot_clock_tick(clock) if clock is not None else None,
+            registry,
             (commander,),
         )
         participant_keys = (

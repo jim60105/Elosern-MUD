@@ -217,7 +217,10 @@ def _snapshot_round_clock(
         AdvanceSource, WorldClock, _snapshot_clock_tick,
         build_advance_snapshot_registry, read_world_clock,
     )
-    from world.rules.combat_session.settlement import _ROUND_SECONDS
+    from world.rules.combat_session.settlement import (
+        _ROUND_SECONDS,
+        announced_population_cell,
+    )
 
     clock = read_world_clock()
     scope = tuple(battlefield.roster.values())
@@ -226,28 +229,34 @@ def _snapshot_round_clock(
         if horizon_rounds is None
         else max(int(horizon_rounds), record.rounds_elapsed + 1)
     )
-    registry = build_advance_snapshot_registry(
-        clock if clock is not None else WorldClock(),
-        rounds * _ROUND_SECONDS,
-        AdvanceSource.COMBAT, scope,
-    )
-    if command_seconds and command_seconds > 0:
-        from world.rules.clock import MAX_ADVANCE_SECONDS
-
-        traversal = build_advance_snapshot_registry(
+    # The population surfaces the registry captures are discovered from the
+    # observed units, so a fight cell the party already left would be missed --
+    # exactly the units the terminal settlement's own cell catch-up writes.
+    # Announcing the cell for the build puts them inside this unit's rollback
+    # contract.
+    with announced_population_cell(record):
+        registry = build_advance_snapshot_registry(
             clock if clock is not None else WorldClock(),
-            max(int(command_seconds), MAX_ADVANCE_SECONDS),
-            AdvanceSource.COMMAND,
-            scope,
+            rounds * _ROUND_SECONDS,
+            AdvanceSource.COMBAT, scope,
         )
-        for key, surface in traversal.items():
-            existing = registry.get(key)
-            if existing is None:
-                registry[key] = surface
-            else:
-                existing.attributes.update(surface.attributes)
-                if surface.location is not None:
-                    existing.location = surface.location
+        if command_seconds and command_seconds > 0:
+            from world.rules.clock import MAX_ADVANCE_SECONDS
+
+            traversal = build_advance_snapshot_registry(
+                clock if clock is not None else WorldClock(),
+                max(int(command_seconds), MAX_ADVANCE_SECONDS),
+                AdvanceSource.COMMAND,
+                scope,
+            )
+            for key, surface in traversal.items():
+                existing = registry.get(key)
+                if existing is None:
+                    registry[key] = surface
+                else:
+                    existing.attributes.update(surface.attributes)
+                    if surface.location is not None:
+                        existing.location = surface.location
     return clock, _snapshot_clock_tick(clock) if clock is not None else None, registry, scope
 
 

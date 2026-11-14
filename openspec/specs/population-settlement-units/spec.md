@@ -163,6 +163,10 @@ A command SHALL catch up the observed units before it parses or runs, a movement
 - **WHEN** a party moves one edge into a cell whose unit is behind
 - **THEN** the unit is caught up to the pre-movement tick before the edge's own settlement starts, and the edge's settlement observes it
 
+#### Scenario: A follower's move reuses its leader's catch-up
+- **WHEN** a companion's move is settled inside an enclosing movement settlement
+- **THEN** the outermost settlement is the only one that catches up, the nested one shares that passage and starts no catch-up of its own, and no nested-catch-up refusal is raised
+
 #### Scenario: Failed catch-up before a command
 - **WHEN** the catch-up before a command raises
 - **THEN** one `population_catch_up_failed` error event is emitted and the command still runs

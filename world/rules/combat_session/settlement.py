@@ -543,12 +543,16 @@ def _catch_up_population_cell(record: CombatSessionRecord) -> None:
         >= regional_population.current_population_tick()
     ):
         return
-    population_lifecycle.ensure_locations_current([location])
+    # The settlement runs inside the round or exit transaction it owns, and that
+    # unit's advance snapshot registry already restores every population surface
+    # on failure, so this catch-up is the enclosing owner's own and may settle
+    # inside it.
+    population_lifecycle.ensure_locations_current([location], enclosing_owner=True)
 
 
 @contextlib.contextmanager
-def _announced_population_cell(record: CombatSessionRecord):
-    """Announce the session's own cell for the settlement's clock advances.
+def announced_population_cell(record: CombatSessionRecord):
+    """Announce the session's own cell for an advance or its surface snapshot.
 
     ``settle_session`` advances the clock for the terminal combat time and for
     a defeat aftermath. A party that stands on its battlefield has that unit
@@ -556,7 +560,11 @@ def _announced_population_cell(record: CombatSessionRecord):
     already moved away has not, and the advance would leave the fight cell's
     unit behind the tick the protection write requires. Announcing the cell for
     the body makes the observed pass settle it inside the same advance, so the
-    later write is lawful without a catch-up of its own.
+    later write is lawful without a catch-up of its own. The round and exit
+    snapshot builders use the same announcement: the advance registry
+    discovers the population surfaces it can restore from the observed units,
+    and the terminal cell catch-up writes exactly a cell the party may have
+    left.
     """
     location = _population_cell_location(record)
     if location is None:
@@ -927,7 +935,7 @@ def settle_session(
     started = time.monotonic()
     aftermath = None
     try:
-        with transaction.atomic(), _announced_population_cell(record):
+        with transaction.atomic(), announced_population_cell(record):
             if record.mode == "guild_exam":
                 from world.rules.guild_exams import (
                     ExamReason,

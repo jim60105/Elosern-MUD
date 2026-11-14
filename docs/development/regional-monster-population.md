@@ -2898,6 +2898,15 @@ the harness's own atomic blocks, which Django marks (`_from_testcase`), and
 that reaches a catch-up entry point inside any other atomic block while the set
 is behind therefore fails with the same named error production would raise.
 
+The one exception is an explicit owner, not a switch: a caller whose own
+durable unit already snapshots and restores the very population surfaces the
+catch-up writes passes `enclosing_owner=True` to `ensure_locations_current`
+(`world/rules/combat_session/settlement.py::_catch_up_population_cell`, whose
+round and exit registries now announce the session's population cell while they
+are built). Every other caller keeps the refusal, and a nested movement
+settlement starts no catch-up of its own because the outermost edge already
+caught the shared passage up.
+
 `ensure_locations_current(locations)` seeds the units around each locator
 (`population_units.units_around`) and `ensure_observed_population_current()`
 seeds the observed units below; both resolve the live wilderness themselves.
@@ -3044,7 +3053,7 @@ the outer one's marker.
   and a catch-up can move the relocated individual itself.
 - A terminal combat settlement catches its own recorded population cell up
   before it opens its transaction (`_catch_up_population_cell`) and announces
-  that cell for its own clock advances (`_announced_population_cell`, in
+  that cell for its own clock advances (`announced_population_cell`, in
   `world/rules/combat_session/settlement.py`). A party that no longer stands on
   its battlefield -- an arrival contact that stopped the relocation, a
   retirement -- would otherwise leave the fight cell's unit behind the tick the

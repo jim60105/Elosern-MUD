@@ -248,6 +248,19 @@ def traversal_scope(scope: TraversalScope | None) -> Iterator[None]:
         _traversal_scopes.reset(token)
 
 
+def _settlement_in_progress() -> bool:
+    """Whether an enclosing movement settlement already owns this relocation.
+
+    Both settlement owners bind ``settlement_scope`` for the body they move,
+    and only after their own outermost catch-up, so an empty tuple means this
+    call is the outermost settlement and must catch its passage up itself. A
+    party follower's move, an NPC-led follower's move and a console
+    relocation of a following body all settle inside the owner's transaction:
+    they share its passage and reuse the catch-up it already performed.
+    """
+    return bool(_settlement_owners.get())
+
+
 def field_presence(body: Any, tick: int) -> bool:
     """Whether ``body`` is ordinary field presence at game ``tick``.
 
@@ -972,7 +985,14 @@ def settle_movement(
     from world.maps.population_lifecycle import ensure_locations_current
     from world.maps.population_units import announced_observation
 
-    ensure_locations_current(passage)
+    # A settlement nested inside another one -- a follower's move running
+    # inside its leader's settlement -- shares that outer passage and its
+    # transaction: the outer boundary caught the passage up before it opened,
+    # and a nested catch-up would only be a savepoint of it. The population
+    # owner refuses that by name, so only the outermost settlement catches its
+    # passage up.
+    if not _settlement_in_progress():
+        ensure_locations_current(passage)
     # Every panel push, checkpoint fact and settlement callback of this
     # traversal shares one causal publication group, so each watcher receives
     # one final publication for the commit (webclient-publication-settlements).

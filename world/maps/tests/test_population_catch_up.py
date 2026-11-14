@@ -555,8 +555,8 @@ class MovementCatchUpTests(CatchUpFixture):
         real_ensure = population_lifecycle.ensure_population_current
         real_advance = WorldClock.advance
 
-        def ensured(wilderness, seeds):
-            result = real_ensure(wilderness, seeds)
+        def ensured(wilderness, seeds, **kwargs):
+            result = real_ensure(wilderness, seeds, **kwargs)
             order.append(("catch_up", result))
             return result
 
