@@ -65,13 +65,15 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
             with self.subTest(token=token):
                 output = self.call(CmdRite(), token)
 
-                self.assertIn("測試敘述。", output)
-                self.assertIn("你：測試自語。", output)
-                self.assertIn("測試守護：測試守護對{name}說話。", output)
-                self.assertLess(
-                    output.index("測試敘述。"),
-                    output.index(f"你完成了{LANDMARK_NAME}的儀式。"),
+                emitted = (
+                    "測試敘述。",
+                    "你：測試自語。",
+                    "測試守護：測試守護對{name}說話。",
+                    f"你完成了{LANDMARK_NAME}的儀式。",
                 )
+                offsets = [output.index(line) for line in emitted]
+                self.assertEqual(offsets, sorted(offsets))
+                self.assertEqual(output.count(emitted[-1]), 1)
 
     def test_a_named_companion_performs_with_the_watch_scene(self):
         output = self.call(CmdRite(), f"{SHARED.key} {self.companion.key}")
@@ -79,6 +81,9 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
         self.assertIn(f"測試守護對{self.companion.key}說話。", output)
         self.assertIn(
             f"{self.companion.key}完成了{LANDMARK_NAME}的儀式。", output
+        )
+        self.assertEqual(
+            output.count(f"{self.companion.key}完成了{LANDMARK_NAME}的儀式。"), 1
         )
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)

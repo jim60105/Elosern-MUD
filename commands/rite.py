@@ -81,20 +81,26 @@ class CmdRite(Command):
         self.caller.msg("\n".join(lines))
 
     def _option_for(self, site: Any, token: str) -> Any:
-        """The authored option named by its exact key or exact label, or ``None``."""
-        for option in site.archetype.options:
-            if token in (option.key, option.label_zh):
-                return option
-        return None
+        """The option named by its exact key, else by exactly one exact label.
 
-    def _member_id(self, token: str) -> Any:
-        """Resolve the named companion, or ``None`` after the shared refusal."""
+        Keys are unique by the loader's contract; labels are display text, so a
+        key spelled like another option's label must win, and two options
+        sharing one label are ambiguous rather than silently ordered.
+        """
+        options = site.archetype.options
+        for option in options:
+            if option.key == token:
+                return option
+        labelled = [option for option in options if option.label_zh == token]
+        return labelled[0] if len(labelled) == 1 else None
+
+    def _resolve_member(self, token: str) -> Any:
+        """The named present companion, or ``None`` after the shared refusal."""
         try:
-            member = resolve_member_token(self.caller, token)
+            return resolve_member_token(self.caller, token)
         except PartyScopeError:
             self.caller.msg(REFUSAL_MESSAGES["rite_member_unavailable"])
             return None
-        return member.id
 
     def func(self) -> None:
         tokens = self.args.split()
@@ -114,9 +120,10 @@ class CmdRite(Command):
             return
         member_id = None
         if len(tokens) == 2:
-            member_id = self._member_id(tokens[1])
-            if member_id is None:
+            member = self._resolve_member(tokens[1])
+            if member is None:
                 return
+            member_id = member.id
         try:
             result = perform_rite(
                 self.caller, option.key, member_id, operation_id=None
