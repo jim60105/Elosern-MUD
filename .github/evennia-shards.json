@@ -831,6 +831,7 @@
         "commands.tests.test_character_creation.test_wizard_activation_flow",
         "commands.tests.test_church_commands",
         "commands.tests.test_church_redeem_commands",
+        "commands.tests.test_rite_command",
         "commands.tests.test_combat_actions",
         "commands.tests.test_combat_exit_commands",
         "commands.tests.test_command_branch_behaviour",
@@ -953,6 +954,7 @@
       "name": "webclient-21-1",
       "workers": 4,
       "labels": [
+        "web.webclient.actions.tests.test_rite_actions",
         "web.webclient.actions.tests.test_service_actions",
         "web.webclient.actions.tests.test_service_validators",
         "web.webclient.actions.tests.test_services_open",

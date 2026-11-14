@@ -313,13 +313,14 @@ notice again but never writes it to the full log twice. A recognized non-success
 result during travel adds one local refusal entry (`refusal:<request id>`,
 committed server time, server message) and never a second full-log line.
 
-### Camp preview and camp
+### Camp preview, camp and the landmark rite
 
 The whole-party camp (wilderness-camping) adds two exploration actions with
 exact payloads and exact success data slots, validated on both boundaries
 (`web/webclient/actions/exploration_actions.py` `validate_camp_preview_data` /
 `validate_camp_result_data`, mirrored by `protocol/core.js`
-`validateCampPreviewData` / `validateCampData`):
+`validateCampPreviewData` / `validateCampData`). The landmark rite action
+follows the same exact-payload and request-identity rules:
 
 - `explore.camp_preview` takes exactly `{}` and answers through the
   result-only path (no panel, no revision): `{available, refusal,
@@ -337,6 +338,22 @@ exact payloads and exact success data slots, validated on both boundaries
   with a stable ASCII reason; the result `message` is the server summary.
   A refusal is an ordinary `rejected` result with the same code and message
   the preview reports, and writes nothing.
+- `explore.landmark_rite` takes exactly `{option, member_id}` (`member_id` a
+  nullable party-member id) and publishes a full snapshot. The server resolves
+  the district, archetype, cost and scene itself from the record owner's node;
+  no other field may name them. Its success data is `{delivery,
+  first_completion}`: `delivery` is the committed authored scene as
+  `{kind: "formal", delivery_id, scene_id, scene_revision, actor_name,
+  guardian_name, lines}`, and it carries `scene_revision` because `revision`
+  is a reserved result-data key (a result carrying it is replaced by the
+  internal-error envelope after the rite already committed). The watch
+  perspective substitutes the authored `{name}` placeholder with the
+  performing body's key. A refusal is an ordinary `rejected` result carrying
+  the settlement's stable code and message, and writes nothing. As with the
+  camp, the dispatcher hands the adapter the admitted request identity
+  (`request_identity: {epoch, request_id}`) after payload validation, never as
+  a wire key; the rite's own commit-only replay cache returns the committed
+  result for a repeated identity without settling time again.
 - The dispatcher hands the camp adapter the admitted request identity
   (`request_identity: {epoch, request_id}`) after payload validation; it is
   never a wire key. The adapter's durable camp identity is the SHA-256 of

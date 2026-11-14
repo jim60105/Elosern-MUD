@@ -187,6 +187,10 @@ def build_production_action_registry() -> ActionRegistry:
         validate_wait_payload,
         validate_practice_payload,
     )
+    from web.webclient.actions.rite_actions import (
+        landmark_rite_adapter,
+        validate_landmark_rite_payload,
+    )
     from web.webclient.actions.party_actions import (
         _party_transfer_adapter,
         _party_view_member_adapter,
@@ -674,6 +678,17 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="explore.camp",
             validate_payload=validate_camp_payload,
             adapter=_camp_adapter,
+            affected_panels=(),
+        )
+    )
+    # A landmark rite settles world time, the performer's sexual state and the
+    # rite record together and returns the committed scene as a delivery
+    # (landmark-rite-action); it changes every eager panel, like the camp.
+    registry.register(
+        ActionSpec(
+            action_id="explore.landmark_rite",
+            validate_payload=validate_landmark_rite_payload,
+            adapter=landmark_rite_adapter,
             affected_panels=(),
         )
     )

@@ -183,8 +183,9 @@ def _stale_result() -> dict[str, Any]:
 
 
 #: Actions whose adapter derives a durable operation identity from the
-#: admitted transport request (wilderness-camping: owner/epoch/request).
-_REQUEST_IDENTITY_ACTIONS = frozenset({"explore.camp"})
+#: admitted transport request (wilderness-camping and landmark-rite-action:
+#: owner/epoch/request).
+_REQUEST_IDENTITY_ACTIONS = frozenset({"explore.camp", "explore.landmark_rite"})
 
 
 def handle_ui_action(
