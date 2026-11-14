@@ -9,6 +9,7 @@ nothing about the prose, the archetype count or any authored value.
 from pathlib import Path
 import unittest
 
+from tools.spec_traceability import covers_requirement
 from world.lore.map_districts import DISTRICTS_PATH, REPOSITORY_ROOT, parse_districts_document
 from world.lore.rites import CONTENT_PATH
 from world.lore.rites.loader import load_rites
@@ -20,6 +21,9 @@ def _district_keys() -> frozenset[str]:
 
 
 class ShippedRiteDocumentContractTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_the_shipped_document_assigns_every_shipped_district(self):
         district_keys = _district_keys()
         snapshot = load_rites(CONTENT_PATH, district_keys=district_keys)

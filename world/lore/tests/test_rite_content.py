@@ -729,6 +729,9 @@ class LoadPublishedTests(unittest.TestCase):
         path.write_text(_text(document), encoding="utf-8")
         return path
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_a_valid_document_is_installed_and_returned(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self._write(directory, _document())
@@ -737,6 +740,9 @@ class LoadPublishedTests(unittest.TestCase):
         self.assertEqual(dict(snapshot.districts), {"d1": "alpha", "d2": "alpha"})
         self.assertIs(current(), snapshot)
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_the_published_district_world_supplies_the_default_keys(self):
         document = SimpleNamespace(districts={"d1": "alpha", "d2": "alpha"})
 
@@ -748,6 +754,9 @@ class LoadPublishedTests(unittest.TestCase):
         self.assertEqual(set(snapshot.districts), {"d1", "d2"})
         self.assertIs(current(), snapshot)
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_an_unpublished_district_world_raises_before_anything_installs(self):
         from world.lore.map_districts import DistrictNotLoaded
 
@@ -763,6 +772,9 @@ class LoadPublishedTests(unittest.TestCase):
         with self.assertRaises(RitesNotLoaded):
             current()
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_a_rejected_document_leaves_the_previous_snapshot_current(self):
         previous = RiteSnapshot(archetypes={}, districts={})
         install(previous)
@@ -776,6 +788,9 @@ class LoadPublishedTests(unittest.TestCase):
 
         self.assertIs(current(), previous)
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_a_missing_document_raises_and_leaves_the_previous_snapshot_current(self):
         previous = RiteSnapshot(archetypes={}, districts={})
         install(previous)
@@ -787,6 +802,9 @@ class LoadPublishedTests(unittest.TestCase):
 
         self.assertIs(current(), previous)
 
+    @covers_requirement(
+        "landmark-rite-content::the-shipped-rite-document-is-adopted-against-the-published-districts"
+    )
     def test_a_missing_document_installs_nothing_without_a_previous_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "missing.yaml"
