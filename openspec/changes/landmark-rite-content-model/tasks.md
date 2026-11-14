@@ -11,7 +11,7 @@ Tests use synthetic documents only. Do not create `world/lore/rites/content/`.
 
 ## 2. Gates
 
-- [x] 2.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-content-model` and `openspec validate landmark-rite-content-model --strict`. Verify: all exit 0.
+- [x] 2.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-content-model` and `openspec validate landmark-rite-content-model --strict`. The reference-context gate fingerprints every `world/lore` source file: when it reports a stale fingerprint, run `uv run --locked python -m tools.map_reference_context` and commit the regenerated `content/map-reference-context.json`. Verify: all exit 0.
 
 ## Workflow follow-up
 

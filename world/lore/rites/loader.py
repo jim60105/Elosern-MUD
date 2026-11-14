@@ -435,7 +435,7 @@ def _archetype(
     """Build one archetype from its document, or return ``None`` after reporting."""
 
     before = len(problems)
-    if KEY_PATTERN.match(key) is None:
+    if not isinstance(key, str) or KEY_PATTERN.match(key) is None:
         _fault(
             problems,
             field_path,
@@ -489,17 +489,19 @@ def _archetype(
             seen_option_keys: set[str] = set()
             for index, option_node in enumerate(option_nodes):
                 option_path = f"{field_path}.options[{index}]"
-                option = _option(option_node, option_path, seen_scene_ids, problems)
-                if option is not None:
-                    if option.key in seen_option_keys:
+                raw_key = option_node.get("key") if isinstance(option_node, dict) else None
+                if isinstance(raw_key, str):
+                    if raw_key in seen_option_keys:
                         _fault(
                             problems,
                             f"{option_path}.key",
                             _DUPLICATE_OPTION,
-                            f"option key {option.key!r} is already used in this archetype",
+                            f"option key {raw_key!r} is already used in this archetype",
                         )
                     else:
-                        seen_option_keys.add(option.key)
+                        seen_option_keys.add(raw_key)
+                option = _option(option_node, option_path, seen_scene_ids, problems)
+                if option is not None:
                     options.append(option)
 
     if len(problems) != before:

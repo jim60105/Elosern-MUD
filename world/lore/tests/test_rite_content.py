@@ -305,6 +305,19 @@ class OptionBoundTests(unittest.TestCase):
             _pairs(_error(document)), [("archetypes.alpha.options[1].key", "duplicate_option")]
         )
 
+    def test_duplicate_option_key_survives_an_unrelated_option_fault(self):
+        document = _document()
+        options = document["archetypes"]["alpha"]["options"]
+        options[0]["seconds"] = 119
+        options[1]["key"] = "solo"
+        self.assertEqual(
+            _pairs(_error(document)),
+            [
+                ("archetypes.alpha.options[0].seconds", "seconds_bound"),
+                ("archetypes.alpha.options[1].key", "duplicate_option"),
+            ],
+        )
+
     def test_seconds_bound(self):
         for seconds in (119, 901, "180", True):
             with self.subTest(seconds=seconds):
