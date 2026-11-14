@@ -109,6 +109,9 @@ def _settle_population_at(
         from world.rules.field_contact import settle_population_contact_at
 
         # A failed contact restores its participants and the advance goes on.
+        # The block may change liveness, ownership markers and physiology, so
+        # no read of the pass's earlier facts may answer across it.
+        regional_population.forget_living_presence()
         with (
             monster_activity.unbatched_state_writes(),
             suspended_maintenance_tally(),

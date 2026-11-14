@@ -2440,3 +2440,73 @@ protected-battle restart are covered by their owning focused suites
 `test_permanent_occupants`, GM/movement tests) rather than duplicated in this
 runner. The runner deliberately exercises one real birth/defeat/recovery/reload
 path plus the construction-fault retry.
+
+## Settlement read reuse
+
+A settlement pass reads the same durable records at every boundary, so this
+change makes those reads repeatable without changing any result.
+
+### Two identity-keyed decodes
+
+`regional_population.read_population_timeline` decodes the stored timeline once
+per stored value: it keys the decoded `PopulationTimeline` on the identity of
+`wilderness.attributes.get(POPULATION_TIMELINE_ATTRIBUTE, return_obj=True).db_value`
+and answers every later read from that decode while the object is unchanged.
+`_state_map` does the same for the per-zone state record and always hands out
+its own copy, and `zone_states` keys its validated answer on both stored values
+it was validated against -- the zone map and the world seed. A whole-value
+write, an in-place mutation and a rollback restore all replace those objects,
+so the next read always decodes again. This is the mechanism the activity
+record already uses.
+
+### Pass-scoped facts
+
+Inside `reused_living_presence()` one pass also reuses four measures that cannot
+change between the writes it owns:
+
+- the enumerated living individuals (`_living_monsters()` once per pass);
+- each individual's durable `home_ecology_zone` and `site_key`;
+- the active sessions' open cell protection (`_active_session_protection()`
+  once per pass);
+- one tick's protected cells, held with the stored timeline value they were
+  computed from.
+
+`presence_fingerprint` still decides whether a presence map must be rebuilt
+after a coordinate or timeline write, so a moved individual is measured again
+while the pass's enumerated roster stays shared.
+
+### Invalidation points
+
+`forget_living_presence()` drops the enumerated roster, the per-individual
+facts, the session protection and the protected-cell cache. It is called after
+a committed wave (`_commit_planned_wave`), after a site populate and a site
+recovery, when a site is written cleared, and immediately before the field
+contact block in `_settle_population_at`. It is a no-op with no open scope, so
+direct owner operations and the pure readers are unaffected.
+
+### Tests
+
+`world/maps/tests/test_settlement_decode_reuse.py` carries the coverage, with
+the shared projection in `world/maps/tests/_settlement_projection.py`:
+
+- `DecodeReuseTests` -- five reads decode each record once; a whole-value
+  write, an in-place mutation and a rolled-back restore each force a fresh
+  read; a world-seed change revalidates the zone records.
+- `PassFactTests` -- one quiet pass over several boundaries enumerates the
+  individuals and reads session protection once; a mid-pass wave is read with
+  the newborn individuals and their home zone; three destination checks at one
+  tick compute the protected cells once and answer what an unshared check
+  answers.
+- `DifferentialSettlementTests` -- a world with a staying group, a travelling
+  group, a zone below its lower density and a cleared recoverable site settles
+  over `(1500,)`, `(700, 800)` and `(61, 1439)` with reuse and without it, and
+  all six projections are equal.
+
+No test measures wall-clock time; the bounds are state equality and call
+counts. Run the module from the worktree root with the single-token
+environment file (`/tmp/mud-test.env` containing `MUD_TEST_SETTINGS=1`):
+
+```
+uv run --locked --env-file=/tmp/mud-test.env evennia test \
+  --settings test_settings.py --keepdb world.maps.tests.test_settlement_decode_reuse
+```

@@ -66,6 +66,7 @@ from world.lore.monster_activity import movement_units
 from world.maps.regional_population import (
     MALFORMED_STATE,
     MalformedPopulationState,
+    forget_living_presence,
     presence_at,
     protected_cells,
     read_population_seed,
@@ -531,6 +532,9 @@ def _populate(
             operation_id=f"site:{site.key}:{sequence}",
             ordinal=ordinal,
         )
+    # The population added individuals, so no read of an earlier pass-fact
+    # answer may answer again.
+    forget_living_presence()
     return tuple(created)
 
 
@@ -668,6 +672,7 @@ def _apply_recovery(
             site, tick=tick, cleared_at_tick=cleared_at_tick, created=len(created)
         ),
     )
+    forget_living_presence()
     return created
 
 
@@ -957,6 +962,9 @@ def settle_monster_sites_at(tick: int) -> list[ScheduledEvent]:
                 "cleared_at_tick": clear_tick,
             }
             changed = True
+            # A clear changes this site's own membership facts, so no read of
+            # an earlier pass-fact answer may answer again.
+            forget_living_presence()
             _emit(
                 "monster_site_cleared",
                 _site_context(site, tick=tick, cleared_at_tick=clear_tick),

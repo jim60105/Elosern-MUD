@@ -433,15 +433,40 @@ def _require_argument_int(value: object, what: str, minimum: int = 0) -> int:
     return value
 
 
+#: The last validated per-zone state map and the stored value object it came
+#: from. Every write, in-place mutation and rollback restore replaces that
+#: object, so its identity proves the decode is still current. Callers always
+#: receive their own copy, so a whole-value write from a read map never
+#: mutates this one.
+_DECODED_ZONE_MAP: tuple[Any, dict[str, dict]] | None = None
+
+
 def _state_map(wilderness: Any) -> dict[str, dict]:
     """The durable per-zone state map, copied out for a whole-value write.
+
+    An unchanged stored value is validated once and copied out again from that
+    decode.
+    """
+    global _DECODED_ZONE_MAP
+    stored = wilderness.attributes.get(REGIONAL_POPULATION_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
+    decoded = _DECODED_ZONE_MAP
+    if decoded is not None and decoded[0] is raw:
+        return {key: dict(value) for key, value in decoded[1].items()}
+    states = _zone_map_from_raw(wilderness.db.regional_population)
+    if stored is not None:
+        _DECODED_ZONE_MAP = (raw, states)
+    return {key: dict(value) for key, value in states.items()}
+
+
+def _zone_map_from_raw(raw: object) -> dict[str, dict]:
+    """Validate one stored per-zone state map.
 
     An absent Attribute is the only empty state. A present value that is not a
     mapping of zone keys to mappings is malformed and refuses: it is never
     normalized into "nothing was initialized", which would let a later
     initialization overwrite saved owner state.
     """
-    raw = wilderness.db.regional_population
     if raw is None:
         return {}
     if not isinstance(raw, Mapping):
@@ -631,17 +656,48 @@ def zone_state(wilderness: Any, zone_key: str) -> ZonePopulationState | None:
     return _zone_state_from_record(zone_key, record, read_population_seed(wilderness))
 
 
+#: The last decoded zone states, together with the two stored value objects
+#: they were validated against: a changed seed can invalidate a record that
+#: did not itself change, so both identities must still hold.
+_DECODED_ZONE_STATES: tuple[Any, Any, dict[str, ZonePopulationState]] | None = None
+
+
 def zone_states(wilderness: Any) -> dict[str, ZonePopulationState]:
-    """Every initialized zone's validated state from one decode, in key order."""
+    """Every initialized zone's validated state from one decode, in key order.
+
+    The validated answer is reused while both stored values it was read from
+    -- the zone map and the world seed a record is validated against -- are
+    unchanged.
+    """
+    global _DECODED_ZONE_STATES
     _require_wilderness(wilderness)
+    stored_zones = wilderness.attributes.get(
+        REGIONAL_POPULATION_ATTRIBUTE, return_obj=True
+    )
+    stored_seed = wilderness.attributes.get(POPULATION_SEED_ATTRIBUTE, return_obj=True)
+    if stored_zones is not None and stored_seed is not None:
+        decoded = _DECODED_ZONE_STATES
+        if (
+            decoded is not None
+            and decoded[0] is stored_zones.db_value
+            and decoded[1] is stored_seed.db_value
+        ):
+            return dict(decoded[2])
     states = _state_map(wilderness)
     if not states:
         return {}
     world_seed = read_population_seed(wilderness)
-    return {
+    validated = {
         key: _zone_state_from_record(key, states[key], world_seed)
         for key in sorted(states)
     }
+    if stored_zones is not None and stored_seed is not None:
+        _DECODED_ZONE_STATES = (
+            stored_zones.db_value,
+            stored_seed.db_value,
+            validated,
+        )
+    return dict(validated)
 
 
 def due_recovery_zone_keys(wilderness: Any, *, tick: int) -> tuple[str, ...]:
@@ -860,6 +916,59 @@ def _active_session_protection(wilderness: Any) -> tuple[PopulationProtection, .
     return tuple(protections)
 
 
+def _session_protection(wilderness: Any) -> tuple[PopulationProtection, ...]:
+    """The active sessions' protection of one reuse scope, read once.
+
+    Called only while a bulk settlement owns an open scope: every persisted
+    session's open interval is a pass-stable fact until
+    :func:`forget_living_presence` drops it. With no scope open the read passes
+    straight through.
+    """
+    reuse = _PRESENCE_REUSE
+    if reuse is None:
+        return _active_session_protection(wilderness)
+    if reuse.session_protection is None:
+        reuse.session_protection = _active_session_protection(wilderness)
+    return reuse.session_protection
+
+
+def _protection_intervals(wilderness: Any) -> tuple[PopulationProtection, ...]:
+    """The timeline's recorded intervals plus the active sessions' open ones."""
+    timeline = (
+        read_population_timeline(wilderness)
+        if population_provisioned(wilderness)
+        else None
+    )
+    return (
+        () if timeline is None else timeline.protection
+    ) + _session_protection(wilderness)
+
+
+def _protection_cells(
+    intervals: Iterable[PopulationProtection], tick: int, name: str
+) -> set[tuple[int, int]]:
+    """The cells one interval set protects at one tick."""
+    cells: set[tuple[int, int]] = set()
+    for protection in intervals:
+        if protection.cell.wilderness != name:
+            continue
+        if protection.start_tick > tick:
+            continue
+        if protection.end_tick is not None and protection.end_tick < tick:
+            continue
+        cells.add((protection.cell.x, protection.cell.y))
+    return cells
+
+
+def _protected_cells_at(wilderness: Any, tick: int) -> frozenset[tuple[int, int]]:
+    """The cells that hold no birth space at one already selected tick."""
+    return frozenset(
+        _protection_cells(
+            _protection_intervals(wilderness), tick, _wilderness_name(wilderness)
+        )
+    )
+
+
 def _protected_cells(
     wilderness: Any, at_tick: int | None = None
 ) -> frozenset[tuple[int, int]]:
@@ -870,25 +979,29 @@ def _protected_cells(
     mutable room identity. The actual-state read additionally scans the
     participants' real coordinates, so a session this owner cannot attribute
     to a recorded cell still shields the cell its participants occupy.
+
+    Inside a reuse scope, one tick's answer is computed once and held with the
+    stored timeline value it was computed from.
     """
     tick = current_population_tick() if at_tick is None else at_tick
-    timeline = read_population_timeline(wilderness) if population_provisioned(wilderness) else None
-    intervals = (
-        (() if timeline is None else timeline.protection)
-        + _active_session_protection(wilderness)
-    )
-    cells: set[tuple[int, int]] = set()
-    name = _wilderness_name(wilderness)
-    for protection in intervals:
-        if protection.cell.wilderness != name:
-            continue
-        if protection.start_tick > tick:
-            continue
-        if protection.end_tick is not None and protection.end_tick < tick:
-            continue
-        cells.add((protection.cell.x, protection.cell.y))
     if at_tick is not None:
-        return frozenset(cells)
+        reuse = _PRESENCE_REUSE
+        if reuse is None:
+            return _protected_cells_at(wilderness, tick)
+        stored = wilderness.attributes.get(
+            POPULATION_TIMELINE_ATTRIBUTE, return_obj=True
+        )
+        current = None if stored is None else stored.db_value
+        key = (id(wilderness), tick)
+        held = reuse.protected.get(key)
+        if held is not None and held[0] is current:
+            return held[1]
+        cells = _protected_cells_at(wilderness, tick)
+        reuse.protected[key] = (current, cells)
+        return cells
+    cells = _protection_cells(
+        _protection_intervals(wilderness), tick, _wilderness_name(wilderness)
+    )
     participants = _session_participant_ids()
     if not participants:
         return frozenset(cells)
@@ -1170,16 +1283,37 @@ def _protection_from_dict(value: object, index: int) -> PopulationProtection:
     return PopulationProtection(engagement_id, PopulationPosition(*cell), start_tick, end_tick)
 
 
+#: The last decoded timeline and the stored value object it came from. Every
+#: write, in-place mutation and rollback restore replaces that object, so its
+#: identity proves the decode is still current. The timeline is a frozen
+#: dataclass over tuples, so the shared value is read-only.
+_DECODED_TIMELINE: tuple[Any, PopulationTimeline] | None = None
+
+
 def read_population_timeline(wilderness: Any) -> PopulationTimeline:
     """The durable chronological presence evidence of this world.
 
     A missing or malformed timeline is the named owner-state refusal: it is
     never reconstructed from older records, and no implicit empty timeline is
     substituted for saved owner state. The explicit seed initialization is the
-    only creator of the empty value.
+    only creator of the empty value. An unchanged stored value is decoded once
+    and answered again from that decode.
     """
+    global _DECODED_TIMELINE
     _require_wilderness(wilderness)
-    raw = wilderness.db.population_timeline
+    stored = wilderness.attributes.get(POPULATION_TIMELINE_ATTRIBUTE, return_obj=True)
+    raw = None if stored is None else stored.db_value
+    decoded = _DECODED_TIMELINE
+    if decoded is not None and decoded[0] is raw:
+        return decoded[1]
+    timeline = _timeline_from_raw(wilderness.db.population_timeline)
+    if stored is not None:
+        _DECODED_TIMELINE = (raw, timeline)
+    return timeline
+
+
+def _timeline_from_raw(raw: object) -> PopulationTimeline:
+    """Decode one stored timeline value, refusing a missing or malformed one."""
     if not isinstance(raw, Mapping):
         raise MalformedPopulationState(
             f"{MALFORMED_STATE}: {POPULATION_TIMELINE_ATTRIBUTE!r} is missing or not a mapping"
@@ -1366,10 +1500,23 @@ def record_population_protection(
 
 @dataclass(slots=True)
 class _PresenceReuse:
-    """The last living-presence read of one reuse scope."""
+    """The pass-stable facts of one reuse scope.
+
+    ``fingerprint`` and ``presence`` hold the last living-presence read,
+    ``living`` the individuals it enumerated, ``facts`` each individual's
+    durable home zone and site marker, ``session_protection`` the active
+    sessions' protection, and ``protected`` one tick's protected cells together
+    with the stored timeline value they were computed from.
+    """
 
     fingerprint: tuple[Any, ...] | None = None
     presence: Mapping[int, PopulationPresence] = field(default_factory=dict)
+    living: tuple[Monster, ...] | None = None
+    facts: dict[int, tuple[str | None, str | None]] = field(default_factory=dict)
+    session_protection: tuple[PopulationProtection, ...] | None = None
+    protected: dict[tuple[int, int], tuple[Any, frozenset[tuple[int, int]]]] = field(
+        default_factory=dict
+    )
 
 
 _PRESENCE_REUSE: _PresenceReuse | None = None
@@ -1393,9 +1540,18 @@ def reused_living_presence() -> Iterator[None]:
 
 
 def forget_living_presence() -> None:
-    """Drop a reused read after work that may have changed liveness."""
-    if _PRESENCE_REUSE is not None:
-        _PRESENCE_REUSE.fingerprint = None
+    """Drop the reused facts after work that may have changed them.
+
+    A no-op with no open scope, so a direct owner operation never pays for it.
+    """
+    reuse = _PRESENCE_REUSE
+    if reuse is None:
+        return
+    reuse.fingerprint = None
+    reuse.living = None
+    reuse.facts = {}
+    reuse.session_protection = None
+    reuse.protected = {}
 
 
 def _living_presence(wilderness: Any) -> Mapping[int, PopulationPresence]:
@@ -1406,22 +1562,51 @@ def _living_presence(wilderness: Any) -> Mapping[int, PopulationPresence]:
         return reuse.presence
     name = _wilderness_name(wilderness)
     presence: dict[int, PopulationPresence] = {}
-    for individual in _living_monsters():
+    for individual in _living_individuals(reuse):
         cell = actual_cell(wilderness, individual)
+        home_zone, site_key = _individual_facts(reuse, individual)
         presence[individual.pk] = PopulationPresence(
             True,
             None if cell is None else PopulationPosition(name, cell[0], cell[1]),
-            _require_optional_name(
-                getattr(individual.db, "home_ecology_zone", None), "home_ecology_zone"
-            ),
-            _require_optional_name(
-                getattr(individual.db, "site_key", None), "site_key"
-            ),
+            home_zone,
+            site_key,
         )
     if reuse is not None:
         reuse.fingerprint = fingerprint
         reuse.presence = presence
     return presence
+
+
+def _living_individuals(reuse: _PresenceReuse | None) -> tuple[Monster, ...]:
+    """Every living individual, enumerated once per reuse scope."""
+    if reuse is None:
+        return _living_monsters()
+    if reuse.living is None:
+        reuse.living = _living_monsters()
+    return reuse.living
+
+
+def _individual_facts(
+    reuse: _PresenceReuse | None, individual: Any
+) -> tuple[str | None, str | None]:
+    """One individual's durable home zone and site marker, read once per scope."""
+    if reuse is None:
+        return _stored_individual_facts(individual)
+    facts = reuse.facts.get(individual.pk)
+    if facts is None:
+        facts = _stored_individual_facts(individual)
+        reuse.facts[individual.pk] = facts
+    return facts
+
+
+def _stored_individual_facts(individual: Any) -> tuple[str | None, str | None]:
+    """One individual's stored home zone and site marker, validated."""
+    return (
+        _require_optional_name(
+            getattr(individual.db, "home_ecology_zone", None), "home_ecology_zone"
+        ),
+        _require_optional_name(getattr(individual.db, "site_key", None), "site_key"),
+    )
 
 
 def presence_at(
@@ -2226,6 +2411,9 @@ def _commit_planned_wave(
         if snapshot is not None:
             restore_population_surfaces(snapshot)
         raise
+    # The wave added individuals, so no read of the pass's earlier facts may
+    # answer again.
+    forget_living_presence()
     return tuple(created)
 
 
