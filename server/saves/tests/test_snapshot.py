@@ -130,6 +130,7 @@ class CreateSnapshotTests(SnapshotTestCase):
         self.assertEqual((art_dir / "scene/forest.webp").read_bytes(), b"forest-v1")
         self.assertEqual((art_dir / "portrait/character/hero.webp").read_bytes(), b"hero-v1")
 
+    @covers_requirement("gm-save-management::saved-database-is-one-self-contained-file")
     def test_a_write_ahead_source_saves_one_rollback_journal_file(self):
         live = self.world.root / "live-wal"
         live.mkdir()

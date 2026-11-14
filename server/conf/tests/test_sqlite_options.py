@@ -14,6 +14,7 @@ import django.db.utils
 from django.db.utils import ConnectionHandler
 
 from server.conf.sqlite_options import SQLITE_OPTIONS
+from tools.spec_traceability import covers_requirement
 
 
 class SqliteOptionsTests(unittest.TestCase):
@@ -46,6 +47,7 @@ class SqliteOptionsTests(unittest.TestCase):
         connection.ensure_connection()
         return connection
 
+    @covers_requirement("sqlite-concurrency::world-database-connections-use-write-ahead-logging")
     def test_a_reader_is_not_refused_during_a_write_transaction(self):
         writer = self.connection()
         writer.set_autocommit(False, force_begin_transaction_with_broken_autocommit=True)
@@ -58,6 +60,7 @@ class SqliteOptionsTests(unittest.TestCase):
         writer.commit()
         writer.set_autocommit(True)
 
+    @covers_requirement("sqlite-concurrency::world-database-connections-use-write-ahead-logging")
     def test_a_second_writer_is_refused_as_busy_and_the_first_still_commits(self):
         first = self.connection()
         first.set_autocommit(False, force_begin_transaction_with_broken_autocommit=True)
@@ -76,6 +79,7 @@ class SqliteOptionsTests(unittest.TestCase):
             plain.close()
         self.assertEqual(count, 1)
 
+    @covers_requirement("sqlite-concurrency::world-database-connections-use-write-ahead-logging")
     def test_the_first_connection_converts_a_rollback_journal_file(self):
         plain = sqlite3.connect(self.path)
         try:

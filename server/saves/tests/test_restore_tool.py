@@ -96,6 +96,7 @@ class RestoreToolTests(unittest.TestCase):
         self.assertEqual(self.result()["save"], self.save.id)
         self.assertEqual(self.result()["kind"], "manual")
 
+    @covers_requirement("gm-save-management::restoration-never-pairs-a-sidecar-with-another-database")
     def test_a_restore_over_a_write_ahead_database_drops_its_sidecars(self):
         wal = self.layout.db_file.parent / "evennia.db3-wal"
         shm = self.layout.db_file.parent / "evennia.db3-shm"
@@ -110,6 +111,7 @@ class RestoreToolTests(unittest.TestCase):
         self.assertFalse(wal.exists())
         self.assertFalse(shm.exists())
 
+    @covers_requirement("gm-save-management::restoration-never-pairs-a-sidecar-with-another-database")
     def test_a_rollback_returns_the_original_write_ahead_sidecars(self):
         db_dir = self.layout.db_file.parent
         wal = db_dir / "evennia.db3-wal"
