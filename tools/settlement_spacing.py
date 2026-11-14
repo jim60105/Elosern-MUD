@@ -347,12 +347,6 @@ def _road_gap_problems(
     return problems
 
 
-def _reject(label: str, detail: str) -> ValueError:
-    """A rejected input value, naming the file and entry that carries it."""
-
-    return ValueError(f"{label}: {detail}")
-
-
 def _place(
     declaration: LocationDeclaration,
     lore: Mapping[str, tuple[str | None, int | None]],
@@ -383,7 +377,7 @@ def build_input(
     try:
         network = decode_road_network(Path(roads).read_text(encoding="utf-8"))
     except ValueError as error:
-        raise _reject(f"{roads}", str(error)) from error
+        raise ValueError(f"{roads}: {error}") from error
     rows = load_lore(lore)
     region_nation = {
         region.region_id: region.nation_key
