@@ -27,7 +27,7 @@ Do not edit `AppClient.vue`, `AppShell.vue`, any store, or anything under `docs/
 
 ## 5. Gates
 
-- [ ] 5.1 Run `pnpm test -- web/webclient-app/tests/rite web/webclient-app/tests/components`, `uv run --locked python -m unittest tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change landmark-rite-surfaces` and `openspec validate landmark-rite-surfaces --strict`. Verify: all exit 0.
+- [x] 5.1 Run `pnpm test -- web/webclient-app/tests/rite web/webclient-app/tests/components`, `uv run --locked python -m unittest tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change landmark-rite-surfaces` and `openspec validate landmark-rite-surfaces --strict`. Verify: all exit 0.
 
 ## Workflow follow-up
 
