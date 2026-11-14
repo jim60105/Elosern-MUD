@@ -302,8 +302,8 @@ test("lore_codex v2 bounds slots per category and in total", () => {
     p.categories[0].total = Protocol.LORE_CODEX_MAX_SLOTS_PER_CATEGORY + 1;
     rebalance(p);
   });
-  // 512 shipped slots pass; a top-level total of 513 does not, even though
-  // no more than 512 slots ship.
+  // A full total bound passes; one slot over the aggregate does not, even
+  // though no category exceeds its own bound.
   const payload = validLoreCodexPayload();
   const perCategory = Protocol.LORE_CODEX_MAX_TOTAL_SLOTS / Object.keys(LABELS).length;
   payload.categories.forEach((cat) => {

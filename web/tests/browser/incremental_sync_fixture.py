@@ -131,16 +131,17 @@ def oversized_payload(marker: str, target_bytes: int) -> dict[str, Any]:
     from web.webclient.presentation.lore_codex import (
         LORE_CODEX_CATEGORIES,
         LORE_CODEX_MAX_FIELD_VALUE_CODE_POINTS,
-        LORE_CODEX_MAX_TOTAL_SLOTS,
         validate_lore_codex,
     )
     from web.webclient.presentation.protocol import json_byte_size
 
-    # A quarter of the per-category share of the slot bound: each v2 entry
-    # slot carries a fixed field overhead, so 64 entry slots per category
-    # alone would exceed the envelope (and 32 the smallest byte target)
-    # before any card value grows. 512 growable card values stay plenty.
-    per_category = LORE_CODEX_MAX_TOTAL_SLOTS // len(LORE_CODEX_CATEGORIES) // 4
+    # This fixture's own size tuning, deliberately independent of the panel's
+    # slot bound: each v2 entry slot carries a fixed field overhead, so 32
+    # entry slots per category already weigh 54 229 bytes and 64 weigh
+    # 107 477 before any card value grows. Sixteen leaves the payload small
+    # enough that the card values below reach every byte target exactly while
+    # staying inside the panel's own cap.
+    per_category = 16
     categories = []
     for group_index, category_key in enumerate(LORE_CODEX_CATEGORIES):
         monster = category_key == "monster"

@@ -68,8 +68,12 @@ from world.rules.lore_knowledge import (
 LORE_CODEX_SCHEMA_VERSION = 2
 
 # Exact shared bounds -- must stay equal in the JS validator.
-LORE_CODEX_MAX_SLOTS_PER_CATEGORY = 128
-LORE_CODEX_MAX_TOTAL_SLOTS = 512
+# The roster is authored map content: every settlement, village and hamlet is
+# an anchor. The per-category bound is raised for the shipped roster with
+# headroom (342 anchors at the time of writing) instead of undercutting it, and
+# the byte envelope stays the real wire limit (placeholders are trimmed first).
+LORE_CODEX_MAX_SLOTS_PER_CATEGORY = 1024
+LORE_CODEX_MAX_TOTAL_SLOTS = 2048
 LORE_CODEX_MAX_GROUPS_PER_CATEGORY = 16
 LORE_CODEX_MAX_CARD_FIELDS = 8
 LORE_CODEX_MAX_VARIANT_LINES = 8

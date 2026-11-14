@@ -488,17 +488,20 @@ class LoreCodexValidatorTests(unittest.TestCase):
         payload["categories"][0]["total"] = LORE_CODEX_MAX_SLOTS_PER_CATEGORY + 1
         with self.assertRaises(ProtocolValidationError):
             validate_lore_codex(_rebalance(payload))
-        # 512 shipped slots pass; a top-level total of 513 does not, even
-        # though no more than 512 slots ship.
+        # A full total bound passes; one slot over the aggregate does not,
+        # even though no category exceeds its own bound.
         payload = _valid_payload()
+        per_category = LORE_CODEX_MAX_TOTAL_SLOTS // len(payload["categories"])
         for category in payload["categories"]:
             category["groups"] = category["groups"][:1] or [
                 {"key": "t_tier_a", "label": "甲級", "slots": []}
             ]
-            category["groups"][0]["slots"] = [_placeholder() for _ in range(64)]
-            category["total"] = 64
+            category["groups"][0]["slots"] = [
+                _placeholder() for _ in range(per_category)
+            ]
+            category["total"] = per_category
         validate_lore_codex(_rebalance(payload))
-        payload["categories"][0]["total"] = 65
+        payload["categories"][0]["total"] = per_category + 1
         with self.assertRaises(LoreCodexPanelError):
             validate_lore_codex(_rebalance(payload))
 

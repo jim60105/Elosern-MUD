@@ -178,7 +178,7 @@ A monster entry's `art` SHALL be the existing `portrait:monster:<species_key>` d
 
 ### Requirement: The panel is bounded, trims placeholders then art, and fails closed
 
-The panel SHALL declare and enforce bounds of 128 slots per category, 512 slots in total, 16 groups per category, 8 card fields, 1024 code points per field value and 8 variant lines, plus code-point bounds on every string. Over the envelope limit, trailing placeholders SHALL drop first, last category first, then entry art SHALL become null from the last slot backwards; counts stay untrimmed. If nothing is left to trim, the presenter SHALL raise its named error.
+The panel SHALL declare and enforce bounds of 1024 slots per category, 2048 slots in total, 16 groups per category, 8 card fields, 1024 code points per field value and 8 variant lines, plus code-point bounds on every string. Over the envelope limit, trailing placeholders SHALL drop first, last category first, then entry art SHALL become null from the last slot backwards; counts stay untrimmed. If nothing is left to trim, the presenter SHALL raise its named error.
 
 #### Scenario: Trailing placeholders drop first
 - **WHEN** a synthetic codex exceeds the envelope limit by less than its placeholders weigh
@@ -192,8 +192,12 @@ The panel SHALL declare and enforce bounds of 128 slots per category, 512 slots 
 - **WHEN** a codex whose entry cards alone exceed the envelope is built
 - **THEN** the presenter raises its named validation error and ships nothing
 
+#### Scenario: The slot bounds scale with the authored map content
+- **WHEN** the anchor category enumerates every settlement, village and hamlet in the published map world
+- **THEN** its slot count stays inside the per-category bound, and the byte envelope stays the transport limit that trims placeholders before any count changes
+
 #### Scenario: A bound violation raises
-- **WHEN** a category would exceed 128 slots or a card would exceed 8 fields
+- **WHEN** a category would exceed 1024 slots or a card would exceed 8 fields
 - **THEN** the presenter raises its named validation error
 
 #### Scenario: The client mirror rejects a payload the server would not emit

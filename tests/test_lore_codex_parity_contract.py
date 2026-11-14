@@ -17,6 +17,7 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PY_LORE_CODEX = REPO_ROOT / "web/webclient/presentation/lore_codex.py"
+_PY_PROTOCOL = REPO_ROOT / "web/webclient/presentation/protocol.py"
 _JS_PROTOCOL = REPO_ROOT / "web/static/webclient/js/elosern/protocol.js"
 
 _LORE_CODEX_CONSTANTS = (
@@ -46,6 +47,27 @@ _EXPECTED_CATEGORIES = (
 
 
 class LoreCodexValidatorParityContract(unittest.TestCase):
+    def test_the_slot_bound_fits_the_generic_frame_list_ceiling(self):
+        """A category's slot array is one envelope list and must fit it.
+
+        The generic JSON-safety check bounds every array before the codex
+        validator sees it, so a per-category bound above that ceiling would
+        fail with a message naming neither constant.
+        """
+        codex_source = _PY_LORE_CODEX.read_text(encoding="utf-8")
+        protocol_source = _PY_PROTOCOL.read_text(encoding="utf-8")
+
+        def constant(source: str, name: str) -> int:
+            match = re.search(rf"^{name}\s*=\s*([0-9_]+)", source, re.MULTILINE)
+            self.assertIsNotNone(match, f"{name} not found")
+            return int(match.group(1).replace("_", ""))
+
+        per_category = constant(codex_source, "LORE_CODEX_MAX_SLOTS_PER_CATEGORY")
+        total = constant(codex_source, "LORE_CODEX_MAX_TOTAL_SLOTS")
+        frame_list = constant(protocol_source, "MAX_LIST_ITEMS")
+        self.assertLessEqual(per_category, frame_list)
+        self.assertLessEqual(total, frame_list * 2)
+
     def test_python_and_js_lore_codex_bounds_are_identical(self):
         py_source = _PY_LORE_CODEX.read_text(encoding="utf-8")
         js_source = protocol_client_source()

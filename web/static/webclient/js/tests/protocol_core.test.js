@@ -767,8 +767,10 @@ test("enforces global JSON-safety bounds", () => {
   }
   assert.throws(() => Protocol.checkGlobalSafety(many));
 
-  // Over 320 list items.
-  assert.throws(() => Protocol.checkGlobalSafety(new Array(322).fill(1)));
+  // Over the list-item ceiling (raised for the lore_codex anchor roster).
+  assert.throws(() =>
+    Protocol.checkGlobalSafety(new Array(Protocol.MAX_LIST_ITEMS + 1).fill(1))
+  );
   // A 300-item affordance list is inside the global ceiling.
   assert.doesNotThrow(() => Protocol.checkGlobalSafety(new Array(300).fill({ x: 1 })));
 

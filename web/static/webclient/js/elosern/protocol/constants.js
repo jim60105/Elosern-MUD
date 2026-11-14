@@ -11,9 +11,10 @@ var MAX_CANONICAL_JSON_BYTES = 65536;
 // web.webclient.presentation.protocol.MAX_DEPTH.
 var MAX_DEPTH = 16;
 var MAX_FIELDS = 64;
-// Clears the largest legitimate flat panel list: the `context_actions`
-// exploration form's affordance array (at most 320 entries).
-var MAX_LIST_ITEMS = 320;
+// Clears the largest legitimate flat panel list: the `lore_codex` anchor
+// roster's category slot array, which carries every settlement, village and
+// hamlet (at most LORE_CODEX_MAX_SLOTS_PER_CATEGORY entries).
+var MAX_LIST_ITEMS = 1024;
 var MAX_STRING_CODE_POINTS = 2048;
 var MAX_PANEL_COUNT = 32;
 var MAX_LAYOUT_VERSION = 65535;
@@ -289,8 +290,11 @@ var TITLE_CODEX_CATEGORIES = [
 // webclient-lore-codex-panel). These constants are shared with the server
 // through a dual-direction parity test.
 var LORE_CODEX_SCHEMA_VERSION = 2;
-var LORE_CODEX_MAX_SLOTS_PER_CATEGORY = 128;
-var LORE_CODEX_MAX_TOTAL_SLOTS = 512;
+// The roster is authored map content (every settlement, village and hamlet is
+// an anchor), so these bounds scale with it; the byte envelope stays the real
+// wire limit.
+var LORE_CODEX_MAX_SLOTS_PER_CATEGORY = 1024;
+var LORE_CODEX_MAX_TOTAL_SLOTS = 2048;
 var LORE_CODEX_MAX_GROUPS_PER_CATEGORY = 16;
 var LORE_CODEX_MAX_CARD_FIELDS = 8;
 var LORE_CODEX_MAX_VARIANT_LINES = 8;

@@ -36,12 +36,15 @@ PROTOCOL_VERSION = 1
 # geometry → image_size → width), whose deepest legitimate leaf sits at depth
 # 15; the ``context_actions`` v3 skill descriptors reach depth 11. The
 # list-item ceiling clears the largest legitimate flat panel list: the
+# ``lore_codex`` anchor roster, whose category slot array carries every
+# settlement, village and hamlet (at most
+# ``lore_codex.LORE_CODEX_MAX_SLOTS_PER_CATEGORY`` = 1024 entries); the
 # ``context_actions`` exploration form's affordance array (at most
-# ``MAX_CONTEXT_AFFORDANCES`` = 320 entries).
+# ``MAX_CONTEXT_AFFORDANCES`` = 320 entries) fits far below it.
 MAX_CANONICAL_JSON_BYTES = 65_536
 MAX_DEPTH = 16
 MAX_FIELDS = 64
-MAX_LIST_ITEMS = 320
+MAX_LIST_ITEMS = 1_024
 MAX_STRING_CODE_POINTS = 2_048
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
