@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "7993058defdeb359681dd79afd8c5ea7425b7fa4deea5542554caad6b7f2d69c",
+  "fingerprint": "a2950e2a33287f5618d874a7b145df255df0a849c8b057ead6acc6ea964bd1a8",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16334,7 +16334,7 @@
     "world/rules/monster_individual.py": "aacf9a52419bfff9677495d5305e8b7380bb375905c10268e4287c0f5e8773fd",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_edges.py": "ea91cd45cea73df108322dca9949522c02dd0818e7d891afc130ff35293624b6",
-    "world/rules/movement_settlement.py": "88a6a7bfacee7b18c231eecfa480cf24c68a5ce02ce07fa4e6e42be0719cb46d",
+    "world/rules/movement_settlement.py": "fd6e6d0d84487092a720ccdc605560af0dc700e66bb80ec624e381a83f13a784",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "93b04048e6593599605183f7dc3d8d92330ff136759c314893c7d43c14563993",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",

@@ -621,6 +621,12 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         }
         self.wilderness.db.population_unit_cursors = {"default": tick, "units": {}}
         self.clock.tick = tick
+        # The rebuilt world starts at ``tick``: the durable clock must agree,
+        # or a writer guard sees the previous run's world tick over this
+        # record. ``advance`` persists the same way.
+        persist = getattr(self.clock, "_persist", None)
+        if persist is not None:
+            persist(tick)
         return tuple(initialize_zone(self.wilderness, zone.key, seed=SEED, tick=tick))
 
     def _scenario_outcome(

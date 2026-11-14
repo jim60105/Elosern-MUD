@@ -188,7 +188,12 @@ def numeric_section(monster: Any) -> dict[str, Any]:
 
 
 def placement_section(monster: Any) -> dict[str, Any]:
-    """Home ownership and actual position, reported as independent facts."""
+    """Home ownership, actual position and unit settlement progress.
+
+    Ownership, position and the settled-through tick of the unit the individual
+    actually stands in are independent facts; the settlement rows only read the
+    durable cursor record and never settle the unit.
+    """
     from world.lore.monster_placement import MONSTER_SITE_REGISTRY
 
     site_key = read_attr(monster, "site_key", default=None)
@@ -248,6 +253,13 @@ def placement_section(monster: Any) -> dict[str, Any]:
         # whether anyone observes the group. Reads never move the group.
         rows.append(row("活動", activity["policy"], mono=True))
         rows.append(row("下一次決策", str(activity["next_decision"]), mono=True))
+    progress = _settlement_progress_of(monster)
+    if progress is not None:
+        # The unit's own committed cursor is the operator's progress fact; a
+        # lagging unit is marked, never settled by this read.
+        rows.append(row("結算進度", str(progress["cursor"]), mono=True))
+        if progress["behind"] is not None:
+            rows.append(row("結算落後", str(progress["behind"]), mono=True))
     return ledger(rows)
 
 
@@ -296,6 +308,36 @@ def _journey_of(monster: Any) -> dict[str, Any] | None:
         "arrival": journey.arrival_tick,
         "retry": journey.retry_tick,
     }
+
+
+def _settlement_progress_of(monster: Any) -> dict[str, int | None] | None:
+    """The monster's unit settled-through tick and its lag, or ``None``.
+
+    A read of the durable per-unit cursor record only: the operator view
+    reports how far the unit has been settled and never catches it up. A world
+    without the population seed, and a monster with no wilderness position,
+    carry no progress fact.
+    """
+    from world.maps import population_units, regional_population
+    from world.rules.movement_edges import LocationRef
+
+    wilderness = regional_population.live_wilderness()
+    if wilderness is None or not regional_population.population_provisioned(wilderness):
+        return None
+    cell = actual_cell_of(monster)
+    if cell is None:
+        return None
+    unit = population_units.unit_of_location(
+        population_units.current_unit_index(),
+        LocationRef.wilderness(wilderness.db_key, *cell),
+    )
+    if unit is None:
+        return None
+    cursor = population_units.unit_cursor(
+        population_units.read_unit_cursors(wilderness), unit
+    )
+    tick = regional_population.current_population_tick()
+    return {"cursor": cursor, "behind": tick - cursor if cursor < tick else None}
 
 
 def loot_section(monster: Any) -> dict[str, Any]:

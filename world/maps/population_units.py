@@ -12,7 +12,8 @@ to the residual unit.
 
 Nothing here decides anything. The index is a pure function of the published
 registries, and the per-unit cursor record is written only by fresh
-provisioning and the lifecycle pass; no owner decision reads it yet.
+provisioning and the lifecycle pass. The writer guards read it; no owner
+decision does.
 """
 
 from __future__ import annotations
@@ -45,6 +46,9 @@ POPULATION_SCOPE_VIOLATION = "population_scope_violation"
 
 #: The named refusal of a catch-up that would settle inside another transaction.
 POPULATION_CATCH_UP_NESTED = "population_catch_up_nested"
+
+#: The named refusal of a write into a unit behind the world tick.
+POPULATION_UNIT_NOT_CURRENT = "population_unit_not_current"
 
 _ZONE = "zone"
 _AREA = "area"
@@ -441,6 +445,17 @@ class PopulationCatchUpNested(regional_population.RegionalPopulationError):
     """
 
 
+class PopulationUnitNotCurrent(regional_population.RegionalPopulationError):
+    """A population write touches a settlement unit behind the world tick.
+
+    The unit's history stops at its cursor, so a presence fact, protection or
+    group written today would describe a state the unit never settled. The
+    error names the first offending unit in sorted order and both ticks; the
+    fix is a catch-up at the entry point that reached the writer, never a
+    weakened guard.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class PopulationScope:
     """The closed set of settlement units one scoped pass may settle."""
@@ -800,6 +815,54 @@ def require_cell_in_active_scope(cell: tuple[int, int]) -> None:
     )
 
 
+def require_units_current(wilderness: Any, units: Iterable[str]) -> None:
+    """Refuse a write touching a unit behind the current world tick.
+
+    A settlement pass owns the settling it is doing, and a world without the
+    population seed records no population state at all, so both answer without
+    a read. Otherwise the unit cursor record is read once and the first
+    offending unit in sorted order names itself with its cursor and the world
+    tick. A missing or malformed record refuses through the owner's own error.
+
+    ``units`` may be a generator: nothing is evaluated once the guard is inert,
+    and an answer that names no unit reads no record.
+    """
+    if pass_running() or not regional_population.population_provisioned(wilderness):
+        return
+    touched = sorted(set(units))
+    if not touched:
+        return
+    tick = regional_population.current_population_tick()
+    cursors = read_unit_cursors(wilderness)
+    for unit_id in touched:
+        cursor = unit_cursor(cursors, unit_id)
+        if cursor < tick:
+            raise PopulationUnitNotCurrent(
+                f"{POPULATION_UNIT_NOT_CURRENT}: unit {unit_id!r} settled through "
+                f"{cursor} is behind the world tick {tick}"
+            )
+
+
+def require_current(wilderness: Any, locations: Iterable[Any | None]) -> None:
+    """Refuse a write touching the unit of any non-null locator that is behind.
+
+    The same silence as :func:`require_units_current`: a running pass and an
+    unprovisioned world answer before the unit index or the cursor record is
+    read. ``locations`` may be a generator for the same reason.
+    """
+    if pass_running() or not regional_population.population_provisioned(wilderness):
+        return
+    index = current_unit_index()
+    require_units_current(
+        wilderness,
+        (
+            unit
+            for location in locations
+            if (unit := unit_of_location(index, location)) is not None
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class UnitCursors:
     """One settled-through tick per unit, plus the unlisted default."""
@@ -941,10 +1004,12 @@ __all__ = [
     "POPULATION_CATCH_UP_NESTED",
     "POPULATION_UNIT_CURSORS_ATTRIBUTE",
     "POPULATION_SCOPE_VIOLATION",
+    "POPULATION_UNIT_NOT_CURRENT",
     "RESIDUAL_UNIT",
     "PopulationCatchUpNested",
     "PopulationScope",
     "PopulationScopeViolation",
+    "PopulationUnitNotCurrent",
     "UnitCursors",
     "UnitIndex",
     "active_scope",
@@ -962,7 +1027,9 @@ __all__ = [
     "observed_units",
     "pass_running",
     "read_unit_cursors",
+    "require_current",
     "require_in_active_scope",
+    "require_units_current",
     "require_units_in_active_scope",
     "running_pass",
     "scope_start_tick",

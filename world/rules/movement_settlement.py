@@ -1347,16 +1347,38 @@ def settle_relocation(entity: Any, destination: Any) -> None:
     re-raises, exactly as the adapter did when it owned this body. Its
     evidence is ``world/maps/tests/test_gm.py``, which drives the verb and
     asserts the arrival, party, dialogue and rollback consequences.
+
+    The relocation is population presence evidence for the cells it leaves and
+    enters, so both endpoint units are caught up before the captures below and
+    before the owning transaction: a catch-up can move the entity itself, and a
+    transition written into a unit that stopped at an earlier tick refuses by
+    name.
     """
     from server.console.errors import ConsoleError
     from typeclasses.characters import PlayerCharacter
+    from world.maps.population_lifecycle import ensure_locations_current
     from world.quests.room_observation import observe_arrival_lore
     from world.rules.city_gates import reanchor_home_on_gate_arrival
     from world.rules.dialogue import clear_dialogue_session
     from world.rules.map_knowledge import record_arrival
+    from world.rules.movement_edges import (
+        LocationRefError,
+        MovementEdgeError,
+        location_ref,
+    )
     from world.rules.party import follow_companions
     from world.rules.surfaces import restore_attributes, snapshot_attributes
 
+    seeds = []
+    for endpoint in (entity, destination):
+        try:
+            seeds.append(location_ref(endpoint))
+        except (
+            LocationRefError,
+            MovementEdgeError,
+        ):  # observability: ignore R2: an unrepresentable endpoint names no settlement unit to catch up
+            continue
+    ensure_locations_current(seeds)
     source = entity.location
     source_wilderness = getattr(source, "wilderness", None)
     # Capture before the move: the contrib deletes a recycled source room's
