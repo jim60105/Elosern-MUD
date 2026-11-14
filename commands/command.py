@@ -14,8 +14,13 @@ from world.observability import log_error, log_info
 # from evennia import default_cmds
 
 
-def _catch_up_observed_population(char, key) -> None:
-    """Catch the observed units up, reporting a failure without aborting the command."""
+def catch_up_observed_population(char, key) -> None:
+    """Catch the observed units up, reporting a failure without aborting the caller.
+
+    Shared by every player input boundary: the command pre-hook below and the
+    web action dispatcher, whose adapters call the rules without a command.
+    ``key`` names the command or the web action.
+    """
 
     # Imported here so the command module keeps its own import order and never
     # loads the population owner while commands register.
@@ -41,7 +46,7 @@ class PopulationCatchUpMixin:
 
     def at_pre_cmd(self):
         result = super().at_pre_cmd()
-        _catch_up_observed_population(getattr(self.caller, "pk", 0) or 0, self.key)
+        catch_up_observed_population(getattr(self.caller, "pk", 0) or 0, self.key)
         return result
 
 
@@ -86,7 +91,7 @@ class Command(BaseCommand):
             "cmd_in",
             context={"char": char, "cmd": self.key, "args": args[:200]},
         )
-        _catch_up_observed_population(char, self.key)
+        catch_up_observed_population(char, self.key)
         return None
 
     def at_post_cmd(self) -> None:

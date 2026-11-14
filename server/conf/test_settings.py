@@ -12,11 +12,6 @@ if os.environ.get("MUD_TEST_SETTINGS") != "1" or sys.argv[1:2] != ["test"]:
         "MUD_TEST_SETTINGS=1"
     )
 
-# The test harness wraps every case in one outer atomic block that no game owner
-# opened, so a catch-up that really writes inside it must not be read as a
-# nested production entry point. The refusal's own test re-enables it.
-POPULATION_CATCH_UP_REFUSES_NESTED = False
-
 # The production settings derive their initial values from the environment
 # (settings-environment-overrides). A test run must never inherit a
 # developer's or CI runner's deployment shell, so pop every env-backed

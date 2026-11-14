@@ -22,7 +22,6 @@ from __future__ import annotations
 from types import MappingProxyType
 from unittest.mock import patch
 
-from django.test import override_settings
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
 from tools.spec_traceability import covers_requirement
@@ -676,7 +675,6 @@ class DefeatProtectionTests(ObservedAdvanceFixture):
     @covers_requirement(
         "population-settlement-units::a-clock-advance-settles-observed-units-only"
     )
-    @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
     def test_the_settlement_announces_its_cell_for_the_aftermath_advance(self):
         self._build_scenario()
         self._publish_contact()

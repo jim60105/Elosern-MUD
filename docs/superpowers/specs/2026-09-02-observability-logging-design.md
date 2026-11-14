@@ -194,7 +194,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
 | `population_maintenance_settled` | `tick_from`、`tick_to`，加上本次 pass 每個維護事件名稱的計數（`fatigue_transition`、`monster_activity_decided`、`monster_departed`、`monster_arrived`、`monster_arrival_deferred`）；一次 durable 提交的 population lifecycle settlement pass 僅一條 info 匯總 |
 | `population_caught_up` | `units`、`tick_from`、`tick_to`（catch-up 自行提交其耐用交易時一條 info；範圍內每個單位都已跟上目前 tick 時不發出） |
-| `population_catch_up_failed` | `char`、`cmd` + `exc`（error 級；指令開始前的 catch-up 失敗後已還原現場，指令仍照常執行） |
+| `population_catch_up_failed` | `char`、`cmd` + `exc`（error 級；指令或 Web 動作開始前的 catch-up 失敗後已還原現場，指令或動作仍照常執行；`cmd` 為指令鍵或 Web 動作的 action id） |
 | `population_backlog_drained` | `units`、`tick_from`、`tick_to`、`remaining`（背景排空自行提交其耐用交易時一條 info；`units` 為本次結算的封閉集合單位數，`remaining` 為本次結束後仍落後的單位數；沒有任何落後單位時不發出） |
 | `population_backlog_drain_failed` | `units`、`tick_from`、`tick_to` + `exc`（error 級；一個封閉集合結算失敗後已還原現場並改試下一個落後集合；世界層故障無單位可指名時 `units` 為 0） |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |

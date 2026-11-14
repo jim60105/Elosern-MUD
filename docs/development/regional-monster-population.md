@@ -2892,9 +2892,11 @@ A catch-up that would write refuses an enclosing transaction:
 `population_catch_up_nested`) is raised when the set is behind and the
 connection is already inside an atomic block, so a future nested entry point
 fails loudly instead of leaving live caches ahead of a rolled-back block. The
-refusal is on by default; the test settings disable it because every test case
-runs inside the harness's own outer transaction that no game owner opened, and
-the refusal's own test re-enables it with `override_settings`.
+refusal has no switch and is live under test as well: a test case runs inside
+the harness's own atomic blocks, which Django marks (`_from_testcase`), and
+`population_lifecycle._inside_game_transaction` ignores exactly those. A test
+that reaches a catch-up entry point inside any other atomic block while the set
+is behind therefore fails with the same named error production would raise.
 
 `ensure_locations_current(locations)` seeds the units around each locator
 (`population_units.units_around`) and `ensure_observed_population_current()`
@@ -3009,6 +3011,12 @@ the outer one's marker.
   `commands/command.py::Command.at_pre_cmd`, after the `cmd_in` event and
   before parsing. A failed catch-up emits `population_catch_up_failed` (error
   level, `char`, `cmd`, `exc`) and the command still runs.
+- Every admitted web action catches the observed units up in
+  `web/webclient/actions/dispatcher.py::handle_ui_action`, immediately before
+  its adapter runs, through the same helper
+  (`commands.command.catch_up_observed_population`). The event's `cmd` field
+  carries the action id. A refused action (stale, busy, malformed, unknown)
+  catches nothing up.
 - `settle_movement` catches its passage up before it builds the pre-move
   snapshot and before its own transaction, then wraps the rest of the
   settlement in `announced_observation(passage)`.
@@ -3049,9 +3057,10 @@ cell, or reads it to decide something, calls `ensure_locations_current` before
 its own `transaction.atomic()` and before its own snapshot. A catch-up inside
 an enclosing transaction would be only a savepoint: the enclosing rollback
 would revert the durable rows while the live caches kept the settled values.
-Input that never passes through `Command.at_pre_cmd` (a menu node, a web
-endpoint) skips the command catch-up: its writers are guarded by
-`population-writer-guards`, and its reads are corrected by the next command.
+Input that passes through neither `Command.at_pre_cmd` nor the web action
+dispatcher (a menu node, a plain HTTP endpoint) skips the catch-up: its writers
+are guarded by `population-writer-guards`, and its reads are corrected by the
+next command or web action.
 
 ## Costs and residual risks
 

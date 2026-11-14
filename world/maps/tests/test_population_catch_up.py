@@ -15,10 +15,10 @@ requirement states and what excludes any unit outside the radius.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.db import transaction
-from django.test import override_settings
 
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 from evennia.utils.create import create_object
@@ -51,6 +51,14 @@ from world.maps.wilderness_provider import WILDERNESS_NAME
 from world.rules.clock import WorldClock, get_world_clock
 from world.rules import gm as rules_gm
 from world.rules.movement_edges import LocationRef, resolve_direction_edge
+from web.webclient.actions.dispatcher import handle_ui_action
+from web.webclient.actions.registry import ActionRegistry
+from web.webclient.actions.tests.test_dispatcher._support import (
+    FakeSession,
+    _coordinator,
+    _presenter_registry,
+    _proof_spec,
+)
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS
 
 START = 100
@@ -342,6 +350,108 @@ class CommandSeamTests(CatchUpFixture):
         self.assertEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
 
 
+class WebActionSeamTests(CatchUpFixture):
+    """A web action runs no command, so the dispatcher carries the same seam."""
+
+    _RESULT = {
+        "outcome": "success",
+        "code": "ok",
+        "message": "完成",
+        "affected_panels": ("status",),
+    }
+
+    def dispatch(self, player, adapter, *, stale: bool = False) -> None:
+        """Send one ``proof.noop`` action for ``player`` through the dispatcher."""
+        registry = ActionRegistry("test")
+        registry.register(_proof_spec(adapter=adapter))
+        session = FakeSession()
+        coordinator = _coordinator(session)
+        session.puppet = player
+        coordinator.full_snapshot(SimpleNamespace(actor=player, protocol_version=1))
+        handle_ui_action(
+            session,
+            player,
+            {
+                "protocol_version": 1,
+                "presentation_epoch": coordinator.epoch,
+                "request_id": "r1",
+                "base_revision": coordinator.revision + (1 if stale else 0),
+                "action_id": "proof.noop",
+                "payload": {},
+            },
+            registry,
+            _presenter_registry(),
+        )
+
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
+    def test_a_web_action_settles_the_units_before_its_adapter_runs(self):
+        self._build_scenario()
+        player = place_player(self, EAST_OF_ZONE_A)
+        self.lag()
+        seen: list[int | None] = []
+
+        def adapter(actor, payload, session=None):
+            seen.append(self.cursor_record().units.get(self.unit_b))
+            return dict(self._RESULT)
+
+        with (
+            patch.object(population_lifecycle, "log_info"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.dispatch(player, adapter)
+        self.assertEqual(
+            seen,
+            [LAG_TICK],
+            "the neighbouring unit is current before the adapter's own code",
+        )
+
+    @covers_requirement(
+        "population-settlement-units::actions-begin-with-the-units-they-touch-current"
+    )
+    def test_a_failed_catch_up_is_reported_and_the_web_action_still_runs(self):
+        self._build_scenario()
+        player = place_player(self, EAST_OF_ZONE_A)
+        self.lag()
+        ran: list[bool] = []
+
+        def adapter(actor, payload, session=None):
+            ran.append(True)
+            return dict(self._RESULT)
+
+        with (
+            patch.object(
+                population_lifecycle,
+                "ensure_population_current",
+                side_effect=RuntimeError("injected catch-up fault"),
+            ),
+            patch("commands.command.log_error") as logged,
+        ):
+            self.dispatch(player, adapter)
+        self.assertEqual(ran, [True])
+        self.assertEqual(
+            [call.args[0] for call in logged.call_args_list],
+            ["population_catch_up_failed"],
+        )
+        context = logged.call_args.kwargs["context"]
+        self.assertEqual(context["char"], player.pk)
+        self.assertEqual(context["cmd"], "proof.noop")
+
+    def test_a_refused_web_action_catches_nothing_up(self):
+        self._build_scenario()
+        player = place_player(self, EAST_OF_ZONE_A)
+        self.lag()
+        ran: list[bool] = []
+        self.dispatch(
+            player,
+            lambda actor, payload, session=None: ran.append(True) or dict(self._RESULT),
+            stale=True,
+        )
+        self.assertEqual(ran, [])
+        self.assertNotEqual(self.cursor_record().units.get(self.unit_b), LAG_TICK)
+
+
 class OperatorCatchUpTests(CatchUpFixture):
     """The operator and quest entry points catch their target up first."""
 
@@ -394,7 +504,6 @@ class CatchUpBoundaryTests(CatchUpFixture):
         self.assertFalse(settled)
         self.assertEqual(self.cursor_record(), cursors)
 
-    @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
     @covers_requirement(
         "population-settlement-units::catch-up-settles-a-lagging-closed-set-to-the-current-tick"
     )

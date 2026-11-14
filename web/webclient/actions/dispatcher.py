@@ -274,6 +274,15 @@ def handle_ui_action(
             "request_identity": {"epoch": coordinator.epoch, "request_id": request_id},
         }
 
+    # A web action never passes through a command's pre-hook, and it may be the
+    # first input after a relocation that ran no clock advance (a login puts
+    # the character back on its cell). The observed units are caught up here,
+    # before the adapter and outside any transaction; a failure is reported and
+    # never prevents the action, exactly as for a command.
+    from commands.command import catch_up_observed_population
+
+    catch_up_observed_population(getattr(actor, "pk", 0) or 0, spec.action_id)
+
     # Capture the epoch at admission; completion publication requires it to
     # still match so a puppet change cannot publish A-derived state to B.
     state.in_flight = True
