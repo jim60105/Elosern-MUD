@@ -2,5 +2,5 @@
   {"id": "western_hills_valleys", "region": "western_hills_valleys"},
   {"id": "southwest_coast", "region": "southwest_coast"},
   {"id": "southeast_coast", "region": "southeast_coast"},
-  {"id": "eastern_plains_south", "region": "eastern_plains", "bounds": [0, 0, 2699, 1100]}
+  {"id": "eastern_plains", "region": "eastern_plains"}
 ]}

@@ -2185,3 +2185,561 @@ locations:
       cell_y: 677
     geographic_constraint: Plain road between the north plain and the western bend
     scene_archetype:
+  village_elm_flat:
+    kind: village
+    display_name_zh: 榆埔村
+    description: Farming village on the elm-dotted flat of the maple foot road, between the maple wood and the steed plain.
+    cell:
+      cell_x: 1639
+      cell_y: 1179
+    geographic_constraint: Elm-dotted open flat on the Maple Foot to Steed Plain road
+    scene_archetype:
+  village_buckwheat_hollow:
+    kind: village
+    display_name_zh: 蕎坳村
+    description: Buckwheat-growing village in a shallow hollow of the crystal road, north of the black soil fields.
+    cell:
+      cell_x: 1672
+      cell_y: 1470
+    geographic_constraint: Buckwheat hollow on the Black Soil to Crystal road
+    scene_archetype:
+  village_wheat_slope:
+    kind: village
+    display_name_zh: 麥坡村
+    description: Wheat village on a long slope of the capital highway, between the capital and the wheat wave city.
+    cell:
+      cell_x: 1990
+      cell_y: 1331
+    geographic_constraint: Wheat slope on the capital to Wheat Wave highway
+    scene_archetype:
+  village_birch_hollow:
+    kind: village
+    display_name_zh: 樺坳村
+    description: Village among birches in a hollow of the capital to maple foot road, west of the imperial river.
+    cell:
+      cell_x: 1832
+      cell_y: 1316
+    geographic_constraint: Birch hollow on the capital to Maple Foot road
+    scene_archetype:
+  village_linden_ridge:
+    kind: village
+    display_name_zh: 椴嶺村
+    description: Village on a linden-crowned ridge of the crystal road, north of the black soil fields.
+    cell:
+      cell_x: 1719
+      cell_y: 1516
+    geographic_constraint: Linden ridge on the Black Soil to Crystal road
+    scene_archetype:
+  village_hemp_plain:
+    kind: village
+    display_name_zh: 麻原村
+    description: Hemp-growing village on the open plain between the wheat wave city and the crystal town.
+    cell:
+      cell_x: 2017
+      cell_y: 1515
+    geographic_constraint: Open hemp plain between Wheat Wave and Crystal
+    scene_archetype:
+  village_grain_hollow:
+    kind: village
+    display_name_zh: 穀坳村
+    description: Grain village in a hollow of the crystal road, south of the black soil downland.
+    cell:
+      cell_x: 1970
+      cell_y: 1557
+    geographic_constraint: Grain hollow on the Wheat Wave to Crystal road
+    scene_archetype:
+  village_awn_plain:
+    kind: village
+    display_name_zh: 芒原村
+    description: Village of awned barley fields on the plain of the capital highway, east of the imperial river.
+    cell:
+      cell_x: 2063
+      cell_y: 1448
+    geographic_constraint: Barley plain on the capital to Wheat Wave highway
+    scene_archetype:
+  village_locust_hollow:
+    kind: village
+    display_name_zh: 槐坳村
+    description: Village under locust trees in a hollow of the capital to maple foot road, south of the maple woods.
+    cell:
+      cell_x: 1705
+      cell_y: 1271
+    geographic_constraint: Locust hollow on the capital to Maple Foot road
+    scene_archetype:
+  village_fallow_plain:
+    kind: village
+    display_name_zh: 蕪原村
+    description: Farming village on fallow flats beside the maple foot road, west of the imperial river.
+    cell:
+      cell_x: 1644
+      cell_y: 1306
+    geographic_constraint: Fallow flats on the Black Soil to Maple Foot road
+    scene_archetype:
+  village_bulrush_bend:
+    kind: village
+    display_name_zh: 蒲灣村
+    description: Village at a bulrush bend of the imperial west tributary, in the maple wood below the maple foot town.
+    cell:
+      cell_x: 1682
+      cell_y: 1216
+    geographic_constraint: Bulrush bend of the imperial west tributary in the maple wood
+    scene_archetype:
+  village_channel_mouth:
+    kind: village
+    display_name_zh: 汊口村
+    description: Village where a side channel of the imperial west tributary meets the river flat, west of the imperial ferry city.
+    cell:
+      cell_x: 1946
+      cell_y: 1140
+    geographic_constraint: Side channel and river flat of the imperial west tributary
+    scene_archetype:
+  village_tide_meadow:
+    kind: village
+    display_name_zh: 潮野村
+    description: Village on the tidal meadow of the east coast river, between the sunrise town and the dawnlight port.
+    cell:
+      cell_x: 2398
+      cell_y: 1516
+    geographic_constraint: Tidal meadow of the east coast river below the coastal ridge
+    scene_archetype:
+  village_reed_shore:
+    kind: village
+    display_name_zh: 荻岸村
+    description: Village on a reed bank of the east coast river, on the plain east of the wheat wave city.
+    cell:
+      cell_x: 2122
+      cell_y: 1508
+    geographic_constraint: Reed bank of the east coast river east of the wheat plain
+    scene_archetype:
+  hamlet_channel_plain:
+    kind: hamlet
+    display_name_zh: 渠原
+    description: Hamlet on the east pasture road, in the open plain south of the imperial ferry city.
+    cell:
+      cell_x: 2026
+      cell_y: 1092
+    geographic_constraint: Open plain crossing on the imperial ferry to east pasture road
+    scene_archetype:
+  hamlet_sand_shore:
+    kind: hamlet
+    display_name_zh: 沙汀
+    description: Hamlet on the low coastal flat of the east pasture road, south of the tide wind port.
+    cell:
+      cell_x: 2528
+      cell_y: 1130
+    geographic_constraint: Low coastal flat on the tide wind to east pasture road
+    scene_archetype:
+  hamlet_tide_shore:
+    kind: hamlet
+    display_name_zh: 潮汀
+    description: Hamlet on the coastal strip of the sunrise road, between the tide wind port and the sunrise town.
+    cell:
+      cell_x: 2552
+      cell_y: 1212
+    geographic_constraint: Coastal strip on the tide wind to sunrise road
+    scene_archetype:
+  hamlet_willow_bend:
+    kind: hamlet
+    display_name_zh: 柳灣
+    description: Hamlet at a willow bend of the imperial river, on the capital to maple foot road.
+    cell:
+      cell_x: 1904
+      cell_y: 1319
+    geographic_constraint: Willow bend of the imperial river on the capital road
+    scene_archetype:
+  hamlet_bean_plain:
+    kind: hamlet
+    display_name_zh: 菽原
+    description: Hamlet among bean fields on the east pasture road, south of the imperial ferry crossing.
+    cell:
+      cell_x: 2088
+      cell_y: 1073
+    geographic_constraint: Bean fields on the imperial ferry to east pasture road
+    scene_archetype:
+  hamlet_elm_ridge:
+    kind: hamlet
+    display_name_zh: 榆嶺
+    description: Hamlet on an elm ridge of the steed plain road, at the northern end of the plain.
+    cell:
+      cell_x: 1639
+      cell_y: 1111
+    geographic_constraint: Elm ridge on the Maple Foot to Steed Plain road
+    scene_archetype:
+  hamlet_millet_knoll:
+    kind: hamlet
+    display_name_zh: 黍岡
+    description: Hamlet on a millet knoll of the sunrise road, east of the wheat wave city.
+    cell:
+      cell_x: 2132
+      cell_y: 1484
+    geographic_constraint: Millet knoll on the Wheat Wave to Sunrise road
+    scene_archetype:
+  hamlet_caltrop_pond:
+    kind: hamlet
+    display_name_zh: 菱塘
+    description: Hamlet by a water caltrop pond on the east pasture road, above the southern plain.
+    cell:
+      cell_x: 2482
+      cell_y: 1085
+    geographic_constraint: Water caltrop pond on the east pasture road
+    scene_archetype:
+  hamlet_reed_shoal:
+    kind: hamlet
+    display_name_zh: 荻灘
+    description: Hamlet on a reed shoal of the sunrise road, south of the tide wind port.
+    cell:
+      cell_x: 2525
+      cell_y: 1264
+    geographic_constraint: Reed shoal on the tide wind to sunrise road
+    scene_archetype:
+  hamlet_fallow_field:
+    kind: hamlet
+    display_name_zh: 蕪田
+    description: Hamlet on fallow fields of the east pasture road, above the southern coast plain.
+    cell:
+      cell_x: 2143
+      cell_y: 1035
+    geographic_constraint: Fallow fields on the imperial ferry to east pasture road
+    scene_archetype:
+  hamlet_birch_ridge:
+    kind: hamlet
+    display_name_zh: 樺嶺
+    description: Hamlet on a birch ridge of the north wood road, south of the north wood keep.
+    cell:
+      cell_x: 1862
+      cell_y: 1697
+    geographic_constraint: Birch ridge on the Crystal to North Wood Keep road
+    scene_archetype:
+  hamlet_mulberry_garden:
+    kind: hamlet
+    display_name_zh: 桑園
+    description: Hamlet among mulberry gardens on the sunrise road, east of the wheat wave city.
+    cell:
+      cell_x: 2193
+      cell_y: 1468
+    geographic_constraint: Mulberry gardens on the Wheat Wave to Sunrise road
+    scene_archetype:
+  hamlet_locust_plain:
+    kind: hamlet
+    display_name_zh: 槐原
+    description: Hamlet on a locust plain of the steed plain road, north of the steed plain town.
+    cell:
+      cell_x: 1639
+      cell_y: 1044
+    geographic_constraint: Locust plain on the Maple Foot to Steed Plain road
+    scene_archetype:
+  hamlet_hemp_knoll:
+    kind: hamlet
+    display_name_zh: 麻岡
+    description: Hamlet on a hemp knoll of the sunken bell road, north of the sunken bell town.
+    cell:
+      cell_x: 2110
+      cell_y: 1570
+    geographic_constraint: Hemp knoll on the Wheat Wave to Sunken Bell road
+    scene_archetype:
+  hamlet_bulrush_shoal:
+    kind: hamlet
+    display_name_zh: 蒲灘
+    description: Hamlet on a bulrush shoal of the east pasture road, above the eastern plain.
+    cell:
+      cell_x: 2440
+      cell_y: 1043
+    geographic_constraint: Bulrush shoal on the tide wind to east pasture road
+    scene_archetype:
+  hamlet_paulownia_slope:
+    kind: hamlet
+    display_name_zh: 桐坡
+    description: Hamlet on a paulownia slope of the sunrise road, inland of the tide wind port.
+    cell:
+      cell_x: 2490
+      cell_y: 1306
+    geographic_constraint: Paulownia slope on the tide wind to sunrise road
+    scene_archetype:
+  hamlet_linden_knoll:
+    kind: hamlet
+    display_name_zh: 椴岡
+    description: Hamlet on a linden knoll of the capital highway, west of the wheat wave city.
+    cell:
+      cell_x: 2042
+      cell_y: 1383
+    geographic_constraint: Linden knoll on the capital to Wheat Wave highway
+    scene_archetype:
+  hamlet_buckwheat_ridge:
+    kind: hamlet
+    display_name_zh: 蕎嶺
+    description: Hamlet on a buckwheat ridge of the maple foot road, west of the imperial river.
+    cell:
+      cell_x: 1764
+      cell_y: 1303
+    geographic_constraint: Buckwheat ridge on the capital to Maple Foot road
+    scene_archetype:
+  hamlet_bean_knoll:
+    kind: hamlet
+    display_name_zh: 菽岡
+    description: Hamlet on a bean knoll of the east pasture road, above the southern plain.
+    cell:
+      cell_x: 2196
+      cell_y: 993
+    geographic_constraint: Bean knoll on the imperial ferry to east pasture road
+    scene_archetype:
+  hamlet_mulberry_slope:
+    kind: hamlet
+    display_name_zh: 桑坡
+    description: Hamlet on a mulberry slope of the north wood road, north of the crystal town.
+    cell:
+      cell_x: 1844
+      cell_y: 1759
+    geographic_constraint: Mulberry slope on the Crystal to North Wood Keep road
+    scene_archetype:
+  hamlet_alfalfa_plain:
+    kind: hamlet
+    display_name_zh: 苜原
+    description: Hamlet in alfalfa fields of the steed plain road, north of the steed plain town.
+    cell:
+      cell_x: 1650
+      cell_y: 981
+    geographic_constraint: Alfalfa fields on the Maple Foot to Steed Plain road
+    scene_archetype:
+  hamlet_fallow_knoll:
+    kind: hamlet
+    display_name_zh: 蕪岡
+    description: Hamlet on a fallow knoll of the sunrise road, between the wheat wave city and the sunrise town.
+    cell:
+      cell_x: 2260
+      cell_y: 1467
+    geographic_constraint: Fallow knoll on the Wheat Wave to Sunrise road
+    scene_archetype:
+  hamlet_reed_bar:
+    kind: hamlet
+    display_name_zh: 荻洲
+    description: Hamlet on a reed bar of the east pasture road, above the eastern plain.
+    cell:
+      cell_x: 2393
+      cell_y: 996
+    geographic_constraint: Reed bar on the tide wind to east pasture road
+    scene_archetype:
+  hamlet_elm_hollow:
+    kind: hamlet
+    display_name_zh: 榆坳
+    description: Hamlet in an elm hollow of the crystal road, east of the black soil fields.
+    cell:
+      cell_x: 1772
+      cell_y: 1548
+    geographic_constraint: Elm hollow on the Black Soil to Crystal road
+    scene_archetype:
+  hamlet_millet_slope:
+    kind: hamlet
+    display_name_zh: 黍坡
+    description: Hamlet on a millet slope of the sunken bell road, north of the sunken bell town.
+    cell:
+      cell_x: 2152
+      cell_y: 1619
+    geographic_constraint: Millet slope on the Wheat Wave to Sunken Bell road
+    scene_archetype:
+  hamlet_paulownia_knoll:
+    kind: hamlet
+    display_name_zh: 桐岡
+    description: Hamlet on a paulownia knoll of the sunrise road, above the tide wind coast.
+    cell:
+      cell_x: 2444
+      cell_y: 1352
+    geographic_constraint: Paulownia knoll on the tide wind to sunrise road
+    scene_archetype:
+  hamlet_fallow_hollow:
+    kind: hamlet
+    display_name_zh: 蕪坳
+    description: Hamlet in a fallow hollow of the maple foot road, west of the black soil town.
+    cell:
+      cell_x: 1636
+      cell_y: 1367
+    geographic_constraint: Fallow hollow on the Black Soil to Maple Foot road
+    scene_archetype:
+  hamlet_river_beach:
+    kind: hamlet
+    display_name_zh: 河汀
+    description: Hamlet on a river beach of the starglow road, below the imperial ferry city.
+    cell:
+      cell_x: 2000
+      cell_y: 1074
+    geographic_constraint: River beach of the imperial river on the starglow road
+    scene_archetype:
+  hamlet_duckweed_bend:
+    kind: hamlet
+    display_name_zh: 萍灣
+    description: Hamlet at a duckweed bend of the imperial river, on the capital to imperial ferry road.
+    cell:
+      cell_x: 1973
+      cell_y: 1209
+    geographic_constraint: Duckweed bend of the imperial river on the capital road
+    scene_archetype:
+  hamlet_alfalfa_knoll:
+    kind: hamlet
+    display_name_zh: 苜岡
+    description: Hamlet on an alfalfa knoll of the east pasture road, above the southern plain.
+    cell:
+      cell_x: 2248
+      cell_y: 949
+    geographic_constraint: Alfalfa knoll on the imperial ferry to east pasture road
+    scene_archetype:
+  hamlet_birch_slope:
+    kind: hamlet
+    display_name_zh: 樺坡
+    description: Hamlet on a birch slope of the north wood road, near the north wood keep.
+    cell:
+      cell_x: 1816
+      cell_y: 1816
+    geographic_constraint: Birch slope on the Crystal to North Wood Keep road
+    scene_archetype:
+  hamlet_buckwheat_slope:
+    kind: hamlet
+    display_name_zh: 蕎坡
+    description: Hamlet on a buckwheat slope of the steed plain road, north of the steed plain town.
+    cell:
+      cell_x: 1679
+      cell_y: 926
+    geographic_constraint: Buckwheat slope on the Maple Foot to Steed Plain road
+    scene_archetype:
+  hamlet_mulberry_knoll:
+    kind: hamlet
+    display_name_zh: 桑岡
+    description: Hamlet on a mulberry knoll of the sunrise road, west of the sunrise town.
+    cell:
+      cell_x: 2327
+      cell_y: 1467
+    geographic_constraint: Mulberry knoll on the Wheat Wave to Sunrise road
+    scene_archetype:
+  hamlet_parasol_knoll:
+    kind: hamlet
+    display_name_zh: 梧岡
+    description: Hamlet on a parasol tree knoll of the east pasture road, above the southern plain.
+    cell:
+      cell_x: 2346
+      cell_y: 949
+    geographic_constraint: Parasol tree knoll on the tide wind to east pasture road
+    scene_archetype:
+  hamlet_locust_knoll:
+    kind: hamlet
+    display_name_zh: 槐岡
+    description: Hamlet on a locust knoll of the crystal road, south of the black soil downland.
+    cell:
+      cell_x: 1823
+      cell_y: 1585
+    geographic_constraint: Locust knoll on the Black Soil to Crystal road
+    scene_archetype:
+  hamlet_linden_slope:
+    kind: hamlet
+    display_name_zh: 椴坡
+    description: Hamlet on a linden slope of the sunken bell road, west of the sunken bell town.
+    cell:
+      cell_x: 2199
+      cell_y: 1666
+    geographic_constraint: Linden slope on the Wheat Wave to Sunken Bell road
+    scene_archetype:
+  hamlet_paulownia_plain:
+    kind: hamlet
+    display_name_zh: 桐原
+    description: Hamlet on a paulownia plain of the sunrise road, between the tide wind port and the sunrise town.
+    cell:
+      cell_x: 2404
+      cell_y: 1401
+    geographic_constraint: Paulownia plain on the tide wind to sunrise road
+    scene_archetype:
+  hamlet_millet_plain:
+    kind: hamlet
+    display_name_zh: 黍原
+    description: Hamlet on a millet plain of the crystal road, east of the wheat wave city.
+    cell:
+      cell_x: 1920
+      cell_y: 1591
+    geographic_constraint: Millet plain on the Wheat Wave to Crystal road
+    scene_archetype:
+  hamlet_bay_shore:
+    kind: hamlet
+    display_name_zh: 灣汀
+    description: Hamlet on the low shore of a bay of the dawnlight road, below the dawnlight port.
+    cell:
+      cell_x: 2429
+      cell_y: 1499
+    geographic_constraint: Low bay shore on the Dawnlight to Sunrise road
+    scene_archetype:
+  hamlet_duckweed_pond:
+    kind: hamlet
+    display_name_zh: 萍塘
+    description: Hamlet by a duckweed pond above the imperial river, on the capital to imperial ferry road.
+    cell:
+      cell_x: 1987
+      cell_y: 1165
+    geographic_constraint: Duckweed pond above the imperial river on the capital road
+    scene_archetype:
+  hamlet_channel_beach:
+    kind: hamlet
+    display_name_zh: 渠汀
+    description: Hamlet on a channel beach of the starglow road, below the imperial ferry city.
+    cell:
+      cell_x: 2016
+      cell_y: 1018
+    geographic_constraint: Channel beach of the imperial river on the starglow road
+    scene_archetype:
+  hamlet_saddle_hollow:
+    kind: hamlet
+    display_name_zh: 鞍坳
+    description: Hamlet on the low saddle between the imperial river and the west tributary, on the spur road below the ferry city.
+    cell:
+      cell_x: 1975
+      cell_y: 1112
+    geographic_constraint: Low saddle between the imperial river and the west tributary on the channel spur
+    scene_archetype:
+  hamlet_shore_farm:
+    kind: hamlet
+    display_name_zh: 汀莊
+    description: Hamlet on the north bank of the imperial west tributary, off the channel spur road.
+    cell:
+      cell_x: 1934
+      cell_y: 1164
+    geographic_constraint: North bank of the imperial west tributary, off the roads
+    scene_archetype:
+  hamlet_willow_dike:
+    kind: hamlet
+    display_name_zh: 柳堤
+    description: Hamlet behind a willow dike of the imperial river, off the capital road.
+    cell:
+      cell_x: 1942
+      cell_y: 1280
+    geographic_constraint: Willow dike of the imperial river below the capital
+    scene_archetype:
+  hamlet_bulrush_dike:
+    kind: hamlet
+    display_name_zh: 蒲堤
+    description: Hamlet on a bulrush dike of the imperial river, off the capital road.
+    cell:
+      cell_x: 1950
+      cell_y: 1244
+    geographic_constraint: Bulrush dike of the imperial river below the capital
+    scene_archetype:
+  hamlet_lotus_pond:
+    kind: hamlet
+    display_name_zh: 藕塘
+    description: Hamlet by a lotus pond on the open plain east of the hemp village.
+    cell:
+      cell_x: 1998
+      cell_y: 1500
+    geographic_constraint: Lotus pond on the plain between hemp plain and grain hollow
+    scene_archetype:
+  hamlet_caltrop_shore:
+    kind: hamlet
+    display_name_zh: 菱浦
+    description: Hamlet on a water caltrop shore of the east coast river, off the reed shore road.
+    cell:
+      cell_x: 2138
+      cell_y: 1516
+    geographic_constraint: Water caltrop shore of the east coast river
+    scene_archetype:
+  hamlet_reed_pond:
+    kind: hamlet
+    display_name_zh: 葦塘
+    description: Hamlet by a reed pond on the tidal meadow, off the sunrise road.
+    cell:
+      cell_x: 2414
+      cell_y: 1520
+    geographic_constraint: Reed pond on the tidal meadow of the east coast river
+    scene_archetype:
