@@ -34,4 +34,4 @@ None.
 ## Batch:
 
 - depends-on: place-card-instrument-panel
-- conflicts: imports `components/instrument-panel.css` created by `place-card-instrument-panel`; adds methods to `web/tests/browser/test_browser_map_column_instruments.py` and appends to `.github/browser-shards.json` like `objective-tracker-instrument-panel`, and both edit `tests/overlays/objective_tracker_integration.test.js`. Land it third, before `objective-tracker-instrument-panel`.
+- conflicts: imports `components/instrument-panel.css` created by `place-card-instrument-panel`; adds methods to `web/tests/browser/test_browser_map_column_instruments.py` and appends to `.github/browser-shards.json` like `objective-tracker-instrument-panel`, and both edit `tests/overlays/objective_tracker_integration.test.js` and `web/tests/browser/test_browser_contextual_hud_stage.py`. Land it third, before `objective-tracker-instrument-panel`.
