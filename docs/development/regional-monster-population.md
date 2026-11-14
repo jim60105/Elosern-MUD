@@ -2610,7 +2610,7 @@ a gate; the tests use synthetic registries.
   birth binding to a distant area, equal rectangles in different regions, a
   reversed registry order that resolves identically, the residual unit, and the
   live birth/site link readers over patched synthetic registries.
-- `UnitResolutionFixture` -- a group inside its zone touches exactly that unit;
+- `UnitResolutionTests` -- a group inside its zone touches exactly that unit;
   an escaped member's position links two zones and the closure of either holds
   both; a journey's endpoints do the same until arrival; a room and an uncovered
   published cell are residual; an unknown site is residual.

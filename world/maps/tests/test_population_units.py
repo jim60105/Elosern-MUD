@@ -7,8 +7,8 @@ and cursor scenarios use the file-local synthetic activity rows of
 ``test_monster_activity``. No test asserts wall-clock time or hardware speed:
 the assertions are unit identifiers, exact cursor values and state equality.
 
-The delta requirements of this change have no canonical identifier until the
-archive sync, so these tests carry no ``covers_requirement`` annotation yet.
+Each test claims the canonical identifier of the requirement and scenario its
+assertions establish.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from fractions import Fraction
 from types import MappingProxyType
 from unittest import TestCase
 from unittest.mock import patch
+
+from tools.spec_traceability import covers_requirement
 
 import world.lore.monster_activity as lore_activity
 import world.lore.monster_placement as lore_placement
@@ -106,6 +108,9 @@ def _area(
 class AuthoredGeometryTests(TestCase):
     """Authored zones and areas resolve to units without reading the database."""
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_disjoint_zones_resolve_to_two_units(self):
         index = build_unit_index(
             {
@@ -123,6 +128,9 @@ class AuthoredGeometryTests(TestCase):
         self.assertEqual(index.unit_of_cell(REGION, (5, 5)), west)
         self.assertEqual(index.unit_of_cell(REGION, (25, 5)), east)
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_an_area_that_overlaps_two_zones_bridges_them(self):
         index = build_unit_index(
             {
@@ -138,6 +146,9 @@ class AuthoredGeometryTests(TestCase):
         self.assertEqual(index.unit_of_cell(REGION, (5, 5)), unit)
         self.assertEqual(index.unit_of_cell(REGION, (25, 5)), unit)
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_birth_binding_links_a_zone_to_a_distant_area(self):
         zone = _zone(
             "t_zone",
@@ -157,6 +168,9 @@ class AuthoredGeometryTests(TestCase):
             index.unit_of_cell(REGION, (105, 105)),
         )
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_equal_rectangles_in_different_regions_are_two_units(self):
         index = build_unit_index(
             {
@@ -179,6 +193,9 @@ class AuthoredGeometryTests(TestCase):
             index.unit_of_cell(OTHER_REGION, (5, 5)), "zone:t_zone_there"
         )
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_resolution_is_stable_when_the_registries_are_reversed(self):
         zones = {
             "t_zone_a": _zone("t_zone_a", rectangles=((0, 9, 0, 9),)),
@@ -205,6 +222,9 @@ class AuthoredGeometryTests(TestCase):
                 backward.unit_of_cell(REGION, cell),
             )
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_a_room_and_an_uncovered_cell_are_the_residual_unit(self):
         index = build_unit_index(
             {"t_zone": _zone("t_zone", rectangles=((0, 9, 0, 9),))}, {}, {}
@@ -215,6 +235,9 @@ class AuthoredGeometryTests(TestCase):
         self.assertEqual(index.unit_of_cell(REGION, (500, 500)), RESIDUAL_UNIT)
         self.assertEqual(index.unit_of_cell(OTHER_REGION, (5, 5)), RESIDUAL_UNIT)
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_zone_bound_areas_read_birth_bindings_from_the_registries(self):
         zone = _zone(
             "t_zone",
@@ -302,6 +325,9 @@ class AuthoredGeometryTests(TestCase):
             # A site whose cell lies inside the zone joins through the zone.
             self.assertEqual(site_area_links(), ())
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_a_site_outside_every_zone_joins_its_own_areas(self):
         composition = EncounterComposition(
             "t_site_composition",
@@ -379,7 +405,7 @@ class AuthoredGeometryTests(TestCase):
             self.assertEqual(index.unit_of_area["t_area_a"], "area:t_area_a")
 
 
-class UnitResolutionFixture(ActivityFixture):
+class UnitResolutionTests(ActivityFixture):
     """Two disjoint synthetic zones inside the real published probe region."""
 
     def setUp(self):
@@ -454,6 +480,9 @@ class UnitResolutionFixture(ActivityFixture):
         x, y = candidate
         return x_min <= x <= x_max and y_min <= y <= y_max
 
+    @covers_requirement(
+        "population-settlement-units::a-group-s-units-and-unit-closures-are-derived-from-live-state"
+    )
     def test_a_group_inside_its_zone_touches_exactly_that_unit(self):
         group_id, _bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
         state = read_monster_activity(self.wilderness)
@@ -466,6 +495,9 @@ class UnitResolutionFixture(ActivityFixture):
             frozenset({self.unit_a}),
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-group-s-units-and-unit-closures-are-derived-from-live-state"
+    )
     def test_an_escaped_member_links_two_units(self):
         group_id, _bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
         state = read_monster_activity(self.wilderness)
@@ -490,6 +522,9 @@ class UnitResolutionFixture(ActivityFixture):
             frozenset({self.unit_a, self.unit_b}),
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-group-s-units-and-unit-closures-are-derived-from-live-state"
+    )
     def test_journey_endpoints_touch_both_units_until_arrival(self):
         group_id, bodies = self._group(cell=PROBE, owner_key="t_units_zone_a")
         state = read_monster_activity(self.wilderness)
@@ -529,6 +564,9 @@ class UnitResolutionFixture(ActivityFixture):
             frozenset({self.unit_a, self.unit_b}),
         )
 
+    @covers_requirement(
+        "population-settlement-units::authored-geometry-resolves-to-settlement-units"
+    )
     def test_a_room_and_an_uncovered_cell_are_the_residual_unit(self):
         self.assertEqual(
             unit_of_location(self.index, LocationRef.room(1)), RESIDUAL_UNIT
@@ -564,6 +602,9 @@ class UnitResolutionFixture(ActivityFixture):
 class UnitCursorTests(ActivityFixture):
     """Each unit records its settled-through tick and refuses a bad record."""
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_fresh_provisioning_records_the_provisioning_tick(self):
         for attribute in (
             regional_population.POPULATION_SEED_ATTRIBUTE,
@@ -578,6 +619,9 @@ class UnitCursorTests(ActivityFixture):
         for unit_id in ("zone:t_any_zone", "area:t_any_area", RESIDUAL_UNIT):
             self.assertEqual(unit_cursor(cursors, unit_id), 100)
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_a_pass_records_its_endpoint_for_every_unit(self):
         self.assertEqual(read_unit_cursors(self.wilderness).default, 0)
         settle_population_lifecycle(100, 260)
@@ -586,6 +630,9 @@ class UnitCursorTests(ActivityFixture):
         self.assertEqual(unit_cursor(cursors, "zone:t_any_zone"), 260)
         self.assertEqual(unit_cursor(cursors, RESIDUAL_UNIT), 260)
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_explicit_units_advance_without_moving_the_default(self):
         write_unit_cursors(self.wilderness, UnitCursors(50, {}))
         advance_unit_cursors(self.wilderness, ("zone:t_one",), 80)
@@ -608,6 +655,9 @@ class UnitCursorTests(ActivityFixture):
         self.assertEqual(unit_cursor(cursors, "zone:t_one"), 90)
         self.assertEqual(unit_cursor(cursors, "zone:t_two"), 70)
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_a_later_stage_failure_restores_the_record(self):
         self._register_lifecycle()
         settle_population_lifecycle(0, 100)
@@ -639,6 +689,9 @@ class UnitCursorTests(ActivityFixture):
         self.wilderness.attributes.reset_cache()
         self.assertEqual(read_unit_cursors(self.wilderness).default, 100)
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_a_missing_or_malformed_record_refuses_and_rewrites_nothing(self):
         cases = (
             [],
@@ -670,6 +723,9 @@ class UnitCursorTests(ActivityFixture):
                     case,
                 )
 
+    @covers_requirement(
+        "population-settlement-units::each-unit-records-its-settlement-progress"
+    )
     def test_a_pass_over_a_missing_or_malformed_record_refuses_before_settling(self):
         timeline_tick = read_population_timeline(self.wilderness).settled_through_tick
         activity_tick = read_monster_activity(self.wilderness).settled_through_tick
