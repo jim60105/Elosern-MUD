@@ -260,6 +260,7 @@ class MapColumnInstrumentBrowserTest(BrowserAcceptanceTest):
                     page.evaluate(_REMOVE_PROBE_JS)
 
     @covers_requirement(
+        "webclient-contextual-hud::an-instrument-panel-wears-a-feathered-ground-and-one-brass-fitting-instead-of-a-box",
         "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
     )
     def test_place_card_is_an_instrument_panel(self):

@@ -1885,7 +1885,7 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 
 #### Scenario: The card wears island chrome at a fixed size
 - **WHEN** the card renders
-- **THEN** it wears the HUD island chrome (the translucent panel fill, the backdrop blur, the hairline border, the shared radius and shadow, all from the shared design tokens), spans the same content-column width as the minimap island beneath it, keeps a fixed height whatever the label lengths, and truncates a label that exceeds its width with an overflow indicator while keeping the full label as its accessible text
+- **THEN** it is an instrument panel as "An instrument panel wears a feathered ground and one brass fitting instead of a box" defines (no border, radius, shadow or opaque fill of its own), spans the full width of the `map` column, keeps a fixed height whatever the label lengths, and truncates a label that exceeds its width with an overflow indicator while keeping the full label as its accessible text
 
 #### Scenario: The card is display-only
 - **WHEN** the card renders outside exploration, or while the exploration panel is unavailable
@@ -1893,7 +1893,7 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 
 #### Scenario: The two values read on two levels
 - **WHEN** the card renders heading and time
-- **THEN** it sets them on two levels: the location heading in the serif face at the `--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the world-time line; the heading, the rule, and the time line fit the card's fixed height
+- **THEN** it sets them on two levels: the location heading in the serif face at the `--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the world-time line; the heading, the rule, and the time line fit the card's fixed height; the heading and the time line align their text to the right, toward the panel's spine, and the rule stands at the right end of the card's content box, whether or not the room actions render
 
 #### Scenario: The time line keeps every server value intact
 - **WHEN** the world-time line renders
@@ -1905,7 +1905,7 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 
 #### Scenario: The card heads the map column
 - **WHEN** the shell renders in exploration mode with a committed `local_map` panel
-- **THEN** the place card is the first island of the `map` anchor, its rendered width equals the minimap island's rendered width, and the stage renders no place card in its left column
+- **THEN** the place card is the first island of the `map` anchor, its rendered width equals the `map` anchor's width (±1px), and the stage renders no place card in its left column
 
 #### Scenario: The card names the region, not the raw room key
 - **WHEN** the player stands in a wilderness cell whose status location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
@@ -1936,6 +1936,14 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 #### Scenario: The card is absent in combat
 - **WHEN** the committed mode changes from exploration to combat, and later back
 - **THEN** in combat the place card is not rendered (`display:none`, outside the accessibility tree) while it keeps its committed location and time, and on the return it renders again as the first island of the `map` anchor
+
+#### Scenario: The room actions wear no chrome
+- **WHEN** the card carries its room actions
+- **THEN** the 查看房間 and 休息 buttons have no border and no background fill of their own, each keeps a hit box at least 30px × S tall and wide, the 休息 button keeps its visible word beside its icon, and only the hovered or keyboard-focused button shows the active brass tick beneath it while every other button shows none
+
+#### Scenario: The room actions stand clear of the spine
+- **WHEN** the card carries its room actions at 1280x720, 1451x790 and 2560x1440
+- **THEN** each button's right edge stands at least 14px × S left of the card's right edge, and the heading's accessible name is still never truncated by the buttons
 
 ### Requirement: Text speed and auto-advance are client-local reading preferences the settings surface owns
 The settings surface's reading section SHALL offer a text-speed control with the four steps `慢` (`slow`), `標準` (`normal`), `快` (`fast`), and `瞬間` (`instant`), and an auto-advance toggle (`自動翻頁`). The text speed SHALL default to `normal` and auto-advance SHALL default to off.
@@ -2309,7 +2317,7 @@ The stage SHALL animate the committed changes below, taking every duration and d
 
 #### Scenario: A new location label slides in
 - **WHEN** a new location label commits, and when the world time alone changes
-- **THEN** the place card's heading slides in from the left and fades in while the previous heading fades out, and a world-time-only change does not animate
+- **THEN** the place card's heading slides in from the right, the column's anchored edge, and fades in while the previous heading fades out, and a world-time-only change does not animate
 
 #### Scenario: A new current node pans the minimap
 - **WHEN** a new current node commits on a coordinate-bearing island
@@ -2338,8 +2346,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
 #### Scenario: The place card slides in the new location
 - **WHEN** the effective level is `full` and a move commits a new location label, and later only the
   world time changes
-- **THEN** the new heading enters from the left with a fade while the old heading fades out, and the
-  time-only change swaps the time line with no transition
+- **THEN** the new heading enters from the right with a fade (its horizontal offset is positive while it
+  travels) while the old heading fades out, and the time-only change swaps the time line with no transition
 
 #### Scenario: The minimap pans to the new node
 - **WHEN** effective motion is full and an adjacent move commits with unchanged coordinate-bearing island level and mode
@@ -3326,3 +3334,22 @@ The `map` anchor SHALL be as wide as the right column minus 28px × S and never 
 #### Scenario: Content changes update the fade without a scroll
 - **WHEN** a surface mounts into or unmounts from the anchor, or a surface changes height, with no scroll event
 - **THEN** the masked edges are recomputed for the new content height, so a column that starts to overflow gains its bottom fade and a column that comes to fit loses every fade
+
+### Requirement: An instrument panel wears a feathered ground and one brass fitting instead of a box
+A HUD surface that its own requirement names an instrument panel SHALL have no border, corner radius, box shadow or opaque fill of its own. Beneath its content it SHALL paint a blurred ink ground that feathers out toward its open sides and one brass fitting along its anchored edges, both decoration outside the accessibility tree and pointer hit-testing, and its content SHALL stay clear of the fitting's spine.
+
+#### Scenario: The panel itself is not a box
+- **WHEN** an instrument panel renders in the live client
+- **THEN** its own computed border widths are 0, its corner radius is 0, its box shadow is `none` and its background colour is transparent
+
+#### Scenario: The ground and the fitting are painted decoration
+- **WHEN** an instrument panel in the `map` column renders
+- **THEN** a layer beneath its content paints the shared panel ink with a backdrop blur and a mask that keeps it solid at the right edge and fades it toward the left edge and over the bottom edge, and a second layer paints the band ornament at the top-right corner with a crown along the top and a spine down the right side; neither layer is an element in the accessibility tree and neither receives pointer events
+
+#### Scenario: Content never crosses the spine
+- **WHEN** an instrument panel in the `map` column renders its content at 1280x720, 1451x790 and 2560x1440
+- **THEN** every content element's right edge stands at least 14px × S left of the panel's right edge, which is where the spine runs
+
+#### Scenario: One token change reaches every panel
+- **WHEN** the shared panel ink, the band ornament or the band edge tokens change
+- **THEN** every instrument panel's ground and fitting change with them, because each panel resolves them from the shared design tokens rather than from per-component literals
