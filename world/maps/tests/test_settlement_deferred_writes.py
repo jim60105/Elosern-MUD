@@ -9,9 +9,9 @@ changes.
 
 Every scenario is synthetic, and every assertion is deterministic: state
 equality, named failures and statement/call counts, never wall-clock time or
-hardware speed. The tests of the delta's ADDED requirements carry no
-``covers_requirement`` annotation until archive sync assigns their canonical
-IDs.
+hardware speed. Each behaviour test carries the ``covers_requirement``
+annotation of the requirement it establishes, using the canonical identifier
+archive sync assigns.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ from evennia.objects.models import ObjectDB
 from evennia.typeclasses.attributes import Attribute
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
+
+from tools.spec_traceability import covers_requirement
 
 from typeclasses.monsters import Monster
 
@@ -158,6 +160,9 @@ class DeferredBufferTests(EvenniaTest):
         self.attribute = self.holder.attributes.get("probe", return_obj=True)
         self.attribute_id = int(self.attribute.pk)
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_a_deferred_value_reads_new_and_stays_unstored(self):
         self.assertFalse(surfaces.attribute_stores_deferred())
         with CaptureQueriesContext(connection) as queries:
@@ -175,6 +180,7 @@ class DeferredBufferTests(EvenniaTest):
             {self.attribute_id: 1},
         )
 
+    @covers_requirement("world-clock::a-failed-pass-stores-nothing-it-deferred")
     def test_a_failed_buffer_restores_the_original_and_stores_nothing(self):
         with self.assertRaises(ZeroDivisionError):
             with CaptureQueriesContext(connection) as queries:
@@ -189,6 +195,7 @@ class DeferredBufferTests(EvenniaTest):
             {self.attribute_id: 0},
         )
 
+    @covers_requirement("world-clock::a-failed-pass-stores-nothing-it-deferred")
     def test_a_pending_value_lost_before_the_store_fails_closed(self):
         pending = self.attribute
         with self.assertRaises(DeferredStoreLost) as caught:
@@ -204,6 +211,9 @@ class DeferredBufferTests(EvenniaTest):
         self.assertEqual(self.holder.db.probe, {"count": 0})
         self.assertIn("probe", str(caught.exception))
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_a_flush_stores_now_and_then_resumes_buffering(self):
         with deferred_attribute_stores():
             store_attribute(self.holder, "probe", {"count": 1})
@@ -227,6 +237,9 @@ class DeferredBufferTests(EvenniaTest):
             self.assertEqual(surfaces._DEFERRED.pending, {})
         self.assertEqual(self.holder.db.fresh, {"count": 4})
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_a_nested_buffer_reuses_the_open_one(self):
         with CaptureQueriesContext(connection) as queries:
             with deferred_attribute_stores():
@@ -359,6 +372,9 @@ class StatementBoundTests(_PassScenarioFixture):
             label: counts[attribute_id] for label, attribute_id in rows.items()
         }
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_statements_do_not_grow_with_boundary_ticks(self):
         ticks = self._boundary_ticks(START + 4000)
         self.assertGreaterEqual(len(ticks), 7, "the discovery interval is long enough")
@@ -414,6 +430,9 @@ class PendingVisibilityTests(_PassScenarioFixture):
         self.assertEqual(len(arrivals), 1, "the journey arrives exactly once")
         return arrivals[0]
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_readers_see_pending_values(self):
         arrival_tick = self._arrival_tick()
         _group_id, bodies = self._build_travelling_world()
@@ -466,6 +485,9 @@ class PendingVisibilityTests(_PassScenarioFixture):
             len(observed["timeline"].transitions),
         )
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_the_contact_block_starts_from_stored_state(self):
         arrival_tick = self._arrival_tick()
         _group_id, bodies = self._build_travelling_world()
@@ -505,6 +527,7 @@ class PendingVisibilityTests(_PassScenarioFixture):
         self.assertEqual(observed["reserve_after_in_block_write"], RESERVE - 1000)
         self.assertEqual(read_optional_fatigue_state(body).reserve_units, RESERVE - 1000)
 
+    @covers_requirement("world-clock::a-failed-pass-stores-nothing-it-deferred")
     def test_a_fault_after_the_contact_flush_restores_every_surface(self):
         arrival_tick = self._arrival_tick()
         _group_id, bodies = self._build_travelling_world()
@@ -538,6 +561,9 @@ class ZoneCacheInvalidationTests(ScenarioSettlementFixture):
         super().setUp()
         self._register_lifecycle()
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_a_zone_state_write_invalidates_the_decode_caches(self):
         self._build_scenario()
         regional_population._state_map(self.wilderness)
@@ -554,6 +580,7 @@ class ZoneCacheInvalidationTests(ScenarioSettlementFixture):
 class FaultAfterDeferredWritesTests(_PassScenarioFixture):
     """A fault after deferred writes stores none of them."""
 
+    @covers_requirement("world-clock::a-failed-pass-stores-nothing-it-deferred")
     def test_a_fault_after_deferred_writes(self):
         _group_id, bodies = self._build_travelling_world()
         wilderness = self.wilderness
@@ -654,6 +681,9 @@ class GaugeRecordStoreTests(ActivityFixture):
             for key in GAUGE_KEYS
         }
 
+    @covers_requirement(
+        "world-clock::gauge-regeneration-stores-a-body-s-trait-record-once-per-settlement"
+    )
     def test_three_regenerating_gauges(self):
         self._reset_activity(tick=START)
         _group_id, bodies = self._group(
@@ -742,6 +772,9 @@ class DifferentialDeferredWritesTests(ScenarioSettlementFixture):
         )
         return in_memory
 
+    @covers_requirement(
+        "world-clock::a-lifecycle-pass-inside-an-advance-stores-each-written-record-once"
+    )
     def test_results_are_unchanged(self):
         partitions = ((1500,), (700, 800), (61, 1439))
         projections = {
