@@ -52,10 +52,10 @@ uv run --locked python -m unittest tests.test_map_authoring_contract
 uv run --locked python -m tools.contract_gate
 ```
 
-`tools.settlement_spacing` reads the map sources, the road artifact, the lore
-join and `tools/settlement_spacing_areas.json` and writes nothing. It prints
-one line per problem and then a summary; it exits 0 with no problem, 1 with any,
-and 2 when one of those inputs does not load.
+`tools.settlement_spacing` reads the map sources, the road artifact and the
+lore join, and writes nothing. It prints one line per problem and then a
+summary; it exits 0 with no problem, 1 with any, and 2 when one of those
+inputs does not load.
 
 The three `settlement_synthesis` commands read the workspace and write nothing.
 `site` and `budget` print JSON. `lint` prints one line per finding and then a
