@@ -1,0 +1,49 @@
+version: 1
+kind: settlement
+id: hamlet_ridge_edge
+location_ref: hamlet_ridge_edge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 100
+    y_m: 200
+    prototype_parent: anchor_room
+    key: 嶺邊岔路
+    desc: 岔路貼著稜線的邊緣，往北的路一路爬升到鹽道城，往南則順著山勢落回南谷。風從谷裡吹上來，帶著濕氣。
+    anchor_key: hamlet_ridge_edge
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 農舍前
+    desc: 農舍前搭了一個遮雨的棚子，屋旁拴著一頭馱騾。屋主說這條路坡長，過路的商隊多半在此餵牲口。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: s
+- source: homestead_front
+  destination: crossing
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: s
+    destination_node: crossing
+  - return_direction: n
+    destination_node: homestead_front
+city_gate:

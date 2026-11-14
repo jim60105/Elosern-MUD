@@ -94,11 +94,36 @@ Ground rules:
   name the crossing and the single farmstead; each entrance names the direction
   or the neighbour it leads to, and no shop, guild branch or service is
   presented as usable.
-- [ ] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
+- [x] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
+
+  Result: `algorithm_version`, `fingerprint`, `frame_cells`, `nodes`, `roads`
+  and `version` are unchanged; only `source_signature` differs.
 
 ## 5. Validation and hand-off
 
 - [ ] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
+
+  Result: the area entry is in place; `check_map_sources.py` exits 0 and
+  `settlement_synthesis lint` prints `fit: 0 errors, 0 warnings`. Enabling the
+  area surfaced three road gaps that cross the boundary into the earlier
+  `western_hills_valleys` area — the case design D2 names. Five boundary
+  hamlets close two of them: `hamlet_ridge_edge` (1024, 420) and
+  `hamlet_hillside` (1028, 477) split `city_salt_road--town_honey_vale`
+  (175.9 km into 58.7 / 58.6 / 58.6); `hamlet_ridge_waist` (351, 544),
+  `hamlet_mid_vale` (302, 593) and `hamlet_flat_meadow` (249, 646) sit on the
+  earlier side of the boundary under the D2 exception and split
+  `city_salt_ferry--port_west_ore` (288.2 km into 72.3 / 69.3 / 74.9 / 71.5).
+  The third gap, `city_confluence--town_olive_ferry` (455, 540) to
+  (454, 448), stays at 138.9 km: it is not closable by any legal site. A
+  split of a 138.9 km gap into two gaps of at most 75 km must fall between
+  397.0 and 408.1 km along the road, and of the eleven cells in that window
+  three lie 1.0 to 2.2 km from `city_salt_ferry` (hamlet minimum 15 km) and
+  the other eight lie inside a monster habitat (D3 rule 4). The road runs
+  past the city without touching its cell, so the city's own position never
+  splits the gap. `spacing` therefore reports `1 problems` until a decision
+  outside this change's file list is taken: either a `spacing_exemption`
+  with a design reason (D7 forbids one without it) or marking national
+  settlements in `tools/settlement_spacing`, which is a validator change.
 - [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 - [ ] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 - [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate altoria-coast-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.

@@ -269,6 +269,11 @@ ANCHOR_LORE: dict[str, AnchorLore] = {
     "hamlet_stream_head": AnchorLore("altoria", 200, None),
     "hamlet_stream_tail": AnchorLore("altoria", 130, None),
     "hamlet_tide_sound": AnchorLore("altoria", 100, None),
+    "hamlet_ridge_waist": AnchorLore("altoria", 150, None),
+    "hamlet_mid_vale": AnchorLore("altoria", 130, None),
+    "hamlet_flat_meadow": AnchorLore("altoria", 110, None),
+    "hamlet_ridge_edge": AnchorLore("altoria", 140, None),
+    "hamlet_hillside": AnchorLore("altoria", 120, None),
 }
 
 

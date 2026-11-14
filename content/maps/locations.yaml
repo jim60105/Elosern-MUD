@@ -1671,3 +1671,48 @@ locations:
       cell_y: 108
     geographic_constraint: North shore plain between the tide port and the cogongrass flats
     scene_archetype:
+  hamlet_ridge_waist:
+    kind: hamlet
+    display_name_zh: 嶺腰
+    description: Hamlet on the waist of a hill ridge, on the road from the salt ferry to the west ore port.
+    cell:
+      cell_x: 351
+      cell_y: 544
+    geographic_constraint: Hill ridge on the road from the salt ferry to the west ore port
+    scene_archetype:
+  hamlet_mid_vale:
+    kind: hamlet
+    display_name_zh: 谷中
+    description: Hamlet in the middle of a valley on the road between the salt ferry and the west ore port.
+    cell:
+      cell_x: 302
+      cell_y: 593
+    geographic_constraint: Valley floor on the road between the salt ferry and the west ore port
+    scene_archetype:
+  hamlet_flat_meadow:
+    kind: hamlet
+    display_name_zh: 坪埔
+    description: Hamlet on a flat meadow above the western ore port.
+    cell:
+      cell_x: 249
+      cell_y: 646
+    geographic_constraint: Flat meadow above the western ore port
+    scene_archetype:
+  hamlet_ridge_edge:
+    kind: hamlet
+    display_name_zh: 嶺邊
+    description: Hamlet on the edge of a ridge south of the salt city.
+    cell:
+      cell_x: 1024
+      cell_y: 420
+    geographic_constraint: Ridge edge on the hill road south of the salt city
+    scene_archetype:
+  hamlet_hillside:
+    kind: hamlet
+    display_name_zh: 山腰
+    description: Hamlet on the hillside where the hill road climbs from the south vale.
+    cell:
+      cell_x: 1028
+      cell_y: 477
+    geographic_constraint: Hillside on the climb from the south vale to the honey vale
+    scene_archetype:
