@@ -27,6 +27,7 @@ from django.test.utils import CaptureQueriesContext
 
 from typeclasses.monsters import Monster
 
+from world.maps import gm as map_gm
 from world.maps import monster_activity, population_units, regional_population
 from world.maps.monster_activity import create_group
 from world.maps.tests._settlement_projection import (
@@ -217,6 +218,28 @@ class ScopedEnumerationTests(ReadNarrowingFixture):
         self.assertIn(int(owner.pk), counts.home_ids)
         self.assertIn(int(owner.pk), narrow)
         self.assertFalse(self.far_living_ids() & set(narrow))
+
+    def test_a_removed_registration_key_is_skipped_by_the_scoped_read(self):
+        self._build_scenario()
+        place_player(self, WANDER_A)
+        removed = self.registered_owner(CELLS_A[6])
+        removed_pk = int(removed.pk)
+        # The operator removal deletes the row and records the loss; the
+        # coordinate registration keeps its key until the next map write.
+        self.assertTrue(map_gm.delete_entity(f"#{removed_pk}")["deleted"])
+        self.assertIsNone(removed.pk)
+        registration = regional_population._coordinate_registration(self.wilderness)
+        self.assertTrue(any(key is removed for key in registration))
+        scope = self.observed_scope()
+        self.assertNotIn(removed_pk, self.scoped_presence(scope))
+        # The observed pass still settles the interval after the removal.
+        self.advance(60)
+        self.assertEqual(
+            population_units.unit_cursor(
+                population_units.read_unit_cursors(self.wilderness), self.unit_a
+            ),
+            START + 60,
+        )
 
 
 class UnchangedOutcomeTests(ReadNarrowingFixture):

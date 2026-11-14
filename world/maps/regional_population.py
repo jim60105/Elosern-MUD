@@ -781,8 +781,10 @@ def _scope_living_monsters(wilderness: Any, scope: Any) -> tuple[Monster, ...]:
 
     Liveness and order stay the whole-world ones (stored HP over the family
     rows, sorted by persistent ID), so a narrower roster never reorders or
-    reinterprets an individual it shares with the whole-world pass. The
-    registration scan is pure cell lookups: it reads no row.
+    reinterprets an individual it shares with the whole-world pass. The stored
+    map is unpacked once (the same view :func:`actual_cell` reads) and a key
+    whose row an operator removal deleted is skipped, so the scan adds no row
+    read per covered cell.
     """
     from world.maps import monster_activity, population_units
 
@@ -797,9 +799,15 @@ def _scope_living_monsters(wilderness: Any, scope: Any) -> tuple[Monster, ...]:
         for entity, stored in registration.items():
             if not isinstance(entity, Monster):
                 continue
+            # A removed individual keeps its registration key until the next
+            # map write; its row is gone, so the scan skips it exactly as the
+            # live population view skips a revoked instance.
+            pk = getattr(entity, "pk", None)
+            if pk is None:
+                continue
             cell = coordinate_pair(stored)
             if cell is not None and scope.covers_cell(cell):
-                ids.add(int(entity.pk))
+                ids.add(int(pk))
     if not ids:
         return ()
     return tuple(
