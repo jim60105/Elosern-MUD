@@ -222,13 +222,13 @@ shops:
 依順序跑最小聚焦集：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.lore.tests.test_items \
   world.rules.tests.test_item_use \
   world.rules.tests.test_equipment_toggle \
   world.rules.tests.test_equipment_effect_rulebook \
   world.rules.tests.test_shop_economy
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb commands.tests.test_items
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb commands.tests.test_items
 ```
 
 測試該涵蓋的內容，照既有前例辦：新物品的構造通過 registry 驗證（`world/lore/tests/test_items.py`）、可行為的 preflight 分支（如 `hp_full`、飾品達五件上限）、交易價格帶驗證。驗證完成後跑可追溯性門檻：

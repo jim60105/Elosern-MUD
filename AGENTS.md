@@ -11,6 +11,97 @@ feature work. It is the architectural source of truth for every OpenSpec change;
 if a change conflicts with it, the design document wins unless the change
 explicitly amends the design.
 
+## Start here
+
+### Commands that always work
+
+Copy these exactly; replace only the `<...>` part.
+
+| Purpose | Command |
+| --- | --- |
+| One non-browser test module, class or method (`commands`, `server`, `typeclasses`, `world`, `web/webclient`, `web/gm`) | `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb <dotted.label>` |
+| One repository-wide module under `tests/` | `uv run --locked python -m unittest tests.<module>` |
+| One browser test (run `pnpm run build` first if any JS or Vue source changed) | `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.<file>.<Class>.<method>` |
+| Vue component suite / one file | `pnpm test` / `pnpm exec vitest run <path>` |
+| Dependency-free Node gate | `node --test web/static/webclient/js/tests/*.test.js` |
+| Give a new, renamed, moved or deleted test its CI owner | `uv run --locked python -m tools.shard_register fix` |
+| All cheap contracts before handoff (about 30 s; prints the repair for each failure) | `uv run --locked python -m tools.contract_gate` |
+| Validate one OpenSpec change | `openspec validate <change> --strict` |
+
+A hook (the Evennia test guard) inspects every shell command and blocks the
+ones it cannot bound. It is deliberate: never work around it.
+
+- Run a test command alone. Nothing may follow it: no `|`, `>`, `;`, here-doc,
+  `$(...)` or `&`. Only `cd <dir> &&` may precede it. The tool already returns
+  the output, so there is nothing to redirect.
+- Never put a test command inside a script, `python -c`, `bash -c` or any other
+  wrapper program.
+- One command may discover at most 100 tests. Narrow the label instead of
+  splitting a big run into batches.
+- The guard also reads commands that only mention a test invocation (an `echo`,
+  `printf` or here-doc that writes such text). Create those files with the
+  file-writing tool, not the shell.
+- `.env.evennia-test` is the committed opt-in file. Do not create another one;
+  a task list that names `/tmp/mud-test.env` means this file.
+
+### Where to work
+
+Read the named guide before touching the directory. A package guide lists the
+modules by task, so you do not have to read the package to find the owner.
+
+| Task | Read first | Code and data |
+| --- | --- | --- |
+| A game rule or any state change | `world/rules/AGENTS.md` | `world/rules/`, numbers in `world/rules/rulebook/*.yaml` |
+| An item, spell, monster, NPC or player preset | `docs/development/adding-items.md`, `adding-spells.md`, `adding-monsters.md`, `adding-npcs.md`, `adding-player-presets.md` | `world/lore/`, `world/skills/registry/` |
+| NPC dialogue, voice lines, persona cards | `.agents/skills/npc-dialogue-content/SKILL.md` | named in the skill |
+| Map, settlement or interior data | `.agents/skills/map-data-authoring/SKILL.md`, `world/maps/AGENTS.md` | `content/maps/` |
+| Monster population, sites, field behaviour | `world/maps/AGENTS.md`, `docs/development/regional-monster-population.md`, `monster-field-behaviour.md` | `world/maps/`, `world/lore/monster_*.py` |
+| Quests | `docs/gm/quests.md`, `docs/development/quest-generation-modes.md` | `world/quests/` |
+| An LLM layer or a prompt | `world/ai/AGENTS.md`, `docs/development/llm-architecture.md` | `world/ai/`, `world/prompts/`, `prompts/` |
+| Memory, recall, threads, dreams, letters | `world/narrative/AGENTS.md`, `docs/development/narrative-memory-and-recall.md` | `world/narrative/` |
+| A player text command | the command-documentation rule below | `commands/`, `docs/game/commands.md`, `docs/game/command-reference.md` |
+| A webclient panel or UI action (server side) | `docs/development/webclient-synchronization.md` | `web/webclient/presentation/` (one module per panel), `web/webclient/actions/` (one module per action family, allowlisted in `registry.py`) |
+| Webclient UI (Vue) | `web/webclient-app/AGENTS.md`, `docs/development/frontend-developer-guide.md` | `web/webclient-app/` |
+| A browser acceptance test | `web/tests/browser/AGENTS.md` | `web/tests/browser/` |
+| GM portal | `docs/development/gm-portal-runtime-inspection.md`, `gm-portal-world-data.md`, `gm-portal-saves.md` | `web/gm/`, `web/admin-app/`, `server/console/` |
+| Settings and environment variables | `docs/development/settings-and-environment.md` | `server/conf/settings.py`, `.env.example` |
+| Writing or restructuring tests | `docs/development/evennia-testing-guide.md` | `<package>/tests/`, `world/tests/synthetic_data/` |
+
+`world/README.md` maps every package under `world/` to its ownership role.
+
+### When something fails
+
+| Symptom | What to do |
+| --- | --- |
+| "Evennia test guard blocked this command" | Re-run the bare command from the table above, with nothing before or after it. |
+| `restricted to test commands`, or settings refuse to import | The opt-in is missing: use `--env-file=.env.evennia-test` as one token. |
+| A contract test reports an unowned or stale shard label | `uv run --locked python -m tools.shard_register fix`, then commit the manifest with the test. |
+| `content/map-reference-context.json is stale` | `uv run --locked python -m tools.map_reference_context`, then commit the file. It changes whenever a registry entry, quest, service host or monster placement row changes. |
+| An uncovered requirement in the traceability gate | Annotate the test whose assertions establish it (see "OpenSpec test traceability"). Never annotate an unrelated test and never look for a waiver. |
+| The test-data lint flags a test file | The test names shipped content. Rebuild it on `world.tests.synthetic_data`; do not add the file to the ledger. |
+| The observability lint flags a line | Follow the "Observability" section; never add to `tools/observability_freeze.json`. |
+| `MapWorldNotLoaded` or `SettlementNotLoaded` in a test | Nothing published the map world. Call `world.tests.geography_fixture.publish_shipped_map_world()` in setup; see `world/maps/AGENTS.md`. |
+| A test passes alone and fails in the suite (or the reverse) | Shared mutable state leaked: a registry, a clock event source, an idmapper cache. See "檢查全域 mutable state" in `docs/development/evennia-testing-guide.md`. |
+| A browser test fails locally after a JS fix | The served bundle is stale: `pnpm run build`. |
+| A retained-database failure you cannot explain | Drop `--keepdb` and add `--noinput` once, or delete only `server/db/evennia-test.sqlite3`. |
+
+### Choices already made
+
+- Requirements and tests define logic, never game data. No scenario or test
+  pins a specific settlement, population, coordinate, count or ID roster, so a
+  data edit never needs a spec or test edit. A change that is only game data
+  may ship without a spec.
+- No test asserts real elapsed time or anything else that depends on hardware
+  speed: CI runners are slow and uneven. Pin a performance fix with call
+  counts, write counts or scheduling values, and benchmark in a throwaway
+  script.
+- Do not add a probe or gate whose every outcome is "continue anyway". Record
+  the measurement without blocking and fix slowness in a follow-up.
+- The standalone map editor is a developer-only tool: it takes the lowest
+  implementation complexity that still keeps its guarantees (a status
+  indicator and a server-side rejection instead of per-control UI state) and
+  reuses the game's visual theme.
+
 ## Architectural invariants
 
 - Preserve the single-writer boundary: it separates generative from
@@ -166,11 +257,16 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   `.github/evennia-shards.json`. Adding, renaming, or moving a test module MUST
   update that manifest in the same change, or the CI ownership contract
   (`tests.test_evennia_test_optimization_contract`) fails on every branch after
-  yours. Verify locally by running
-  `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract`
-  where `<file>` contains `MUD_TEST_SETTINGS=1`. Use the single-token
-  `--env-file=<path>` spelling: the Evennia test guard rejects both an inline
-  `MUD_TEST_SETTINGS=1 ...` prefix and the two-token `--env-file <file>` form.
+  yours. Do not edit the manifest by hand: run
+  `uv run --locked python -m tools.shard_register fix` (it also covers
+  `.github/browser-shards.json` and `.github/top-level-shards.json`), then
+  verify with `uv run --locked python -m tools.contract_gate manifests contracts`.
+  A module under a package label (`server`) is already owned and must not get
+  its own label; the tool knows this.
+- Evennia test commands take the opt-in through the committed file as one
+  token, `--env-file=.env.evennia-test`: the Evennia test guard rejects both an
+  inline `MUD_TEST_SETTINGS=1 ...` prefix and the two-token `--env-file <file>`
+  form.
 - Before handoff or archive, run `uv run --locked python -m tools.contract_gate`
   (traceability, the two lints, shard manifests, and the shard-ownership and
   frozen-audit contracts; seconds). It is not a test run to skip; CI preflight
@@ -190,7 +286,8 @@ changes or unexplained retained-state failures, omit `--keepdb` and add
   with output captured to a scratch file. Never loop over many whole
   `web/tests/browser/*` files in one command.
 - Every new browser test class or method under `web/tests/browser/` MUST be added
-  to `.github/browser-shards.json` in the same feature commit.
+  to `.github/browser-shards.json` in the same feature commit
+  (`uv run --locked python -m tools.shard_register fix` does it).
   `tests.test_evennia_test_optimization_contract`
   (`test_browser_method_labels_preserve_exact_ownership`) enforces exact
   ownership; the workflow's inline validator checks structure only, so registration

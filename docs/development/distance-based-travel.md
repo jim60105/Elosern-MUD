@@ -111,7 +111,7 @@ design §10）。它說明移動耗時如何由作者宣告的物理幾何與地
 ## 驗證
 
 ```sh
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.rules.tests.test_movement world.rules.tests.test_movement_settlement \
   world.rules.tests.test_clock world.rules.tests.test_party_follow_possession \
   world.rules.tests.test_party_time_settlement
@@ -223,7 +223,7 @@ uv run --locked openspec validate integrate-fatigue-aware-traversal --strict
 驗證：
 
 ```sh
-uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.rules.tests.test_ground_reveal world.rules.tests.test_map_knowledge \
   world.rules.tests.test_map_knowledge_integration world.rules.tests.test_sight \
   world.rules.tests.test_clock world.rules.tests.test_sleep_receipt \

@@ -114,7 +114,7 @@ tail -n 100 server/logs/server.log
 2. **或在執行測試時省略 `--keepdb` 並加上 `--noinput` 透過測試設定重建**：
    測試環境專用設定檔為 `server/conf/test_settings.py`，需搭配 `MUD_TEST_SETTINGS=1`：
    ```bash
-   MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --noinput tests.test_evennia_test_optimization_contract
+   uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --noinput tests.test_evennia_test_optimization_contract
    ```
 
 ---

@@ -1144,7 +1144,7 @@ fast / integration test tags
 開發中的快速回饋：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --keepdb \
     --failfast \
@@ -1154,7 +1154,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 排除 integration tests：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --keepdb \
     --exclude-tag=integration \
@@ -1164,7 +1164,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 完整本機測試（平行執行，開發中預設，24-core 機器實測 ~45s；最終 handoff 證據請改為下方序列指令）：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --noinput \
     --parallel 16 \
@@ -1174,7 +1174,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 完整本機測試（序列執行，最終 handoff 證據標準）：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --keepdb \
     commands server typeclasses world web.webclient
@@ -1183,7 +1183,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 定期找慢測試：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --keepdb \
     --timing \
@@ -1194,7 +1194,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 檢查 order dependency：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --parallel 1 \
     --shuffle \
@@ -1204,7 +1204,7 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test \
 檢查 parallel isolation（以日常開發 profile 執行）：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test \
+uv run --locked --env-file=.env.evennia-test evennia test \
     --settings test_settings.py \
     --keepdb \
     --parallel 16 \
@@ -1485,7 +1485,7 @@ settlement detect wrong ownership and recipients. Reloaded depleted gauges
 detect startup refill. Keep broad arithmetic vectors in shared synthetic
 suites, and inject rollback faults after a write or acquired practice claim.
 
-For local Evennia commands, use `uv run --locked --env-file=<file> evennia test`
+For local Evennia commands, use `uv run --locked --env-file=.env.evennia-test evennia test`
 with a file containing `MUD_TEST_SETTINGS=1`, and choose focused test labels.
 The single-token environment-file spelling is required. Local commands must
 remain below ten minutes; a necessary full non-browser run is permitted once

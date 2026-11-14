@@ -1,5 +1,7 @@
 """The repository contract gate bundles the cheap contracts and CI reuses it."""
 
+import contextlib
+import io
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -67,6 +69,22 @@ class ContractGateTests(unittest.TestCase):
         self.assertEqual(list(contract_gate.GATES), ["reference-context", "traceability", "observability", "test-data", "manifests", "contracts"])
         self.assertIn("tests.test_evennia_test_optimization_contract", contract_gate.CONTRACT_MODULES)
         self.assertIn("tests.test_webclient_frozen_contract", contract_gate.CONTRACT_MODULES)
+
+    def test_a_failed_gate_prints_its_next_step_and_a_passing_gate_does_not(self):
+        self.assertEqual(set(contract_gate.NEXT_STEPS), set(contract_gate.GATES))
+        outcomes = {"observability": False, "test-data": True}
+        gates = {name: (lambda name=name: outcomes[name]) for name in outcomes}
+        output = io.StringIO()
+        with patch.object(contract_gate, "GATES", gates), contextlib.redirect_stdout(output):
+            self.assertEqual(contract_gate.main(["observability", "test-data"]), 1)
+        self.assertIn(contract_gate.NEXT_STEPS["observability"], output.getvalue())
+        self.assertNotIn(contract_gate.NEXT_STEPS["test-data"], output.getvalue())
+
+    def test_the_manifest_gate_names_the_command_that_repairs_ownership_drift(self):
+        self.assertIn("python -m tools.shard_register fix", contract_gate.NEXT_STEPS["manifests"])
+        with patch.object(contract_gate.shard_register, "main", return_value=1) as check:
+            self.assertFalse(contract_gate.GATES["manifests"]())
+        check.assert_called_once_with(["check"])
 
     def test_ci_preflight_reuses_the_gate(self):
         workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/quality-gate.yml").read_text(encoding="utf-8"))

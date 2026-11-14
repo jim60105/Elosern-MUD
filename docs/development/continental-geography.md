@@ -543,7 +543,7 @@ game consumer contracts run under the Evennia test runner (`<env>` holds
 `MUD_TEST_SETTINGS=1`):
 
 ```sh
-uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.maps.tests.test_geography_source \
   world.lore.tests.test_wilderness_regions \
   world.lore.tests.test_anchors \
@@ -558,7 +558,7 @@ Map districts run under the Evennia test runner (`<env>` holds
 `MUD_TEST_SETTINGS=1`):
 
 ```sh
-uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.lore.tests.test_map_districts world.lore.tests.test_map_district_content \
   world.rules.tests.test_map_district_lighting
 ```
@@ -570,7 +570,7 @@ production recomputation under the Evennia runner:
 ```sh
 cd packages/map-core && uv run --locked --extra generation python -m pytest tests/test_partition.py
 uv run --locked python -m unittest tests.test_map_partition_independence
-uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.maps.tests.test_map_district_partition
 ```
 
@@ -581,6 +581,6 @@ Quest destination resolution runs under the Evennia runner with synthetic
 geography and quests only:
 
 ```sh
-uv run --locked --env-file=<env> evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   web.webclient.presentation.tests.test_map_quest_destinations
 ```

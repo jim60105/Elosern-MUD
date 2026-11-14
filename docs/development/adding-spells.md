@@ -279,7 +279,7 @@ _skill(
 
 ```sh
 # 單元級（快速迭代）
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_progression world.rules.tests.test_buffs world.rules.tests.test_status_display
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb world.skills.tests.test_spell_catalogs world.rules.tests.test_progression world.rules.tests.test_buffs world.rules.tests.test_status_display
 
 # 載入即驗證所有 effect 字串可解析
 uv run --locked python -c "from world.skills.registry import SKILL_REGISTRY"
@@ -289,7 +289,7 @@ uv run --locked python -m tools.spec_traceability check
 openspec validate <change> --strict
 
 # 完整套件（handoff 前）
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb --noinput --parallel 16 commands server typeclasses world web.webclient
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb --noinput --parallel 16 commands server typeclasses world web.webclient
 uv run --locked python -m unittest discover -s tests -t .
 openspec validate --all --strict
 ```

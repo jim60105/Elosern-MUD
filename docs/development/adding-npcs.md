@@ -362,7 +362,7 @@ registry. Hold start/extension/release events are emitted on the outer commit.
 依順序跑最小聚焦集：
 
 ```sh
-MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --keepdb \
+uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb \
   world.imports.tests.test_loader_trait_values \
   world.imports.tests.test_batch_all_or_nothing \
   world.imports.tests.test_capability_imports \

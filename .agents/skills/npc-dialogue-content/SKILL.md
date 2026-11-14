@@ -285,9 +285,9 @@ Editorial quality is carried by the review document, not by an assertion.
     `world.rules.tests.test_authored_dialogue_runtime`,
     `uv run --locked python -m tools.contract_gate`.
     Test commands in this repo take the single-token form
-    `uv run --locked --env-file=/tmp/mud-test.env evennia test --settings test_settings.py --keepdb <label>`;
-    pipes, redirects and `;` are rejected by the guard, and `.env.test` inside the
-    repository is not used.
+    `uv run --locked --env-file=.env.evennia-test evennia test --settings test_settings.py --keepdb <label>`;
+    pipes, redirects and `;` are rejected by the guard. `.env.evennia-test` is the
+    committed opt-in file; do not create another one.
 
 ## Workflow
 
