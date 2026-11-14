@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 火塘石圈
-    desc: 火塘石圈邊晾著網具，繩結打在石上。往東的官道通往東渡鎮。繩結打得很密，免得網具被水沖走。
+    desc: 火塘石圈邊晾著網具，繩結打在石上。往東出營地的小徑走過灘地，才接上通往東渡鎮的官道。
     anchor_key:
     typeclass:
     scene_archetype: city_street

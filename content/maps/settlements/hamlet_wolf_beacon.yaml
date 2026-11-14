@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 烽煙圖騰
-    desc: 圖騰柱立於四條官道的交會處，柱頂留著點火用的凹槽。戰時這裡升起的煙能傳很遠。凹槽裡常年備著乾柴與引火的絨草。
+    desc: 圖騰柱立於官道穿過營地的路段旁，柱頂留著點火用的凹槽。戰時這裡升起的煙能傳很遠，凹槽裡常年備著乾柴與引火的絨草。
     anchor_key: hamlet_wolf_beacon
     typeclass:
     scene_archetype: city_street

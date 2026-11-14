@@ -4,7 +4,7 @@ ok  village_deer_vale                  village  (300, 1635) road
 ok  village_eagle_crag                 village  (480, 1576) road 
 ok  village_panther_ravine             village  (845, 1538) road 
 ok  village_badger_den                 village  (685, 1544) road 
-ok  village_lynx_slope                 village  (1103, 1503) road 
+ok  village_lynx_den                   village  (1103, 1503) road 
 ok  village_fox_tail                   village  (524, 1533) road 
 ok  village_macaque_cliff              village  (555, 1395) road 
 ok  village_otter_ford                 village  (314, 1759) road 

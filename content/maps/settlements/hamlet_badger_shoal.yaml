@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘邊架著捕魚的竹籠。往西的路通往西渡營與西渡鎮。竹籠的開口朝向下游，魚順著水就被攔住。
+    desc: 共火塘邊架著捕魚的竹籠，籠口朝向下游。往西出灘的小徑沿河岸走，接上通往西渡營與西渡鎮的官道。
     anchor_key:
     typeclass:
     scene_archetype: city_street

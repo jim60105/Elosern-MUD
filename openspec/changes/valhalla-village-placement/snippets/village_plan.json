@@ -5,7 +5,7 @@
  {"id": "village_eagle_crag", "cell": [480, 1576], "kind": "village"},
  {"id": "village_panther_ravine", "cell": [845, 1538], "kind": "village"},
  {"id": "village_badger_den", "cell": [685, 1544], "kind": "village"},
- {"id": "village_lynx_slope", "cell": [1103, 1503], "kind": "village"},
+ {"id": "village_lynx_den", "cell": [1103, 1503], "kind": "village"},
  {"id": "village_fox_tail", "cell": [524, 1533], "kind": "village"},
  {"id": "village_macaque_cliff", "cell": [555, 1395], "kind": "village"},
  {"id": "village_otter_ford", "cell": [314, 1759], "kind": "village"},

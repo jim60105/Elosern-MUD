@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘邊曬著切好的草料。往西北的路通往霜風鎮。草料攤在向陽的石面上曬乾，翻動時揚起細細的草屑。
+    desc: 共火塘邊曬著切好的草料，攤在向陽的石面上。往西北出營地的小徑繞過河灣，才接上通往霜風鎮的官道。
     anchor_key:
     typeclass:
     scene_archetype: city_street

@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共用火塘
-    desc: 共用火塘旁堆著河灘撿來的圓石，石頭用來壓住棚布。往西北的路通往鹿鳴渡。棚布被石頭壓住，風再大也不拍打。
+    desc: 共用火塘旁堆著河灘撿來的圓石，石頭用來壓住棚布。往西北的小徑沿河岸走，接上通往鹿鳴渡的官道。
     anchor_key:
     typeclass:
     scene_archetype: city_street

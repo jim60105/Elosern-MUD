@@ -46,13 +46,25 @@ Ground rules:
 
 - [x] 2.1 Propose villages, approve each against design D2 and D3, and write the rows of design D4. Verify: `place_sites.py --locations` (command in design Context) reports every new cell walkable, off the water and of nation `valhalla`, and `uv run --locked python -m tools.settlement_spacing` reports no problem except `village_off_road` for the new villages.
 
-  Result: 17 villages, all on an inner trunk cell at a two- or three-road
-  junction, two of them on the highland river (otter ford, reindeer shoal).
+  Result: 17 villages, all on an inner trunk cell of a shared road corridor,
+  two of them at a ford or shoal a few kilometres from the highland river
+  (otter ford, reindeer shoal).
   `snippets/village_plan.json` and `snippets/plan_villages.txt` record the
   approved cells; `snippets/villages_context.jsonl` the site facts.
   `place_sites.py --locations` reported `314/314 sites valid` (exit 0) and
   `settlement_spacing` printed `spacing: 0 problems` — no `village_off_road`,
   because every village stands on a trunk cell.
+
+  Review correction (final rubber-duck finding 1): the approved plan called
+  these cells junctions, but the script's `roads=N` counts route polylines
+  that overlap on one corridor, not geometric forks — every new map has two
+  gates, so each village is a through cell. The committed `description` and
+  `geographic_constraint` now name the terrain feature and the corridor, and
+  the two river rows say "above" the ford or shoal, which matches the 2 km and
+  4 km site facts. Two IDs were renamed before commit: `village_lynx_slope`
+  became `village_lynx_den` to match the display name 山貓寨, and
+  `hamlet_deer_slope` became `hamlet_deer_trail` because Altoria already has
+  `hamlet_deer_slope`. `snippets/placement_evidence.md` records both.
 - [x] 2.2 Regenerate per design D6. Verify: `uv run --locked python -m tools.settlement_spacing` reports no `village_off_road`, and every new village ID appears as a `spur_of` value in `world/maps/data/road_network.json`.
 
   Result: `spacing: 0 problems`; all 17 new village IDs are `spur_of` values
@@ -73,6 +85,12 @@ Ground rules:
   `place_sites.py --locations` reported `349/349 sites valid` (exit 0) and
   `settlement_spacing` printed `spacing: 0 problems` (the D7 area entry was
   enabled early so the checker could speak, as the previous change did).
+
+  Review correction (final rubber-duck finding 1, second half): the six camp
+  rows that claimed a "junction", a "crossing" or "where four roads meet" —
+  `hamlet_badger_knoll`, `hamlet_fox_knoll`, `hamlet_badger_bend`,
+  `hamlet_wolf_beacon`, `hamlet_serpent_ridge`, `hamlet_tiger_tail` — name the
+  corridor instead.
 - [x] 3.2 Regenerate per design D6 and make the trunk comparison of D6. Verify: no road row without `spur_of` changed.
 
   Result: with the hamlet rows written, the artifact is 140 nodes and 159 road
@@ -99,6 +117,14 @@ Ground rules:
   hearth; every entrance names the direction and the neighbour it leads to; no
   shop, guild branch or service is presented as usable. The D9 timing lines are
   recorded in task 1.2 and task 5.4.
+
+  Review correction (final rubber-duck findings 5 and 6): the nine off-road
+  camps now say an exit trail reaches the named road ("往東出營地的小徑…接上
+  通往鹿鳴渡的官道") instead of implying a road at the camp, and the
+  `hamlet_antelope_ridge` exit names 東渡營, the Valhalla-side crossing rather
+  than the Kingdom town. Two descriptions that still said roads 交會 —
+  `village_wolf_fang` and `hamlet_wolf_beacon` — now describe the shared
+  corridor, and `hamlet_tiger_tail` likewise.
 - [x] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
 
   Result: `/tmp/valhalla-placing/road_after_villages.json` is the task 3.2

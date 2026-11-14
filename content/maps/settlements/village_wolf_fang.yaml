@@ -14,7 +14,7 @@ nodes:
     y_m: 210
     prototype_parent: anchor_room
     key: 寨心圖騰
-    desc: 三條官道在此交會，寨心立著一根刻滿狼牙的圖騰柱。黃土路面被獸群踩得發亮，雨天積著淺淺的泥水。
+    desc: 官道沿著林緣的同一條走廊穿過，寨心立著一根刻滿狼牙的圖騰柱。黃土路面被獸群踩得發亮，雨天積著淺淺的泥水。
     anchor_key: village_wolf_fang
     typeclass:
     scene_archetype: city_street

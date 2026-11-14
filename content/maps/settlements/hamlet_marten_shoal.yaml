@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 共火塘
-    desc: 共火塘的石圈外晾著幾張剛洗過的皮子。往西的路通往西渡營。皮子晾在石圈外的木架上，需要常翻面。
+    desc: 共火塘的石圈外晾著幾張剛洗過的皮子，需要常翻面。往西過灘的小徑穿過矮林，才接上往西渡營的官道。
     anchor_key:
     typeclass:
     scene_archetype: city_street

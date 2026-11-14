@@ -14,7 +14,7 @@ nodes:
     y_m: 100
     prototype_parent: anchor_room
     key: 虎尾圖騰
-    desc: 圖騰柱上的虎尾繞柱一圈，尾端朝向外側。柱下是兩條官道交會後的空地。空地中央留著生火的圓形焦痕。
+    desc: 圖騰柱上的虎尾繞柱一圈，尾端朝向外側。柱旁是官道穿過營地時留下的空地，空地中央有生火的圓形焦痕。
     anchor_key: hamlet_tiger_tail
     typeclass:
     scene_archetype: city_street

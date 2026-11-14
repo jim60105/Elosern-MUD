@@ -2746,155 +2746,155 @@ locations:
   village_wolf_fang:
     kind: village
     display_name_zh: 狼牙寨
-    description: Beastfolk stockade at a three-road junction where the shadow wood roads meet the horn plain road.
+    description: Beastfolk stockade at a wolf fang outcrop on the forest edge, where the shadow wood and horn plain roads run together.
     cell:
       cell_x: 236
       cell_y: 1628
-    geographic_constraint: Three-road junction of the shadow wood and horn plain trunks at the western forest edge
+    geographic_constraint: Wolf fang outcrop on the forest edge beside the shadow wood and horn plain corridor
     scene_archetype:
   village_bear_ridge:
     kind: village
     display_name_zh: 熊脊寨
-    description: Beastfolk stockade on a bear ridge where the horn plain and west ford camp roads cross.
+    description: Beastfolk stockade on a bear ridge above the horn plain and west ford camp road corridor.
     cell:
       cell_x: 436
       cell_y: 1620
-    geographic_constraint: Bear ridge at the horn plain and west ford camp road crossing
+    geographic_constraint: Bear ridge above the horn plain and west ford camp road corridor
     scene_archetype:
   village_deer_vale:
     kind: village
     display_name_zh: 鹿谷寨
-    description: Beastfolk stockade in a low deer vale where three highland roads meet.
+    description: Beastfolk stockade on the floor of a deer vale where the shadow wood roads share one corridor.
     cell:
       cell_x: 300
       cell_y: 1635
-    geographic_constraint: Low deer vale at a three-road junction below the shadow wood
+    geographic_constraint: Deer vale floor on the shared shadow wood road corridor
     scene_archetype:
   village_eagle_crag:
     kind: village
     display_name_zh: 鷹崖寨
-    description: Beastfolk stockade on an eagle crag above the horn plain road.
+    description: Beastfolk stockade on an eagle crag above the horn plain and west ford camp road corridor.
     cell:
       cell_x: 480
       cell_y: 1576
-    geographic_constraint: Eagle crag on the horn plain and west ford camp road crossing
+    geographic_constraint: Eagle crag above the horn plain and west ford camp road corridor
     scene_archetype:
   village_panther_ravine:
     kind: village
     display_name_zh: 豹澗寨
-    description: Beastfolk stockade in a panther ravine where the swift wind road meets the ancestor shrine road.
+    description: Beastfolk stockade in a panther ravine where the swift wind road passes the ancestor shrine road.
     cell:
       cell_x: 845
       cell_y: 1538
-    geographic_constraint: Panther ravine at the swift wind and ancestor shrine road junction
+    geographic_constraint: Panther ravine beside the swift wind and ancestor shrine road corridor
     scene_archetype:
   village_badger_den:
     kind: village
     display_name_zh: 獾穴寨
-    description: Beastfolk stockade in a badger den hollow on the swift wind road.
+    description: Beastfolk stockade in a badger den hollow on the swift wind road corridor east of the mutual market.
     cell:
       cell_x: 685
       cell_y: 1544
-    geographic_constraint: Badger den hollow at the mutual market and swift wind road junction
+    geographic_constraint: Badger den hollow on the mutual market and swift wind road corridor
     scene_archetype:
   village_lynx_den:
     kind: village
     display_name_zh: 山貓寨
-    description: Beastfolk stockade on a lynx ridge south of the falcon town, where two highland roads cross.
+    description: Beastfolk stockade at a lynx den on the ridge between the iron claw and pine ferry roads, south of the falcon town.
     cell:
       cell_x: 1103
       cell_y: 1503
-    geographic_constraint: Lynx ridge at the iron claw and pine ferry road junction
+    geographic_constraint: Lynx den on the ridge between the iron claw and pine ferry roads
     scene_archetype:
   village_fox_tail:
     kind: village
     display_name_zh: 狐尾寨
-    description: Beastfolk stockade on a fox tail spur of the horn plain road.
+    description: Beastfolk stockade on a fox tail spur beside the horn plain and swift wind road corridor.
     cell:
       cell_x: 524
       cell_y: 1533
-    geographic_constraint: Fox tail spur of the horn plain and swift wind road
+    geographic_constraint: Fox tail spur beside the horn plain and swift wind road corridor
     scene_archetype:
   village_macaque_cliff:
     kind: village
     display_name_zh: 獼猴崖
-    description: Beastfolk stockade on a macaque cliff above the west ford road.
+    description: Beastfolk stockade on a macaque cliff above the shared shadow wood and swift wind road corridor.
     cell:
       cell_x: 555
       cell_y: 1395
-    geographic_constraint: Macaque cliff at the shadow wood and swift wind road junction
+    geographic_constraint: Macaque cliff above the shadow wood and swift wind road corridor
     scene_archetype:
   village_otter_ford:
     kind: village
     display_name_zh: 水獺渡
-    description: Beastfolk stockade at an otter ford of the highland river on the frost wind road.
+    description: Beastfolk stockade above an otter ford of the highland river, on the frost wind road south of the shadow wood.
     cell:
       cell_x: 314
       cell_y: 1759
-    geographic_constraint: Otter ford of the highland river at the shadow wood and frost wind road junction
+    geographic_constraint: Otter ford of the highland river above the shadow wood and frost wind road corridor
     scene_archetype:
   village_tiger_claw:
     kind: village
     display_name_zh: 虎爪寨
-    description: Beastfolk stockade at a tiger claw bend where the iron claw and pine ferry roads meet.
+    description: Beastfolk stockade at a tiger claw bend of the iron claw and pine ferry road corridor.
     cell:
       cell_x: 1136
       cell_y: 1642
-    geographic_constraint: Tiger claw bend at the iron claw and pine ferry road junction
+    geographic_constraint: Tiger claw bend on the iron claw and pine ferry road corridor
     scene_archetype:
   village_boar_wood:
     kind: village
     display_name_zh: 野豬林
-    description: Beastfolk stockade in a wild boar wood where the mutual market roads divide.
+    description: Beastfolk stockade in a wild boar wood on the mutual market road corridor.
     cell:
       cell_x: 868
       cell_y: 1426
-    geographic_constraint: Wild boar wood at the mutual market and swift wind road junction
+    geographic_constraint: Wild boar wood on the mutual market and swift wind road corridor
     scene_archetype:
   village_serpent_creek:
     kind: village
     display_name_zh: 蛇溪寨
-    description: Beastfolk stockade on a serpent creek of the swift wind road.
+    description: Beastfolk stockade on a serpent creek of the swift wind and ancestor shrine road corridor.
     cell:
       cell_x: 785
       cell_y: 1560
-    geographic_constraint: Serpent creek at the swift wind and ancestor shrine road junction
+    geographic_constraint: Serpent creek beside the swift wind and ancestor shrine road corridor
     scene_archetype:
   village_crane_knoll:
     kind: village
     display_name_zh: 鶴崗寨
-    description: Beastfolk stockade on a crane knoll where the swift wind and ancestor shrine roads meet.
+    description: Beastfolk stockade on a crane knoll beside the swift wind and ancestor shrine road corridor.
     cell:
       cell_x: 637
       cell_y: 1495
-    geographic_constraint: Crane knoll at the swift wind and ancestor shrine road junction
+    geographic_constraint: Crane knoll beside the swift wind and ancestor shrine road corridor
     scene_archetype:
   village_falcon_nest:
     kind: village
     display_name_zh: 隼巢寨
-    description: Beastfolk stockade at a falcon nest above the horn plain road.
+    description: Beastfolk stockade at a falcon nest above the horn plain and west ford camp road corridor.
     cell:
       cell_x: 568
       cell_y: 1490
-    geographic_constraint: Falcon nest at the horn plain and west ford camp road junction
+    geographic_constraint: Falcon nest above the horn plain and west ford camp road corridor
     scene_archetype:
   village_mastiff_ridge:
     kind: village
     display_name_zh: 獒嶺寨
-    description: Beastfolk stockade on a mastiff ridge where the west ford roads divide.
+    description: Beastfolk stockade on a mastiff ridge on the shadow wood road corridor above the west ford camp.
     cell:
       cell_x: 505
       cell_y: 1365
-    geographic_constraint: Mastiff ridge at the shadow wood and swift wind road junction
+    geographic_constraint: Mastiff ridge on the shadow wood and swift wind road corridor
     scene_archetype:
   village_reindeer_shoal:
     kind: village
     display_name_zh: 馴鹿灘
-    description: Beastfolk stockade on a reindeer shoal of the highland river below the frost wind town.
+    description: Beastfolk stockade above a reindeer shoal of the highland river, on the frost wind and stag ferry road.
     cell:
       cell_x: 267
       cell_y: 1763
-    geographic_constraint: Reindeer shoal on the north bank of the highland river at the frost wind and stag ferry road junction
+    geographic_constraint: Reindeer shoal of the highland river above the frost wind and stag ferry road corridor
     scene_archetype:
   hamlet_otter_tail:
     kind: hamlet
@@ -2935,11 +2935,11 @@ locations:
   hamlet_badger_knoll:
     kind: hamlet
     display_name_zh: 獾岡營地
-    description: Beastfolk clan camp on a badger knoll where the grizzly and pine ferry roads meet.
+    description: Beastfolk clan camp on a badger knoll on the grizzly and pine ferry road corridor.
     cell:
       cell_x: 947
       cell_y: 1456
-    geographic_constraint: Badger knoll at the grizzly and pine ferry road junction
+    geographic_constraint: Badger knoll on the grizzly and pine ferry road corridor
     scene_archetype:
   hamlet_hare_den:
     kind: hamlet
@@ -2962,11 +2962,11 @@ locations:
   hamlet_wolf_beacon:
     kind: hamlet
     display_name_zh: 狼煙營地
-    description: Beastfolk clan camp at a wolf beacon where four highland roads meet below the horn plain.
+    description: Beastfolk clan camp at a wolf beacon on the shared shadow wood road corridor below the horn plain.
     cell:
       cell_x: 360
       cell_y: 1651
-    geographic_constraint: Four-road junction below the horn plain on the shadow wood roads
+    geographic_constraint: Wolf beacon on the shared shadow wood road corridor below the horn plain
     scene_archetype:
   hamlet_panther_tail:
     kind: hamlet
@@ -2980,11 +2980,11 @@ locations:
   hamlet_fox_knoll:
     kind: hamlet
     display_name_zh: 狐岡營地
-    description: Beastfolk clan camp on a fox knoll where the grizzly and pine ferry roads cross.
+    description: Beastfolk clan camp on a fox knoll on the grizzly and pine ferry road corridor.
     cell:
       cell_x: 1012
       cell_y: 1456
-    geographic_constraint: Fox knoll at the grizzly and pine ferry road junction
+    geographic_constraint: Fox knoll on the grizzly and pine ferry road corridor
     scene_archetype:
   hamlet_roe_slope:
     kind: hamlet
@@ -3043,11 +3043,11 @@ locations:
   hamlet_badger_bend:
     kind: hamlet
     display_name_zh: 獾坳營地
-    description: Beastfolk clan camp at a badger bend where the horn plain and shadow wood roads meet the stag ferry road.
+    description: Beastfolk clan camp at a badger bend on the horn plain and stag ferry road corridor.
     cell:
       cell_x: 375
       cell_y: 1688
-    geographic_constraint: Badger bend at the horn plain and stag ferry road junction
+    geographic_constraint: Badger bend on the horn plain and stag ferry road corridor
     scene_archetype:
   hamlet_falcon_knoll:
     kind: hamlet
@@ -3061,11 +3061,11 @@ locations:
   hamlet_serpent_ridge:
     kind: hamlet
     display_name_zh: 蛇嶺營地
-    description: Beastfolk clan camp on a serpent ridge where the iron claw and pine ferry roads cross.
+    description: Beastfolk clan camp on a serpent ridge on the iron claw and pine ferry road corridor.
     cell:
       cell_x: 1136
       cell_y: 1555
-    geographic_constraint: Serpent ridge at the iron claw and pine ferry road junction
+    geographic_constraint: Serpent ridge on the iron claw and pine ferry road corridor
     scene_archetype:
   hamlet_weasel_knoll:
     kind: hamlet
@@ -3115,11 +3115,11 @@ locations:
   hamlet_tiger_tail:
     kind: hamlet
     display_name_zh: 虎尾營地
-    description: Beastfolk clan camp on a tiger tail where the iron claw and pine ferry roads cross.
+    description: Beastfolk clan camp on a tiger tail on the iron claw and pine ferry road corridor.
     cell:
       cell_x: 1098
       cell_y: 1680
-    geographic_constraint: Tiger tail at the iron claw and pine ferry road junction
+    geographic_constraint: Tiger tail on the iron claw and pine ferry road corridor
     scene_archetype:
   hamlet_wolf_den:
     kind: hamlet

@@ -13,7 +13,7 @@ ok  hamlet_owl_wood                    hamlet   (1251, 1731) road
 ok  hamlet_marten_den                  hamlet   (1265, 1664) road 
 ok  hamlet_wolf_vale                   hamlet   (1114, 1765) road 
 ok  hamlet_bear_creek                  hamlet   (1075, 1763) road 
-ok  hamlet_deer_slope                  hamlet   (419, 1801) road 
+ok  hamlet_deer_trail                  hamlet   (419, 1801) road 
 ok  hamlet_badger_bend                 hamlet   (375, 1688) road 
 ok  hamlet_falcon_knoll                hamlet   (967, 1829) road 
 ok  hamlet_serpent_ridge               hamlet   (1136, 1555) road 
