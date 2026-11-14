@@ -407,6 +407,7 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
                 updates.append((key, whole, continuous - whole))
         if not updates:
             continue
+        record = None
         if (
             attribute_stores_deferred()
             and getattr(entity, "attributes", None) is not None
@@ -414,6 +415,16 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
             # One trait record per body per settlement call: the gauges are
             # written into a detached copy of the record and stored once.
             record = deserialize(entity.attributes.get("traits", category="traits"))
+            if not isinstance(record, Mapping):
+                # No materialized trait record: keep the handler's own write
+                # path rather than failing an advance that used to settle.
+                record = None
+        if record is None:
+            for key, new_current, new_remainder in updates:
+                gauge = getattr(entity.traits, key)
+                gauge.current = new_current
+                gauge.regen_remainder = new_remainder
+        else:
             for key, new_current, new_remainder in updates:
                 gauge = getattr(entity.traits, key)
                 record[key]["current"] = round(
@@ -428,15 +439,12 @@ def _settle_gauge_regen(entities: Iterable[Any], elapsed_seconds: int) -> None:
             # instead of dropping them: a cold read would construct the Trait
             # again, and Evennia's constructor validation saves the whole
             # record — a second store this change exists to avoid.
-            for key, cached in entity.traits._cache.items():
+            for key in list(entity.traits._cache):
                 cached_record = entity.traits.trait_data.get(key)
-                if cached_record is not None:
-                    cached._data = cached_record
-        else:
-            for key, new_current, new_remainder in updates:
-                gauge = getattr(entity.traits, key)
-                gauge.current = new_current
-                gauge.regen_remainder = new_remainder
+                if cached_record is None:
+                    del entity.traits._cache[key]
+                else:
+                    entity.traits._cache[key]._data = cached_record
 
 
 def settle_gauge_regeneration(
