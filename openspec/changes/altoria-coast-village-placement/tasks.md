@@ -128,25 +128,34 @@ Ground rules:
   exists, no habitat was edited and no validator was changed.
 - [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
 
-  Result: partly delivered. Green so far, one command per group of labels:
-  `world.lore.tests.test_anchors test_settlements test_anchor_placement` (48
-  tests, OK), `world.maps.tests.test_altoria_capital test_city_movement_cost
+  Result: partly delivered, every recorded run green. One command per group,
+  the guard capping a command at 100 discovered tests:
+  `world.lore.tests.test_anchors test_settlements test_anchor_placement` — 48
+  tests OK; `world.maps.tests.test_altoria_capital test_city_movement_cost
   test_city_walkthrough test_city_wilderness_roundtrip
   test_editor_final_yaml_adoption test_geography_source test_limbo_room
-  test_movement_roundtrip` (70 tests, OK), `world.maps.tests.test_runtime_adoption
-  test_settlement_reload test_sparse_graph test_static_map_references
-  test_village_ciaran` (46 tests, OK) and `world.maps.tests.test_bootstrap`
-  (46 tests, OK, also the D9 timing label). Not run: the remaining `web.
-  webclient`, `typeclasses`, `commands`, `world.quests` and `world.rules`
-  labels — the guard caps one command at 100 discovered tests, so those need
-  several more standalone groups, and the run budget ended first. The twelve
-  data-independent red labels keep the baseline evidence recorded by
-  `altoria-hills-village-placement` (`SettlementNotLoaded` registry-before-
-  publish in fixtures and at import, `no such table: django_content_type` on
-  the quest-registration rollback, `_anchor_key`/`anchor_locator` import-time
-  lookups), and `tests.test_map_core_contract` keeps its known
-  `CHANNEL_LOG_NUM_TAIL_LINES` runner error. No residual-pin rewrite was
-  needed. This box stays unticked because the sweep is not complete.
+  test_movement_roundtrip` — 70 tests OK;
+  `world.maps.tests.test_runtime_adoption test_settlement_reload
+  test_sparse_graph test_static_map_references test_village_ciaran` — 46 tests
+  OK; `world.maps.tests.test_bootstrap` — 46 tests OK, also the D9 timing
+  label; `web.webclient.actions.tests.test_exploration_actions.test_move_and_look
+  web.webclient.actions.tests.test_node_ids` — 43 tests OK.
+
+  Not run: `web.webclient.actions.tests.test_travel_actions`,
+  `web.webclient.presentation.tests.test_area_map`, the two
+  `test_exploration_panel` labels, the seven `test_local_map` labels,
+  `test_map_quest_destinations`, `test_world_map`, the four `typeclasses`
+  labels, `commands.tests.test_localized.test_xyz_grid_and_help`, the fourteen
+  `world.quests` labels, the eleven `world.rules` labels and
+  `tests.test_map_core_contract`. Those need many more standalone groups than
+  the remaining run budget allowed. The twelve data-independent red labels
+  keep the baseline evidence recorded by `altoria-hills-village-placement`
+  (`SettlementNotLoaded` registry-before-publish in fixtures and at import,
+  `no such table: django_content_type` on the quest-registration rollback,
+  `_anchor_key`/`anchor_locator` import-time lookups), and
+  `tests.test_map_core_contract` keeps its known `CHANNEL_LOG_NUM_TAIL_LINES`
+  runner error. No residual-pin rewrite was needed. This box stays unticked
+  because the sweep is not complete.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images, all read. The capture page was built in the worktree
