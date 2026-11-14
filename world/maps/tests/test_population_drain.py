@@ -31,6 +31,7 @@ from django.conf import settings as django_settings
 from django.test import override_settings
 from evennia.utils.create import create_script
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 
 from world.maps import (
@@ -145,6 +146,10 @@ class DrainFixture(ScopedSettlementFixture):
 class LaggingSetTests(DrainFixture):
     """The drain picks the lowest closed set and never passes the world tick."""
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
     def test_one_slice_moves_the_most_lagging_set_and_keeps_the_world_tick(self):
         self.set_world_tick(FAR_TICK)
         self.write_cursors(FAR_TICK, {self.unit_a: START, self.unit_b: 400})
@@ -161,6 +166,10 @@ class LaggingSetTests(DrainFixture):
         self.assertEqual(self.settled_through(self.unit_b), 400)
         self.assertEqual(self.world_tick(), FAR_TICK)
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
     def test_a_slice_ends_at_the_world_tick(self):
         self.set_world_tick(500)
         self.write_cursors(500, {self.unit_a: START})
@@ -168,6 +177,10 @@ class LaggingSetTests(DrainFixture):
         self.assertEqual(self.settled_through(self.unit_a), 500)
         self.assertEqual(self.world_tick(), 500)
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
     def test_a_current_world_writes_nothing_and_emits_nothing(self):
         before = self.cursors()
         projection = settlement_projection(self.wilderness)
@@ -177,6 +190,10 @@ class LaggingSetTests(DrainFixture):
         self.assertEqual(self.cursors(), before)
         self.assertEqual(settlement_projection(self.wilderness), projection)
 
+    @covers_requirement(
+        "population-settlement-units::"
+        "a-drain-run-settles-the-most-lagging-closed-set-by-one-bounded-slice"
+    )
     def test_linked_units_move_together(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START, self.unit_b: START})
@@ -213,6 +230,9 @@ class LaggingSetTests(DrainFixture):
 class DrainEquivalenceTests(DrainFixture):
     """A drained world is the world a whole-world pass leaves."""
 
+    @covers_requirement(
+        "population-settlement-units::draining-gives-the-whole-world-result"
+    )
     def test_one_slice_equals_one_scoped_pass_over_the_same_interval(self):
         self.set_world_tick(COMPLETION_TICK)
         self.write_cursors(COMPLETION_TICK, {self.unit_a: START})
@@ -225,6 +245,9 @@ class DrainEquivalenceTests(DrainFixture):
         settle_population_scope(self.wilderness, {self.unit_a}, START + SLICE)
         self.assertEqual(settlement_projection(self.wilderness), drained)
 
+    @covers_requirement(
+        "population-settlement-units::draining-gives-the-whole-world-result"
+    )
     def test_drain_to_completion_equals_one_whole_world_pass(self):
         self.set_world_tick(COMPLETION_TICK)
         self.write_cursors(COMPLETION_TICK, {self.unit_a: START, self.unit_b: START})
@@ -244,6 +267,9 @@ class DrainEquivalenceTests(DrainFixture):
 class DrainReportTests(DrainFixture):
     """A settled run reports itself; a failed run keeps every prior value."""
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
     def test_reported_slice(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START, self.unit_b: 400})
@@ -266,6 +292,9 @@ class DrainReportTests(DrainFixture):
             "the event names the settled unit, both ticks and the lagging unit",
         )
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
     def test_the_reported_remaining_count_is_units_not_sets(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START, self.unit_b: 400})
@@ -288,6 +317,9 @@ class DrainReportTests(DrainFixture):
         # also holds already stands at the world tick: one unit lags, not two.
         self.assertEqual(context["remaining"], 1)
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
     def test_a_linked_set_keeps_its_current_unit_and_reports_only_lagging_units(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: 700, self.unit_b: START})
@@ -312,6 +344,9 @@ class DrainReportTests(DrainFixture):
         self.assertEqual(context["tick_to"], 400)
         self.assertEqual(context["remaining"], 1)
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
     def test_a_failed_run_keeps_the_prior_state_and_the_next_run_settles(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -365,6 +400,9 @@ class DrainReportTests(DrainFixture):
         self.assertTrue(self.drain())
         self.assertEqual(self.settled_through(self.unit_a), START + SLICE)
 
+    @covers_requirement(
+        "population-settlement-units::a-drain-run-is-atomic-and-reports-itself"
+    )
     def test_a_failing_set_does_not_starve_the_next(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START, self.unit_b: START})
@@ -408,6 +446,9 @@ class DrainReportTests(DrainFixture):
 class PeriodicCallerTests(DrainFixture):
     """The periodic caller repeats once per interval and honours its switch."""
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-honours-its-switch"
+    )
     def test_disabled_repeat_does_not_drain(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
@@ -423,6 +464,9 @@ class PeriodicCallerTests(DrainFixture):
         drain.assert_not_called()
         self.assertEqual(self.settled_through(self.unit_a), START)
 
+    @covers_requirement(
+        "population-settlement-units::the-periodic-drain-honours-its-switch"
+    )
     def test_enabled_repeat_drains_once_with_the_configured_slice(self):
         self.set_world_tick(700)
         self.write_cursors(700, {self.unit_a: START})
