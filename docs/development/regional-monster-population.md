@@ -3198,7 +3198,10 @@ with a pass.
 
 One `population_backlog_drained` info event is scheduled on durable commit,
 carrying the settled unit count, both ticks and `remaining` -- the number of
-units still lagging after this run. A run that settles nothing emits nothing.
+units whose own cursor is still behind the world tick after this run. The
+settled count is the closed set's size, so a linked set that holds an
+already-current unit reports it in `units` but not in `remaining`. A run that
+settles nothing emits nothing.
 
 ## The periodic caller
 

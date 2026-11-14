@@ -201,8 +201,8 @@ class LaggingSetTests(DrainFixture):
             "every unit of the index belongs to one closed set",
         )
         self.assertEqual(
-            len(sets),
             sum(len(closed) for closed in sets),
+            len(set().union(*sets)),
             "distinct closed sets are disjoint",
         )
         self.assertIn(population_units.RESIDUAL_UNIT, units)
@@ -284,7 +284,33 @@ class DrainReportTests(DrainFixture):
             self.assertTrue(self.drain())
         context = self.events(info)[0].kwargs["context"]
         self.assertEqual(context["units"], 1)
-        self.assertEqual(context["remaining"], 2)
+        # The linked set still lags through unit B, but the residual unit it
+        # also holds already stands at the world tick: one unit lags, not two.
+        self.assertEqual(context["remaining"], 1)
+
+    def test_a_linked_set_keeps_its_current_unit_and_reports_only_lagging_units(self):
+        self.set_world_tick(700)
+        self.write_cursors(700, {self.unit_a: 700, self.unit_b: START})
+        self.link_group_home(self.group_ids[ZONE_B][0], WANDER_A)
+        self.assertEqual(
+            lagging_sets(self.wilderness, 700),
+            ((START, frozenset({self.unit_a, self.unit_b})),),
+        )
+        with (
+            patch.object(population_drain, "log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            self.assertTrue(self.drain(300))
+        self.assertEqual(self.settled_through(self.unit_b), 400)
+        self.assertEqual(
+            self.settled_through(self.unit_a),
+            700,
+            "a settlement never rewinds an already-current unit",
+        )
+        context = self.events(info)[0].kwargs["context"]
+        self.assertEqual(context["units"], 2)
+        self.assertEqual(context["tick_to"], 400)
+        self.assertEqual(context["remaining"], 1)
 
     def test_a_failed_run_keeps_the_prior_state_and_the_next_run_settles(self):
         self.set_world_tick(700)

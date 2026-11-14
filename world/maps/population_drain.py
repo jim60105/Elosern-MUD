@@ -21,6 +21,8 @@ one either.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from django.conf import settings
 from django.db import transaction
 
@@ -47,6 +49,31 @@ def _require_slice(slice_seconds: object) -> int:
     return slice_seconds
 
 
+def _units_still_lagging(
+    pending: Iterable[tuple[int, frozenset[str]]],
+    cursors: population_units.UnitCursors,
+    settled: frozenset[str],
+    target: int,
+    now: int,
+) -> int:
+    """How many units lag once this run settled ``settled`` to ``target``.
+
+    A settlement never lowers a cursor, so a settled unit stands at
+    ``max(cursor, target)`` afterwards and every other unit keeps its cursor.
+    A linked set may lawfully hold an already-current unit; it is counted only
+    while its own cursor is behind ``now``, which is what the event reports.
+    """
+    remaining = 0
+    for _, closed in pending:
+        for unit_id in closed:
+            after = population_units.unit_cursor(cursors, unit_id)
+            if unit_id in settled and target > after:
+                after = target
+            if after < now:
+                remaining += 1
+    return remaining
+
+
 def drain_population_backlog(slice_seconds: int) -> bool:
     """Settle the most lagging closed set forward by one slice.
 
@@ -69,6 +96,7 @@ def drain_population_backlog(slice_seconds: int) -> bool:
         ):
             return False
         now = regional_population.current_population_tick()
+        cursors = population_units.read_unit_cursors(wilderness)
         pending = population_units.lagging_sets(wilderness, now)
     except Exception as error:
         # A world-level fault (an unreadable or malformed record) has no unit
@@ -87,9 +115,7 @@ def drain_population_backlog(slice_seconds: int) -> bool:
             registry = population_lifecycle.snapshot_population_lifecycle_surfaces(
                 start, target, scope=scope
             )
-            remaining = sum(len(closed) for _, closed in pending) - (
-                len(units) if target >= now else 0
-            )
+            remaining = _units_still_lagging(pending, cursors, units, target, now)
             event = {
                 "units": len(units),
                 "tick_from": start,
