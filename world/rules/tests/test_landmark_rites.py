@@ -2,185 +2,40 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
-from types import SimpleNamespace as NS
-from typing import Any
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.dbserialize import deserialize
-from evennia.utils.test_resources import EvenniaTest
 
 from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
-from world.lore.rites import installed, uninstall
-from world.lore.rites.shape import RiteArchetype, RiteOption, RiteSnapshot
-from world.lore.scenes import Narration, Scene
+from world.lore.rites import uninstall
 from world.rules.clock import get_world_clock
 from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.landmark_rite_record import RECORD_ATTR, read_record
 from world.rules.landmark_rites import (
-    REFUSAL_MESSAGES,
-    RiteRefused,
     eligible_performers,
     perform_rite,
     preflight,
     rite_site_for,
 )
-from world.rules.map_knowledge import node_id_for
-from world.rules.party import join_party
 from world.rules.possession import enter_possession
 from world.rules.skip_safety import SkipRejectReason
-from world.tests.geography_fixture import publish_shipped_geography
-from world.tests.synthetic_grid_map import load_synthetic_grid, synthetic_rooms
-
-publish_shipped_geography()
-
-DISTRICT_KEY = "t_district"
-ARCHETYPE_KEY = "t_archetype"
-GUARDIAN_NAME = "測試守護"
-DISTRICT_NAME = "測試丘陵"
-LANDMARK_NAME = "測試碑"
-SOLO_SECONDS = 120
-SHARED_SECONDS = 300
-SOLO_SHAME = 1
-SOLO_EXPOSURE = 2
-SHARED_SHAME = 2
-SHARED_EXPOSURE = 1
-
-
-def _scene(scene_id: str) -> Scene:
-    """One synthetic single-narration scene."""
-    return Scene(scene_id=scene_id, revision="r1", lines=(Narration(text="測試敘述。"),))
-
-
-SOLO = RiteOption(
-    key="solo",
-    label_zh="獨自",
-    seconds=SOLO_SECONDS,
-    shame=SOLO_SHAME,
-    exposure=SOLO_EXPOSURE,
-    self_scene=_scene("t_rite.solo.self"),
-    watch_scene=None,
+from world.rules.tests.rite_fixtures import (
+    ARCHETYPE_KEY,
+    DISTRICT_KEY,
+    DISTRICT_NAME,
+    LANDMARK_NAME,
+    SHARED,
+    SHARED_EXPOSURE,
+    SHARED_SECONDS,
+    SHARED_SHAME,
+    SNAPSHOT,
+    SOLO,
+    SOLO_EXPOSURE,
+    SOLO_SECONDS,
+    SOLO_SHAME,
+    RiteSettlementFixture,
 )
-SHARED = RiteOption(
-    key="shared",
-    label_zh="共行",
-    seconds=SHARED_SECONDS,
-    shame=SHARED_SHAME,
-    exposure=SHARED_EXPOSURE,
-    self_scene=_scene("t_rite.shared.self"),
-    watch_scene=_scene("t_rite.shared.watch"),
-)
-SNAPSHOT = RiteSnapshot(
-    archetypes={
-        ARCHETYPE_KEY: RiteArchetype(
-            key=ARCHETYPE_KEY,
-            guardian_name_zh=GUARDIAN_NAME,
-            guardian_form_zh="測試形體",
-            options=(SOLO, SHARED),
-        )
-    },
-    districts={DISTRICT_KEY: ARCHETYPE_KEY},
-)
-
-
-class RiteSettlementFixture(EvenniaTest):
-    """One synthetic landmark, one synthetic rite world, one present companion."""
-
-    def setUp(self):
-        super().setUp()
-        load_synthetic_grid()
-        self.source, self.landmark, self.end = synthetic_rooms()
-        self.player = self.char1
-        self.player.race = "human"
-        self.player.apply_race_baseline()
-        self.player.location = self.landmark
-        self.district = NS(
-            district_id=DISTRICT_KEY,
-            district_name_zh=DISTRICT_NAME,
-            landmark_name_zh=LANDMARK_NAME,
-        )
-        self.district_snapshot = NS(districts={DISTRICT_KEY: self.district})
-        self.landmark_node = node_id_for(self.landmark)
-        self.enterContext(
-            patch(
-                "world.lore.map_districts.current",
-                new=lambda: self.district_snapshot,
-            )
-        )
-        self.enterContext(
-            patch(
-                "world.lore.map_districts.landmark_node_ids",
-                side_effect=lambda *args, **kwargs: {
-                    DISTRICT_KEY: self.landmark_node
-                },
-            )
-        )
-        self.enterContext(installed(SNAPSHOT))
-        self.companion = self._companion("測試同伴")
-        self.assertNotEqual(self.player.pk, self.companion.pk)
-
-    def _companion(self, key: str, location: Any = None):
-        npc = create_object(NPC, key=key, location=self.player.location)
-        npc.race = "human"
-        npc.apply_race_baseline()
-        join_party(npc, self.player)
-        if location is not None:
-            npc.location = location
-        return npc
-
-    def perform(self, *args: Any, **kwargs: Any):
-        """Perform one rite, delivering its commit callbacks first."""
-        with self.captureOnCommitCallbacks(execute=True):
-            return perform_rite(*args, **kwargs)
-
-    def record(self) -> Any:
-        raw = self.player.attributes.get(RECORD_ATTR)
-        return None if raw is None else deserialize(raw)
-
-    def sexual_state(self, entity: Any) -> tuple[Any, ...]:
-        return (
-            entity.sexual.pleasure.value,
-            entity.sexual.climax_phase.level,
-            entity.sexual.climax_today,
-            entity.sexual.climax_turns,
-            entity.sexual.shame.value,
-            entity.sexual.exposure.value,
-        )
-
-    def refused(
-        self,
-        code: str,
-        call: Any,
-        *,
-        actor: Any = None,
-        char: Any = None,
-        district: Any = None,
-    ) -> RiteRefused:
-        """Assert one refusal wrote nothing and logged exactly one refused event."""
-        actor = self.player if actor is None else actor
-        tick_before = get_world_clock().tick
-        record_before = deepcopy(self.record())
-        state_before = self.sexual_state(actor)
-        with patch("world.rules.landmark_rites.log_info") as info:
-            with self.assertRaises(RiteRefused) as caught:
-                call()
-        refusal = caught.exception
-        self.assertEqual(refusal.code, code)
-        self.assertEqual(refusal.message, REFUSAL_MESSAGES[code])
-        self.assertEqual(get_world_clock().tick, tick_before)
-        self.assertEqual(self.record(), record_before)
-        self.assertEqual(self.sexual_state(actor), state_before)
-        self.assertEqual(info.call_count, 1)
-        self.assertEqual(info.call_args.args[0], "landmark_rite_refused")
-        context = info.call_args.kwargs["context"]
-        self.assertEqual(context["reason"], code)
-        if char is not None:
-            self.assertEqual(context["char"], char)
-        if district is not None:
-            self.assertEqual(context["district"], district)
-        return refusal
 
 
 class RiteSiteTests(RiteSettlementFixture):
