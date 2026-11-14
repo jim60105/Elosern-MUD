@@ -14,7 +14,7 @@ nodes:
     y_m: 167
     prototype_parent: anchor_room
     key: 山腰岔路
-    desc: 岔路開在山腰的平台上，往北是下坡回到鹽道城，往南則是通往蜜谷鎮的長坡。路旁的石堆標出冬季的界線。
+    desc: 岔路開在山腰的平台上，往南是下坡回到鹽道城，往北則是通往蜜谷鎮的長坡。路旁的石堆標出冬季的界線。
     anchor_key: hamlet_hillside
     typeclass:
     scene_archetype: city_street

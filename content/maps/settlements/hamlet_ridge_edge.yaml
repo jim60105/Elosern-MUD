@@ -14,7 +14,7 @@ nodes:
     y_m: 200
     prototype_parent: anchor_room
     key: 嶺邊岔路
-    desc: 岔路貼著稜線的邊緣，往北的路一路爬升到鹽道城，往南則順著山勢落回南谷。風從谷裡吹上來，帶著濕氣。
+    desc: 岔路貼著稜線的邊緣，往南的路一路下到鹽道城，往北則順著山勢爬向蜜谷。風從谷裡吹上來，帶著濕氣。
     anchor_key: hamlet_ridge_edge
     typeclass:
     scene_archetype: city_street

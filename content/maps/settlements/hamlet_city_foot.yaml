@@ -23,7 +23,7 @@ nodes:
     y_m: 100
     prototype_parent: grid_room
     key: 農舍前
-    desc: 農舍前堆著準備送進城裡的柴薪與菜籃，屋後就是通往西礦港的路。屋主說城裡的伙房每天都要來收一趟。
+    desc: 農舍前堆著準備送進城裡的柴薪與菜籃，屋後就是沿著城牆走的官道。屋主說城裡的伙房每天都要來收一趟。
     anchor_key:
     typeclass:
     scene_archetype: city_street
