@@ -2510,3 +2510,123 @@ environment file (`/tmp/mud-test.env` containing `MUD_TEST_SETTINGS=1`):
 uv run --locked --env-file=/tmp/mud-test.env evennia test \
   --settings test_settings.py --keepdb world.maps.tests.test_settlement_decode_reuse
 ```
+
+# Settlement units
+
+Developer document for the `population-settlement-units` change. Every clock
+advance still settles the whole world; this change only defines the parts a
+later change may settle on their own, and records how far each part has been
+settled. Nothing reads the record for a decision yet, so the change is a no-op
+at merge.
+
+## The division rule
+
+`world/maps/population_units.py` resolves the authored geometry into settlement
+units. The nodes are every ecology zone, and every activity area that declares a
+region. Two nodes share a unit exactly when a chain of links connects them:
+
+- a rectangle overlap inside one region (`a.x_min <= b.x_max and b.x_min <= a.x_max`
+  and the same on `y`), or
+- a birth binding: a zone whose pool's compositions resolve an activity whose
+  area is region-bound, or a site whose composition rows do; a site that covers
+  no zone joins its own areas to each other.
+
+The unit identifier is `zone:<smallest zone key>` of the component, or
+`area:<smallest area key>` when the component holds no zone. Home-radius areas
+have no node; a group bound to one is located by its home and area cells.
+`unit_of_cell` scans the rectangles of the cell's region in
+`(unit id, rectangle)` order. Rectangles of one region that cover the same cell
+are in one unit by construction, so the scan order can never change the answer.
+
+## The residual unit
+
+Every room, and every cell that no authored rectangle of its region covers,
+belongs to `~residual`. It is the unit of the unauthored world: a party standing
+in a settlement room or on open ground outside every zone.
+
+## A group's units and the closure
+
+`group_units(index, group, journey)` is the set of units a live group touches:
+its home, its position, its journey's source and destination, every cell of its
+activity area (`monster_activity.group_area`, the same area its decision reads),
+and its owning zone's or site's unit. `unit_closure(index, state, seeds)` is the
+least fixed point of adding every group's units once one of them is in the set.
+It is the set a caller may settle without reading state another unit owns.
+
+### Cost and refusal boundary
+
+Information for `unit-scoped-population-settlement`, which first puts the
+closure on the advance path. As written, `unit_closure` recomputes
+`group_units` for every group on every fixed-point iteration and decodes every
+locator of each group's area, so its cost grows with the world's population:
+that is the quantity the chain exists to remove, and no production caller uses
+it yet. A scoped pass must compute it once per advance over the groups whose
+units it can reach, and keep that result for the whole pass. It must also
+decide whether a refusal may escape: `group_units` propagates
+`MonsterActivityStateInvalid`, `MonsterActivityRegistryError` and
+`MovementEdgeError`, while `monster_activity._resolved_area_keys` deliberately
+answers `None` for the last two because an unresolvable area is a lawful
+scheduled stay. Refusing a player action over one unresolvable area would be a
+behaviour change, so the boundary belongs to that change's design.
+
+## The cursor record
+
+`wilderness.db.population_unit_cursors` is a whole-value mapping with exactly
+`default` (a non-negative integer) and `units` (unit identifier to
+non-negative integer). Fresh provisioning writes it at the provisioning tick;
+`settle_population_lifecycle` raises the default, and every listed unit with it,
+to the pass endpoint at the end of its body. A record that cannot change is not
+rewritten, a cursor never decreases, and an absent, extra-keyed or ill-typed
+record refuses by name with the population owner's `malformed_state`. There is
+no migration: a pre-change development world is re-provisioned as
+`docs/development/database-reset.md` describes. `snapshot_population_surfaces`
+owns the record, so a rolled-back advance restores it.
+
+## Why the units are independent
+
+A group decides from its own record, its members' physiology, its area and the
+protection of its destination cell; ordinary movement never leaves the area. A
+zone's recovery reads only the individuals standing in the zone and the
+individuals whose home is the zone; a site reads only its members and its cell.
+The one way an individual enters another unit's cell is an escape across the
+area boundary, which `group_units` records as a link and `unit_closure` closes
+over. A future rule that lets one unit's settlement read another unit's state
+breaks this argument, and must extend it (and its test) first.
+
+## Measured on the shipped registries
+
+175 ecology zones and 260 region-bound activity areas resolve to 217 units:
+175 zone units (178 areas overlap a zone) and 42 components of site activity
+areas that no zone covers. No shipped site's cell lies inside an ecology zone,
+and no shipped site binds two areas, so the birth-binding links merge nothing
+further: the count is 217 with and without them. This number is information, not
+a gate; the tests use synthetic registries.
+
+## Tests
+
+`world/maps/tests/test_population_units.py` carries the coverage:
+
+- `AuthoredGeometryTests` -- disjoint zones, an area bridging two zones, a
+  birth binding to a distant area, equal rectangles in different regions, a
+  reversed registry order that resolves identically, the residual unit, and the
+  live birth/site link readers over patched synthetic registries.
+- `UnitResolutionTests` -- a group inside its zone touches exactly that unit;
+  an escaped member's position links two zones and the closure of either holds
+  both; a journey's endpoints do the same until arrival; a room and an uncovered
+  published cell are residual; an unknown site is residual.
+- `UnitCursorTests` -- fresh provisioning at 100 makes every unit report 100; a
+  pass through 260 records 260; a scoped advance raises only its units and never
+  lowers one; a later clock stage's failure restores 100 in memory and after a
+  cache reload; a missing or malformed record refuses and rewrites nothing, a
+  pass over one refuses before any settlement is committed, and a refused
+  advance leaves the stored mapping byte-identical.
+
+No test measures wall-clock time; the bounds are unit identifiers, exact cursor
+values and state equality. Run the module from the worktree root with the
+single-token environment file (`/tmp/mud-test.env` containing
+`MUD_TEST_SETTINGS=1`):
+
+```
+uv run --locked --env-file=/tmp/mud-test.env evennia test \
+  --settings test_settings.py --keepdb world.maps.tests.test_population_units
+```

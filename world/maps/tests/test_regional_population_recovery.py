@@ -619,6 +619,7 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
             "transitions": [],
             "protection": [],
         }
+        self.wilderness.db.population_unit_cursors = {"default": tick, "units": {}}
         self.clock.tick = tick
         return tuple(initialize_zone(self.wilderness, zone.key, seed=SEED, tick=tick))
 

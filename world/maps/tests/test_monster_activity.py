@@ -308,6 +308,10 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
             "transitions": [],
             "protection": [],
         }
+        self.wilderness.db.population_unit_cursors = {
+            "default": tick,
+            "units": {},
+        }
         get_world_clock().tick = tick
 
     def _departure_seed(

@@ -62,6 +62,7 @@ from types import MappingProxyType
 from typing import Any
 
 from django.db import transaction
+from elosern_map_core.terrain import is_within_frame, region_for_coordinates
 from evennia.contrib.grid.wilderness.wilderness import WildernessScript
 from evennia.utils.dbserialize import from_pickle
 
@@ -558,12 +559,15 @@ def initialize_population_seed(wilderness: Any, *, seed: int, tick: int) -> int:
         # The explicit fresh provisioning operation is the only creator of the
         # empty timeline. It carries no ordinary births and no recovery state.
         _write_timeline(wilderness, PopulationTimeline(int(tick), (), ()))
-    from world.maps import monster_activity
+    from world.maps import monster_activity, population_units
 
     # The same explicit fresh provisioning initializes the map-owned activity
     # record once. A preexisting world without it refuses by name through the
     # activity owner; nothing is filled in implicitly on load.
     monster_activity.initialize_monster_activity(wilderness, tick=int(tick))
+    # The per-unit settlement record is fresh-provisioning state too: a world
+    # that lacks it refuses by name instead of being filled in on load.
+    population_units.initialize_unit_cursors(wilderness, tick=int(tick))
     _emit(
         "monster_population_seed_initialized",
         {"seed": int(seed), "tick": int(tick)},
@@ -820,6 +824,19 @@ def _published_geography() -> Any:
     from world.maps.geography import current as current_geography
 
     return current_geography()
+
+
+def cell_region(cell: tuple[int, int]) -> str | None:
+    """The published region of one wilderness cell, or ``None`` outside it.
+
+    The answer is read from the published terrain of this world, so every
+    consumer of one settlement decision classifies a cell the same way. A cell
+    outside the authored frame has no region and therefore no authored unit.
+    """
+    terrain = _published_geography().terrain
+    if not is_within_frame(terrain.frame_cells, cell):
+        return None
+    return region_for_coordinates(terrain, cell[0], cell[1])
 
 
 def _region_cells(zone: EcologyZone) -> frozenset[tuple[int, int]]:
@@ -2805,6 +2822,13 @@ def snapshot_population_surfaces(wilderness: Any) -> dict[int, SurfaceSnapshot]:
                 ("monster_activity", None): _db_safe_attribute_snapshot(
                     wilderness, "monster_activity"
                 ),
+                # The per-unit settlement cursors are advanced by every
+                # lifecycle pass, so the same rollback must restore them. The
+                # literal matches "monster_activity" above: importing the
+                # population_units constant here would close an import cycle.
+                ("population_unit_cursors", None): _db_safe_attribute_snapshot(
+                    wilderness, "population_unit_cursors"
+                ),
             }
         )
     }
@@ -2924,6 +2948,7 @@ __all__ = [
     "ZonePopulationState",
     "active_combat_participant_ids",
     "actual_cell",
+    "cell_region",
     "commit_population_wave",
     "coordinate_pair",
     "counts_from_presence",

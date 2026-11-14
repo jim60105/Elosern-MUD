@@ -36,7 +36,12 @@ from typing import Any
 
 from django.db import transaction
 
-from world.maps import monster_activity, monster_sites, regional_population
+from world.maps import (
+    monster_activity,
+    monster_sites,
+    population_units,
+    regional_population,
+)
 from world.observability import log_info
 from world.observability.tally import maintenance_tally, suspended_maintenance_tally
 from world.rules.clock import (
@@ -196,6 +201,11 @@ def settle_population_lifecycle(
     wilderness = _wilderness()
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return []
+    # A world without a usable per-unit record must refuse before any
+    # settlement work, not after it: a direct caller outside a clock advance
+    # owns its own commit, so a tail-only check would leave settled state
+    # behind a raised advance.
+    population_units.read_unit_cursors(wilderness)
     events: list[ScheduledEvent] = []
     tick = start_tick
     with maintenance_tally() as counts:
@@ -224,6 +234,9 @@ def settle_population_lifecycle(
             )
             monster_activity.retire_room_protection(wilderness, end_tick)
             monster_activity.retire_settled_decision_receipts(wilderness, end_tick)
+            # The pass endpoint is the owner's whole-world progress: every unit
+            # is settled through it until a scoped pass says otherwise.
+            population_units.advance_unit_cursors(wilderness, None, end_tick)
         if counts:
             context = {
                 "tick_from": int(start_tick),
