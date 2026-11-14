@@ -67,7 +67,19 @@ jobs:
         # The generation extra is only for the offline partition generator;
         # the runtime codec/freshness tests also run without it in the root suite.
         working-directory: packages/map-core
+        env:
+          # These tests carry main-spec requirement annotations and are the only
+          # runtime evidence for them, so the preflight run writes the same
+          # evidence shape the shard jobs write.
+          OPENSPEC_TEST_EVIDENCE: evidence.map-core.jsonl
         run: uv run --locked --extra generation python -m pytest tests
+
+      - name: Upload map-core requirement evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: map-core-artifacts
+          path: packages/map-core/evidence.map-core.jsonl
+          if-no-files-found: error
 
       - name: Validate map reference context freshness
         run: uv run --locked python -m tools.map_reference_context --check
@@ -563,10 +575,12 @@ jobs:
             test -s "evidence.browser-shard-${index}.jsonl" || { echo "evidence.browser-shard-${index}.jsonl is missing or empty"; exit 1; }
           done < <(uv run --locked python -c \
             "import json; print('\n'.join(str(s['index']) for s in json.load(open('.github/browser-shards.json'))['shards']))")
+          test -s "evidence.map-core.jsonl" || { echo "evidence.map-core.jsonl is missing or empty"; exit 1; }
 
       - name: Concatenate requirement evidence in entry-point order
         run: >-
-          cat evidence.evennia-shard-*.jsonl evidence.browser-shard-*.jsonl evidence.top-level-shard-*.jsonl
+          cat evidence.map-core.jsonl evidence.evennia-shard-*.jsonl
+          evidence.browser-shard-*.jsonl evidence.top-level-shard-*.jsonl
           > evidence.combined.jsonl
 
       - name: Verify successful requirement execution

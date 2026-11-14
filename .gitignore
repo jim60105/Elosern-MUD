@@ -73,6 +73,8 @@ env/
 coverage-*
 coverage.json
 coverage.xml
+# Requirement evidence a test run appends to (one file per CI job).
+evidence.*.jsonl
 .tox
 toolbox/*.lock
 *.mo
