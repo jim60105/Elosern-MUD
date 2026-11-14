@@ -84,6 +84,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
             "ART_TRANSLATE_ENABLED": "OFF",
             "ART_TRANSLATE_DOWNLOAD_ENABLED": "Yes",
             "ART_SCHEDULER_ENABLED": "OFF",
+            "POPULATION_DRAIN_ENABLED": "No",
             "ELOSERN_VUE_CLIENT": "Yes",
         }
         result = self._run(_settings_repr(BOOL_SETTINGS), **env)
@@ -98,6 +99,7 @@ class ValidCoercionTests(_SubprocessSettingsTests):
                 "ART_TRANSLATE_ENABLED": "False",
                 "ART_TRANSLATE_DOWNLOAD_ENABLED": "True",
                 "ART_SCHEDULER_ENABLED": "False",
+                "POPULATION_DRAIN_ENABLED": "False",
                 "ELOSERN_VUE_CLIENT": "True",
             },
         )
