@@ -169,6 +169,14 @@ Ground rules:
   test_package_proposal test_quests_observability` — 76 tests, `OK`. That is
   30 labels and 643 tests, none red.
 
+  Three more groups after that: `typeclasses.tests.test_exit_movement_cost
+  test_exits test_map_discovery` — 48 tests, `OK`;
+  `typeclasses.tests.test_npc_dialogue
+  commands.tests.test_localized.test_xyz_grid_and_help
+  world.quests.tests.test_room_observation` — 94 tests, `OK`;
+  `world.quests.tests.test_scene_smoke test_story_dialogue
+  world.rules.tests.test_dialogue_refresh_lifecycle` — 24 tests, `OK`.
+
   Still unrun: the twelve `web.webclient.presentation` labels
   (`test_exploration_panel.test_presenter`,
   `test_exploration_panel.test_wilderness_and_npc_titles`, the eight
