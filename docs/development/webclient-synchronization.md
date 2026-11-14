@@ -313,13 +313,14 @@ notice again but never writes it to the full log twice. A recognized non-success
 result during travel adds one local refusal entry (`refusal:<request id>`,
 committed server time, server message) and never a second full-log line.
 
-### Camp preview and camp
+### Camp preview, camp and the landmark rite
 
 The whole-party camp (wilderness-camping) adds two exploration actions with
 exact payloads and exact success data slots, validated on both boundaries
 (`web/webclient/actions/exploration_actions.py` `validate_camp_preview_data` /
 `validate_camp_result_data`, mirrored by `protocol/core.js`
-`validateCampPreviewData` / `validateCampData`):
+`validateCampPreviewData` / `validateCampData`). The landmark rite action
+follows the same exact-payload and request-identity rules:
 
 - `explore.camp_preview` takes exactly `{}` and answers through the
   result-only path (no panel, no revision): `{available, refusal,
