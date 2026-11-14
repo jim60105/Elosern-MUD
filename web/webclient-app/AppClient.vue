@@ -238,6 +238,17 @@ const riteStage = useRiteStage({ store, panel, travelLayout, blocked: choicesOwn
 const riteOnStage = riteStage.onStage;
 // The rite card or the stage holds the stage: the presence rail steps away.
 const riteSurfaceOpen = computed(() => riteStage.cardOpen.value || riteStage.onStage.value);
+// The return entry and its R key wait while another centred card owns the
+// choices anchor (the dream and sleep-handoff cards, the camp card, the room
+// card or a person's card), so the rite card never opens beneath one.
+const riteEntryShown = computed(
+  () =>
+    riteStage.entryShown.value &&
+    !choicesOwnedBySleep.value &&
+    !campOpen.value &&
+    !roomCardOpen.value &&
+    !presenceCardOpen.value,
+);
 const riteEntryRef = ref(null);
 const landmarkCardOpen = computed(
   () => !!landmarkArrival.value && !choicesOwnedBySleep.value && !riteStage.rite.value,
@@ -294,7 +305,7 @@ watch(
   },
 );
 function onRiteEntryOpen() {
-  if (!riteStage.entryShown.value) return false;
+  if (!riteEntryShown.value) return false;
   return riteStage.openEntry();
 }
 // The shell's bindings while the rite stage is presented (design D3); every
@@ -1693,7 +1704,7 @@ const rootStyle = computed(() => {
              D4): directly under the place card while the rite panel is
              available and neither its card nor its stage is open. -->
         <RiteEntry
-          v-if="riteStage.entryShown.value"
+          v-if="riteEntryShown"
           ref="riteEntryRef"
           :guardian="riteStage.rite.value.guardian.name"
           @open="riteStage.openEntry()"

@@ -202,6 +202,33 @@ describe("the rite arrival card", () => {
     expect(s.find("rite-panel").exists()).toBe(true);
   });
 
+  it("the entry and R wait while a sleep-handoff card owns the choices anchor", async () => {
+    const s = await travelStage();
+    await s.commitRite(ritePanel());
+    await s.key(s.find("rite-arrival-card").element, "Escape");
+    expect(s.find("rite-entry").exists()).toBe(true);
+    s.publish({ sleep_handoff: sleepHandoffPanel() });
+    await tick();
+    expect(s.find("sleep-handoff-card").exists()).toBe(true);
+    expect(s.find("rite-entry").exists()).toBe(false);
+    await s.key(document.body, "r", { code: "KeyR" });
+    expect(s.store.view.rite.phase).toBe("closed");
+    expect(s.find("rite-arrival-card").exists()).toBe(false);
+  });
+
+  it("the committed mode leaving exploration drops the stage", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    s.accept("ui_update", fx.update({ revision: s.next(), mode: "combat", panels: { context_actions: fx.combatActions() } }));
+    await tick();
+    await tick();
+    expect(s.store.view.mode).toBe("combat");
+    expect(s.find("rite-panel").exists()).toBe(false);
+    expect(s.find("rite-backdrop").exists()).toBe(false);
+    expect(s.find("rite-entry").exists()).toBe(false);
+    expect(s.store.view.rite.phase).toBe("closed");
+  });
+
   it("waits behind a sleep-handoff card and opens once it closes", async () => {
     const s = await travelStage();
     s.publish({ sleep_handoff: sleepHandoffPanel() });
