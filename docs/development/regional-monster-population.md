@@ -2998,12 +2998,14 @@ the outer one's marker.
   relocation records a presence transition for the cells it leaves and enters,
   and a catch-up can move the relocated individual itself.
 - A terminal combat settlement catches its own recorded population cell up
-  before it writes the closed protection interval
-  (`world/rules/combat_session/settlement.py::_catch_up_population_cell`, called
-  before that protection write). A party that no longer stands on its
-  battlefield -- an arrival contact that stopped the relocation, a retirement --
-  would otherwise reach the writer with that unit behind; the cell is settled to
-  the current tick first.
+  before it opens its transaction (`_catch_up_population_cell`) and announces
+  that cell for its own clock advances (`_announced_population_cell`, in
+  `world/rules/combat_session/settlement.py`). A party that no longer stands on
+  its battlefield -- an arrival contact that stopped the relocation, a
+  retirement -- would otherwise leave the fight cell's unit behind the tick the
+  closed protection interval requires; the announced cell is settled by the
+  settlement's own advance, so the protection write never needs a catch-up
+  inside a transaction.
 
 **The rule for new code.** Any new code that writes population state for a
 cell, or reads it to decide something, calls `ensure_locations_current` before

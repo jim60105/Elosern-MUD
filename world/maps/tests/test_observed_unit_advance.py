@@ -23,6 +23,7 @@ from __future__ import annotations
 from types import MappingProxyType
 from unittest.mock import patch
 
+from django.test import override_settings
 from evennia.contrib.grid.wilderness.wilderness import enter_wilderness
 
 import world.lore.monster_activity as lore_activity
@@ -625,6 +626,46 @@ class DefeatProtectionTests(ObservedAdvanceFixture):
         # The defeat settlement writes the fight cell's protection evidence; the
         # writer refuses a lagging unit by name, so the settlement catches the
         # cell up before its own transaction.
+        forfeit(player)
+        now = int(get_world_clock().tick)
+        self.assertGreater(now, 700, "the settlement advanced the clock")
+        self.assertEqual(self.settled_through(self.unit_b), now)
+        protection = read_population_timeline(self.wilderness).protection
+        self.assertTrue(
+            [
+                entry
+                for entry in protection
+                if (int(entry.cell.x), int(entry.cell.y)) == battlefield
+            ]
+        )
+
+    @override_settings(POPULATION_CATCH_UP_REFUSES_NESTED=True)
+    def test_the_settlement_announces_its_cell_for_the_aftermath_advance(self):
+        self._build_scenario()
+        self._publish_contact()
+        battlefield = WANDER_B
+        player = self.place_party(battlefield)
+        enter_wilderness(player, coordinates=battlefield, name=WILDERNESS_NAME)
+        self._group(
+            cell=battlefield,
+            activity=CONTACT_STATIONARY,
+            owner_key=ZONE_B,
+            tick=START,
+            members=1,
+        )
+        admitted = field_contact.admit_field_contact_at(
+            player, source_id=field_contact.SOURCE_FIELD, tick=START
+        )
+        self.assertIsNotNone(admitted)
+        # The party still stands on the battlefield, so the observed advance
+        # settles the fight cell's unit to the world tick...
+        self.advance(600)
+        self.assertEqual(self.settled_through(self.unit_b), 700)
+        # ...and the party then leaves it. The settlement's own entry catch-up
+        # is inert (the unit is current) and the production nested refusal is
+        # on, so only the announced cell can keep the unit current through the
+        # defeat aftermath's advance.
+        enter_wilderness(player, coordinates=WANDER_A, name=WILDERNESS_NAME)
         forfeit(player)
         now = int(get_world_clock().tick)
         self.assertGreater(now, 700, "the settlement advanced the clock")
