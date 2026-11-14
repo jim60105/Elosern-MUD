@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 from django.db import transaction
 
+from tools.spec_traceability import covers_requirement
+
 from world.maps import population_lifecycle, regional_population
 from world.maps import monster_activity as activity_owner
 from world.maps.monster_activity import (
@@ -92,6 +94,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
             return DEPARTURE_TICK
         return state.journeys[journey_id].arrival_tick
 
+    @covers_requirement(
+        "observability-logging::world-maintenance-settlement-reports-one-aggregated-event-per-pass"
+    )
     def test_many_groups_emit_one_info_summary_and_debug_detail(self) -> None:
         self._register_lifecycle()
         seed = self._departure_seed(tick=DEPARTURE_TICK, members=2)
@@ -128,6 +133,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
         self.assertEqual(debug_events.count("monster_departed"), len(bodies))
         self.assertEqual(debug_events.count("monster_arrived"), len(bodies))
 
+    @covers_requirement(
+        "observability-logging::world-maintenance-settlement-reports-one-aggregated-event-per-pass"
+    )
     def test_a_quiet_pass_emits_no_summary(self) -> None:
         self.assertTrue(regional_population.population_provisioned(self.wilderness))
         with (
@@ -137,6 +145,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
             settle_population_lifecycle(0, 0)
         lifecycle_info.assert_not_called()
 
+    @covers_requirement(
+        "observability-logging::world-maintenance-settlement-reports-one-aggregated-event-per-pass"
+    )
     def test_a_rolled_back_advance_emits_neither_summary_nor_detail(self) -> None:
         self._register_lifecycle()
         seed = self._departure_seed(tick=DEPARTURE_TICK, members=2)
@@ -170,6 +181,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
         ):
             logged.assert_not_called()
 
+    @covers_requirement(
+        "observability-logging::maintenance-events-outside-a-settlement-pass-keep-info-level"
+    )
     def test_a_direct_owner_decision_stays_at_info(self) -> None:
         group_id, _bodies = self._group(tick=0, members=1)
         decision = plan_group_decision(self.wilderness, group_id, tick=90)
@@ -191,6 +205,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
         )
         activity_debug.assert_not_called()
 
+    @covers_requirement(
+        "observability-logging::maintenance-events-outside-a-settlement-pass-keep-info-level"
+    )
     def test_fatigue_settled_outside_a_pass_stays_at_info(self) -> None:
         body = self._monster()
         interval = FatigueInterval(
@@ -205,6 +222,9 @@ class PopulationMaintenanceLogTests(ActivityFixture):
         self.assertEqual(_events(fatigue_info), ["fatigue_transition"])
         fatigue_debug.assert_not_called()
 
+    @covers_requirement(
+        "observability-logging::maintenance-events-outside-a-settlement-pass-keep-info-level"
+    )
     def test_a_contact_inside_a_pass_stays_at_info_and_is_not_counted(self) -> None:
         body = self._monster()
         interval = FatigueInterval(
