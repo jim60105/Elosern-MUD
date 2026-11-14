@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_reindeer_shoal
+location_ref: village_reindeer_shoal
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 242
+    y_m: 200
+    prototype_parent: anchor_room
+    key: 鹿角圖騰
+    desc: 寨心鋪著一層混了細砂的平地，馴鹿圖騰的角枝向兩側張開。北邊的淺灘在晴天才看得見水光。
+    anchor_key: village_reindeer_shoal
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 443
+    y_m: 200
+    prototype_parent: grid_room
+    key: 東寨門
+    desc: 東寨門通往鹿鳴渡，門外的路沿著河灘延伸。趕鹿的族人從這裡把鹿群帶去下游。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 342
+    prototype_parent: grid_room
+    key: 西北寨門
+    desc: 西北寨門朝霜風鎮的方向，門邊堆著餵鹿用的乾草。冬天草料吃緊時，這堆草要按日分發。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 242
+    y_m: 100
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子南側的砂地上，壇前圍著鹿角搭成的籬。族人遷移鹿群前會先來壇前辭行。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

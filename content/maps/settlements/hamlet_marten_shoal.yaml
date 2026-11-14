@@ -1,0 +1,47 @@
+version: 1
+kind: settlement
+id: hamlet_marten_shoal
+location_ref: hamlet_marten_shoal
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  crossing:
+    x_m: 155
+    y_m: 155
+    prototype_parent: anchor_room
+    key: 圖騰柱下
+    desc: ''
+    anchor_key: hamlet_marten_shoal
+    typeclass:
+    scene_archetype: city_street
+  homestead_front:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 火塘邊
+    desc: ''
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: crossing
+  destination: homestead_front
+  direction: sw
+- source: homestead_front
+  destination: crossing
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: crossing
+city_gate:

@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_deer_vale
+location_ref: village_deer_vale
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 315
+    y_m: 208
+    prototype_parent: anchor_room
+    key: 寨心廣場
+    desc: 寨心是一片夯實的平地，中央的鹿角圖騰柱高過屋頂。谷底的水氣讓木柱上長出薄薄一層青苔。
+    anchor_key: village_deer_vale
+    typeclass:
+    scene_archetype: city_street
+  village_end_east:
+    x_m: 530
+    y_m: 208
+    prototype_parent: grid_room
+    key: 東寨門
+    desc: 東寨門正對角原城方向，門外的官道沿谷地東行。清晨常有鹿群在門外林緣停留。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_west:
+    x_m: 100
+    y_m: 208
+    prototype_parent: grid_room
+    key: 西寨門
+    desc: 西寨門通往影林城那一側的林子，門前架著拒馬。守門的族人習慣在這裡分派獵隊。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 315
+    y_m: 100
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在南邊的谷坡上，壇前的石階一路通到寨心。祭壇後方是鹿谷最密的林子。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_east
+  direction: e
+- source: village_end_east
+  destination: village_green
+  direction: w
+- source: village_green
+  destination: village_end_west
+  direction: w
+- source: village_end_west
+  destination: village_green
+  direction: e
+- source: village_green
+  destination: shrine_front
+  direction: s
+- source: shrine_front
+  destination: village_green
+  direction: n
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: w
+    destination_node: village_end_east
+  - return_direction: e
+    destination_node: village_end_west
+city_gate:

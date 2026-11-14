@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_bear_ridge
+location_ref: village_bear_ridge
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 236
+    y_m: 236
+    prototype_parent: anchor_room
+    key: 寨心圖騰
+    desc: 寨心立著熊首圖騰，柱腳拴著幾匹剛從山坡牽下來的馱獸。四野是高過屋脊的草坡。
+    anchor_key: village_bear_ridge
+    typeclass:
+    scene_archetype: city_street
+  village_end_southeast:
+    x_m: 372
+    y_m: 100
+    prototype_parent: grid_room
+    key: 東南寨門
+    desc: 東南寨門順著山脊下行，通往西渡營那一頭的官道。門外坡面開著成片的野花。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_northwest:
+    x_m: 100
+    y_m: 372
+    prototype_parent: grid_room
+    key: 西北寨門
+    desc: 西北寨門朝角原城的方向，門洞正對著山脊缺口。風從缺口灌進來，吹得門上的骨鈴作響。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 168
+    y_m: 168
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇築在寨子西南的緩坡上，壇面向著熊脊最高處。祭壇四周的石縫裡長著耐寒的苔草。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_southeast
+  direction: se
+- source: village_end_southeast
+  destination: village_green
+  direction: nw
+- source: village_green
+  destination: village_end_northwest
+  direction: nw
+- source: village_end_northwest
+  destination: village_green
+  direction: se
+- source: village_green
+  destination: shrine_front
+  direction: sw
+- source: shrine_front
+  destination: village_green
+  direction: ne
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: nw
+    destination_node: village_end_southeast
+  - return_direction: se
+    destination_node: village_end_northwest
+city_gate:

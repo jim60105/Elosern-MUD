@@ -1,0 +1,79 @@
+version: 1
+kind: settlement
+id: village_lynx_den
+location_ref: village_lynx_den
+options:
+  map_visual_range: 2
+  map_mode: nodes
+exit_prototype:
+  prototype_parent: xyz_exit
+  typeclass: typeclasses.exits.CostedXYZExit
+nodes:
+  village_green:
+    x_m: 234
+    y_m: 234
+    prototype_parent: anchor_room
+    key: 貓影圖騰
+    desc: 寨心鋪著山貓形狀的石板，中央的圖騰柱刻著躍起的貓影。石板縫裡嵌滿了細碎的獸牙。
+    anchor_key: village_lynx_den
+    typeclass:
+    scene_archetype: city_street
+  village_end_northeast:
+    x_m: 368
+    y_m: 368
+    prototype_parent: grid_room
+    key: 東北寨門
+    desc: 東北寨門通往鐵爪城，門外那道坡是整片丘陵最陡的一段。馱隊經過時總要在門前歇腳。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  village_end_southwest:
+    x_m: 100
+    y_m: 100
+    prototype_parent: grid_room
+    key: 西南寨門
+    desc: 西南寨門朝獵鷹鎮的方向，門洞正對著南邊的官道。鎮上的獵戶常從這道門進出。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+  shrine_front:
+    x_m: 301
+    y_m: 167
+    prototype_parent: grid_room
+    key: 祖靈祭壇
+    desc: 祖靈祭壇在寨子東南的高地上，壇前立著一根磨亮的石柱。獵隊出發前會繞著石柱走上三圈。
+    anchor_key:
+    typeclass:
+    scene_archetype: city_street
+roads:
+- source: village_green
+  destination: village_end_northeast
+  direction: ne
+- source: village_end_northeast
+  destination: village_green
+  direction: sw
+- source: village_green
+  destination: village_end_southwest
+  direction: sw
+- source: village_end_southwest
+  destination: village_green
+  direction: ne
+- source: village_green
+  destination: shrine_front
+  direction: se
+- source: shrine_front
+  destination: village_green
+  direction: nw
+wilderness_entry:
+  shape:
+  - '#'
+  offset:
+    dx: 0
+    dy: 0
+  single_cell_footprint: true
+  gates:
+  - return_direction: sw
+    destination_node: village_end_northeast
+  - return_direction: ne
+    destination_node: village_end_southwest
+city_gate:
