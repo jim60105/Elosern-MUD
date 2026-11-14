@@ -447,6 +447,7 @@
       "name": "rules-13-1",
       "workers": 4,
       "labels": [
+        "world.rules.tests.test_landmark_rite_record",
         "world.rules.tests.test_party_identity",
         "world.rules.tests.test_party_inventory_transfer",
         "world.rules.tests.test_party_inventory_view",
