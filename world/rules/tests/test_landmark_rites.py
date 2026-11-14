@@ -118,6 +118,7 @@ class RiteSettlementFixture(EvenniaTest):
         )
         self.enterContext(installed(SNAPSHOT))
         self.companion = self._companion("測試同伴")
+        self.assertNotEqual(self.player.pk, self.companion.pk)
 
     def _companion(self, key: str, location: Any = None):
         npc = create_object(NPC, key=key, location=self.player.location)
@@ -429,6 +430,36 @@ class RiteRefusalTests(RiteSettlementFixture):
             "world.rules.time_skip.planned_seconds", return_value=SOLO_SECONDS - 60
         ):
             self.refused("rite_interrupted", lambda: self.perform(self.player, "solo"))
+
+    def test_a_post_preflight_refusal_names_the_owner_not_the_body(self):
+        # The resolved plan carries both roles: the refused event must still
+        # name the record owner, not the companion that would have performed.
+        with patch(
+            "world.rules.time_skip.planned_seconds", return_value=SHARED_SECONDS - 60
+        ):
+            self.refused(
+                "rite_interrupted",
+                lambda: self.perform(
+                    self.player, "shared", member_id=self.companion.id
+                ),
+                actor=self.companion,
+                char=self.player.pk,
+                district=DISTRICT_KEY,
+            )
+
+    def test_an_unreadable_site_still_reports_the_refusal(self):
+        # The refusal code is already determined when the diagnostic identity
+        # re-read runs: a broken site read may drop the district, never the code.
+        with patch(
+            "world.rules.landmark_rites.rite_site_for",
+            side_effect=[None, RuntimeError("site unreadable")],
+        ):
+            self.refused(
+                "rite_no_landmark",
+                lambda: self.perform(self.player, "solo"),
+                char=self.player.pk,
+                district="",
+            )
 
     def test_a_corrupt_record_is_refused_and_left_untouched(self):
         corrupt = {"schema_version": 1, "completed": {DISTRICT_KEY: "not a mapping"}}

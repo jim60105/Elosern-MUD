@@ -310,7 +310,7 @@ def _refusal_identity(actor: Any) -> tuple[Any, str]:
     try:
         owner = record_owner_for(actor)
         site = rite_site_for(owner)
-    except Exception:  # observability: ignore R2: a diagnostic re-read must never mask the refusal it annotates; an unreadable owner, site or room degrades to the acting body and no district
+    except Exception:  # observability: ignore R2: a diagnostic re-read must never mask the refusal it annotates; an unresolvable owner degrades to the acting body, and an unreadable site keeps the owner and reports no district
         return (actor if owner is None else owner), ""
     return owner, "" if site is None else site.district_key
 
@@ -378,10 +378,13 @@ def _settle(plan: RitePlan, actor: Any, operation_id: str | None) -> RiteResult:
     )
     tick_snapshot = _snapshot_clock_tick(clock)
     record_snapshot = attribute_snapshot(owner, RECORD_ATTR)
-    climax_before = body.sexual.climax_today
     first_completion = site.district_key not in read_record(owner)["completed"]
     try:
         with transaction.atomic():
+            # Read inside the transaction: a first-time body's baseline
+            # materializes here, so a failure drops it with the savepoint
+            # instead of leaving it behind.
+            climax_before = body.sexual.climax_today
             apply_pleasure_gain(body, 100)
             apply_pleasure_gain(body, 0)
             body.sexual.shame.value += option.shame
