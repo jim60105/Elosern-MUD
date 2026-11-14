@@ -2,14 +2,17 @@ import { h } from "vue";
 import RiteArrivalCard from "../../components/rite/RiteArrivalCard.vue";
 import RitePanel from "../../components/rite/RitePanel.vue";
 import RiteBackdrop from "../../components/rite/RiteBackdrop.vue";
+import RiteEntry from "../../components/rite/RiteEntry.vue";
+import PlaceCard from "../../components/PlaceCard.vue";
 import { ritePerformers } from "../../components/rite/rite-model.js";
 import { RITE_ART_PANEL, RITE_PARTY, ritePanel, ritePanelWithArt } from "../fixtures/rite.js";
 
 // The landmark rite surfaces (landmark-rite-surfaces; approved prototype
 // Design/LandmarkRites): the rite arrival card, the rite panel and the rite
-// backdrop, each rendered alone over a synthetic committed `rite` panel.
-// Nothing mounts them in the client yet and they send nothing: the card
-// emits approach / leave and the panel perform(key) / leave.
+// backdrop, each rendered alone over a synthetic committed `rite` panel, and
+// the return entry under the place card. They send nothing: the card emits
+// approach / leave, the panel perform(key) / leave and the entry open; the
+// client shell (`composables/use-rite-stage.js`) mounts them.
 //
 // The cards sit in a frame sized like HudFrame's `choices` anchor over the
 // dialogue stage (centred, min(560px·S, 40%) wide, from the top inset to the
@@ -80,6 +83,33 @@ const backdrop = (args) => ({
   render: () => stage([h(RiteBackdrop, { rite: args.rite, artPanel: RITE_ART_PANEL })]),
 });
 
+// The return entry in a column sized like HudFrame's `map` anchor (top
+// right, 230px·S wide), directly under the place card.
+const entry = (args) => ({
+  render: () =>
+    stage([
+      h(
+        "div",
+        {
+          style: {
+            position: "absolute",
+            top: "var(--stage-inset-y)",
+            right: "calc(16px * var(--ui-scale))",
+            width: "calc(230px * var(--ui-scale))",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: "calc(9px * var(--ui-scale))",
+          },
+        },
+        [
+          h(PlaceCard, { locationLabel: args.rite.district.landmark, timeLabel: "春 3 日 ‧ 09:40・白晝", motionLevel: "full" }),
+          h(RiteEntry, { guardian: args.rite.guardian.name }),
+        ],
+      ),
+    ]),
+});
+
 export default {
   title: "World/LandmarkRite",
   component: RiteArrivalCard,
@@ -135,3 +165,7 @@ export const PanelThreeOptions = {
 export const Backdrop = { render: backdrop, args: { rite: ritePanelWithArt() } };
 // No art: quiet ink with the same plate.
 export const BackdropNoArt = { name: "Backdrop No Art", render: backdrop, args: { rite: ritePanel() } };
+
+// The return entry under the place card once the card was dismissed on the
+// landmark: activating it (or R) reopens the card as a revisit.
+export const Entry = { render: entry, args: { rite: ritePanel() } };

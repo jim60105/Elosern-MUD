@@ -7,7 +7,7 @@
 // companion performs, an option that does not admit a companion is disabled
 // with its reason. It sends nothing: an activation emits `perform(key)` and
 // 退開 or Escape emits `leave`.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import ChoiceCard from "../ChoiceCard.vue";
 import { UNSEEN_LABEL, riteRows } from "./rite-model.js";
 
@@ -26,11 +26,20 @@ function onPick(key) {
   if (key === "leave") emit("leave");
   else emit("perform", key);
 }
+
+// The host hands focus back to the card's list (the rite stage re-takes it
+// from the message page once the shell has presented the stage).
+const card = ref(null);
+function focus() {
+  card.value?.focus();
+}
+defineExpose({ focus });
 </script>
 
 <template>
   <div class="rite-panel">
     <ChoiceCard
+      ref="card"
       :rows="rows"
       :view-key="`rite-${performer.id}`"
       :trailing-index="rite.options.length"

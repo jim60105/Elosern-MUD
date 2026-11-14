@@ -341,6 +341,24 @@ dream or creation surface owns the stage. There is no server travel mode.
   `unreadLabel`, and emits `perform(key)` / `leave`; `RiteBackdrop` is the
   stage's art under an ink wash with the landmark・guardian plate. The card
   and the panel send nothing themselves: the host dispatches and decides.
+  The store group `stores/elosern/rite.js` publishes `view.rite` (the
+  available panel, the local phase closed/card/stage, the revisit mark, the
+  pending request and the delivery being played) and owns the one
+  `explore.landmark_rite`. `composables/use-rite-stage.js` binds it to the
+  shell: the arrival card replaces `LandmarkCard` (and dismisses the travel
+  arrival it stands for) after the dream and sleep-handoff cards; the stage is
+  local presentation over the committed exploration mode, so only the
+  `AppShell` props switch to the dialogue presentation (`shellMode` and its
+  siblings in AppClient) while every other reader keeps the committed mode;
+  the action dock, the travel map, the presence rail and the right standee
+  leave the stage, the party line-up stands on it and `RiteBackdrop` replaces
+  the map. The delivery plays through `useAuthoredScene` and `MessageWindow`
+  only (a delivery the player cannot present returns the panel at once), and
+  the panel takes focus back from the shell's message-page rescue.
+  `components/rite/RiteEntry.vue` is the return entry under the place card
+  (`◆ <guardian> 儀式`, key R through `use-window-hotkeys.js`'s
+  `onRiteEntry`), shown while the panel is available, the mode is
+  exploration and neither the card nor the stage is open.
 - `PartyMedallions` shows the controlled body once, then each member whose
   own `status.fatigue` row is committed (status v5+ emits one per
   source-present traveller), with its supplied reserve, stage label and
