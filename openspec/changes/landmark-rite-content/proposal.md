@@ -24,7 +24,7 @@ None.
 ## Impact
 
 - New: `world/lore/rites/content/landmark_rites.yaml`, `docs/lore/landmark-rites-review.md`, `world/lore/tests/test_rite_content_document.py`.
-- Edits: `world/lore/rites/__init__.py` (`load_published`), `server/conf/at_server_startstop.py` (one startup step and `STARTUP_STEP_ORDER`), `server/conf/tests/test_startup_observability.py`, `world/lore/tests/test_rite_content.py`, `.github/evennia-shards.json`, `tools/test_data_freeze.json`.
+- Edits: `world/lore/rites/__init__.py` (`load_published`), `server/conf/at_server_startstop.py` (one startup step and `STARTUP_STEP_ORDER`), `server/conf/tests/test_startup_observability.py`, `world/lore/tests/test_rite_content.py`, `.github/evennia-shards.json`, `tools/test_data_freeze.json`, `tools/test_data_lint_seed.json`, and the regenerated `content/map-reference-context.json` (it hashes every `world/lore/**/*.py` file).
 - The other five archetypes (`landmark-rite-content-completion`), the watch perspectives, a third option and art are separate changes.
 
 ## Batch:
