@@ -101,28 +101,21 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 "the exploration root renders exactly one compass pane",
             )
             self.assertEqual(page.locator("#action-dock [data-item-key]").count(), 0)
-            # A pointed-at room action carries the muted-gold fill
-            # (webclient-desktop-shell: the focused or hovered control is
-            # marked by a muted-gold fill) — the flat --gold-glow token,
-            # resolved through a probe node inside the client root (the token
-            # is declared on .elosern-root, not :root).
+            # A pointed-at room action is marked by its brass tick, not a
+            # fill (place-card-instrument-panel: the room actions wear no
+            # chrome; the tick fades in over --motion-fast).
             wait_button = page.locator('[data-anchor="map"] [data-testid="place-card-wait"]')
             wait_button.hover()
-            page.wait_for_timeout(200)
-            gold_glow = page.evaluate(
-                """() => {
-                    const probe = document.createElement('span');
-                    probe.style.background = 'var(--gold-glow)';
-                    document.querySelector('#action-dock').appendChild(probe);
-                    const rgb = getComputedStyle(probe).backgroundColor;
-                    probe.remove();
-                    return rgb;
-                }"""
+            page.wait_for_function(
+                """() => getComputedStyle(
+                  document.querySelector('[data-anchor="map"] [data-testid="place-card-wait"]'), '::after'
+                ).opacity === '1'""",
+                timeout=5000,
             )
             self.assertEqual(
                 wait_button.evaluate("el => getComputedStyle(el).backgroundColor"),
-                gold_glow,
-                "the hovered 休息 button carries the muted-gold --gold-glow fill",
+                "rgba(0, 0, 0, 0)",
+                "the hovered 休息 button has no fill of its own",
             )
             page.mouse.move(0, 0)
             # The exploration screen draws no detail pane: server-authored
