@@ -2994,13 +2994,22 @@ write by name: `population_units.PopulationUnitNotCurrent` (reason
 `regional_population.current_population_tick()`. The message names the first
 offending unit in sorted order, its settled-through tick and the world tick, so
 an operator sees which unit stopped where. Both answer before reading anything
-when a settlement pass is running (the pass owns the settling) or when the world
-has no population seed (no population state is recorded there). In a
-provisioned world a missing or malformed cursor record refuses through
-`MalformedPopulationState` unchanged.
+when a settlement pass is running or when the world has no population seed (no
+population state is recorded there). In a provisioned world a missing or
+malformed cursor record refuses through `MalformedPopulationState` unchanged,
+so a world provisioned before the cursor record existed refuses on its first
+writer read exactly as it refuses its first advance.
 
-Five writers call the guard before any other read that could raise and before
-any write, so a refusal stores nothing:
+The pass gate is sound for a whole-world pass, which owns every unit: inside it
+the cursors are raised to the advance's end tick before the clock tick moves.
+A writer reachable from a *scoped* pass must therefore also carry the
+active-scope check (`require_units_in_active_scope`), as group creation does, so
+the pass cannot settle the units it owns while another writer stores a lagging
+unit it does not.
+
+Five writers call the guard before any write, and before the timeline, cursor
+and registration reads that could raise for another reason, so a refusal stores
+nothing:
 
 - `regional_population.register_explicit_group` -- the target cell. The group it
   creates is created before its own coordinate and room attachment writes, so a
@@ -3008,7 +3017,8 @@ any write, so a refusal stores nothing:
   refuses before the registration has written anything.
 - `monster_activity.create_group` -- every unit of the group it is about to
   store (`population_units.group_units`): home, position, its activity area and
-  its owner.
+  its owner. It must read the activity record first to reject a duplicate group
+  id, so this is the one writer whose guard follows a read.
 - `regional_population.record_population_transition` -- the before and after
   positions that belong to this wilderness; a position on another map names no
   unit of this record. A presence's home-zone and site markers are deliberately
@@ -3035,4 +3045,6 @@ monster stands on an actual wilderness cell, and `結算落後` with the world t
 minus the cursor when that unit is behind. The read only reads: it never calls a
 catch-up and never settles. A room-resident monster carries no wilderness cell,
 so it reports neither row, and both rows carry the same keys as every other
-placement row.
+placement row. A provisioned world whose cursor record is malformed refuses
+through the owner's error, and the section reports itself unavailable instead
+of the placement ledger.

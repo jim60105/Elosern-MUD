@@ -358,7 +358,8 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertEqual(self.timeline().transitions, ())
 
     def test_a_registration_reaching_a_lagging_area_writes_nothing(self):
-        # The cell itself is current; the group's activity area is in unit B.
+        # The cell and the owner are current; only the group's activity area is
+        # in unit B, so the activity-area unit alone must refuse.
         self.lag()
         self.make_current(self.unit_a)
         individual = self._monster(WANDER_A)
@@ -372,7 +373,7 @@ class WriterRefusalTests(WriterGuardFixture):
                 WANDER_A,
                 tick=START,
                 owner_kind="zone",
-                owner_key=ZONE_B,
+                owner_key=ZONE_A,
                 activity_key=ACTIVITY_B_WANDER,
                 operation_id=f"guard:register:{individual.pk}",
             )
@@ -404,7 +405,8 @@ class WriterRefusalTests(WriterGuardFixture):
         self.assertEqual(self.group_ids(), groups)
 
     def test_a_group_reaching_a_lagging_unit_writes_nothing(self):
-        # The home cell is in the current unit; the activity area is not.
+        # The home cell and the owner are in the current unit; the activity
+        # area is not, so the activity-area unit alone must refuse.
         self.lag()
         self.make_current(self.unit_a)
         individual = self._monster(WANDER_A)
@@ -416,7 +418,7 @@ class WriterRefusalTests(WriterGuardFixture):
                 self.wilderness,
                 operation_id=f"guard:group:{individual.pk}",
                 owner_kind="zone",
-                owner_key=ZONE_B,
+                owner_key=ZONE_A,
                 activity_key=ACTIVITY_B_WANDER,
                 home=_wilderness_ref(WANDER_A),
                 position=_wilderness_ref(WANDER_A),
@@ -456,6 +458,55 @@ class WriterRefusalTests(WriterGuardFixture):
             self.write_protection(WANDER_B)
         self.assertIn(self.unit_b, str(caught.exception))
         self.assert_nothing_written(before, coordinates)
+
+    def test_a_transition_of_a_lagging_home_zone_is_recorded(self):
+        # Both positions are in the current unit; the lagging unit is named
+        # only by the home-zone marker, whose evidence the owner retires once
+        # its own pass has passed the tick.
+        self.lag()
+        self.make_current(self.unit_a)
+        individual = self.bodies[ZONE_A][0]
+        source_id = f"guard:home-zone:{individual.pk}"
+        record_population_transition(
+            self.wilderness,
+            PopulationTransition(
+                source_id=source_id,
+                individual_id=int(individual.pk),
+                occurred_tick=START,
+                before=PopulationPresence(
+                    True, PopulationPosition(WILDERNESS_NAME, *WANDER_A), ZONE_B, None
+                ),
+                after=PopulationPresence(False, None, ZONE_B, None),
+            ),
+        )
+        self.assertIn(
+            source_id,
+            {transition.source_id for transition in self.timeline().transitions},
+        )
+
+    def test_a_transition_position_on_another_map_is_skipped(self):
+        self.lag()
+        individual = self.bodies[ZONE_B][0]
+        source_id = f"guard:other-map:{individual.pk}"
+        record_population_transition(
+            self.wilderness,
+            PopulationTransition(
+                source_id=source_id,
+                individual_id=int(individual.pk),
+                occurred_tick=START,
+                before=PopulationPresence(
+                    True,
+                    PopulationPosition("t_other_wilderness", *WANDER_B),
+                    None,
+                    None,
+                ),
+                after=PopulationPresence(False, None, None, None),
+            ),
+        )
+        self.assertIn(
+            source_id,
+            {transition.source_id for transition in self.timeline().transitions},
+        )
 
     def test_a_departure_from_a_lagging_unit_writes_nothing(self):
         self.lag()

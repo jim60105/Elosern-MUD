@@ -1086,6 +1086,33 @@ class RecoveryLifecycleTests(RegistryIsolationMixin, EvenniaTest):
         settle_population_lifecycle(100, 100)
         self.assertEqual(zone_state(self.wilderness, ZONE_KEY).recovery_due_tick, 110)
 
+    def test_an_operator_teleport_catches_a_lagging_unit_up_before_it_writes(self):
+        from world.maps import population_units
+        from world.rules.movement_settlement import settle_relocation
+
+        self._use_zone()
+        self.assertTrue(
+            enter_wilderness(self.char2, coordinates=PROBE, name=WILDERNESS_NAME)
+        )
+        destination = self.char2.location
+        created = self._initialized(tick=100)
+        # The durable world tick runs ahead of every cursor, so only the
+        # relocation's own catch-up can make the endpoint units current before
+        # it records the presence transition.
+        self.clock.tick = 110
+        self.clock._persist(110)
+        self.assertEqual(len(population_units.read_unit_cursors(self.wilderness).units), 0)
+        settle_relocation(Monster.objects.get(pk=created[0]), destination)
+        cursors = population_units.read_unit_cursors(self.wilderness)
+        self.assertTrue(cursors.units, "the relocation caught at least one unit up")
+        self.assertTrue(all(value >= 110 for value in cursors.units.values()))
+        relocations = [
+            transition
+            for transition in read_population_timeline(self.wilderness).transitions
+            if transition.source_id.startswith("relocation:")
+        ]
+        self.assertEqual(len(relocations), 1)
+
     # -- observation routes -------------------------------------------------
 
     @covers_requirement(

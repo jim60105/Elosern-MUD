@@ -69,6 +69,7 @@ from world.rules.fatigue import (
 from world.rules.monster_individual import construct_species_individual
 from world.rules.movement_edges import LocationRef
 from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.population_cursor_stage import register_cursor_stage
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registries
 from world.skills.registry import SkillCategory, TargetSpec
 from world.tests.synthetic_data import make_skill
@@ -724,6 +725,10 @@ class MappedPaidCursorTests(EvenniaTest):
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=_SEED, tick=0)
+        # The exact physiology this class asserts would not survive a real
+        # lifecycle pass, so the fixture takes only the stage's cursor step and
+        # the writer guards see a current unit.
+        register_cursor_stage(self, self.wilderness)
         self.player = _player("mapped paid player")
         self.assertTrue(
             enter_wilderness(

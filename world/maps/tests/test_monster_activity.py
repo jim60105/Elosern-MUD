@@ -647,6 +647,7 @@ class SeededDecisionTests(ActivityFixture):
         rows = {entry["label"]: entry for entry in section["rows"]}
         self.assertIn("活動", rows)
         self.assertIn("下一次決策", rows)
+        self.assertIn("實際座標", rows)
         # A current unit carries its progress and no behind row, with the same
         # row keys as the neighbouring activity row.
         self.assertEqual(rows["結算進度"]["value"], "100")

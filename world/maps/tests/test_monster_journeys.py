@@ -62,6 +62,7 @@ from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.monster_individual import construct_species_individual
 from world.rules.movement_edges import LocationRef, PhysicalEdge
 from world.tests.geography_fixture import publish_shipped_map_world
+from world.tests.population_cursor_stage import register_cursor_stage
 from world.tests.synthetic_data import SYNTH_MONSTER_VARIANTS, synthetic_registries
 
 PROBE = (500, 700)
@@ -458,7 +459,10 @@ class MappedFleeIntegrationTests(EvenniaTest):
         )
         self.wilderness = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         initialize_population_seed(self.wilderness, seed=SEED, tick=0)
-        self._register_cursor_stage()
+        # The shipped placement's births name variants the synthetic registry
+        # does not carry, so the real lifecycle stage cannot run here; this
+        # fixture needs only its cursor step to keep the writer guards honest.
+        register_cursor_stage(self, self.wilderness)
         self.assertTrue(
             enter_wilderness(self.char1, coordinates=PROBE, name=WILDERNESS_NAME)
         )
@@ -502,32 +506,6 @@ class MappedFleeIntegrationTests(EvenniaTest):
             tick=0,
         )
         return individual
-
-    def _register_cursor_stage(self) -> None:
-        """Keep the settlement cursors with the world tick, as production does.
-
-        Production's population lifecycle stage raises every unit cursor to the
-        advance's end tick before the clock tick moves. This fixture cannot run
-        that stage: it publishes the shipped placement, whose births name
-        variants the synthetic species registry does not carry. The seam
-        therefore performs the stage's cursor step alone, so the writer guards
-        see the same world production gives them.
-        """
-        from world.maps import population_lifecycle, population_units
-        from world.rules import clock as clock_module
-
-        def settle(start_tick: int, end_tick: int):
-            population_units.advance_unit_cursors(
-                self.wilderness, None, int(end_tick)
-            )
-            return []
-
-        clock_module.register_event_source(population_lifecycle.STAGE_KIND, settle, None)
-        self.addCleanup(
-            clock_module._EVENT_SOURCES.pop,
-            population_lifecycle.STAGE_KIND,
-            None,
-        )
 
     @covers_requirement(
         "monster-journeys::mapped-individual-escape-commits-a-real-adjacent-departure",
