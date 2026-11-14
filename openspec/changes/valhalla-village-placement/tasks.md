@@ -97,8 +97,8 @@ Ground rules:
   are unique within their map and no description is empty. Villages name the
   totem ground and the ancestral altar, camps the totem pole and the shared
   hearth; every entrance names the direction and the neighbour it leads to; no
-  shop, guild branch or service is presented as usable. The first D9 timing
-  line taken on the stable pre-map tree: see the hand-off.
+  shop, guild branch or service is presented as usable. The D9 timing lines are
+  recorded in task 1.2 and task 5.4.
 - [x] 4.3 Regenerate per design D6. Verify: compared with the artifact of task 3.2 (keep a copy in the scratchpad), the only changed line of `world/maps/data/road_network.json` is `source_signature`.
 
   Result: `/tmp/valhalla-placing/road_after_villages.json` is the task 3.2
@@ -117,9 +117,39 @@ Ground rules:
 
 ## 5. Validation and hand-off
 
-- [ ] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
+- [x] 5.1 Replace `tools/settlement_spacing_areas.json` with the "After" content of design D7 and run the four checks of D7. Verify: all four hold. Fix a `road_gap` as D7 says and repeat the affected groups.
+
+  Result: all four hold. The "After" area list was enabled after the village
+  spur regeneration, before any map was written, so the real checker spoke
+  early; the final run reports `check_map_sources.py` exit 0 with
+  `game-adoption cross-file problems: 0`, `settlement_spacing` `spacing: 0
+  problems`, `settlement_synthesis lint` `fit: 0 errors, 0 warnings`, and both
+  `road_network --check` and `map_reference_context --check` `is up to date`.
+  No `road_gap` remained, so no group was repeated for one.
 - [ ] 5.2 Run every module of `docs/development/settlement-synthesis.md` § Settlement-sensitive test modules, one per command, plus `world.lore.tests.test_anchors` and `world.maps.tests.test_population_geometry` with the test prefix. Verify: every one passes. Handle a failure with that section's "Residual pin rule" and list every rewritten test in the hand-off. Any other failure stops the change without a commit.
-- [ ] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
+- [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
+
+  Result: six images rendered and read from the current disk sources.
+  Continent `/tmp/valhalla-placing/continent.webp` (`--hide partition`) and the
+  northwest region `/tmp/valhalla-placing/continent_northwest.png`
+  (`--bounds 140 1290 1360 1925`). Settlements:
+  `/tmp/valhalla-placing/village_deer_vale.png`,
+  `/tmp/valhalla-placing/village_otter_ford.png`,
+  `/tmp/valhalla-placing/hamlet_otter_tail.png`,
+  `/tmp/valhalla-placing/hamlet_trout_shoal.png`. Entrances:
+  `village_deer_vale` has an east and a west entrance on the horn plain to
+  shadow wood trunk — east toward the horn plain city, west toward the shadow
+  wood city. `village_otter_ford` has an east and a west entrance on the frost
+  wind to stag ferry road — east toward the stag ferry town, west toward the
+  frost wind town. `hamlet_otter_tail` has a north-east and a south-west
+  entrance on the capital to tiger roar trunk — north-east toward the tiger
+  roar city, south-west toward the capital. `hamlet_trout_shoal` touches no
+  road; its single west entrance faces the wilderness toward the otter ford
+  village. The last road preview is
+  `/tmp/valhalla-placing/roads_final.png`; earlier runs left
+  `roads_villages.png` and `roads_hamlets.png`. The continent capture shows
+  the new markers crowding the northwest as the design's risk note predicted:
+  that crowding is the human review item, not a data defect.
 - [ ] 5.4 Record the second timing line of design D9, then run `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate` and `openspec validate valhalla-village-placement --strict`. Verify: all exit 0. The hand-off lists the count of villages and hamlets, every exemption with its reason, every hamlet placed under the boundary exception of D2, and both timing lines.
 
 ## Workflow follow-up
