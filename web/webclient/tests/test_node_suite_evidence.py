@@ -1831,6 +1831,19 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         # and without artwork.
         self._run_vitest("web/webclient-app/tests/rite/surfaces.test.js")
 
+    @covers_requirement(
+        "webclient-landmark-rite::the-rite-card-opens-on-arrival-and-never-on-a-session-s-first-snapshot",
+        "webclient-landmark-rite::rite-transitions-are-local-and-performing-dispatches-once",
+        "webclient-landmark-rite::the-rite-state-adopts-its-own-result-and-resets-off-the-landmark",
+        "webclient-landmark-rite::an-open-rite-card-or-stage-is-a-centred-card",
+    )
+    def test_landmark_rite_store_vitest_evidence_passes(self):
+        # landmark-rite-store D2: the arrival rule (first snapshot, repeat,
+        # return, other district, new session), the local transitions and their
+        # refusals, the single guarded dispatch, result adoption, the resets, and
+        # the centred-card predicate seen through the travel store's walk refusal.
+        self._run_vitest("web/webclient-app/tests/rite/store.test.js")
+
 
 class RoomActionsEvidenceTest(unittest.TestCase):
     """exploration-room-actions; redesign-rest-entry: the rest entry is the
