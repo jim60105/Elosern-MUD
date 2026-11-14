@@ -154,8 +154,14 @@ Ground rules:
   `no such table: django_content_type` on the quest-registration rollback,
   `_anchor_key`/`anchor_locator` import-time lookups), and
   `tests.test_map_core_contract` keeps its known `CHANNEL_LOG_NUM_TAIL_LINES`
-  runner error. No residual-pin rewrite was needed. This box stays unticked
-  because the sweep is not complete.
+  runner error. No residual-pin rewrite was needed.
+
+  One further group ran green after that record was written:
+  `world.rules.tests.test_movement_settlement test_party_time_settlement
+  test_travel_plan` — `Ran 77 tests in 222.292s`, `OK (skipped=1)`. The
+  `typeclasses` and `commands` labels could not be grouped inside the guard's
+  100-test cap in the remaining budget, so this box stays unticked because the
+  sweep is not complete.
 - [x] 5.3 Capture the continent with `capture_map.py --hide partition` and the settlement views of two new villages and two new hamlets (one on a through road, one at a spur end, one off-road where one exists). Read the images. Verify: the hand-off gives the absolute path of each image and of the last road preview, and states for each captured map which road each entrance meets.
 
   Result: six images, all read. The capture page was built in the worktree
