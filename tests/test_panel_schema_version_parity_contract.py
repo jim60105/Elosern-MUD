@@ -88,6 +88,9 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         self.assertEqual(self._module_value("quest_log.py", "QUEST_LOG_SCHEMA_VERSION"), 2)
         self.assertEqual(self._js_allowlist_value(protocol_client_source(), "quest_log"), 2)
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
+    )
     def test_rite_bounds_match_the_browser_mirror(self):
         # The browser mirror repeats every ``RITE_*`` numeral; a drift would let
         # one side accept a panel the other rejects.
@@ -126,6 +129,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
     @covers_requirement(
         "webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only",
         "webclient-oob-protocol::every-panel-payload-has-an-exact-availability-discriminator",
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
     )
     def test_panel_schema_versions_are_equal_everywhere(self):
         registry_source = _PY_REGISTRY.read_text(encoding="utf-8")

@@ -10,6 +10,7 @@ import copy
 import unittest
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_SAFE_INTEGER,
@@ -248,6 +249,9 @@ def _mutations():
 
 
 class RiteValidatorTests(unittest.TestCase):
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
+    )
     def test_the_valid_panel_is_accepted(self):
         self.assertEqual(validate_rite(copy.deepcopy(VALID)), VALID)
         with_delivery = _with_delivery()
@@ -258,6 +262,9 @@ class RiteValidatorTests(unittest.TestCase):
         payload = _panel(art=copy.deepcopy(MINIMAL_ARTWORK))
         self.assertEqual(validate_rite(payload), payload)
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-validated-identically-by-server-and-browser",
+    )
     def test_one_mutation_per_bound_is_rejected(self):
         for label, payload in _mutations():
             with self.subTest(label):
@@ -301,6 +308,10 @@ class RitePanelPresenterTests(RiteSettlementFixture):
                 {"option": option, "member_id": member_id},
             )
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-available-exactly-on-a-rite-landmark",
+        "landmark-rite-panel::the-rite-panel-lists-options-performers-and-experienced-options",
+    )
     def test_the_landmark_panel_names_the_site_options_and_performers(self):
         payload = self._payload()
 
@@ -342,6 +353,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertIsNone(payload["delivery"])
         self.assertEqual(validate_rite(payload), payload)
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-available-exactly-on-a-rite-landmark",
+    )
     def test_the_lit_flag_follows_the_district_lighting_read(self):
         with patch(
             "world.rules.map_district_lighting.lit_district_keys",
@@ -353,6 +367,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertTrue(payload["available"])
         self.assertTrue(payload["district"]["lit"])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-is-available-exactly-on-a-rite-landmark",
+    )
     def test_off_the_landmark_the_presenter_is_unavailable(self):
         self.player.location = self.source
         with self.assertRaises(PanelUnavailableError):
@@ -364,6 +381,10 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertFalse(payload["available"])
         self.assertEqual(payload["reason"]["code"], RITE_UNAVAILABLE_REASON[0])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-lists-options-performers-and-experienced-options",
+        "landmark-rite-panel::the-rite-panel-carries-the-last-delivery-only-on-its-node",
+    )
     def test_a_committed_rite_is_carried_on_the_same_node(self):
         result = self._settle(member_id=int(self.companion.id))
 
@@ -375,6 +396,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertEqual(payload["delivery"], result["data"]["delivery"])
         self.assertEqual(payload["seen"], ["shared"])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-carries-the-last-delivery-only-on-its-node",
+    )
     def test_a_delivery_bound_to_another_node_is_not_carried(self):
         result = self._settle(member_id=int(self.companion.id))
         delivery = result["data"]["delivery"]
@@ -384,6 +408,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
 
         self.assertIsNone(self._payload()["delivery"])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-carries-the-last-delivery-only-on-its-node",
+    )
     def test_returning_to_the_committed_node_carries_the_delivery_again(self):
         result = self._settle(member_id=int(self.companion.id))
         self.player.location = self.source
@@ -393,6 +420,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.player.location = self.landmark
         self.assertEqual(self._payload()["delivery"], result["data"]["delivery"])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-lists-options-performers-and-experienced-options",
+    )
     def test_a_corrupt_record_degrades_to_no_seen_and_one_warning(self):
         self.player.attributes.add(RECORD_ATTR, {"schema_version": 2, "completed": {}})
         with patch("web.webclient.presentation.rite.log_warn") as warning:
@@ -407,12 +437,18 @@ class RitePanelPresenterTests(RiteSettlementFixture):
             {"char": self.player.pk, "district": DISTRICT_KEY},
         )
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-lists-options-performers-and-experienced-options",
+    )
     def test_a_sleeping_companion_is_not_a_performer(self):
         write_fatigue_state(self.companion, 180000, SleepPosture.VOLUNTARY)
 
         payload = self._payload()
         self.assertEqual([row["member_id"] for row in payload["performers"]], [None])
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-lists-options-performers-and-experienced-options",
+    )
     def test_a_possessed_companion_leads_and_the_owner_row_is_the_player(self):
         enter_possession(self.player, self.companion)
 
