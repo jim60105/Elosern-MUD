@@ -431,6 +431,59 @@ def unit_closure(
     return _closure_over(group_units_map(index, state), seeds)
 
 
+def all_units(index: UnitIndex) -> tuple[str, ...]:
+    """Every settlement unit of one index, plus the residual unit, sorted."""
+    return tuple(
+        sorted(
+            {RESIDUAL_UNIT}
+            | set(index.unit_of_zone.values())
+            | set(index.unit_of_area.values())
+        )
+    )
+
+
+def closed_sets(
+    index: UnitIndex, state: Any, seeds: Iterable[str]
+) -> tuple[frozenset[str], ...]:
+    """The distinct closed sets the given seeds resolve to, in unit order.
+
+    Every seed resolves through the same closure rule a scoped pass applies, so
+    distinct answers are disjoint and together they partition the units a
+    whole-world pass would settle. The group units are computed once and every
+    seed's closure derives from them, so resolving the whole index costs one
+    group scan, not one per seed.
+    """
+    units_of = group_units_map(index, state)
+    sets = {_closure_over(units_of, (seed,)) for seed in seeds}
+    return tuple(sorted(sets, key=lambda units: min(units)))
+
+
+def lagging_sets(
+    wilderness: Any, now: int
+) -> tuple[tuple[int, frozenset[str]], ...]:
+    """Every closed set behind ``now``, as ``(cursor, units)`` sorted pairs.
+
+    The cursor of a set is its lowest unit cursor: a set with unequal cursors
+    is lawful and is settled from its lowest cursor. A record whose every unit
+    of the index has settled through ``now`` answers with no set after one
+    cursor read, without decoding the activity record.
+    """
+    from world.maps import monster_activity
+
+    index = current_unit_index()
+    units = all_units(index)
+    cursors = read_unit_cursors(wilderness)
+    if all(unit_cursor(cursors, unit_id) >= now for unit_id in units):
+        return ()
+    state = monster_activity.read_monster_activity(wilderness)
+    pending: list[tuple[int, frozenset[str]]] = []
+    for closed in closed_sets(index, state, units):
+        cursor = min(unit_cursor(cursors, unit_id) for unit_id in closed)
+        if cursor < now:
+            pending.append((cursor, closed))
+    return tuple(sorted(pending, key=lambda item: (item[0], min(item[1]))))
+
+
 class PopulationScopeViolation(regional_population.RegionalPopulationError):
     """A scoped pass would write outside the units it may settle."""
 
@@ -1014,15 +1067,18 @@ __all__ = [
     "UnitIndex",
     "active_scope",
     "advance_unit_cursors",
+    "all_units",
     "all_units_current",
     "announced_observation",
     "build_scope",
     "build_unit_index",
+    "closed_sets",
     "concerned_units",
     "current_unit_index",
     "group_units",
     "group_units_map",
     "initialize_unit_cursors",
+    "lagging_sets",
     "note_created_group",
     "observed_units",
     "pass_running",

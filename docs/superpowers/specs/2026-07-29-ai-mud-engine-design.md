@@ -730,6 +730,11 @@ opening replenishes stock before the shop accepts a trade.
 > reaches it. Decision D4 (player-driven clock) is unchanged: no world time passes without a player
 > action.
 
+> **Amended 2026-11-14 (change population-backlog-drain).** A periodic server task settles the most
+> lagging population unit forward by at most one configured slice of game time, never past the
+> current world tick. It materialises game time that already elapsed through player actions, moves
+> no clock, and yields the same state as immediate settlement, so decision D4 stands.
+
 ---
 
 ## 7. Generative Layer

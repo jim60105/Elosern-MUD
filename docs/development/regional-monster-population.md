@@ -3131,3 +3131,108 @@ so it reports neither row, and both rows carry the same keys as every other
 placement row. A provisioned world whose cursor record is malformed refuses
 through the owner's error, and the section reports itself unavailable instead
 of the placement ledger.
+
+# Background drain
+
+Developer document for the `population-backlog-drain` change. After
+`observed-unit-advance` a clock advance settles only the observed units, so an
+unobserved unit keeps its own settled-through tick and falls behind the world
+tick. Without a drain, that debt is paid in one synchronous step by the first
+action that needs the unit, and the step grows with the game time the unit was
+left alone. `world/maps/population_drain.py` pays the debt in bounded pieces
+while the player reads or idles.
+
+## The drain run
+
+`drain_population_backlog(slice_seconds)` settles at most one closed set and
+answers `True` when it settled something:
+
+1. The slice must be a positive integer number of game seconds; any other value
+   is an argument error, never a silent clamp.
+2. A world with no wilderness, no population seed or no cursor record answers
+   `False` and writes nothing.
+3. `population_units.lagging_sets(wilderness, now)` names every closed set
+   behind the world tick. A set is a `unit_closure` of the authored geometry:
+   distinct answers are disjoint and every unit of the index belongs to exactly
+   one. A set's cursor is its lowest unit cursor, because a set with unequal
+   cursors is lawful and is settled from its lowest one. The pairs are sorted by
+   cursor and then by the set's smallest unit identifier.
+4. The first `MAX_SETS_PER_RUN` (3) lagging sets are attempted in that order.
+   For one set the run settles from its cursor to
+   `min(world tick, cursor + slice_seconds)`: one bounded slice of game time,
+   never past the current tick. The pass is scoped (`contact=False`), so it
+   admits no field contact, and it never moves the world tick.
+
+The set envelope (`build_scope`) and the pre-run surface registry
+(`snapshot_population_lifecycle_surfaces(start, target, scope=scope)`) are
+built before anything is written. The pass runs inside
+`held_advance_registry()` and one `transaction.atomic()`, exactly the rollback
+strength of a clock advance.
+
+The common case costs one cursor record read: when every unit of the index has
+settled through the world tick, the run answers before decoding the activity
+record or resolving a closed set.
+
+## Failure
+
+A set whose settlement raises keeps its complete prior durable and live state:
+the transaction rolls back and `restore_advance_registry` restores every
+surface the pass wrote in memory. The run emits one
+`population_backlog_drain_failed` error event naming the set's unit count and
+both ticks, then tries the next most lagging set, so one bad set cannot starve
+the others. The failing set is retried by the next run, which is the intended
+signal.
+
+A world-level fault (an unreadable or malformed cursor or activity record) has
+no unit to name: the same error event is emitted with `units: 0` and
+`tick_from`/`tick_to` `0`, and the run answers `False`. The function never
+raises a world or settlement fault, so the periodic caller always survives.
+
+`restore_advance_registry` is also why the drain must not run inside an
+enclosing transaction that it does not own: a drain that joined one would keep
+live caches ahead of a rollback it cannot see. The reactor runs the periodic
+repeat and every clock advance synchronously, so a repeat can never interleave
+with a pass.
+
+## The event
+
+One `population_backlog_drained` info event is scheduled on durable commit,
+carrying the settled unit count, both ticks and `remaining` -- the number of
+units whose own cursor is still behind the world tick after this run. The
+settled count is the closed set's size, so a linked set that holds an
+already-current unit reports it in `units` but not in `remaining`. A run that
+settles nothing emits nothing.
+
+## The periodic caller
+
+`PopulationDrainScript` is a persistent `DefaultScript` registered in
+`settings.GLOBAL_SCRIPTS` as `population_drain`. It holds no logic of its own:
+`at_script_creation` reads the interval from the settings, and `at_repeat`
+performs one drain run while `POPULATION_DRAIN_ENABLED` is true.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `POPULATION_DRAIN_ENABLED` | `True` | Whether the periodic caller drains |
+| `POPULATION_DRAIN_INTERVAL_SECONDS` | `2` | Real seconds between repeats |
+| `POPULATION_DRAIN_SLICE_SECONDS` | `600` | Game seconds one run advances |
+
+Each has an environment override of the same name; see
+`docs/development/settings-and-environment.md`. A disabled drain changes no
+outcome: a lagging unit is still caught up synchronously by the first action
+that needs it. The slice of 600 equals
+`monster_activity.RESTING_DECISION_INTERVAL`, so one slice of a resting unit
+holds about one decision per group.
+
+To drain by hand from a shell (for example after a long time skip):
+
+```python
+from world.maps.population_drain import drain_population_backlog
+
+while drain_population_backlog(600):
+    pass
+```
+
+Every partition of the same elapsed interval gives the same per-unit result,
+so paying the debt in slices changes no outcome. The caveat is the synchronous
+catch-up: a long time skip followed at once by travel into another unit still
+pays that unit's whole lag in one step, because the drain does not bound it.

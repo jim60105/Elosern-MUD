@@ -662,6 +662,15 @@ ART_SCHEDULER_ENABLED = _env_bool("ART_SCHEDULER_ENABLED", True)
 ART_SCHEDULER_INTERVAL_SECONDS = _env_int("ART_SCHEDULER_INTERVAL_SECONDS", 30)
 ART_SCHEDULER_LIMIT = _env_int("ART_SCHEDULER_LIMIT", 4)
 
+# Background drain of the monster-population backlog. A clock advance settles
+# only the observed units, so a periodic drain pays the unobserved units' debt
+# off the action path in bounded game-time slices. When it is disabled, a
+# lagging unit is still caught up synchronously by the first action that needs
+# it. The interval is real seconds; the slice is game seconds.
+POPULATION_DRAIN_ENABLED = _env_bool("POPULATION_DRAIN_ENABLED", True)
+POPULATION_DRAIN_INTERVAL_SECONDS = _env_int("POPULATION_DRAIN_INTERVAL_SECONDS", 2)
+POPULATION_DRAIN_SLICE_SECONDS = _env_int("POPULATION_DRAIN_SLICE_SECONDS", 600)
+
 # The periodic art drain Script. It survives reloads and is recreated
 # automatically; at_script_creation reads the interval from the settings above.
 # When ART_SCHEDULER_ENABLED is False the Script never drains (records remain
@@ -671,6 +680,11 @@ GLOBAL_SCRIPTS = {
         "typeclass": "world.art.scheduler.ArtDrainScript",
         "repeats": -1,
         "desc": "Periodic deterministic art-queue drain.",
+    },
+    "population_drain": {
+        "typeclass": "world.maps.population_drain.PopulationDrainScript",
+        "repeats": -1,
+        "desc": "Periodic bounded settlement of lagging population units.",
     },
 }
 

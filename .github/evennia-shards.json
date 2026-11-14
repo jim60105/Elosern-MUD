@@ -1198,7 +1198,8 @@
         "world.maps.tests.test_population_writer_guards",
         "world.maps.tests.test_population_units",
         "world.maps.tests.test_population_zone_pass",
-        "world.maps.tests.test_scoped_population_settlement"
+        "world.maps.tests.test_scoped_population_settlement",
+        "world.maps.tests.test_population_drain"
       ]
     },
     {
