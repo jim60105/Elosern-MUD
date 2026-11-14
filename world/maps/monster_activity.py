@@ -1246,8 +1246,12 @@ def _declaration(activity_key: str) -> Any | None:
 _RESOLVED_AREAS = SourceMemo()
 
 
-def _group_area(group: MonsterGroup) -> tuple[Mapping[str, object], ...]:
-    """The bounded legal cells of one group's committed activity binding."""
+def group_area(group: MonsterGroup) -> tuple[Mapping[str, object], ...]:
+    """The bounded legal cells of one group's committed activity binding.
+
+    Public because the settlement-unit index reads the same area a decision
+    reads: the two must never disagree about which cells a group may occupy.
+    """
     from world.lore.monster_activity import (
         ACTIVITY_AREA_REGISTRY,
         resolve_activity_area,
@@ -1431,7 +1435,7 @@ def _resolved_area_keys(group: MonsterGroup) -> frozenset[str] | None:
 
     try:
         return frozenset(
-            _locator_key(locator) for locator in _group_area(group)
+            _locator_key(locator) for locator in group_area(group)
         )
     except (MonsterActivityRegistryError, MovementEdgeError):  # observability: ignore R2: an authored area the published candidate cannot resolve is a lawful scheduled stay; the publisher rejects it before production use
         return None
@@ -1759,7 +1763,7 @@ def _commit_departure(
                 "monster_activity_member_displaced",
                 f"member {body.pk} is not at the group position",
             )
-    area_keys = {_locator_key(locator) for locator in _group_area(group)}
+    area_keys = {_locator_key(locator) for locator in group_area(group)}
     if _locator_key(encode_location_ref(plan.edge.destination)) not in area_keys:
         raise MonsterActivityOperationInvalid(
             "monster_activity_destination_outside",
@@ -3472,6 +3476,7 @@ __all__ = [
     "decode_fraction",
     "encode_fraction",
     "group",
+    "group_area",
     "group_fingerprint",
     "group_id_for",
     "group_of_member",

@@ -106,6 +106,7 @@ class DecodeReuseTests(ActivityFixture):
         super().setUp()
         self.wilderness.db.regional_population = {ZONE_KEY: dict(ZONE_RECORD)}
         self.wilderness.db.population_timeline = _timeline_record(0)
+        self.wilderness.db.population_unit_cursors = {"default": 0, "units": {}}
 
     @staticmethod
     def _decoding(name: str):

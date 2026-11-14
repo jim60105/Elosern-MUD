@@ -45,6 +45,7 @@ from world.lore.monster_placement import (
     variant_species_key,
 )
 from world.maps import monster_activity as activity_owner
+from world.maps import population_units
 from world.maps import regional_population as owner
 from world.maps.regional_population import (
     BLOCKED_HOME_SATURATED,
@@ -1187,6 +1188,9 @@ class RegionalPopulationTests(RegistryIsolationMixin, EvenniaTest):
                 # The same construction/registration operations own the
                 # map-owned activity record, so a caller rollback covers it.
                 ("monster_activity", None),
+                # Every lifecycle pass advances the per-unit settlement
+                # cursors, so the same rollback owns that record too.
+                (population_units.POPULATION_UNIT_CURSORS_ATTRIBUTE, None),
             },
         )
         # Restoring the snapshot is a faithful no-op on unchanged state.

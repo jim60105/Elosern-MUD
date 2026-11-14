@@ -325,6 +325,7 @@ class _BoundaryBase(BattlefieldIsolation, EvenniaTestCase):
             "transitions": [],
             "protection": [],
         }
+        self.wilderness.db.population_unit_cursors = {"default": 100, "units": {}}
         self.wilderness.db.monster_sites = {
             _SITE_KEY: {
                 "state": monster_sites.SITE_STATE_CLEARED,
