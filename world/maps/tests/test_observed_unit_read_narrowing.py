@@ -13,8 +13,8 @@ Every scenario is built from the synthetic two-zone world of
 no shipped zone, site, composition or individual is named, and no assertion is
 a wall-clock or hardware-speed measurement.
 
-The delta's two ADDED requirements have no canonical identifiers before the
-archive sync, so no test here carries ``covers_requirement``.
+Each scenario test carries the canonical identifier of the requirement its
+assertions establish; the archive sync produced those identifiers.
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from unittest.mock import patch
 
 from django.db import connection, reset_queries
 from django.test.utils import CaptureQueriesContext
+
+from tools.spec_traceability import covers_requirement
 
 from typeclasses.monsters import Monster
 
@@ -133,6 +135,9 @@ class ReadNarrowingFixture(ScopedSettlementFixture):
 class ScopedEnumerationTests(ReadNarrowingFixture):
     """A scoped read covers its own units and answers their whole-world counts."""
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-enumerates-only-its-own-individuals"
+    )
     def test_the_scoped_zone_counts_equal_the_whole_world_counts(self):
         self._build_scenario()
         place_player(self, WANDER_A)
@@ -163,6 +168,9 @@ class ScopedEnumerationTests(ReadNarrowingFixture):
         self.assertFalse(far & set(narrow))
         self.assertLessEqual(set(narrow), set(whole))
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-enumerates-only-its-own-individuals"
+    )
     def test_a_home_owned_member_standing_in_a_linked_unit_counts_at_home(self):
         self._build_scenario()
         self.assertEqual(
@@ -195,6 +203,9 @@ class ScopedEnumerationTests(ReadNarrowingFixture):
         self.assertIn(int(member.pk), counts.home_ids)
         self.assertNotIn(int(member.pk), counts.local_ids)
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-enumerates-only-its-own-individuals"
+    )
     def test_a_registered_individual_without_a_group_counts_locally_and_home(self):
         self._build_scenario()
         place_player(self, WANDER_A)
@@ -285,6 +296,9 @@ class UnchangedOutcomeTests(ReadNarrowingFixture):
         )
         return projection
 
+    @covers_requirement(
+        "population-settlement-units::a-scoped-pass-enumerates-only-its-own-individuals"
+    )
     def test_the_narrowed_and_whole_world_enumeration_settle_the_same_world(self):
         self.assertEqual(
             self.run_scenario(narrow=True), self.run_scenario(narrow=False)
@@ -371,6 +385,9 @@ class AdvanceWorkTests(ReadNarrowingFixture):
             total, observed = self.capture(announced)
         return total, observed, far_groups
 
+    @covers_requirement(
+        "population-settlement-units::advance-database-work-is-independent-of-unobserved-units"
+    )
     def test_growing_the_far_zone_keeps_the_advance_statement_count(self):
         one, one_units, one_groups = self.measure(groups=1, members=1)
         many, many_units, many_groups = self.measure(groups=6, members=3)
