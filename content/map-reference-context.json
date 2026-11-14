@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "85f32c3f260ae81157f86d06e47d61b31cd00929b2bc7793df0a5ace0b079af3",
+  "fingerprint": "03233f3dee0523454bbe5f30391114b30deaf5617487fd6d78f92d7b6d3e0815",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16281,7 +16281,7 @@
     "world/rules/equipment_effects.py": "863600d22c00b736d6493b87032dd5837d6f80ea65d1b4104f09cd49894ac1e4",
     "world/rules/event_log.py": "fc92123fe7ac5f1b2d12202cbf1f372d9c7e7958af90fe580778fea9b757e3aa",
     "world/rules/exam_schedule_holds.py": "d52a96c326f2289617147fbb3167b5442ad43922f4a893f7ef63f825b829f814",
-    "world/rules/fatigue.py": "19cce36ee4734e07953fbc178eea770d6f4698759b3a594a0015f161c9d330b1",
+    "world/rules/fatigue.py": "966da403dad4d2ceec43419d9b41c5fe08e5e0422295201316bffbb5d21d7579",
     "world/rules/field_cast.py": "84a1f29179fda01db8948916b1031e1082caa0b0afa308b7a93e878830fed0bb",
     "world/rules/field_contact.py": "22b9e09fce0ec2de006ed957a964399afe2e38f5e6a4f5b4ebf61ef7f9a75355",
     "world/rules/gm.py": "48c48cda62a7b094030794c33c3c86d9372effcd2a22349bd5058a3c644dc8ff",

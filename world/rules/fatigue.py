@@ -81,7 +81,8 @@ from typing import Any
 import yaml
 from django.db import transaction
 
-from world.observability import log_info
+from world.observability import log_debug, log_info
+from world.observability.tally import note_maintenance
 from world.rules.buffs import (
     BUFF_DEFINITIONS,
     PHYSIOLOGICAL_PROTECTION,
@@ -1220,11 +1221,18 @@ def settle_fatigue_intervals(
                 payload = _transition_event_context(
                     interval.entity, prediction, caller_context
                 )
-                transaction.on_commit(
-                    lambda payload=payload: log_info(
-                        "fatigue_transition", context=payload
+                if note_maintenance("fatigue_transition"):
+                    transaction.on_commit(
+                        lambda payload=payload: log_debug(
+                            "fatigue_transition", context=payload
+                        )
                     )
-                )
+                else:
+                    transaction.on_commit(
+                        lambda payload=payload: log_info(
+                            "fatigue_transition", context=payload
+                        )
+                    )
                 if (
                     prediction.start.posture in (SleepPosture.VOLUNTARY, SleepPosture.FORCED)
                     and prediction.end.posture is SleepPosture.AWAKE

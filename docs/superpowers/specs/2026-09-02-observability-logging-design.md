@@ -192,6 +192,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `party_retreat_resolved` | `char`、`session`、`outcome`、`reason`、`source`、`destination`、`members`、`attempt_tick`、`arrival_tick`（confirmed 隊伍撤退的外層提交邊界；`outcome` 為 `escaped`／`failed`，`reason` 為 `contest_failed`／`no_affordable_route` 或成功時的空字串，`source`／`destination` 為實際路線的穩定 locator 字串，`members` 為該次實際離開的成員 dbref 清單；僅於最外層耐用提交時發出，回滾或重複確認不產生） |
 | `sleep_interrupt_receipt_unusable` | `char`、`reason`（warn 級；接觸打斷讀到不可用的睡眠紀錄時不改寫、不補發） |
 | `clock_advance` | `tick_from`、`tick_to`、`scope` |
+| `population_maintenance_settled` | `tick_from`、`tick_to`，加上本次 pass 每個維護事件名稱的計數（`fatigue_transition`、`monster_activity_decided`、`monster_departed`、`monster_arrived`、`monster_arrival_deferred`）；一次 durable 提交的 population lifecycle settlement pass 僅一條 info 匯總 |
 | `quest_transition` | `char`、`quest`、`issuer`（治理該任務的發單方 key）、`stage_from`、`stage_to` |
 | `quest_auto_settlement` | `char`、`quest`（quest_id，即領取憑證）、`issuer`、`copper`、`items`（item keys）；自動結算的付款邊界，與櫃檯交回（`settlement_done`）可區辨 |
 | `settlement_done` | `char`、`ms`、`notifications`（數量） |
@@ -297,6 +298,8 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 | `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
 | `quest_beat_publication_rejected` | `beat_id`, `snapshot_id`, `owner`; warning with sanitized exception type/message, no blueprint or prose-bearing chain |
 | `possession_release` | `char`、`npc`、`reason`、`room`；正常歸位或隊伍變更交還控制權的狀態邊界（`handback`／`party_change`），記錄同伴最終所在房間 |
+
+`fatigue_transition`、`monster_activity_decided`、`monster_departed`、`monster_arrived` 與 `monster_arrival_deferred` 在 population lifecycle settlement pass 內一律降為 debug 級，並由該 pass 的 `population_maintenance_settled` 匯總；同一批事件在 pass 之外（戰鬥逃逸、直接 owner 操作、clock 的 mental stage）以及 field contact 入場時仍維持 info 級。
 
 ### 4.3 AI／外部服務邊界
 

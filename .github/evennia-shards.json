@@ -1146,7 +1146,8 @@
       "name": "maps-34-1",
       "workers": 4,
       "labels": [
-        "world.maps.tests.test_monster_activity"
+        "world.maps.tests.test_monster_activity",
+        "world.maps.tests.test_population_maintenance_log"
       ]
     },
     {
@@ -1246,6 +1247,7 @@
         "world.observability.tests.test_recent",
         "world.observability.tests.test_render",
         "world.observability.tests.test_sanitize",
+        "world.observability.tests.test_tally",
         "world.observability.tests.test_transcript"
       ]
     },
