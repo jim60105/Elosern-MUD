@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -325,6 +326,33 @@ class RuntimeEvidenceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             report = verify(root, evidence)
+        self.assertTrue(report.ok)
+
+    def test_evidence_identity_follows_the_repository_path(self):
+        """Detect evidence named after a package directory that cannot be imported."""
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            spec_path = root / "openspec" / "specs" / "sample" / "spec.md"
+            spec_path.parent.mkdir(parents=True)
+            spec_path.write_text(SPEC, encoding="utf-8")
+            package = root / "packages" / "map-core" / "tests"
+            package.mkdir(parents=True)
+            module_path = package / "test_sample.py"
+            module_path.write_text(ANNOTATED_TEST, encoding="utf-8")
+            spec = importlib.util.spec_from_file_location("test_sample", module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            evidence = root / "evidence.jsonl"
+            with patch.dict(os.environ, {EVIDENCE_ENV: str(evidence)}):
+                module.SampleTests("test_behavior").test_behavior()
+            records = [
+                record["test"]
+                for record in map(json.loads, evidence.read_text().splitlines())
+            ]
+            report = verify(root, evidence)
+        self.assertEqual(
+            records, ["packages.map-core.tests.test_sample.SampleTests.test_behavior"]
+        )
         self.assertTrue(report.ok)
 
 

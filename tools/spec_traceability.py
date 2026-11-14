@@ -6,7 +6,7 @@ import argparse
 import ast
 from collections import defaultdict
 from dataclasses import asdict, dataclass
-from functools import wraps
+from functools import lru_cache, wraps
 import json
 import os
 from pathlib import Path
@@ -95,12 +95,52 @@ class TraceabilityReport:
         }
 
 
+_REPOSITORY_MARKER = Path("openspec") / "specs"
+
+
+@lru_cache(maxsize=None)
+def _repository_root_for(path: Path) -> Path | None:
+    """The nearest ancestor that holds the main spec tree, if there is one."""
+    for directory in path.parents:
+        if (directory / _REPOSITORY_MARKER).is_dir():
+            return directory
+    return None
+
+
+def evidence_identity(test: Callable[..., Any]) -> str:
+    """The static index's identity for a test: its repository-relative path.
+
+    ``__module__`` is the name the file was imported under, and a directory
+    whose name is not an identifier (``packages/map-core``) cannot appear in
+    one, so a pytest run from inside such a package names the module
+    ``test_authoring`` where the static index names
+    ``packages.map-core.tests.test_authoring``. Building the identity from the
+    file path makes the two sides agree for every layout pytest can collect; a
+    test file outside any main spec tree keeps its imported module name.
+    """
+    module = getattr(test, "__module__", "")
+    filename = getattr(getattr(test, "__code__", None), "co_filename", None)
+    if filename:
+        path = Path(filename).resolve()
+        root = _repository_root_for(path)
+        if root is not None:
+            try:
+                relative = path.relative_to(root)
+            except ValueError:
+                relative = None
+            if relative is not None:
+                module = ".".join(relative.with_suffix("").parts)
+    return f"{module}.{test.__qualname__}"
+
+
 def covers_requirement(*requirement_ids: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Associate a test with requirements and record its successful CI execution."""
     if not requirement_ids or any(not isinstance(item, str) for item in requirement_ids):
         raise TypeError("covers_requirement requires one or more string IDs")
 
     def decorate(test: Callable[P, R]) -> Callable[P, R]:
+        identity = evidence_identity(test)
+
         @wraps(test)
         def wrapped(*args: P.args, **kwargs: P.kwargs) -> R:
             result = test(*args, **kwargs)
@@ -108,7 +148,7 @@ def covers_requirement(*requirement_ids: str) -> Callable[[Callable[P, R]], Call
             if evidence_path:
                 record = json.dumps(
                     {
-                        "test": f"{test.__module__}.{test.__qualname__}",
+                        "test": identity,
                         "requirements": list(requirement_ids),
                     },
                     ensure_ascii=False,
