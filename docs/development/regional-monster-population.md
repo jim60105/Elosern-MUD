@@ -2948,10 +2948,44 @@ The advance's registry contract and its contact forecast share that scope:
 No stage before the lifecycle stage moves a player character or announces a location, so the
 registry's scope and the stage's scope are the same set.
 
-Remaining whole-record work: one pass still decodes and stores the activity record once, scans the
-coordinate map once and enumerates living individuals once, whatever the number of units it settles.
-Those are constant-per-advance operations that still grow with world size;
-`observed-unit-read-narrowing` narrows the living-individual scan for the clock stage.
+### The scoped enumeration
+
+`observed-unit-read-narrowing` narrowed the pass's one living-individual scan to the pass's own
+individuals. `regional_population.reused_living_presence(scope=…)` carries the pass's
+`PopulationScope` for the whole pass, and `regional_population._scope_living_monsters` replaces the
+whole-world `_living_monsters` inside it:
+
+- the members of every group the pass may settle (`population_units.settling_group_ids`, which
+  includes a group the pass itself created, so a birth is enumerated from the moment it exists);
+- every individual the coordinate registration places on a cell `scope.covers_cell` accepts;
+- read through one identity filter (`Monster.objects.all_family().filter(pk__in=…)`), with the same
+  liveness rule (`persisted_hp > 0`) and the same persistent-ID order as the whole-world roster.
+
+The scope is the *presence read's* enumeration, not a stored roster: `forget_living_presence()` keeps
+it and drops the rest, so a birth, a site clear or a contact block makes the pass re-enumerate the
+same narrower set. The whole-world pass (`settle_population_lifecycle`, `scope=None`) keeps
+`_living_monsters` unchanged, and so does every `presence_at` caller outside a pass.
+
+**The stated assumption.** A scoped pass builds its presence facts only from the scope's group
+members and the coordinate registration; an individual outside both is invisible to it whatever its
+home marker or position. No writer creates one: a zone or site birth stamps the home marker,
+registers the individual and creates its group in one commit, an explicit placement
+(`register_explicit_group`) registers the individual and creates its group without stamping a home
+marker, and `home_ecology_zone` is only ever written by that birth path. The whole-world pass still
+finds such an individual, so this is a stated assumption of the scoped read, not a new rule.
+
+A zone's counts are unchanged by the narrowing: its local cells lie in its own unit, and a home-owned
+member standing elsewhere is a member of a group that links both units into one closed set. A pending
+transition of another unit is still replayed into `presence_at(at_tick=…)`, exactly as the whole-world
+answer replays it.
+
+Remaining whole-record work per scoped pass, stated and not removed here: one decode and one store
+of the activity record, one `group_units_map` computation for the scope build, one in-memory scan of
+the coordinate registration (pure cell lookups, no row read), and the replay of the record's pending
+timeline transitions. The contact forecast is outside this pass:
+`population_forecast.capture_activity_snapshot` keeps whole-world presence, and a player action
+reaches it through `mental_time.next_registered_boundary`. So the *settlement pass* is independent of
+unobserved units; the whole action's cost is that plus the forecast's own read.
 
 A world save needs no flush: it stores the per-unit cursor record (`population_unit_cursors`) as one
 whole value, so a restored world continues every unit from its own settled-through tick. A unit that
