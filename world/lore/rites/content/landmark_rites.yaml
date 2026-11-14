@@ -193,6 +193,197 @@ archetypes:
             - {kind: narration, text: 你的背在落葉裡拱起，樹根跟著收緊，熱潮被根鬚逼出來，最後一次顫動時，頭頂的樹冠讓開一道縫，露出底下通往西邊的乾河床。}
             - {kind: speech, speaker: host, text: 「看見河床了嗎？跟著它走。」}
         watch: null
+  grave:
+    guardian_name_zh: 塚下的女聲
+    guardian_form_zh: 從石冢縫隙透出的女聲，只在有人靠近碑石時應答。
+    options:
+      - key: inscribe
+        label_zh: 描過碑文
+        seconds: 240
+        shame: 2
+        exposure: 0
+        self:
+          scene_id: rite.grave.inscribe.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 墓碑上的字被苔痕吃去一半，剩下的刻痕裡積著細砂。}
+            - {kind: speech, speaker: actor, text: 「這行字是誰的名字？還有人記得嗎？」}
+            - {kind: speech, speaker: host, text: 「用手指描過去，別停。石頭記得住被讀過的名字。」}
+            - {kind: narration, text: 你的指節嵌進刻痕，砂粒壓在指腹下，石面從第一筆開始回溫，掌心的紋路跟著刻痕走。}
+            - {kind: narration, text: 碑後的土裡滲出一隻看不見的手，沿著你的小腿往上，隔著裙布貼住私處，指尖陷進布料裡。}
+            - {kind: narration, text: 你撐住碑身，額頭抵著石面，熱意從腿間衝上頸項，最後一筆在指下亮起，碑面同時透出一條往北的凹道。}
+            - {kind: speech, speaker: host, text: 「名字讀完了。往北那條凹道，是送葬的人踩出的路。」}
+            - {kind: speech, speaker: actor, text: 「我記住了。」}
+        watch: null
+      - key: lie
+        label_zh: 躺進空壙
+        seconds: 300
+        shame: 2
+        exposure: 0
+        self:
+          scene_id: rite.grave.lie.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 墓碑旁邊有一塊挖開又填平的空壙，土面比四周低了一掌。}
+            - {kind: speech, speaker: actor, text: 「這裡是留給誰的位置？」}
+            - {kind: speech, speaker: host, text: 「留給願意躺下的人。躺進去，土才會把名字交給你。」}
+            - {kind: narration, text: 你躺進凹下的土裡，濕冷的土貼住背脊，鬆開的土粒順著腰側滑進衣內。}
+            - {kind: narration, text: 土底有什麼從下方頂上來，隔著衣料貼住臀部與大腿，擠進私處的縫，跟著你的呼吸往裡推。}
+            - {kind: narration, text: 你抓緊坑邊的草，土面隨你的顫動陷下去一寸，熱潮浸進土裡，壙底的碎石排成一個名字。}
+            - {kind: speech, speaker: host, text: 「這個名字埋在東邊的樹下。別在白天挖。」}
+        watch: null
+  mine:
+    guardian_name_zh: 坑底的迴響
+    guardian_form_zh: 礦坑深處回來的聲音，只在有人出聲時應答。
+    options:
+      - key: shout
+        label_zh: 朝坑底喊
+        seconds: 180
+        shame: 1
+        exposure: 0
+        self:
+          scene_id: rite.mine.shout.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 坑口垂著一條磨斷的舊繩，往下看不見底，只有冷風從深處上來。}
+            - {kind: speech, speaker: actor, text: 「喂，底下還有人嗎？」}
+            - {kind: speech, speaker: host, text: 「你喊什麼，它就回什麼。喊第二句，它才多回答一句。」}
+            - {kind: narration, text: 你伏在坑口喊出第二句，回音從石壁彈回來，最後一句比你的聲音低，貼著耳骨震。}
+            - {kind: narration, text: 看不見的氣流從坑底升上來，鑽進裙底，抵住私處收緊，繞著花蒂往裡探。}
+            - {kind: narration, text: 你撐住坑口的石緣，腰腹跟著回音震動，熱意從腿根散開，回音停下時坑底亮起一點火星，正對著一條側道。}
+            - {kind: speech, speaker: host, text: 「那點火在第三段坑道。順著側道下去，別走直坑。」}
+        watch: null
+      - key: crawl
+        label_zh: 爬進窄道
+        seconds: 300
+        shame: 1
+        exposure: 0
+        self:
+          scene_id: rite.mine.crawl.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 側道窄得只能側肩通過，石壁上的鑿痕還留著當年的白灰。}
+            - {kind: speech, speaker: actor, text: 「這條路通到哪裡？爬過去就有東西嗎？」}
+            - {kind: speech, speaker: host, text: 「爬到聽見自己的心跳回來的地方。石頭會把深處的事貼在你背上。」}
+            - {kind: narration, text: 你側身擠進石縫，乳房與腰腹蹭過粗石，布料被石角勾住，冷氣貼著背脊往下滑。}
+            - {kind: narration, text: 窄道在腰後收緊，石壁貼住臀部，一道濕涼的氣流從腳邊爬上來，抵著私處磨過花蒂。}
+            - {kind: narration, text: 你用手肘撐著往前，心跳在石壁間回來三次，最後一次撞在背上時熱潮湧出，石縫同時透出一道光，照見往下的石階。}
+            - {kind: speech, speaker: host, text: 「跟著光走，第三階會鬆動，踩左邊。」}
+        watch: null
+  gate:
+    guardian_name_zh: 門洞裡的影
+    guardian_form_zh: 門洞裡比四周更深的一道影，只在有人開口求過時凝成聲音。
+    options:
+      - key: knock
+        label_zh: 叩響石門
+        seconds: 240
+        shame: 1
+        exposure: 0
+        self:
+          scene_id: rite.gate.knock.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 石門的門楣上鑿著三個凹洞，門縫裡塞著風乾的草束。}
+            - {kind: speech, speaker: actor, text: 「要敲幾下，這扇門才肯讓人過？」}
+            - {kind: speech, speaker: host, text: 「敲三下，然後把名字說給門聽。門記住名字，才認得放誰過去。」}
+            - {kind: narration, text: 你抬手叩了三下，石門悶響，門縫裡的草束跟著抖落，門後有東西把你的名字念回來一遍。}
+            - {kind: narration, text: 門楣上垂下一道看不見的重量，壓在你的肩上，一路滑到腰腹，隔著衣料抵住私處。}
+            - {kind: narration, text: 你按著門板，額頭靠上石面，熱意從腿間衝上頸項，門軸在那一刻鬆開半寸，露出一條往下的石階。}
+            - {kind: speech, speaker: host, text: 「門認得你了。階梯走到底，別回頭看門後的東西。」}
+        watch: null
+      - key: trade
+        label_zh: 留下過路禮
+        seconds: 300
+        shame: 2
+        exposure: 1
+        self:
+          scene_id: rite.gate.trade.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 石門前有一塊被踏得發亮的門檻石，石面中央凹成淺窪。}
+            - {kind: speech, speaker: actor, text: 「過這道門，要留下什麼？」}
+            - {kind: speech, speaker: host, text: 「留下走過去的證據。門檻收下，門就開。」}
+            - {kind: narration, text: 你跨上門檻，腳底貼住發亮的石面，門洞裡的風把裙襬掀到腰後。}
+            - {kind: narration, text: 門檻的淺窪裡漫出看不見的手，托住你的臀部，另一隻貼住私處，跟著你的重心往裡推。}
+            - {kind: narration, text: 你扶住門框，膝蓋抵著石檻，熱潮落在窪裡，石面同時吸走那道濕痕，門後的通道亮出一條路。}
+            - {kind: speech, speaker: host, text: 「痕跡留在檻上，門就記住你走過。往裡那條路，第二個岔口往右。」}
+        watch: null
+  cliff:
+    guardian_name_zh: 瀑後的歌聲
+    guardian_form_zh: 風與水霧裡傳出的女聲，只在有人走到崖下或崖邊時應答。
+    options:
+      - key: bathe
+        label_zh: 走進瀑下
+        seconds: 300
+        shame: 1
+        exposure: 1
+        self:
+          scene_id: rite.cliff.bathe.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 瀑布落下的水聲壓過整片谷地，潭邊的石頭被水磨得發白。}
+            - {kind: speech, speaker: actor, text: 「站在水底下，水會把什麼交給我？」}
+            - {kind: speech, speaker: host, text: 「走進水裡，別擋著水流。水把重量洗掉，才肯把路露出來。」}
+            - {kind: narration, text: 你走進潭裡，水從腳踝升到胸口，瀑下的水柱砸在肩上，布料貼住全身，水冷得讓皮膚收緊。}
+            - {kind: narration, text: 瀑柱在腰間散開，水流鑽進裙下，一股順著私處滑進去，另一股壓著花蒂來回，腳底的石頭開始鬆動。}
+            - {kind: narration, text: 你仰起頭，水壓把身體往下按，熱潮逆著水流衝上來，顫動的那一瞬，水簾讓開一道縫，露出後方的石洞與一條往上鑿出的路。}
+            - {kind: speech, speaker: host, text: 「看見那條路了？水停之前上去，別讓它合起來。」}
+        watch: null
+      - key: lean
+        label_zh: 站上崖緣
+        seconds: 360
+        shame: 2
+        exposure: 2
+        self:
+          scene_id: rite.cliff.lean.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 崖邊的岩面被風削成刀口，往下只看見雲在腳底翻。}
+            - {kind: speech, speaker: actor, text: 「站到那麼邊上，風會告訴我什麼？」}
+            - {kind: speech, speaker: host, text: 「把腳尖交給崖，把重量交給風。看得見底下的東西，才看得見遠的地方。」}
+            - {kind: narration, text: 你走到崖緣，腳尖頂著岩口，風從背後推上來，裙襬整片掀開，大腿與臀部露在空處。}
+            - {kind: narration, text: 風分成幾道貼住身體，一道繞住私處收緊，一道卡在花蒂上跟著心跳震，腳下的碎石滾下崖去。}
+            - {kind: narration, text: 你張開手臂保持平衡，身體在崖口晃了一下，熱潮從腿根衝到頸項，谷底的雲同時被風吹開，露出一條蜿蜒的獸徑。}
+            - {kind: speech, speaker: host, text: 「那條獸徑通到另一邊的山口。風停之後再下去。」}
+        watch: null
+  plaza:
+    guardian_name_zh: 廣場上的目光
+    guardian_form_zh: 四周的注視聚成的一道聲音，只在有人走進那圈石板時開口。
+    options:
+      - key: stand
+        label_zh: 站到中央
+        seconds: 300
+        shame: 2
+        exposure: 2
+        self:
+          scene_id: rite.plaza.stand.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 廣場的石板被車輪與腳步磨得發亮，四周的攤販還沒收，旅人沿著邊上走。}
+            - {kind: speech, speaker: actor, text: 「站在這裡，所有人都在看？」}
+            - {kind: speech, speaker: host, text: 「站到中央，讓每一雙眼睛都落下來。看得見你的人，才肯替你指路。」}
+            - {kind: narration, text: 你走到廣場中央站定，四周的視線壓下來，貼在背上與肩上，順著腰腹往下滑。}
+            - {kind: narration, text: 石板上的熱氣從腳底升上來，看不見的目光停在私處與大腿內側，跟著四周的呼吸收緊，繞著花蒂打轉。}
+            - {kind: narration, text: 你站在中央沒有動，膝蓋卻開始發軟，熱潮在眾目之下湧出，腳邊的石板同時浮起一段刻痕，刻著這個位置從前的名字。}
+            - {kind: speech, speaker: host, text: 「名字只在被看見的時候顯出來。記住它，往北側那條巷子走，第二個轉角往左。」}
+        watch: null
+      - key: circle
+        label_zh: 繞行一圈
+        seconds: 360
+        shame: 2
+        exposure: 2
+        self:
+          scene_id: rite.plaza.circle.self
+          revision: r1
+          lines:
+            - {kind: narration, text: 廣場中央有一圈顏色較深的石板，接縫裡嵌著細砂。}
+            - {kind: speech, speaker: actor, text: 「繞著這圈走，會有東西留下嗎？」}
+            - {kind: speech, speaker: host, text: 「走完一圈，讓每一邊都看見你。繞完的石板會把路記下來。」}
+            - {kind: narration, text: 你沿著深色的石板走，第一邊的視線落在臉上，第二邊落在背脊，第三邊停在腰與臀部。}
+            - {kind: narration, text: 走到第三邊時裙底一涼，看不見的目光貼住私處，跟著步伐前後磨過花蒂，膝蓋開始發軟。}
+            - {kind: narration, text: 你撐著走完最後一邊，熱潮在石板接縫間落下，腳下的刻痕逐段亮起，連成一條往東側巷子的線。}
+            - {kind: speech, speaker: host, text: 「線亮完了。往東側那條巷子走，走到第二個路口再停。」}
+        watch: null
 districts:
   north_deep_forest: tree
   border_source_highlands: spring
@@ -238,80 +429,79 @@ districts:
   howling_highlands: megalith
   mossy_coast_woods: tree
   wolf_fang_coast: megalith
-  # provisional: reassigned by landmark-rite-content-completion
-  north_road_uplands: megalith
-  maple_vale: spring
-  vineyard_slopes: tree
-  white_ram_foothills: tree
-  eyrie_cliffs: tower
-  amethyst_mine_vale: megalith
-  royal_river_valley: statue
-  east_river_fields: spring
-  westpass_uplands: megalith
-  bell_vale: statue
-  mill_reach: megalith
-  limestone_terrace: megalith
-  icespring_gorge: spring
-  honey_vale: tower
-  silverbrook_vale: megalith
-  red_earth_hills: megalith
-  rift_scarp_plateau: tower
-  old_battlefield: statue
-  olive_slopes: megalith
+  north_road_uplands: gate
+  maple_vale: cliff
+  vineyard_slopes: mine
+  white_ram_foothills: gate
+  eyrie_cliffs: cliff
+  amethyst_mine_vale: mine
+  royal_river_valley: plaza
+  east_river_fields: mine
+  westpass_uplands: gate
+  bell_vale: grave
+  mill_reach: mine
+  limestone_terrace: mine
+  icespring_gorge: cliff
+  honey_vale: cliff
+  silverbrook_vale: gate
+  red_earth_hills: gate
+  rift_scarp_plateau: cliff
+  old_battlefield: grave
+  olive_slopes: statue
   anvil_vale: megalith
-  south_pass_west_slopes: megalith
-  estuary_flats: megalith
-  salt_road_hills: megalith
-  salt_cliff_coast: tower
-  thunder_peak_range: tower
-  tidesong_dunes: megalith
-  pearl_bay_coast: statue
-  white_sand_coast: megalith
-  forest_rim_heath: megalith
-  whalebone_heath: megalith
-  north_pass_east_slopes: megalith
+  south_pass_west_slopes: gate
+  estuary_flats: gate
+  salt_road_hills: gate
+  salt_cliff_coast: cliff
+  thunder_peak_range: cliff
+  tidesong_dunes: mine
+  pearl_bay_coast: grave
+  white_sand_coast: gate
+  forest_rim_heath: gate
+  whalebone_heath: gate
+  north_pass_east_slopes: cliff
   sunken_bell_lake: spring
-  starfall_plain: megalith
-  spruce_foothills: megalith
+  starfall_plain: mine
+  spruce_foothills: gate
   sunrise_downs: megalith
-  black_soil_plain: megalith
-  hawkwing_heath: megalith
-  echo_canyon: megalith
-  imperial_capital_plain: megalith
-  canal_plain: megalith
-  rose_plain: tree
-  tide_wind_downs: statue
-  imperial_river_reach: megalith
-  imperial_wheatlands: megalith
-  stormrock_heath: tower
-  great_pass_east: megalith
+  black_soil_plain: tree
+  hawkwing_heath: statue
+  echo_canyon: gate
+  imperial_capital_plain: gate
+  canal_plain: gate
+  rose_plain: statue
+  tide_wind_downs: spring
+  imperial_river_reach: gate
+  imperial_wheatlands: gate
+  stormrock_heath: cliff
+  great_pass_east: gate
   emerald_lake_plain: spring
   eastern_pasture: tower
-  flax_plain: megalith
-  mithril_foothills: megalith
+  flax_plain: gate
+  mithril_foothills: mine
   river_isle_flats: spring
   herbal_plain: tree
-  griffin_plateau: tower
-  bluewave_downs: megalith
+  griffin_plateau: cliff
+  bluewave_downs: spring
   cloudsea_foothills: tower
-  east_branch_ford: megalith
-  spice_road_plain: megalith
-  giants_stair_highlands: megalith
-  south_pass_east_slopes: megalith
+  east_branch_ford: gate
+  spice_road_plain: gate
+  giants_stair_highlands: gate
+  south_pass_east_slopes: gate
   imperial_south_shore: tower
-  imperial_delta: megalith
-  sea_serpent_slopes: statue
-  obsidian_ridge: tower
+  imperial_delta: gate
+  sea_serpent_slopes: grave
+  obsidian_ridge: cliff
   bear_claw_woods: megalith
   north_pass_west_slopes: megalith
-  shaman_cave_woods: megalith
+  shaman_cave_woods: mine
   war_drum_highlands: megalith
-  pine_hunting_grounds: statue
-  bison_plateau: statue
-  iron_vein_highlands: tower
-  ancestor_cairn_hills: statue
-  grizzly_vale: megalith
+  pine_hunting_grounds: tree
+  bison_plateau: grave
+  iron_vein_highlands: cliff
+  ancestor_cairn_hills: grave
+  grizzly_vale: mine
   giant_rockfall_slopes: megalith
   falcon_rise: tower
   blood_moon_vale: megalith
-  rivers_watch_woods: megalith
+  rivers_watch_woods: tower
