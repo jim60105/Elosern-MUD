@@ -239,7 +239,7 @@ def _next_population_boundary(
         if (
             due is not None
             and tick < due <= end_tick
-            and (scope is None or state.zone_key in scope.behind(due).zone_keys)
+            and (scope is None or scope.zone_in_step(state.zone_key, due))
         ):
             candidates.append(due)
     return min(candidates) if candidates else None
@@ -252,6 +252,7 @@ def _run_pass(
     end_tick: int,
     *,
     contact: bool,
+    cursors: Any | None = None,
 ) -> list[ScheduledEvent]:
     """Run one settlement pass over ``[start_tick, end_tick]`` for ``scope``.
 
@@ -262,9 +263,11 @@ def _run_pass(
     # A world without a usable per-unit record must refuse before any
     # settlement work, not after it: a direct caller outside a clock advance
     # owns its own commit, so a tail-only check would leave settled state
-    # behind a raised advance. The record is read once here and handed to every
-    # boundary, because it cannot change before the pass advances it.
-    cursors = population_units.read_unit_cursors(wilderness)
+    # behind a raised advance. The record is read once per pass -- the scoped
+    # entry point hands over the one `build_scope` already read -- and handed to
+    # every boundary, because it cannot change before the pass advances it.
+    if cursors is None:
+        cursors = population_units.read_unit_cursors(wilderness)
     contact_tick = end_tick if contact else None
     events: list[ScheduledEvent] = []
     tick = start_tick
@@ -353,20 +356,32 @@ def settle_population_scope(
     interval that ended before the set's cursor does nothing; an interval that
     starts and ends at it settles that tick, exactly like a whole-world pass.
 
-    ``contact`` is accepted for signature symmetry with the whole-world stage but
-    never runs the authored field contact: that stage contacts whoever stands
-    near the present party, so it is a whole-world write that stays with the
-    whole-world pass.
+    The authored field contact is a whole-world write (it contacts whoever
+    stands near the present party), so a scoped pass refuses it by name rather
+    than accepting a flag it cannot honour. One interval must not leave a
+    contact boundary unsettled behind an advanced cursor.
     """
     if wilderness is None or not regional_population.population_provisioned(wilderness):
         return []
-    scope = population_units.build_scope(wilderness, seeds)
+    if contact:
+        raise ValueError(
+            "a scoped settlement pass cannot run the authored field contact"
+        )
+    cursors = population_units.read_unit_cursors(wilderness)
+    scope = population_units.build_scope(wilderness, seeds, cursors=cursors)
     if not scope.units:
         return []
     start_tick = population_units.scope_start_tick(wilderness, scope)
     if end_tick < start_tick:
         return []
-    return _run_pass(wilderness, scope, start_tick, end_tick, contact=contact)
+    return _run_pass(
+        wilderness,
+        scope,
+        start_tick,
+        end_tick,
+        contact=False,
+        cursors=cursors,
+    )
 
 
 def next_population_lifecycle_boundary(

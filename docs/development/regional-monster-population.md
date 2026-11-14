@@ -2657,13 +2657,26 @@ behaves exactly as before:
   `settle_monster_sites_at`, `next_site_boundary` and `retained_loss_ids` only
   the scope's sites.
 
-Three writers refuse an out-of-scope placement by name: `_begin_group_journey`
-and `_arrive` check the destination locator before their first write, and
-`create_group` checks the new group's units before storing it. `_populate` and
-`_commit_planned_wave` check the site cell and the wave cell before the first
-created row. Writers a scoped pass never reaches (a GM placement, a combat
-withdrawal, an exam construction) run outside the scope window, so their guards
-are no-ops and their behaviour is unchanged.
+Four writer classes refuse an out-of-scope placement by name: a departure
+(`_begin_group_journey`) and an arrival (`_arrive`) check the destination
+locator before their first write; a group creation (`create_group`) checks the
+new group's units before storing it; and a birth checks its cell before the
+first created row (`_populate` for a site, `_commit_planned_wave` for a wave).
+Writers a scoped pass never reaches (a GM placement, a combat withdrawal, an
+exam construction) run outside the scope window, so their guards are no-ops and
+their behaviour is unchanged.
+
+`settle_population_scope` reads the per-unit record once and hands it to the
+scope build and to every boundary, so a pass pays one decode. A seed that names
+no unit of the authored geometry is dropped instead of recorded: a settlement
+must never persist a cursor for a unit the world does not have. The scope names
+its sites from the owner's own registry (the binding `settle_monster_sites_at`
+iterates), so the two can never disagree about which sites the pass settles.
+The boundary query asks `zone_in_step`, a dictionary lookup against the zones
+and their cursors resolved at build time, so per-boundary work does not re-resolve
+the scope's zones and sites. The authored field contact is refused by name
+rather than accepted and ignored: it is a whole-world write, and an interval must
+not leave its contact boundary unsettled behind an advanced cursor.
 
 ## Evidence retirement by concerned units
 
@@ -2699,18 +2712,26 @@ whole-world pass over the same interval, which is what
 ## Progress markers
 
 A zone's `settled_through_tick` records how far the last pass that noted it
-reached, not how far its unit is settled: a per-unit pass visits a subset of the
-world's boundary ticks, so the marker is pass-reach metadata that no decision
-reads. `settlement_projection` therefore compares zone records exactly only when
-every pass visits the same last tick. The scoped test world places one bounded
-future loss per zone on the interval endpoint, so the whole-world pass and every
-unit's pass share that last boundary; the differential test then asserts the full
-projection, and the endpoint loss is one of the categories the coordinator
-merges anyway. The timeline marker is the pass endpoint in both paths (a scoped
-pass may leave a lagging other unit's evidence stored while the marker has
-passed it); that over-claim costs only retained evidence, because the scoped
-retirement never consults the marker and a later whole-world pass that
-early-returns keeps evidence it would otherwise drop.
+reached, not how far its unit is settled: a whole-world pass notes every zone at
+every merged boundary, a scoped pass notes only its own zones at its own
+boundaries, so two partitions of one interval can leave different markers. No
+decision reads it -- the activity owner, the site owner, the forecast and every
+birth rule read the recovery due tick, the generation sequence and the per-unit
+cursor instead -- and the equality requirement states that exception while
+keeping every decision-bearing field in the claim. The marker still never
+decreases (`max(old, tick)`).
+
+`settlement_projection` compares zone records exactly only when every pass visits
+the same last tick, so the scoped test world places one bounded future loss per
+zone on the interval endpoint: the whole-world pass and every unit's pass then
+share that last boundary and the differential test asserts the full projection.
+The endpoint loss is one of the categories the coordinator merges anyway.
+
+The timeline marker is the pass endpoint in both paths (a scoped pass may leave a
+lagging other unit's evidence stored while the marker has passed it); that
+over-claim costs only retained evidence, because the scoped retirement never
+consults the marker and a later whole-world pass that early-returns keeps
+evidence it would otherwise drop.
 
 ## The named scope refusal
 
@@ -2790,14 +2811,22 @@ replaced (`build_two_zone_world`).
 - `ScopeObjectTests` -- the closed set, its groups, zones and sites; `behind`
   with equal and with unequal cursors, including the pass-start exception; the
   active scope, its named refusal and its restoration; and the concerned units of
-  a recorded loss.
+  a recorded loss. An unknown seed never reaches the cursor record.
 - `ScopeCursorTests` -- a scoped pass raises only its own unit's cursor, an
   interval that ended before the cursor settles nothing, and an interval that
-  starts and ends at the cursor settles that tick.
+  starts and ends at the cursor settles that tick; with unequal cursors the
+  zone note and site step of the ahead unit are observed absent at every tick up
+  to its cursor, and a scoped pass refuses the whole-world field contact.
+- `ZoneMarkerTests` -- a zone's marker is the last boundary its own pass noted,
+  the other zone's marker is untouched, the marker never decreases, and a
+  deliberately lowered marker changes no activity, site, per-individual or
+  timeline outcome.
 - `DifferentialSettlementTests` -- the whole-world pass against unit by unit in
   both orders and against a five-part partition, the linked-after-diverging
   scenario, linked units settling together, a reload between two parts, and a
-  journey the scenario really records. The whole projection (activity, timeline,
+  journey the scenario really records; a partial departure, which derives a new
+  travelling group id the pass must adopt, settles every journey it began inside
+  the interval. The whole projection (activity, timeline,
   zone and site records, and per-individual position, gauges, reserve, posture
   and sleep receipt) is compared.
 - `OtherUnitTests` -- settling one zone leaves the other's zone record, groups,

@@ -593,6 +593,74 @@ class ScopeObjectTests(ScopedSettlementFixture):
             frozenset({population_units.RESIDUAL_UNIT}),
         )
 
+    def test_an_unknown_seed_never_reaches_the_cursor_record(self):
+        self._build_scenario()
+        self.assertEqual(
+            population_units.build_scope(
+                self.wilderness, ["zone:no-such-zone"]
+            ).units,
+            frozenset(),
+        )
+        self.assertEqual(
+            settle_population_scope(
+                self.wilderness, ["zone:no-such-zone"], 400
+            ),
+            [],
+        )
+        self.assertEqual(dict(self.cursor_record().units), {})
+
+
+class ZoneMarkerTests(ScopedSettlementFixture):
+    """A zone's settled-through marker records how far its own pass reached."""
+
+    def test_the_marker_is_the_last_boundary_the_pass_noted(self):
+        self._build_scenario()
+        noted: list[tuple[tuple[str, ...], int]] = []
+        real = regional_population.note_population_boundaries
+
+        def note(wilderness, zone_keys, *, tick):
+            noted.append((tuple(zone_keys), int(tick)))
+            return real(wilderness, zone_keys, tick=tick)
+
+        with patch.object(regional_population, "note_population_boundaries", note):
+            settle_population_scope(self.wilderness, [self.unit_a], END)
+        markers = {
+            key: state.settled_through_tick
+            for key, state in zone_states(self.wilderness).items()
+        }
+        self.assertEqual(
+            markers[ZONE_A],
+            max(tick for keys, tick in noted if ZONE_A in keys),
+        )
+        # The other unit's zone was never noted, so its marker is its own.
+        self.assertEqual(markers[ZONE_B], START)
+        self.assertFalse([tick for keys, tick in noted if ZONE_B in keys])
+
+    def test_the_marker_never_decreases(self):
+        self._build_scenario()
+        settle_population_scope(self.wilderness, [self.unit_a], 800)
+        marker = zone_states(self.wilderness)[ZONE_A].settled_through_tick
+        settle_population_scope(self.wilderness, [self.unit_a], 700)
+        self.assertEqual(
+            zone_states(self.wilderness)[ZONE_A].settled_through_tick, marker
+        )
+        self.assertGreaterEqual(marker, START)
+
+    def test_no_decision_reads_the_marker(self):
+        reference = self.run_plan([([self.unit_a], 800)])
+        self._build_scenario()
+        self.wilderness.db.regional_population = {
+            ZONE_A: self._zone_record(),
+            ZONE_B: {**self._zone_record(), "settled_through_tick": 0},
+        }
+        settle_population_scope(self.wilderness, [self.unit_a], 800)
+        projection = settlement_projection(self.wilderness)
+        for part in ("activity", "timeline", "sites", "bodies"):
+            self.assertEqual(projection[part], reference[part], msg=part)
+        self.assertEqual(
+            projection["zones"][ZONE_B]["settled_through_tick"], 0
+        )
+
 
 class ScopeCursorTests(ScopedSettlementFixture):
     """A scoped pass moves its own unit's cursor and nobody else's."""
@@ -640,6 +708,62 @@ class ScopeCursorTests(ScopedSettlementFixture):
         self.assertEqual(
             zone_states(self.wilderness)[ZONE_A].settled_through_tick, 400
         )
+
+    def test_unequal_cursors_run_no_zone_or_site_step_for_the_ahead_unit(self):
+        self._build_scenario()
+        population_units.write_unit_cursors(
+            self.wilderness,
+            population_units.UnitCursors(
+                START, MappingProxyType({self.unit_a: 400})
+            ),
+        )
+        noted: list[tuple[tuple[str, ...], int]] = []
+        sites: list[tuple[int, tuple[str, ...] | None]] = []
+        real_note = regional_population.note_population_boundaries
+        real_sites = monster_sites.settle_monster_sites_at
+
+        def note(wilderness, zone_keys, *, tick):
+            noted.append((tuple(zone_keys), int(tick)))
+            return real_note(wilderness, zone_keys, tick=tick)
+
+        def site(tick, *, scope=None):
+            sites.append(
+                (
+                    int(tick),
+                    None if scope is None else tuple(sorted(scope.site_keys)),
+                )
+            )
+            return real_sites(tick, scope=scope)
+
+        with (
+            patch.object(regional_population, "note_population_boundaries", note),
+            patch.object(monster_sites, "settle_monster_sites_at", site),
+        ):
+            settle_population_scope(
+                self.wilderness, [self.unit_a, self.unit_b], 700
+            )
+        early_notes = [keys for keys, tick in noted if tick <= 400]
+        self.assertTrue(early_notes)
+        self.assertTrue(
+            all(ZONE_A not in keys for keys in early_notes), "ahead zone noted"
+        )
+        early_sites = [keys for tick, keys in sites if tick <= 400]
+        self.assertTrue(early_sites)
+        self.assertTrue(
+            all(keys is not None and SITE_KEY not in keys for keys in early_sites),
+            "ahead site settled",
+        )
+        self.assertTrue(
+            [keys for keys, tick in noted if tick > 400 and ZONE_A in keys],
+            "the ahead unit never resumed",
+        )
+
+    def test_a_scoped_pass_refuses_the_whole_world_contact(self):
+        self._build_scenario()
+        with self.assertRaises(ValueError):
+            settle_population_scope(
+                self.wilderness, [self.unit_a], 400, contact=True
+            )
 
 
 class DifferentialSettlementTests(ScopedSettlementFixture):

@@ -434,18 +434,21 @@ class PopulationScope:
     site_keys: frozenset[str]
     #: Unit id -> the cursor the unit reported when the scope was built.
     start_ticks: Mapping[str, int]
+    #: Zone key -> its unit, and site key -> its unit, resolved once.
+    zone_units: Mapping[str, str]
+    site_units: Mapping[str, str]
 
     def behind(self, tick: int, *, inclusive: bool = False) -> "PopulationScope":
         """This scope's zones and sites of the units that have not passed ``tick``.
 
-        A unit whose cursor is ``tick`` has already settled that tick, so its
-        zone and site steps are skipped there; a group step is idempotent by
-        each member's own cursor and needs no narrowing. The pass's own first
-        tick is the one exception (``inclusive``): a whole-world pass always
-        settles its interval start, and a unit whose cursor is that start has
-        not settled it yet.
+        A unit whose cursor is ``tick`` has already committed that tick's zone
+        note and site step, so both are skipped there. The pass's own first tick
+        is the one exception (``inclusive``): a whole-world pass always settles
+        its interval start, and a unit whose cursor is that start has not
+        committed it yet. Every zone and site step is a no-op when it runs again
+        on a tick whose work is already committed, which is what makes skipping
+        a passed tick and re-running an inclusive one equally safe.
         """
-        index = current_unit_index()
         if inclusive:
             active = {
                 unit for unit, start in self.start_ticks.items() if start <= tick
@@ -458,13 +461,23 @@ class PopulationScope:
             self.units,
             self.group_ids,
             tuple(
-                key for key in self.zone_keys if index.unit_of_zone.get(key) in active
+                key for key in self.zone_keys if self.zone_units.get(key) in active
             ),
             frozenset(
-                key for key in self.site_keys if site_unit(index, key) in active
+                key for key in self.site_keys if self.site_units.get(key) in active
             ),
             self.start_ticks,
+            self.zone_units,
+            self.site_units,
         )
+
+    def zone_in_step(self, zone_key: str, tick: int, *, inclusive: bool = False) -> bool:
+        """Whether this scope's pass notes one zone at ``tick``."""
+        unit = self.zone_units.get(zone_key)
+        if unit is None:
+            return False
+        start = self.start_ticks.get(unit)
+        return start is not None and (start <= tick if inclusive else start < tick)
 
     def covers(self, location: Any | None) -> bool:
         """Whether one locator lies inside the scope; no locator is covered."""
@@ -480,21 +493,43 @@ class PopulationScope:
         ) in self.units
 
 
-def build_scope(wilderness: Any, seeds: Iterable[str]) -> PopulationScope:
+def build_scope(
+    wilderness: Any, seeds: Iterable[str], *, cursors: UnitCursors | None = None
+) -> PopulationScope:
     """The closed set of units reached from ``seeds`` and everything inside it.
 
-    One cursor read, one activity-record read and one group-units computation for
-    the whole pass; the answer is kept for the pass in :func:`scoped`. The
-    per-unit record is read first, so a missing or malformed one refuses before
-    any settlement work.
+    One activity-record read, one group-units computation and -- unless the
+    caller already read it -- one cursor read for the whole pass; the answer is
+    kept for the pass in :func:`scoped`. The per-unit record is read first, so a
+    missing or malformed one refuses before any settlement work. A seed that
+    names no unit of the authored geometry is dropped rather than recorded: a
+    settlement must never persist a cursor for a unit the world does not have.
     """
     from world.maps import monster_activity
+    from world.maps import monster_sites
 
-    cursors = read_unit_cursors(wilderness)
+    record = read_unit_cursors(wilderness) if cursors is None else cursors
     index = current_unit_index()
     state = monster_activity.read_monster_activity(wilderness)
     units_of = group_units_map(index, state)
-    units = _closure_over(units_of, seeds)
+    known = (
+        set(index.unit_of_zone.values())
+        | set(index.unit_of_area.values())
+        | {RESIDUAL_UNIT}
+    )
+    units = _closure_over(units_of, [seed for seed in seeds if seed in known])
+    zone_keys = tuple(
+        key
+        for key in regional_population.initialized_zone_keys(wilderness)
+        if index.unit_of_zone.get(key) in units
+    )
+    # The owner's own binding decides which sites the pass settles, so the scope
+    # names its sites from that one registry.
+    site_keys = tuple(
+        key
+        for key in monster_sites.MONSTER_SITE_REGISTRY
+        if site_unit(index, key) in units
+    )
     return PopulationScope(
         units,
         frozenset(
@@ -502,15 +537,13 @@ def build_scope(wilderness: Any, seeds: Iterable[str]) -> PopulationScope:
             for group_id, group_set in units_of.items()
             if group_set and group_set <= units
         ),
-        tuple(
-            key
-            for key in regional_population.initialized_zone_keys(wilderness)
-            if index.unit_of_zone.get(key) in units
+        zone_keys,
+        frozenset(site_keys),
+        MappingProxyType({unit: unit_cursor(record, unit) for unit in units}),
+        MappingProxyType(
+            {key: index.unit_of_zone[key] for key in zone_keys if key in index.unit_of_zone}
         ),
-        frozenset(
-            key for key in lore_placement.MONSTER_SITE_REGISTRY if site_unit(index, key) in units
-        ),
-        MappingProxyType({unit: unit_cursor(cursors, unit) for unit in units}),
+        MappingProxyType({key: site_unit(index, key) for key in site_keys}),
     )
 
 

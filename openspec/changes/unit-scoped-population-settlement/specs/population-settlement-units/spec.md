@@ -18,7 +18,7 @@ A scoped lifecycle pass SHALL settle only the groups, journeys, zones and sites 
 - **THEN** both units report 700, and no zone or site step ran for the first unit at any tick up to 400
 
 ### Requirement: Separate settlement equals whole-world settlement
-Settling every closed set of units separately SHALL leave the same activity record, zone records, site records and per-individual position, gauges, reserve, posture and sleep receipt as one whole-world pass over the same interval, for any order of the sets and any partition of the interval per set.
+Settling every closed set of units separately SHALL leave the same activity record, zone records, site records and per-individual position, gauges, reserve, posture and sleep receipt as one whole-world pass over the same interval, for any order of the sets and any partition of the interval per set, except each zone record's settled-through marker, which records the boundary the pass itself reached and which no decision reads.
 
 #### Scenario: Order and partition
 - **WHEN** a synthetic world of two disjoint units, with wandering groups, a travelling group, a zone below its lower density and a recoverable site, is settled over one interval as a whole, then unit by unit in both orders, then with one unit in two parts and the other in three
@@ -35,6 +35,10 @@ Settling every closed set of units separately SHALL leave the same activity reco
 #### Scenario: Reload between parts
 - **WHEN** one unit is settled to the midpoint, every attribute cache is reset, and it is then settled to the endpoint
 - **THEN** its state projection equals the projection of settling it in one part
+
+#### Scenario: Zone progress marker
+- **WHEN** a scoped pass settles one unit whose own last boundary lies below another unit's later boundary
+- **THEN** that unit's zone record reports the last boundary its own pass noted, the marker never decreases, and the activity record, site records, per-individual facts and timeline evidence of a settlement do not depend on it
 
 ### Requirement: Shared evidence is kept until every concerned unit has passed it
 A recorded presence transition SHALL be retired only when every unit of its before and after positions and home zones has been settled to or past its occurrence tick. A closed cell protection interval SHALL be retired only when the unit of its cell has been settled past its end.
