@@ -79,3 +79,18 @@ export const Overflow = {
   render,
   args: { ...overflowCardArgs(GUILD_HALL), autofocus: true, trapFocus: true },
 };
+
+// The header slot: a consumer's line inside the frame, above the rows and
+// under its own hairline. It never scrolls with the rows and never joins the
+// keyboard composite.
+export const WithHeader = {
+  name: "With Header",
+  render: (args) => ({
+    render: () =>
+      h(ChoiceCard, args, {
+        header: () =>
+          h("p", { style: { margin: 0, font: "var(--text-sm)/1.5 var(--f-sans)", color: "var(--paper-300)", letterSpacing: "0.12em" } }, "葛里安‧衛登"),
+      }),
+  }),
+  args: { ...verbCardArgs(GUILD_HALL, 11), autofocus: true, trapFocus: true },
+};

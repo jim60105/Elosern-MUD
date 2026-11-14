@@ -288,6 +288,45 @@ describe("ChoiceCard", () => {
     expect(activeRow(w)).toBe(rows(w)[1].element);
   });
 
+  // landmark-rite-surfaces D1: a consumer header sits inside the frame
+  // before the rows and leaves the keyboard composite untouched.
+  it("renders a supplied header before the rows and keeps the composite unchanged", async () => {
+    wrapper = mount(ChoiceCard, {
+      attachTo: document.body,
+      props: { rows: ROWS, trailingIndex: 4, autofocus: true },
+      slots: { header: '<p data-testid="synthetic-header">合成標頭</p>' },
+    });
+    const header = card(wrapper).find(".choice-card__header");
+    expect(header.exists()).toBe(true);
+    expect(header.find('[data-testid="synthetic-header"]').text()).toBe("合成標頭");
+    expect(header.attributes("aria-hidden")).toBeUndefined();
+    const rowsBox = card(wrapper).get(".choice-card__rows").element;
+    expect(header.element.compareDocumentPosition(rowsBox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header.findAll('[role="menuitem"]')).toHaveLength(0);
+    expect(wrapper.findAll("[tabindex]")).toHaveLength(1);
+    expect(activeRow(wrapper)).toBe(rows(wrapper)[0].element);
+    await key(wrapper, "ArrowDown");
+    expect(activeRow(wrapper)).toBe(rows(wrapper)[1].element);
+  });
+
+  it("renders no header element without a header slot", () => {
+    const w = mountCard();
+    expect(w.find(".choice-card__header").exists()).toBe(false);
+  });
+
+  it("names an unread row with the supplied unread label, else the default", () => {
+    const unread = [{ key: "a", label: "甲", badge: "1", enabled: true, unread: true }, ROWS[4]];
+    const plain = mountCard({ rows: unread, trailingIndex: 1 });
+    const fallback = plain.get('[data-row-key="a"] .choice-card__sr').text();
+    plain.unmount();
+    wrapper = null;
+    const labelled = mountCard({ rows: unread, trailingIndex: 1, unreadLabel: "合成標記" });
+    const supplied = labelled.get('[data-row-key="a"] .choice-card__sr').text();
+    expect(supplied).toBe("合成標記");
+    expect(fallback).not.toBe(supplied);
+    expect(fallback.length).toBeGreaterThan(0);
+  });
+
   // authored-dialogue-locked-ui (web/webclient-app/AGENTS.md styling
   // pitfall): the card's own style block is the one source of its rules.
   // app-shell.css carries no `.elosern-root` duplicate or override of a

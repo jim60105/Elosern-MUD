@@ -81,6 +81,7 @@
     "World/AreaMapView",
     "World/WorldMapView",
     "World/WildernessTravel",
+    "World/LandmarkRite",
     "World/DetailFooter",
     "World/TileWall",
     "World/CodexDetail",
