@@ -58,6 +58,10 @@ test("the valid panel and its delivery are accepted at version one", function ()
   withDelivery.seen = ["shared"];
   assert.equal(validate(withDelivery), withDelivery);
 
+  var mixedBlank = clone(VALID);
+  mixedBlank.district.name = "丘\ufeff";
+  assert.equal(validate(mixedBlank), mixedBlank);
+
   assert.equal(Protocol.RITE_SCHEMA_VERSION, 1);
   assert.equal(Protocol.PANEL_ALLOWLIST.rite, 1);
   assert.equal(typeof Protocol.validateRitePanel, "function");
@@ -75,6 +79,8 @@ test("one mutation per bound rejects the whole panel", function () {
     function (p) { p.district.key = "測試"; },
     function (p) { p.district.key = ""; },
     function (p) { p.district.name = "  "; },
+    function (p) { p.district.name = "\ufeff"; },
+    function (p) { p.district.name = new Array(258).join("丘"); },
     function (p) { p.district.lit = "false"; },
     function (p) { p.guardian.extra = 1; },
     function (p) { p.guardian.name = " "; },
@@ -95,6 +101,8 @@ test("one mutation per bound rejects the whole panel", function () {
     function (p) { p.performers[1].member_id = null; },
     function (p) { p.performers[1].member_id = 0; },
     function (p) { p.performers[1].member_id = true; },
+    function (p) { p.performers[1].member_id = 9007199254740992; },
+    function (p) { p.performers[1].name = new Array(130).join("名"); },
     function (p) { p.performers.push({ member_id: 7, name: "測試路人", owner: false }); },
     function (p) { p.performers[1].owner = true; },
     function (p) {
@@ -133,6 +141,22 @@ test("one mutation per bound rejects the whole panel", function () {
     function (p) {
       p.delivery = clone(DELIVERY);
       p.delivery.scene_id = new Array(98).join("a");
+    },
+    function (p) {
+      p.delivery = clone(DELIVERY);
+      p.delivery.delivery_id = new Array(130).join("a");
+    },
+    function (p) {
+      p.delivery = clone(DELIVERY);
+      p.delivery.delivery_id = "儀式";
+    },
+    function (p) {
+      p.delivery = clone(DELIVERY);
+      p.delivery.actor_name = new Array(130).join("名");
+    },
+    function (p) {
+      p.delivery = clone(DELIVERY);
+      p.delivery.guardian_name = new Array(130).join("名");
     },
     function (p) {
       p.delivery = clone(DELIVERY);

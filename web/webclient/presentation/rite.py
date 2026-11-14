@@ -64,6 +64,12 @@ RITE_MAX_LINE_TEXT = 2_000
 
 #: An authored option key: a lowercase head then lowercase/digits/underscores.
 _OPTION_KEY = re.compile(r"[a-z][a-z0-9_]{0,31}")
+#: The characters that make a text blank: the ECMAScript WhiteSpace and
+#: LineTerminator set, shared verbatim with the browser mirror so a value can
+#: never pass one validator and fail the other.
+_BLANK = re.compile(
+    "[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+"
+)
 _SPEAKERS = ("actor", "host")
 
 _PANEL_FIELDS = {
@@ -112,7 +118,7 @@ def _bounded_ascii(value: Any, field: str, maximum: int) -> str:
 
 def _nonblank(payload: dict[str, Any], field: str, maximum: int) -> str:
     value = _require_str(payload, field, maximum=maximum)
-    if not value.strip():
+    if not value or _BLANK.fullmatch(value) is not None:
         raise ProtocolValidationError(f"{field} must be non-blank")
     return value
 

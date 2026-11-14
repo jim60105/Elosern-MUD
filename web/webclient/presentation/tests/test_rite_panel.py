@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
+    MAX_SAFE_INTEGER,
     ProtocolValidationError,
     json_byte_size,
 )
@@ -169,6 +170,18 @@ def _mutations():
     long_scene_id = _with_delivery()
     long_scene_id["delivery"]["scene_id"] = "a" * 97
 
+    long_delivery_id = _with_delivery()
+    long_delivery_id["delivery"]["delivery_id"] = "a" * 129
+
+    non_ascii_delivery_id = _with_delivery()
+    non_ascii_delivery_id["delivery"]["delivery_id"] = "儀式"
+
+    long_actor_name = _with_delivery()
+    long_actor_name["delivery"]["actor_name"] = "名" * 129
+
+    long_guardian_name = _with_delivery()
+    long_guardian_name["delivery"]["guardian_name"] = "名" * 129
+
     reserved_revision = _with_delivery()
     reserved_revision["delivery"]["revision"] = "r1"
 
@@ -191,6 +204,8 @@ def _mutations():
         ("non-ascii district key", _section("district", key="測試")),
         ("empty district key", _section("district", key="")),
         ("blank district name", _section("district", name="  ")),
+        ("ecmascript-blank district name", _section("district", name="\ufeff")),
+        ("too long district name", _section("district", name="丘" * 257)),
         ("too long district landmark", _section("district", landmark="碑" * 257)),
         ("non-boolean district lit", _section("district", lit=None)),
         ("extra guardian key", _section("guardian", extra=1)),
@@ -205,8 +220,13 @@ def _mutations():
         ("non-boolean companion", _option_case("companion", 1)),
         ("no performers", _panel(performers=[])),
         ("first performer with an id", _performer_case("member_id", 7)),
+        ("too long performer name", _performer_case("name", "名" * 129)),
         ("seventeen performers", crowded),
         ("duplicate member_id", duplicate_member),
+        (
+            "member_id above MAX_SAFE_INTEGER",
+            _performer_case("member_id", MAX_SAFE_INTEGER + 1),
+        ),
         ("two owners", two_owners),
         ("seen key not an option", _panel(seen=["other"])),
         ("duplicate seen key", _panel(seen=["solo", "solo"])),
@@ -218,6 +238,10 @@ def _mutations():
         ("empty line text", empty_text),
         ("too long line text", long_text),
         ("too long scene id", long_scene_id),
+        ("too long delivery id", long_delivery_id),
+        ("non-ascii delivery id", non_ascii_delivery_id),
+        ("too long actor name", long_actor_name),
+        ("too long delivery guardian name", long_guardian_name),
         ("extra delivery key", reserved_revision),
         ("oversize panel", oversize),
     ]
@@ -252,6 +276,10 @@ class RiteValidatorTests(unittest.TestCase):
         ]
         self.assertGreater(json_byte_size(oversize), RITE_MAX_BYTES)
         self.assertEqual(len(oversize["delivery"]["lines"]), 32)
+
+    def test_a_mixed_blank_and_text_value_is_not_blank(self):
+        payload = _section("district", name="丘\ufeff")
+        self.assertEqual(validate_rite(payload), payload)
 
 
 class RitePanelPresenterTests(RiteSettlementFixture):
@@ -355,6 +383,15 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         setattr(self.player.ndb, DELIVERY_NDB, {"node": other, "delivery": delivery})
 
         self.assertIsNone(self._payload()["delivery"])
+
+    def test_returning_to_the_committed_node_carries_the_delivery_again(self):
+        result = self._settle(member_id=int(self.companion.id))
+        self.player.location = self.source
+        with self.assertRaises(PanelUnavailableError):
+            self._payload()
+
+        self.player.location = self.landmark
+        self.assertEqual(self._payload()["delivery"], result["data"]["delivery"])
 
     def test_a_corrupt_record_degrades_to_no_seen_and_one_warning(self):
         self.player.attributes.add(RECORD_ATTR, {"schema_version": 2, "completed": {}})

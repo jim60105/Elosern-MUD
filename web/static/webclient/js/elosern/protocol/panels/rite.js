@@ -41,6 +41,9 @@ var RITE_MAX_LINE_TEXT = C.RITE_MAX_LINE_TEXT;
 var RITE_KIND = "rite";
 var RITE_DELIVERY_KIND = "formal";
 var SPEAKERS = ["actor", "host"];
+// The characters that make a text blank: the ECMAScript WhiteSpace and
+// LineTerminator set, shared verbatim with web.webclient.presentation.rite.
+var BLANK_RE = /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+$/u;
 
 var PANEL_FIELDS = [
   "schema_version",
@@ -85,7 +88,7 @@ function requireAscii(value, field, maximum) {
 
 function requireNonblank(value, field, maximum) {
   requireString(value, field, maximum);
-  if (value.trim() === "") {
+  if (value.length < 1 || BLANK_RE.test(value)) {
     throw new Error(field + " must be non-blank");
   }
   return value;

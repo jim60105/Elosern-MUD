@@ -41,15 +41,19 @@ An available `rite` panel SHALL list the archetype's options in authored order w
 - **THEN** the panel is still available, lists nothing as experienced, and one warning is logged
 
 ### Requirement: The rite panel carries the last delivery only on its node
-After a rite commits through the browser action, the `rite` panel SHALL carry that rite's delivery while the record owner remains on the same node, and SHALL carry no delivery on any other node or after the owner returns from one.
+After a rite commits through the browser action, the `rite` panel SHALL carry that rite's delivery while the record owner's current canonical node is the node the rite committed on, and SHALL carry no delivery on any other node.
 
 #### Scenario: Same node
 - **WHEN** a rite commits and the panel is rendered again on the same node
 - **THEN** the panel carries the delivery the action returned
 
 #### Scenario: Another node
-- **WHEN** the owner moves to another rite landmark, or leaves and returns
+- **WHEN** the owner moves to another rite landmark, or leaves the landmark
 - **THEN** the panel there carries no delivery from the earlier node
+
+#### Scenario: Return to the committed node
+- **WHEN** the owner leaves and returns to the node the rite committed on
+- **THEN** the panel carries that delivery again
 
 ### Requirement: The rite panel is validated identically by server and browser
 The server and the browser SHALL accept exactly the same bounded `rite` panel shape and SHALL reject a malformed or oversize panel whole, never trimming it into validity.
