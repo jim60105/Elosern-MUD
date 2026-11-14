@@ -33,7 +33,7 @@ Sexual state SHALL be written only to the acting body. The completion record SHA
 
 #### Scenario: Companion performs
 - **WHEN** a present companion performs an option that declares a watch scene
-- **THEN** the companion's sexual state changed, the player character's did not, the record is the player character's, and the delivered scene is the watch scene
+- **THEN** the companion's sexual state changed, no rite sexual write reached the player character (ordinary time settlement still settles it), the record is the player character's, and the delivered scene is the watch scene
 
 #### Scenario: Possessed companion
 - **WHEN** the player possesses a companion and that companion performs with no member named

@@ -149,6 +149,8 @@ def perform_rite(actor: Any, option_key: str, member_id: int | None = None, *, o
    - `write_record(owner, with_completion(read_record(owner), site.district_key, option.key, tick))`, `tick` being the world tick after the advance (`int(get_world_clock().tick)`: the enclosing snapshot's clock instance is pre-advance, because `advance_wait` resolves its own);
    - build the `RiteResult` (`climax = body.sexual.climax_today > climax_before`);
    - `transaction.on_commit(...)`: store the receipt and `log_info("landmark_rite_committed", context={"char": owner.pk, "district": ..., "archetype": ..., "option": ..., "body": body.pk, "seconds": option.seconds, "elapsed": result.elapsed_seconds, "climax": climax})`.
+
+   The record is the one surface re-read under the transaction (`with_completion(read_record(owner), ...)`); the district, option and acting body come from the plan `preflight` resolved microseconds earlier in the same synchronous request, so nothing can change them between the two steps.
 6. `except Exception:` restore with `_restore_clock_tick(clock, tick_snapshot)`, `_restore_advance_registry(registry, entities)`, `restore_attribute_best_effort(owner, RECORD_ATTR, record_snapshot)`, then re-raise.
 7. Every `RiteRefused` leaving `perform_rite` is logged once before it propagates: `log_info("landmark_rite_refused", context={"char": <owner pk or actor pk>, "district": <district key or "">, "reason": code})`.
 

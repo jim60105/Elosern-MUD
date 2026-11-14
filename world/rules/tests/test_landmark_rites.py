@@ -266,9 +266,46 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.exposure.value, SHARED_EXPOSURE)
         self.assertEqual(result.plan.perspective, "watch")
         self.assertIs(result.scene, SHARED.watch_scene)
+        self.assertFalse(self.companion.attributes.has(RECORD_ATTR))
         self.assertEqual(
             self.record()["completed"][DISTRICT_KEY]["options"]["shared"]["count"], 1
         )
+
+    def test_a_companion_rite_writes_no_sexual_state_to_the_owner(self):
+        # The owner sits in afterglow, the one state ordinary time settlement
+        # may damp while a companion performs. The rite itself must add no
+        # climax, shame step or exposure step to the owner's body.
+        self.player.sexual.climax_phase.value = "餘韻"
+        self.player.sexual.shame.value = 0
+        self.player.sexual.exposure.value = 0
+        climax_before = self.player.sexual.climax_today
+
+        result = self.perform(self.player, "shared", member_id=self.companion.id)
+
+        self.assertEqual(result.plan.perspective, "watch")
+        self.assertEqual(self.player.sexual.climax_today, climax_before)
+        self.assertEqual(self.player.sexual.shame.value, 0)
+        self.assertEqual(self.player.sexual.exposure.value, 0)
+        self.assertEqual(self.companion.sexual.shame.value, SHARED_SHAME)
+        self.assertEqual(self.companion.sexual.exposure.value, SHARED_EXPOSURE)
+
+    def test_a_rite_preserves_retired_record_entries(self):
+        retired = {
+            "first_tick": 5,
+            "last_tick": 5,
+            "count": 1,
+            "options": {"t_retired_option": {"count": 1, "last_tick": 5}},
+        }
+        self.player.attributes.add(
+            RECORD_ATTR,
+            {"schema_version": 1, "completed": {"t_retired_district": retired}},
+        )
+
+        self.perform(self.player, "solo")
+
+        record = read_record(self.player)
+        self.assertEqual(record["completed"]["t_retired_district"], retired)
+        self.assertEqual(record["completed"][DISTRICT_KEY]["count"], 1)
 
     def test_a_possessed_companion_delivers_the_watch_scene(self):
         enter_possession(self.player, self.companion)
@@ -278,6 +315,7 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
         self.assertIn(DISTRICT_KEY, self.record()["completed"])
+        self.assertFalse(self.companion.attributes.has(RECORD_ATTR))
         self.refused(
             "rite_no_watch_scene",
             lambda: self.perform(self.companion, "solo"),
@@ -302,6 +340,19 @@ class RiteRefusalTests(RiteSettlementFixture):
             "rite_member_unavailable",
             lambda: self.perform(self.player, "shared", member_id=self.companion.id),
         )
+
+    def test_a_knocked_out_or_unrelated_member_is_refused(self):
+        knocked_out = self._companion("測試倒地")
+        knocked_out.traits.hp.current = 0
+        unrelated = create_object(NPC, key="測試路人", location=self.player.location)
+        for member in (knocked_out, unrelated):
+            with self.subTest(member=member.key):
+                self.refused(
+                    "rite_member_unavailable",
+                    lambda member=member: self.perform(
+                        self.player, "shared", member_id=member.id
+                    ),
+                )
 
     def test_a_solo_only_option_refuses_a_companion(self):
         self.refused(
@@ -371,6 +422,23 @@ class RiteRollbackTests(RiteSettlementFixture):
         self.assertIsNone(self.record())
         self.assertEqual(info.call_count, 0)
 
+    def test_a_failed_companion_rite_rolls_both_bodies_back(self):
+        # The record owner and the acting body differ here: a restore that
+        # covered only one of them would still pass the single-body test.
+        tick_before = get_world_clock().tick
+        player_before = self.sexual_state(self.player)
+        companion_before = self.sexual_state(self.companion)
+        with patch(
+            "world.rules.landmark_rites.write_record",
+            side_effect=RuntimeError("record write failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.perform(self.player, "shared", member_id=self.companion.id)
+        self.assertEqual(get_world_clock().tick, tick_before)
+        self.assertEqual(self.sexual_state(self.player), player_before)
+        self.assertEqual(self.sexual_state(self.companion), companion_before)
+        self.assertIsNone(self.record())
+
     def test_a_retry_after_a_rolled_back_attempt_commits_once(self):
         tick_start = get_world_clock().tick
         with patch(
@@ -388,11 +456,14 @@ class RiteRollbackTests(RiteSettlementFixture):
 class RiteReplayTests(RiteSettlementFixture):
     def test_a_duplicate_request_identity_settles_once(self):
         tick_before = get_world_clock().tick
-        first = self.perform(self.player, "solo", operation_id="t_rite_duplicate")
-        second = self.perform(self.player, "solo", operation_id="t_rite_duplicate")
+        with patch("world.rules.landmark_rites.log_info") as info:
+            first = self.perform(self.player, "solo", operation_id="t_rite_duplicate")
+            second = self.perform(self.player, "solo", operation_id="t_rite_duplicate")
         self.assertIs(first, second)
         self.assertEqual(get_world_clock().tick - tick_before, SOLO_SECONDS)
         self.assertEqual(self.record()["completed"][DISTRICT_KEY]["count"], 1)
+        self.assertEqual(info.call_count, 1)
+        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
 
     def test_a_request_identity_is_scoped_to_the_acting_body(self):
         first = self.perform(self.player, "solo", operation_id="t_rite_shared_id")

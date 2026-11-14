@@ -176,7 +176,10 @@ def rite_site_for(owner: Any) -> RiteSite | None:
     location = getattr(owner, "location", None)
     if not isinstance(location, (GridRoom, TerrainRoom)):
         return None
-    node = node_id_for(location)
+    try:
+        node = node_id_for(location)
+    except (TypeError, ValueError):  # observability: ignore R2: a room whose xyz/coordinates cannot produce a canonical node ID has no rite site (design D3's `None -> None`); this presentation read writes nothing and the node grammar owns the diagnostic
+        return None
     if node is None:
         return None
     district_key = _district_key_for_node(node)
@@ -251,7 +254,9 @@ def preflight(actor: Any, option_key: str, member_id: int | None = None) -> Rite
         except PartyScopeError as error:
             raise RiteRefused("rite_member_unavailable") from error
     perspective = "self" if body is owner else "watch"
-    if getattr(body, "sexual", None) is None:
+    # The handler's class presence, not a materializing instance read: a refused
+    # request must leave the named body's baseline uncreated too.
+    if getattr(type(body), "sexual", None) is None:
         raise RiteRefused("rite_member_unavailable")
     if perspective == "watch" and option.watch_scene is None:
         raise RiteRefused("rite_no_watch_scene")
@@ -295,25 +300,31 @@ def _receipt_key(actor: Any, operation_id: str) -> tuple[int | None, str]:
     return (pk if isinstance(pk, int) else None, operation_id)
 
 
-def _refusal_context(actor: Any, code: str) -> dict[str, Any]:
-    """The refused event's context: owner-first character, district, and reason.
+def _refusal_identity(actor: Any) -> tuple[Any, str]:
+    """The diagnostic owner and district of a refusal, degrading to the actor.
 
-    A diagnostic re-read on the failure path only; it never changes the
-    refusal that propagates.
+    This runs on the failure path only, once the refusal code is already
+    determined: an unreadable owner, site or room must never replace it.
     """
-    from world.lore.map_districts import DistrictNotLoaded
-
-    district = ""
     try:
         owner = record_owner_for(actor)
     except RiteRefused:  # observability: ignore R2: a body with no resolvable owner has no district either; the acting body identifies the refusal
-        owner = actor
+        return actor, ""
+    try:
+        site = rite_site_for(owner)
+    except Exception:  # observability: ignore R2: a diagnostic re-read must never mask the refusal it annotates; an unreadable site or room degrades to no district
+        return owner, ""
+    return owner, "" if site is None else site.district_key
+
+
+def _refusal_context(
+    actor: Any, code: str, plan: RitePlan | None = None
+) -> dict[str, Any]:
+    """The refused event's context: owner-first character, district, and reason."""
+    if plan is None:
+        owner, district = _refusal_identity(actor)
     else:
-        try:
-            site = rite_site_for(owner)
-        except DistrictNotLoaded:  # observability: ignore R2: without a published district world there is no district to name, and the refusal still propagates unchanged
-            site = None
-        district = "" if site is None else site.district_key
+        owner, district = plan.owner, plan.site.district_key
     return {"char": getattr(owner, "pk", None), "district": district, "reason": code}
 
 
@@ -431,6 +442,7 @@ def perform_rite(
         recorded = _RECEIPTS.get(_receipt_key(actor, operation_id))
         if recorded is not None:
             return recorded
+    plan: RitePlan | None = None
     try:
         plan = preflight(actor, option_key, member_id)
         admit_contact_before_action(actor)
@@ -440,6 +452,6 @@ def perform_rite(
     except RiteRefused as refusal:
         log_info(
             "landmark_rite_refused",
-            context=_refusal_context(actor, refusal.code),
+            context=_refusal_context(actor, refusal.code, plan),
         )
         raise
