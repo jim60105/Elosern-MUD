@@ -63,8 +63,8 @@ MAP_COORD_MIN = -10_000_000
 MAP_COORD_MAX = 10_000_000
 
 # Logical-body structural ceiling. A reassembled map body is not a wire frame:
-# its lists may exceed the 320-item frame ceiling and are bounded instead by the
-# exact per-collection limits below. Depth, field count, string length and
+# its lists may exceed the generic 1,024-item frame ceiling and are bounded
+# instead by the exact per-collection limits below. Depth, field count, string length and
 # scalar safety stay the generic ones.
 MAP_MAX_LIST_ITEMS = 8_192
 #: Envelope depth of a panel value (envelope -> panels -> panel).
@@ -154,7 +154,11 @@ WORLD_MAX_DISTRICTS = 256
 WORLD_MAX_OUTLINE_POLYGONS = 64
 WORLD_MAX_TERRAIN_REGIONS = 64
 WORLD_MAX_DISTRICT_POLYLINES = 256
-WORLD_MAX_PLACES = 256
+# Every settlement, village and hamlet is a place the world map may mark. The
+# bound is raised for the shipped roster with headroom (349 places today) rather
+# than undercutting it; the measured world-map byte bound stays the real
+# transport limit (the worst measured payload is 1.66 MB against 2 MiB).
+WORLD_MAX_PLACES = 512
 WORLD_MAX_DISTRICT_NATIONS = 8
 WORLD_MAX_QUEST_MARKERS = 64
 WORLD_APPROXIMATE_GRID_KM = 50
@@ -1089,7 +1093,7 @@ def check_world_map_envelope(envelope: Any) -> dict[str, Any]:
     The world map is the only value exempt from the generic frame budget.
     The rest of the envelope, with the world map replaced by ``null``, passes
     the unchanged generic check: metadata and every sibling panel (including
-    ``local_map`` and ``area_map``) keep the 65,536-byte, 320-item, depth and
+    ``local_map`` and ``area_map``) keep the 65,536-byte, 1,024-item, depth and
     string bounds. The world map itself must pass its exact schema, the
     generic scalar rules and its logical byte ceiling. Returns the validated
     world-map body; raises :class:`ProtocolValidationError` otherwise.

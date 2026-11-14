@@ -1,7 +1,7 @@
 """Bounded atomic part codec for on-demand map panels.
 
 A logical ``area_map``/``world_map`` body may exceed one existing OOB frame
-(65,536 canonical bytes, 320-item lists). It then travels as indexed parts
+(65,536 canonical bytes, 1,024-item lists). It then travels as indexed parts
 (OpenSpec change define-map-panel-protocol): every part is an ordinary
 ``ui_update`` frame whose ``panels`` hold exactly that map panel in the part
 wire variant

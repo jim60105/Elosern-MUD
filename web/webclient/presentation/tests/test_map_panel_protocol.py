@@ -553,18 +553,25 @@ def _context():
 
 
 def _dense_grid():
-    """A small-byte grid area whose 400 edges exceed the 320-item frame list."""
+    """A grid area whose canonical body exceeds one intact frame by bytes.
+
+    The split has to be driven by the byte ceiling, not by a list-item ceiling:
+    the global list bound scales with the shipped lore roster, so a many-edge
+    body under the byte ceiling legitimately travels intact. Forty nodes and
+    every undirected pair as a directed edge measure about 98 KB canonically,
+    above the 65 536-byte frame ceiling.
+    """
     body = _copy("grid")
     body["nodes"] = [
         {"id": f"grid:t_map:{i}:0", "label": f"點{i}", "x": i, "y": 0,
          "visibility": "current" if i == 0 else "seen", "gateway": None, "action": None}
-        for i in range(21)
+        for i in range(40)
     ]
     body["current_node"] = "grid:t_map:0:0"
     body["edges"] = [
         {"source": f"grid:t_map:{a}:0", "destination": f"grid:t_map:{b}:0"}
-        for a in range(21) for b in range(21) if a != b
-    ][:400]
+        for a in range(40) for b in range(40) if a != b
+    ]
     body["quest_markers"] = []
     return body
 

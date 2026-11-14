@@ -552,7 +552,7 @@ intact `world_map` object (one without `part`) is checked in two pieces:
 
 - The rest of the envelope, with the world map replaced by `null`, passes the
   unchanged generic check. Metadata and every sibling panel keep the
-  65,536-byte, 320-item, depth and string bounds. That includes `local_map`,
+  65,536-byte, 1,024-item, depth and string bounds. That includes `local_map`,
   `area_map` and the dialogue companion (the dialogue allowance applies only
   to pure dialogue publications without the world-map exemption).
 - The world map passes the generic scalar rules, its exact schema and its
@@ -585,7 +585,7 @@ logs `map_panel_invalid`. Each intact world-map frame logs the debug event
 ## Bounded parts
 
 A map update that satisfies the generic frame bounds (65,536 canonical bytes,
-320-item lists, depth 16, 2,048-code-point strings), or the world-map
+1,024-item lists, depth 16, 2,048-code-point strings), or the world-map
 allowance above, ships as one ordinary `ui_update`. Otherwise:
 
 1. Any eager companion panels in the same update, including the dialogue
