@@ -630,25 +630,27 @@ Seventeen OpenSpec changes under `openspec/changes/`, each sized for one
 engineer-day. Content and every player entry point land before the lighting
 switch, so no district is ever unlit-by-construction.
 
-| # | Change | Contents | Depends on |
-| --- | --- | --- | --- |
-| 1 | `landmark-rite-content-model` | `world/lore/rites/` shapes, strict loader, snapshot holder; no content | — |
-| 2 | `landmark-rite-content` | First five archetypes (ten `self` scenes), assignment of every district (the other families provisional), startup adoption, data-contract test, authoring review | 1 |
-| 3 | `landmark-rite-content-completion` | Remaining five archetypes and the final assignment; content only | 2 |
-| 4 | `landmark-rite-settlement` | Completion record, preflight and atomic settlement, refusal codes, observability events | 1 |
-| 5 | `landmark-rite-action` | `explore.landmark_rite`, the `儀式` command, command echo, command docs | 3, 4 |
-| 6 | `landmark-rite-panel` | `rite` panel presenter and validator, browser protocol mirror, stored delivery | 5 |
-| 7 | `landmark-rite-surfaces` | `RiteArrivalCard`, `RitePanel`, `RiteBackdrop`, `ChoiceCard` header slot, stories | 6 |
-| 8 | `landmark-rite-store` | Rite presentation state as a webclient store group | 7 |
-| 9 | `landmark-rite-stage` | Shell integration: card, stage, playback through the shared player, return entry and R key | 8 |
-| 10 | `landmark-rite-journeys` | Managed browser journeys (wilderness and city) at both viewports | 9 |
-| 11 | `landmark-rite-performer-picking` | Performer picked on the stage figures and with the arrow keys | 9 |
-| 12 | `landmark-rite-lighting` | Lit set from the record, reveal projection takes the lit set, movement announces nothing | 9 |
-| 13 | `landmark-rite-discovery-notice` | `已探明` on the first completed rite, in text and on the stage | 12 |
-| 14 | `landmark-rite-arrival-signal-removal` | `district_lit` and `lit_district` removal | 12 |
-| 15 | `landmark-rite-art` | Ten `rite_*` scene archetypes with bundled illustrations, panel artwork | 3, 6 |
-| 16 | `landmark-rite-watch-perspectives` | `watch` scenes; content only | 11 |
-| 17 | `landmark-rite-third-option` | A third option where an archetype supports one; content only | 16 |
+| # | Change | Contents | Depends on | Frontend |
+| --- | --- | --- | --- | --- |
+| 1 | `landmark-rite-content-model` | `world/lore/rites/` shapes, strict loader, snapshot holder; no content | — | — |
+| 2 | `landmark-rite-content` | First five archetypes (ten `self` scenes), assignment of every district (the other families provisional), startup adoption, data-contract test, authoring review | 1 | — |
+| 3 | `landmark-rite-content-completion` | Remaining five archetypes and the final assignment; content only | 2 | — |
+| 4 | `landmark-rite-settlement` | Completion record, preflight and atomic settlement, refusal codes, observability events | 1 | — |
+| 5 | `landmark-rite-action` | `explore.landmark_rite`, the `儀式` command, command echo, command docs | 3, 4 | wire |
+| 6 | `landmark-rite-panel` | `rite` panel presenter and validator, browser protocol mirror, stored delivery | 5 | wire |
+| 7 | `landmark-rite-surfaces` | `RiteArrivalCard`, `RitePanel`, `RiteBackdrop`, `ChoiceCard` header slot, stories | 6 | **UI** |
+| 8 | `landmark-rite-store` | Rite presentation state as a webclient store group | 7 | state |
+| 9 | `landmark-rite-stage` | Shell integration: card, stage, playback through the shared player, return entry and R key | 8 | **UI** |
+| 10 | `landmark-rite-journeys` | Managed browser journeys (wilderness and city) at both viewports | 9 | **UI** (tests, fixes) |
+| 11 | `landmark-rite-performer-picking` | Performer picked on the stage figures and with the arrow keys | 9 | **UI** |
+| 12 | `landmark-rite-lighting` | Lit set from the record, reveal projection takes the lit set, movement announces nothing | 9 | — |
+| 13 | `landmark-rite-discovery-notice` | `已探明` on the first completed rite, in text and on the stage | 12 | **UI** |
+| 14 | `landmark-rite-arrival-signal-removal` | `district_lit` and `lit_district` removal | 12 | **UI** |
+| 15 | `landmark-rite-art` | Ten `rite_*` scene archetypes with bundled illustrations, panel artwork | 3, 6 | assets |
+| 16 | `landmark-rite-watch-perspectives` | `watch` scenes; content only | 11 | — |
+| 17 | `landmark-rite-third-option` | A third option where an archetype supports one; content only | 16 | — |
+
+Frontend column: **UI** changes what the browser player sees (Vue components, the shell or their styles); `state` is browser store logic with no rendering; `wire` is the browser protocol mirror or command echo only; `assets` adds images the existing UI shows; — touches no frontend file.
 
 Changes 1 to 4 are additive and change nothing the player sees. Change 5 makes
 rites performable from the text client while districts still light from visits.
