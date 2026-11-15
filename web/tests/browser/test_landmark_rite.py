@@ -129,6 +129,34 @@ _TEXT_RUNS = """([selector, anchor]) => {
     });
 }"""
 
+# Pairs of text-owning elements under the selector whose boxes cross (an
+# element and its own ancestor are one run, never a pair).
+_TEXT_COLLISIONS = """(selector) => {
+  const runs = Array.from(document.querySelectorAll(selector + ' *'))
+    .filter((el) => Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim()))
+    .filter((el) => el.getClientRects().length > 0);
+  const crossed = [];
+  for (let i = 0; i < runs.length; i += 1) {
+    for (let j = i + 1; j < runs.length; j += 1) {
+      const [p, q] = [runs[i], runs[j]];
+      if (p.contains(q) || q.contains(p)) continue;
+      const a = p.getBoundingClientRect();
+      const b = q.getBoundingClientRect();
+      const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (w > 1 && h > 1) crossed.push([p.textContent.trim().slice(0, 16), q.textContent.trim().slice(0, 16)]);
+    }
+  }
+  return crossed;
+}"""
+
+# The backdrop's plate stands below the header bar, inside the viewport.
+_PLATE_CLEAR = """() => {
+  const plate = document.querySelector('[data-testid="rite-backdrop-plate"]').getBoundingClientRect();
+  const header = document.querySelector('[data-metric="--header-h"]').getBoundingClientRect().height;
+  return plate.top >= header - 0.5 && plate.right <= window.innerWidth && plate.height > 0;
+}"""
+
 # No scrollbar on the page and no inner overflow on the surface itself.
 _OVERFLOW = """(selector) => {
   const fits = (el) => el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1;
@@ -192,6 +220,7 @@ class LandmarkRiteTests(_TravelStage):
         self.assertTrue(runs)
         self.assertEqual([run for run in runs if not run["inside"]], [])
         self.assertGreaterEqual(min(run["size"] for run in runs), 16 * scale - 0.01, runs)
+        self.assertEqual(page.evaluate(_TEXT_COLLISIONS, f'[data-testid="{surface}"]'), [])
 
     def _arrive(self, page, rite: dict, extra: dict | None = None) -> None:
         """Commit the panel's availability; the arrival card opens with focus
@@ -221,6 +250,7 @@ class LandmarkRiteTests(_TravelStage):
         self.assertTrue(page.locator('[data-testid="anchor-actor-left"] [data-testid="companion-lineup"]').is_visible())
         self.assertEqual(page.locator('[data-testid="travel-map"]').count(), 0)
         self.assertEqual(_page_text(page), _rite_panel()["guardian"]["form"])
+        self.assertTrue(page.evaluate(_PLATE_CLEAR))
         self._fits(page, "rite-panel", viewport)
 
     def _perform_and_play(self, page) -> None:

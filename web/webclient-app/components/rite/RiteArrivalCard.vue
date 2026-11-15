@@ -162,6 +162,15 @@ onMounted(() => go.value?.focus({ preventScroll: true }));
   position: absolute;
   inset: 0;
 }
+/* The body rises over the band's faded foot, so a reached art fault takes
+   the band's top right, opposite the kicker, never under the landmark. */
+.rite-arrival .rite-arrival__art .artwork-preview > .artwork-failure {
+  top: calc(16px * var(--ui-scale));
+  right: calc(22px * var(--ui-scale));
+  bottom: auto;
+  left: auto;
+  max-width: 50%;
+}
 /* No descriptor: no empty picture frame, only a short engraved header band
    carrying the kicker over a quiet horizon line. */
 .rite-arrival__art.is-empty {

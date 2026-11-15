@@ -73,8 +73,10 @@ const hasArt = computed(() => !!props.rite.art);
 .rite-backdrop__plate {
   position: absolute;
   z-index: 1;
+  /* The stage runs under the header bar: the plate starts where the HUD's
+     top anchors do, below the bar. */
   right: calc(24px * var(--ui-scale));
-  top: calc(20px * var(--ui-scale));
+  top: calc(var(--header-h) + var(--stage-inset-y));
   display: inline-flex;
   align-items: baseline;
   gap: calc(8px * var(--ui-scale));
