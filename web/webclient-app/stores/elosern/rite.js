@@ -18,6 +18,10 @@
 //   the picked row leaves the panel or picking stops being offered.
 // - An open card or stage is one more centred card: it stops walking and the
 //   compass as the camp card does.
+// - `newlyLit` (landmark-rite-discovery-notice D2) marks the adopted result
+//   of the district's first completion; the stage names the newly lit
+//   district from it once the scene finishes. Approaching, leaving and the
+//   next dispatched perform clear it.
 // - The state resets when the panel becomes unavailable, the mode leaves
 //   exploration or the session changes.
 
@@ -31,6 +35,7 @@ function closedPresentation() {
     delivery: null,
     playing: false,
     performerId: "self", // the `id` of one ritePerformers(panel) row
+    newlyLit: false, // the adopted result was the district's first completion
   };
 }
 
@@ -71,6 +76,7 @@ export function applyRite(ctx) {
     const result = rs.lastActionResult;
     if (!pending || !result || result.requestId !== pending.requestId || result.epoch !== pending.epoch) return;
     state.pending = null;
+    if (result.outcome === "success") state.newlyLit = result.data?.first_completion === true;
     const delivery = result.data?.delivery;
     if (result.outcome === "success" && delivery !== null && typeof delivery === "object" && !Array.isArray(delivery)) {
       state.delivery = delivery;
@@ -129,6 +135,7 @@ export function applyRite(ctx) {
       playing: state.playing,
       performerId: state.performerId,
       canSwitch: switchable(panel),
+      newlyLit: state.newlyLit,
     });
   };
 
@@ -176,6 +183,7 @@ export function applyRite(ctx) {
     if (state.phase !== "card") return false;
     state.phase = "stage";
     state.performerId = "self";
+    state.newlyLit = false;
     ctx.publishView();
     return true;
   };
@@ -207,6 +215,7 @@ export function applyRite(ctx) {
       null,
     );
     if (!requestId) return false;
+    state.newlyLit = false;
     state.pending = Object.freeze({ requestId, epoch: rs.activeEpoch, generation: rs.generation });
     ctx.publishView();
     return true;

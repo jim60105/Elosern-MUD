@@ -13,6 +13,11 @@
 //   single finish returns the panel;
 // - the return entry under the place card (`entryShown`).
 //
+// After the scene of a district's first completion finishes, the message
+// window names the newly lit district under the guardian's form
+// (landmark-rite-discovery-notice D2) until the player leaves or performs
+// again.
+//
 // It sends nothing itself: `perform` is the store's one
 // `explore.landmark_rite`, for the performer the store holds.
 //
@@ -34,6 +39,32 @@ export function riteFigureId(row, controlledId) {
   return controlledId === null || controlledId === undefined ? null : String(controlledId);
 }
 
+// The stage's message window lines: the guardian's form, and, once a first
+// completion's scene has finished, one line naming the newly lit district.
+// The lit mark and the district name take the narrative emphasis (gold), the
+// lit district's colour on the arrival card; the name is a text token, never
+// parsed as markup.
+export function riteStageLines(rite, newlyLit) {
+  if (!rite) return [];
+  const lines = [{ kind: "out", text: rite.guardian.form, seq: 1 }];
+  if (newlyLit) {
+    const name = rite.district.name;
+    const tail = "的地圖亮了起來。";
+    lines.push({
+      kind: "out",
+      text: `◆ ${name}${tail}`,
+      seq: 2,
+      tokens: [
+        { kind: "open", tag: "span", classes: ["em"] },
+        { kind: "text", value: `◆ ${name}` },
+        { kind: "close" },
+        { kind: "text", value: tail },
+      ],
+    });
+  }
+  return lines;
+}
+
 export function useRiteStage({ store, blocked }) {
   const view = computed(() => store.view?.rite ?? null);
   const rite = computed(() => view.value?.panel ?? null);
@@ -53,7 +84,7 @@ export function useRiteStage({ store, blocked }) {
   );
   const canSwitch = computed(() => view.value?.canSwitch === true && panelShown.value);
   const lines = computed(() =>
-    rite.value ? [{ kind: "out", text: rite.value.guardian.form, seq: 1 }] : [],
+    riteStageLines(rite.value, view.value?.newlyLit === true && !playing.value),
   );
   const dialogueModel = computed(() => ({
     host: { displayName: rite.value?.guardian?.name ?? "" },

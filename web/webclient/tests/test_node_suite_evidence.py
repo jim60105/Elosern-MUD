@@ -1860,6 +1860,7 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-landmark-rite::arrow-keys-step-the-performer-from-the-rite-panel",
         "webclient-landmark-rite::the-dispatched-rite-names-the-picked-performer",
         "webclient-landmark-rite::the-performer-defaults-to-the-controlled-character",
+        "webclient-landmark-rite::the-rite-stage-names-a-newly-lit-district",
     )
     def test_landmark_rite_stage_vitest_evidence_passes(self):
         # landmark-rite-stage D5: the mounted client shell. The arrival card

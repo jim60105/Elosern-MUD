@@ -3,6 +3,8 @@ import MessageWindow from "../../components/MessageWindow.vue";
 import FullLogOverlay from "../../components/FullLogOverlay.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
 import { useAuthoredScene } from "../../composables/use-authored-scene.js";
+import { riteStageLines } from "../../composables/use-rite-stage.js";
+import { ritePanel } from "../fixtures/rite.js";
 import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
 
 // MessageWindow: the AVG message window (AVG stage design §6;
@@ -334,6 +336,28 @@ export const Dialogue = {
     marks: [],
     textSpeed: "instant",
   },
+};
+
+// The landmark rite stage's message window (landmark-rite-stage D2): the
+// guardian's form under the guardian's name plate while no scene plays. After
+// the scene of a district's first completion it adds one line naming the
+// newly lit district (landmark-rite-discovery-notice D2), its lit mark and
+// name in the narrative emphasis.
+const RITE = ritePanel();
+const riteStageArgs = (newlyLit) => ({
+  mode: "dialogue",
+  dialogue: { host: { displayName: RITE.guardian.name }, bondStage: null },
+  lines: riteStageLines(RITE, newlyLit),
+  marks: [],
+  textSpeed: "instant",
+});
+
+export const RiteStage = { render: renderWindow, args: riteStageArgs(false) };
+
+export const RiteStageNewlyLit = {
+  name: "Rite Stage Newly Lit",
+  render: renderWindow,
+  args: riteStageArgs(true),
 };
 
 // An authored scene (authored-dialogue-playback): the shared manual player

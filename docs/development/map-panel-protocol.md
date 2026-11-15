@@ -230,6 +230,13 @@ after commit; outer rollbacks discard it, and message-delivery failures log
 without compensating committed movement. Nested NPC relocations and direct
 teleports send no movement line.
 
+The exploration announcement follows the first completed rite at a district
+instead: its completion message gains one `已探明：<district>` line, the
+settlement logs one `map_district_discovered` event after commit
+(`world/rules/landmark_rites.py`), and the rite stage names the newly lit
+district once the scene finishes. A repeated, refused or rolled-back rite adds
+none of these.
+
 The world presenter reads knowledge through `persisted_visits`, which reads the
 persisted Attribute value with a values query and reconciles its in-memory
 cache before using the unchanged parser. Evennia assigns a cached Attribute

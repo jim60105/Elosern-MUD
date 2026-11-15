@@ -7,7 +7,7 @@ Design document: `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §
 - `world/rules/landmark_rites.py` `perform_rite`: returns `RiteResult` with `first_completion` and `plan.site` (`district_key`, `district_name`); its `transaction.on_commit` callback stores the receipt and logs `landmark_rite_committed`.
 - `web/webclient/actions/rite_actions.py`: `rite_completion_line(result)` builds the one completion line both the browser adapter and the text command send; the adapter's result data carries `first_completion`.
 - `web/webclient-app/stores/elosern/rite.js` adopts the action result (`data.delivery`); `composables/use-rite-stage.js` builds `lines` (the guardian's form) for the stage's message window.
-- The event name `map_district_discovered` (context `char`, `district`) existed on the movement path until `landmark-rite-lighting` removed it there; the observability catalog already lists it.
+- The event name `map_district_discovered` (context `char`, `district`) existed on the movement path until `landmark-rite-lighting` removed it there; the observability catalog (`docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4) never listed it, so D3 adds its row.
 
 ## Goals / Non-Goals
 
@@ -30,13 +30,14 @@ Design document: `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §
 
 ### D2. Browser
 
-- `stores/elosern/rite.js`: add `newlyLit` (boolean) to `view.rite`. On an adopted success result set it to `result.data.first_completion === true`. Clear it in `approachRite`, `leaveRite`, at the start of `performRite`, and in every reset.
+- `stores/elosern/rite.js`: add `newlyLit` (boolean) to `view.rite`. On an adopted success result set it to `result.data.first_completion === true`. Clear it in `approachRite`, `leaveRite`, when `performRite` dispatches its request (a locally refused perform performs nothing and keeps it), and in every reset.
 - `composables/use-rite-stage.js` `lines`: when `view.rite.newlyLit` and no scene is playing, append `{kind: "out", text: "◆ " + rite.district.name + "的地圖亮了起來。", seq: 2}` after the guardian's form.
 
 ### D3. Documentation
 
 - `docs/game/command-reference.md`: the `rite` entry gains one sentence: the first rite completed at a landmark explores its district on the map.
 - `docs/development/map-panel-protocol.md`: state that the exploration announcement follows the first completed rite.
+- `docs/superpowers/specs/2026-09-02-observability-logging-design.md` §4: add the `map_district_discovered` row (`char`, `district`).
 
 ### D4. Tests
 

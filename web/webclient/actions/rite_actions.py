@@ -86,10 +86,17 @@ def rite_scene_text(result: RiteResult) -> str:
 
 
 def rite_completion_line(result: RiteResult) -> str:
-    """The one completion line emitted after the scene."""
+    """The completion message emitted after the scene.
+
+    One line naming the performer and the landmark; the district's first
+    completion adds a second line naming the district it explored.
+    """
     plan = result.plan
     name = "你" if plan.perspective == "self" else plan.body.key
-    return f"{name}完成了{plan.site.landmark_name}的儀式。"
+    line = f"{name}完成了{plan.site.landmark_name}的儀式。"
+    if result.first_completion:
+        return f"{line}\n已探明：{plan.site.district_name}"
+    return line
 
 
 def validate_landmark_rite_payload(payload: Any) -> dict[str, Any]:

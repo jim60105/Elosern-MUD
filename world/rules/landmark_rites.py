@@ -329,7 +329,8 @@ def _refusal_context(
 def _publish_commit(
     actor: Any, operation_id: str | None, result: RiteResult
 ) -> None:
-    """Post-commit publication: the replay receipt and the committed event."""
+    """Post-commit publication: the replay receipt, the committed event and,
+    on the district's first completion, the discovery event."""
     if operation_id is not None:
         _RECEIPTS[_receipt_key(actor, operation_id)] = result
         while len(_RECEIPTS) > _RECEIPT_LIMIT:
@@ -348,6 +349,11 @@ def _publish_commit(
             "climax": result.climax,
         },
     )
+    if result.first_completion:
+        log_info(
+            "map_district_discovered",
+            context={"char": plan.owner.pk, "district": plan.site.district_key},
+        )
 
 
 def _settle(plan: RitePlan, actor: Any, operation_id: str | None) -> RiteResult:

@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ritePanel } from "../stories/fixtures/rite.js";
 import { ritePerformers } from "../components/rite/rite-model.js";
-import { riteFigureId } from "../composables/use-rite-stage.js";
+import { riteFigureId, riteStageLines } from "../composables/use-rite-stage.js";
 import { PARTY_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
 import { ROSTER_CHARACTERS_SAMPLE } from "../stories/fixtures/core.js";
 import { fx, liveTravel, panelsAt, tick, TOWN_SUBJECT, walkArea, walkNode, walkPanels } from "./travel/support.js";
@@ -110,7 +110,7 @@ function helpers(h) {
       code: "explore.landmark_rite",
       message: "完成",
       presentation_revision: h.store.view.revision,
-      data: { delivery: DELIVERY, first_completion: true },
+      data: { delivery: DELIVERY, first_completion: false },
       ...overrides,
     };
     if (body.data === undefined) delete body.data;
@@ -118,7 +118,8 @@ function helpers(h) {
     await tick();
     await tick();
   };
-  return { ...h, find, rites, key, pressR, frameMode, page, plate, commitRite, answer };
+  const blocks = () => page().findAll(".narrative-line").map((el) => el.text());
+  return { ...h, find, rites, key, pressR, frameMode, page, plate, commitRite, answer, blocks };
 }
 
 /** The travel layout at a wilderness cell with its map adopted. */
@@ -385,6 +386,70 @@ describe("the rite stage", () => {
   });
 });
 
+// The newly lit district (landmark-rite-discovery-notice D2): after the scene
+// of a district's first completion, the message window adds one line naming
+// it under the guardian's form, until the player leaves or performs again.
+describe("the newly lit district on the rite stage", () => {
+  const FORM = ritePanel().guardian.form;
+  const DISTRICT = ritePanel().district.name;
+  let performed = 0;
+
+  /**
+   * Perform the first option, answer with `first_completion`, and page
+   * through the whole scene. Every committed rite carries its own delivery
+   * id: the shared player never replays a retired one.
+   */
+  async function playThrough(s, firstCompletion) {
+    performed += 1;
+    const delivery = { ...DELIVERY, delivery_id: `rite:synthetic_highlands:drink:${performed}` };
+    await s.key(s.find("rite-panel").element, "1");
+    await s.answer({ data: { delivery, first_completion: firstCompletion } });
+    expect(s.store.view.rite.playing).toBe(true);
+    for (let line = 0; line < DELIVERY.lines.length; line += 1) {
+      // During playback the window shows the scene line, never the notice.
+      expect(s.page().text()).not.toContain(DISTRICT);
+      await s.key(s.page().element, "Enter");
+    }
+    expect(s.find("rite-panel").exists()).toBe(true);
+  }
+
+  it("names the district under the guardian's form once the first completion's scene finishes", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, true);
+    const shown = s.blocks();
+    expect(shown).toHaveLength(2);
+    expect(shown[0]).toBe(FORM);
+    expect(shown[1]).toContain(DISTRICT);
+    // The lit mark and the name take the narrative emphasis.
+    expect(s.page().find(".narrative-line:nth-child(2) .em").text()).toContain(DISTRICT);
+  });
+
+  it("a repeat shows only the guardian's form", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, false);
+    expect(s.blocks()).toEqual([FORM]);
+  });
+
+  it("leaving and re-entering the stage, or performing again, drops it", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, true);
+    expect(s.blocks()).toHaveLength(2);
+    await s.key(s.find("rite-panel").element, "Escape");
+    await s.pressR();
+    await s.key(s.find("rite-arrival-card").element, "Enter");
+    expect(s.find("rite-panel").exists()).toBe(true);
+    expect(s.blocks()).toEqual([FORM]);
+
+    await playThrough(s, true);
+    expect(s.blocks()).toHaveLength(2);
+    await playThrough(s, false);
+    expect(s.blocks()).toEqual([FORM]);
+  });
+});
+
 // Performer picking (landmark-rite-performer-picking D6): the controlled
 // character (roster identity 2) and the two companions of the party panel
 // (101, 102) stand on the stage; the synthetic panel lists all three.
@@ -512,6 +577,24 @@ describe("rite performer picking", () => {
     expect(s.find("rite-panel-performer-hint").exists()).toBe(false);
     await s.key(s.find("rite-panel").element, "ArrowRight");
     expect(performerName(s)).toBe("合成旅人");
+  });
+});
+
+describe("rite stage lines", () => {
+  it("the notice is one more line whose emphasis span carries the district name as text", () => {
+    const panel = ritePanel({ district: { key: "synthetic_marsh", name: "<b>合成沼澤</b>", landmark: "合成石龕", lit: false } });
+    expect(riteStageLines(null, true)).toEqual([]);
+    const plain = riteStageLines(panel, false);
+    expect(plain.map((line) => line.text)).toEqual([panel.guardian.form]);
+    const lit = riteStageLines(panel, true);
+    expect(lit).toHaveLength(2);
+    expect(lit[0]).toEqual(plain[0]);
+    const tokens = lit[1].tokens;
+    expect(tokens[0]).toMatchObject({ kind: "open", classes: ["em"] });
+    expect(tokens[1].kind).toBe("text");
+    expect(tokens[1].value).toContain(panel.district.name);
+    expect(tokens.filter((token) => token.kind === "open")).toHaveLength(1);
+    expect(tokens.filter((token) => token.kind === "close")).toHaveLength(1);
   });
 });
 
