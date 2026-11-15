@@ -1822,13 +1822,14 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-landmark-rite::the-rite-panel-lists-the-options-as-one-choice-card",
         "webclient-landmark-rite::a-companion-performer-cannot-pick-a-solo-only-option",
         "webclient-landmark-rite::the-rite-backdrop-names-the-landmark-and-guardian-over-the-art",
+        "webclient-landmark-rite::arrow-keys-step-the-performer-from-the-rite-panel",
     )
     def test_landmark_rite_surfaces_vitest_evidence_passes(self):
         # landmark-rite-surfaces D7: the arrival card's content, keys and focus
         # trap, revisit and missing-art states; the panel's option rows, digit
         # and Escape activation, unseen mark and performer header; the disabled
-        # solo-only row of a companion performer; and the backdrop's plate with
-        # and without artwork.
+        # solo-only row of a companion performer; the backdrop's plate with
+        # and without artwork; and the performer switching hint and arrow keys.
         self._run_vitest("web/webclient-app/tests/rite/surfaces.test.js")
 
     @covers_requirement(
@@ -1836,12 +1837,16 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-landmark-rite::rite-transitions-are-local-and-performing-dispatches-once",
         "webclient-landmark-rite::the-rite-state-adopts-its-own-result-and-resets-off-the-landmark",
         "webclient-landmark-rite::an-open-rite-card-or-stage-is-a-centred-card",
+        "webclient-landmark-rite::the-dispatched-rite-names-the-picked-performer",
+        "webclient-landmark-rite::the-performer-defaults-to-the-controlled-character",
     )
     def test_landmark_rite_store_vitest_evidence_passes(self):
         # landmark-rite-store D2: the arrival rule (first snapshot, repeat,
         # return, other district, new session), the local transitions and their
         # refusals, the single guarded dispatch, result adoption, the resets, and
-        # the centred-card predicate seen through the travel store's walk refusal.
+        # the centred-card predicate seen through the travel store's walk refusal;
+        # and the picked performer's member id in the dispatched rite, with the
+        # controlled-character default on entry and on withdrawal of the pick.
         self._run_vitest("web/webclient-app/tests/rite/store.test.js")
 
     @covers_requirement(
@@ -1851,6 +1856,10 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-landmark-rite::picking-an-option-dispatches-one-rite-and-plays-its-delivery",
         "webclient-landmark-rite::a-return-entry-reopens-the-rite-card-while-the-panel-is-available",
         "webclient-landmark-rite::leaving-the-landmark-drops-every-rite-surface",
+        "webclient-landmark-rite::the-rite-performer-is-picked-on-the-stage-figures",
+        "webclient-landmark-rite::arrow-keys-step-the-performer-from-the-rite-panel",
+        "webclient-landmark-rite::the-dispatched-rite-names-the-picked-performer",
+        "webclient-landmark-rite::the-performer-defaults-to-the-controlled-character",
     )
     def test_landmark_rite_stage_vitest_evidence_passes(self):
         # landmark-rite-stage D5: the mounted client shell. The arrival card
@@ -1858,7 +1867,9 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         # card; the stage as local presentation over exploration mode; one pick
         # sending one rite and its delivery advancing line by line through the
         # shared player with narration, actor and guardian attribution; the
-        # return entry and R key; and the withdrawal dropping every surface.
+        # return entry and R key; the withdrawal dropping every surface; and
+        # landmark-rite-performer-picking D6: picking on the figures, the arrow
+        # steps, the picked member in the sent rite and the default on re-entry.
         self._run_vitest("web/webclient-app/tests/app_client_rite.test.js")
 
 
