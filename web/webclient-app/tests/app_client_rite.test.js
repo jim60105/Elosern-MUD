@@ -64,7 +64,7 @@ function arrivalLog(node) {
         day: 3,
         time: "09:40",
         text: "抵達合成石龕。",
-        params: { arrival_node: node, name: "合成石龕", lit_district: null, prose: "水聲。", artwork: null },
+        params: { arrival_node: node, name: "合成石龕", prose: "水聲。", artwork: null },
       }],
     },
   };

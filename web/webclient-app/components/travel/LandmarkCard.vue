@@ -2,11 +2,11 @@
 // LandmarkCard (OpenSpec change wilderness-travel-route-ui; interface design
 // §10): the landmark arrival card in the `choices` anchor. It is bound to one
 // committed typed `landmark_reached` notice the store publishes as
-// `view.travel.arrival` ({id, name, litDistrict, prose, artwork}) and shows
-// exactly what the notice supplied: the reached room's scene descriptor in a
-// 16:6 frame through ArtworkPreview (no descriptor: a quiet ink frame, never
-// substitute art), 抵達地標, the name, `◆ <district>已探明` only when this
-// arrival lit it, the prose and 繼續.
+// `view.travel.arrival` ({id, name, prose, artwork}) and shows exactly what
+// the notice supplied: the reached room's scene descriptor in a 16:6 frame
+// through ArtworkPreview (no descriptor: a quiet ink frame, never substitute
+// art), 抵達地標, the name, the prose and 繼續. A step never lights a
+// district, so the card states no lighting.
 //
 // Focus starts on 繼續 and Tab stays inside the card (the shared focus-trap
 // contract). 繼續, Enter and Escape emit `continue` once; the host closes the
@@ -89,9 +89,6 @@ onMounted(() => {
     </div>
     <div class="landmark-card__body">
       <h2 :id="titleId" class="landmark-card__title" data-testid="landmark-card-name">{{ arrival.name }}</h2>
-      <p v-if="arrival.litDistrict" class="landmark-card__lit" data-testid="landmark-card-lit">
-        <span aria-hidden="true">◆</span> {{ arrival.litDistrict }}已探明
-      </p>
       <p :id="proseId" class="landmark-card__prose" data-testid="landmark-card-prose">{{ arrival.prose }}</p>
       <button
         ref="go"
@@ -109,7 +106,7 @@ onMounted(() => {
 <style>
 /* The arrival card: the shared card frame around a 16:6 scene band whose
    foot fades into the ink body, the name in the display face over the
-   fade, the gold district line and the serif prose. Every text run keeps
+   fade and the serif prose. Every text run keeps
    the 16px x scale floor. */
 /* The frame is the card's own (the doubled class wins over the shared
    `choice-card` block whichever stylesheet loads last), so the card reads
@@ -219,11 +216,17 @@ onMounted(() => {
   color: var(--paper-50);
   text-shadow: 0 2px 8px #000;
 }
-.landmark-card__lit {
-  margin: 0;
-  font: var(--text-sm)/1.3 var(--f-sans);
-  letter-spacing: 0.08em;
-  color: var(--gold-400);
+/* A short engraved gold rule under the name: it closes the heading and
+   gives the prose its own breath, like the ledger rules elsewhere in the
+   ink-and-gold frame. Purely decorative, so it carries no text. */
+.landmark-card__title::after {
+  content: "";
+  display: block;
+  width: calc(112px * var(--ui-scale));
+  height: 1px;
+  margin-top: calc(12px * var(--ui-scale));
+  background: linear-gradient(90deg, rgba(228, 200, 142, 0.7), rgba(185, 154, 96, 0.25) 60%, transparent);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
 .landmark-card__prose {
   margin: 0;

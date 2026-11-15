@@ -486,7 +486,6 @@ class MovementObservation:
             actor,
             source_location,
             wilderness_source_coordinates=wilderness_source_coordinates,
-            knowledge_owner=knowledge_owner,
         )
 
     @staticmethod
@@ -502,7 +501,6 @@ class MovementObservation:
         source_location: Any,
         *,
         wilderness_source_coordinates: tuple[int, int] | None,
-        knowledge_owner: Any,
     ) -> None:
         from world.rules import travel_interrupts
         from world.rules.clock import read_world_clock
@@ -519,7 +517,6 @@ class MovementObservation:
                 actor,
                 source_location,
                 cell=wilderness_source_coordinates,
-                knowledge_owner=knowledge_owner,
                 members=self._members,
             )
         except Exception as error:  # observability: ignore R2: the failure IS reported by _failed's travel_interrupts_failed event below; an interrupt read must never fail a committed move
@@ -534,12 +531,12 @@ class MovementObservation:
         A travel lineage also takes the travel log's capture of the reached
         position once, independently of the interrupt comparison's outcome.
         """
-        self._capture_interrupt_after(actor, knowledge_owner=knowledge_owner)
+        self._capture_interrupt_after(actor)
         if self._travel:
             location = getattr(actor, "location", None)
             self.travel_after = self._travel_capture(actor, location, knowledge_owner)
 
-    def _capture_interrupt_after(self, actor: Any, *, knowledge_owner: Any) -> None:
+    def _capture_interrupt_after(self, actor: Any) -> None:
         from world.rules import travel_interrupts
 
         try:
@@ -557,7 +554,6 @@ class MovementObservation:
                 actor,
                 location,
                 cell=cell,
-                knowledge_owner=knowledge_owner,
                 members=self._members,
             )
             self.after = after

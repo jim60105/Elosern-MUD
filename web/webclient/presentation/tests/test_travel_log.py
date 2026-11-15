@@ -38,7 +38,7 @@ VALID = {
     "ford_crossed": {"name": "甲原"},
     "hostile_sighted": {"name": "灰狼", "count": 2, "threat": None},
     "landmark_sighted": {"name": None, "bearing": "東北", "distance_km": 4},
-    "landmark_reached": {"arrival_node": "wild:elosern:1:2", "name": "合成塔", "lit_district": None, "prose": "塔。", "artwork": None},
+    "landmark_reached": {"arrival_node": "wild:elosern:1:2", "name": "合成塔", "prose": "塔。", "artwork": None},
     "fatigue_stage": {"member_id": "7", "name": "伊蓮", "stage": "light", "label": "微倦"},
     "dusk": {},
     "nightfall": {},
@@ -58,7 +58,8 @@ class ValidatorTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     @covers_requirement(
-        "webclient-travel-log::travel-notices-are-committed-structured-events"
+        "webclient-travel-log::travel-notices-are-committed-structured-events",
+        "webclient-travel-log::the-landmark-arrival-notice-carries-no-lighting-field",
     )
     def test_every_kind_adopts_its_exact_params(self):
         for kind, params in VALID.items():
@@ -79,6 +80,16 @@ class ValidatorTests(unittest.TestCase):
                     trimmed.pop(next(iter(trimmed)))
                     with self.assertRaises(ProtocolValidationError):
                         validate_travel_log(_panel(_entry(kind, trimmed)))
+
+    @covers_requirement(
+        "webclient-travel-log::the-landmark-arrival-notice-carries-no-lighting-field"
+    )
+    def test_a_landmark_arrival_carrying_a_lit_district_rejects(self):
+        for lit in (None, "合成塔"):
+            with self.subTest(lit=lit):
+                stale = {**VALID["landmark_reached"], "lit_district": lit}
+                with self.assertRaises(ProtocolValidationError):
+                    validate_travel_log(_panel(_entry("landmark_reached", stale)))
 
     def test_malformed_entries_reject(self):
         cases = {

@@ -39,7 +39,6 @@ export const STOP_TEXT = Object.freeze({
  */
 export const INTERRUPT_TEXT = Object.freeze({
   landmark_reached: "抵達地標",
-  district_lit: "探明新的地區",
   landmark_sighted: "望見遠方的地標",
   hostile_in_sight: "發現敵蹤",
   pace_threshold: "已到節制門檻",

@@ -14,7 +14,7 @@ var VALID = {
   ford_crossed: { name: "甲原" },
   hostile_sighted: { name: "灰狼", count: 2, threat: null },
   landmark_sighted: { name: null, bearing: "東北", distance_km: 4 },
-  landmark_reached: { arrival_node: "wild:elosern:1:2", name: "合成塔", lit_district: "合成塔", prose: "塔。", artwork: null },
+  landmark_reached: { arrival_node: "wild:elosern:1:2", name: "合成塔", prose: "塔。", artwork: null },
   fatigue_stage: { member_id: "7", name: "伊蓮", stage: "light", label: "微倦" },
   dusk: {},
   nightfall: {},
@@ -55,6 +55,13 @@ test("extra or missing kind-specific fields reject", function () {
       delete missing[keys[0]];
       assert.throws(function () { validate(panel([entry(kind, missing)])); }, kind + " missing");
     }
+  });
+});
+
+test("a landmark arrival carrying a lit district rejects", function () {
+  [null, "合成塔"].forEach(function (lit) {
+    var stale = Object.assign({}, VALID.landmark_reached, { lit_district: lit });
+    assert.throws(function () { validate(panel([entry("landmark_reached", stale)])); }, "lit_district " + lit);
   });
 });
 

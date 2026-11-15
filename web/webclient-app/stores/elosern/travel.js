@@ -680,7 +680,6 @@ export function applyTravel(ctx) {
     return Object.freeze({
       id: arrival.id,
       name: p.name,
-      litDistrict: p.lit_district ?? null,
       prose: p.prose,
       artwork: p.artwork ?? null,
     });

@@ -32,7 +32,7 @@ var PARAM_FIELDS = {
   ford_crossed: ["name"],
   hostile_sighted: ["name", "count", "threat"],
   landmark_sighted: ["name", "bearing", "distance_km"],
-  landmark_reached: ["arrival_node", "name", "lit_district", "prose", "artwork"],
+  landmark_reached: ["arrival_node", "name", "prose", "artwork"],
   fatigue_stage: ["member_id", "name", "stage", "label"],
   dusk: [],
   nightfall: [],
@@ -88,7 +88,6 @@ function validateParams(kind, params) {
         throw new Error("arrival_node exceeds its bound");
       }
       requireString(params.name, "name", MAX_NAME);
-      optionalName(params.lit_district, "lit_district");
       requireString(params.prose, "prose", MAX_PROSE);
       if (params.artwork !== null) {
         artwork.validateArtwork(params.artwork);

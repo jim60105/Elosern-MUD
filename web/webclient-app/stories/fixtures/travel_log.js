@@ -42,8 +42,8 @@ export function travelJourney() {
     ),
     travelEntry(
       "landmark_reached",
-      { arrival_node: "wild:elosern:60:80", name: "合成古哨塔", lit_district: "合成古哨塔", prose: "風從塔頂的缺口灌進來。", artwork: null },
-      { day: 12, time: "16:50", text: "抵達合成古哨塔。合成古哨塔已探明。" },
+      { arrival_node: "wild:elosern:60:80", name: "合成古哨塔", prose: "風從塔頂的缺口灌進來。", artwork: null },
+      { day: 12, time: "16:50", text: "抵達合成古哨塔。" },
     ),
     travelEntry("dusk", {}, { day: 12, time: "18:00", text: "暮色降臨。" }),
     travelEntry("nightfall", {}, { day: 12, time: "19:30", text: "入夜了。" }),

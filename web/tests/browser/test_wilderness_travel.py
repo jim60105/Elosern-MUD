@@ -1666,8 +1666,8 @@ _COMMIT_ROUTE = """([index, panels, interrupts]) => {
 }"""
 
 _FLAGS = (
-    "landmark_reached", "district_lit", "landmark_sighted", "hostile_in_sight",
-    "pace_threshold", "nightfall", "member_asleep",
+    "landmark_reached", "landmark_sighted", "hostile_in_sight", "pace_threshold",
+    "nightfall", "member_asleep",
 )
 
 
@@ -1694,7 +1694,7 @@ def _arrival_log(node: str, serial: int) -> dict:
                 "id": "%s:route%03d.0" % ("f" * 32, serial), "kind": "landmark_reached",
                 "tick": 4000 + serial, "day": 3, "time": "09:40", "text": "抵達合成古塔。",
                 "params": {
-                    "arrival_node": node, "name": "合成古塔", "lit_district": "合成東麓",
+                    "arrival_node": node, "name": "合成古塔",
                     "prose": "石階被風磨得發亮，塔頂的缺口望得見整片東麓。", "artwork": None,
                 },
             }],
@@ -1826,7 +1826,10 @@ class TravelRouteTests(_TravelStage):
                 page.evaluate("() => window.__elosernBridge.store.clearTravelTarget()")
         page.close()
 
-    @covers_requirement("webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events")
+    @covers_requirement(
+        "webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events",
+        "webclient-travel-route-walking::the-landmark-arrival-card-states-no-district-lighting",
+    )
     def test_landmark_focus(self):
         """A committed typed arrival bound to the reached node opens the card
         with focus on 繼續 and Tab trapped inside; Enter closes it once and
@@ -1840,7 +1843,7 @@ class TravelRouteTests(_TravelStage):
             page.locator('[data-testid="travel-map"]').focus()
             page.keyboard.press("Enter")
             page.wait_for_function("() => window.__travelMoves.length >= 1", timeout=15000)
-            self._commit(page, 0, (CX + 1, CY), ["landmark_reached", "district_lit"], _arrival_log(_node(CX + 1, CY), 1))
+            self._commit(page, 0, (CX + 1, CY), ["landmark_reached"], _arrival_log(_node(CX + 1, CY), 1))
             card = page.locator('[data-testid="landmark-card"]')
             card.wait_for(timeout=15000)
             self.assertIsNone(self._walking(page))
@@ -1850,7 +1853,8 @@ class TravelRouteTests(_TravelStage):
                 timeout=15000,
             )
             self.assertEqual(card.get_attribute("role"), "dialog")
-            self.assertIn("合成東麓", page.locator('[data-testid="landmark-card-lit"]').inner_text())
+            # A step lights no district: the card states no lighting.
+            self.assertNotIn("已探明", card.inner_text())
             # Every rendered text run keeps the 16px x scale floor.
             sizes = page.evaluate(
                 "() => Array.from(document.querySelectorAll('[data-testid=\"landmark-card\"] *'))"

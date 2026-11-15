@@ -29,8 +29,8 @@ Design document: `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §
 
 ### D1. Server
 
-- `travel_interrupts.py`: remove `"district_lit"` from `FLAG_ORDER` and from `movement_flags`; remove `MovementFacts.lit_districts` and the lighting import and read in `read_movement_facts`; update the docstrings (including the paragraph about a corrupt knowledge record).
-- `travel_events.py`: remove `TravelCapture.lit_districts` and its fill in `_capture` (and the lighting import there); the `landmark_reached` renderer returns `f"抵達{p['name']}。"`; remove `newly_lit` and the `lit_district` key from the draft params.
+- `travel_interrupts.py`: remove `"district_lit"` from `FLAG_ORDER` and from `movement_flags`; remove `MovementFacts.lit_districts` and the lighting import and read in `read_movement_facts`; update the docstrings (including the paragraph about a corrupt knowledge record). With the lighting read gone, `read_movement_facts`'s `knowledge_owner` keyword has no use: remove it, and stop forwarding it from `movement_settlement.MovementObservation`'s private interrupt captures. The public `capture_before` / `capture_after` keep it for the travel log capture.
+- `travel_events.py`: remove `TravelCapture.lit_districts` and its fill in `_capture`; the lit set stays a local read in `_capture` because `_distant_in_sight` still names a visible distant source only for a lit district (the `landmark_sighted` naming rule, unchanged); the `landmark_reached` renderer returns `f"抵達{p['name']}。"`; remove `newly_lit` and the `lit_district` key from the draft params.
 - `travel_log.py`: `PARAM_FIELDS["landmark_reached"] = frozenset({"arrival_node", "name", "prose", "artwork"})`; remove the `lit_district` validation line. The schema version stays 1: the exact-field validators already reject a stale record, and a version bump is a compatibility device this pre-release project does not need.
 
 ### D2. Browser
@@ -50,6 +50,7 @@ Update, do not delete, the tests that named the signals:
 - `test_travel_log.py` and `travel_log.test.js`: the four-field record is accepted; a record that still carries `lit_district` is rejected as an extra key, on both sides.
 - `landmark.test.js`: the arrival record has no `litDistrict`; the card renders no lit row.
 - `route-walking.test.js`, `test_wilderness_travel.py`, `travel_log_fixture.py`, `test_world_map.py`, `protocol_immutable.test.js`: remove the flag and the field from their fixtures and flag lists.
+- Also carrying the dead signals (found while applying): `world/maps/tests/test_wilderness_population.py` (a `MovementFacts` constructor), `web/webclient-app/tests/app_client_rite.test.js` and `web/tests/browser/test_landmark_rite.py` (a `lit_district: null` arrival fixture), and the `landmark-card-lit` hook row in `docs/development/webclient-vue-frozen-contract-audit.md`. `travel_log_fixture.py` and `test_world_map.py` hold no reference and stay unchanged.
 
 ### D4. Documentation
 
@@ -59,4 +60,5 @@ Update, do not delete, the tests that named the signals:
 
 ## Risks / Trade-offs
 
+- Deploy skew: both validators match fields exactly, so a browser still running a bundle from before this change rejects a four-field `landmark_reached` record (and the reverse) until the page reloads. Travel notices are never persisted, so only that short window is affected; it is accepted rather than covered by a version bump or shim.
 - A wire change without a version change: a stale local `dist` hides a mistake in the browser mirror. Run `pnpm run build` before any browser test.

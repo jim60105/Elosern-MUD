@@ -10,12 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { useElosernStore } from "../../stores/elosern.js";
 import { ROUTE_CHANGED_LINE } from "../../stores/elosern/travel.js";
+import { legView } from "../../components/travel/leg-model.js";
 import { fx, liveTravel, tick, walkArea, walkCapacity, walkNode, walkPanels } from "./support.js";
 
 const CX = 60;
 const CY = 80;
 const DEST = { x: CX + 4, y: CY };
-const FLAGS = ["landmark_reached", "district_lit", "landmark_sighted", "hostile_in_sight", "pace_threshold", "nightfall", "member_asleep"];
+const FLAGS = ["landmark_reached", "landmark_sighted", "hostile_in_sight", "pace_threshold", "nightfall", "member_asleep"];
 
 beforeEach(() => {
   localStorage.clear();
@@ -303,6 +304,19 @@ describe("walk context", () => {
     vi.advanceTimersByTime(2000);
     expect(r.moves()).toHaveLength(1);
     expect(r.travel().notice).toEqual({ kind: "interrupted", flags: ["hostile_in_sight"] });
+  });
+});
+
+describe("interrupt texts", () => {
+  const detail = (flags) => legView({ mapStatus: "ready", error: { kind: "interrupted", flags } }).intent.detail;
+
+  it("each remaining flag reads as its own text and no lighting flag has one", () => {
+    const fallback = detail([]);
+    const texts = FLAGS.map((flag) => detail([flag]));
+    for (const text of texts) expect(text).not.toBe(fallback);
+    expect(new Set(texts).size).toBe(FLAGS.length);
+    // A step never lights a district: a stray lighting flag names nothing.
+    expect(detail(["district_lit"])).toBe(fallback);
   });
 });
 
