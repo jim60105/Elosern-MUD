@@ -10,7 +10,7 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 ## 2. Server
 
 - [x] 2.1 Apply design D1 with the server tests of design D4. Verify: the test prefix passes for each of `web.webclient.actions.tests.test_rite_actions`, `commands.tests.test_rite_command`, `world.rules.tests.test_landmark_rites` (three commands).
-- [ ] 2.2 Apply design D3. Verify: `uv run --locked python -m unittest tests.test_command_docs` passes.
+- [x] 2.2 Apply design D3. Verify: `uv run --locked python -m unittest tests.test_command_docs` passes.
 
 ## 3. Browser
 
