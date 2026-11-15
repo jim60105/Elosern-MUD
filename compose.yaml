@@ -10,6 +10,10 @@ services:
   evennia:
     image: localhost/elosern-mud:${IMAGE_TAG:-edge}
     build: *evennia-build
+    # File-backed container logs: `podman compose logs` keeps working on hosts
+    # without journald (CI containers, minimal servers).
+    logging:
+      driver: k8s-file
     ports:
       - "4000:4000"
       - "4001:4001"
@@ -89,6 +93,8 @@ services:
       - artwork-prepare
     image: localhost/elosern-mud:${IMAGE_TAG:-edge}
     build: *evennia-build
+    logging:
+      driver: k8s-file
     # The repository script, mounted read-only: the runtime image itself
     # carries no artwork, archive, or extraction workflow.
     entrypoint:
@@ -120,6 +126,8 @@ services:
       - bootstrap
     image: localhost/elosern-mud:${IMAGE_TAG:-edge}
     build: *evennia-build
+    logging:
+      driver: k8s-file
     entrypoint:
       - /usr/local/bin/dumb-init
       - --
