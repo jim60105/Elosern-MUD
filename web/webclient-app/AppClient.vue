@@ -304,6 +304,16 @@ watch(
     if (riteStage.panelShown.value && riteFocusReclaimable()) ritePanelRef.value?.focus?.();
   },
 );
+// One option activated on the panel: the panel leaves the stage on the next
+// render, so focus held in it is parked on the message page first (the
+// dialogue choice list's rule), where Space and Enter page the delivered
+// scene.
+function onRitePerform(key) {
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  const fromPanel = !!active?.closest?.(".rite-panel");
+  if (!riteStage.perform(key)) return;
+  if (fromPanel) shellRef.value?.focusMessagePage?.();
+}
 function onRiteEntryOpen() {
   if (!riteEntryShown.value) return false;
   return riteStage.openEntry();
@@ -1457,7 +1467,7 @@ const rootStyle = computed(() => {
             :rite="riteStage.rite.value"
             :performer="riteStage.performer.value"
             :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
-            @perform="riteStage.perform"
+            @perform="onRitePerform"
             @leave="onRiteLeave"
           />
           <!-- The landmark arrival (wilderness-travel-route-ui): one

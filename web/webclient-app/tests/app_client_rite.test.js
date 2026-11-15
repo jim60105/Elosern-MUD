@@ -284,10 +284,13 @@ describe("the rite stage", () => {
     expect(s.rites()).toHaveLength(1);
     expect(s.rites()[0].payload).toEqual({ option: "drink", member_id: null });
     expect(s.find("rite-panel").exists()).toBe(false);
+    // The leaving panel parked focus on the message page, where the keys
+    // page the scene; it never dropped to the body.
+    expect(document.activeElement).toBe(s.page().element);
     await s.answer();
     expect(s.find("rite-panel").exists()).toBe(false);
+    expect(document.activeElement).toBe(s.page().element);
     const frames = [{ text: s.page().text(), plate: s.plate() }];
-    s.page().element.focus();
     // Escape while the scene plays does not leave the stage.
     await s.key(s.page().element, "Escape");
     expect(s.frameMode()).toBe("dialogue");
