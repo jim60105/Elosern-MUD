@@ -485,6 +485,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
             },
         )
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-carries-the-archetype-s-scene-artwork"
+    )
     def test_the_panel_carries_the_resolved_artwork(self):
         """A produced descriptor rides the panel verbatim and still validates."""
         with patch(
@@ -502,6 +505,9 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertIsNone(target.room_art_key)
         self.assertIs(target.room_binding_invalid, False)
 
+    @covers_requirement(
+        "landmark-rite-panel::the-rite-panel-carries-the-archetype-s-scene-artwork"
+    )
     def test_an_unresolvable_artwork_degrades_to_none_with_one_warning(self):
         """A failed resolution leaves the panel available with no artwork."""
         error = RuntimeError("no descriptor")

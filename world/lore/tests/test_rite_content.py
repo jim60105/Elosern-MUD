@@ -779,6 +779,9 @@ class LoadPublishedTests(unittest.TestCase):
         self.assertEqual(set(snapshot.districts), {"d1", "d2"})
         self.assertIs(current(), snapshot)
 
+    @covers_requirement(
+        "landmark-rite-content::adoption-requires-a-registered-art-subject-for-every-archetype"
+    )
     def test_an_unregistered_art_subject_rejects_naming_the_archetype(self):
         """Adoption refuses a document the scene chain cannot present.
 
@@ -799,6 +802,9 @@ class LoadPublishedTests(unittest.TestCase):
         with self.assertRaises(RitesNotLoaded):
             current()
 
+    @covers_requirement(
+        "landmark-rite-content::adoption-requires-a-registered-art-subject-for-every-archetype"
+    )
     def test_a_registered_art_subject_installs_the_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self._write(directory, _document())
