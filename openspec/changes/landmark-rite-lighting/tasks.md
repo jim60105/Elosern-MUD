@@ -16,7 +16,7 @@ Do not touch the `district_lit` flag, the `lit_district` notice field, `Landmark
 
 ## 3. Movement narrative
 
-- [ ] 3.1 Apply design D4 and update `typeclasses/tests/test_map_discovery.py` and `world/rules/tests/test_landmark_rites.py` per design D6. Verify: the test prefix passes for `typeclasses.tests.test_map_discovery` and for `world.rules.tests.test_landmark_rites` (two commands).
+- [x] 3.1 Apply design D4 and update `typeclasses/tests/test_map_discovery.py` and `world/rules/tests/test_landmark_rites.py` per design D6. Verify: the test prefix passes for `typeclasses.tests.test_map_discovery` and for `world.rules.tests.test_landmark_rites` (two commands).
 
 ## 4. Remaining consumers' tests
 

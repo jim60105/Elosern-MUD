@@ -1,7 +1,7 @@
-"""Traversal-only district discovery, derived from unchanged visited knowledge."""
+"""Traversal movement narrative and the persisted-visit read it shares with the world map."""
 from django.db import transaction
 
-from world.observability import log_info, log_warn
+from world.observability import log_warn
 from world.rules.map_knowledge import KNOWLEDGE_ATTR, KnowledgeError, _derive_node_id, parse_knowledge
 
 
@@ -49,38 +49,23 @@ def visited_before_traversal(actor):
 
 
 def publish_traversal_narrative(actor, before):
-    """Schedule one immutable message after the final settlement outcome.
+    """Schedule the one immutable movement message after the final settlement.
 
-    The caller is an explicit exit traversal, never a direct move/teleport.
-    Re-read after record_arrival: its exception isolation must not create a
-    discovery when persistence failed. Outer transaction rollbacks discard the
-    callback. Message delivery cannot compensate an already committed move.
+    The caller is an explicit exit traversal, never a direct move/teleport. A
+    movement announces no district discovery: a district lights only when its
+    rite completes (map-district-discovery). ``before`` (the pre-traversal
+    visited set) is no longer read and is kept for signature stability. Outer
+    transaction rollbacks discard the callback. Message delivery cannot
+    compensate an already committed move.
     """
     from typeclasses.characters import PlayerCharacter
-    from world.lore.map_districts import current, landmark_node_ids
 
     if not isinstance(actor, PlayerCharacter) and not getattr(actor.db, "possessed_by", None):
         return
-    destination=traversal_node_id(actor, actor.location)
-    discovery=None
-    after = set()
-    if isinstance(actor, PlayerCharacter):
-        try:
-            after={visit.node_id for visit in persisted_visits(actor)}
-        except KnowledgeError as error:
-            log_warn("map_discovery_knowledge_unreadable", exc=error, context={"char": actor.pk})
-    if before is not None and destination not in before and destination in after:
-        landmarks = landmark_node_ids()
-        discovery=next((district for district in current().districts.values()
-                        if landmarks.get(district.district_id) == destination),None)
     message=f"你移動到了{actor.location.key}。"
-    if discovery is not None:
-        message += f"\n已探明：{discovery.district_name_zh}"
     def deliver():
         try:
             actor.msg(message)
-            if discovery is not None:
-                log_info("map_district_discovered", context={"char": actor.pk, "district": discovery.district_id})
         except Exception as error:
             log_warn("map_discovery_delivery_failed", exc=error, context={"char": actor.pk})
     transaction.on_commit(deliver)

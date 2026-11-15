@@ -1,4 +1,4 @@
-"""Synthetic landmark discovery through real committed traversal seams."""
+"""Synthetic landmark traversals through real committed seams announce no discovery."""
 from contextlib import contextmanager
 from types import SimpleNamespace as NS
 from unittest.mock import patch
@@ -61,18 +61,29 @@ class LandmarkArrivalTests(EvenniaTest):
         return [call.args[0] for call in msg.call_args_list if call.args and isinstance(call.args[0],str)
                 and call.args[0].startswith("你移動到了")]
 
+    def discovered(self,emit):
+        """The ``map_district_discovered`` events every log level emitted."""
+        return [call for call in emit.call_args_list if call.args[1] == "map_district_discovered"]
+
+    def lit(self):
+        from world.rules.map_district_lighting import lit_district_keys
+        return lit_district_keys(self.char1,{"t_district":self.district})
+
     @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
     def test_grid_first_and_repeat_arrivals_emit_one_committed_narrative(self):
-        with patch.object(self.char1,"msg") as msg,patch("world.rules.map_discovery.log_info") as info:
+        with patch.object(self.char1,"msg") as msg,patch("world.observability.api._emit") as emit:
             self.move()
-            self.assertEqual(self.narratives(msg),[f"你移動到了{self.landmark.key}。\n已探明：測試丘陵"])
+            # One movement line, no second (exploration) line.
+            self.assertEqual(self.narratives(msg),[f"你移動到了{self.landmark.key}。"])
             self.assertIn(self.district.landmark_node,{visit.node_id for visit in parse_knowledge(self.char1)})
-            info.assert_called_once_with("map_district_discovered",context={"char":self.char1.pk,"district":"t_district"})
+            self.assertEqual(self.discovered(emit),[])
+            self.assertEqual(self.lit(),frozenset())
             self.char1.location=self.source
             msg.reset_mock()
             self.move()
             self.assertEqual(self.narratives(msg),[f"你移動到了{self.landmark.key}。"])
-            self.assertEqual(info.call_count,1)
+            self.assertEqual(self.discovered(emit),[])
+            self.assertEqual(self.lit(),frozenset())
 
     @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
     def test_veto_and_late_settlement_failure_have_no_discovery_or_record(self):
@@ -139,7 +150,6 @@ class LandmarkArrivalTests(EvenniaTest):
     @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
     def test_existing_attribute_save_failure_cannot_discover_or_light_from_dirty_cache(self):
         from world.rules.map_knowledge import record_arrival
-        from world.rules.map_district_lighting import lit_district_keys
         from web.webclient.presentation.world_map import world_map_presenter
         from web.webclient.presentation.tests.test_world_map import fixtures, SECRET
         from evennia.utils.dbserialize import to_pickle
@@ -157,15 +167,18 @@ class LandmarkArrivalTests(EvenniaTest):
         with patch.object(type(attribute),"save",new=fail_knowledge_save), \
              patch.object(self.char1,"msg") as msg, \
              patch("world.rules.map_knowledge.log_warn") as warning, \
-             patch("world.rules.map_discovery.log_info") as info:
+             patch("world.observability.api._emit") as emit:
             self.move()
         self.assertEqual(dirty_seen,[True])
         self.assertIs(self.char1.location,self.landmark)
         self.assertNotIn("已探明",str(self.narratives(msg)))
-        info.assert_not_called()
+        self.assertEqual(self.discovered(emit),[])
         self.assertEqual(warning.call_args.args[0],"map_knowledge_record_arrival_failed")
-        self.assertEqual({visit.node_id for visit in parse_knowledge(self.char1)},before)
-        self.assertEqual(lit_district_keys(self.char1,{"t_district":self.district}),frozenset())
+        # The narrative no longer reads knowledge; the persisted read still
+        # holds only the visits that reached storage.
+        from world.rules.map_discovery import persisted_visits
+        self.assertEqual({visit.node_id for visit in persisted_visits(self.char1)},before)
+        self.assertEqual(self.lit(),frozenset())
 
         # A map read must independently reject the same dirty cache, without
         # relying on the narrative having already repaired it.
@@ -250,8 +263,8 @@ class LandmarkArrivalTests(EvenniaTest):
              patch.object(self.char1,"msg") as msg,self.captureOnCommitCallbacks(execute=True):
             gate.at_traverse(self.char1,self.source)
         self.assertEqual(self.char1.location.coordinates,cell)
-        self.assertEqual(len(self.narratives(msg)),1)
-        self.assertIn("已探明：測試丘陵",self.narratives(msg)[0])
+        self.assertEqual(self.narratives(msg),[f"你移動到了{self.char1.location.key}。"])
+        self.assertEqual(self.lit(),frozenset())
         destination=(cell[0]+1,cell[1])
         self.district.landmark_node=encode_wild(WILDERNESS_NAME,*destination)
         step=next(exit for exit in self.char1.location.exits if exit.key == "east")
@@ -259,5 +272,5 @@ class LandmarkArrivalTests(EvenniaTest):
              patch.object(self.char1,"msg") as msg,self.captureOnCommitCallbacks(execute=True):
             step.at_traverse(self.char1,self.char1.location)
         self.assertEqual(self.char1.location.coordinates,destination)
-        self.assertEqual(len(self.narratives(msg)),1)
-        self.assertIn("已探明：測試丘陵",self.narratives(msg)[0])
+        self.assertEqual(self.narratives(msg),[f"你移動到了{self.char1.location.key}。"])
+        self.assertEqual(self.lit(),frozenset())

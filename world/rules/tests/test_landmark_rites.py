@@ -18,6 +18,8 @@ from world.rules.landmark_rites import (
     preflight,
     rite_site_for,
 )
+from world.rules.map_district_lighting import lit_district_keys
+from world.rules.map_knowledge import record_arrival
 from world.rules.possession import enter_possession
 from world.rules.skip_safety import SkipRejectReason
 from world.rules.tests.rite_fixtures import (
@@ -467,6 +469,37 @@ class RiteRollbackTests(RiteSettlementFixture):
         self.perform(self.player, "solo", operation_id="t_rite_retry")
         self.assertEqual(get_world_clock().tick - tick_start, SOLO_SECONDS)
         self.assertEqual(self.record()["completed"][DISTRICT_KEY]["count"], 1)
+
+
+class RiteLightingTests(RiteSettlementFixture):
+    """A district lights on its first committed rite and on nothing else."""
+
+    def lit(self):
+        return lit_district_keys(self.player)
+
+    def test_a_first_committed_rite_lights_its_district(self):
+        record_arrival(self.player)
+        self.assertEqual(self.lit(), frozenset())
+        self.perform(self.player, "solo")
+        self.assertEqual(self.lit(), frozenset({DISTRICT_KEY}))
+
+    def test_a_companion_rite_lights_the_owner_s_district(self):
+        self.perform(self.player, "shared", member_id=self.companion.id)
+        self.assertEqual(self.lit(), frozenset({DISTRICT_KEY}))
+        self.assertEqual(lit_district_keys(self.companion), frozenset())
+
+    def test_a_refused_rite_lights_nothing(self):
+        self.refused("rite_unknown_option", lambda: self.perform(self.player, "t_none"))
+        self.assertEqual(self.lit(), frozenset())
+
+    def test_a_rolled_back_rite_lights_nothing(self):
+        with patch(
+            "world.rules.landmark_rites.write_record",
+            side_effect=RuntimeError("record write failed"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.perform(self.player, "solo")
+        self.assertEqual(self.lit(), frozenset())
 
 
 class RiteReplayTests(RiteSettlementFixture):
