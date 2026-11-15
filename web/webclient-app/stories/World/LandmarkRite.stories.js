@@ -79,8 +79,11 @@ const panel = (args) => ({
   },
 });
 
+// In the client the stage runs under the header bar and the plate clears it;
+// this frame already starts below the bar, so the bar's height is zero here.
 const backdrop = (args) => ({
-  render: () => stage([h(RiteBackdrop, { rite: args.rite, artPanel: RITE_ART_PANEL })]),
+  render: () =>
+    stage([h("div", { style: { "--header-h": "0px" } }, [h(RiteBackdrop, { rite: args.rite, artPanel: RITE_ART_PANEL })])]),
 });
 
 // The return entry in a column sized like HudFrame's `map` anchor (top
