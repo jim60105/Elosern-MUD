@@ -18,7 +18,7 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 4. Gates
 
-- [ ] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-discovery-notice` and `openspec validate landmark-rite-discovery-notice --strict`. Verify: all exit 0.
+- [x] 4.1 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-discovery-notice` and `openspec validate landmark-rite-discovery-notice --strict`. Verify: all exit 0.
 
 ## Workflow follow-up
 
