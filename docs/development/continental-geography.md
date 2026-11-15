@@ -233,10 +233,10 @@ forest.
 
 - Placement. Seeds sit near the centroids of a relaxed layout computed per
   nation. The original seeds stay fixed at their authored cells. The
-  Grandia and Valhalla capital anchor cells are also fixed, so standing in
-  either capital lights its district. Pass and border-river fords are not
-  landmarks: the border closes the partition there, so a seed on it produces a
-  sliver district along the ridge or river. The coordinates live only in the
+  Grandia and Valhalla capital anchor cells are also fixed, so a rite
+  performed in either capital lights its district. Pass and border-river
+  fords are not landmarks: the border closes the partition there, so a seed on
+  it produces a sliver district along the ridge or river. The coordinates live only in the
   authored document; nothing is generated at runtime.
 - Future grid maps. When the Grandia or Valhalla capital gains a settlement
   grid map, move its landmark to the matching `grid:` node (its footprint
@@ -272,12 +272,15 @@ synthetic rule tests pass their own `terrain`. The published districts are
 browsable in the GM portal index; they are not mirrored by
 `world/lore/sync.py`.
 
-Lighting is derived, never stored: `world/rules/map_district_lighting.py`
-lights a district if and only if its exact landmark node is in the visited
-record read through `parse_knowledge`. Nearby cells never light a district;
-`record_arrival` stays the only writer and no discovery attribute, name or
-geometry is added to knowledge. The first-arrival `已探明` narrative belongs to
-the world-map panel change.
+Lighting is derived, never stored separately: `world/rules/map_district_lighting.py`
+lights a district if and only if the player character's landmark rite record
+(`world/rules/landmark_rite_record.py`) holds a completed rite for it and the
+published district world declares it. Visiting a landmark, or any nearby cell,
+lights nothing; map knowledge stays a record of visits, `record_arrival` stays
+its only writer and no discovery attribute, name or geometry is added to it.
+`lit_district_keys` raises on a corrupt rite record; `readable_lit_district_keys`,
+which presentation and travel use, degrades it to no lit district with one
+`landmark_rite_record_corrupt` warning. A movement announces no discovery.
 
 ## District partition
 

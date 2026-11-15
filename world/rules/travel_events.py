@@ -554,13 +554,13 @@ def _capture(actor, location, knowledge_owner, members, read_world_clock):
         return TravelCapture(cell=None, tick=tick, travellers=travellers)
     from world.maps import wilderness_provider
     from world.lore.wilderness_regions import regions
-    from world.rules.map_district_lighting import lit_district_keys
+    from world.rules.map_district_lighting import readable_lit_district_keys
 
     region_key = wilderness_provider.region_for_coordinates(*cell)
     region = regions().get(region_key)
     fords = wilderness_provider.terrain_definition().waterway_fords
     owner = knowledge_owner if knowledge_owner is not None else actor
-    lit = frozenset(lit_district_keys(owner))
+    lit = readable_lit_district_keys(owner)
     calendar = None if clock is None else clock.calendar
     return TravelCapture(
         cell=cell,

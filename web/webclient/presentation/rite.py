@@ -293,8 +293,7 @@ def rite_presenter(context: Any) -> dict[str, Any]:
         record_owner_for,
         rite_site_for,
     )
-    from world.rules.map_district_lighting import lit_district_keys
-    from world.rules.map_knowledge import KnowledgeError
+    from world.rules.map_district_lighting import readable_lit_district_keys
 
     actor = context.actor
     try:
@@ -332,12 +331,11 @@ def rite_presenter(context: Any) -> dict[str, Any]:
             context={"char": owner.pk, "district": site.district_key},
         )
         completed = ()
-    seen = [row["key"] for row in options if row["key"] in completed]
-
-    try:
-        lit = site.district_key in lit_district_keys(owner)
-    except KnowledgeError:  # observability: ignore R2: an unreadable knowledge record degrades to unlit without writing; the map presenters already report that fault
+        # The same unreadable record lights nothing; it is already reported.
         lit = False
+    else:
+        lit = site.district_key in readable_lit_district_keys(owner)
+    seen = [row["key"] for row in options if row["key"] in completed]
 
     payload = {
         "schema_version": RITE_SCHEMA_VERSION,

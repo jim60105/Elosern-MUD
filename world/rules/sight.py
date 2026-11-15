@@ -12,7 +12,7 @@ policy into pure projections:
   current phase.
 
 Every function takes immutable inputs and a policy, writes nothing, and never
-lights a district: seeing a landmark is not visiting it. Terrain, elevation and
+lights a district: seeing a landmark is not completing its rite. Terrain, elevation and
 district registration are read only by the thin runtime seam at the bottom of
 this module, so the rules above stay testable with synthetic policies.
 
@@ -1048,20 +1048,21 @@ def visible_distant_markers(
 ) -> tuple[dict[str, Any], ...]:
     """Read-only distant markers for one character standing on ``cell``.
 
-    Reads the character's map knowledge for lit districts only; it writes
-    nothing, ticks no clock and never lights a district.
+    Reads the character's completed-rite record for lit districts only (an
+    unreadable record lights nothing); it writes nothing, ticks no clock and
+    never lights a district.
     """
 
     from world.lore.map_districts import current as districts_current
     from world.maps.wilderness_provider import WILDERNESS_KM_PER_CELL
-    from world.rules.map_district_lighting import lit_district_keys
+    from world.rules.map_district_lighting import readable_lit_district_keys
 
     registry = districts_current().districts
     return distant_markers(
         cell,
         calendar,
         published_distant_sources(),
-        lit_district_keys(character, registry),
+        readable_lit_district_keys(character, registry),
         inputs=published_ground_inputs(cell),
         cell_size_km=WILDERNESS_KM_PER_CELL,
         district_names={key: row.landmark_name_zh for key, row in registry.items()},

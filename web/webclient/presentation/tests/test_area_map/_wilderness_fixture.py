@@ -39,11 +39,12 @@ class _WildernessFixture(EvenniaTest):
         return (ex + 10, ey + 5)
 
     def _lit_overview(self, start, radius=2):
-        from world.lore import map_districts
+        from world.rules.tests.rite_fixtures import complete_rite_record
 
         district_at = _live("world.maps.district_partition", "district_at")
         key = district_at(start)
         self.assertIsNotNone(key)
-        landmark = map_districts.landmark_node_ids()[key]
-        self._pin({start: radius}, visited_grid=(landmark,))
+        # A completed rite lights the district; a landmark visit would not.
+        self._pin({start: radius})
+        complete_rite_record(self.char1, key)
         return key, _render(self.char1)

@@ -35,8 +35,7 @@ class WildernessContentTests(_WildernessFixture):
         self._pin({start: 6})
         district_at = _live("world.maps.district_partition", "district_at")
         here = district_at(start)
-        with mock.patch.object(area_map_module, "_lit_landmarks", return_value={}):
-            payload = _render(self.char1)
+        payload = _render(self.char1)
         cells = _decode_rows(payload)
         labels = area_map_module.WILDERNESS_TERRAIN_LABELS
         seen_keys = set()
@@ -57,12 +56,14 @@ class WildernessContentTests(_WildernessFixture):
             if facts is not None and district_at(cell) != here:
                 self.assertIsNone(facts["display"]["district_key"], cell)
         self.assertEqual(cells[start]["display"]["district_key"], here)
-        # Lighting another district (by its exact landmark) discloses it too.
+        # Lighting another district (by completing its rite) discloses it too.
         others = {district_at(cell) for cell, facts in cells.items() if facts is not None} - {here, None}
         if others:
+            from world.rules.tests.rite_fixtures import complete_rite_record
+
             other = sorted(others)[0]
-            with mock.patch.object(area_map_module, "_lit_landmarks", return_value={other: "grid:t_none:0:0"}):
-                lit_cells = _decode_rows(_render(self.char1))
+            complete_rite_record(self.char1, other)
+            lit_cells = _decode_rows(_render(self.char1))
             disclosed = {facts["display"]["district_key"] for facts in lit_cells.values() if facts is not None}
             self.assertIn(other, disclosed)
         self.assertTrue(_js_accepts(payload))
@@ -81,8 +82,7 @@ class WildernessContentTests(_WildernessFixture):
         nodes = _by_id(payload)
         self.assertEqual(nodes[current]["landmark"], {"name": "合成石標"})
         self.assertTrue(all(node["landmark"] is None for node in payload["nodes"] if node["id"] != current))
-        with mock.patch.object(area_map_module, "_lit_landmarks", return_value={}):
-            plain = _render(self.char1)
+        plain = _render(self.char1)
         self.assertTrue(all(node["landmark"] is None for node in plain["nodes"]))
         self.assertTrue(_js_accepts(payload))
 
@@ -222,13 +222,7 @@ class WildernessContentTests(_WildernessFixture):
             for x in range(start[0] - reach, start[0] + reach + 1)
             for y in range(start[1] - reach, start[1] + reach + 1)
         }
-        # Exact landmark membership (lit districts) reads one selected chunk
-        # per district landmark, never the whole record.
-        landmarks = _live("world.lore.map_districts", "landmark_node_ids")()
-        for node_id in landmarks.values():
-            if node_id.startswith("wild:"):
-                _, _, x, y = node_id.split(":")
-                allowed.add(f"{int(x) // CHUNK_CELLS}:{int(y) // CHUNK_CELLS}")
+        # Lighting comes from the rite record: no landmark chunk is decoded.
         stored_chunks = set(_knowledge(visits)["wilderness"][_live("world.maps.wilderness_provider", "WILDERNESS_NAME")])
         self.assertGreater(len(stored_chunks - allowed), 0, "the record holds chunks far from the window")
         self.assertTrue(decoded)

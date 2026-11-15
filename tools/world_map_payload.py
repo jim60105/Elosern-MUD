@@ -1,9 +1,11 @@
 """Measure actual production world-map assembly and its finite trail extremes.
 
 Run with ``uv run --locked python -m tools.world_map_payload --json``.
-Geometry, lighting, place filtering and row runs come from the production
-presenter. This tool supplies exploration histories and maximal wire markers;
-it does not contain a second implementation of map geometry or disclosure.
+Geometry, place filtering and row runs come from the production presenter.
+This tool supplies exploration histories, the lit district set each case
+assumes (lighting comes from completed rites, not visits) and maximal wire
+markers; it does not contain a second implementation of map geometry or
+disclosure.
 """
 from __future__ import annotations
 
@@ -45,9 +47,9 @@ def _all_visits():
     return visits
 
 
-def _assemble(visits,markers):
+def _assemble(visits,markers,lit):
     from web.webclient.presentation.world_map import assemble_world_map
-    return assemble_world_map(visit_ids=visits,current=(1999.5,1099.5),markers=markers)
+    return assemble_world_map(visit_ids=visits,current=(1999.5,1099.5),markers=markers,lit=frozenset(lit))
 
 
 def representative_payload():
@@ -56,7 +58,8 @@ def representative_payload():
     landmarks=landmark_node_ids()
     districts=sorted(current().districts.values(),key=lambda row:sum(
         (a-b)**2 for a,b in zip(world_node_point(landmarks[row.district_id]),(850.5,1024.5))))
-    return _assemble({landmarks[row.district_id] for row in districts[:REPRESENTATIVE_LIT_DISTRICTS]},[])
+    chosen=districts[:REPRESENTATIVE_LIT_DISTRICTS]
+    return _assemble({landmarks[row.district_id] for row in chosen},[],{row.district_id for row in chosen})
 
 
 def one_km_payload():
@@ -68,7 +71,7 @@ def one_km_payload():
     for y in range(1000,2700):
         for x in range(1000,2600,2):
             if count >= 20000:
-                return _assemble(visits,_markers())
+                return _assemble(visits,_markers(),district_keys())
             node=encode_wild(WILDERNESS_NAME,x,y)
             if node not in visits:
                 visits.add(node)
@@ -89,12 +92,12 @@ def worst_payload():
     from world.maps.wilderness_provider import WILDERNESS_NAME
     visits=_all_visits()
     visits.update(encode_wild(WILDERNESS_NAME,x,y) for y in range(0,2700,5) for x in range(0,2700,10))
-    return _assemble(visits,_markers())
+    return _assemble(visits,_markers(),district_keys())
 
 
 def measure():
     from web.webclient.presentation.world_map_geometry import common_layer
-    cases=dict(common_layer=common_layer(),all_unlit=_assemble(set(),[]),
+    cases=dict(common_layer=common_layer(),all_unlit=_assemble(set(),[],()),
                representative=representative_payload(),one_km=one_km_payload(),worst=worst_payload())
     return {name:dict(canonical_bytes=len(canonical_bytes(body))) for name,body in cases.items()}
 

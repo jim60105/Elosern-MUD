@@ -51,9 +51,9 @@ class WorldMapPrivacyTests(TestCase):
     @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
     def test_full_serialization_filters_unlit_and_hidden_and_separates_players(self):
         with fixtures():
-            fresh=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[])
-            lit=panel.assemble_world_map(visit_ids={LANDMARK},current=(1,2),markers=[])
-            other=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[])
+            fresh=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[],lit=frozenset())
+            lit=panel.assemble_world_map(visit_ids={LANDMARK},current=(1,2),markers=[],lit=frozenset({SECRET}))
+            other=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[],lit=frozenset())
             self.assertEqual(fresh,other)
             serialized=json.dumps(fresh)
             for secret in (SECRET,VILLAGE,DUNGEON,PUBLIC,"SECRET_LANDMARK_632","secret_terrain"):
@@ -64,17 +64,40 @@ class WorldMapPrivacyTests(TestCase):
             self.assertNotIn(VILLAGE,json.dumps(lit))
             self.assertNotIn(DUNGEON,json.dumps(lit))
             lit["districts"][0]["outline"][0][0][0]=99
-            again=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[])
+            again=panel.assemble_world_map(visit_ids=set(),current=(1,2),markers=[],lit=frozenset())
             self.assertEqual(again["districts"][0]["outline"][0][0],[0,0])
 
     @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
     def test_visited_hidden_place_survives_unlit_district(self):
         with fixtures():
-            body=panel.assemble_world_map(visit_ids={encode_wild(WILDERNESS_NAME,4,2)},current=(4.5,2.5),markers=[])
+            body=panel.assemble_world_map(visit_ids={encode_wild(WILDERNESS_NAME,4,2)},current=(4.5,2.5),markers=[],lit=frozenset())
             self.assertEqual([row["name"] for row in body["visited_places"]],[VILLAGE])
             self.assertFalse(body["districts"][0]["lit"])
             self.assertNotIn(DUNGEON,json.dumps(body))
             self.assertEqual(body["current"],dict(x=4.5,y=2.5))
+
+    def test_a_visited_landmark_without_a_rite_stays_unlit(self):
+        with fixtures():
+            body=panel.assemble_world_map(visit_ids={LANDMARK},current=(1,2),markers=[],lit=frozenset())
+        self.assertFalse(body["districts"][0]["lit"])
+        self.assertEqual(set(body["districts"][0]),{"id","lit","outline"})
+        self.assertNotIn(SECRET,json.dumps(body))
+
+    def test_the_presenter_lights_a_district_from_its_completed_rite(self):
+        from world.rules.landmark_rite_record import RECORD_ATTR,empty_record,with_completion
+        record=with_completion(empty_record(),SECRET,"t_option",3)
+        stored={RECORD_ATTR:record}
+        actor=NS(attributes=NS(get=lambda key,default=None,**kwargs:stored.get(key,default)))
+        with fixtures(),patch.object(panel.geometry,"current_point",return_value=(1,2)), \
+             patch.object(panel,"persisted_visits",return_value=()), \
+             patch.object(panel,"quest_markers",return_value=[]) as markers:
+            lit=panel.world_map_presenter(NS(actor=actor))
+            stored.clear()
+            dark=panel.world_map_presenter(NS(actor=actor))
+        self.assertTrue(lit["districts"][0]["lit"])
+        self.assertIn(PUBLIC,json.dumps(lit))
+        self.assertFalse(dark["districts"][0]["lit"])
+        self.assertEqual([call.args[1] for call in markers.call_args_list],[frozenset({SECRET}),frozenset()])
 
     @covers_requirement("webclient-world-map::unknown-world-commission-destinations-are-rounded-before-serialization")
     def test_marker_whitelist_removes_all_exact_alternate_metadata(self):
@@ -262,6 +285,6 @@ class WorldMapTrailTests(TestCase):
         self.assertEqual(body["resolution_km"],5)
         checker={encode_wild(WILDERNESS_NAME,x,y) for y in range(0,2700,5) for x in range(0,2700,10)}
         with fixtures():
-            assembled=panel.assemble_world_map(visit_ids=checker,current=(1,2),markers=[])
+            assembled=panel.assemble_world_map(visit_ids=checker,current=(1,2),markers=[],lit=frozenset())
         self.assertEqual(sum(len(runs) for _,runs in assembled["trail"]["rows"]),145_800)
         self.assertEqual(assembled["trail"]["rows"][-1][1][-1],[538,1])

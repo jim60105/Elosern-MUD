@@ -27,7 +27,12 @@ from world.lore.rites import installed
 from world.lore.rites.shape import RiteArchetype, RiteOption, RiteSnapshot
 from world.lore.scenes import Narration, Scene, Speech
 from world.rules.clock import get_world_clock
-from world.rules.landmark_rite_record import RECORD_ATTR
+from world.rules.landmark_rite_record import (
+    RECORD_ATTR,
+    read_record,
+    with_completion,
+    write_record,
+)
 from world.rules.landmark_rites import REFUSAL_MESSAGES, RiteRefused, perform_rite
 from world.rules.map_knowledge import node_id_for
 from world.rules.party import join_party
@@ -100,6 +105,14 @@ SNAPSHOT = RiteSnapshot(
     },
     districts={DISTRICT_KEY: ARCHETYPE_KEY},
 )
+
+
+def complete_rite_record(owner: Any, district_key: str) -> None:
+    """Record one completed rite for ``district_key`` on ``owner``, lighting it.
+
+    The shared way a test lights a district: a visit no longer does.
+    """
+    write_record(owner, with_completion(read_record(owner), district_key, "t", 0))
 
 
 class RiteSettlementFixture(EvenniaTest):
