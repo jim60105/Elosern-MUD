@@ -239,6 +239,7 @@ class RiteRenderingTests(unittest.TestCase):
             f"測試同伴完成了{LANDMARK_NAME}的儀式。",
         )
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_a_first_completion_adds_one_line_naming_the_district(self):
         def message(first_completion):
             return rite_completion_line(
@@ -327,6 +328,7 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_only_the_first_completion_message_names_the_district(self):
         with patch.object(self.player, "msg") as message:
             first = self.settle("solo")

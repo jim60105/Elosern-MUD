@@ -89,6 +89,7 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
                 self.assertEqual(offsets, sorted(offsets))
                 self.assertEqual(output.count(emitted[-1]), 1)
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_only_the_first_completion_names_the_explored_district(self):
         first = self.call(CmdRite(), SOLO.key).splitlines()
         repeat = self.call(CmdRite(), SOLO.key).splitlines()

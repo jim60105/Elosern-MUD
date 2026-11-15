@@ -516,6 +516,7 @@ class RiteDiscoveryTests(RiteSettlementFixture):
             call()
         return _events(info, "map_district_discovered")
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_a_first_committed_rite_logs_one_discovery_and_a_repeat_none(self):
         first = self.discoveries(lambda: self.perform(self.player, "solo"))
         self.assertEqual(first, [{"char": self.player.pk, "district": DISTRICT_KEY}])
@@ -527,6 +528,7 @@ class RiteDiscoveryTests(RiteSettlementFixture):
         )
         self.assertEqual(found, [{"char": self.player.pk, "district": DISTRICT_KEY}])
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_a_refused_rite_logs_no_discovery(self):
         def refuse():
             with self.assertRaises(RiteRefused):
@@ -534,6 +536,7 @@ class RiteDiscoveryTests(RiteSettlementFixture):
 
         self.assertEqual(self.discoveries(refuse), [])
 
+    @covers_requirement("map-district-discovery::the-first-completed-rite-adds-one-discovery-narrative")
     def test_a_rolled_back_rite_logs_no_discovery(self):
         def roll_back():
             with patch(
