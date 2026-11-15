@@ -14,7 +14,7 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 3. Browser
 
-- [ ] 3.1 Apply design D2 with the Vitest tests of design D4. Verify: `pnpm test -- web/webclient-app/tests/rite/store.test.js` and `pnpm test -- web/webclient-app/tests/app_client_rite.test.js` pass.
+- [x] 3.1 Apply design D2 with the Vitest tests of design D4. Verify: `pnpm test -- web/webclient-app/tests/rite/store.test.js` and `pnpm test -- web/webclient-app/tests/app_client_rite.test.js` pass.
 
 ## 4. Gates
 

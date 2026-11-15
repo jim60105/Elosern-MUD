@@ -110,7 +110,7 @@ function helpers(h) {
       code: "explore.landmark_rite",
       message: "完成",
       presentation_revision: h.store.view.revision,
-      data: { delivery: DELIVERY, first_completion: true },
+      data: { delivery: DELIVERY, first_completion: false },
       ...overrides,
     };
     if (body.data === undefined) delete body.data;
@@ -118,7 +118,8 @@ function helpers(h) {
     await tick();
     await tick();
   };
-  return { ...h, find, rites, key, pressR, frameMode, page, plate, commitRite, answer };
+  const blocks = () => page().findAll(".narrative-line").map((el) => el.text());
+  return { ...h, find, rites, key, pressR, frameMode, page, plate, commitRite, answer, blocks };
 }
 
 /** The travel layout at a wilderness cell with its map adopted. */
@@ -382,6 +383,70 @@ describe("the rite stage", () => {
     expect(s.frameMode()).toBe("exploration");
     expect(s.find("rite-backdrop").exists()).toBe(false);
     expect(s.find("travel-map").exists()).toBe(true);
+  });
+});
+
+// The newly lit district (landmark-rite-discovery-notice D2): after the scene
+// of a district's first completion, the message window adds one line naming
+// it under the guardian's form, until the player leaves or performs again.
+describe("the newly lit district on the rite stage", () => {
+  const FORM = ritePanel().guardian.form;
+  const DISTRICT = ritePanel().district.name;
+  let performed = 0;
+
+  /**
+   * Perform the first option, answer with `first_completion`, and page
+   * through the whole scene. Every committed rite carries its own delivery
+   * id: the shared player never replays a retired one.
+   */
+  async function playThrough(s, firstCompletion) {
+    performed += 1;
+    const delivery = { ...DELIVERY, delivery_id: `rite:synthetic_highlands:drink:${performed}` };
+    await s.key(s.find("rite-panel").element, "1");
+    await s.answer({ data: { delivery, first_completion: firstCompletion } });
+    expect(s.store.view.rite.playing).toBe(true);
+    for (let line = 0; line < DELIVERY.lines.length; line += 1) {
+      // During playback the window shows the scene line, never the notice.
+      expect(s.page().text()).not.toContain(DISTRICT);
+      await s.key(s.page().element, "Enter");
+    }
+    expect(s.find("rite-panel").exists()).toBe(true);
+  }
+
+  it("names the district under the guardian's form once the first completion's scene finishes", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, true);
+    const shown = s.blocks();
+    expect(shown).toHaveLength(2);
+    expect(shown[0]).toBe(FORM);
+    expect(shown[1]).toContain(DISTRICT);
+    // The lit mark and the name take the narrative emphasis.
+    expect(s.page().find(".narrative-line:nth-child(2) .em").text()).toContain(DISTRICT);
+  });
+
+  it("a repeat shows only the guardian's form", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, false);
+    expect(s.blocks()).toEqual([FORM]);
+  });
+
+  it("leaving and re-entering the stage, or performing again, drops it", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    await playThrough(s, true);
+    expect(s.blocks()).toHaveLength(2);
+    await s.key(s.find("rite-panel").element, "Escape");
+    await s.pressR();
+    await s.key(s.find("rite-arrival-card").element, "Enter");
+    expect(s.find("rite-panel").exists()).toBe(true);
+    expect(s.blocks()).toEqual([FORM]);
+
+    await playThrough(s, true);
+    expect(s.blocks()).toHaveLength(2);
+    await playThrough(s, false);
+    expect(s.blocks()).toEqual([FORM]);
   });
 });
 

@@ -247,6 +247,72 @@ describe("rite result adoption", () => {
   });
 });
 
+describe("the newly lit mark", () => {
+  /** Perform on the stage and answer with `first_completion`. */
+  const performed = (h, firstCompletion, key = "drink") => {
+    expect(h.store.performRite(key)).toBe(true);
+    h.answer({ data: { delivery: DELIVERY, first_completion: firstCompletion } });
+  };
+
+  it("follows the adopted success result's first completion", () => {
+    const h = harness();
+    h.onStage();
+    expect(h.view().newlyLit).toBe(false);
+    performed(h, true);
+    expect(h.view()).toMatchObject({ newlyLit: true, playing: true });
+    // The scene finishing keeps it: the stage names the district now.
+    expect(h.store.finishRiteScene()).toBe(true);
+    expect(h.view().newlyLit).toBe(true);
+    // A new perform clears it at dispatch; a repeat's result leaves it clear.
+    expect(h.store.performRite("drink")).toBe(true);
+    expect(h.view().newlyLit).toBe(false);
+    h.answer({ data: { delivery: DELIVERY, first_completion: false } });
+    expect(h.view().newlyLit).toBe(false);
+  });
+
+  it("a refused result and a foreign result set nothing", () => {
+    const h = harness();
+    h.onStage();
+    expect(h.store.performRite("drink")).toBe(true);
+    h.accept("ui_action_result", fx.actionResult({ request_id: "session:999", presentation_revision: h.store.view.revision }));
+    expect(h.view().newlyLit).toBe(false);
+    h.answer({ outcome: "rejected", code: "rite_unknown_option", message: "沒有這個儀式。", data: undefined });
+    expect(h.view().newlyLit).toBe(false);
+  });
+
+  it("a perform refused locally keeps it", () => {
+    const h = harness();
+    h.onStage();
+    performed(h, true);
+    h.store.finishRiteScene();
+    expect(h.store.performRite("swim")).toBe(false);
+    h.store.setConnected(false);
+    expect(h.store.performRite("drink")).toBe(false);
+    expect(h.view().newlyLit).toBe(true);
+  });
+
+  it("leaving and re-entering the stage clears it", () => {
+    const h = harness();
+    h.onStage();
+    performed(h, true);
+    h.store.finishRiteScene();
+    expect(h.store.leaveRite()).toBe(true);
+    expect(h.view().newlyLit).toBe(false);
+    expect(h.store.openRiteCard()).toBe(true);
+    expect(h.store.approachRite()).toBe(true);
+    expect(h.view().newlyLit).toBe(false);
+  });
+
+  it("the panel becoming unavailable clears it", () => {
+    const h = harness();
+    h.onStage();
+    performed(h, true);
+    h.store.finishRiteScene();
+    h.commitRite(null);
+    expect(h.view().newlyLit).toBe(false);
+  });
+});
+
 describe("rite reset", () => {
   it("the panel becoming unavailable closes the stage with no request and no delivery", () => {
     const h = harness();
@@ -255,7 +321,7 @@ describe("rite reset", () => {
     h.commitRite(null);
     expect(h.view()).toEqual({
       panel: null, phase: "closed", revisit: false, pending: false, delivery: null, playing: false,
-      performerId: "self", canSwitch: false,
+      performerId: "self", canSwitch: false, newlyLit: false,
     });
     // The stale result arriving later adopts nothing.
     h.answer();
