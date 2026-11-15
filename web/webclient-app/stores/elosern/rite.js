@@ -12,10 +12,16 @@
 // - Opening, approaching and leaving are local and send nothing. Performing
 //   sends exactly one `explore.landmark_rite {option, member_id}` and adopts
 //   only that request's own result.
+// - The performer (landmark-rite-performer-picking D1) is one row of the
+//   panel's `performers`, picked on the stage. It is the controlled
+//   character (`"self"`) on every entry to the stage, and returns to it when
+//   the picked row leaves the panel or picking stops being offered.
 // - An open card or stage is one more centred card: it stops walking and the
 //   compass as the camp card does.
 // - The state resets when the panel becomes unavailable, the mode leaves
 //   exploration or the session changes.
+
+import { ritePerformers } from "../../components/rite/rite-model.js";
 
 function closedPresentation() {
   return {
@@ -24,7 +30,18 @@ function closedPresentation() {
     pending: null, // { requestId, epoch, generation }
     delivery: null,
     playing: false,
+    performerId: "self", // the `id` of one ritePerformers(panel) row
   };
+}
+
+// Picking is offered only when there is someone else to pick and something
+// a companion may perform.
+function switchable(panel) {
+  return (
+    panel !== null &&
+    panel.performers.length > 1 &&
+    panel.options.some((option) => option.companion === true)
+  );
 }
 
 export function applyRite(ctx) {
@@ -97,6 +114,9 @@ export function applyRite(ctx) {
     }
     hydrated = true;
     adopt(rs);
+    if (!switchable(panel) || !ritePerformers(panel).some((row) => row.id === state.performerId)) {
+      state.performerId = "self";
+    }
   };
 
   ctx.riteView = function riteView() {
@@ -107,7 +127,39 @@ export function applyRite(ctx) {
       pending: state.pending !== null,
       delivery: state.delivery,
       playing: state.playing,
+      performerId: state.performerId,
+      canSwitch: switchable(panel),
     });
+  };
+
+  // The rows a pick may land on, or null while picking is not open: only on
+  // the stage, with picking offered, and while nothing is pending or playing.
+  function pickableRows() {
+    if (state.phase !== "stage" || state.pending || state.playing || !switchable(panel)) return null;
+    return ritePerformers(panel);
+  }
+
+  function setPerformer(id) {
+    if (id === state.performerId) return true;
+    state.performerId = id;
+    ctx.publishView();
+    return true;
+  }
+
+  /** Pick a listed performer by its row id. Sends nothing. */
+  ctx.pickRitePerformer = function pickRitePerformer(id) {
+    const rows = pickableRows();
+    if (rows === null || !rows.some((row) => row.id === id)) return false;
+    return setPerformer(id);
+  };
+
+  /** Step to the next (delta > 0) or previous listed performer, wrapping. */
+  ctx.stepRitePerformer = function stepRitePerformer(delta) {
+    const rows = pickableRows();
+    if (rows === null || !Number.isFinite(delta) || delta === 0) return false;
+    const index = Math.max(0, rows.findIndex((row) => row.id === state.performerId));
+    const next = (index + Math.sign(delta) + rows.length) % rows.length;
+    return setPerformer(rows[next].id);
   };
 
   /** Reopen the card from the return entry. Sends nothing. */
@@ -123,6 +175,7 @@ export function applyRite(ctx) {
   ctx.approachRite = function approachRite() {
     if (state.phase !== "card") return false;
     state.phase = "stage";
+    state.performerId = "self";
     ctx.publishView();
     return true;
   };
@@ -135,15 +188,22 @@ export function applyRite(ctx) {
     return true;
   };
 
-  /** Perform one listed option: exactly one `explore.landmark_rite`. */
-  ctx.performRite = function performRite(optionKey, memberId = null) {
+  /**
+   * Perform one listed option as the picked performer: exactly one
+   * `explore.landmark_rite`. A companion never sends an option that does not
+   * admit one.
+   */
+  ctx.performRite = function performRite(optionKey) {
     if (state.phase !== "stage" || state.pending || state.playing || panel === null) return false;
-    if (!panel.options.some((option) => option.key === optionKey)) return false;
+    const option = panel.options.find((candidate) => candidate.key === optionKey);
+    if (!option) return false;
+    const performer = ritePerformers(panel).find((row) => row.id === state.performerId);
+    if (!performer || (!performer.self && option.companion !== true)) return false;
     const rs = committed();
     if (!rs.connected || rs.phase !== "active" || ctx.inFlight || rs.mutationsLocked) return false;
     const requestId = ctx.dispatchAction(
       "explore.landmark_rite",
-      { option: optionKey, member_id: memberId ?? null },
+      { option: optionKey, member_id: performer.memberId ?? null },
       null,
     );
     if (!requestId) return false;
