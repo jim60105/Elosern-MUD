@@ -58,7 +58,8 @@ class ValidatorTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     @covers_requirement(
-        "webclient-travel-log::travel-notices-are-committed-structured-events"
+        "webclient-travel-log::travel-notices-are-committed-structured-events",
+        "webclient-travel-log::the-landmark-arrival-notice-carries-no-lighting-field",
     )
     def test_every_kind_adopts_its_exact_params(self):
         for kind, params in VALID.items():
@@ -80,6 +81,9 @@ class ValidatorTests(unittest.TestCase):
                     with self.assertRaises(ProtocolValidationError):
                         validate_travel_log(_panel(_entry(kind, trimmed)))
 
+    @covers_requirement(
+        "webclient-travel-log::the-landmark-arrival-notice-carries-no-lighting-field"
+    )
     def test_a_landmark_arrival_carrying_a_lit_district_rejects(self):
         for lit in (None, "合成塔"):
             with self.subTest(lit=lit):

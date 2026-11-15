@@ -6,10 +6,10 @@ Attach stateless commit-qualified interrupt flags to wilderness moves. This capa
 ## Requirements
 
 ### Requirement: Wilderness steps report stateless committed interrupts
-Successful wilderness moves SHALL return unique interrupt flags derived from committed before/after state and optional validated walk context without storing walking state.
+Successful wilderness moves SHALL return unique interrupt flags derived from committed before/after state and optional validated walk context without storing walking state. District lighting SHALL raise no flag.
 
 #### Scenario: Transition/context table
-- **WHEN** synthetic snapshots independently add each landmark, lit district, source, hostile, threshold, night entry or sleeping member
+- **WHEN** synthetic snapshots independently add each landmark, source, hostile, threshold, night entry or sleeping member
 - **THEN** each documented flag raises only for its positive transition/context and combined flags use stable order
 
 #### Scenario: Identity and absent context
@@ -19,6 +19,10 @@ Successful wilderness moves SHALL return unique interrupt flags derived from com
 #### Scenario: Future birth is not an interruption
 - **WHEN** a visible habitat has no actual living hostile but a recovery is pending
 - **THEN** no new-hostile interrupt is raised from that future schedule or habitat guidance
+
+#### Scenario: Landmark step raises no lighting flag
+- **WHEN** a step reaches a district landmark
+- **THEN** the flags are exactly the landmark-reached flag and the flag vocabulary contains no lighting flag
 
 ### Requirement: Interrupt results respect movement failure boundaries
 Interrupts SHALL accompany only committed successful steps; comparison failures log and leave successful movement intact while existing refusal results remain unchanged.

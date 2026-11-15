@@ -1826,7 +1826,10 @@ class TravelRouteTests(_TravelStage):
                 page.evaluate("() => window.__elosernBridge.store.clearTravelTarget()")
         page.close()
 
-    @covers_requirement("webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events")
+    @covers_requirement(
+        "webclient-travel-route-walking::landmark-arrivals-own-focus-through-committed-typed-events",
+        "webclient-travel-route-walking::the-landmark-arrival-card-states-no-district-lighting",
+    )
     def test_landmark_focus(self):
         """A committed typed arrival bound to the reached node opens the card
         with focus on 繼續 and Tab trapped inside; Enter closes it once and
