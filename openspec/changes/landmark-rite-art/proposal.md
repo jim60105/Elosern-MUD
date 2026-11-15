@@ -26,6 +26,7 @@ A registered rite archetype is an ordinary scene archetype: generated quests and
 - `bundled-scene-art`: the completeness scenario no longer names a count of images.
 - `landmark-rite-content`: adoption requires a registered art subject per archetype.
 - `landmark-rite-panel`: the panel carries the archetype's artwork descriptor.
+- `official-artwork-catalog`: the tracked-art exception scenario no longer names a count of scene paths.
 
 ## Impact
 

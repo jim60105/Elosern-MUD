@@ -490,7 +490,7 @@ directories and images with `reason=official_root_indexed` (for example
 naming the offending root-relative paths the diagnostics carry.
 
 The bundled event is independent of the operator root: require
-`reason=bundled_root_indexed definitions=11 images=11 refused=0` on every
+`reason=bundled_root_indexed definitions=21 images=21 refused=0` on every
 deployment, including one with no `ART_OFFICIAL_ROOT` mounted. A lower `images`
 count means the checkout is incomplete (`refused` names the affected scene
 keys), and the missing identities answer 404 rather than a substitute image.

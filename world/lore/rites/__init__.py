@@ -58,7 +58,12 @@ def current() -> RiteSnapshot:
 
 
 def install(snapshot: RiteSnapshot) -> RiteSnapshot:
-    """Bind one validated snapshot as this process's rite world."""
+    """Bind one validated snapshot as this process's rite world.
+
+    Adoption's art-subject check belongs to :func:`load_published`: ``install``
+    trusts a snapshot that was already adopted, which is what the synthetic
+    test worlds and the scoped :func:`installed` seam supply.
+    """
 
     global _INSTALLED
     if not isinstance(snapshot, RiteSnapshot):

@@ -1,7 +1,7 @@
 """Tests for the deterministic built-in fallback resolver (art-gallery-fallback).
 
 Covers the closed vocabulary committed to the repository (contract test in
-both directions, size bound, the closed eleven-path tracked-art exception for
+both directions, size bound, the closed scene-path tracked-art exception for
 the bundled scene collection, no tracked runtime art), the ordered resolution
 rule (declared registry key -> monster constant -> sex/age band ->
 deterministic subject-key hash), fail-closed behaviour on malformed stored
@@ -238,7 +238,7 @@ class ClosedVocabularyContractTests(unittest.TestCase):
         tracked = subprocess_git_ls_files_images()
         # The closed runtime vocabulary is still exclusive: the defaults
         # directory, the explicitly reviewed documentation/fixture images, and
-        # the closed eleven-path bundled-scene exception. A new tracked image
+        # the closed scene-path bundled-scene exception. A new tracked image
         # outside this exact set fails here. The scene entries are an
         # allowlist, not a requirement that every pack has landed, so the four
         # artwork packs stay independent.
@@ -257,7 +257,7 @@ class ClosedVocabularyContractTests(unittest.TestCase):
     def test_the_owned_bundled_scene_pack_is_tracked(self):
         """This pack's own three scene illustrations are committed and servable.
 
-        The eleven-path exception permits not-yet-delivered future packs, so
+        The scene-path exception permits not-yet-delivered future packs, so
         the allowlist above cannot prove this pack landed anything: this
         assertion names the three actual outdoor files, and ``git ls-files``
         proves they are tracked (a runtime/seed/operator image never appears
