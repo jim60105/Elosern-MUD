@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
+from world.lore.rites.shape import art_subject_key
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_SAFE_INTEGER,
@@ -35,6 +36,7 @@ from world.rules.landmark_rite_record import RECORD_ATTR
 from world.rules.map_knowledge import node_id_for, record_arrival
 from world.rules.possession import enter_possession
 from world.rules.tests.rite_fixtures import (
+    ARCHETYPE_KEY,
     DISTRICT_KEY,
     DISTRICT_NAME,
     GUARDIAN_FORM,
@@ -291,12 +293,20 @@ class RiteValidatorTests(unittest.TestCase):
 
 
 class RitePanelPresenterTests(RiteSettlementFixture):
-    def _payload(self, actor=None):
+    def _render(self, actor=None):
         return rite_presenter(
             PresentationContext(
                 actor=self.player if actor is None else actor, protocol_version=1
             )
         )
+
+    def _payload(self, actor=None):
+        # The fixture's synthetic archetype derives an unregistered scene art
+        # subject, so the one scene chain is stubbed: these tests assert the
+        # panel's own facts, and the two dedicated artwork tests drive the
+        # resolution outcomes themselves.
+        with patch("world.art.presenter.describe_scene", return_value=MINIMAL_ARTWORK):
+            return self._render(actor)
 
     def _settle(self, option="shared", member_id=None):
         with self.captureOnCommitCallbacks(execute=True):
@@ -327,7 +337,7 @@ class RitePanelPresenterTests(RiteSettlementFixture):
         self.assertEqual(
             payload["guardian"], {"name": GUARDIAN_NAME, "form": GUARDIAN_FORM}
         )
-        self.assertIsNone(payload["art"])
+        self.assertEqual(payload["art"], MINIMAL_ARTWORK)
         self.assertEqual(
             payload["options"],
             [
@@ -473,6 +483,41 @@ class RitePanelPresenterTests(RiteSettlementFixture):
                 "name": self.player.key,
                 "owner": True,
             },
+        )
+
+    def test_the_panel_carries_the_resolved_artwork(self):
+        """A produced descriptor rides the panel verbatim and still validates."""
+        with patch(
+            "world.art.presenter.describe_scene", return_value=MINIMAL_ARTWORK
+        ) as resolved:
+            payload = self._render()
+
+        self.assertEqual(payload["art"], MINIMAL_ARTWORK)
+        self.assertEqual(validate_rite(payload), payload)
+        self.assertEqual(resolved.call_count, 1)
+        target = resolved.call_args.args[0]
+        self.assertEqual(target.identity, f"rite:{ARCHETYPE_KEY}")
+        self.assertIs(target.trusted_identity, False)
+        self.assertEqual(target.archetype, art_subject_key(ARCHETYPE_KEY))
+        self.assertIsNone(target.room_art_key)
+        self.assertIs(target.room_binding_invalid, False)
+
+    def test_an_unresolvable_artwork_degrades_to_none_with_one_warning(self):
+        """A failed resolution leaves the panel available with no artwork."""
+        error = RuntimeError("no descriptor")
+        with patch(
+            "world.art.presenter.describe_scene", side_effect=error
+        ), patch("web.webclient.presentation.rite.log_warn") as warning:
+            payload = self._render()
+
+        self.assertTrue(payload["available"])
+        self.assertIsNone(payload["art"])
+        self.assertEqual(validate_rite(payload), payload)
+        self.assertEqual(warning.call_count, 1)
+        self.assertEqual(warning.call_args.args[0], "landmark_rite_artwork_failed")
+        self.assertIs(warning.call_args.kwargs["exc"], error)
+        self.assertEqual(
+            warning.call_args.kwargs["context"], {"archetype": ARCHETYPE_KEY}
         )
 
 
