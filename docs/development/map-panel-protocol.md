@@ -185,13 +185,17 @@ display label（南門、碼頭埠）. Panel node IDs use the canonical coordina
 `grid:<map>:<x>:<y>` grammar. These identities and labels serve separate roles;
 the settlement document owns the node and road set without a fixed panel-level count.
 
-## The `world_map` publisher and discovery narrative
+## The `world_map` publisher and movement narrative
 
 `world_map.py` filters every response using the requesting actor's current
-visited record. `world_map_geometry.py` caches common geography and static
-district geometry without any player state. Final payloads are never cached.
-Unlit districts carry a stable nonsemantic wire ID, `lit: false`, and their
-outline only. Lighting derives from exact canonical landmark membership.
+visited record and lit district set. `world_map_geometry.py` caches common
+geography and static district geometry without any player state. Final
+payloads are never cached. Unlit districts carry a stable nonsemantic wire ID,
+`lit: false`, and their outline only. The lit set comes from the completed-rite
+record (`world/rules/map_district_lighting.py`): a district is lit once the
+player has completed a rite at its landmark, and visiting the landmark alone
+lights nothing. `assemble_world_map` takes that set as its `lit` argument; the
+visited record supplies only visited places and the trail.
 Ordinary places appear in lit districts or after a visit; elven villages and
 dungeons always require an actual visit. Visited places also have an independent
 layer, so a hidden place remains represented before its district lights.
@@ -217,20 +221,21 @@ ties toward positive infinity and `approximate: true`. The wire marker whitelist
 contains no canonical node identity, exact-derived distance or bearing.
 
 Only explicit exit traversals opt into the shared committed movement narrative.
-The settlement captures pre-arrival landmark membership, invokes the unchanged
-knowledge writer through the existing completion helper, then confirms the
-exact destination node exists after settlement. The single movement message
-appends `已探明：<district>` on first arrival. Corrupt knowledge or a swallowed
-knowledge write failure cannot announce discovery. Delivery runs after commit;
-outer rollbacks discard it, and message-delivery failures log without compensating
-committed movement. Nested NPC relocations, direct teleports, reads and reconnects
-do not produce discovery.
+The settlement invokes the unchanged knowledge writer through the existing
+completion helper and sends the single movement line `你移動到了<room>。`. A
+movement announces nothing else: arriving at a landmark, first time or not,
+neither lights its district nor emits an exploration announcement or a
+discovery event, because only a completed rite lights a district. Delivery runs
+after commit; outer rollbacks discard it, and message-delivery failures log
+without compensating committed movement. Nested NPC relocations and direct
+teleports send no movement line.
 
-Knowledge confirmation reads the persisted Attribute value with a values query
-and reconciles its in-memory cache before using the unchanged parser. Evennia
-assigns a cached Attribute value before saving, so a second cached parse alone
-cannot establish persistence after a swallowed save failure. The world presenter
-uses the same read boundary and cannot light a district from that dirty cache.
+The world presenter reads knowledge through `persisted_visits`, which reads the
+persisted Attribute value with a values query and reconciles its in-memory
+cache before using the unchanged parser. Evennia assigns a cached Attribute
+value before saving, so a cached parse alone cannot establish persistence after
+a swallowed save failure; through this boundary a dirty cache never reaches the
+visited places or the trail. Lighting never reads knowledge at all.
 Missing instance origins are read directly from stored Attributes, avoiding the
 autocreating `origin_room` descriptor during a read-only request.
 
