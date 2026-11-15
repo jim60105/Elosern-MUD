@@ -2,7 +2,7 @@
 
 ## Context
 
-Design document: `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §6 and §11 (rule 5 governs the watch perspective). The shipped document is `world/lore/rites/content/landmark_rites.yaml` (`landmark-rite-content`): ten archetypes, two options each, every `watch` is `null`.
+Design document: `docs/superpowers/specs/2026-11-14-landmark-rites-design.md` §6 and §11 (rule 5 governs the watch perspective). When this change was authored, the shipped document was `world/lore/rites/content/landmark_rites.yaml` (`landmark-rite-content`): ten archetypes, two options each, every `watch` was `null`.
 
 Mechanisms already in place and not changed here:
 
