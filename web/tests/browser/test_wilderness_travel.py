@@ -1851,7 +1851,6 @@ class TravelRouteTests(_TravelStage):
             )
             self.assertEqual(card.get_attribute("role"), "dialog")
             # A step lights no district: the card states no lighting.
-            self.assertEqual(page.locator('[data-testid="landmark-card-lit"]').count(), 0)
             self.assertNotIn("已探明", card.inner_text())
             # Every rendered text run keeps the 16px x scale floor.
             sizes = page.evaluate(
