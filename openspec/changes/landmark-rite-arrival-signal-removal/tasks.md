@@ -5,12 +5,12 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `landmark-rite-lighting` is merged: `uv run --locked python -c "from world.rules.map_district_lighting import readable_lit_district_keys"` exits 0. If not, stop and report.
+- [x] 1.1 Confirm `landmark-rite-lighting` is merged: `uv run --locked python -c "from world.rules.map_district_lighting import readable_lit_district_keys"` exits 0. If not, stop and report.
 
 ## 2. Server
 
-- [ ] 2.1 Apply design D1 to `travel_interrupts.py` and update `world/rules/tests/test_travel_interrupts.py` per design D3. Verify: the test prefix with `world.rules.tests.test_travel_interrupts` passes.
-- [ ] 2.2 Apply design D1 to `travel_events.py` and `travel_log.py` and update `world/rules/tests/test_travel_events.py`, `web/webclient/presentation/tests/test_travel_log.py` and `web/webclient/presentation/tests/test_world_map.py` per design D3. Verify: the test prefix passes for each of the three labels (three commands).
+- [x] 2.1 Apply design D1 to `travel_interrupts.py` and update `world/rules/tests/test_travel_interrupts.py` per design D3. Verify: the test prefix with `world.rules.tests.test_travel_interrupts` passes.
+- [x] 2.2 Apply design D1 to `travel_events.py` and `travel_log.py` and update `world/rules/tests/test_travel_events.py`, `web/webclient/presentation/tests/test_travel_log.py` and `web/webclient/presentation/tests/test_world_map.py` per design D3. Verify: the test prefix passes for each of the three labels (three commands).
 
 ## 3. Browser
 

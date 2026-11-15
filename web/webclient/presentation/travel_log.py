@@ -42,7 +42,7 @@ PARAM_FIELDS: dict[str, frozenset[str]] = {
     "ford_crossed": frozenset({"name"}),
     "hostile_sighted": frozenset({"name", "count", "threat"}),
     "landmark_sighted": frozenset({"name", "bearing", "distance_km"}),
-    "landmark_reached": frozenset({"arrival_node", "name", "lit_district", "prose", "artwork"}),
+    "landmark_reached": frozenset({"arrival_node", "name", "prose", "artwork"}),
     "fatigue_stage": frozenset({"member_id", "name", "stage", "label"}),
     "dusk": frozenset(),
     "nightfall": frozenset(),
@@ -91,7 +91,6 @@ def _validate_params(kind: str, params: Any) -> None:
         if not isinstance(node, str) or len(node) > MAX_NODE_ID or not validate_node(node):
             raise ProtocolValidationError("arrival_node must be a canonical node id")
         _require_str(params, "name", maximum=MAX_NAME)
-        _optional_str(params, "lit_district")
         _require_str(params, "prose", maximum=MAX_PROSE)
         if params["artwork"] is not None:
             validate_artwork(params["artwork"])

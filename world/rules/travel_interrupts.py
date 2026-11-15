@@ -10,8 +10,11 @@ comparison.
 
 The flags are exactly the approved design's §7.3 table, in its stable order:
 
-``landmark_reached``, ``district_lit``, ``landmark_sighted``,
-``hostile_in_sight``, ``pace_threshold``, ``nightfall``, ``member_asleep``.
+``landmark_reached``, ``landmark_sighted``, ``hostile_in_sight``,
+``pace_threshold``, ``nightfall``, ``member_asleep``.
+
+A district lights only when its landmark rite completes, never on a movement
+step, so no flag reports district lighting.
 
 ``pace_threshold`` mirrors ``world.rules.travel_plan``'s first-legal-step
 stop: a member at or beyond the pace's stage after the step raises it, so a
@@ -44,7 +47,6 @@ from world.rules.travel_plan import (
 #: The approved stable output order (design §7.3).
 FLAG_ORDER: tuple[str, ...] = (
     "landmark_reached",
-    "district_lit",
     "landmark_sighted",
     "hostile_in_sight",
     "pace_threshold",
@@ -85,7 +87,6 @@ class MovementFacts:
     cell: tuple[int, int] | None
     tick: int
     landmarks: frozenset[str]
-    lit_districts: frozenset[str]
     distant_sources: frozenset[str]
     hostiles: frozenset[str]
     travellers: tuple[TravellerFact, ...]
@@ -214,21 +215,13 @@ def read_movement_facts(
     location: Any,
     *,
     cell: tuple[int, int] | None = None,
-    knowledge_owner: Any = None,
     members: Sequence[Any] | None = None,
 ) -> MovementFacts:
     """Capture one position's immutable interrupt facts.
 
-    ``knowledge_owner`` is the authorized ``PlayerCharacter`` knowledge owner
-    (the commander behind a possessed body); ``members`` freezes the traversing
-    cohort so the after capture can never reselect a different party. The lit
-    set is the owner's completed-rite record; an unreadable record degrades to
-    no lit district with one warning, so it can never fabricate a newly lit
-    district.
+    ``members`` freezes the traversing cohort so the after capture can never
+    reselect a different party.
     """
-    from world.rules.map_district_lighting import readable_lit_district_keys
-
-    owner = knowledge_owner if knowledge_owner is not None else actor
     if cell is None:
         cell = wilderness_cell(location)
     clock = read_world_clock()
@@ -262,7 +255,6 @@ def read_movement_facts(
         cell=cell,
         tick=tick,
         landmarks=landmarks,
-        lit_districts=readable_lit_district_keys(owner),
         distant_sources=distant_sources,
         hostiles=hostiles,
         travellers=_traveller_facts(members),
@@ -336,7 +328,6 @@ def movement_flags(
     """The ordered, duplicate-free interrupt flags of one committed step."""
     raised = {
         "landmark_reached": bool(after.landmarks),
-        "district_lit": bool(after.lit_districts - before.lit_districts),
         "landmark_sighted": bool(after.distant_sources - before.distant_sources),
         "hostile_in_sight": bool(after.hostiles - before.hostiles),
         "pace_threshold": pace_threshold_reached(before, after, _walk_pace(walk)),

@@ -560,7 +560,6 @@ class WildernessPopulationViewTests(EvenniaTest):
             cell=self.cell,
             tick=0,
             landmarks=frozenset(),
-            lit_districts=frozenset(),
             distant_sources=frozenset(),
             hostiles=frozenset(),
             travellers=(),

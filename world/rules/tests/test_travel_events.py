@@ -39,7 +39,6 @@ def _capture(**overrides):
         "woodland": False,
         "ford": False,
         "landmarks": (),
-        "lit_districts": frozenset(),
         "hostiles": (),
         "travellers": (TravellerRow("7", "伊蓮", "normal", "精神充沛"),),
     }
@@ -76,21 +75,32 @@ class BuildTravelEventsTests(unittest.TestCase):
         # A skip on a ford cell crosses nothing.
         self.assertEqual(build_travel_events(_capture(ford=True), _capture(ford=True), "skip"), ())
 
-    def test_landmark_arrival_lights_only_when_newly_lit(self):
+    def test_landmark_arrival_carries_exactly_four_fields_and_no_lighting(self):
         """A declaration carries no prose field: the notice's prose is the
-        reached room's ordinary appearance handed in by the owner."""
-        after = _capture(landmarks=(("d_tower", "合成塔"),), lit_districts=frozenset({"d_tower"}))
+        reached room's ordinary appearance handed in by the owner. A step
+        never lights a district, so the notice and its text name only the
+        arrival, on a first and on a repeat visit alike."""
+        after = _capture(landmarks=(("d_tower", "合成塔"),))
         first = build_travel_events(
             _capture(), after, "move", landmark_prose="塔下風大。", arrival_node=NODE
         )
-        self.assertEqual(_kinds(first), ["landmark_reached"])
-        self.assertEqual(
-            dict(first[0].params),
-            {"arrival_node": NODE, "name": "合成塔", "lit_district": "合成塔", "prose": "塔下風大。", "artwork": None},
-        )
         repeat = build_travel_events(after, after, "move", landmark_prose="塔下風大。", arrival_node=NODE)
-        self.assertEqual(_kinds(repeat), ["landmark_reached"])
-        self.assertIsNone(repeat[0].params["lit_district"])
+        for drafts in (first, repeat):
+            self.assertEqual(_kinds(drafts), ["landmark_reached"])
+            self.assertEqual(
+                dict(drafts[0].params),
+                {"arrival_node": NODE, "name": "合成塔", "prose": "塔下風大。", "artwork": None},
+            )
+            self.assertEqual(drafts[0].text, "抵達合成塔。")
+            self.assertEqual(drafts[0].text.count("合成塔"), 1)
+
+    def test_a_capture_carries_no_lit_district_set(self):
+        """The comparison reads only the capture, and the capture holds no
+        lighting fact, so a completed rite for the reached district cannot
+        change the arrival notice."""
+        from dataclasses import fields
+
+        self.assertNotIn("lit_districts", {field.name for field in fields(TravelCapture)})
 
     def test_new_hostiles_group_by_label_threat_and_count(self):
         after = _capture(
@@ -371,7 +381,7 @@ class ProducerHookTests(TestCase):
         actor = mock.Mock(pk=5, location=location)
         actor.at_look.return_value = "塔前石階。"
         before = _capture()
-        after = _capture(cell=(12, 34), landmarks=(("d_tower", "合成塔"),), lit_districts=frozenset({"d_tower"}))
+        after = _capture(cell=(12, 34), landmarks=(("d_tower", "合成塔"),))
         clock = SimpleNamespace(tick=after.tick)
         with self.captureOnCommitCallbacks(execute=True), \
                 mock.patch.object(travel_events, "_wilderness_cell", return_value=(12, 34)), \
@@ -388,7 +398,7 @@ class ProducerHookTests(TestCase):
         self.assertEqual(reached.kind, "landmark_reached")
         self.assertEqual(reached.params["prose"], "塔前石階。")
         self.assertEqual(reached.params["arrival_node"], NODE)
-        self.assertEqual(reached.params["lit_district"], "合成塔")
+        self.assertNotIn("lit_district", reached.params)
 
     def _landmark_step(self):
         actor = mock.Mock(pk=5, location=object())

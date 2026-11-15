@@ -5,9 +5,9 @@ and a successful room look are the only places a travel notice may be produced.
 This module is their narrow, read-only helper:
 
 - :func:`capture_travel_facts` copies the primitive facts of one position
-  (region, woodland, ford, landmarks, lit districts, the live-sight hostile
-  observations, the visible distant sources and the travelling party's
-  fatigue rows) into an immutable :class:`TravelCapture`. Sightings are read
+  (region, woodland, ford, landmarks, the live-sight hostile observations,
+  the visible distant sources and the travelling party's fatigue rows) into
+  an immutable :class:`TravelCapture`. Sightings are read
   from the same canonical sight and population functions the area map and
   the interrupts consume (wilderness-travel-window-ui); their internal
   observation and source identities stay inside the capture.
@@ -161,7 +161,6 @@ class TravelCapture:
     woodland: bool = False
     ford: bool = False
     landmarks: tuple[tuple[str, str], ...] = ()
-    lit_districts: frozenset[str] = frozenset()
     hostiles: tuple[tuple[str, str, str | None], ...] = ()
     distant: tuple[tuple[str, str, int, str | None], ...] = ()
     travellers: tuple[TravellerRow, ...] = ()
@@ -215,9 +214,7 @@ _TEMPLATES: dict[str, Callable[[Mapping[str, Any]], str]] = {
         f"望見{p['bearing']}方約 {p['distance_km']} 公里處的"
         f"{p['name'] if p['name'] else '地標'}。"
     ),
-    "landmark_reached": lambda p: (
-        f"抵達{p['name']}。" + (f"{p['lit_district']}已探明。" if p["lit_district"] else "")
-    ),
+    "landmark_reached": lambda p: f"抵達{p['name']}。",
     "fatigue_stage": lambda p: f"{p['name']}：{p['label']}。",
     "dusk": lambda p: "暮色降臨。",
     "nightfall": lambda p: "入夜了。",
@@ -304,8 +301,7 @@ def build_travel_events(
             drafts.append(
                 _draft("ford_crossed", {"name": _bounded_name(after.region_name or "")}, tick)
             )
-        newly_lit = after.lit_districts - (before.lit_districts if before is not None else after.lit_districts)
-        for key, name in after.landmarks:
+        for _key, name in after.landmarks:
             if arrival_node is None:
                 break
             drafts.append(
@@ -314,7 +310,6 @@ def build_travel_events(
                     {
                         "arrival_node": arrival_node,
                         "name": _bounded_name(name),
-                        "lit_district": _bounded_name(name) if key in newly_lit else None,
                         "prose": _bounded_prose(landmark_prose),
                         "artwork": landmark_artwork,
                     },
@@ -560,6 +555,8 @@ def _capture(actor, location, knowledge_owner, members, read_world_clock):
     region = regions().get(region_key)
     fords = wilderness_provider.terrain_definition().waterway_fords
     owner = knowledge_owner if knowledge_owner is not None else actor
+    # The owner's lit districts only name a visible distant source; a step
+    # never lights a district, so the capture carries no lit set.
     lit = readable_lit_district_keys(owner)
     calendar = None if clock is None else clock.calendar
     return TravelCapture(
@@ -570,7 +567,6 @@ def _capture(actor, location, knowledge_owner, members, read_world_clock):
         woodland=wilderness_provider.sight_terrain_class(cell) == "woodland",
         ford=any(tuple(cell) in {tuple(c) for c in cells} for cells in fords.values()),
         landmarks=_landmarks_at(cell),
-        lit_districts=lit,
         hostiles=() if calendar is None else _hostiles_in_sight(location, cell, calendar, owner),
         distant=() if calendar is None else _distant_in_sight(cell, calendar, lit),
         travellers=travellers,

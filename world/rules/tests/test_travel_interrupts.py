@@ -10,6 +10,7 @@ lives with the adapter tests that drive a real traversal.
 from __future__ import annotations
 
 import unittest
+from dataclasses import fields
 from types import SimpleNamespace
 from unittest import mock
 
@@ -42,7 +43,6 @@ def _facts(
     cell=(5, 5),
     tick=0,
     landmarks=(),
-    lit=(),
     distant=(),
     hostiles=(),
     travellers=(),
@@ -51,7 +51,6 @@ def _facts(
         cell=cell,
         tick=tick,
         landmarks=frozenset(landmarks),
-        lit_districts=frozenset(lit),
         distant_sources=frozenset(distant),
         hostiles=frozenset(hostiles),
         travellers=tuple(travellers),
@@ -90,11 +89,6 @@ class TransitionTableTests(unittest.TestCase):
             "landmark_reached": (
                 _facts(cell=(5, 5)),
                 _facts(cell=(5, 6), landmarks={"synthetic_district"}),
-                None,
-            ),
-            "district_lit": (
-                _facts(lit=()),
-                _facts(cell=(5, 6), lit={"synthetic_district"}),
                 None,
             ),
             "landmark_sighted": (
@@ -144,7 +138,6 @@ class TransitionTableTests(unittest.TestCase):
         night = _night_start_tick()
         before = _facts(
             tick=night - 1,
-            lit={"old"},
             travellers=(
                 _traveller(member_id=1, stage=FatigueStage.NORMAL),
                 _traveller(member_id=2, asleep=False),
@@ -154,7 +147,6 @@ class TransitionTableTests(unittest.TestCase):
             cell=(6, 6),
             tick=night,
             landmarks={"synthetic_district"},
-            lit={"old", "new"},
             distant={"landmark:synthetic_source"},
             hostiles={"object:9001"},
             travellers=(
@@ -167,10 +159,15 @@ class TransitionTableTests(unittest.TestCase):
             FLAG_ORDER,
         )
 
-    def test_a_district_already_lit_before_the_step_does_not_rerase_it(self):
-        before = _facts(lit={"synthetic_district"})
-        after = _facts(cell=(5, 6), lit={"synthetic_district"})
-        self.assertNotIn("district_lit", movement_flags(before, after))
+    def test_a_landmark_step_raises_no_lighting_flag(self):
+        # A district lights only when its rite completes, never on a step:
+        # reaching a landmark raises exactly the arrival flag, and the
+        # vocabulary carries no lighting flag at all.
+        before = _facts(cell=(5, 5))
+        after = _facts(cell=(5, 6), landmarks={"synthetic_district"})
+        self.assertEqual(movement_flags(before, after), ("landmark_reached",))
+        self.assertNotIn("district_lit", FLAG_ORDER)
+        self.assertNotIn("lit_districts", {field.name for field in fields(MovementFacts)})
 
     def test_a_known_distant_source_does_not_rerase_the_sighting(self):
         before = _facts(distant={"landmark:synthetic_source"})
