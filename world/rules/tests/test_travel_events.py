@@ -95,9 +95,8 @@ class BuildTravelEventsTests(unittest.TestCase):
             self.assertEqual(drafts[0].text.count("合成塔"), 1)
 
     def test_a_capture_carries_no_lit_district_set(self):
-        """The comparison reads only the capture, and the capture holds no
-        lighting fact, so a completed rite for the reached district cannot
-        change the arrival notice."""
+        """The capture, the comparison's only input, holds no lighting fact
+        (the arrival notice itself is pinned by the exact-params test)."""
         from dataclasses import fields
 
         self.assertNotIn("lit_districts", {field.name for field in fields(TravelCapture)})

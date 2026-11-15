@@ -139,8 +139,9 @@ success `data` field:
 The list is ordered and duplicate-free: `landmark_reached`,
 `landmark_sighted`, `hostile_in_sight`, `pace_threshold`, `nightfall`,
 `member_asleep`. An empty list is legal. A district lights only when its
-landmark rite completes, never on a step, so no flag reports lighting. The flags compare immutable facts of
-the committed step (`world/rules/travel_interrupts.py`):
+landmark rite completes, never on a step, so no flag reports lighting. The
+flags compare immutable facts of the committed step
+(`world/rules/travel_interrupts.py`):
 
 - `landmark_reached` -- the party stands on a district's exact canonical
   landmark cell (a repeat visit still raises it).

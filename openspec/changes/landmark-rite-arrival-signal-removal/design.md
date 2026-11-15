@@ -61,5 +61,4 @@ Update, do not delete, the tests that named the signals:
 ## Risks / Trade-offs
 
 - Deploy skew: both validators match fields exactly, so a browser still running a bundle from before this change rejects a four-field `landmark_reached` record (and the reverse) until the page reloads. Travel notices are never persisted, so only that short window is affected; it is accepted rather than covered by a version bump or shim.
-
 - A wire change without a version change: a stale local `dist` hides a mistake in the browser mirror. Run `pnpm run build` before any browser test.
