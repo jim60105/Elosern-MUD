@@ -473,10 +473,27 @@ class ReconnectTest(BrowserAcceptanceTest):
                     # The scene full-view control sits under the stage anchor
                     # (its center point resolves to `div.stage-anchor`), so a
                     # plain pointer click times out; dispatch the DOM click
-                    # that drives the component's `@click` handler.
-                    page.evaluate(
-                        '() => document.querySelector(\'[data-testid="scene-backdrop-control"]\').click()'
+                    # that drives the component's `@click` handler. The
+                    # control mounts only once the art panel's committed scene
+                    # has loaded and is presented, so gate on the committed
+                    # scene and the control's presence, then click through the
+                    # locator that resolved it: a separate `querySelector`
+                    # could find it gone between two round-trips.
+                    wait_for_store_state(
+                        page,
+                        lambda state: bool(
+                            ((state.get("panels") or {}).get("art") or {}).get("scene")
+                        ),
+                        {
+                            "selector": open_selector,
+                            "predicate": (
+                                '() => !!document.querySelector(\'[data-testid="scene-backdrop-control"]\')'
+                            ),
+                            "description": "scene full-view control on a committed scene",
+                        },
+                        timeout=30000,
                     )
+                    page.locator(open_selector).evaluate("(el) => el.click()")
                 else:
                     page.click(open_selector, timeout=15000)
                 page.wait_for_selector(open_wait, timeout=15000)
