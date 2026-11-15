@@ -20,8 +20,8 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 4. Documentation and gates
 
-- [ ] 4.1 Apply design D4. Verify: `grep -rnE "district_lit|\blit_district\b|\blitDistrict\b" --include=*.py --include=*.js --include=*.vue --include=*.md --include=*.json . --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.worktrees --exclude-dir=archive --exclude-dir=superpowers --exclude-dir=design --exclude-dir=.storybook-out` prints only lines under `openspec/changes/landmark-rite-`.
-- [ ] 4.2 Run `pnpm run build-storybook` then `pnpm run showcase-coverage`, `uv run --locked python -m unittest tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change landmark-rite-arrival-signal-removal` and `openspec validate landmark-rite-arrival-signal-removal --strict`. Verify: all exit 0.
+- [x] 4.1 Apply design D4. Verify: `grep -rnE "district_lit|\blit_district\b|\blitDistrict\b" --include=*.py --include=*.js --include=*.vue --include=*.md --include=*.json . --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.worktrees --exclude-dir=archive --exclude-dir=superpowers --exclude-dir=design --exclude-dir=.storybook-out` prints only lines under `openspec/changes/landmark-rite-`, apart from the design D3 negative tests that name the stale flag or field to assert its rejection or absence.
+- [x] 4.2 Run `pnpm run build-storybook` then `pnpm run showcase-coverage`, `uv run --locked python -m unittest tests.test_webclient_frozen_contract`, `uv run --locked python -m tools.contract_gate --change landmark-rite-arrival-signal-removal` and `openspec validate landmark-rite-arrival-signal-removal --strict`. Verify: all exit 0.
 
 ## Workflow follow-up
 

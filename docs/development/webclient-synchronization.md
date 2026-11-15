@@ -239,7 +239,7 @@ the same ids.
 
 | Source | Owner seam | Notices |
 |---|---|---|
-| Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; `lit_district` only when this arrival lit it; prose is the reached room's ordinary appearance, art its scene descriptor), `dusk` / `nightfall` (each phase entry inside the charged step), `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
+| Settled wilderness step (exit traversal or gate entry) | `movement_settlement.settle_movement` | `region_entered` (region identity changed), `woodland_entered` (woodland entered from outside it), `ford_crossed` (the reached cell is a ford), `landmark_reached` (the reached cell is a district's exact landmark; prose is the reached room's ordinary appearance, art its scene descriptor), `dusk` / `nightfall` (each phase entry inside the charged step), `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
 | Positive explicit wait/rest and each sleep interval | `time_skip.advance_wait`, `time_skip.continue_sleep` | `dusk` / `nightfall`, `hostile_sighted`, `landmark_sighted`, `fatigue_stage` |
 | Successful wilderness room look | `explore.look {room}` adapter and the bare `看` command | `look` (one-line summary; the full appearance in `prose` and in the ordinary narration) |
 | No producer yet | camping | `camp_result` (consumer contract only) |
@@ -288,16 +288,16 @@ zh-TW line (non-blank, at most 1,024). The closed union:
 | `region_entered`, `woodland_entered`, `ford_crossed` | `{name}` |
 | `hostile_sighted` | `{name, count, threat}` |
 | `landmark_sighted` | `{name, bearing, distance_km}` |
-| `landmark_reached` | `{arrival_node, name, lit_district, prose, artwork}` |
+| `landmark_reached` | `{arrival_node, name, prose, artwork}` |
 | `fatigue_stage` | `{member_id, name, stage, label}` |
 | `dusk`, `nightfall` | `{}` |
 | `camp_result` | `{summary}` |
 | `look` | `{prose}` |
 
 Names, labels, bearing and summary are at most 256 code points; `name` is
-nullable only for `landmark_sighted`, `threat` and `lit_district` are
-nullable. `count` is a positive and `distance_km` a non-negative safe integer;
-`member_id` is opaque ASCII (at most 64), `stage` a canonical fatigue stage,
+nullable only for `landmark_sighted`, and `threat` is nullable. `count` is a
+positive and `distance_km` a non-negative safe integer; `member_id` is opaque
+ASCII (at most 64), `stage` a canonical fatigue stage,
 `prose` at most 2,048 code points (the protocol's global string bound),
 `artwork` the validated descriptor or `null`, and `arrival_node` a canonical
 node id (at most 128). Both validators reject extra kind-specific fields; a

@@ -329,8 +329,8 @@ dream or creation surface owns the stage. There is no server travel mode.
   change forgets it, and while it is held a walk stops and a replan waits.
   `components/travel/LandmarkCard.vue` renders it in the `choices` anchor
   after the sleep-handoff cards (ArtworkPreview in a 16:6 frame, or a short
-  header band without a descriptor; `◆ <district>已探明` only when lit; the
-  shared focus trap; 繼續/Enter/Esc close once through
+  header band without a descriptor; no lighting row, since a step never lights
+  a district; the shared focus trap; 繼續/Enter/Esc close once through
   `store.dismissTravelArrival(id)` and AppClient returns focus to the map).
 - Landmark rites: `components/rite/` holds the three rite surfaces, each a
   passive reader of the committed `rite` panel (`rite-model.js` derives the

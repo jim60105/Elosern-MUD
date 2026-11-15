@@ -133,17 +133,17 @@ A successful **wilderness** step (`wild:` destination node) carries one extra
 success `data` field:
 
 ```json
-{"interrupts": ["landmark_reached", "district_lit", "landmark_sighted"]}
+{"interrupts": ["landmark_reached", "landmark_sighted"]}
 ```
 
-The list is ordered and duplicate-free: `landmark_reached`, `district_lit`,
+The list is ordered and duplicate-free: `landmark_reached`,
 `landmark_sighted`, `hostile_in_sight`, `pace_threshold`, `nightfall`,
-`member_asleep`. An empty list is legal. The flags compare immutable facts of
+`member_asleep`. An empty list is legal. A district lights only when its
+landmark rite completes, never on a step, so no flag reports lighting. The flags compare immutable facts of
 the committed step (`world/rules/travel_interrupts.py`):
 
 - `landmark_reached` -- the party stands on a district's exact canonical
   landmark cell (a repeat visit still raises it).
-- `district_lit` -- the lit-district set grew across the step.
 - `landmark_sighted` -- a distant sight source's internal key is visible after
   the step and was not visible before it.
 - `hostile_in_sight` -- a live hostile population-view observation key entered
