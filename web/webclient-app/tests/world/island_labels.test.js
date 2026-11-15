@@ -76,7 +76,7 @@ describe("island label candidates", () => {
     // the current label then avoids both markers and the exit's label.
     const requests = [
       request("ctx", "context", 185, 175, "後巷"),
-      request("cur", "current", 120, 120, "中央廣場", { avoid: [180] }),
+      request("cur", "current", 120, 120, "測試廣場", { avoid: [180] }),
       request("ex", "exit", 120, 160, "南大道"),
     ];
     const obstacles = [

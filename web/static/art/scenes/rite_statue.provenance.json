@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_statue",
+  "label_zh": "鹿影石雕",
+  "scene_sentence_zh": "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出長長的影子。",
+  "asset": "web/static/art/scenes/rite_statue.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 205616,
+    "sha256": "ea9bee3d1c6a00b7e2c486d38b91ac4958207001658c4f39df48c90a87542623"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003418,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a weathered white marble stag statue upon a low circular plinth in a windswept meadow, one antler broken, lichen gathered in the carved fur, tall dry grass bending around the base, late afternoon sun raking from the left across pale stone, a scattered ring of flat stones in the open grass below",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG windswept meadow with a weathered white marble stag statue on a low circular plinth, one antler broken, lichen in the carved fur, dry golden grass bending around the base and a scattered ring of flat stones. No figure, no creature, no readable lettering; the statue dominates the upper half over open grass.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the stag keeps the upper band and the open grass ring stays clear across the lower foreground.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

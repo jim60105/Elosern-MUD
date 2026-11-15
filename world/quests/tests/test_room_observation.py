@@ -28,7 +28,7 @@ from world.quests.definitions import (
     QuestType,
 )
 from world.quests.room_observation import QuestObservableRoomMixin
-from world.maps.static_references import settlement_node_xyz
+from world.maps.static_references import anchor_entrance_xyz, settlement_node_xyz
 from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
 from world.tests.geography_fixture import (
     sync_test_settlements,
@@ -216,7 +216,11 @@ class RoomArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, Evennia
         self.player.location = self.room1
 
     def _anchor(self) -> AnchorRoom:
-        room = AnchorRoom.objects.filter(db_key="中央廣場").first()
+        # The sole placement row supplies the anchor's entrance cell, so this
+        # lookup names no shipped place key.
+        room = GridRoom.objects.filter_xyz(
+            xyz=anchor_entrance_xyz(live_anchor_placement_row())
+        ).first()
         self.assertIsInstance(room, AnchorRoom)
         return room
 
@@ -480,7 +484,9 @@ class PartyArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, Evenni
         self.player.location = self.room1
 
     def _anchor(self) -> AnchorRoom:
-        room = AnchorRoom.objects.filter(db_key="中央廣場").first()
+        room = GridRoom.objects.filter_xyz(
+            xyz=anchor_entrance_xyz(live_anchor_placement_row())
+        ).first()
         self.assertIsInstance(room, AnchorRoom)
         return room
 

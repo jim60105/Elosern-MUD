@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_spring",
+  "label_zh": "泉之石龕",
+  "scene_sentence_zh": "苔蘚覆滿的泉池上緣開著一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
+  "asset": "web/static/art/scenes/rite_spring.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 199058,
+    "sha256": "498bdd1e428643f9240c345984d1151a4b276c078d28272632cccc58a170af46"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003417,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a low carved stone niche above a mossy spring basin, still black water brimming to the stone lip, ferns and pale moss covering wet granite blocks, cool morning light through the canopy glinting on the water, a single tarnished bronze cup on the stone rim, open gravel across the lower foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG spring shrine: a carved stone niche over a dark still basin ringed by worn sandstone columns and urns, ferns and moss on the wet granite, a small bronze bowl on the rim, an open gravel and stone apron across the lower foreground. No figure, no creature, no readable lettering; the landmark object sits in the upper half with the open pool and apron below.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the niche and columns keep the upper band while the lower apron stays unobstructed for stage figures, and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

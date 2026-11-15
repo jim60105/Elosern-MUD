@@ -77,7 +77,7 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 )
 
 # The closed tracked-art exception for the bundled scene collection
-# (unified-scenes-outdoor-art): exactly these eleven committed scene
+# (unified-scenes-outdoor-art): exactly these twenty-one committed scene
 # illustrations may ever be tracked under web/static/art/scenes/, and nothing
 # else in that directory. Like APPROVED_NON_RUNTIME_IMAGES above, each path
 # joins this exact set deliberately, in review, never by directory prefix.
@@ -86,7 +86,7 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 # here need not exist yet — the list is an allowlist, not a coverage claim.
 # This pack asserts its own three actual files in
 # ``test_the_owned_bundled_scene_pack_is_tracked``; the complete
-# eleven-key inventory is asserted by the scene catalog that now resolves
+# twenty-one-key inventory is asserted by the scene catalog that now resolves
 # these keys (``world.art.tests.test_bundled_scenes``), which fails if the
 # committed directory ever holds fewer or more files than the declarations.
 TRACKED_SCENE_ART_PATHS = frozenset(
@@ -101,6 +101,16 @@ TRACKED_SCENE_ART_PATHS = frozenset(
         "web/static/art/scenes/coastal_path.webp",
         "web/static/art/scenes/cave_interior.webp",
         "web/static/art/scenes/shrine_interior.webp",
+        "web/static/art/scenes/rite_spring.webp",
+        "web/static/art/scenes/rite_statue.webp",
+        "web/static/art/scenes/rite_megalith.webp",
+        "web/static/art/scenes/rite_tower.webp",
+        "web/static/art/scenes/rite_tree.webp",
+        "web/static/art/scenes/rite_grave.webp",
+        "web/static/art/scenes/rite_mine.webp",
+        "web/static/art/scenes/rite_gate.webp",
+        "web/static/art/scenes/rite_cliff.webp",
+        "web/static/art/scenes/rite_plaza.webp",
         "web/static/art/scenes/dream_throne.webp",
     }
 )

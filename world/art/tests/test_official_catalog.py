@@ -1002,9 +1002,9 @@ class BundledCollectionPublishTests(_CatalogCase):
         self.assertEqual(summary["images"], 1)
         context = self.boundary()
         self.assertEqual(context["reason"], "official_root_indexed")
-        self.assertEqual(len(current_bundled_scenes()), 11)
+        self.assertEqual(len(current_bundled_scenes()), 21)
         self.assertEqual(bundled_info.call_args.args[0], BUNDLED_SCENE_CATALOG_EVENT)
-        self.assertEqual(bundled_info.call_args.kwargs["context"]["images"], 11)
+        self.assertEqual(bundled_info.call_args.kwargs["context"]["images"], 21)
         for identity in current_catalog().identities():
             self.assertFalse(identity.startswith("bundled-scene/"))
         for identity in current_bundled_scenes().identities():
@@ -1020,7 +1020,7 @@ class BundledCollectionPublishTests(_CatalogCase):
             summary = self.load()
         self.assertTrue(summary["skipped"])
         self.assertEqual(len(current_catalog()), 0)
-        self.assertEqual(len(current_bundled_scenes()), 11)
+        self.assertEqual(len(current_bundled_scenes()), 21)
 
 
 class StartupWiringTests(unittest.TestCase):

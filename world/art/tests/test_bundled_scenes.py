@@ -1,12 +1,13 @@
 """Data-contract test: bundled scene-art registry, collection and media identity contract
 
-The ``unified-scene-catalog`` change declares the closed eleven-key scene-art
+The ``unified-scene-catalog`` change declares the closed scene-art
 registry (``world/art/scene_definitions.py``) over the ACTUAL committed
 collection under ``web/static/art/scenes``, which four prerequisite artwork
-packs delivered. This module is that registry's data contract: it proves the
+packs delivered, and ``landmark-rite-art`` extended with the ten rite scenes.
+This module is that registry's data contract: it proves the
 declarations cover the registered archetypes plus the explicit dream scene, the
 declared terminal table is the approved one, the committed directory holds
-exactly the eleven declared illustrations (each decoding, bounded, full-bleed
+exactly the declared illustrations (each decoding, bounded, full-bleed
 16:9 and distinct, with a provenance sidecar whose checksum is the shipped
 bytes), and the STARTUP ADMISSION publishes exactly those declared keys under
 ``bundled-scene/<key>/<sha256>.webp`` identities from the fixed repository root.
@@ -69,6 +70,16 @@ DECLARED_TERMINALS = {
     "coastal_path": "forest_path",
     "cave_interior": "forest_path",
     "shrine_interior": "city_street",
+    "rite_spring": "forest_path",
+    "rite_statue": "forest_path",
+    "rite_megalith": "forest_path",
+    "rite_tower": "forest_path",
+    "rite_tree": "forest_path",
+    "rite_grave": "forest_path",
+    "rite_mine": "forest_path",
+    "rite_gate": "forest_path",
+    "rite_cliff": "forest_path",
+    "rite_plaza": "city_street",
     DREAM_SCENE_KEY: "city_street",
 }
 
@@ -111,9 +122,9 @@ class AuthoredRegistryTests(unittest.TestCase):
         registered = tuple(SCENE_ARCHETYPE_REGISTRY)
         self.assertEqual(SCENE_ART_KEYS, registered + (DREAM_SCENE_KEY,))
         self.assertNotIn(DREAM_SCENE_KEY, registered)
-        self.assertEqual(len(SCENE_ART_KEYS), 11)
+        self.assertEqual(len(SCENE_ART_KEYS), 21)
         self.assertEqual(
-            len(set(SCENE_ART_KEYS)), 11, "a declaration may not repeat a scene key"
+            len(set(SCENE_ART_KEYS)), 21, "a declaration may not repeat a scene key"
         )
 
     @covers_requirement(
@@ -169,7 +180,7 @@ class AuthoredRegistryTests(unittest.TestCase):
 
 
 class CommittedCollectionTests(unittest.TestCase):
-    """The ACTUAL shipped eleven files, their sidecars and their uniqueness."""
+    """The ACTUAL shipped twenty-one files, their sidecars and their uniqueness."""
 
     @covers_requirement(
         "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
@@ -186,7 +197,7 @@ class CommittedCollectionTests(unittest.TestCase):
 
         The complete-collection gate the tracked-art exception defers to the
         scene catalog: the committed ``web/static/art/scenes/`` directory holds
-        exactly the eleven declared illustrations and their sidecars — the
+        exactly the twenty-one declared illustrations and their sidecars — the
         closed set the exception names — and nothing else.
         """
         names = sorted(path.name for path in SCENES_DIRECTORY.iterdir())
@@ -200,7 +211,7 @@ class CommittedCollectionTests(unittest.TestCase):
         "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
     )
     def test_every_required_image_is_bounded_full_bleed_and_distinct(self):
-        """Eleven distinct committed illustrations, none over the file bound."""
+        """Twenty-one distinct committed illustrations, none over the file bound."""
         from PIL import Image
 
         digests: dict[str, str] = {}
@@ -221,7 +232,7 @@ class CommittedCollectionTests(unittest.TestCase):
         self.assertEqual(
             len(set(digests.values())),
             len(SCENE_ART_KEYS),
-            "the eleven bundled scenes must be eleven distinct images, never one "
+            "the twenty-one bundled scenes must be twenty-one distinct images, never one "
             "file committed under several names",
         )
 
@@ -293,7 +304,9 @@ class BrokenCoverageTests(unittest.TestCase):
         # Every scene whose declared terminal is the removed key is reported
         # alongside the removed declaration itself.
         self.assertIn("city_street: no scene-art definition", problems)
-        for key in ("tavern_interior", "shrine_interior", DREAM_SCENE_KEY):
+        for key in (
+            "tavern_interior", "shrine_interior", "rite_plaza", DREAM_SCENE_KEY
+        ):
             with self.subTest(key=key):
                 self.assertIn(
                     f"{key}: terminal 'city_street' has no required image", problems
@@ -405,16 +418,16 @@ class BundledAdmissionTests(unittest.TestCase):
         with patch.object(scene_definitions, "log_info") as logged:
             summary = load_bundled_scene_catalog()
         snapshot = current_bundled_scenes()
-        self.assertEqual(summary["definitions"], 11)
-        self.assertEqual(summary["images"], 11)
+        self.assertEqual(summary["definitions"], 21)
+        self.assertEqual(summary["images"], 21)
         self.assertEqual(summary["refused"], 0)
         self.assertEqual(summary["reason"], "bundled_root_indexed")
         self.assertFalse(summary["skipped"])
-        self.assertEqual(len(snapshot), 11)
+        self.assertEqual(len(snapshot), 21)
         self.assertEqual(
             logged.call_args.args[0], BUNDLED_SCENE_CATALOG_EVENT
         )
-        self.assertEqual(logged.call_args.kwargs["context"]["images"], 11)
+        self.assertEqual(logged.call_args.kwargs["context"]["images"], 21)
         for key in SCENE_ART_KEYS:
             with self.subTest(key=key):
                 payload = (SCENES_DIRECTORY / bundled_asset_filename(key)).read_bytes()
@@ -432,7 +445,7 @@ class BundledAdmissionTests(unittest.TestCase):
                     f"{BUNDLED_SCENE_MEDIA_PREFIX}{key}/{fingerprint}{BUNDLED_SCENE_EXTENSION}",
                 )
         self.assertEqual(
-            len(snapshot.identities()), 11, "identities are unique per scene key"
+            len(snapshot.identities()), 21, "identities are unique per scene key"
         )
 
     @covers_requirement(
@@ -463,12 +476,12 @@ class BundledAdmissionTests(unittest.TestCase):
                     summary = load_bundled_scene_catalog()
                 snapshot = current_bundled_scenes()
             self.assertEqual(summary["images"], 1)
-            self.assertEqual(summary["refused"], 10)
+            self.assertEqual(summary["refused"], len(SCENE_ART_KEYS) - 1)
             self.assertEqual(len(snapshot), 1)
             self.assertTrue(snapshot.admits("forest_path", _digest(planted)))
             self.assertIsNone(snapshot.entry("city_street"))
             reasons = [call.kwargs["context"]["reason"] for call in warned.call_args_list]
-            self.assertEqual(reasons, ["image_missing"] * 10)
+            self.assertEqual(reasons, ["image_missing"] * (len(SCENE_ART_KEYS) - 1))
 
     def test_a_corrupt_file_is_refused_without_blocking_its_siblings(self):
         with tempfile.TemporaryDirectory() as scratch:
@@ -484,7 +497,7 @@ class BundledAdmissionTests(unittest.TestCase):
                 summary = load_bundled_scene_catalog()
             snapshot = current_bundled_scenes()
             self.assertEqual(summary["images"], 1)
-            self.assertEqual(summary["refused"], 10)
+            self.assertEqual(summary["refused"], len(SCENE_ART_KEYS) - 1)
             self.assertTrue(snapshot.admits("city_street", _digest(
                 scenes / bundled_asset_filename("city_street")
             )))
@@ -525,7 +538,7 @@ class BundledAdmissionTests(unittest.TestCase):
             with patch.object(scene_definitions, "log_warn") as warned:
                 summary = load_bundled_scene_catalog()
         self.assertEqual(summary["refused"], 1)
-        self.assertEqual(summary["images"], 11)
+        self.assertEqual(summary["images"], 21)
         self.assertEqual(summary["diagnostics"], 1)
         self.assertEqual(warned.call_count, 1)
         context = warned.call_args.kwargs["context"]
@@ -535,7 +548,7 @@ class BundledAdmissionTests(unittest.TestCase):
 
     def test_the_reset_drops_every_admission(self):
         load_bundled_scene_catalog()
-        self.assertEqual(len(current_bundled_scenes()), 11)
+        self.assertEqual(len(current_bundled_scenes()), 21)
         reset_bundled_scenes()
         self.assertEqual(len(current_bundled_scenes()), 0)
         self.assertIsNone(current_bundled_scenes().entry("forest_path"))

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_gate",
+  "label_zh": "赤岩拱門",
+  "scene_sentence_zh": "赤色砂岩的巨大拱門橫跨乾燥隘口，正午的強光把門內的通道照得發白。",
+  "asset": "web/static/art/scenes/rite_gate.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 151872,
+    "sha256": "2fee43f6007265867bd5d0d918a8c1c7026f884f7b4c08ea066dfdfb11986556"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003424,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a towering natural arch of banded red sandstone spanning a dry pass, wind-polished curves and dusty ledges, hard noon light and a hot haze at the horizon, a bare trodden track running straight through the opening and open gravel on this side of it",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG natural arch of banded red sandstone spanning a dry pass, wind-polished curves and dusty ledges, noon haze at the horizon and a trodden track running straight through the opening over open gravel. No figure, no creature, no readable lettering; the arch frames the upper two thirds over the open approach.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the arch and its sky opening keep the upper band while the track and gravel stay clear below.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

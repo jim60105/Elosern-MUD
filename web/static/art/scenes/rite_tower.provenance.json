@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_tower",
+  "label_zh": "霧鐘石塔",
+  "scene_sentence_zh": "海崖上的圓石塔只剩殘拱，霧中垂著一口青綠的鐘，腳下是一片空蕩的石台。",
+  "asset": "web/static/art/scenes/rite_tower.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 121468,
+    "sha256": "76446c2cf1e251c3a7b7a2db159cb7815e0e08a5592a8e2cdb717fba9673172a"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003420,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a ruined round stone bell tower rising from a sea cliff in thick fog, a green-bronze bell hanging in the broken arch at the top, wet slate and salt-stained masonry, cold diffuse sea light and wind-torn mist, a bare flagstone platform at the tower foot with open air beyond",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG ruined round stone bell tower above the sea, a green-bronze bell hanging in the broken arch, sea spray and fog beyond, a bare flagstone platform at its foot and a small illegible plaque on one pier. No figure, no creature, no readable lettering; the tower and bell fill the upper two thirds over the open platform.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the tower arch and bell keep the upper band, the platform and its dark piers frame an unobstructed lower foreground.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

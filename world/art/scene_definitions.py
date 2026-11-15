@@ -169,6 +169,16 @@ _SCENE_ART_DEFINITIONS = (
     SceneArtDefinition("coastal_path", "forest_path"),
     SceneArtDefinition("cave_interior", "forest_path"),
     SceneArtDefinition("shrine_interior", "city_street"),
+    SceneArtDefinition("rite_spring", "forest_path"),
+    SceneArtDefinition("rite_statue", "forest_path"),
+    SceneArtDefinition("rite_megalith", "forest_path"),
+    SceneArtDefinition("rite_tower", "forest_path"),
+    SceneArtDefinition("rite_tree", "forest_path"),
+    SceneArtDefinition("rite_grave", "forest_path"),
+    SceneArtDefinition("rite_mine", "forest_path"),
+    SceneArtDefinition("rite_gate", "forest_path"),
+    SceneArtDefinition("rite_cliff", "forest_path"),
+    SceneArtDefinition("rite_plaza", "city_street"),
     SceneArtDefinition(DREAM_SCENE_KEY, "city_street"),
 )
 

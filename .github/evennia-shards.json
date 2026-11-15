@@ -709,7 +709,8 @@
         "world.art.tests.test_worker.test_store_isolation",
         "world.art.tests.test_worker.test_translate_stage",
         "world.narrative.tests.test_dialogue_memory",
-        "world.narrative.tests.test_gm"
+        "world.narrative.tests.test_gm",
+        "world.art.tests.test_bundled_rite_art"
       ]
     },
     {

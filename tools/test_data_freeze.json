@@ -33,6 +33,10 @@
       "reason": "bundled scene distribution and decode contract"
     },
     {
+      "path": "world/art/tests/test_bundled_rite_art.py",
+      "reason": "bundled rite scene distribution and decode contract"
+    },
+    {
       "path": "world/art/tests/test_bundled_sacred_art.py",
       "reason": "bundled scene distribution and decode contract"
     },

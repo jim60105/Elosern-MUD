@@ -46,7 +46,7 @@ their own changes — so those kinds index any structurally valid key.
 
 **The bundled scene collection is admitted alongside.** ``load_catalog``
 publishes ``world.art.scene_definitions``' bundled snapshot FIRST and
-unconditionally, on every exit path: the eleven committed scene illustrations
+unconditionally, on every exit path: the committed scene illustrations
 must serve in the no-operator-art configuration that absence is exactly for.
 The two publishes are independent (neither can zero the other), and the
 bundled collection has its own event id, so this catalog's contract of exactly
@@ -502,7 +502,7 @@ def _registered_preset_keys() -> frozenset[str]:
 def _registered_scene_keys() -> frozenset[str]:
     """The authored scene-art keys — the ``scene`` kind's registry.
 
-    The closed eleven-key vocabulary (every registered archetype plus the
+    The closed scene-key vocabulary (every registered archetype plus the
     explicit dream type) the bundled collection and the media boundary use, so
     an operator ``scene/<key>/`` directory can only name a scene that actually
     exists in the game. Imported per call (this module may not import the art
