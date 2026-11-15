@@ -27,6 +27,12 @@ __all__ = [
 #: The shipped rite document (authored by ``landmark-rite-content``).
 CONTENT_PATH = Path(__file__).resolve().parent / "content" / "landmark_rites.yaml"
 
+#: The adoption rejection code of an archetype whose derived scene art subject
+#: is not a registered scene archetype: the rite surface resolves every rite
+#: archetype's backdrop through the one scene chain, so an archetype without a
+#: registered subject is content the repository cannot present.
+_ART_SUBJECT_UNREGISTERED = "art_subject_unregistered"
+
 
 class RitesNotLoaded(RuntimeError):
     """A consumer read the rite domain before any snapshot was installed."""
@@ -52,7 +58,12 @@ def current() -> RiteSnapshot:
 
 
 def install(snapshot: RiteSnapshot) -> RiteSnapshot:
-    """Bind one validated snapshot as this process's rite world."""
+    """Bind one validated snapshot as this process's rite world.
+
+    Adoption's art-subject check belongs to :func:`load_published`: ``install``
+    trusts a snapshot that was already adopted, which is what the synthetic
+    test worlds and the scoped :func:`installed` seam supply.
+    """
 
     global _INSTALLED
     if not isinstance(snapshot, RiteSnapshot):
@@ -76,16 +87,40 @@ def load_published(
     document and replaces the installed snapshot; startup calls it once per
     process, after the map world is adopted, so a snapshot installed against an
     earlier district world becomes stale rather than invalid.
+
+    Adoption additionally requires every archetype's derived scene art subject
+    (``art_subject_key``) to be a registered scene archetype: the panel and the
+    stage present the rite through that one scene chain, so a document naming an
+    unregistered subject is rejected whole, with one
+    ``art_subject_unregistered`` diagnostic per such archetype, and nothing is
+    installed.
     """
 
-    from world.lore.rites.loader import load_rites
+    from world.lore.rites.loader import RiteContentError, RiteDiagnostic, load_rites
+    from world.lore.rites.shape import art_subject_key
+    from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 
     source = CONTENT_PATH if path is None else Path(path)
     if district_keys is None:
         from world.lore.map_districts import current as published_districts
 
         district_keys = frozenset(published_districts().districts)
-    return install(load_rites(source, district_keys=district_keys))
+    snapshot = load_rites(source, district_keys=district_keys)
+    unregistered = tuple(
+        RiteDiagnostic(
+            field_path=f"archetypes.{key}",
+            code=_ART_SUBJECT_UNREGISTERED,
+            message=(
+                f"archetype {key!r} derives the scene art subject "
+                f"{art_subject_key(key)!r}, which is not a registered scene archetype"
+            ),
+        )
+        for key in snapshot.archetypes
+        if art_subject_key(key) not in SCENE_ARCHETYPE_REGISTRY
+    )
+    if unregistered:
+        raise RiteContentError(unregistered)
+    return install(snapshot)
 
 
 def uninstall() -> None:

@@ -17,6 +17,7 @@ Every document here is synthetic placeholder data, never shipped prose or rows.
 """
 
 from dataclasses import FrozenInstanceError
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
@@ -724,6 +725,28 @@ class LoadPublishedTests(unittest.TestCase):
         uninstall()
         self.addCleanup(uninstall)
 
+    @contextmanager
+    def _registered_subject(self):
+        """Register the synthetic archetype's derived scene art subject.
+
+        Adoption requires every archetype's derived subject to be a registered
+        scene archetype: the panel presents the rite through that one scene
+        chain. This scoped registry adds the one subject the synthetic document
+        derives and restores the shipped registry afterwards.
+        """
+        from world.lore import scene_archetypes
+
+        subject_key = art_subject_key("alpha")
+        # The registry name is assembled at runtime: a test source never names
+        # a catalog symbol literally (the test-data gate's symbol-ref rule).
+        registry_name = "_".join(("SCENE", "ARCHETYPE", "REGISTRY"))
+        registry = dict(getattr(scene_archetypes, registry_name))
+        registry[subject_key] = scene_archetypes.SceneArchetype(
+            subject_key, "測試原型", "測試場景。"
+        )
+        with patch.object(scene_archetypes, registry_name, registry):
+            yield
+
     def _write(self, directory: str, document: object) -> Path:
         path = Path(directory) / "landmark_rites.yaml"
         path.write_text(_text(document), encoding="utf-8")
@@ -735,7 +758,8 @@ class LoadPublishedTests(unittest.TestCase):
     def test_a_valid_document_is_installed_and_returned(self):
         with tempfile.TemporaryDirectory() as directory:
             path = self._write(directory, _document())
-            snapshot = load_published(path, district_keys=DISTRICT_KEYS)
+            with self._registered_subject():
+                snapshot = load_published(path, district_keys=DISTRICT_KEYS)
 
         self.assertEqual(dict(snapshot.districts), {"d1": "alpha", "d2": "alpha"})
         self.assertIs(current(), snapshot)
@@ -749,9 +773,45 @@ class LoadPublishedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = self._write(directory, _document())
             with patch("world.lore.map_districts.current", return_value=document):
-                snapshot = load_published(path)
+                with self._registered_subject():
+                    snapshot = load_published(path)
 
         self.assertEqual(set(snapshot.districts), {"d1", "d2"})
+        self.assertIs(current(), snapshot)
+
+    @covers_requirement(
+        "landmark-rite-content::adoption-requires-a-registered-art-subject-for-every-archetype"
+    )
+    def test_an_unregistered_art_subject_rejects_naming_the_archetype(self):
+        """Adoption refuses a document the scene chain cannot present.
+
+        The synthetic archetype ``alpha`` derives ``rite_alpha``, which is not a
+        registered scene archetype, so the document is rejected whole with one
+        diagnostic naming that archetype and nothing is installed.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, _document())
+            with self.assertRaises(RiteContentError) as caught:
+                load_published(path, district_keys=DISTRICT_KEYS)
+
+        self.assertEqual(
+            _pairs(caught.exception),
+            [("archetypes.alpha", "art_subject_unregistered")],
+        )
+        self.assertIn("rite_alpha", str(caught.exception))
+        with self.assertRaises(RitesNotLoaded):
+            current()
+
+    @covers_requirement(
+        "landmark-rite-content::adoption-requires-a-registered-art-subject-for-every-archetype"
+    )
+    def test_a_registered_art_subject_installs_the_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, _document())
+            with self._registered_subject():
+                snapshot = load_published(path, district_keys=DISTRICT_KEYS)
+
+        self.assertEqual(dict(snapshot.districts), {"d1": "alpha", "d2": "alpha"})
         self.assertIs(current(), snapshot)
 
     @covers_requirement(

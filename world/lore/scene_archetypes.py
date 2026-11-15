@@ -73,6 +73,56 @@ _SCENE_ARCHETYPES = (
         "神殿內部",
         "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。",
     ),
+    SceneArchetype(
+        "rite_spring",
+        "泉之石龕",
+        "苔蘚覆滿的泉池上緣開著一座低矮石龕，墨黑的水面映著林隙間垂落的冷光。",
+    ),
+    SceneArchetype(
+        "rite_statue",
+        "鹿影石雕",
+        "風掃過的草原上立著白色鹿形石雕，斷角與苔痕在斜陽下拖出長長的影子。",
+    ),
+    SceneArchetype(
+        "rite_megalith",
+        "符文巨石",
+        "光裸的山頂環立著蝕痕斑駁的巨石，低垂的日光把石影拉過短草與碎石。",
+    ),
+    SceneArchetype(
+        "rite_tower",
+        "霧鐘石塔",
+        "海崖上的圓石塔只剩殘拱，霧中垂著一口青綠的鐘，腳下是一片空蕩的石台。",
+    ),
+    SceneArchetype(
+        "rite_tree",
+        "古樹之心",
+        "巨樹的樹心被根鬚拱成一片凹陷的泥土空地，琥珀色的光柱自樹冠缺口斜落。",
+    ),
+    SceneArchetype(
+        "rite_grave",
+        "騎士墓群",
+        "緩坡上一片無人憑弔的墓園，低矮的墓碑歪斜而立，斷裂的石十字與雜草野花一同沉寂在灰霧裡。",
+    ),
+    SceneArchetype(
+        "rite_mine",
+        "紫晶坑道",
+        "廢棄的紫晶坑口撐著塌斜的木架，一道冷光自頂隙落下，照亮成堆的碎石地面。",
+    ),
+    SceneArchetype(
+        "rite_gate",
+        "赤岩拱門",
+        "赤色砂岩的巨大拱門橫跨乾燥隘口，正午的強光把門內的通道照得發白。",
+    ),
+    SceneArchetype(
+        "rite_cliff",
+        "冰泉崖壁",
+        "野溪自深色花崗岩崖壁直落入乳藍色的天然岩池，水霧與冷冽的飛沫在濕黑的石面上浮動。",
+    ),
+    SceneArchetype(
+        "rite_plaza",
+        "中央廣場",
+        "王都中心的石鋪廣場上立著雕花噴泉，拱廊與垂下的旗幟圍著一片空蕩的鋪面。",
+    ),
 )
 
 # Frozen: consumers may read registry values but never extend or replace them.

@@ -20,7 +20,7 @@ Related documentation: [Settings and environment](/development/settings-and-envi
 ## Bundled scene artwork is a tracked exception
 
 The repository also commits the required built-in scene illustrations — the
-closed eleven-path set under `web/static/art/scenes/`, delivered by the
+closed set of scene paths under `web/static/art/scenes/`, delivered by the
 artwork packs — because a scene's own background must render with no operator
 mount and no generation service. Those files are tracked in git deliberately,
 are bounded in size, and each carries a `<key>.provenance.json` sidecar
@@ -180,7 +180,7 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   extensions `.png`, `.webp`, `.jpg`, and `.avif` are the closed accepted set.
 - `scene/<scene-key>/` and `room/<room-art-key>/` name registered authored
   content, never a database row id or a translated display name. The scene keys
-  are the eleven declared in `world/art/scene_definitions.py`; the room-art keys
+  are the ones declared in `world/art/scene_definitions.py`; the room-art keys
   are the authored room vocabulary of the same module. A directory keyed to a
   name no registry declares is skipped with one bounded diagnostic while
   unrelated artwork still indexes.
@@ -490,7 +490,7 @@ directories and images with `reason=official_root_indexed` (for example
 naming the offending root-relative paths the diagnostics carry.
 
 The bundled event is independent of the operator root: require
-`reason=bundled_root_indexed definitions=11 images=11 refused=0` on every
+`reason=bundled_root_indexed definitions=21 images=21 refused=0` on every
 deployment, including one with no `ART_OFFICIAL_ROOT` mounted. A lower `images`
 count means the checkout is incomplete (`refused` names the affected scene
 keys), and the missing identities answer 404 rather than a substitute image.
@@ -517,5 +517,5 @@ that same position.
 | `official_art_catalog_loaded` reports refusals | Per-entry admission refused unsupported, symlinked, out-of-root, or oversized files; the event and its bounded diagnostics name the offending root-relative paths and the unrelated artwork still loads. |
 | `official_art_catalog_loaded` reports `root_state=unavailable` (with `root_fault=True` and a `reason=source_unavailable` line) | The configured root cannot be used: missing while explicitly bound, unreadable, a symlink, or an existing non-directory entry. Fix the mount or the `ART_OFFICIAL_ROOT` path; a bare `root_state=absent_default root_fault=False` line is the normal unconfigured case and needs no action. |
 | A manifest's declared `default` is not the image the game resolves | The declared filename is missing or was refused at admission. The directory's bounded `manifest_default_not_an_admitted_file` diagnostic names the cause, and the first filename in deterministic order is served instead (a declared default that was admitted is always the one used). |
-| `bundled_scene_catalog_loaded` reports fewer than eleven images | The checkout is missing or has a corrupt `web/static/art/scenes/<scene-key>.webp`; the diagnostics name the affected scene keys. The served identity for a lost file is a real 404 — never another image. |
+| `bundled_scene_catalog_loaded` reports fewer images than declared | The checkout is missing or has a corrupt `web/static/art/scenes/<scene-key>.webp`; the diagnostics name the affected scene keys. The served identity for a lost file is a real 404 — never another image. |
 | A `scene/<key>/` or `room/<key>/` directory was ignored | The directory key is not registered authored content (the declared scene keys and the authored room-art vocabulary of `world/art/scene_definitions.py`), or the directory entry was refused; the bounded diagnostic names it. |

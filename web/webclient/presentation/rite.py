@@ -14,6 +14,11 @@ landmark's node, lit or unlit. Off it, the presenter asks for the registry's
 registered unavailable form. ``options`` and ``performers`` are advisory
 presentation data only: the action re-derives every admission itself.
 
+``art`` carries the artwork descriptor the existing scene chain produces for
+the archetype's scene art subject, so the rite surfaces present the one
+registered illustration; a descriptor that cannot be produced is no artwork at
+all, never a substitute image.
+
 ``delivery`` is non-persistent ``ndb`` state bound to the node it was committed
 on, so a snapshot replay on that node carries it and any other node does not.
 It is lost on a server restart; the player may perform the rite again.
@@ -281,6 +286,37 @@ def _stored_delivery(owner: Any) -> dict[str, Any] | None:
     return candidate if isinstance(candidate, dict) else None
 
 
+def _rite_artwork(archetype_key: str) -> dict[str, Any] | None:
+    """The archetype's existing scene descriptor, or ``None``.
+
+    A rite presents its backdrop through the one scene resolution chain, keyed
+    by the archetype's derived scene art subject. The logical identity is the
+    rite's own (``rite:<archetype-key>``), never a map-owned place, so it
+    authorizes no retained display content. Any failure degrades to no artwork
+    and one warning: the panel stays available.
+    """
+    try:
+        from world.art.presenter import describe_scene
+        from world.lore.rites.shape import art_subject_key
+        from world.rules.art_view import SceneTarget
+
+        target = SceneTarget(
+            identity=f"rite:{archetype_key}",
+            trusted_identity=False,
+            archetype=art_subject_key(archetype_key),
+            room_art_key=None,
+            room_binding_invalid=False,
+        )
+        return validate_artwork(describe_scene(target))
+    except Exception as error:  # observability: ignore R2: no artwork is a presentable state
+        log_warn(
+            "landmark_rite_artwork_failed",
+            exc=error,
+            context={"archetype": archetype_key},
+        )
+        return None
+
+
 def rite_presenter(context: Any) -> dict[str, Any]:
     """Render the committed rite site, or the registered unavailable form."""
     from world.rules.landmark_rite_record import (
@@ -351,7 +387,7 @@ def rite_presenter(context: Any) -> dict[str, Any]:
             "name": site.archetype.guardian_name_zh,
             "form": site.archetype.guardian_form_zh,
         },
-        "art": None,
+        "art": _rite_artwork(site.archetype.key),
         "options": options,
         "performers": performers,
         "delivery": _stored_delivery(owner),

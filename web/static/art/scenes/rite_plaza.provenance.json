@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_plaza",
+  "label_zh": "中央廣場",
+  "scene_sentence_zh": "王都中心的石鋪廣場上立著雕花噴泉，拱廊與垂下的旗幟圍著一片空蕩的鋪面。",
+  "asset": "web/static/art/scenes/rite_plaza.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 152044,
+    "sha256": "cf1f55e01b4c65fa094787b230b925bd5c68208630e446f9546522b261c55bd7"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003426,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a broad stone plaza at the heart of a walled capital city, a carved fountain monument on a stepped base at its centre, arcaded facades and hanging banners along the edges, pale morning light and long shadows across flagstones, an empty expanse of open paving in the foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG capital plaza: a carved fountain monument on a stepped base at the centre, arcaded facades and hung banners with abstract emblems along the edges, pale morning light across an empty expanse of paving. No figure, no creature, no readable lettering; the monument and arcades fill the upper two thirds over the open paving.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the fountain monument and arcades keep the upper band while the open paving stays clear below.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

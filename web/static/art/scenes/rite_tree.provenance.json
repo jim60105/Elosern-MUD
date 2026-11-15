@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_tree",
+  "label_zh": "古樹之心",
+  "scene_sentence_zh": "巨樹的樹心被根鬚拱成一片凹陷的泥土空地，琥珀色的光柱自樹冠缺口斜落。",
+  "asset": "web/static/art/scenes/rite_tree.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 192652,
+    "sha256": "7c71442f6e473255cf1038215a06778e4294e3e5718a17530ac957a9d04a74e4"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003421,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "the hollow heart of an immense ancient tree, roots arching over a sunken earthen floor like ribs, bark worn smooth where hands have passed, amber shafts of light slanting down through the canopy opening, drifting pollen and dry leaves scattered across the open root floor",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG interior of an immense ancient tree, stone columns fused into arching roots around a glowing hollow heart, amber shafts falling into a sunken earthen floor dusted with drifting petals. No figure, no creature, no readable lettering; the trunk and hollow hold the upper two thirds over the open root floor.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the hollow heart keeps the upper band while the root floor stays open for stage figures.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}

@@ -1,7 +1,7 @@
 """Tests for the deterministic built-in fallback resolver (art-gallery-fallback).
 
 Covers the closed vocabulary committed to the repository (contract test in
-both directions, size bound, the closed eleven-path tracked-art exception for
+both directions, size bound, the closed scene-path tracked-art exception for
 the bundled scene collection, no tracked runtime art), the ordered resolution
 rule (declared registry key -> monster constant -> sex/age band ->
 deterministic subject-key hash), fail-closed behaviour on malformed stored
@@ -77,7 +77,7 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 )
 
 # The closed tracked-art exception for the bundled scene collection
-# (unified-scenes-outdoor-art): exactly these eleven committed scene
+# (unified-scenes-outdoor-art): exactly these twenty-one committed scene
 # illustrations may ever be tracked under web/static/art/scenes/, and nothing
 # else in that directory. Like APPROVED_NON_RUNTIME_IMAGES above, each path
 # joins this exact set deliberately, in review, never by directory prefix.
@@ -86,7 +86,7 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 # here need not exist yet — the list is an allowlist, not a coverage claim.
 # This pack asserts its own three actual files in
 # ``test_the_owned_bundled_scene_pack_is_tracked``; the complete
-# eleven-key inventory is asserted by the scene catalog that now resolves
+# twenty-one-key inventory is asserted by the scene catalog that now resolves
 # these keys (``world.art.tests.test_bundled_scenes``), which fails if the
 # committed directory ever holds fewer or more files than the declarations.
 TRACKED_SCENE_ART_PATHS = frozenset(
@@ -101,6 +101,16 @@ TRACKED_SCENE_ART_PATHS = frozenset(
         "web/static/art/scenes/coastal_path.webp",
         "web/static/art/scenes/cave_interior.webp",
         "web/static/art/scenes/shrine_interior.webp",
+        "web/static/art/scenes/rite_spring.webp",
+        "web/static/art/scenes/rite_statue.webp",
+        "web/static/art/scenes/rite_megalith.webp",
+        "web/static/art/scenes/rite_tower.webp",
+        "web/static/art/scenes/rite_tree.webp",
+        "web/static/art/scenes/rite_grave.webp",
+        "web/static/art/scenes/rite_mine.webp",
+        "web/static/art/scenes/rite_gate.webp",
+        "web/static/art/scenes/rite_cliff.webp",
+        "web/static/art/scenes/rite_plaza.webp",
         "web/static/art/scenes/dream_throne.webp",
     }
 )
@@ -228,7 +238,7 @@ class ClosedVocabularyContractTests(unittest.TestCase):
         tracked = subprocess_git_ls_files_images()
         # The closed runtime vocabulary is still exclusive: the defaults
         # directory, the explicitly reviewed documentation/fixture images, and
-        # the closed eleven-path bundled-scene exception. A new tracked image
+        # the closed scene-path bundled-scene exception. A new tracked image
         # outside this exact set fails here. The scene entries are an
         # allowlist, not a requirement that every pack has landed, so the four
         # artwork packs stay independent.
@@ -247,7 +257,7 @@ class ClosedVocabularyContractTests(unittest.TestCase):
     def test_the_owned_bundled_scene_pack_is_tracked(self):
         """This pack's own three scene illustrations are committed and servable.
 
-        The eleven-path exception permits not-yet-delivered future packs, so
+        The scene-path exception permits not-yet-delivered future packs, so
         the allowlist above cannot prove this pack landed anything: this
         assertion names the three actual outdoor files, and ``git ls-files``
         proves they are tracked (a runtime/seed/operator image never appears

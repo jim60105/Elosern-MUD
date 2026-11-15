@@ -306,7 +306,7 @@ class LocalizedHelpCommandTests(EvenniaCommandTestMixin, EvenniaTest):
     def test_help_suggestions_find_entry_text_matches(self):
         from evennia.utils.create import create_help_entry
 
-        create_help_entry("測試主題", "其中提到了 中央廣場 這個地方。", category="general")
-        output = self.call(CmdHelp(), "中央廣場", cmdset=self._merged_cmdset())
+        create_help_entry("測試主題", "其中提到了 測試廣場 這個地方。", category="general")
+        output = self.call(CmdHelp(), "測試廣場", cmdset=self._merged_cmdset())
         self.assertIn("其他建議主題", output)
         self.assertIn("測試主題", output)

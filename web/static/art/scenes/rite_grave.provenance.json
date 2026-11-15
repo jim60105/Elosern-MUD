@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "rite_grave",
+  "label_zh": "騎士墓群",
+  "scene_sentence_zh": "緩坡上一片無人憑弔的墓園，低矮的墓碑歪斜而立，斷裂的石十字與雜草野花一同沉寂在灰霧裡。",
+  "asset": "web/static/art/scenes/rite_grave.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 206790,
+    "sha256": "c27809548722f1996950a1fc9460aeeb326ceac451167dd6286b7b84bf01132f"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 811003422,
+    "created": "2026-11-15"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a deserted hillside graveyard of low stone grave slabs laid flat into the turf with rows of small standing plain stones, a single simple stone cross rising among them, tall grass and pale wildflowers crowding the bases, heavy grey overcast light, long mist drifting between the markers, an open mossy path threading the graves in the foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: A painterly JRPG hillside graveyard of long rows of flat stone grave slabs set into the turf with small standing markers and one plain stone cross, mist drifting between them, wildflowers and tall grass along the margins, a mossy path threading the rows. No figure, no creature, no readable lettering; the cross and marker rows occupy the upper two thirds.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop: the full-bleed composition holds at 1451x790: the cross and marker rows keep the upper band while the path and grass stay open below.",
+    "contact_sheet": "Reviewed on a ten-up contact sheet of the whole rite pack: each archetype reads as its own place — spring basin, stag statue, stone circle, sea tower, tree hollow, grave rows, crystal mine, sandstone arch, waterfall basin and capital plaza — with a consistent painterly palette and no two compositions alike."
+  }
+}
