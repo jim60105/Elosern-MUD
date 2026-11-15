@@ -15,6 +15,8 @@ from __future__ import annotations
 import os
 import tempfile
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import inject_update, scene_block, valid_status_panel
 from .test_wilderness_travel import CX, CY, TOWN, _art, _node, _party, _TravelStage, _walk_area, _walk_panels
@@ -291,6 +293,7 @@ class LandmarkRiteTests(_TravelStage):
         self.assertEqual(len(_held(page)), 1)
         self.assertTrue(page.evaluate("() => window.__elosernBridge.store.getSender().sendAction.__riteHold === true"))
 
+    @covers_requirement("webclient-landmark-rite::the-rite-flow-is-verified-in-the-live-client-at-two-viewports")
     def test_wilderness_rite_journey(self):
         """From a wilderness arrival: card, stage, one option, the scene pages
         and 退開 back to the map; R and Enter reopen the stage at the larger
@@ -342,6 +345,7 @@ class LandmarkRiteTests(_TravelStage):
         self.assertEqual(len(_held(page)), 1)
         page.close()
 
+    @covers_requirement("webclient-landmark-rite::the-rite-flow-is-verified-in-the-live-client-at-two-viewports")
     def test_city_rite_journey(self):
         """From a settlement room: the card over the room, the stage, one
         option, the scene pages and the return entry under the place card."""
