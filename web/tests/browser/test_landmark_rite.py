@@ -76,7 +76,7 @@ def _arrival_log(node: str) -> dict:
                 "id": "%s:rite001.0" % ("e" * 32), "kind": "landmark_reached",
                 "tick": 5001, "day": 3, "time": "09:40", "text": "抵達合成石龕。",
                 "params": {
-                    "arrival_node": node, "name": "合成石龕", "lit_district": None,
+                    "arrival_node": node, "name": "合成石龕",
                     "prose": "合成散文。", "artwork": None,
                 },
             }],

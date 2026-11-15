@@ -14,9 +14,9 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 3. Browser
 
-- [ ] 3.1 Apply design D2 to the protocol files and update `travel_log.test.js` and `protocol_immutable.test.js`. Verify: `node --test web/static/webclient/js/tests/travel_log.test.js` and `node --test web/static/webclient/js/tests/protocol_immutable.test.js` pass, and `uv run --locked python -m unittest tests.test_panel_schema_version_parity_contract` passes.
-- [ ] 3.2 Apply design D2 to the store, `leg-model.js`, `LandmarkCard.vue`, the fixtures and the stories, and update `landmark.test.js` and `route-walking.test.js`. Verify: `pnpm test -- web/webclient-app/tests/travel` passes.
-- [ ] 3.3 Update `web/tests/browser/test_wilderness_travel.py` and `web/tests/browser/travel_log_fixture.py`. Verify: after `pnpm run build`, the browser prefix with `web.tests.browser.test_wilderness_travel.TravelRouteTests` passes and the browser prefix with `web.tests.browser.test_wilderness_travel.TravelLogTests` passes (two commands).
+- [x] 3.1 Apply design D2 to the protocol files and update `travel_log.test.js` and `protocol_immutable.test.js`. Verify: `node --test web/static/webclient/js/tests/travel_log.test.js` and `node --test web/static/webclient/js/tests/protocol_immutable.test.js` pass, and `uv run --locked python -m unittest tests.test_panel_schema_version_parity_contract` passes.
+- [x] 3.2 Apply design D2 to the store, `leg-model.js`, `LandmarkCard.vue`, the fixtures and the stories, and update `landmark.test.js` and `route-walking.test.js`. Verify: `pnpm test -- web/webclient-app/tests/travel` passes.
+- [x] 3.3 Update `web/tests/browser/test_wilderness_travel.py` and `web/tests/browser/travel_log_fixture.py`. Verify: after `pnpm run build`, the browser prefix with `web.tests.browser.test_wilderness_travel.TravelRouteTests` passes and the browser prefix with `web.tests.browser.test_wilderness_travel.TravelLogTests` passes (two commands).
 
 ## 4. Documentation and gates
 

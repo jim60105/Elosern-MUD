@@ -664,7 +664,6 @@ function landmarkStage(args) {
         {
           arrival_node: walkNode(x, y),
           name: "合成古哨塔",
-          lit_district: args.lit ? "合成東麓" : null,
           prose: "石階被風磨得發亮，塔頂的缺口望得見整片東麓的草原。守塔人留下的火盆早已冷卻，只剩幾道焦黑的痕跡。",
           artwork: args.art ? LANDMARK_ART : null,
         },
@@ -706,19 +705,19 @@ function landmarkStage(args) {
 }
 
 // Landmark Arrival: the party stands on the stone marker; the card shows the
-// reached room's scene in its 16:6 frame, the name, the district this
-// arrival lit and the prose, with focus on 繼續.
+// reached room's scene in its 16:6 frame, the name and the prose, with focus
+// on 繼續.
 export const LandmarkArrival = {
   name: "Landmark Arrival",
-  args: { ...MORNING, aim: null, art: true, lit: true, time: "春 3 日 ‧ 09:40・白晝" },
+  args: { ...MORNING, aim: null, art: true, time: "春 3 日 ‧ 09:40・白晝" },
   render: landmarkStage,
 };
 
-// An arrival without a scene descriptor and on an already-lit district: a
-// quiet ink frame stands in for the picture, and no district line shows.
+// An arrival without a scene descriptor: a quiet ink header band carries the
+// kicker in place of the picture.
 export const LandmarkArrivalPlain = {
   name: "Landmark Arrival Plain",
-  args: { ...MORNING, aim: null, art: false, lit: false, time: "春 3 日 ‧ 09:40・白晝" },
+  args: { ...MORNING, aim: null, art: false, time: "春 3 日 ‧ 09:40・白晝" },
   render: landmarkStage,
 };
 

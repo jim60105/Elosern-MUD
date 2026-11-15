@@ -19,7 +19,7 @@ const CY = 80;
 let serial = 0;
 
 /** One typed `landmark_reached` notice reached at `node`. */
-function arrival(node, { id = null, lit = null, artwork = null, name = "合成古塔" } = {}) {
+function arrival(node, { id = null, artwork = null, name = "合成古塔" } = {}) {
   serial += 1;
   return {
     id: id ?? `${"a".repeat(32)}:t${String(serial).padStart(4, "0")}.0`,
@@ -28,7 +28,7 @@ function arrival(node, { id = null, lit = null, artwork = null, name = "合成�
     day: 3,
     time: "09:40",
     text: `抵達${name}。`,
-    params: { arrival_node: node, name, lit_district: lit, prose: "風從塔頂的缺口灌進來。", artwork },
+    params: { arrival_node: node, name, prose: "風從塔頂的缺口灌進來。", artwork },
   };
 }
 
@@ -61,9 +61,11 @@ describe("committed arrival state", () => {
   it("opens one card for a typed arrival bound to the current node", () => {
     const h = harness();
     expect(h.travel().arrival).toBeNull();
-    const entry = arrival(walkNode(CX, CY), { lit: "合成東麓" });
+    const entry = arrival(walkNode(CX, CY));
     h.publish(log([entry]));
-    expect(h.travel().arrival).toEqual({ id: entry.id, name: "合成古塔", litDistrict: "合成東麓", prose: "風從塔頂的缺口灌進來。", artwork: null });
+    // Exactly the notice's own fields: a step lights no district, so the
+    // record carries no lighting field.
+    expect(h.travel().arrival).toEqual({ id: entry.id, name: "合成古塔", prose: "風從塔頂的缺口灌進來。", artwork: null });
   });
 
   it("a repeated arrival never reopens once dismissed, even after a new epoch replays it", () => {
@@ -160,21 +162,24 @@ describe("LandmarkCard", () => {
   function card(props) {
     const w = mount(LandmarkCard, {
       attachTo: document.body,
-      props: { arrival: { id: "x", name: "合成古塔", litDistrict: null, prose: "風。", artwork: null, ...props }, artPanel: { available: true } },
+      props: { arrival: { id: "x", name: "合成古塔", prose: "風。", artwork: null, ...props }, artPanel: { available: true } },
     });
     wrappers.push(w);
     return w;
   }
 
-  it("shows the supplied art and the district line only when this arrival lit it", () => {
+  it("shows the supplied art, the name and the prose, and never a lighting row", () => {
     const plain = card({});
     expect(plain.find('[data-testid="artwork-preview"]').exists()).toBe(false);
-    expect(plain.find('[data-testid="landmark-card-lit"]').exists()).toBe(false);
     expect(plain.get('[data-testid="landmark-card-name"]').text()).toBe("合成古塔");
-    const lit = card({ litDistrict: "合成東麓", artwork: sceneDescriptor() });
-    expect(lit.find('[data-testid="artwork-preview"]').exists()).toBe(true);
-    expect(lit.get('[data-testid="landmark-card-lit"]').text()).toContain("合成東麓");
-    expect(lit.get('[data-testid="landmark-card"]').attributes()).toMatchObject({ role: "dialog", "aria-modal": "true" });
+    expect(plain.get('[data-testid="landmark-card-prose"]').text()).toBe("風。");
+    // Even a stray lighting field on the record renders nothing.
+    const art = card({ litDistrict: "合成東麓", artwork: sceneDescriptor() });
+    expect(art.find('[data-testid="artwork-preview"]').exists()).toBe(true);
+    expect(art.find('[data-testid="landmark-card-lit"]').exists()).toBe(false);
+    expect(art.text()).not.toContain("合成東麓");
+    expect(art.text()).not.toContain("已探明");
+    expect(art.get('[data-testid="landmark-card"]').attributes()).toMatchObject({ role: "dialog", "aria-modal": "true" });
   });
 
   it.each(["Enter", "Escape"])("%s closes once and stays inside the card", async (key) => {

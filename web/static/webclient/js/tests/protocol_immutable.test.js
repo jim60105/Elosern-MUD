@@ -366,7 +366,7 @@ test("an explore.move interrupt slot is adopted and detached from the envelope",
   // list in the success data slot; the reducer owns a frozen copy so no
   // later transport mutation can rewrite what the walk queue reads.
   const data = {
-    interrupts: ["landmark_reached", "district_lit", "member_asleep"],
+    interrupts: ["landmark_reached", "landmark_sighted", "member_asleep"],
   };
   const payload = actionResult({
     presentation_revision: 2,
@@ -385,12 +385,12 @@ test("an explore.move interrupt slot is adopted and detached from the envelope",
   data.interrupts[0] = "nightfall";
   assert.deepEqual(store.getCommittedState().lastActionResult.data.interrupts, [
     "landmark_reached",
-    "district_lit",
+    "landmark_sighted",
     "member_asleep",
   ]);
   assert.deepEqual(store.getState().lastActionResult.data.interrupts, [
     "landmark_reached",
-    "district_lit",
+    "landmark_sighted",
     "member_asleep",
   ]);
 });
