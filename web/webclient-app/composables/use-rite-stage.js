@@ -14,10 +14,25 @@
 // - the return entry under the place card (`entryShown`).
 //
 // It sends nothing itself: `perform` is the store's one
-// `explore.landmark_rite`, always for the controlled character here.
-import { computed, onScopeDispose, watch } from "vue";
+// `explore.landmark_rite`, for the performer the store holds.
+//
+// Performer picking (landmark-rite-performer-picking D2) reuses the party
+// line-up's targeting input: while picking is offered the listed performers'
+// figures are hit areas, the picked one lit and selected, a hovered one lit,
+// the rest dimmed; during a request or a scene only the performer is lit.
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { ritePerformers } from "../components/rite/rite-model.js";
 import { useAuthoredScene } from "./use-authored-scene.js";
+
+// The line-up identity of one performer row. The first row is the controlled
+// body, whose figure is the line-up's controlled slot (a possessed companion
+// in that row included); every other row is a party member, whose figure
+// carries its member id (the owner's figure too, while a companion is
+// possessed: the roster identity is the same database id).
+export function riteFigureId(row, controlledId) {
+  if (row.id !== "self") return row.id;
+  return controlledId === null || controlledId === undefined ? null : String(controlledId);
+}
 
 export function useRiteStage({ store, blocked }) {
   const view = computed(() => store.view?.rite ?? null);
@@ -32,7 +47,11 @@ export function useRiteStage({ store, blocked }) {
   const entryShown = computed(
     () => !!rite.value && phase.value === "closed" && store.view?.mode === "exploration",
   );
-  const performer = computed(() => (rite.value ? ritePerformers(rite.value)[0] ?? null : null));
+  const performers = computed(() => (rite.value ? ritePerformers(rite.value) : []));
+  const performer = computed(
+    () => performers.value.find((row) => row.id === view.value?.performerId) ?? performers.value[0] ?? null,
+  );
+  const canSwitch = computed(() => view.value?.canSwitch === true && panelShown.value);
   const lines = computed(() =>
     rite.value ? [{ kind: "out", text: rite.value.guardian.form, seq: 1 }] : [],
   );
@@ -83,7 +102,53 @@ export function useRiteStage({ store, blocked }) {
     return store.openRiteCard() === true;
   }
   function perform(key) {
-    return store.performRite(key, null) === true;
+    return store.performRite(key) === true;
+  }
+
+  // The line-up identity under the pointer, or null. It never outlives the
+  // pick it previews: activation, a keyboard step, the pointer leaving the
+  // line-up and the panel going away all clear it.
+  const hovered = ref(null);
+  function clearHover() {
+    hovered.value = null;
+  }
+  watch(canSwitch, (open) => {
+    if (!open) clearHover();
+  });
+
+  /** The line-up's targeting input on the stage, or null. */
+  function targeting({ controlledId }) {
+    if (!onStage.value || !performer.value) return null;
+    const own = riteFigureId(performer.value, controlledId);
+    const lit = new Set(own === null ? [] : [own]);
+    if (playing.value || pending.value) return { lit, selectable: new Set(), selected: new Set() };
+    if (!canSwitch.value) return null;
+    const selectable = new Set(
+      performers.value.map((row) => riteFigureId(row, controlledId)).filter((id) => id !== null),
+    );
+    if (hovered.value !== null && selectable.has(hovered.value)) lit.add(hovered.value);
+    return { lit, selectable, selected: new Set(own === null ? [] : [own]) };
+  }
+
+  /** A pointer on a line-up figure: hover previews, activation picks. */
+  function onFigure(identity, action, { controlledId }) {
+    if (!canSwitch.value || identity === null || identity === undefined) return false;
+    const id = String(identity);
+    const row = performers.value.find((candidate) => riteFigureId(candidate, controlledId) === id);
+    if (!row) return false;
+    if (action === "hover") {
+      hovered.value = id;
+      return true;
+    }
+    if (action !== "activate") return false;
+    clearHover();
+    return store.pickRitePerformer(row.id) === true;
+  }
+
+  /** Step the performer from the panel's arrows. */
+  function step(delta) {
+    clearHover();
+    return store.stepRitePerformer(delta) === true;
   }
   function advance() {
     return scene.advance();
@@ -96,6 +161,11 @@ export function useRiteStage({ store, blocked }) {
     panelShown,
     entryShown,
     performer,
+    canSwitch,
+    targeting,
+    onFigure,
+    clearHover,
+    step,
     lines,
     dialogueModel,
     scene,
