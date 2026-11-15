@@ -16,6 +16,7 @@ from commands.rite import CmdRite
 from tools.spec_traceability import covers_requirement
 from world.rules.landmark_rites import REFUSAL_MESSAGES
 from world.rules.tests.rite_fixtures import (
+    DISTRICT_NAME,
     GUARDIAN_FORM,
     GUARDIAN_NAME,
     LANDMARK_NAME,
@@ -87,6 +88,16 @@ class RiteCommandTests(EvenniaCommandTestMixin, RiteSettlementFixture):
                 offsets = [output.index(line) for line in emitted]
                 self.assertEqual(offsets, sorted(offsets))
                 self.assertEqual(output.count(emitted[-1]), 1)
+
+    def test_only_the_first_completion_names_the_explored_district(self):
+        first = self.call(CmdRite(), SOLO.key).splitlines()
+        repeat = self.call(CmdRite(), SOLO.key).splitlines()
+
+        self.assertEqual(len(first), len(repeat) + 1)
+        extra = [line for line in first if line not in repeat]
+        self.assertEqual(len(extra), 1)
+        self.assertIn(DISTRICT_NAME, extra[0])
+        self.assertNotIn(DISTRICT_NAME, "\n".join(repeat))
 
     @covers_requirement(
         "landmark-rite-command::the-rite-command-lists-and-performs-rites-from-the-text-client"

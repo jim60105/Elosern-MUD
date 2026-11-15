@@ -13,6 +13,7 @@ from world.rules.clock import get_world_clock
 from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.landmark_rite_record import RECORD_ATTR, read_record
 from world.rules.landmark_rites import (
+    RiteRefused,
     eligible_performers,
     perform_rite,
     preflight,
@@ -38,6 +39,13 @@ from world.rules.tests.rite_fixtures import (
     SOLO_SHAME,
     RiteSettlementFixture,
 )
+
+
+def _events(info, name):
+    """The contexts of every ``log_info`` call that emitted ``name``."""
+    return [
+        call.kwargs["context"] for call in info.call_args_list if call.args[0] == name
+    ]
 
 
 class RiteSiteTests(RiteSettlementFixture):
@@ -119,10 +127,10 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertTrue(result.climax)
         self.assertIs(result.scene, SOLO.self_scene)
         self.assertEqual(result.elapsed_seconds, SOLO_SECONDS)
-        self.assertEqual(info.call_count, 1)
-        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        committed = _events(info, "landmark_rite_committed")
+        self.assertEqual(len(committed), 1)
         self.assertEqual(
-            info.call_args.kwargs["context"],
+            committed[0],
             {
                 "char": self.player.pk,
                 "district": DISTRICT_KEY,
@@ -168,8 +176,7 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(
             self.record()["completed"][DISTRICT_KEY]["options"]["shared"]["count"], 1
         )
-        context = info.call_args.kwargs["context"]
-        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        (context,) = _events(info, "landmark_rite_committed")
         self.assertEqual(context["char"], self.player.pk)
         self.assertEqual(context["body"], self.companion.pk)
 
@@ -227,8 +234,7 @@ class RiteCommitTests(RiteSettlementFixture):
         self.assertEqual(self.player.sexual.climax_today, 0)
         self.assertIn(DISTRICT_KEY, self.record()["completed"])
         self.assertFalse(self.companion.attributes.has(RECORD_ATTR))
-        context = info.call_args.kwargs["context"]
-        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        (context,) = _events(info, "landmark_rite_committed")
         self.assertEqual(context["char"], self.player.pk)
         self.assertEqual(context["body"], self.companion.pk)
         self.refused(
@@ -502,6 +508,45 @@ class RiteLightingTests(RiteSettlementFixture):
         self.assertEqual(self.lit(), frozenset())
 
 
+class RiteDiscoveryTests(RiteSettlementFixture):
+    """The district's first committed rite logs one discovery; nothing else does."""
+
+    def discoveries(self, call):
+        with patch("world.rules.landmark_rites.log_info") as info:
+            call()
+        return _events(info, "map_district_discovered")
+
+    def test_a_first_committed_rite_logs_one_discovery_and_a_repeat_none(self):
+        first = self.discoveries(lambda: self.perform(self.player, "solo"))
+        self.assertEqual(first, [{"char": self.player.pk, "district": DISTRICT_KEY}])
+        self.assertEqual(self.discoveries(lambda: self.perform(self.player, "solo")), [])
+
+    def test_a_companion_s_first_rite_names_the_record_owner(self):
+        found = self.discoveries(
+            lambda: self.perform(self.player, "shared", member_id=self.companion.id)
+        )
+        self.assertEqual(found, [{"char": self.player.pk, "district": DISTRICT_KEY}])
+
+    def test_a_refused_rite_logs_no_discovery(self):
+        def refuse():
+            with self.assertRaises(RiteRefused):
+                self.perform(self.player, "t_none")
+
+        self.assertEqual(self.discoveries(refuse), [])
+
+    def test_a_rolled_back_rite_logs_no_discovery(self):
+        def roll_back():
+            with patch(
+                "world.rules.landmark_rites.write_record",
+                side_effect=RuntimeError("record write failed"),
+            ):
+                with self.assertRaises(RuntimeError):
+                    self.perform(self.player, "solo")
+
+        self.assertEqual(self.discoveries(roll_back), [])
+        self.assertIsNone(self.record())
+
+
 class RiteReplayTests(RiteSettlementFixture):
     @covers_requirement(
         "landmark-rite-settlement::a-repeated-request-identity-settles-once"
@@ -514,8 +559,8 @@ class RiteReplayTests(RiteSettlementFixture):
         self.assertIs(first, second)
         self.assertEqual(get_world_clock().tick - tick_before, SOLO_SECONDS)
         self.assertEqual(self.record()["completed"][DISTRICT_KEY]["count"], 1)
-        self.assertEqual(info.call_count, 1)
-        self.assertEqual(info.call_args.args[0], "landmark_rite_committed")
+        self.assertEqual(len(_events(info, "landmark_rite_committed")), 1)
+        self.assertEqual(len(_events(info, "map_district_discovered")), 1)
 
     @covers_requirement(
         "landmark-rite-settlement::a-repeated-request-identity-settles-once"

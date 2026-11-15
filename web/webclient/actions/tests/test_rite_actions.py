@@ -38,6 +38,7 @@ from world.rules.clock import get_world_clock
 from world.rules.landmark_rites import REFUSAL_MESSAGES, RitePlan, RiteResult, RiteSite
 from world.rules.tests.rite_fixtures import (
     DISTRICT_KEY,
+    DISTRICT_NAME,
     GUARDIAN_NAME,
     LANDMARK_NAME,
     SHARED,
@@ -56,6 +57,7 @@ def _pure_result(
     option,
     perspective: str,
     body_key: str = "測試同伴",
+    first_completion: bool = True,
 ) -> RiteResult:
     """One result value over a standalone synthetic scene, without a database."""
     plan = RitePlan(
@@ -75,7 +77,7 @@ def _pure_result(
         scene=scene,
         tick=150,
         elapsed_seconds=option.seconds,
-        first_completion=True,
+        first_completion=first_completion,
         climax=True,
         operation_id="t_rite_operation",
     )
@@ -216,18 +218,43 @@ class RiteRenderingTests(unittest.TestCase):
     def test_the_completion_line_names_the_performer(self):
         self.assertEqual(
             rite_completion_line(
-                _pure_result(scene=_three_line_scene(), option=SOLO, perspective="self")
+                _pure_result(
+                    scene=_three_line_scene(),
+                    option=SOLO,
+                    perspective="self",
+                    first_completion=False,
+                )
             ),
             f"你完成了{LANDMARK_NAME}的儀式。",
         )
         self.assertEqual(
             rite_completion_line(
                 _pure_result(
-                    scene=_three_line_scene(), option=SHARED, perspective="watch"
+                    scene=_three_line_scene(),
+                    option=SHARED,
+                    perspective="watch",
+                    first_completion=False,
                 )
             ),
             f"測試同伴完成了{LANDMARK_NAME}的儀式。",
         )
+
+    def test_a_first_completion_adds_one_line_naming_the_district(self):
+        def message(first_completion):
+            return rite_completion_line(
+                _pure_result(
+                    scene=_three_line_scene(),
+                    option=SOLO,
+                    perspective="self",
+                    first_completion=first_completion,
+                )
+            ).splitlines()
+
+        first, repeat = message(True), message(False)
+        self.assertEqual(len(first), len(repeat) + 1)
+        self.assertEqual(first[: len(repeat)], repeat)
+        self.assertIn("測試丘陵", first[-1])
+        self.assertNotIn("測試丘陵", "\n".join(repeat))
 
 
 class RiteActionTests(RiteSettlementFixture):
@@ -265,7 +292,9 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(result["code"], "explore.landmark_rite")
         self.assertEqual(result["affected_panels"], ())
-        self.assertEqual(result["message"], f"你完成了{LANDMARK_NAME}的儀式。")
+        self.assertEqual(
+            result["message"].splitlines()[0], f"你完成了{LANDMARK_NAME}的儀式。"
+        )
         message.assert_called_once_with(result["message"])
         delivery = result["data"]["delivery"]
         self.assertEqual(delivery["kind"], "formal")
@@ -292,7 +321,7 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(delivery["scene_id"], SHARED.watch_scene.scene_id)
         self.assertEqual(delivery["lines"][2]["text"], f"測試守護對{self.companion.key}說話。")
         self.assertEqual(
-            result["message"],
+            result["message"].splitlines()[0],
             f"{self.companion.key}完成了{LANDMARK_NAME}的儀式。",
         )
         self.assertEqual(self.companion.sexual.climax_today, 1)
@@ -301,6 +330,23 @@ class RiteActionTests(RiteSettlementFixture):
     @covers_requirement(
         "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
     )
+    def test_only_the_first_completion_message_names_the_district(self):
+        with patch.object(self.player, "msg") as message:
+            first = self.settle("solo")
+            repeat = self.settle("solo")
+
+        first_lines = first["message"].splitlines()
+        repeat_lines = repeat["message"].splitlines()
+        self.assertEqual(len(first_lines), len(repeat_lines) + 1)
+        self.assertIn(DISTRICT_NAME, first_lines[-1])
+        self.assertNotIn(DISTRICT_NAME, repeat["message"])
+        self.assertTrue(first["data"]["first_completion"])
+        self.assertFalse(repeat["data"]["first_completion"])
+        self.assertEqual(
+            [call.args[0] for call in message.call_args_list],
+            [first["message"], repeat["message"]],
+        )
+
     def test_a_request_away_from_the_landmark_is_rejected_unchanged(self):
         self.player.location = self.source
         before = self.world_state()

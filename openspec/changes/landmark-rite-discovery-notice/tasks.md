@@ -5,11 +5,11 @@ Do not add `covers_requirement` for ADDED requirements in this change; that happ
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `landmark-rite-lighting` is merged: `uv run --locked python -c "from world.rules.map_district_lighting import readable_lit_district_keys"` exits 0, and `grep -c "已探明" world/rules/map_discovery.py` prints 0. If not, stop and report.
+- [x] 1.1 Confirm `landmark-rite-lighting` is merged: `uv run --locked python -c "from world.rules.map_district_lighting import readable_lit_district_keys"` exits 0, and `grep -c "已探明" world/rules/map_discovery.py` prints 0. If not, stop and report.
 
 ## 2. Server
 
-- [ ] 2.1 Apply design D1 with the server tests of design D4. Verify: the test prefix passes for each of `web.webclient.actions.tests.test_rite_actions`, `commands.tests.test_rite_command`, `world.rules.tests.test_landmark_rites` (three commands).
+- [x] 2.1 Apply design D1 with the server tests of design D4. Verify: the test prefix passes for each of `web.webclient.actions.tests.test_rite_actions`, `commands.tests.test_rite_command`, `world.rules.tests.test_landmark_rites` (three commands).
 - [ ] 2.2 Apply design D3. Verify: `uv run --locked python -m unittest tests.test_command_docs` passes.
 
 ## 3. Browser
