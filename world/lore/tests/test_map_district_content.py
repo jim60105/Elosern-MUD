@@ -13,6 +13,7 @@ Mechanism rules are covered with synthetic fixtures in ``test_map_districts``.
 import json
 import unittest
 from collections.abc import Mapping
+from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
@@ -40,8 +41,9 @@ from world.maps import district_partition, geography, wilderness_provider
 from world.maps.map_data import settlement_graph
 from world.maps.static_references import binding_signature, map_reference_index
 from world.maps.wilderness_reachability import walkable_components
-from world.rules.map_district_lighting import lit_district_keys_from_visits
-from world.rules.map_knowledge import NodeVisit, decode_node, encode_grid, encode_wild
+from world.rules.landmark_rite_record import RECORD_ATTR, empty_record, with_completion
+from world.rules.map_district_lighting import lit_district_keys
+from world.rules.map_knowledge import decode_node, encode_grid, encode_wild
 from world.tests.geography_fixture import publish_shipped_geography
 
 
@@ -314,13 +316,18 @@ class SyntheticConsumerEvidenceTests(unittest.TestCase):
         self.assertEqual(
             node_id, encode_wild(wilderness_provider.WILDERNESS_NAME, 300, 200)
         )
-        visit = NodeVisit(node_id, 1, 1)
-        with mock.patch.object(map_districts, "_PUBLISHED", after):
-            # Lighting reads the published snapshot by default: the new
-            # declaration needs no code registration.
-            self.assertEqual(
-                lit_district_keys_from_visits([visit]), frozenset({"beta_seed"})
+        record = with_completion(empty_record(), "beta_seed", "t_option", 1)
+        owner = SimpleNamespace(
+            attributes=SimpleNamespace(
+                get=lambda key, default=None: record if key == RECORD_ATTR else default
             )
+        )
+        with mock.patch.object(map_districts, "_PUBLISHED", after):
+            # Lighting reads the published snapshot by default: a completed
+            # rite for the new declaration lights it with no code registration.
+            self.assertEqual(lit_district_keys(owner), frozenset({"beta_seed"}))
+        with mock.patch.object(map_districts, "_PUBLISHED", before):
+            self.assertEqual(lit_district_keys(owner), frozenset())
 
     @covers_requirement(
         "map-districts::the-authored-continent-has-a-complete-discoverable-landmark-roster"

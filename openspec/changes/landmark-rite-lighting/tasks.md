@@ -6,13 +6,13 @@ Do not touch the `district_lit` flag, the `lit_district` notice field, `Landmark
 
 ## 1. Preconditions
 
-- [ ] 1.1 Confirm `landmark-rite-stage` is merged (the browser can perform a rite): `ls web/webclient-app/composables/use-rite-stage.js web/webclient/presentation/rite.py world/rules/landmark_rite_record.py` lists three files. If not, stop and report.
+- [x] 1.1 Confirm `landmark-rite-stage` is merged (the browser can perform a rite): `ls web/webclient-app/composables/use-rite-stage.js web/webclient/presentation/rite.py world/rules/landmark_rite_record.py` lists three files. If not, stop and report.
 
 ## 2. Lit set
 
-- [ ] 2.1 Apply design D1 to `world/rules/map_district_lighting.py`, add the helper `complete_rite_record`, and rewrite `world/rules/tests/test_map_district_lighting.py` per design D6. Verify: the test prefix with `world.rules.tests.test_map_district_lighting` passes.
-- [ ] 2.2 Apply design D2 to `world/rules/map_knowledge.py` and update `world/rules/tests/test_ground_reveal.py` per design D6. Verify: the test prefix with `world.rules.tests.test_ground_reveal` passes.
-- [ ] 2.3 Apply design D3 to `sight.py`, `travel_events.py`, `travel_interrupts.py`, `area_map.py`, `world_map.py`, `tools/world_map_payload.py` and `rite.py`, and update the world map, area map and rite panel tests per design D6. Verify: `grep -rn "lit_district_keys_from_visits\|_lit_district_keys_for_record\|\.lit_district_keys()" world web typeclasses commands tools --include=*.py` prints nothing, and the test prefix passes for each of `web.webclient.presentation.tests.test_world_map`, `web.webclient.presentation.tests.test_world_map_measurement`, `web.webclient.presentation.tests.test_area_map`, `web.webclient.presentation.tests.test_rite_panel` (four commands).
+- [x] 2.1 Apply design D1 to `world/rules/map_district_lighting.py`, add the helper `complete_rite_record`, and rewrite `world/rules/tests/test_map_district_lighting.py` per design D6. Verify: the test prefix with `world.rules.tests.test_map_district_lighting` passes.
+- [x] 2.2 Apply design D2 to `world/rules/map_knowledge.py` and update `world/rules/tests/test_ground_reveal.py` per design D6. Verify: the test prefix with `world.rules.tests.test_ground_reveal` passes.
+- [x] 2.3 Apply design D3 to `sight.py`, `travel_events.py`, `travel_interrupts.py`, `area_map.py`, `world_map.py`, `tools/world_map_payload.py` and `rite.py`, and update the world map, area map and rite panel tests per design D6. Verify: `grep -rn "lit_district_keys_from_visits\|_lit_district_keys_for_record\|\.lit_district_keys()" world web typeclasses commands tools --include=*.py` prints nothing, and the test prefix passes for each of `web.webclient.presentation.tests.test_world_map`, `web.webclient.presentation.tests.test_world_map_measurement`, `web.webclient.presentation.tests.test_area_map`, `web.webclient.presentation.tests.test_rite_panel` (four commands).
 
 ## 3. Movement narrative
 

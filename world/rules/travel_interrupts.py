@@ -221,13 +221,12 @@ def read_movement_facts(
 
     ``knowledge_owner`` is the authorized ``PlayerCharacter`` knowledge owner
     (the commander behind a possessed body); ``members`` freezes the traversing
-    cohort so the after capture can never reselect a different party. A
-    corrupt knowledge record raises (:class:`world.rules.map_knowledge.
-    KnowledgeError`) instead of degrading: the collector logs the failed
-    comparison and returns no flags, so an unreadable lighting record can never
-    fabricate a newly lit district.
+    cohort so the after capture can never reselect a different party. The lit
+    set is the owner's completed-rite record; an unreadable record degrades to
+    no lit district with one warning, so it can never fabricate a newly lit
+    district.
     """
-    from world.rules.map_district_lighting import lit_district_keys
+    from world.rules.map_district_lighting import readable_lit_district_keys
 
     owner = knowledge_owner if knowledge_owner is not None else actor
     if cell is None:
@@ -263,7 +262,7 @@ def read_movement_facts(
         cell=cell,
         tick=tick,
         landmarks=landmarks,
-        lit_districts=lit_district_keys(owner),
+        lit_districts=readable_lit_district_keys(owner),
         distant_sources=distant_sources,
         hostiles=hostiles,
         travellers=_traveller_facts(members),

@@ -69,11 +69,12 @@ def quest_markers(actor, lit):
     return markers[:WORLD_MAX_QUEST_MARKERS]
 
 
-def assemble_world_map(*, visit_ids, current, markers):
-    """Assemble with fresh containers; cached static bodies remain private."""
-    from world.lore.map_districts import landmark_node_ids
+def assemble_world_map(*, visit_ids, current, markers, lit):
+    """Assemble with fresh containers; cached static bodies remain private.
 
-    lit={key for key,node_id in landmark_node_ids().items() if node_id in visit_ids}
+    ``lit`` is the caller's lit district set (the completed-rite record);
+    ``visit_ids`` supplies only visited places and the trail, never lighting.
+    """
     permitted=[]
     visited=[]
     for owner,row,hidden,node_ids in geometry.place_geometry():
@@ -97,7 +98,7 @@ def assemble_world_map(*, visit_ids, current, markers):
 
 
 def world_map_presenter(context):
-    from world.lore.map_districts import landmark_node_ids
+    from world.rules.map_district_lighting import readable_lit_district_keys
 
     actor=context.actor
     current=geometry.current_point(actor)
@@ -108,5 +109,5 @@ def world_map_presenter(context):
     except KnowledgeError as error:  # observability: ignore R2: unreadable knowledge is explicitly unavailable, never reset
         raise PanelUnavailableError from error
     ids={visit.node_id for visit in visits}
-    lit={key for key,node_id in landmark_node_ids().items() if node_id in ids}
-    return assemble_world_map(visit_ids=ids,current=current,markers=quest_markers(actor,lit))
+    lit=readable_lit_district_keys(actor)
+    return assemble_world_map(visit_ids=ids,current=current,markers=quest_markers(actor,lit),lit=lit)

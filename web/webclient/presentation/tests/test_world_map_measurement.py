@@ -89,6 +89,7 @@ class WorldMapMeasurementTests(unittest.TestCase):
             visit_ids=set(landmark_node_ids().values()),
             current=(1999.5, 1099.5),
             markers=[],
+            lit=frozenset(world_map_payload.district_keys()),
         )
         size = len(world_map_payload.canonical_bytes(body))
         print(f"Actual all-lit presenter geometry: {size} canonical bytes")

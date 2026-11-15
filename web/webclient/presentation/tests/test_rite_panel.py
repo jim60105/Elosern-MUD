@@ -32,7 +32,7 @@ from web.webclient.presentation.rite import (
 from web.webclient.actions.rite_actions import landmark_rite_adapter
 from world.rules.fatigue import SleepPosture, write_fatigue_state
 from world.rules.landmark_rite_record import RECORD_ATTR
-from world.rules.map_knowledge import node_id_for
+from world.rules.map_knowledge import node_id_for, record_arrival
 from world.rules.possession import enter_possession
 from world.rules.tests.rite_fixtures import (
     DISTRICT_KEY,
@@ -41,6 +41,7 @@ from world.rules.tests.rite_fixtures import (
     GUARDIAN_NAME,
     LANDMARK_NAME,
     RiteSettlementFixture,
+    complete_rite_record,
 )
 
 VALID = {
@@ -291,15 +292,11 @@ class RiteValidatorTests(unittest.TestCase):
 
 class RitePanelPresenterTests(RiteSettlementFixture):
     def _payload(self, actor=None):
-        with patch(
-            "world.rules.map_district_lighting.lit_district_keys",
-            return_value=frozenset(),
-        ):
-            return rite_presenter(
-                PresentationContext(
-                    actor=self.player if actor is None else actor, protocol_version=1
-                )
+        return rite_presenter(
+            PresentationContext(
+                actor=self.player if actor is None else actor, protocol_version=1
             )
+        )
 
     def _settle(self, option="shared", member_id=None):
         with self.captureOnCommitCallbacks(execute=True):
@@ -356,16 +353,20 @@ class RitePanelPresenterTests(RiteSettlementFixture):
     @covers_requirement(
         "landmark-rite-panel::the-rite-panel-is-available-exactly-on-a-rite-landmark",
     )
-    def test_the_lit_flag_follows_the_district_lighting_read(self):
-        with patch(
-            "world.rules.map_district_lighting.lit_district_keys",
-            return_value=frozenset({DISTRICT_KEY}),
-        ):
-            payload = rite_presenter(
-                PresentationContext(actor=self.player, protocol_version=1)
-            )
+    def test_the_lit_flag_follows_a_completed_rite(self):
+        # Standing on (and having visited) the landmark lights nothing.
+        record_arrival(self.player)
+        self.assertFalse(self._payload()["district"]["lit"])
+
+        complete_rite_record(self.player, DISTRICT_KEY)
+        payload = self._payload()
         self.assertTrue(payload["available"])
         self.assertTrue(payload["district"]["lit"])
+
+    def test_a_settled_rite_lights_the_panel(self):
+        self.assertFalse(self._payload()["district"]["lit"])
+        self._settle(option="solo")
+        self.assertTrue(self._payload()["district"]["lit"])
 
     @covers_requirement(
         "landmark-rite-panel::the-rite-panel-is-available-exactly-on-a-rite-landmark",
@@ -425,11 +426,15 @@ class RitePanelPresenterTests(RiteSettlementFixture):
     )
     def test_a_corrupt_record_degrades_to_no_seen_and_one_warning(self):
         self.player.attributes.add(RECORD_ATTR, {"schema_version": 2, "completed": {}})
-        with patch("web.webclient.presentation.rite.log_warn") as warning:
+        with patch("web.webclient.presentation.rite.log_warn") as warning, patch(
+            "world.rules.map_district_lighting.log_warn"
+        ) as lighting_warning:
             payload = self._payload()
 
         self.assertTrue(payload["available"])
         self.assertEqual(payload["seen"], [])
+        self.assertFalse(payload["district"]["lit"])
+        lighting_warning.assert_not_called()
         self.assertEqual(warning.call_count, 1)
         self.assertEqual(warning.call_args.args[0], "landmark_rite_record_corrupt")
         self.assertEqual(

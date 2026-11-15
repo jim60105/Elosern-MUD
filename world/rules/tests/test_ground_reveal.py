@@ -1,12 +1,14 @@
 """Ground observation writes and the bounded reveal projection.
 
-Synthetic schema-2 records, synthetic district ownership and fixed radii keep
-every expectation independent of shipped content. Arrival and explicit-skip
+Synthetic schema-2 records, synthetic rite records, synthetic district
+ownership and fixed radii keep every expectation independent of shipped
+content. Lit ownership comes from the completed-rite record, never a visit. Arrival and explicit-skip
 settlement are exercised through the real clock owners with injected sight
 radii and fault injection after the observation write.
 """
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
@@ -18,9 +20,11 @@ from world.maps import wilderness_provider
 from world.tests.geography_fixture import publish_shipped_geography
 from world.rules.clock import AdvanceSource, WorldClock, _EVENT_SOURCES, get_world_clock
 from world.rules.fatigue import SleepPosture, read_fatigue_state, write_fatigue_state
+from world.rules.landmark_rite_record import RECORD_ATTR, empty_record, with_completion
 from world.rules.map_knowledge import (
     CHUNK_CELLS,
     KNOWLEDGE_ATTR,
+    KnowledgeSnapshot,
     is_revealed,
     parse_knowledge,
     record_ground_observation,
@@ -71,12 +75,12 @@ def _wild_node(x, y):
 class _Attributes:
     """A read-only attribute surface that fails on any write attempt."""
 
-    def __init__(self, record):
-        self.record = record
+    def __init__(self, stored):
+        self.stored = stored
         self.writes = []
 
     def get(self, key, default=None):
-        return self.record
+        return self.stored.get(key, default)
 
     def add(self, *args, **kwargs):
         self.writes.append((args, kwargs))
@@ -87,15 +91,38 @@ class _Attributes:
         raise AssertionError("a read projection must never write")
 
 
+def _rite_record(district_keys):
+    """A rite record holding one completion for each of ``district_keys``."""
+    record = empty_record()
+    for key in district_keys:
+        record = with_completion(record, key, "t_option", 1)
+    return record
+
+
 class _Character:
-    def __init__(self, record=None):
-        self.attributes = _Attributes(record)
+    def __init__(self, record=None, *, rites=None):
+        stored = {}
+        if record is not None:
+            stored[KNOWLEDGE_ATTR] = record
+        if rites is not None:
+            stored[RECORD_ATTR] = rites
+        self.pk = 11
+        self.attributes = _Attributes(stored)
 
 
 class GroundRevealProjectionTests(unittest.TestCase):
-    def _reveal(self, record, bounds, *, landmarks=None, owners=None):
-        character = _Character(record)
+    def _reveal(self, record, bounds, *, lit=(), owners=None, landmarks=None, rites=None):
+        """The character-level projection for one synthetic world.
+
+        ``lit`` districts are completed in the character's rite record (unless
+        an explicit ``rites`` record is given) and declared by the registry;
+        ``landmarks`` pins the landmark node table so a test can visit one.
+        """
+        character = _Character(record, rites=_rite_record(lit) if rites is None else rites)
         with patch(
+            "world.lore.map_districts.current",
+            new=lambda: SimpleNamespace(districts={key: None for key in lit}),
+        ), patch(
             "world.lore.map_districts.landmark_node_ids",
             return_value=dict(landmarks or {}),
         ), patch(
@@ -195,13 +222,13 @@ class GroundRevealProjectionTests(unittest.TestCase):
             revealed = self._reveal(
                 record,
                 (60, 60, 70, 66),
-                landmarks={"harbour": _wild_node(65, 63)},
+                lit={"harbour"},
                 owners={(70, 66): "harbour"},
             )
         self.assertIn((70, 66), revealed, "the whole lit district is revealed")
         self.assertIn((63, 63), revealed)
-        # Membership decodes the landmark's chunk; the window decodes only its
-        # two expanded observation chunks. Nothing else is touched.
+        # Lighting reads no knowledge chunk; the window decodes only its two
+        # expanded observation chunks. Nothing else is touched.
         self.assertEqual(set(decoded), {"0:0", "1:0"})
 
     @covers_requirement(
@@ -233,7 +260,7 @@ class GroundRevealProjectionTests(unittest.TestCase):
             revealed = self._reveal(
                 record,
                 (60, 60, 70, 66),
-                landmarks={"harbour": _wild_node(60, 60)},
+                lit={"harbour"},
                 owners={(70, 66): "harbour"},
             )
         self.assertEqual(revealed, {(70, 66)})
@@ -293,9 +320,7 @@ class GroundRevealProjectionTests(unittest.TestCase):
             }
         )
         character = _Character(record)
-        with patch("world.lore.map_districts.landmark_node_ids", return_value={}), patch(
-            "world.maps.district_partition.district_at", return_value=None
-        ):
+        with patch("world.maps.district_partition.district_at", return_value=None):
             self.assertTrue(is_revealed(character, (0, 0)))
             self.assertFalse(is_revealed(character, (1, 0)))
         self.assertEqual(character.attributes.writes, [])
@@ -321,20 +346,82 @@ class GroundRevealProjectionTests(unittest.TestCase):
             }
         )
         character = _Character(record)
-        with patch("world.lore.map_districts.landmark_node_ids", return_value={}), patch(
-            "world.maps.district_partition.district_at", return_value=None
-        ):
+        with patch("world.maps.district_partition.district_at", return_value=None):
             self.assertIn((61, 61), revealed_in_bounds(character, (55, 55, 65, 65)))
             self.assertFalse(has_visited(character, _wild_node(61, 61)))
             self.assertTrue(has_visited(character, _wild_node(60, 60)))
 
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
+    def test_a_visited_landmark_alone_reveals_only_its_disc(self):
+        # The district's exact landmark node is visited and every cell in the
+        # query belongs to that district, but no rite is completed there.
+        record = _record(
+            {
+                "0:0": {
+                    str(_offset(60, 60)): {
+                        "first_seen_tick": 1,
+                        "last_seen_tick": 1,
+                        "sight": 1,
+                    }
+                }
+            }
+        )
+        bounds = (55, 55, 65, 65)
+        owners = {
+            (x, y): "harbour" for x in range(55, 66) for y in range(55, 66)
+        }
+        disc = {(60, 60), (59, 60), (61, 60), (60, 59), (60, 61)}
+        dark = self._reveal(
+            record,
+            bounds,
+            owners=owners,
+            landmarks={"harbour": _wild_node(60, 60)},
+        )
+        self.assertEqual(dark, self._reveal(record, bounds))
+        self.assertLessEqual(dark, {(x, y) for x in range(59, 62) for y in range(59, 62)})
+        self.assertLessEqual(disc, dark)
+        # One completed rite reveals the whole district beyond the disc.
+        lit = self._reveal(record, bounds, lit={"harbour"}, owners=owners)
+        self.assertEqual(lit, frozenset(owners))
 
-def _reference_reveal(record, bounds, landmarks, owners):
+    @covers_requirement(
+        "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
+    )
+    def test_an_unreadable_rite_record_keeps_discs_and_lights_nothing(self):
+        record = _record(
+            {
+                "0:0": {
+                    str(_offset(60, 60)): {
+                        "first_seen_tick": 1,
+                        "last_seen_tick": 1,
+                        "sight": 0,
+                    }
+                }
+            }
+        )
+        corrupt = {"schema_version": 1, "completed": {"harbour": "not a mapping"}}
+        with patch("world.rules.map_district_lighting.log_warn") as warning:
+            revealed = self._reveal(
+                record,
+                (55, 55, 65, 65),
+                owners={(57, 57): "harbour"},
+                rites=corrupt,
+            )
+        self.assertEqual(revealed, {(60, 60)})
+        self.assertEqual(warning.call_count, 1)
+        self.assertEqual(warning.call_args.args[0], "landmark_rite_record_corrupt")
+        self.assertEqual(corrupt["completed"], {"harbour": "not a mapping"})
+
+
+def _reference_reveal(record, bounds, lit, owners):
     """The pre-snapshot reveal algorithm, kept as an independent oracle.
 
-    It walks every visit's whole disc with ``in_ground_disc`` and then the lit
-    district ownership of every remaining cell, with no early exit or offset
-    table, so the optimized projection is compared against plain arithmetic.
+    It walks every visit's whole disc with ``in_ground_disc`` and then the
+    supplied lit district ownership of every remaining cell, with no early
+    exit or offset table, so the optimized projection is compared against
+    plain arithmetic.
     """
     from world.rules.sight import in_ground_disc
 
@@ -351,7 +438,6 @@ def _reference_reveal(record, bounds, landmarks, owners):
         for offset, entry in entries.items():
             offset = int(offset)
             stored[(cx * CHUNK_CELLS + offset % CHUNK_CELLS, cy * CHUNK_CELLS + offset // CHUNK_CELLS)] = entry["sight"]
-    lit = {key for key, node_id in landmarks.items() if node_id in {_wild_node(*cell) for cell in stored}}
     revealed = set()
     for (ox, oy), radius in stored.items():
         if not (x0 - 8 <= ox <= x1 + 8 and y0 - 8 <= oy <= y1 + 8):
@@ -370,7 +456,15 @@ def _reference_reveal(record, bounds, landmarks, owners):
 class RevealDifferentialTests(unittest.TestCase):
     """The snapshot projection equals the plain reference on random records."""
 
-    _reveal = GroundRevealProjectionTests._reveal
+    def _reveal(self, record, bounds, *, lit, owners):
+        """The snapshot projection with an injected lit set."""
+        with patch(
+            "world.maps.district_partition.district_at",
+            side_effect=lambda cell: owners.get(tuple(cell)),
+        ):
+            return KnowledgeSnapshot.from_record(record).revealed_in_bounds(
+                bounds, lit=frozenset(lit)
+            )
 
     @covers_requirement(
         "wilderness-ground-reveal::permanent-reveal-is-a-bounded-read-projection"
@@ -391,13 +485,7 @@ class RevealDifferentialTests(unittest.TestCase):
                     "sight": rng.randrange(0, 9),
                 }
             record = _record(chunks)
-            landmark_cell = next(
-                (int(key) % CHUNK_CELLS + int(chunk.split(":")[0]) * CHUNK_CELLS,
-                 int(key) // CHUNK_CELLS + int(chunk.split(":")[1]) * CHUNK_CELLS)
-                for chunk, entries in chunks.items()
-                for key in entries
-            )
-            landmarks = {"t_lit": _wild_node(*landmark_cell), "t_dark": _wild_node(2600, 2600)}
+            lit = {"t_lit"} if case % 2 == 0 else set()
             owners = {
                 (base[0] + dx, base[1] + dy): ("t_lit" if case % 3 == 0 else "t_dark")
                 for dx in range(10, 20)
@@ -406,8 +494,8 @@ class RevealDifferentialTests(unittest.TestCase):
             bounds = (base[0] - 5, base[1] - 5, base[0] + 35, base[1] + 35)
             with self.subTest(case=case):
                 self.assertEqual(
-                    self._reveal(record, bounds, landmarks=landmarks, owners=owners),
-                    _reference_reveal(record, bounds, landmarks, owners),
+                    self._reveal(record, bounds, lit=lit, owners=owners),
+                    _reference_reveal(record, bounds, lit, owners),
                 )
 
 

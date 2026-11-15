@@ -817,18 +817,16 @@ def district_overview(
     )
 
 
-def _lit_landmarks(visited: Callable[[str], bool]) -> dict[str, str]:
-    """The lit districts' landmark node ids, read by exact landmark membership.
+def _lit_landmarks(lit: frozenset[str]) -> dict[str, str]:
+    """The landmark node ids of the lit districts (``lit``: completed rites).
 
-    ``sight.visible_distant_markers`` derives the lit set from the whole
-    knowledge record; the window instead asks only for each district
-    landmark's own node (one selected chunk each), so a long history never
-    decodes every chunk.
+    Only the landmark naming reads this table; a lit district whose landmark
+    does not resolve to a node simply names no node.
     """
     from world.lore.map_districts import current as districts_current, landmark_node_ids
 
     registry = districts_current().districts
-    return {key: node_id for key, node_id in landmark_node_ids(registry).items() if visited(node_id)}
+    return {key: node_id for key, node_id in landmark_node_ids(registry).items() if key in lit}
 
 
 def _distant_markers(
@@ -872,6 +870,7 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
     from world.maps.wilderness_population import population_view, threat_label
     from world.rules import sight
     from world.rules.clock import get_world_clock
+    from world.rules.map_district_lighting import readable_lit_district_keys
     from world.rules.map_knowledge import decode_node, read_snapshot
     from world.rules.wilderness_disclosure import WildernessDisclosure
     from web.webclient.presentation.local_map.gateways import _registered_gateways
@@ -907,7 +906,16 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
     for visit in visits:
         decoded = decode_node(visit.node_id)
         visited_cells.add((decoded["x"], decoded["y"]))
-    revealed = set(snapshot.revealed_in_bounds(bounds, obj=str(actor))) | visited_cells | {(cx, cy)}
+
+    # One lit set per request, from the completed-rite record: it drives the
+    # permanent reveal, district disclosure, distant names and landmark names.
+    try:
+        lit = readable_lit_district_keys(actor)
+        lit_nodes = _lit_landmarks(lit)
+    except Exception as error:
+        log_warn("area_map_lighting_failed", exc=error, context={"layer": "wilderness", "cell": f"{cx},{cy}"})
+        raise PanelUnavailableError from error
+    revealed = set(snapshot.revealed_in_bounds(bounds, lit=lit, obj=str(actor))) | visited_cells | {(cx, cy)}
 
     gateways = {approach: (grid_gate, anchor) for approach, grid_gate, anchor in _registered_gateways()}
     gate_visits: dict[str, bool] = {}
@@ -919,13 +927,6 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
             except KnowledgeError:  # observability: ignore R2: the window read above already validated the envelope; an unreadable answer discloses nothing
                 gate_visits[gate_node] = False
         return gate_visits[gate_node]
-
-    try:
-        lit_nodes = _lit_landmarks(gate_visited)
-    except Exception as error:
-        log_warn("area_map_lighting_failed", exc=error, context={"layer": "wilderness", "cell": f"{cx},{cy}"})
-        raise PanelUnavailableError from error
-    lit = frozenset(lit_nodes)
 
     def disclosure_for(gate_node: str) -> WildernessDisclosure:
         visited = frozenset({gate_node}) if gate_visited(gate_node) else frozenset()
@@ -1029,8 +1030,8 @@ def _wilderness_area(actor: Any, location: Any) -> dict[str, Any]:
             node["action"] = action
         steps.append(destination)
 
-    # A lit district's landmark names its own wild node (a lit landmark was
-    # visited, so its node is already present when it lies in the window).
+    # A lit district's landmark names its own wild node (its rite was performed
+    # there, so its node was visited and is present when it lies in the window).
     landmark_names = _landmark_names(lit_nodes)
     for node in cells.values():
         name = landmark_names.get(node["id"])

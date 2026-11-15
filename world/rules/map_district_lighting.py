@@ -1,53 +1,68 @@
-"""Read-only district lighting derived from map knowledge (map-districts).
+"""Read-only district lighting derived from the landmark rite record (map-districts).
 
-A map district is lit if and only if its exact canonical landmark node is in
-the player's visited record (world-map drawer design §4.3). Lighting is a pure
-derivation: it reads the record through :func:`world.rules.map_knowledge.
-parse_knowledge`, compares node IDs by exact string identity, and never writes
-the record, adds a discovery attribute, or attaches district names or geometry
-to persisted knowledge. ``record_arrival`` stays the sole knowledge writer.
+A map district is lit if and only if the player character's rite record
+(:mod:`world.rules.landmark_rite_record`) holds at least one completed rite for
+it and the district registry declares it (landmark rites design §8). Visiting
+a landmark lights nothing: map knowledge stays a record of visits only.
 
-The first-arrival ``已探明`` narrative belongs to the world-map panel change,
-not to this module.
+Lighting is a pure derivation: it reads the rite record through
+:func:`world.rules.landmark_rite_record.completed_district_keys`, never reads
+map knowledge, and never writes or creates an attribute. ``record_arrival``
+stays the sole knowledge writer and the rite settlement the sole record writer.
+
+Two reads share one rule. :func:`lit_district_keys` is strict and raises on a
+corrupt record; :func:`readable_lit_district_keys` is the read presentation and
+travel use, which degrades an unreadable record to no lit district with one
+warning, so a corrupt record can never fabricate a lit district.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from elosern_map_core.documents import DistrictDeclaration
-from world.lore.map_districts import current
-from world.rules.map_knowledge import KNOWLEDGE_ATTR, NodeVisit, parse_knowledge
-
-
-def lit_district_keys_from_visits(
-    visits: Iterable[NodeVisit],
-    registry: Mapping[str, DistrictDeclaration] | None = None,
-) -> frozenset[str]:
-    """The keys of the districts whose exact landmark node was visited."""
-    from world.lore.map_districts import landmark_node_ids
-
-    districts = current().districts if registry is None else registry
-    visited = {visit.node_id for visit in visits}
-    landmarks = landmark_node_ids(districts)
-    return frozenset(
-        key for key, node_id in landmarks.items() if node_id in visited
-    )
+from world.observability import log_warn
+from world.rules.landmark_rite_record import (
+    LandmarkRiteRecordError,
+    completed_district_keys,
+)
 
 
 def lit_district_keys(
     character: Any,
     registry: Mapping[str, DistrictDeclaration] | None = None,
 ) -> frozenset[str]:
-    """The keys of the districts the character has lit.
+    """The districts whose rite this character has completed at least once.
 
-    A character with no record yet has visited nothing, so nothing is lit. A
-    corrupt record raises :class:`world.rules.map_knowledge.KnowledgeError`
-    exactly as ``parse_knowledge`` does (it is never reset here); the caller
-    decides how an unreadable record is presented, as the local-map presenter
-    does.
+    ``character`` is the rite record owner (the player character, or the
+    commander behind a possessed body). A completed key the registry (default:
+    the published district world) does not declare is not lit. A character who
+    never completed a rite lights nothing and the registry is not read. A
+    corrupt record raises :class:`LandmarkRiteRecordError` and is left as is.
     """
-    if character.attributes.get(KNOWLEDGE_ATTR) is None:
+    completed = completed_district_keys(character)
+    if not completed:
         return frozenset()
-    return lit_district_keys_from_visits(parse_knowledge(character), registry)
+    if registry is None:
+        # Resolved at call time so a substituted district world is honoured.
+        from world.lore.map_districts import current
+
+        registry = current().districts
+    return frozenset(key for key in completed if key in registry)
+
+
+def readable_lit_district_keys(
+    character: Any,
+    registry: Mapping[str, DistrictDeclaration] | None = None,
+) -> frozenset[str]:
+    """As :func:`lit_district_keys`, degrading to no lit district when unreadable."""
+    try:
+        return lit_district_keys(character, registry)
+    except LandmarkRiteRecordError as error:
+        log_warn(
+            "landmark_rite_record_corrupt",
+            exc=error,
+            context={"char": getattr(character, "pk", None), "district": ""},
+        )
+        return frozenset()
