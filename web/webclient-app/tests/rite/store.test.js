@@ -4,7 +4,7 @@
 // asserts the centred-card predicate through the travel store's walk refusal.
 import { afterEach, describe, expect, it } from "vitest";
 import { DIALOGUE_PANEL_SAMPLE } from "../../stories/fixtures/dialogue_panels.js";
-import { ritePanel } from "../../stories/fixtures/rite.js";
+import { RITE_PARTY, ritePanel } from "../../stories/fixtures/rite.js";
 import { fx, liveTravel, panelsAt, tick, walkArea, walkCapacity, walkPanels, WILD_SUBJECT } from "../travel/support.js";
 
 const wrappers = [];
@@ -63,8 +63,8 @@ function harness({ rite = null } = {}) {
     h.accept("ui_action_result", body);
   };
   /** Arrive (card opens) and approach the stage. */
-  const onStage = () => {
-    commitRite(ritePanel());
+  const onStage = (panel = ritePanel()) => {
+    commitRite(panel);
     expect(view().phase).toBe("card");
     expect(h.store.approachRite()).toBe(true);
     expect(view().phase).toBe("stage");
@@ -253,7 +253,10 @@ describe("rite reset", () => {
     h.onStage();
     expect(h.store.performRite("drink")).toBe(true);
     h.commitRite(null);
-    expect(h.view()).toEqual({ panel: null, phase: "closed", revisit: false, pending: false, delivery: null, playing: false });
+    expect(h.view()).toEqual({
+      panel: null, phase: "closed", revisit: false, pending: false, delivery: null, playing: false,
+      performerId: "self", canSwitch: false,
+    });
     // The stale result arriving later adopts nothing.
     h.answer();
     expect(h.view()).toMatchObject({ phase: "closed", delivery: null, playing: false });
@@ -264,6 +267,116 @@ describe("rite reset", () => {
     h.onStage();
     h.publish({ rite: ritePanel(), dialogue: DIALOGUE_PANEL_SAMPLE }, { mode: "dialogue" });
     expect(h.view()).toMatchObject({ phase: "closed", pending: false, delivery: null, playing: false });
+  });
+});
+
+describe("rite performer picking", () => {
+  const PARTY = ritePanel({ performers: RITE_PARTY });
+
+  it("is offered only with another performer and an option a companion may perform", () => {
+    const h = harness();
+    h.onStage(ritePanel());
+    expect(h.view().canSwitch).toBe(false);
+    h.commitRite(ritePanel({ performers: RITE_PARTY, options: [{ key: "bathe", label: "浸入池中", companion: false }] }));
+    expect(h.view().canSwitch).toBe(false);
+    expect(h.store.pickRitePerformer("7")).toBe(false);
+    expect(h.store.stepRitePerformer(1)).toBe(false);
+    h.commitRite(PARTY);
+    expect(h.view()).toMatchObject({ canSwitch: true, performerId: "self" });
+  });
+
+  it("picks a listed performer and refuses an unlisted one", () => {
+    const h = harness();
+    h.onStage(PARTY);
+    expect(h.store.pickRitePerformer("8")).toBe(true);
+    expect(h.view().performerId).toBe("8");
+    expect(h.store.pickRitePerformer("8")).toBe(true);
+    expect(h.store.pickRitePerformer("99")).toBe(false);
+    expect(h.store.pickRitePerformer(8)).toBe(false);
+    expect(h.view().performerId).toBe("8");
+    expect(h.store.pickRitePerformer("self")).toBe(true);
+    expect(h.view().performerId).toBe("self");
+  });
+
+  it("steps through the performers, wrapping in both directions", () => {
+    const h = harness();
+    h.onStage(PARTY);
+    const forward = [];
+    for (let i = 0; i < 3; i += 1) {
+      expect(h.store.stepRitePerformer(1)).toBe(true);
+      forward.push(h.view().performerId);
+    }
+    expect(forward).toEqual(["7", "8", "self"]);
+    expect(h.store.stepRitePerformer(-1)).toBe(true);
+    expect(h.view().performerId).toBe("8");
+    expect(h.store.stepRitePerformer(0)).toBe(false);
+    expect(h.view().performerId).toBe("8");
+  });
+
+  it("refuses picking outside the stage and while a rite is pending or playing", () => {
+    const h = harness();
+    h.commitRite(PARTY);
+    expect(h.view().phase).toBe("card");
+    expect(h.store.pickRitePerformer("7")).toBe(false);
+    expect(h.store.stepRitePerformer(1)).toBe(false);
+    expect(h.store.approachRite()).toBe(true);
+    expect(h.store.performRite("drink")).toBe(true);
+    expect(h.store.pickRitePerformer("7")).toBe(false);
+    expect(h.store.stepRitePerformer(1)).toBe(false);
+    h.answer();
+    expect(h.view().playing).toBe(true);
+    expect(h.store.pickRitePerformer("7")).toBe(false);
+    expect(h.store.stepRitePerformer(1)).toBe(false);
+    expect(h.view().performerId).toBe("self");
+  });
+
+  it("every entry to the stage starts with the controlled character", () => {
+    const h = harness();
+    h.onStage(PARTY);
+    expect(h.store.pickRitePerformer("7")).toBe(true);
+    expect(h.store.leaveRite()).toBe(true);
+    expect(h.view().performerId).toBe("self");
+    expect(h.store.openRiteCard()).toBe(true);
+    expect(h.store.approachRite()).toBe(true);
+    expect(h.view().performerId).toBe("self");
+  });
+
+  it("a committed panel that no longer lists the picked performer returns the pick", () => {
+    const h = harness();
+    h.onStage(PARTY);
+    expect(h.store.pickRitePerformer("8")).toBe(true);
+    h.commitRite(ritePanel({ performers: RITE_PARTY.slice(0, 2) }));
+    expect(h.view()).toMatchObject({ phase: "stage", performerId: "self" });
+    expect(h.store.pickRitePerformer("7")).toBe(true);
+    h.commitRite(ritePanel({ performers: RITE_PARTY.slice(0, 2) }));
+    expect(h.view().performerId).toBe("7");
+    h.commitRite(ritePanel());
+    expect(h.view().performerId).toBe("self");
+  });
+
+  it("sends the picked performer's member id, and nothing for a companion's solo-only option", () => {
+    const h = harness();
+    h.onStage(PARTY);
+    expect(h.store.pickRitePerformer("7")).toBe(true);
+    expect(h.store.performRite("bathe")).toBe(false);
+    expect(h.rites()).toHaveLength(0);
+    expect(h.view().pending).toBe(false);
+    expect(h.store.performRite("drink")).toBe(true);
+    expect(h.rites()).toHaveLength(1);
+    expect(h.rites()[0].payload).toEqual({ option: "drink", member_id: 7 });
+  });
+
+  it("a possessed companion in the first row sends a null member and may not pick a solo-only option", () => {
+    const h = harness();
+    const possessed = [
+      { member_id: null, name: "合成同伴", owner: false },
+      { member_id: 5, name: "合成旅人", owner: true },
+    ];
+    h.onStage(ritePanel({ performers: possessed }));
+    expect(h.store.performRite("bathe")).toBe(false);
+    expect(h.store.pickRitePerformer("5")).toBe(true);
+    expect(h.store.performRite("bathe")).toBe(true);
+    expect(h.rites()[0].payload).toEqual({ option: "bathe", member_id: 5 });
   });
 });
 

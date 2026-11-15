@@ -278,10 +278,13 @@ export const useElosernStore = defineStore("elosern", () => {
     confirmCamp: ctx.confirmCamp,
     continueCampTravel: ctx.continueCampTravel,
     // The landmark rite (landmark-rite-store): the local card and stage
-    // transitions, the one perform and the scene's end.
+    // transitions, the performer pick (landmark-rite-performer-picking), the
+    // one perform and the scene's end.
     openRiteCard: ctx.openRiteCard,
     approachRite: ctx.approachRite,
     leaveRite: ctx.leaveRite,
+    pickRitePerformer: ctx.pickRitePerformer,
+    stepRitePerformer: ctx.stepRitePerformer,
     performRite: ctx.performRite,
     finishRiteScene: ctx.finishRiteScene,
     // The route preview (wilderness-travel-planning-ui): the hovered cell's

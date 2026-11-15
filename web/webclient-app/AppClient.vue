@@ -938,6 +938,22 @@ function onTargetFigure(identity, action) {
   const key = positionKeyFor(stageTarget.value, identity);
   if (key) onTargetPosition(key, action);
 }
+// The party line-up's targeting input has two owners, never active together
+// (landmark-rite-performer-picking D3): the rite stage picks its performer
+// on the figures, every other stage keeps the combat target step.
+const lineupTargeting = computed(() =>
+  riteOnStage.value ? riteStage.targeting({ controlledId: controlledFigureId.value }) : targeting.value,
+);
+function onLineupTargetPointer(identity, action) {
+  if (!riteOnStage.value) {
+    onTargetFigure(identity, action);
+    return;
+  }
+  const picked = riteStage.onFigure(identity, action, { controlledId: controlledFigureId.value });
+  // A click on a figure drops focus to the body; the panel takes it back so
+  // its arrows and digits keep working.
+  if (picked && action === "activate" && riteFocusReclaimable()) ritePanelRef.value?.focus?.();
+}
 function onTargetPosition(key, action) {
   // A pointer resting on a figure when the cross-side question closes enters
   // its hit area without moving; that is no hover, so the step keeps the
@@ -1233,10 +1249,11 @@ const rootStyle = computed(() => {
             :glide="formationGlide"
             :fallen="fallenMap"
             :fall-instant="modeHydrating"
-            :targeting="targeting"
+            :targeting="lineupTargeting"
             :activatable-ids="lineupActivatableIds"
-            @target-pointer="onTargetFigure"
+            @target-pointer="onLineupTargetPointer"
             @activate-member="openPartyWindow"
+            @pointerleave="riteStage.clearHover()"
           />
         </template>
         <!-- The opposite side of the stage (webclient-dialogue-stage-actors
@@ -1467,7 +1484,9 @@ const rootStyle = computed(() => {
             :key="`rite-panel:${riteStage.rite.value.district.key}`"
             :rite="riteStage.rite.value"
             :performer="riteStage.performer.value"
+            :can-switch="riteStage.canSwitch.value"
             :entrance="!modeHydrating && store.view.motionLevel !== 'off'"
+            @step-performer="riteStage.step"
             @perform="onRitePerform"
             @leave="onRiteLeave"
           />

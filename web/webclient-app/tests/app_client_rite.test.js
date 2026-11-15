@@ -6,6 +6,10 @@
 // withdrawal.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ritePanel } from "../stories/fixtures/rite.js";
+import { ritePerformers } from "../components/rite/rite-model.js";
+import { riteFigureId } from "../composables/use-rite-stage.js";
+import { PARTY_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
+import { ROSTER_CHARACTERS_SAMPLE } from "../stories/fixtures/core.js";
 import { fx, liveTravel, panelsAt, tick, TOWN_SUBJECT, walkArea, walkNode, walkPanels } from "./travel/support.js";
 
 vi.setConfig({ testTimeout: 60000 });
@@ -138,8 +142,8 @@ async function roomStage() {
 }
 
 /** Arrive, then approach the stage with Enter on the card. */
-async function enterStage(s) {
-  await s.commitRite(ritePanel());
+async function enterStage(s, panel = ritePanel()) {
+  await s.commitRite(panel);
   await s.key(s.find("rite-arrival-card").element, "Enter");
   expect(s.find("rite-panel").exists()).toBe(true);
 }
@@ -378,5 +382,149 @@ describe("the rite stage", () => {
     expect(s.frameMode()).toBe("exploration");
     expect(s.find("rite-backdrop").exists()).toBe(false);
     expect(s.find("travel-map").exists()).toBe(true);
+  });
+});
+
+// Performer picking (landmark-rite-performer-picking D6): the controlled
+// character (roster identity 2) and the two companions of the party panel
+// (101, 102) stand on the stage; the synthetic panel lists all three.
+const ROSTER = {
+  schema_version: 3,
+  available: true,
+  characters: [{ ...ROSTER_CHARACTERS_SAMPLE[1], current: true }],
+  max_characters: 5,
+  can_create: true,
+  switch_locked: false,
+  lock_reason: null,
+};
+const PERFORMERS = [
+  { member_id: null, name: "合成旅人", owner: true },
+  { member_id: 101, name: "蕾娜", owner: false },
+  { member_id: 102, name: "幽", owner: false },
+];
+const PARTY_RITE = ritePanel({ performers: PERFORMERS });
+
+describe("rite performer picking", () => {
+  /** The travel stage with the party standing in the line-up. */
+  async function partyStage() {
+    const s = await travelStage();
+    s.publish({ party: PARTY_PANEL_SAMPLE, roster: ROSTER });
+    await tick();
+    return s;
+  }
+  const lineup = (s) => s.w.get('[data-anchor="actor-left"] .companion-lineup');
+  const hitIds = (s) => lineup(s).findAll('[data-testid="stage-target-hit"]').map((el) => el.attributes("data-identity"));
+  const hit = (s, id) => lineup(s).get(`[data-testid="stage-target-hit"][data-identity="${id}"]`);
+  const litIds = (s) =>
+    lineup(s).findAll('[data-testid="companion-figure"][data-target-focus="true"]').map((el) => el.attributes("data-identity"));
+  const performerName = (s) => s.find("rite-panel-performer").find(".rite-panel__performer-name").text();
+  const soloRow = (s) => s.find("rite-panel").get('[data-row-key="bathe"]');
+
+  it("the listed figures are hit areas with the controlled one picked", async () => {
+    const s = await partyStage();
+    await enterStage(s, PARTY_RITE);
+    expect(hitIds(s).sort()).toEqual(["101", "102", "2"]);
+    expect(litIds(s)).toEqual(["2"]);
+    expect(performerName(s)).toBe("合成旅人");
+    expect(s.find("rite-panel-performer-hint").exists()).toBe(true);
+  });
+
+  it("activating a companion's figure picks it; hovering lights a figure until the pointer leaves", async () => {
+    const s = await partyStage();
+    await enterStage(s, PARTY_RITE);
+    await hit(s, "102").trigger("pointerenter");
+    expect(litIds(s).sort()).toEqual(["102", "2"]);
+    await lineup(s).trigger("pointerleave");
+    expect(litIds(s)).toEqual(["2"]);
+    document.activeElement?.blur();
+    await hit(s, "101").trigger("click");
+    await tick();
+    expect(performerName(s)).toBe("蕾娜");
+    expect(litIds(s)).toEqual(["101"]);
+    expect(soloRow(s).attributes("aria-disabled")).toBe("true");
+    // The click dropped focus to the body; the panel took it back.
+    expect(s.find("rite-panel").element.contains(document.activeElement)).toBe(true);
+    expect(s.rites()).toHaveLength(0);
+  });
+
+  it("ArrowRight from the panel steps through the performers and wraps, keeping the active row", async () => {
+    const s = await partyStage();
+    await enterStage(s, PARTY_RITE);
+    const panelEl = s.find("rite-panel").element;
+    await s.key(panelEl, "ArrowDown");
+    const names = [];
+    for (let i = 0; i < PERFORMERS.length; i += 1) {
+      await s.key(panelEl, "ArrowRight");
+      names.push(performerName(s));
+      expect(s.find("rite-panel").get('[data-active="true"]').attributes("data-row-key")).toBe("bathe");
+    }
+    expect(names).toEqual(["蕾娜", "幽", "合成旅人"]);
+    await s.key(panelEl, "ArrowLeft");
+    expect(performerName(s)).toBe("幽");
+    expect(litIds(s)).toEqual(["102"]);
+  });
+
+  it("a companion's rite names its member, a solo-only option sends nothing, and playback lights only the performer", async () => {
+    const s = await partyStage();
+    await enterStage(s, PARTY_RITE);
+    await hit(s, "101").trigger("click");
+    await tick();
+    const panelEl = s.find("rite-panel").element;
+    await s.key(panelEl, "2");
+    expect(s.rites()).toHaveLength(0);
+    await s.key(panelEl, "1");
+    expect(s.rites()).toHaveLength(1);
+    expect(s.rites()[0].payload).toEqual({ option: "drink", member_id: 101 });
+    // Pending, then playing: only the performer is lit, nothing selectable.
+    expect(hitIds(s)).toEqual([]);
+    expect(litIds(s)).toEqual(["101"]);
+    await s.answer();
+    expect(s.store.view.rite.playing).toBe(true);
+    expect(hitIds(s)).toEqual([]);
+    expect(litIds(s)).toEqual(["101"]);
+  });
+
+  it("re-entering the stage starts with the controlled character again", async () => {
+    const s = await partyStage();
+    await enterStage(s, PARTY_RITE);
+    await hit(s, "102").trigger("click");
+    await tick();
+    expect(performerName(s)).toBe("幽");
+    await s.key(s.find("rite-panel").element, "Escape");
+    expect(s.find("rite-panel").exists()).toBe(false);
+    // Off the stage the line-up keeps no rite targeting.
+    expect(s.find("rite-entry").exists()).toBe(true);
+    await s.find("rite-entry").trigger("click");
+    await tick();
+    await s.key(s.find("rite-arrival-card").element, "Enter");
+    expect(performerName(s)).toBe("合成旅人");
+    expect(litIds(s)).toEqual(["2"]);
+  });
+
+  it("with one performer, or with no option a companion may perform, nothing is picked on the stage", async () => {
+    const s = await partyStage();
+    await enterStage(s, ritePanel());
+    expect(hitIds(s)).toEqual([]);
+    expect(litIds(s)).toEqual([]);
+    expect(s.find("rite-panel-performer-hint").exists()).toBe(false);
+    await s.commitRite(ritePanel({ performers: PERFORMERS, options: [{ key: "bathe", label: "浸入池中", companion: false }] }));
+    expect(hitIds(s)).toEqual([]);
+    expect(s.find("rite-panel-performer-hint").exists()).toBe(false);
+    await s.key(s.find("rite-panel").element, "ArrowRight");
+    expect(performerName(s)).toBe("合成旅人");
+  });
+});
+
+describe("rite figure identities", () => {
+  it("the first row is the controlled figure, every other row its member id, possessed or not", () => {
+    const possessed = ritePerformers(ritePanel({
+      performers: [
+        { member_id: null, name: "合成同伴", owner: false },
+        { member_id: 5, name: "合成旅人", owner: true },
+      ],
+    }));
+    expect(possessed.map((row) => riteFigureId(row, 101))).toEqual(["101", "5"]);
+    expect(riteFigureId(possessed[0], null)).toBe(null);
+    expect(riteFigureId(possessed[1], null)).toBe("5");
   });
 });

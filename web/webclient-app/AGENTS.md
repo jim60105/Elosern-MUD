@@ -355,6 +355,13 @@ dream or creation surface owns the stage. There is no server travel mode.
   the map. The delivery plays through `useAuthoredScene` and `MessageWindow`
   only (a delivery the player cannot present returns the panel at once), and
   the panel takes focus back from the shell's message-page rescue.
+  The rite performer is picked on the stage through the party line-up's
+  existing `targeting` input and `target-pointer` event (the combat target
+  step's, never active at the same time), with `RitePanel`'s ArrowLeft /
+  ArrowRight as the keyboard path; the store holds the pick
+  (`view.rite.performerId`) and resets it to the controlled character on
+  every stage entry. Picking is offered only while the panel is shown, it
+  lists more than one performer and at least one option admits a companion.
   `components/rite/RiteEntry.vue` is the return entry under the place card
   (`◆ <guardian> 儀式`, key R through `use-window-hotkeys.js`'s
   `onRiteEntry`), shown while the panel is available, the mode is
