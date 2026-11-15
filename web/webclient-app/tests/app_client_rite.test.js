@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ritePanel } from "../stories/fixtures/rite.js";
 import { ritePerformers } from "../components/rite/rite-model.js";
-import { riteFigureId } from "../composables/use-rite-stage.js";
+import { riteFigureId, riteStageLines } from "../composables/use-rite-stage.js";
 import { PARTY_PANEL_SAMPLE } from "../stories/fixtures/party_panels.js";
 import { ROSTER_CHARACTERS_SAMPLE } from "../stories/fixtures/core.js";
 import { fx, liveTravel, panelsAt, tick, TOWN_SUBJECT, walkArea, walkNode, walkPanels } from "./travel/support.js";
@@ -577,6 +577,24 @@ describe("rite performer picking", () => {
     expect(s.find("rite-panel-performer-hint").exists()).toBe(false);
     await s.key(s.find("rite-panel").element, "ArrowRight");
     expect(performerName(s)).toBe("合成旅人");
+  });
+});
+
+describe("rite stage lines", () => {
+  it("the notice is one more line whose emphasis span carries the district name as text", () => {
+    const panel = ritePanel({ district: { key: "synthetic_marsh", name: "<b>合成沼澤</b>", landmark: "合成石龕", lit: false } });
+    expect(riteStageLines(null, true)).toEqual([]);
+    const plain = riteStageLines(panel, false);
+    expect(plain.map((line) => line.text)).toEqual([panel.guardian.form]);
+    const lit = riteStageLines(panel, true);
+    expect(lit).toHaveLength(2);
+    expect(lit[0]).toEqual(plain[0]);
+    const tokens = lit[1].tokens;
+    expect(tokens[0]).toMatchObject({ kind: "open", classes: ["em"] });
+    expect(tokens[1].kind).toBe("text");
+    expect(tokens[1].value).toContain(panel.district.name);
+    expect(tokens.filter((token) => token.kind === "open")).toHaveLength(1);
+    expect(tokens.filter((token) => token.kind === "close")).toHaveLength(1);
   });
 });
 

@@ -327,9 +327,6 @@ class RiteActionTests(RiteSettlementFixture):
         self.assertEqual(self.companion.sexual.climax_today, 1)
         self.assertEqual(self.player.sexual.climax_today, 0)
 
-    @covers_requirement(
-        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
-    )
     def test_only_the_first_completion_message_names_the_district(self):
         with patch.object(self.player, "msg") as message:
             first = self.settle("solo")
@@ -347,6 +344,9 @@ class RiteActionTests(RiteSettlementFixture):
             [first["message"], repeat["message"]],
         )
 
+    @covers_requirement(
+        "landmark-rite-command::rite-action-refusals-are-stable-and-a-duplicate-request-settles-once"
+    )
     def test_a_request_away_from_the_landmark_is_rejected_unchanged(self):
         self.player.location = self.source
         before = self.world_state()
