@@ -163,7 +163,9 @@ onMounted(() => go.value?.focus({ preventScroll: true }));
   inset: 0;
 }
 /* The body rises over the band's faded foot, so a reached art fault takes
-   the band's top right, opposite the kicker, never under the landmark. */
+   the band's top right, opposite the kicker, never under the landmark.
+   This unscoped rule outranks ArtworkPreview's scoped offsets by
+   specificity (four classes against two classes and its scope attribute). */
 .rite-arrival .rite-arrival__art .artwork-preview > .artwork-failure {
   top: calc(16px * var(--ui-scale));
   right: calc(22px * var(--ui-scale));

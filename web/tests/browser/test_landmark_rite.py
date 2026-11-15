@@ -262,7 +262,8 @@ class LandmarkRiteTests(_TravelStage):
         # A second activation while the request is pending sends nothing.
         page.keyboard.press("1")
         page.keyboard.press("Enter")
-        page.wait_for_timeout(300)
+        # Fence: two rendered frames after both keys were dispatched.
+        page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
         self.assertEqual(len(_held(page)), 1)
         self.assertTrue(page.evaluate(_ANSWER_RITE, [0, _DELIVERY]))
         texts = [line["text"] for line in _LINES]

@@ -307,12 +307,13 @@ watch(
 // One option activated on the panel: the panel leaves the stage on the next
 // render, so focus held in it is parked on the message page first (the
 // dialogue choice list's rule), where Space and Enter page the delivered
-// scene.
+// scene. A click that did not focus its button (some browsers never focus a
+// clicked button) leaves focus on the body, which is reclaimable too.
 function onRitePerform(key) {
   const active = typeof document === "undefined" ? null : document.activeElement;
-  const fromPanel = !!active?.closest?.(".rite-panel");
+  const park = !!active?.closest?.(".rite-panel") || riteFocusReclaimable();
   if (!riteStage.perform(key)) return;
-  if (fromPanel) shellRef.value?.focusMessagePage?.();
+  if (park) shellRef.value?.focusMessagePage?.();
 }
 function onRiteEntryOpen() {
   if (!riteEntryShown.value) return false;

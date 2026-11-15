@@ -311,6 +311,17 @@ describe("the rite stage", () => {
     expect(s.rites()).toHaveLength(1);
   });
 
+  it("a click on an option with focus on the body parks focus on the message page", async () => {
+    const s = await travelStage();
+    await enterStage(s);
+    document.activeElement?.blur();
+    expect(document.activeElement).toBe(document.body);
+    await s.find("rite-panel").findAll('[data-testid="choice-card-row"]')[0].trigger("click");
+    await tick();
+    expect(s.rites()).toHaveLength(1);
+    expect(document.activeElement).toBe(s.page().element);
+  });
+
   it("a refusal plays nothing and shows the panel again", async () => {
     const s = await travelStage();
     await enterStage(s);
