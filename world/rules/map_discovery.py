@@ -37,7 +37,13 @@ def traversal_node_id(actor, location):
 
 
 def visited_before_traversal(actor):
-    """None means unreadable; an empty set is a legitimate fresh explorer."""
+    """None means unreadable; an empty set is a legitimate fresh explorer.
+
+    The narrative no longer reads the result (a movement announces no
+    discovery). The read is kept because it reconciles a dirty in-memory
+    knowledge cache through :func:`persisted_visits` before each explicit
+    traversal.
+    """
     from typeclasses.characters import PlayerCharacter
     if not isinstance(actor, PlayerCharacter):
         return None

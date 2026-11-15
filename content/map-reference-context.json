@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "dee8a4eef88358c78faa595afab776d985a6dcf86981d90331c5a4bcd961b635",
+  "fingerprint": "be63a245c172f16fbfed90042b52015d18abf657353e4b1bce692caf7c05f3fb",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16315,7 +16315,7 @@
     "world/rules/landmark_rites.py": "695dcea287521f192ac0d5e629a860233894269c1281eb50930b6a76433fe556",
     "world/rules/lineage_query.py": "b9aaca47b1582b2d1556227a90e0ee21c5a6bf96a6ef945ce9424f0302de93ce",
     "world/rules/lore_knowledge.py": "ef707115b626b9e5c17c8b484a0b25054404f453e82ec6bdef5a6ea247a3abfd",
-    "world/rules/map_discovery.py": "e9bd7be317af1d1ed8c3ba3fd89213e08f3142e14e420c10fd8cccc13910992a",
+    "world/rules/map_discovery.py": "6e994d9fa947f42ce3be0017a3cc4b20e219ed1252c63a82ce507f999dbaeb02",
     "world/rules/map_district_lighting.py": "6ab8ece2b19f4302e08aba0ae24c9656c8ac1e7ec7217ded796edab8fcfbc1d0",
     "world/rules/map_knowledge.py": "d4d17f902c2ff36d0e2747db43057caed310c1157dff5f273014a6c1fb388115",
     "world/rules/mental_time.py": "e89e5712fa09366112ffdde03e64a9a0c6f0715c83cb24a4e9a3daa5867c095b",

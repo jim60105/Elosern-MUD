@@ -499,7 +499,8 @@ the UI scale, and a colliding lower-priority label is hidden, never shrunk.
   previous payload and is lit in the next, observed while the view is
   mounted, spreads its ink from its landmark for `--motion-district-reveal`
   (600 ms, 0 ms at reduced or off motion). It announces `已探明：<district>`
-  once. The first payload, a repeat, a remount, a new `epoch`, and a payload
+  once. A district lights only when its rite completes, so this view-side
+  announcement follows a completed rite, never a movement. The first payload, a repeat, a remount, a new `epoch`, and a payload
   in which a lit district went dark all re-baseline silently.
 
 ## The map drawer
