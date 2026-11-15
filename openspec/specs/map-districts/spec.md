@@ -20,17 +20,6 @@ Each district SHALL resolve one qualified landmark to a reachable walkable posit
 - **WHEN** a region district spans nominal national claims
 - **THEN** its one qualified landmark resolves independently of national borders and discovery still requires that landmark's canonical visited identity
 
-### Requirement: District lighting is derived from visited landmark identity
-A district SHALL be lit if and only if its exact landmark node is in the player map-knowledge visited record. Reading lighting SHALL introduce no persistent state and SHALL leave the existing knowledge writer unchanged.
-
-#### Scenario: Nearby travel does not reveal a district
-- **WHEN** the player visits cells near a landmark but never its canonical node
-- **THEN** the district remains unlit
-
-#### Scenario: Recorded landmark reveals only its district
-- **WHEN** the exact landmark node appears in visited knowledge
-- **THEN** that district becomes lit on read without a second discovery attribute, while other districts remain unlit
-
 ### Requirement: The authored continent has a complete discoverable landmark roster
 The district document SHALL supply every district and landmark exactly once, with qualified identity resolution and runtime geographic validation independent of Python roster imports.
 
@@ -53,3 +42,18 @@ The district document SHALL supply every district and landmark exactly once, wit
 #### Scenario: Authored names are stable lore content
 - **WHEN** a district name changes without its stable identity changing
 - **THEN** discovery and references retain that identity and consumers read the authored name; lore appropriateness is human-reviewed rather than pinned by copied wording
+
+### Requirement: District lighting is derived from completed rites
+A district SHALL be lit if and only if the player character's rite record holds at least one completed rite for it and the district registry declares it. Reading lighting SHALL introduce no persistent state. An unreadable rite record SHALL raise from the strict read and SHALL degrade to no lit district with a warning in the read used by presentation and travel.
+
+#### Scenario: A visit lights nothing
+- **WHEN** the player visits a landmark's canonical node and completes no rite
+- **THEN** the district remains unlit
+
+#### Scenario: A completed rite lights only its district
+- **WHEN** the rite record holds one completion for one district and one for a key the registry does not declare
+- **THEN** exactly the declared district is lit, and no attribute was created by reading
+
+#### Scenario: Unreadable record
+- **WHEN** the rite record violates its envelope
+- **THEN** the strict read raises the named record error, and the degrading read returns no lit district and logs one warning

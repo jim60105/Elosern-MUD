@@ -6,13 +6,13 @@ Announce newly explored districts only after a first landmark arrival commits, u
 
 ## Requirements
 
-### Requirement: First committed landmark arrival adds one discovery narrative
-A successful first arrival at a previously unvisited landmark SHALL append 已探明：<district> to the movement narrative. Failed movement, repeat arrivals, map reads and reconnects SHALL not emit discovery. Lighting SHALL derive only from the unchanged knowledge writer and visited record.
+### Requirement: Movement announces no district discovery
+A landmark traversal, successful or not, SHALL emit only its movement narrative: no exploration announcement and no discovery event. A map read and a reconnect SHALL emit none either.
 
-#### Scenario: Discovery follows successful settlement
+#### Scenario: First landmark traversal
 - **WHEN** a first landmark traversal commits and records the canonical node
-- **THEN** that movement narrative includes one 已探明：<district> message and a later return emits none
+- **THEN** the movement narrative is one line with no exploration announcement, no discovery event is logged and the district is unlit
 
-#### Scenario: Failed movement emits no exploration announcement
+#### Scenario: Failed movement
 - **WHEN** a traversal is blocked, vetoed or rolled back, or a map read/reconnect occurs
 - **THEN** no exploration announcement is emitted and no new discovery state is persisted

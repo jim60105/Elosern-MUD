@@ -69,7 +69,7 @@ class LandmarkArrivalTests(EvenniaTest):
         from world.rules.map_district_lighting import lit_district_keys
         return lit_district_keys(self.char1,{"t_district":self.district})
 
-    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("map-district-discovery::movement-announces-no-district-discovery")
     def test_grid_first_and_repeat_arrivals_emit_one_committed_narrative(self):
         with patch.object(self.char1,"msg") as msg,patch("world.observability.api._emit") as emit:
             self.move()
@@ -85,7 +85,7 @@ class LandmarkArrivalTests(EvenniaTest):
             self.assertEqual(self.discovered(emit),[])
             self.assertEqual(self.lit(),frozenset())
 
-    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("map-district-discovery::movement-announces-no-district-discovery")
     def test_veto_and_late_settlement_failure_have_no_discovery_or_record(self):
         with patch.object(self.char1,"msg") as msg:
             with patch.object(self.char1,"at_pre_move",return_value=False):
@@ -107,7 +107,7 @@ class LandmarkArrivalTests(EvenniaTest):
                     raise RuntimeError("outer rollback")
         self.assertEqual(self.narratives(msg),[])
 
-    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("map-district-discovery::movement-announces-no-district-discovery")
     def test_corrupt_knowledge_and_swallowed_writer_failure_do_not_announce(self):
         corrupt={"schema_version":99,"visited":{}}
         self.char1.attributes.add("map_knowledge",corrupt)
@@ -146,7 +146,7 @@ class LandmarkArrivalTests(EvenniaTest):
             self.assertIs(self.char1.location,self.landmark)
             self.assertEqual(warning.call_args.args[0],"map_discovery_delivery_failed")
 
-    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("map-district-discovery::movement-announces-no-district-discovery")
     @covers_requirement("webclient-world-map::world-scope-reveals-only-common-geography-and-permitted-district-knowledge")
     def test_existing_attribute_save_failure_cannot_discover_or_light_from_dirty_cache(self):
         from world.rules.map_knowledge import record_arrival
@@ -224,7 +224,7 @@ class LandmarkArrivalTests(EvenniaTest):
             self.char1.move_to(self.landmark,quiet=True,move_type="teleport")
         self.assertEqual(self.narratives(msg),[])
 
-    @covers_requirement("map-district-discovery::first-committed-landmark-arrival-adds-one-discovery-narrative")
+    @covers_requirement("map-district-discovery::movement-announces-no-district-discovery")
     def test_gateway_and_wilderness_arrival_use_canonical_landmarks(self):
         from world.lore.wilderness_entry import WildernessEntryPoint,WildernessGate
         from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY

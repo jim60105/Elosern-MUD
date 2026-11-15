@@ -108,14 +108,14 @@ class _Character:
 
 
 class DistrictLightingTests(unittest.TestCase):
-    @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")
+    @covers_requirement("map-districts::district-lighting-is-derived-from-completed-rites")
     def test_a_visited_landmark_lights_nothing(self):
         # Every exact landmark node is visited, yet no rite is recorded.
         character = _Character(visited=landmark_node_ids(_DISTRICTS).values())
         self.assertEqual(lit_district_keys(character, _DISTRICTS), frozenset())
         self.assertEqual(readable_lit_district_keys(character, _DISTRICTS), frozenset())
 
-    @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")
+    @covers_requirement("map-districts::district-lighting-is-derived-from-completed-rites")
     def test_a_completed_rite_lights_only_its_declared_district(self):
         character = _Character(rites=_rites("dune", "t_retired"))
         self.assertEqual(lit_district_keys(character, _DISTRICTS), frozenset({"dune"}))
@@ -143,7 +143,7 @@ class DistrictLightingTests(unittest.TestCase):
         ):
             self.assertEqual(lit_district_keys(character), frozenset())
 
-    @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")
+    @covers_requirement("map-districts::district-lighting-is-derived-from-completed-rites")
     def test_reading_lighting_writes_nothing(self):
         character = _Character(visited=["wild:elosern:300:600"], rites=_rites("dune"))
         before = copy.deepcopy(character.attributes.stored)
@@ -159,7 +159,7 @@ class DistrictLightingTests(unittest.TestCase):
         self.assertEqual(fresh.attributes.stored, {})
         self.assertEqual(fresh.attributes.writes, [])
 
-    @covers_requirement("map-districts::district-lighting-is-derived-from-visited-landmark-identity")
+    @covers_requirement("map-districts::district-lighting-is-derived-from-completed-rites")
     def test_a_corrupt_record_raises_strictly_and_degrades_with_one_warning(self):
         corrupt_record = {"schema_version": 2, "completed": {}}
         corrupt = _Character(rites=corrupt_record)
