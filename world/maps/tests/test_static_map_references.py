@@ -507,6 +507,15 @@ class IntegratedMovedNodeTests(EvenniaTest):
             self.assertTrue(
                 any(exit_obj.destination.pk == shop.pk for exit_obj in interior.exits)
             )
+            # Visiting the landmark node lights nothing; its completed rite,
+            # keyed by the stable district identity, does.
+            self.assertEqual(
+                lit_district_keys(traveller, {district.district_id: district}),
+                frozenset(),
+            )
+            from world.rules.tests.rite_fixtures import complete_rite_record
+
+            complete_rite_record(traveller, district.district_id)
             self.assertEqual(
                 lit_district_keys(traveller, {district.district_id: district}),
                 frozenset({district.district_id}),
