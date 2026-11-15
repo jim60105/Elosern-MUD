@@ -23,7 +23,16 @@ archetypes:
             - {kind: narration, text: 水聲停了半拍，你的身體在水裡收緊，熱意從腿根衝上頸項，水面同時傳出一句話。}
             - {kind: speech, speaker: host, text: 「舊名叫石龕原。往北繞過那口枯井，路沒有斷。」}
             - {kind: speech, speaker: actor, text: 「我記住了。」}
-        watch: null
+        watch:
+          scene_id: rite.spring.drink.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石龕裡的水暗得只剩一線反光，{name}伏在井口，呼氣把水面吹出細紋。"}
+            - {kind: speech, speaker: actor, text: 「這口泉，還記得這片地從前叫什麼名字嗎？」}
+            - {kind: speech, speaker: host, text: "「讓{name}喝一口。泉底的東西替人記住問過的話。」"}
+            - {kind: narration, text: "{name}俯身貼上水面，肩背繃起，井口的水沿著嘴唇聚攏，水面凹下去一小塊。"}
+            - {kind: narration, text: "{name}的手指扣緊井沿，背脊繃成一道弧，呼吸停在喉嚨裡，井口的水面猛地靜止。"}
+            - {kind: speech, speaker: host, text: 「舊名叫石龕原。往北繞過那口枯井，路沒有斷。」}
       - key: wade
         label_zh: 踏入泉心
         seconds: 240
@@ -40,7 +49,17 @@ archetypes:
             - {kind: narration, text: 水底伸出的手托起你的臀部，一道暖流從下方淌過私處，抵著花蒂往裡探，跟著你的吸氣加深。}
             - {kind: narration, text: 你扶住石緣，腰腹在水裡繃緊，熱潮從腿根散開，泉心的亮點在你顫抖的那一瞬閃過一遍，路線就留在眼裡。}
             - {kind: speech, speaker: host, text: 「看見那條線了嗎？跟著它走。」}
-        watch: null
+        watch:
+          scene_id: rite.spring.wade.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "泉心的薄霧浮在水面，霧裡的亮點排成一條線。"}
+            - {kind: speech, speaker: actor, text: 「走進去以後，還上得來嗎？」}
+            - {kind: speech, speaker: host, text: "「把重量交出來，水就讓{name}看見它藏著的路。」"}
+            - {kind: narration, text: "{name}踏進泉心，水從腳背漫到腰腹，濕透的布料貼住腰身，亮點游到腳邊，排成一條往北的線。"}
+            - {kind: narration, text: "水底伸出的手托起{name}的臀部，腳尖離開潭底，{name}扶住泉邊的石緣，肩背在水面上挺起。"}
+            - {kind: narration, text: "泉心的亮點在{name}的腰腹繃緊時整片閃過，呼吸散在霧裡，路線留在水面上。"}
+            - {kind: speech, speaker: host, text: 「跟著那條線走，別回頭。」}
   statue:
     guardian_name_zh: 白石守望者
     guardian_form_zh: 石像胸口滲出的女聲，只在掌心貼上時應答。
@@ -61,7 +80,17 @@ archetypes:
             - {kind: narration, text: 石像的眼窩映出一段不屬於此刻的路，你認出那座塌了一半的橋；同時石縫裡探出看不見的指節，穿過裙襬貼上私處。}
             - {kind: narration, text: 石像的注視壓在你的背上，指節繞住花蒂往裡推，你的膝蓋撞在石階上，熱意衝上頸項，石像胸口那句話跟著你的顫抖落下來。}
             - {kind: speech, speaker: host, text: 「橋斷在春汛。繞東邊的淺灘。」}
-        watch: null
+        watch:
+          scene_id: rite.statue.touch.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石像的裙襬被風蝕出缺口，缺口裡的乾花瓣被{name}的腳步帶起。"}
+            - {kind: speech, speaker: actor, text: 「你在這裡站了多久？又看見過什麼？」}
+            - {kind: speech, speaker: host, text: "「讓{name}站到我看得見的地方，把手放上來。石頭把看過的事借給貼近的人。」"}
+            - {kind: narration, text: "{name}踏上石階，掌心貼住石像的腰腹，石面從貼合處滲出溫度，指節在石上發白。"}
+            - {kind: narration, text: "石像的眼窩浮出一層濕潤的光，光的方向朝著谷外；石縫裡探出看不見的指節，隔著裙布貼住{name}的腿間。"}
+            - {kind: narration, text: "{name}的膝蓋在石階上彎了一下，肩背抵著石像的注視收緊，額頭幾乎碰上石面。"}
+            - {kind: speech, speaker: host, text: "「橋斷在春汛。讓{name}繞東邊的淺灘走。」"}
       - key: kneel
         label_zh: 跪在石前
         seconds: 360
@@ -78,7 +107,17 @@ archetypes:
             - {kind: narration, text: 砂粒停在腰腹，又順著大腿內側匯到私處，看不見的手把砂水推進身體，磨過花蒂。}
             - {kind: narration, text: 你的額頭抵著石階，呼吸斷成聲音，熱潮從私處漫上整條脊背，石像的手掌在耳邊收攏，砂水流過的痕跡排成一個名字。}
             - {kind: speech, speaker: host, text: 「記住這個名字，別在夜裡喊它。」}
-        watch: null
+        watch:
+          scene_id: rite.statue.kneel.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石像的掌心朝上攤著，積著一小片雨水，水面浮著細砂。"}
+            - {kind: speech, speaker: actor, text: 「要拿什麼換你看過的事？」}
+            - {kind: speech, speaker: host, text: "「跪下來，讓我看見{name}的背。石頭記得住被看見的人。」"}
+            - {kind: narration, text: "{name}跪在石階上，裙襬滑到腰上，石像的掌心跟著傾斜，砂水沿背脊往下流。"}
+            - {kind: narration, text: "砂粒停在腰腹，又順著大腿內側匯下去，看不見的手把砂水推進身體，{name}的肩背繃成一條線。"}
+            - {kind: narration, text: "{name}的額頭抵著石階，呼吸斷成聲音，砂水在石面上淌過的痕跡排出一個名字。"}
+            - {kind: speech, speaker: host, text: 「記住這個名字，別在夜裡喊它。」}
   megalith:
     guardian_name_zh: 石陣的低鳴
     guardian_form_zh: 石縫間共鳴的低音，沒有形體，只在石頭被觸碰時應答。
@@ -99,7 +138,17 @@ archetypes:
             - {kind: narration, text: 走到石環背面時，低鳴變成貼著皮膚的震動，刻紋的節奏讓腰腹前後擺動，看不見的石面壓上私處，跟著節拍磨過花蒂。}
             - {kind: narration, text: 你撐住石面，膝蓋發軟，震動在最後一格停住，熱意從腿根炸開，石環同時亮起一道極細的光，把北邊崩塌的路照出來。}
             - {kind: speech, speaker: host, text: 「路在光裡。看完就走，別回頭。」}
-        watch: null
+        watch:
+          scene_id: rite.megalith.trace.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石環上的刻紋被苔痕填了一半，{name}蹲下身，指尖在凹槽邊停住。"}
+            - {kind: speech, speaker: actor, text: 「這些紋路是給誰走的？」}
+            - {kind: speech, speaker: host, text: "「給肯跟著走的人。讓{name}的手指別離開石面，走到最後一格，石頭就會說出記得的路。」"}
+            - {kind: narration, text: "{name}把指尖嵌進第一道刻紋，石底傳來一聲低鳴，順著手臂爬上肩胛，{name}的腰跟著那聲音往前傾。"}
+            - {kind: narration, text: "走到石環背面時，低鳴變成貼著皮膚的震動，{name}扶著石面，膝蓋軟下去，指節在刻紋裡發白。"}
+            - {kind: narration, text: "震動在最後一格停住，{name}的背脊猛地弓起，石環亮起一道極細的光，把北邊崩塌的路照出來。"}
+            - {kind: speech, speaker: host, text: 「路在光裡。看完就走，別回頭。」}
       - key: circle
         label_zh: 繞行石環
         seconds: 300
@@ -116,7 +165,17 @@ archetypes:
             - {kind: narration, text: 第六圈時，石陣的共鳴貼住私處，看不見的振動抵在花蒂上，你只能扶著石柱走完最後一圈，然後被推倒在中央石板上。}
             - {kind: narration, text: 低鳴在你躺下的瞬間連成一條長音，腰腹跟著抽搐，腿間的水淌在石板上，聲音停下時，你已經會哼那段調子。}
             - {kind: speech, speaker: host, text: 「把這段調子哼給守林的人聽，他們會讓你們過。」}
-        watch: null
+        watch:
+          scene_id: rite.megalith.circle.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石環外的草地被踩出一圈淺痕，中央的石板空著，沒有刻紋。"}
+            - {kind: speech, speaker: actor, text: 「繞一圈就會有事發生嗎？」}
+            - {kind: speech, speaker: host, text: "「繞滿七圈，石頭才肯出聲。讓{name}把腳步交給石陣。」"}
+            - {kind: narration, text: "{name}沿著淺痕走，鞋底下的石頭應答出聲，聲音從腳踝爬到腰腹，越繞越密，腳步自己跟上節拍。"}
+            - {kind: narration, text: "第六圈時，{name}扶著石柱停了一下，肩背抵著石陣的共鳴收緊，裙襬下的腿已經不太穩。"}
+            - {kind: narration, text: "{name}被推倒在中央石板上，低鳴連成一條長音，腰腹跟著抽搐，聲音停下時，嘴裡哼出那段調子。"}
+            - {kind: speech, speaker: host, text: 「把這段調子哼給守林的人聽，路就會開。」}
   tower:
     guardian_name_zh: 塔頂的風
     guardian_form_zh: 繞塔而行的風聲，只在最高一層的窗口凝成說話的形狀。
@@ -137,7 +196,17 @@ archetypes:
             - {kind: narration, text: 風從背後鑽進裙底，貼住私處收緊，一束看不見的氣流繞住花蒂，另一束壓著腰腹把你抵在窗框上。}
             - {kind: narration, text: 你抓住窗框，腳尖離地，熱意從腿根衝上頸項，風在你顫抖的那一刻把遠處的煙柱吹成一根直線，正好落在斷橋的位置。}
             - {kind: speech, speaker: host, text: 「看見那道煙了嗎？那不是炊煙。」}
-        watch: null
+        watch:
+          scene_id: rite.tower.climb.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石塔的階梯窄得只容一人，{name}的腳步聲在塔身裡往上撞。"}
+            - {kind: speech, speaker: actor, text: 「塔頂的風，會帶下來什麼？」}
+            - {kind: speech, speaker: host, text: 「上到沒有牆的那一層。風只把遠處的事交給站得穩的人。」}
+            - {kind: narration, text: "{name}爬到最上一層，窗口沒有窗扇，風把裙襬掀到腰上，{name}一手扶住窗框，肩背在風裡挺直。"}
+            - {kind: narration, text: "風從背後鑽進裙底，貼著腿間收緊，又一束壓著腰腹，把{name}整個人抵在窗框上。"}
+            - {kind: narration, text: "{name}抓住窗框，腳尖離地，背脊在風裡繃緊又鬆下來，遠處的煙柱被吹成一根直線，正好落在斷橋的位置。"}
+            - {kind: speech, speaker: host, text: 「斷橋在那道煙底下。那裡沒有人家。」}
       - key: bell
         label_zh: 敲響風鐘
         seconds: 240
@@ -154,7 +223,17 @@ archetypes:
             - {kind: narration, text: 震動沿著背脊往下，停在腰腹，看不見的氣流把私處抵在石面上，跟著鐘腔的共鳴收緊，磨得花蒂發燙。}
             - {kind: narration, text: 你叫出聲時鐘響了，餘音在塔外的荒原上繞過一圈，回來時帶著一個清楚的方向。}
             - {kind: speech, speaker: host, text: 「記住它回來的位置。巡守的人不走那條路。」}
-        watch: null
+        watch:
+          scene_id: rite.tower.bell.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "塔身外那口石鐘的鐘舌早就鏽死，鐘口空著，風從邊上繞過去。"}
+            - {kind: speech, speaker: actor, text: 「鐘舌都鏽死了，風還能讓它出聲嗎？」}
+            - {kind: speech, speaker: host, text: "「風穿過鐘腔就會響。讓{name}的背貼上去，別擋住風。」"}
+            - {kind: narration, text: "{name}把背貼上鐘口，石面冰得肩胛縮起，風灌進鐘腔，整座塔跟著震動。"}
+            - {kind: narration, text: "鐘口的石面隨震動抵著{name}的背，腰腹縮起，呼吸跟著鐘腔的共鳴變短。"}
+            - {kind: narration, text: "{name}叫出聲時鐘響了，餘音繞過塔外的荒原一圈，回來時帶著一個清楚的方向。"}
+            - {kind: speech, speaker: host, text: 「記住它回來的位置。巡守的人不走那條路。」}
   tree:
     guardian_name_zh: 樹心的低語
     guardian_form_zh: 從年輪深處傳出的女聲，只在樹皮被貼住時出聲。
@@ -175,7 +254,17 @@ archetypes:
             - {kind: narration, text: 根部從土裡拱起，纏上大腿與臀部，一根細枝探進裙下，沿著私處的縫滑動，另一根攀住花蒂，跟著樹心的節奏收緊。}
             - {kind: narration, text: 樹枝把你托離地面，樹皮磨熱了腰腹，顫動傳到根上時，樹心裡傳出一句很慢的話，樹脂順著裂縫流成一條指著西邊的細線。}
             - {kind: speech, speaker: host, text: 「往西，越過那排倒下的樹。」}
-        watch: null
+        watch:
+          scene_id: rite.tree.embrace.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "老樹的樹皮裂到胸口的高度，縫裡滲出甜得發悶的樹脂味。"}
+            - {kind: speech, speaker: actor, text: 「抱住你，你就會說話嗎？」}
+            - {kind: speech, speaker: host, text: 「胸口貼緊，別鬆手。根比嘴巴誠實。」}
+            - {kind: narration, text: "{name}環住樹身，胸前的衣料與腰腹貼上樹皮，底下的木頭像脈搏一樣頂住那雙手。"}
+            - {kind: narration, text: "根部從土裡拱起，纏上{name}的大腿與臀部，一根細枝探進裙下，貼著腿間滑動，{name}的膝蓋離開地面。"}
+            - {kind: narration, text: "樹枝把{name}托離地面，背脊貼著樹皮收緊，樹心裡傳出一句很慢的話，樹脂順著裂縫流成一條指著西邊的細線。"}
+            - {kind: speech, speaker: host, text: 「往西，越過那排倒下的樹。」}
       - key: rest
         label_zh: 靠在根上
         seconds: 180
@@ -192,7 +281,17 @@ archetypes:
             - {kind: narration, text: 根鬚鑽進裙下，細的那幾根繞住花蒂，粗的那根抵著私處往裡送，樹心在頭頂上方發出很低的聲音。}
             - {kind: narration, text: 你的背在落葉裡拱起，樹根跟著收緊，熱潮被根鬚逼出來，最後一次顫動時，頭頂的樹冠讓開一道縫，露出底下通往西邊的乾河床。}
             - {kind: speech, speaker: host, text: 「看見河床了嗎？跟著它走。」}
-        watch: null
+        watch:
+          scene_id: rite.tree.rest.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "落葉在樹根之間積成凹地，形狀正好能躺下一個人。"}
+            - {kind: speech, speaker: actor, text: 「躺在這裡，根會對我做什麼？」}
+            - {kind: speech, speaker: host, text: 「躺好，別推開。根找的是願意留下的人。」}
+            - {kind: narration, text: "{name}躺進凹地，落葉底下的根鬚先貼上腳踝，再繞住大腿與腰腹，把{name}按在地面上。"}
+            - {kind: narration, text: "根鬚鑽進裙下，細的那幾根貼著腿間收緊，粗的那幾根壓住腰腹往裡送，{name}的肩背在落葉裡繃起。"}
+            - {kind: narration, text: "{name}的背在落葉裡拱起，樹根跟著收緊，顫動停下時，頭頂的樹冠讓開一道縫，露出底下通往西邊的乾河床。"}
+            - {kind: speech, speaker: host, text: 「看見河床了嗎？跟著它走。」}
   grave:
     guardian_name_zh: 塚下的女聲
     guardian_form_zh: 從石塚縫隙透出的女聲，只在有人靠近碑石時應答。
@@ -214,7 +313,17 @@ archetypes:
             - {kind: narration, text: 你撐住碑身，額頭抵著石面，熱意從腿間衝上頸項，最後一筆在指下亮起，碑面同時透出一條往北的凹道。}
             - {kind: speech, speaker: host, text: 「名字讀完了。往北那條凹道，是送葬的人踩出的路。」}
             - {kind: speech, speaker: actor, text: 「我記住了。」}
-        watch: null
+        watch:
+          scene_id: rite.grave.inscribe.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "碑上的字被苔痕侵蝕掉一半，剩下的刻痕裡積著細砂。"}
+            - {kind: speech, speaker: actor, text: 「這行字是誰的名字？還有人記得嗎？」}
+            - {kind: speech, speaker: host, text: 「順著字跡描過去，別停。石頭記得住被讀過的名字。」}
+            - {kind: narration, text: "{name}的指節嵌進刻痕，砂粒壓在指腹下，石面從第一筆開始回溫，掌心跟著刻痕走。"}
+            - {kind: narration, text: "碑後的土裡探出一隻看不見的手，沿著{name}的小腿往上，隔著裙布貼住腿間，指尖陷進布料裡。"}
+            - {kind: narration, text: "{name}撐住碑身，額頭抵著石面，肩背繃起，最後一筆在指下亮起，碑面同時透出一條往北的凹道。"}
+            - {kind: speech, speaker: host, text: 「名字讀完了。往北那條凹道，是送葬的人踩出的路。」}
       - key: lie
         label_zh: 躺進空壙
         seconds: 300
@@ -231,7 +340,17 @@ archetypes:
             - {kind: narration, text: 土底有什麼從下方頂上來，隔著衣料貼住臀部與大腿，擠進私處的縫，跟著你的呼吸往裡推。}
             - {kind: narration, text: 你抓緊坑邊的草，土面隨你的顫動陷下去一寸，濕意浸進土裡，壙底的碎石排成一個名字。}
             - {kind: speech, speaker: host, text: 「這個名字埋在東邊的樹下。別在白天挖。」}
-        watch: null
+        watch:
+          scene_id: rite.grave.lie.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "碑旁有一塊挖開又填平的空壙，土面比四周低了一掌。"}
+            - {kind: speech, speaker: actor, text: 「這裡是留給誰的位置？」}
+            - {kind: speech, speaker: host, text: "「留給願意躺下的人。躺進去，土才會把名字交給{name}。」"}
+            - {kind: narration, text: "{name}躺進凹下的土裡，濕冷的土貼住背脊，鬆開的土粒順著腰側滑進衣內。"}
+            - {kind: narration, text: "土底有什麼從下方頂上來，隔著衣料貼住臀部與大腿，擠進腿間，跟著{name}的呼吸往裡推。"}
+            - {kind: narration, text: "{name}抓緊坑邊的草，土面隨著顫動陷下去一寸，濕意浸進土裡，壙底的碎石排成一個名字。"}
+            - {kind: speech, speaker: host, text: 「這個名字埋在東邊的樹下。別在白天挖。」}
   mine:
     guardian_name_zh: 坑底的迴響
     guardian_form_zh: 礦坑深處回來的聲音，只在有人出聲時應答。
@@ -252,7 +371,17 @@ archetypes:
             - {kind: narration, text: 看不見的氣流從坑底升上來，鑽進裙底，抵住私處收緊，繞著花蒂往裡探。}
             - {kind: narration, text: 你撐住坑口的石緣，腰腹跟著回音震動，熱意從腿根散開，回音停下時坑底亮起一點火星，正對著一條側道。}
             - {kind: speech, speaker: host, text: 「那點火在第三段坑道。順著側道下去，別走直坑。」}
-        watch: null
+        watch:
+          scene_id: rite.mine.shout.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "坑口垂著一條磨斷的舊繩，往下看不見底，只有冷風從深處上來。"}
+            - {kind: speech, speaker: actor, text: 「這底下，還有東西在嗎？」}
+            - {kind: speech, speaker: host, text: 「喊什麼，它就回什麼。喊第二句，它才多回答一句。」}
+            - {kind: narration, text: "{name}伏在坑口喊出第二句，回音從石壁彈回來，最後一句比{name}的聲音低，貼著耳骨震。"}
+            - {kind: narration, text: "看不見的氣流從坑底升上來，鑽進裙底，抵著腿間收緊，{name}的手指抓住坑口的石緣。"}
+            - {kind: narration, text: "{name}撐住石緣，腰腹跟著回音震動，肩背伏下去又撐起，回音停下時坑底亮起一點火星，正對著一條側道。"}
+            - {kind: speech, speaker: host, text: 「那點火在第三段坑道。順著側道下去，別走直坑。」}
       - key: crawl
         label_zh: 爬進窄道
         seconds: 300
@@ -269,7 +398,17 @@ archetypes:
             - {kind: narration, text: 窄道在腰後收緊，石壁貼住臀部，一道濕涼的氣流從腳邊爬上來，抵著私處磨過花蒂。}
             - {kind: narration, text: 你用手肘撐著往前，心跳在石壁間回來三次，最後一次撞在背上時熱潮湧出，石縫同時透出一道光，照見往下的石階。}
             - {kind: speech, speaker: host, text: 「跟著光走，第三階會鬆動，踩左邊。」}
-        watch: null
+        watch:
+          scene_id: rite.mine.crawl.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "側道窄得只能側身通過，石壁上的鑿痕還留著當年的白灰。"}
+            - {kind: speech, speaker: actor, text: 「這條路通到哪裡？爬過去就有東西嗎？」}
+            - {kind: speech, speaker: host, text: "「爬到聽見自己的心跳回來的地方。石頭會把深處的事貼在{name}的背上。」"}
+            - {kind: narration, text: "{name}側身擠進石縫，胸前的衣料與腰腹蹭過粗石，布料被石角勾住，只剩背影留在道口。"}
+            - {kind: narration, text: "窄道在腰後收緊，石壁貼住{name}的臀部，一道濕涼的氣流從腳邊爬上來，呼吸堵在石縫裡。"}
+            - {kind: narration, text: "{name}用手肘撐著往前，心跳在石壁間回來三次，最後一次撞在背上時肩背一挺，石縫透出的光沿著窄道返照回來。"}
+            - {kind: speech, speaker: host, text: 「跟著光走，第三階會鬆動，踩左邊。」}
   gate:
     guardian_name_zh: 門洞裡的影
     guardian_form_zh: 門洞裡比四周更深的一道影，只在有人開口求過時凝成聲音。
@@ -290,7 +429,17 @@ archetypes:
             - {kind: narration, text: 門楣上垂下一股看不見的重量，落在你的肩上，一路滑到腰腹，隔著衣料抵住私處。}
             - {kind: narration, text: 你按著門板，額頭靠上石面，熱意從腿間衝上頸項，門軸在那一刻鬆開半寸，露出一條往下的石階。}
             - {kind: speech, speaker: host, text: 「門認得你了。階梯走到底，別回頭看門後的東西。」}
-        watch: null
+        watch:
+          scene_id: rite.gate.knock.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石門的門楣上鑿著三個凹洞，門縫裡塞著風乾的草束。"}
+            - {kind: speech, speaker: actor, text: 「要敲幾下，這扇門才肯讓人過？」}
+            - {kind: speech, speaker: host, text: 「敲三下，然後把名字說給門聽。門記住名字，才知道該放誰過去。」}
+            - {kind: narration, text: "{name}抬手叩了三下，石門悶響，門縫裡的草束跟著抖落，門後有東西把{name}的名字念回來一遍。"}
+            - {kind: narration, text: "門楣上垂下一股看不見的重量，落在{name}的肩上，一路滑到腰腹，隔著衣料抵住腿間。"}
+            - {kind: narration, text: "{name}按著門板，額頭靠上石面，肩背繃起，門軸在那一刻鬆開半寸，露出一條往下的石階。"}
+            - {kind: speech, speaker: host, text: "「門認得{name}了。階梯走到底，別回頭看門後的東西。」"}
       - key: trade
         label_zh: 留下過路禮
         seconds: 300
@@ -307,7 +456,17 @@ archetypes:
             - {kind: narration, text: 門檻的淺窪裡探出看不見的手，托住你的臀部，另一隻貼住私處，跟著你的重心往裡推。}
             - {kind: narration, text: 你扶住門框，膝蓋抵著石檻，腿間的水落進窪裡，石面同時吸走那道濕痕，門後的通道亮出一條路。}
             - {kind: speech, speaker: host, text: 「痕跡留在檻上，門就記住你走過。往裡那條路，第二個岔口往右。」}
-        watch: null
+        watch:
+          scene_id: rite.gate.trade.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "石門前有一塊被踏得發亮的門檻石，石面中央凹成淺窪。"}
+            - {kind: speech, speaker: actor, text: 「過這道門，要留下什麼？」}
+            - {kind: speech, speaker: host, text: 「留下走過去的證據。門檻收下，門就開。」}
+            - {kind: narration, text: "{name}跨上門檻，腳底貼住發亮的石面，門洞裡的風把裙襬掀到腰上。"}
+            - {kind: narration, text: "門檻的淺窪裡探出看不見的手，托住{name}的臀部，另一隻貼住腿間，跟著{name}的重心往裡推。"}
+            - {kind: narration, text: "{name}扶住門框，膝蓋抵著石檻，腿間的水落進窪裡，石面同時吸走那道濕痕，門後的通道亮出一條路。"}
+            - {kind: speech, speaker: host, text: "「痕跡留在檻上，門就記住{name}走過。往裡那條路，第二個岔口往右。」"}
   cliff:
     guardian_name_zh: 瀑後的歌聲
     guardian_form_zh: 風與水霧裡傳出的女聲，只在有人走到崖下或崖邊時應答。
@@ -328,7 +487,17 @@ archetypes:
             - {kind: narration, text: 水柱在腰間散開，水流鑽進裙下，一股順著私處滑進去，另一股壓著花蒂來回，腳底的石頭開始鬆動。}
             - {kind: narration, text: 你仰起頭，水壓把身體往下按，熱潮逆著水流衝上來，顫動的那一瞬，水簾讓開一道縫，露出後方的石洞與一條往上鑿出的路。}
             - {kind: speech, speaker: host, text: 「看見那條路了？水停之前上去，別讓它合起來。」}
-        watch: null
+        watch:
+          scene_id: rite.cliff.bathe.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "瀑布落下的水聲壓過整片谷地，潭邊的石頭被水磨得發白。"}
+            - {kind: speech, speaker: actor, text: 「站在水底下，水會把什麼交給我？」}
+            - {kind: speech, speaker: host, text: 「走進水裡，別擋著水流。水把重量洗掉，才肯把路露出來。」}
+            - {kind: narration, text: "{name}走進潭裡，水從腳踝升到胸口，瀑下的水柱砸在肩上，布料貼住全身，肩背被水壓得往前傾。"}
+            - {kind: narration, text: "水柱在腰間散開，水流鑽進裙下，一股順著腿間滑進去，另一股壓著腰腹來回，{name}腳底的石頭開始鬆動。"}
+            - {kind: narration, text: "{name}仰起頭，水壓把身體往下按，肩頸弓起又鬆下，水簾讓開一道縫，露出後方的石洞與一條往上鑿出的路。"}
+            - {kind: speech, speaker: host, text: 「看見那條路了？水停之前上去，別讓它合起來。」}
       - key: lean
         label_zh: 站上崖緣
         seconds: 360
@@ -345,7 +514,17 @@ archetypes:
             - {kind: narration, text: 風分成幾道貼住身體，一道繞住私處收緊，一道抵在花蒂上跟著心跳震，腳下的碎石滾下崖去。}
             - {kind: narration, text: 你張開手臂保持平衡，身體在崖口晃了一下，熱潮從腿根衝到頸項，谷底的雲同時被風吹開，露出一條蜿蜒的獸徑。}
             - {kind: speech, speaker: host, text: 「那條獸徑通到另一邊的山口。風停之後再下去。」}
-        watch: null
+        watch:
+          scene_id: rite.cliff.lean.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "崖邊的岩面被風削成刀口，往下只看見雲在腳底翻。"}
+            - {kind: speech, speaker: actor, text: 「站到那麼邊上，風會告訴我什麼？」}
+            - {kind: speech, speaker: host, text: 「把腳尖踩穩崖邊，把重量交給風。看得見底下的東西，才看得見遠的地方。」}
+            - {kind: narration, text: "{name}走到崖緣，腳尖頂著岩口，風從背後推上來，裙襬整片掀開，大腿與臀部露在空處。"}
+            - {kind: narration, text: "風分成幾道貼住身體，一道繞住腿間收緊，一道壓著腰腹跟著心跳震，腳下的碎石滾下崖去。"}
+            - {kind: narration, text: "{name}張開手臂保持平衡，身體在崖口晃了一下，肩頸繃起，谷底的雲同時被風吹開，露出一條蜿蜒的獸徑。"}
+            - {kind: speech, speaker: host, text: 「那條獸徑通到另一邊的山口。風停之後再下去。」}
   plaza:
     guardian_name_zh: 廣場上的目光
     guardian_form_zh: 四周的注視聚成的一道聲音，只在有人走進那圈石板時開口。
@@ -366,7 +545,17 @@ archetypes:
             - {kind: narration, text: 石板上的熱氣從腳底升上來，看不見的目光停在私處與大腿內側，跟著四周的呼吸收緊，繞著花蒂打轉。}
             - {kind: narration, text: 你站在中央沒有動，膝蓋卻開始發軟，熱潮在眾目之下湧出，腳邊的石板同時浮現一道刻痕，刻著這個位置從前的名字。}
             - {kind: speech, speaker: host, text: 「名字只在被看見的時候顯出來。記住它，往北側那條巷子走，第二個轉角往左。」}
-        watch: null
+        watch:
+          scene_id: rite.plaza.stand.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "廣場的石板被車輪與腳步磨得發亮，四周的攤販還沒收，旅人沿著邊上走。"}
+            - {kind: speech, speaker: actor, text: 「站在這裡，所有人都在看？」}
+            - {kind: speech, speaker: host, text: "「站到中央，讓每一雙眼睛都落下來。看得見{name}的人，才肯替{name}指路。」"}
+            - {kind: narration, text: "{name}走到廣場中央站定，四周的視線壓下來，貼在背上與肩上，順著腰腹往下滑。"}
+            - {kind: narration, text: "石板上的熱氣從腳底升上來，看不見的目光停在腿間與大腿內側，跟著四周的呼吸收緊，{name}的膝蓋開始發軟。"}
+            - {kind: narration, text: "{name}站在中央沒有動，肩背繃緊又鬆下來，腳邊的石板同時浮現一道刻痕，刻著這個位置從前的名字。"}
+            - {kind: speech, speaker: host, text: 「名字只在被看見的時候顯出來。記住它，往北側那條巷子走，第二個轉角往左。」}
       - key: circle
         label_zh: 繞行一圈
         seconds: 360
@@ -383,7 +572,17 @@ archetypes:
             - {kind: narration, text: 走到第三邊時裙底一涼，看不見的目光貼住私處，跟著步伐前後磨過花蒂，膝蓋開始發軟。}
             - {kind: narration, text: 你撐著走完最後一邊，水落在石板接縫間，腳下的刻痕逐段亮起，連成一條往東側巷子的線。}
             - {kind: speech, speaker: host, text: 「線亮完了。往東側那條巷子走，走到第二個路口再停。」}
-        watch: null
+        watch:
+          scene_id: rite.plaza.circle.watch
+          revision: r1
+          lines:
+            - {kind: narration, text: "廣場中央有一圈顏色較深的石板，接縫裡嵌著細砂。"}
+            - {kind: speech, speaker: actor, text: 「繞著這圈走，會有東西留下嗎？」}
+            - {kind: speech, speaker: host, text: "「走完一圈，讓每一邊都看見{name}。繞完的石板會把路記下來。」"}
+            - {kind: narration, text: "{name}沿著深色的石板走，第一邊的視線落在臉上，第二邊落在背脊，第三邊停在腰與臀部。"}
+            - {kind: narration, text: "走到第三邊時，{name}的裙底一涼，看不見的目光貼住腿間，跟著步伐前後磨過，{name}的膝蓋開始發軟。"}
+            - {kind: narration, text: "{name}撐著走完最後一邊，水落在石板接縫間，肩背鬆下來，腳下的刻痕逐段亮起，連成一條往東側巷子的線。"}
+            - {kind: speech, speaker: host, text: 「線亮完了。往東側那條巷子走，走到第二個路口再停。」}
 districts:
   north_deep_forest: tree
   border_source_highlands: spring
