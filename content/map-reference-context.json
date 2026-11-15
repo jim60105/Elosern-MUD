@@ -210,7 +210,7 @@
       "western_hills_valleys"
     ]
   },
-  "fingerprint": "4e87ea228cf9eb8fd7724fe8706d838ba60ac6e96334c46549548f91b4e0e3c6",
+  "fingerprint": "65b2f50ddc2f866c00bb4c502027bcf176d5c2c0db3fd6e28efe239f3d5138ab",
   "incoming_references": {
     "interior_room:altoria_academy:altoria_academy": [
       {
@@ -16336,7 +16336,7 @@
     "world/rules/monster_individual.py": "aacf9a52419bfff9677495d5305e8b7380bb375905c10268e4287c0f5e8773fd",
     "world/rules/movement.py": "cd3d72c72bd4c9cf89b210413b8871056b38caa4969554f4ad5770bb19fe436a",
     "world/rules/movement_edges.py": "ea91cd45cea73df108322dca9949522c02dd0818e7d891afc130ff35293624b6",
-    "world/rules/movement_settlement.py": "33f5e0d5a858927349be7053a400f7b9f675660ec8bf4393c7b1045b6b9e24d2",
+    "world/rules/movement_settlement.py": "ac718e055cb16c4de4a4f29e84f955db2a9cf6080f7bf3a433193a952775bfec",
     "world/rules/mp_flow.py": "cf7f26056b7845b1df943068fe21fc5cfb2b5ab5d837c20a660418d6804179a4",
     "world/rules/namegen.py": "93b04048e6593599605183f7dc3d8d92330ff136759c314893c7d43c14563993",
     "world/rules/npc_capabilities.py": "46b02af1f99742ee7ed081dbc720f676d9b5f23ee41671f38aa9e5bcfc7022e8",
@@ -16457,8 +16457,8 @@
     "world/rules/traits.py": "fb483c81ecbdfaf57f973fb984867c119bf2615451415980ef82e4de61ae7237",
     "world/rules/travel_capacity.py": "13f544331f38dd691e826325ef668edfb082bed1104b8c2c0b97599acd4e45af",
     "world/rules/travel_cost.py": "d16917c8cf84f89ad056af6aef9f6544c623706ab36f3e32ffd3dfebb515dd88",
-    "world/rules/travel_events.py": "c8b60b29797229fbd241290c7737adfc8a51e14cc43f948c52531b845c2e0b1f",
-    "world/rules/travel_interrupts.py": "c59d1625aaf9e17105fef7f741b82f0f5623b1fa4862dc978b2be58883d181b3",
+    "world/rules/travel_events.py": "3ce2284fbfc3810afeed8e3128ce161eabb4ee6be20754467a41177db05d6acd",
+    "world/rules/travel_interrupts.py": "7277dea89d7c3064c96e7f3a2160e47505ae81ad0675c5e421952a3e109a65cb",
     "world/rules/travel_plan.py": "10ce62a44c4bbc7c6add81e14c9fe3f023610214b12078441dc4e0fb94f23737",
     "world/rules/unlock_notices.py": "c3402f1db1a73348f5667761e9fe7722c11a692b2a1371593528b70ac9e452f1",
     "world/rules/upkeep.py": "4d156ca1cd18b4e88643104b9f25813847508a7522b051a7edc215c702ac8f7b",
