@@ -20,12 +20,12 @@ Do not touch the `district_lit` flag, the `lit_district` notice field, `Landmark
 
 ## 4. Remaining consumers' tests
 
-- [ ] 4.1 Run the inventory grep of design D6, convert each visit-lit fixture to `complete_rite_record`, and run each affected module as its own command (a `tests/` module with `uv run --locked python -m unittest <module>`, others with the test prefix). Verify: each passes; name every converted module in the hand-off.
+- [x] 4.1 Run the inventory grep of design D6, convert each visit-lit fixture to `complete_rite_record`, and run each affected module as its own command (a `tests/` module with `uv run --locked python -m unittest <module>`, others with the test prefix). Verify: each passes; name every converted module in the hand-off.
 
 ## 5. Documentation and gates
 
 - [x] 5.1 Apply design D5. Verify: `grep -n "已探明" docs/development/map-panel-protocol.md docs/development/continental-geography.md` shows no sentence tying the announcement or the lighting to a first arrival.
-- [ ] 5.2 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-lighting` and `openspec validate landmark-rite-lighting --strict`. Verify: all exit 0.
+- [x] 5.2 Run `uv run --locked python -m tools.observability_lint check`, `uv run --locked python -m tools.test_data_lint check`, `uv run --locked python -m tools.contract_gate --change landmark-rite-lighting` and `openspec validate landmark-rite-lighting --strict`. Verify: all exit 0.
 
 ## Workflow follow-up
 
