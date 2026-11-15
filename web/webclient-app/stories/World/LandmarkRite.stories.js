@@ -1,4 +1,4 @@
-import { h } from "vue";
+import { h, ref } from "vue";
 import RiteArrivalCard from "../../components/rite/RiteArrivalCard.vue";
 import RitePanel from "../../components/rite/RitePanel.vue";
 import RiteBackdrop from "../../components/rite/RiteBackdrop.vue";
@@ -74,8 +74,33 @@ const panel = (args) => ({
         rite: args.rite,
         performer: performers[args.performerIndex] ?? performers[0],
         entrance: args.entrance,
+        canSwitch: args.canSwitch,
       }),
     );
+  },
+});
+
+// Picking offered (landmark-rite-performer-picking D5): the header carries
+// the switching hint and ArrowLeft / ArrowRight step the performer here as
+// the store does on the stage, wrapping.
+const switchablePanel = (args) => ({
+  setup() {
+    const index = ref(args.performerIndex);
+    const performers = ritePerformers(args.rite);
+    const step = (delta) => {
+      index.value = (index.value + delta + performers.length) % performers.length;
+    };
+    return () =>
+      choicesAnchor(
+        h(RitePanel, {
+          key: JSON.stringify(args),
+          rite: args.rite,
+          performer: performers[index.value] ?? performers[0],
+          entrance: args.entrance,
+          canSwitch: true,
+          onStepPerformer: step,
+        }),
+      );
   },
 });
 
@@ -117,7 +142,7 @@ export default {
   title: "World/LandmarkRite",
   component: RiteArrivalCard,
   parameters: { layout: "fullscreen" },
-  args: { revisit: false, entrance: true, performerIndex: 0 },
+  args: { revisit: false, entrance: true, performerIndex: 0, canSwitch: false },
 };
 
 const LIT = { ...ritePanel().district, lit: true };
@@ -152,7 +177,14 @@ export const PanelExperienced = {
 export const PanelCompanion = {
   name: "Panel Companion",
   render: panel,
-  args: { rite: ritePanel({ performers: RITE_PARTY }), performerIndex: 1 },
+  args: { rite: ritePanel({ performers: RITE_PARTY }), performerIndex: 1, canSwitch: true },
+};
+// Two performers and an option a companion may perform: the switching hint
+// shows, and the arrows step between the two.
+export const PanelSwitchable = {
+  name: "Panel Switchable",
+  render: switchablePanel,
+  args: { rite: ritePanel({ performers: RITE_PARTY.slice(0, 2) }) },
 };
 // A third option is authored.
 export const PanelThreeOptions = {

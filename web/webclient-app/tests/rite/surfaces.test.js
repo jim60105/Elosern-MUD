@@ -303,6 +303,62 @@ describe("RitePanel", () => {
   });
 });
 
+describe("RitePanel performer switching", () => {
+  let documentKeys = [];
+  const onDocumentKey = (event) => documentKeys.push(event.key);
+
+  beforeEach(() => {
+    documentKeys = [];
+    document.addEventListener("keydown", onDocumentKey);
+  });
+
+  afterEach(() => {
+    document.removeEventListener("keydown", onDocumentKey);
+  });
+
+  function mountPanel(canSwitch) {
+    const rite = ritePanel({ performers: RITE_PARTY });
+    return track(
+      mount(RitePanel, {
+        attachTo: document.body,
+        props: { rite, performer: ritePerformers(rite)[0], canSwitch },
+      }),
+    );
+  }
+
+  const card = (w) => w.get('[data-testid="rite-panel"]');
+  const activeRow = (w) => w.get('[data-active="true"]').attributes("data-row-key");
+  async function key(w, name, init = {}) {
+    card(w).element.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init }));
+    await nextTick();
+  }
+
+  it("shows the hint and steps the performer with the arrows without moving the active row", async () => {
+    const w = mountPanel(true);
+    expect(w.find('[data-testid="rite-panel-performer-hint"]').exists()).toBe(true);
+    await key(w, "ArrowDown");
+    expect(activeRow(w)).toBe("bathe");
+    await key(w, "ArrowLeft");
+    await key(w, "ArrowRight");
+    expect(w.emitted("step-performer")).toEqual([[-1], [1]]);
+    expect(activeRow(w)).toBe("bathe");
+    expect(documentKeys).toEqual([]);
+    // A modifier or an IME composition passes the key through.
+    await key(w, "ArrowRight", { altKey: true });
+    await key(w, "ArrowRight", { isComposing: true });
+    expect(w.emitted("step-performer")).toHaveLength(2);
+  });
+
+  it("without picking there is no hint and the arrows emit nothing", async () => {
+    const w = mountPanel(false);
+    expect(w.find('[data-testid="rite-panel-performer-hint"]').exists()).toBe(false);
+    await key(w, "ArrowLeft");
+    await key(w, "ArrowRight");
+    expect(w.emitted("step-performer")).toBeUndefined();
+    expect(documentKeys).toEqual(["ArrowLeft", "ArrowRight"]);
+  });
+});
+
 describe("RiteBackdrop", () => {
   it("names the landmark and the guardian over the artwork", () => {
     const w = track(mount(RiteBackdrop, { props: { rite: ritePanelWithArt(), artPanel: RITE_ART_PANEL } }));
