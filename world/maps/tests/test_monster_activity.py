@@ -300,8 +300,8 @@ class ActivityFixture(RegistryIsolationMixin, EvenniaTest):
             individual.delete()
         self._ordinal = 0
         self.wilderness.db.itemcoordinates = {}
-        self.wilderness.db.monster_activity = state_to_dict(
-            MonsterActivityState({}, {}, {}, (), tick)
+        activity_owner.write_monster_activity(
+            self.wilderness, MonsterActivityState({}, {}, {}, (), tick)
         )
         self.wilderness.db.population_timeline = {
             "settled_through_tick": tick,
@@ -946,8 +946,8 @@ class ChokepointLifecycleTests(ActivityFixture):
         state = read_monster_activity(self.wilderness)
         groups = dict(state.groups)
         groups[group_id] = replace(groups[group_id], next_decision_tick=90000)
-        self.wilderness.db.monster_activity = state_to_dict(
-            replace(state, groups=groups)
+        activity_owner.write_monster_activity(
+            self.wilderness, replace(state, groups=groups)
         )
         before = state_to_dict(read_monster_activity(self.wilderness))
         self.assertIsNone(read_sleep_receipt(body))
@@ -1278,8 +1278,8 @@ class BulkSettlementEconomyTests(ActivityFixture):
 
     def _saved(self, **fields):
         state = read_monster_activity(self.wilderness)
-        self.wilderness.db.monster_activity = state_to_dict(
-            replace(state, **fields)
+        activity_owner.write_monster_activity(
+            self.wilderness, replace(state, **fields)
         )
 
     def test_read_follows_every_kind_of_stored_write(self):
@@ -1430,6 +1430,4 @@ class BulkSettlementEconomyTests(ActivityFixture):
 
 def from_stored(wilderness):
     """Decode the stored record, bypassing any in-flight batched state."""
-    return activity_owner.state_from_dict(
-        wilderness.attributes.get(activity_owner.MONSTER_ACTIVITY_ATTRIBUTE)
-    )
+    return activity_owner.read_stored_monster_activity(wilderness)

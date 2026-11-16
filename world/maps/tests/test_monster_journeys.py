@@ -140,10 +140,17 @@ class ActivityRecordTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual((state.groups, state.journeys, state.receipts), ({}, {}, {}))
         self.assertEqual(state.settled_through_tick, 4)
 
-        self.wilderness.db.monster_activity = {**state_to_dict(state)}
-        saved = dict(self.wilderness.db.monster_activity)
+        monster_activity.write_monster_activity(self.wilderness, state)
+        saved = state_to_dict(
+            monster_activity.read_stored_monster_activity(self.wilderness)
+        )
         initialize_monster_activity(self.wilderness, tick=9)
-        self.assertEqual(dict(self.wilderness.db.monster_activity), saved)
+        self.assertEqual(
+            state_to_dict(
+                monster_activity.read_stored_monster_activity(self.wilderness)
+            ),
+            saved,
+        )
 
     def test_missing_and_malformed_state_refuse_without_reset(self):
         self._seed()

@@ -413,7 +413,9 @@ class MonsterSitePopulationTests(_MonsterSiteFixture):
     def test_a_failed_second_unit_restores_the_site_and_every_member(self):
         states_before = self.wilderness.db.monster_sites
         coordinates_before = dict(self.wilderness.db.itemcoordinates)
-        activity_before = dict(self.wilderness.db.monster_activity)
+        activity_before = activity_owner.state_to_dict(
+            activity_owner.read_stored_monster_activity(self.wilderness)
+        )
         monsters_before = sorted(Monster.objects.values_list("pk", flat=True))
         room = (self.wilderness.db.rooms or {})[PROBE]
         contents_before = {obj.pk for obj in room.contents}
@@ -436,7 +438,12 @@ class MonsterSitePopulationTests(_MonsterSiteFixture):
 
         self.assertEqual(self.wilderness.db.monster_sites, states_before)
         self.assertEqual(dict(self.wilderness.db.itemcoordinates), coordinates_before)
-        self.assertEqual(dict(self.wilderness.db.monster_activity), activity_before)
+        self.assertEqual(
+            activity_owner.state_to_dict(
+                activity_owner.read_stored_monster_activity(self.wilderness)
+            ),
+            activity_before,
+        )
         self.assertEqual({obj.pk for obj in room.contents}, contents_before)
         self.assertEqual(
             sorted(Monster.objects.values_list("pk", flat=True)), monsters_before

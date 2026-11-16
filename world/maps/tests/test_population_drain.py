@@ -40,7 +40,10 @@ from world.maps import (
     population_units,
     regional_population,
 )
-from world.maps.monster_activity import read_monster_activity, state_to_dict
+from world.maps.monster_activity import (
+    read_monster_activity,
+    write_monster_activity,
+)
 from world.maps.population_drain import (
     MAX_SETS_PER_RUN,
     PopulationDrainScript,
@@ -137,9 +140,7 @@ class DrainFixture(ScopedSettlementFixture):
         groups[group_id] = replace(
             groups[group_id], home=LocationRef.wilderness(WILDERNESS_NAME, *cell)
         )
-        self.wilderness.db.monster_activity = state_to_dict(
-            replace(state, groups=groups)
-        )
+        write_monster_activity(self.wilderness, replace(state, groups=groups))
 
     def events(self, logged) -> list:
         return [call for call in logged.call_args_list if call.args]

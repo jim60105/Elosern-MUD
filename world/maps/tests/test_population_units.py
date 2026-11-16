@@ -36,7 +36,7 @@ from world.maps.monster_activity import (
     JourneyPlan,
     MonsterJourney,
     read_monster_activity,
-    state_to_dict,
+    write_monster_activity,
 )
 from world.maps.population_lifecycle import settle_population_lifecycle
 from world.maps.population_units import (
@@ -510,8 +510,8 @@ class UnitResolutionTests(ActivityFixture):
             state.groups[group_id],
             position=LocationRef.wilderness(WILDERNESS_NAME, *self.second_cell),
         )
-        self.wilderness.db.monster_activity = state_to_dict(
-            replace(state, groups={**state.groups, group_id: escaped})
+        write_monster_activity(
+            self.wilderness, replace(state, groups={**state.groups, group_id: escaped})
         )
         state = read_monster_activity(self.wilderness)
         self.assertEqual(
