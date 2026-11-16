@@ -257,6 +257,7 @@ class CharacterActivationTests(EvenniaTest):
     @covers_requirement(
         "player-character-creation::activation-is-an-all-or-nothing-deterministic-core-operation",
         "map-knowledge::arrival-recording-happens-only-at-existing-successful-arrival-seams",
+        "player-character-creation::activation-places-the-character-in-its-subrace-s-start-room",
     )
     def test_successful_activation_places_the_character_in_its_start_room(self):
         from world.rules.clock import get_world_clock
@@ -281,6 +282,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertIn(self.character, self.account.characters)
         self.assertEqual(clock.tick, tick_before)
 
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_preset_activation_lands_in_the_preset_subrace_start_room(self):
         from world.rules.start_location import resolve_start_room
 
@@ -292,6 +294,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(character.location, room)
         self.assertEqual(character.home, room)
 
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_an_unresolvable_start_room_fails_before_any_write(self):
         from world.rules.scene_visits import ENTERED_ARCHETYPES_ATTRIBUTE
         from world.rules.start_location import StartLocationError
@@ -318,6 +321,7 @@ class CharacterActivationTests(EvenniaTest):
             self.character.attributes.get(ENTERED_ARCHETYPES_ATTRIBUTE), archetypes
         )
 
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_a_failure_after_the_move_returns_the_character_without_hooks(self):
         from typeclasses.characters import Character
         from typeclasses.rooms import LimboRoom
@@ -424,6 +428,7 @@ class CharacterActivationTests(EvenniaTest):
         self.assertEqual(warn.call_args.args[0], "rollback_restore_failed")
         self.assertEqual(warn.call_args.kwargs["context"]["key"], "location")
 
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_arrival_effects_run_once_after_a_committed_activation(self):
         from world.rules.start_location import resolve_start_room
 

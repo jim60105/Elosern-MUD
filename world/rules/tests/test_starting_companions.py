@@ -747,6 +747,7 @@ class CompanionActivationBindingTests(QuestRegistryIsolation, EvenniaCommandTest
         return declaration.affinity
 
     @covers_requirement("starting-companions::preset-activation-builds-seeds-and-binds-every-declared-companion-atomically")
+    @covers_requirement("player-character-creation::activation-places-the-character-in-its-subrace-s-start-room")
     def test_activating_the_holder_card_binds_a_live_twin_at_declared_affinity(self):
         shell = self._shell("maker-shell-a")
         self._activate(shell, _T_HOLDER)
