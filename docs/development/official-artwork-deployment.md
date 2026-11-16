@@ -123,7 +123,8 @@ rank the descriptor carries, never by array position:
 | Rank | Source | Where it comes from |
 | ---: | --- | --- |
 | 10 | Room official override | `<root>/room/<room-art-key>/` for a room whose authored metadata declares that key |
-| 20 | Generated archetype art | the scene record's own `done` output, served as `/art/scene/<scene-key>.<ext>?v=<generation digest>` |
+| 15 | Explicit scene official choice | the archetype gallery record's retained selection inside `<root>/scene/<scene-key>/` |
+| 20 | Generated archetype art | the scene gallery record's default card, served from `/art/gallery/scene/<scene-key>/<image-id>.<ext>` |
 | 30 | Operator scene default | `<root>/scene/<scene-key>/` |
 | 40 | Required bundled type art | the committed `web/static/art/scenes/<scene-key>.webp` illustration |
 | 100 | Declared terminal image | the scene's own declared terminal (`city_street` for town scenes, `forest_path` for forest ones) |
@@ -160,6 +161,17 @@ rank the descriptor carries, never by array position:
   it authorizes no retained content at all. A replaced room default, a removed
   binding, a revoked source or a vanished output stops authorizing the pixels
   it no longer describes.
+
+The scene positions above are projections of the same capability-driven
+subject chain the portrait presenter uses. The explicit official choice, the
+generated gallery default and the operator official default share one ordered
+enumerator (`world/art/gallery_match.py`); the scene envelope only puts the
+authored room override ahead of it and follows it with the required bundled
+and declared terminal images. An explicit scene choice is archetype-subject
+state: every room using that archetype inherits it, while the room override
+stays higher priority. Selecting official scene art never erases the shared
+generated card or its default; an explicit runtime-default action is the only
+action that clears the same owner's selection.
 
 ## The directory contract
 
@@ -248,6 +260,9 @@ subject presents, and it is the single place the portrait source policy lives:
 the equipment-bound card, the player's explicit personal official selection,
 the record's default card, the classic generated asset, the reference's
 official default and the subject's committed silhouette, in that precedence.
+The same enumerator now owns the scene archetype chain and respects each
+kind's closed declaration (reference policy, preference owner and terminal
+policy) instead of comparing kinds inline.
 The mounted directory contributes only the official positions of that order:
 
 - the entity's official content reference is ONE source position
@@ -260,6 +275,16 @@ The mounted directory contributes only the official positions of that order:
   `root_fault`) stays a deployment fact of the whole catalog rather than a
   per-subject fault: an explicitly configured but unreadable root is reported
   once at startup, and no subject's attempts carry a directory-wide taint;
+- a registered monster visual species or scene archetype resolves its own
+  official reference from the validated typed subject with no spawned entity,
+  so startup suppression and presentation agree for bare registry subjects;
+- automatic generation is suppressed only when an admitted operator catalog
+  default is actually presentable inside the shared media-URL ceiling. A
+  refused, absent or over-budget default does not suppress, and bundled scene
+  terminals are never treated as operator catalog defaults;
+- suppression applies to automatic paths only: `@art requeue`,
+  `gallery.generate` and the service generation seam remain available, settle a
+  runtime card, and leave the official bytes unchanged;
 - a personal selection or a named default card that can no longer resolve
   keeps its bounded fault at its own position, before the substitute that
   follows it, and the stored preference is never deleted;

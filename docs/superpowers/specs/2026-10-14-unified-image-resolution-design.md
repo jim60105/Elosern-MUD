@@ -57,7 +57,9 @@ A single multi-mode component was considered. The selected layered approach allo
 
 `world/art/` owns the canonical artwork description and ordered source resolution. It reads existing generation and catalog state and performs no queue, gallery, room, or character mutation during presentation.
 
-The existing portrait selection order remains intact. `gallery_fallback.py` supplies the existing declaration, species, sex/apparent-age band, stable-hash, and alpha-image metadata behavior. Its code may be moved or split into focused modules when integrating the common resolver. All callers must migrate together; no old-path re-export, duplicate selector, or compatibility shim remains.
+One capability-driven subject chain owns source precedence for every gallery-bearing kind: matching equipment binding where declared, explicit official selection, gallery default card, temporary classic source only where declared, official catalog default, then the declared terminal seam. Kind differences come only from the closed declaration in `world/art/gallery_kinds.py` (official-reference policy, preference owner, terminal policy, cap, bindings); shared selection, suppression and preference routing perform no inline kind comparison. Scene presentation wraps the same archetype chain with its authored room override ahead of it and its required bundled and declared terminal images after it. `gallery_fallback.py` supplies the existing declaration, species, sex/apparent-age band, stable-hash, and alpha-image metadata behavior. Its code may be moved or split into focused modules when integrating the common resolver. All callers must migrate together; no old-path re-export, duplicate selector, or compatibility shim remains.
+
+Registry-backed kinds resolve their official reference from the validated typed subject alone: a registered monster visual species names `monster/<species>` and a scene archetype names `scene/<archetype>`, with no spawned entity. Character preset/NPC references remain entity-provenance-only and are never inferred from a stable key, display name or numeric identity. An explicit scene official choice is shared archetype-subject state, so every room using that archetype inherits it while the room override stays higher priority; selecting official art never erases a shared generated card or default.
 
 Scene definitions are immutable authored records owned by the art domain. They reference the existing archetype registry and declare their built-in identity and terminal fallback key. Normal archetypes and the explicit dream scene are the complete supported scene-art set. Consumers read those definitions; filename construction and town/forest selection do not recur in presenters or Vue components.
 
@@ -154,13 +156,14 @@ Retain backend boundary diagnostics through named imports from `world.observabil
 The ordered attempts are:
 
 1. Explicit room-specific operator official artwork.
-2. Archetype generated artwork, using the existing shared generated subject.
-3. Archetype operator official artwork, when provided.
-4. That scene type's required built-in official artwork.
-5. Its declared town/forest terminal image, if distinct from an already attempted resource.
-6. A non-image background with the persistent local failure indication.
+2. The archetype's explicit official choice, retained on the shared scene subject.
+3. Archetype generated artwork, using the existing shared generated subject.
+4. Archetype operator official artwork, when provided.
+5. That scene type's required built-in official artwork.
+6. Its declared town/forest terminal image, if distinct from an already attempted resource.
+7. A non-image background with the persistent local failure indication.
 
-Items 3 and 4 together implement the approved archetype-official layer. The built-in source is present without an operator directory or generator. A corrupt optional override is still a fault when reached; a healthy bundled image does not erase it.
+Positions 2 through 4 are the shared capability-driven archetype chain every gallery-bearing subject uses; positions 1 and 5 through 7 are the scene envelope around it. The explicit choice and the operator default are both archetype-subject state, while the room override remains the authored per-room fact. Items 4 and 5 together implement the approved archetype-official layer. The built-in source is present without an operator directory or generator. A corrupt optional override is still a fault when reached; a healthy bundled image does not erase it. Automatic scene generation is suppressed when a presentable operator scene default satisfies the archetype; a bundled terminal is not an operator catalog default.
 
 ### 6.2 Built-in scene inventory
 
@@ -188,13 +191,15 @@ A future normal archetype must add its scene-art definition and required artwork
 
 ### 6.3 Official catalog and serving
 
-Extend the existing external official layout with `scene/<scene-key>/<image-file>` and `room/<room-art-key>/<image-file>`. Scene keys and authored room-art keys are registry-validated; no directory key is a database row ID or translated room name. Continue the existing optional per-content manifest and deterministic default selection rules.
+Extend the existing external official layout with `scene/<scene-key>/<image-file>` and `room/<room-art-key>/<image-file>`. The `scene` kind is a reference kind whose membership authority is the immutable scene-archetype registry, so a bare registered scene subject resolves its own official reference; `room` remains an operator-only authored override with the authored room-art vocabulary. No directory key is a database row ID or translated room name. Continue the existing optional per-content manifest and deterministic default selection rules.
 
 Index operator art at startup and retain content fingerprints. Index required bundled scenes through the same art-domain admission and media-serving primitives, with a separate trusted root and a closed built-in identity namespace. Do not route a bundled request through an operator-controlled root or let an operator file replace the terminal built-in image. Bundled and operator identities must not collide.
 
 Serve built-in scene identities from the existing `web/art_media.py` boundary using a closed scene-key allowlist and content fingerprint. Refactor common safe opening/decoding/response primitives where needed; do not copy the media handler. Preserve same-origin URLs, root confinement, no-follow behavior, and per-entry failure isolation. A media request still returns an actual 404 on missing data, not a substitute image with a successful status.
 
 The game never writes `ART_OFFICIAL_ROOT`. No new runtime setting is required for the repository-bundled root. Operator artwork replacement retains the existing restart/snapshot semantics.
+
+An explicit scene official selection is written to the shared archetype gallery record, never to a room attribute or the mounted directory. Presentation and the automatic-generation guard read the same startup snapshot, and an official default whose fingerprinted URL exceeds the shared media ceiling is treated as unavailable everywhere: it neither presents nor suppresses automatic generation.
 
 ### 6.4 Room identities and metadata
 

@@ -306,6 +306,9 @@ class BareRegistrySubjectReferenceTests(EvenniaTest):
     @covers_requirement(
         "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
     )
+    @covers_requirement(
+        "art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries"
+    )
     def test_a_bare_registered_scene_subject_resolves_its_archetype_reference(self):
         subject = ArtSubject(ArtSubjectKind.SCENE, _SYNTH_SCENE)
         with patch.object(
@@ -323,6 +326,9 @@ class BareRegistrySubjectReferenceTests(EvenniaTest):
 
     @covers_requirement(
         "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
+    )
+    @covers_requirement(
+        "art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries"
     )
     def test_a_bare_registered_species_subject_resolves_its_species_reference(self):
         subject = ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)

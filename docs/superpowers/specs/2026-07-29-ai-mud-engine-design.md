@@ -92,6 +92,13 @@ These were settled during design. Do not relitigate them inside a change.
 > retaining archetype-only generation. The complete source, fallback, failure,
 > and consumer contracts are in
 > `docs/superpowers/specs/2026-10-14-unified-image-resolution-design.md`.
+> The approved follow-up `unify-artwork-selection` keeps this D10 scene
+> ordering while making the archetype portion one capability-driven subject
+> chain shared with portraits: explicit scene official choice, generated
+> archetype art, then the operator archetype default, all ahead of the
+> required bundled image. A scene's explicit official choice is shared
+> archetype-subject state, not a room attribute, and the per-room official
+> override stays the outer, higher-priority authored fact.
 > Required bundled scene artwork is a tracked exception to the external
 > official catalog's no-tracked-artwork rule; operator artwork remains
 > external and read-only. This is an approved design amendment, not a claim
