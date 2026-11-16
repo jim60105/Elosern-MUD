@@ -50,9 +50,8 @@ Out of scope, left for a later design:
   keeps elven faith unknown to outsiders.
 - **Places are life scenes, not service buildings.** No signboards, no
   shopkeeper wording.
-- **幽月谷村 prose stays non-sexual.** The Eolas look like children for life.
-  Every node and room description in that village, the bath included, covers
-  only daily life, work and magic practice.
+- **Prose register.** Node and room descriptions follow the existing 暗影谷村
+  nodes and interiors: landscape, livelihood and daily life.
 
 ## 4. 幽月谷村 (`elven_village_eolas`)
 
