@@ -14,18 +14,14 @@ flag that establishes the named policy without requesting anything.
 ## Requirements
 
 ### Requirement: Automatic character portraits produce exactly one unbound default card
-Every automatic portrait path — player creation, validated import, named-NPC spawn, startup recovery,
-and species-keyed-monster startup synchronization — SHALL route through the gallery generation request,
-not the subject-keyed asset `ensure`, requesting exactly one image from the subject's standard
-deterministic description with no free text, no binding, and `face_rect=None`.
-The resulting card SHALL be unbound, displayed only as the subject's default.
+Every automatic path SHALL use the shared gallery request and official-satisfied guard for every gallery-bearing kind. An eligible unsatisfied subject SHALL request one unbound image from its standard deterministic description, with no free text or face rectangle. Settlement SHALL establish a default only under the declared gallery cap and preserve explicit official preferences.
 
 #### Scenario: A committed creation produces one unbound default card
-- **WHEN** player creation commits and its post-commit job is drained
+- **WHEN** eligible player creation commits without skipping or satisfying official artwork and its requested post-commit job is drained
 - **THEN** the character's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and no classic asset record exists for the subject
 
 #### Scenario: A registered monster tier produces one unbound default card
-- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery and its job is drained
+- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery, no job and no satisfying official default and its requested job is drained
 - **THEN** that species' gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no classic asset record for any retired tier
 
 #### Scenario: The age gate still rejects before any record or prompt
@@ -33,7 +29,7 @@ The resulting card SHALL be unbound, displayed only as the subject's default.
 - **THEN** nothing is queued, no prompt is rendered, no card is appended, and the named diagnostic is logged
 
 #### Scenario: A kind without the age precondition reads no age attribute
-- **WHEN** an automatic path runs for a registered monster visual species
+- **WHEN** an otherwise unsatisfied automatic path runs for a registered monster visual species
 - **THEN** no canonical-age check runs, no age attribute is read, and the request proceeds
 
 #### Scenario: A rolled-back transaction produces nothing
@@ -76,6 +72,10 @@ The resulting card SHALL be unbound, displayed only as the subject's default.
 #### Scenario: No classic fixed-identity asset record on any path
 - **WHEN** any gallery-bearing subject goes through these automatic paths
 - **THEN** no classic fixed-identity asset record is produced
+
+#### Scenario: Official selection survives settlement
+- **WHEN** an automatic or manual request settles after an explicit official choice was stored
+- **THEN** the choice remains selected and still outranks the generated default
 
 ### Requirement: Automatic generation is idempotent against the subject's gallery
 An automatic path SHALL request a generation only when the subject's gallery holds no card AND no
@@ -138,6 +138,14 @@ gallery-bearing kind.
 - **WHEN** a registered visual species has a valid official default and no live individual exists
 - **THEN** startup queues no automatic card for that species, and later individuals present that species official artwork
 
+#### Scenario: Registry subjects suppress without an entity
+- **WHEN** automatic synchronization visits a registered scene or monster subject with no entity and a resolvable official catalog default
+- **THEN** no job, gallery record, default card or prompt is created; manual generation remains available
+
+#### Scenario: Bundled terminals are not catalog defaults
+- **WHEN** a scene has only its bundled terminal and has never requested or deleted a card
+- **THEN** normal automatic generation remains eligible; bundled terminal availability alone does not satisfy the official-catalog guard
+
 ### Requirement: Player creation may skip the automatic portrait
 `world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag,
 defaulting to generating. It SHALL establish the explicit named `portrait_policy` on every path,
@@ -151,7 +159,7 @@ the rest of the finalization, so a rollback leaves no portrait state either way.
 - **THEN** it carries the named portrait policy, its gallery is empty, no job is enqueued, and it resolves through the standard chain's terminal fallback seam rather than owning any portrait state of its own
 
 #### Scenario: The default path still generates
-- **WHEN** a character is activated without the skip flag
+- **WHEN** a character is activated without the skip flag, without a satisfying official default and without an existing card or in-flight job
 - **THEN** exactly one post-commit gallery generation is scheduled
 
 #### Scenario: A rolled-back skipped activation leaves nothing

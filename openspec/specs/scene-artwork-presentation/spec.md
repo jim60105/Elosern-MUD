@@ -6,14 +6,14 @@ Define room-aware scene source precedence, same-place retention and full-view be
 ## Requirements
 
 ### Requirement: Normal scenes use the complete authored source chain
-A normal scene SHALL attempt explicit room official art, archetype generated art (the archetype's scene gallery default card), optional operator archetype official art, required bundled type art, then a distinct declared town/forest terminal image. Source selection SHALL use authored scene type rather than game mode. Exhaustion SHALL produce a non-image background with persistent reached failures.
+Normal scenes SHALL attempt authored room official art before the common archetype subject chain: explicit official choice, generated gallery default, operator archetype default, required bundled type and distinct declared terminal. Source selection SHALL use authored scene type rather than game mode. Exhaustion SHALL preserve reached failures with a non-image background.
 
 #### Scenario: Room override suppresses lower faults
 - **WHEN** a healthy room image precedes a failed archetype job
 - **THEN** the room image displays with no unused job failure
 
 #### Scenario: Generated art wins before official defaults
-- **WHEN** no room override resolves and generated plus operator/bundled type art coexist
+- **WHEN** no room override or explicit official choice resolves and generated plus operator/bundled type art coexist
 - **THEN** the generated image wins; its generation state is independent of official availability
 
 #### Scenario: Corrupt override stays visible
@@ -31,6 +31,10 @@ A normal scene SHALL attempt explicit room official art, archetype generated art
 #### Scenario: A scene gallery card is the generated source
 - **WHEN** a synthetic archetype holds a scene gallery default card
 - **THEN** the generated position presents that card, and an archetype without a card has no generated attempt
+
+#### Scenario: Scene official choice outranks generated default
+- **WHEN** a scene archetype has an explicit valid official choice and a generated default with no room override
+- **THEN** its explicit choice wins through the common subject chain; generation state remains independent
 
 ### Requirement: Retention is scoped to unchanged scene and generation subject
 A new scene identity SHALL immediately invalidate previous-place background content. Same-scene regeneration MAY retain a previously successful applicable image until a same/higher-priority replacement succeeds while continuing current attempts and reached-fault processing. Binding removal, revoked access, different subject or known failed retained source SHALL invalidate retention.

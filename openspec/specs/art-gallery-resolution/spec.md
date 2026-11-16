@@ -14,11 +14,7 @@ identities under the same store-root confinement discipline.
 ## Requirements
 
 ### Requirement: Display resolution is one deterministic chain from equipment to fallback
-`world/art/gallery_match.py` SHALL resolve the image shown for a subject by exactly this ordered
-chain, with no other input. The chain SHALL be a pure function of stored state plus the startup
-official snapshot: the same record, preference, and equipment SHALL always resolve to the same
-image, and no step SHALL perform a network call, filesystem write, job enqueue, or record
-mutation.
+Every gallery-bearing subject SHALL use one read-only deterministic chain of stored state and startup snapshots. Order SHALL be matching binding where declared, explicit official selection, gallery default, classic source while supported, official catalog default, declared terminal, then non-image placeholder. Kind differences SHALL come only from capabilities; authored room overrides remain outside and ahead of the subject chain.
 
 #### Scenario: The most specific matching binding wins
 - **WHEN** one card binds `armor` alone and another binds `armor` and `weapon_main`, and the entity's current equipment matches both
@@ -100,6 +96,14 @@ mutation.
 - **WHEN** an explicit selection/default/classic source cannot resolve
 - **THEN** the canonical internal attempts retain its bounded fault before remaining candidates, while first valid candidate selection preserves existing deterministic policy and no mutation occurs
 
+#### Scenario: Scene and portrait share precedence
+- **WHEN** scene, monster and character subjects each have a generated default and an unselected official default
+- **THEN** each selects the generated default through the same chain; selecting official explicitly makes official win unless a declared binding matches
+
+#### Scenario: Scene envelope retains room priority
+- **WHEN** a scene target declares a valid room override and its archetype has a generated default
+- **THEN** the room override remains first; removing it exposes the archetype chain without changing its shared preferences
+
 ### Requirement: An unbound card is never auto-selected
 A card whose `binding` is `None` SHALL be eligible ONLY as the subject's explicit default. When no
 binding matches the current equipment and `default_image_id` is `None`, the chain SHALL fall through
@@ -115,11 +119,7 @@ exist — so no image the player has not chosen is ever displayed as a surprise.
 - **THEN** that card is resolved
 
 ### Requirement: Monster subjects resolve through the chain without the binding steps
-The chain SHALL run the binding steps only for a subject kind whose capability declaration supports
-bindings. A kind that does not SHALL resolve with those steps skipped: the entity-local official
-selection if valid, else the species default card, then a valid species classic asset record, then
-the species official-default step, then the fallback seam, then the placeholder. The skip SHALL come
-from the declaration, never an inline kind comparison.
+Every kind SHALL skip binding reads and selection unless its capability declares binding support. The remaining chain SHALL be identical across kinds, with preference ownership and terminal policy declared in capabilities. A non-binding kind SHALL never compute an equipment snapshot.
 
 #### Scenario: A monster resolves its single card
 - **WHEN** a monster subject holds its one card
@@ -155,15 +155,16 @@ from the declaration, never an inline kind comparison.
 - **WHEN** a species has an official image while its monster's tier has an old gallery or classic image on disk
 - **THEN** those tier records are never read or applied and the species image resolves
 
+#### Scenario: A redeclared kind changes selection policy
+- **WHEN** a synthetic gallery-bearing kind declares no bindings and subject-scoped official preferences
+- **THEN** it resolves official selection, gallery default and official default without equipment or entity-age reads
+
 ### Requirement: The chain ends at one fallback seam
-`world/art/gallery_match.py` SHALL expose exactly one terminal seam `fallback_for(subject)` consulted
-after the classic asset record and the official-default step and before the placeholder. The
-presenter threads the entity it already resolved to the seam as an optional parameter; a bare
-subject-only call stays legal.
+One declared terminal seam SHALL follow all subject image sources and precede the non-image placeholder. Person terminals SHALL retain demographic alpha selection; scene terminals SHALL retain required bundled illustration and distinct town/forest fallback. Kind-specific terminal policy SHALL be selected by capabilities.
 
 #### Scenario: The seam returning nothing preserves today's placeholder
 - **WHEN** no person alpha terminal is admitted
-- **THEN** identity text remains as the terminal non-image result; scenes use their distinct art-domain chain rather than a person silhouette
+- **THEN** identity text remains as the terminal non-image result; scenes use their declared scene terminal adapter in the shared chain rather than a person silhouette
 
 #### Scenario: The seam still runs when the official step resolves nothing
 - **WHEN** a subject reaches the official-default step and its reference is absent from the snapshot
@@ -174,9 +175,8 @@ subject-only call stays legal.
 - **THEN** one authoritative deterministic alpha selector supplies its terminal without duplicate selector or legacy aliases
 
 #### Scenario: The filled seam serves persons and declines scenes
-- **WHEN** the filled seam resolves
-- **THEN** it resolves the built-in default identity and face rectangle for person subjects and
-  returns `None` for scene subjects
+- **WHEN** the common terminal seam dispatches to its declared adapter
+- **THEN** the person-alpha adapter resolves person identity/geometry and declines scene inputs; the common seam dispatches scene subjects to the scene bundled/terminal adapter instead
 
 ### Requirement: Every resolution payload carries a face rectangle or null
 Canonical portrait resources SHALL carry each original candidate or alpha terminal's own validated face rectangle in its geometry, not a top-level shared payload field. Existing card/fallback pixel-square and classic shared-anchor semantics SHALL remain. Scene geometry SHALL have null face rectangle. Metadata remains placement-only without server crop/transform or second pixels.

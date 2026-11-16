@@ -6,11 +6,7 @@ Define personalization of read-only official artwork: the entity-local explicit 
 ## Requirements
 
 ### Requirement: A personal official selection is an entity-local art preference
-An entity SHALL be able to select one official image, identified by its stable root-relative
-identity within its content reference, as a personal art preference stored on its own art state.
-For characters, setting an explicit runtime default SHALL clear the personal selection, and vice
-versa. For monsters, the shared species card default SHALL stay separate from the entity-local
-choice, which SHALL win without changing another individual.
+Explicit official selections SHALL use stable identities inside the resolved content reference. Capability-declared preference scope SHALL preserve character subject state and monster entity-local state; scenes SHALL use shared archetype subject state. Explicit runtime-default actions SHALL clear the same owner's official selection; generation alone SHALL NOT clear it.
 
 #### Scenario: Explicit official selection presents ahead of the runtime default
 - **WHEN** a subject holds a gallery default card and explicitly selects a valid official image from its content reference
@@ -22,7 +18,7 @@ choice, which SHALL win without changing another individual.
 
 #### Scenario: Selection touches no shared state
 - **WHEN** a player selects an official image
-- **THEN** the mounted directory bytes are unchanged, no card is appended to `GalleryRecord.cards`, and no other entity's presentation changed
+- **THEN** mounted bytes and cards are unchanged; only the declared preference owner's presentation changes, including rooms sharing a scene archetype, while other character subjects, monster individuals and scene archetypes are unaffected
 
 #### Scenario: Equipment precedence retained at step 1
 - **WHEN** a selected-and-resolving official image competes in presentation step 1
@@ -31,11 +27,19 @@ choice, which SHALL win without changing another individual.
 
 #### Scenario: Selection side-effect limits
 - **WHEN** a personal official selection is set
-- **THEN** the selection SHALL NOT edit the mounted directory, SHALL NOT create or modify a gallery card, and SHALL NOT change any other entity's presentation
+- **THEN** the selection SHALL NOT edit mounted files or gallery cards and SHALL NOT affect a different preference owner; a scene owner deliberately includes every room using that archetype
 
 #### Scenario: Species default edits do not clear an individual choice
 - **WHEN** a species gallery default changes while two same-species individuals hold distinct official choices
 - **THEN** both choices remain unchanged and present independently, and no other species preference changes
+
+#### Scenario: Scene selection is archetype-scoped
+- **WHEN** one admitted scene action selects an official image and two rooms share that archetype
+- **THEN** both inherit that choice through the common chain while room overrides remain higher priority; no room attributes or official files change
+
+#### Scenario: Regeneration preserves explicit official choice
+- **WHEN** a subject with an explicit official selection settles a generated replacement
+- **THEN** its selection remains stored and resolves ahead of that replacement
 
 ### Requirement: Stale official selections are retained but ignored for resolution
 Unresolvable personal official selections SHALL remain stored and contribute an attributed fault at their original precedence position before the remaining runtime-default, classic, official-default and alpha sources. Resolution SHALL not delete preferences or images. Replaced bytes at the same identity SHALL use the refreshed snapshot fingerprint.

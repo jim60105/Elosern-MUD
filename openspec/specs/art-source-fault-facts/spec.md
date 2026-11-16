@@ -30,3 +30,7 @@ The startup snapshot SHALL preserve bounded requested-default, rejected-identity
 #### Scenario: Unselected rejection remains isolated
 - **WHEN** one unselected sibling is corrupt while the requested image is healthy
 - **THEN** the healthy image has no presentation fault from that sibling
+
+#### Scenario: Unified chain preserves reached source attribution
+- **WHEN** a scene or portrait explicit official choice is missing and its generated default resolves
+- **THEN** the missing choice contributes its own fault before that default, unrelated lower official siblings contribute none, and no preference changes

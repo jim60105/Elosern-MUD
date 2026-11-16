@@ -22,13 +22,10 @@ repository deterministic-path contract test passes with no edit.
   service-owned queue helpers) writes them
 
 ### Requirement: Startup recovery rescans explicit unique portrait policies
-`art_sync_all()` SHALL also scan living characters that carry an explicit `{"mode": "named",
-"stable_key": ...}` portrait policy and ensure each subject, recovering an enqueue that failed after an
-earlier gameplay commit. A subject whose canonical ages fail the age check SHALL be skipped with a named
-diagnostic and never retried by a later recovery pass for the same policy.
+Startup SHALL recover explicit named portrait policies through the shared automatic gallery guard, including official-default suppression. Invalid ages SHALL reject deterministically with a bounded diagnostic and no persisted rejection marker. Repeated attempts on unchanged invalid data SHALL reject identically.
 
 #### Scenario: A named policy with an empty gallery is recovered at startup
-- **WHEN** a character has an explicit named portrait policy, an empty gallery, and no in-flight job after a restart
+- **WHEN** an eligible character has an explicit named portrait policy, an empty gallery, no in-flight job and no satisfying official default after a restart
 - **THEN** exactly one gallery generation is requested and no gameplay is rolled back
 
 #### Scenario: A subject that already has a card is not regenerated
@@ -47,18 +44,14 @@ diagnostic and never retried by a later recovery pass for the same policy.
 
 #### Scenario: A recovery request is one unbound auto-generated card
 - **WHEN** recovery proceeds for a subject, which happens only for an empty gallery with no
-  in-flight job
+  in-flight job and no satisfying official default after declared eligibility checks
 - **THEN** the requested image is one unbound auto-generated card, never a classic asset record
 
 ### Requirement: Successful player creation and validated import schedule an eligible unique portrait through transaction.on_commit
-The player-creation activation path (after `world.rules.character_creation.activate_player_character`
-succeeds) and the validated import path (`world/imports/loader.py`, inside the all-or-nothing batch)
-SHALL establish the explicit named `portrait_policy` and SHALL schedule the portrait ensure through
-`transaction.on_commit`, so the schedule fires only after the owning transaction commits. A rolled-back
-or rejected creation/import SHALL emit no post-commit job.
+Creation and validated import SHALL establish named portrait policy transactionally. Unless creation explicitly skips generation, they SHALL schedule the guarded gallery callback through transaction.on_commit; actual enqueue SHALL require eligibility and unsatisfied gallery/job/official state. Rejected or rolled-back transactions SHALL emit no callback or job.
 
 #### Scenario: A committed creation schedules exactly one portrait ensure
-- **WHEN** player creation commits successfully
+- **WHEN** player creation commits successfully with generation not explicitly skipped
 - **THEN** the character carries an explicit named policy with a stable key and exactly one
   post-commit portrait ensure is scheduled
 
@@ -76,15 +69,15 @@ or rejected creation/import SHALL emit no post-commit job.
 - **THEN** no imported character carries a portrait policy and no post-commit job is emitted
 
 ### Requirement: Every player-activation path finalizes the portrait lifecycle
-The system SHALL run identical portrait finalization — assigning the named `portrait_policy` and scheduling a post-commit portrait ensure — on every successful player activation path, Telnet and Web alike.
+Every successful activation transport SHALL establish the same named portrait policy and apply the same explicit skip flag and guarded post-commit generation behavior. Official-satisfied, carded, in-flight or ineligible subjects SHALL enqueue nothing; skipped creation SHALL schedule nothing.
 
 #### Scenario: Web activation assigns the portrait policy
 - **WHEN** a character is activated through the Web creation flow
-- **THEN** the character has a named `portrait_policy` with stable key `str(pk)` and exactly one portrait ensure is scheduled
+- **THEN** it has named policy with stable key str(pk); a callback is scheduled only when not explicitly skipped, and enqueue is subject to the shared guard
 
 #### Scenario: Telnet and Web activation produce identical portrait state
-- **WHEN** a character is activated through Telnet and another through the Web flow
-- **THEN** both characters carry the same policy shape and both have portrait jobs queued
+- **WHEN** characters activate through Telnet and Web with equivalent skip, eligibility, gallery, job and official-reference inputs
+- **THEN** both carry the same policy shape and guarded scheduling/enqueue outcome, including no request for skipped or satisfied subjects
 
 #### Scenario: Rolled-back activation leaves no portrait state
 - **WHEN** the activation transaction fails after the policy would have been assigned
